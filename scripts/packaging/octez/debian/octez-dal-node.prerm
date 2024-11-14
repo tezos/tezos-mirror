@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+# Check if the daemon is active before stopping it
+if systemctl is-active --quiet octez-dal-node.service; then
+  # Set a flag in a temporary file to indicate the daemon was running
+  touch /run/octez-dal-node/daemon_was_running
+  echo "Stopping octez-dal-node"
+  sudo systemctl stop octez-dal-node.service
+fi

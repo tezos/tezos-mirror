@@ -7,16 +7,18 @@
 
 use const_decoder::Decoder;
 use host::path::{concat, OwnedPath, Path, RefPath};
-use host::runtime::{Runtime, RuntimeError, ValueType};
+use host::runtime::{RuntimeError, ValueType};
 use primitive_types::{H160, H256, U256};
-use sha3::{Digest, Keccak256};
+use rlp::DecoderError;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_storage::storage::Storage;
+use tezos_storage::{
+    error::Error as GenStorageError, read_u256_le_default, read_u64_le_default,
+};
+use tezos_storage::{path_from_h256, read_h256_be_default, WORD_SIZE};
 use thiserror::Error;
 
-use crate::DurableStorageError;
-
-/// The size of one 256 bit word. Size in bytes
-pub const WORD_SIZE: usize = 32_usize;
+use crate::{code_storage, DurableStorageError};
 
 /// All errors that may happen as result of using the Ethereum account
 /// interface.
@@ -30,6 +32,10 @@ pub enum AccountStorageError {
     /// API.
     #[error("Transaction storage API error: {0:?}")]
     StorageError(tezos_smart_rollup_storage::StorageError),
+    #[error("Failed to decode: {0}")]
+    RlpDecoderError(DecoderError),
+    #[error("Storage error: error while reading a value (incorrect size). Expected {expected} but got {actual}")]
+    InvalidLoadValue { expected: usize, actual: usize },
     /// Some account balance became greater than what can be
     /// stored in an unsigned 256 bit integer.
     #[error("Account balance overflow")]
@@ -38,6 +44,8 @@ pub enum AccountStorageError {
     /// an account does an incredible number of transactions.
     #[error("Nonce overflow")]
     NonceOverflow,
+    #[error("Account code already initialised")]
+    AccountCodeAlreadySet,
 }
 
 impl From<tezos_smart_rollup_storage::StorageError> for AccountStorageError {
@@ -55,6 +63,26 @@ impl From<host::path::PathError> for AccountStorageError {
 impl From<host::runtime::RuntimeError> for AccountStorageError {
     fn from(error: host::runtime::RuntimeError) -> Self {
         AccountStorageError::DurableStorageError(DurableStorageError::from(error))
+    }
+}
+
+impl From<GenStorageError> for AccountStorageError {
+    fn from(e: GenStorageError) -> Self {
+        match e {
+            GenStorageError::Path(e) => {
+                AccountStorageError::DurableStorageError(DurableStorageError::from(e))
+            }
+            GenStorageError::Runtime(e) => {
+                AccountStorageError::DurableStorageError(DurableStorageError::from(e))
+            }
+            GenStorageError::Storage(e) => AccountStorageError::StorageError(e),
+            GenStorageError::RlpDecoderError(e) => {
+                AccountStorageError::RlpDecoderError(e)
+            }
+            GenStorageError::InvalidLoadValue { expected, actual } => {
+                AccountStorageError::InvalidLoadValue { expected, actual }
+            }
+        }
     }
 }
 
@@ -131,9 +159,6 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// such 256 bit integer value in storage.
 const STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/storage");
 
-/// Flag indicating an account has already been indexed.
-const INDEXED_PATH: RefPath = RefPath::assert_from(b"/indexed");
-
 /// If a contract tries to read a value from storage and it has previously not written
 /// anything to this location or if it wrote the default value, then it gets this
 /// value back.
@@ -156,64 +181,6 @@ const CODE_HASH_BYTES: [u8; WORD_SIZE] = Decoder::Hex
 /// The default hash for when there is no code - the hash of the empty string.
 pub const CODE_HASH_DEFAULT: H256 = H256(CODE_HASH_BYTES);
 
-/// Read a single unsigned 256 bit value from storage at the path given.
-fn read_u256(
-    host: &impl Runtime,
-    path: &impl Path,
-    default: U256,
-) -> Result<U256, AccountStorageError> {
-    match host.store_read_all(path) {
-        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(U256::from_little_endian(&bytes)),
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(err.into()),
-    }
-}
-
-/// Read a single unsigned 64 bit value from storage at the path given.
-fn read_u64(
-    host: &impl Runtime,
-    path: &impl Path,
-    default: u64,
-) -> Result<u64, AccountStorageError> {
-    match host.store_read(path, 0, 8) {
-        Ok(bytes) if bytes.len() == 8 => {
-            let bytes_array: [u8; 8] = bytes.try_into().map_err(|_| {
-                AccountStorageError::DurableStorageError(
-                    DurableStorageError::RuntimeError(RuntimeError::DecodingError),
-                )
-            })?;
-            Ok(u64::from_le_bytes(bytes_array))
-        }
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(err.into()),
-    }
-}
-
-/// Read a single 256 bit hash from storage at the path given.
-fn read_h256(
-    host: &impl Runtime,
-    path: &impl Path,
-    default: H256,
-) -> Result<H256, AccountStorageError> {
-    match host.store_read_all(path) {
-        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(H256::from_slice(&bytes)),
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(err.into()),
-    }
-}
-
-/// Get the path corresponding to an index of H256. This is used to
-/// find the path to a value a contract stores in durable storage.
-fn path_from_h256(index: &H256) -> Result<OwnedPath, AccountStorageError> {
-    let path_string = alloc::format!("/{}", hex::encode(index.to_fixed_bytes()));
-    OwnedPath::try_from(path_string).map_err(AccountStorageError::from)
-}
-
-/// Compute Keccak 256 for some bytes
-fn bytes_hash(bytes: &[u8]) -> H256 {
-    H256(Keccak256::digest(bytes).into())
-}
-
 /// Turn an Ethereum address - a H160 - into a valid path
 pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
@@ -230,7 +197,8 @@ impl EthereumAccount {
     /// _always_ have this **nonce**.
     pub fn nonce(&self, host: &impl Runtime) -> Result<u64, AccountStorageError> {
         let path = concat(&self.path, &NONCE_PATH)?;
-        read_u64(host, &path, NONCE_DEFAULT_VALUE)
+        read_u64_le_default(host, &path, NONCE_DEFAULT_VALUE)
+            .map_err(AccountStorageError::from)
     }
 
     /// Increment the **nonce** by one. It is technically possible for this operation to overflow,
@@ -286,7 +254,8 @@ impl EthereumAccount {
     /// Get the **balance** of an account in Wei held by the account.
     pub fn balance(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
         let path = concat(&self.path, &BALANCE_PATH)?;
-        read_u256(host, &path, BALANCE_DEFAULT_VALUE).map_err(AccountStorageError::from)
+        read_u256_le_default(host, &path, BALANCE_DEFAULT_VALUE)
+            .map_err(AccountStorageError::from)
     }
 
     /// Add an amount in Wei to the balance of an account. In theory, this can overflow if the
@@ -351,6 +320,14 @@ impl EthereumAccount {
             .map_err(AccountStorageError::from)
     }
 
+    /// Get the path to a custom account state section, can be used by precompiles
+    pub fn custom_path(
+        &self,
+        suffix: &impl Path,
+    ) -> Result<OwnedPath, AccountStorageError> {
+        concat(&self.path, suffix).map_err(AccountStorageError::from)
+    }
+
     /// Get the path to an index in durable storage for an account.
     fn storage_path(&self, index: &H256) -> Result<OwnedPath, AccountStorageError> {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
@@ -378,7 +355,8 @@ impl EthereumAccount {
         index: &H256,
     ) -> Result<H256, AccountStorageError> {
         let path = self.storage_path(index)?;
-        read_h256(host, &path, STORAGE_DEFAULT_VALUE).map_err(AccountStorageError::from)
+        read_h256_be_default(host, &path, STORAGE_DEFAULT_VALUE)
+            .map_err(AccountStorageError::from)
     }
 
     /// Set the value associated with an index in durable storage. The result depends on the
@@ -431,7 +409,7 @@ impl EthereumAccount {
 
     /// Find whether the account has any code associated with it.
     pub fn code_exists(&self, host: &impl Runtime) -> Result<bool, AccountStorageError> {
-        let path = concat(&self.path, &CODE_PATH)?;
+        let path = concat(&self.path, &CODE_HASH_PATH)?;
 
         match host.store_has(&path) {
             Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => Ok(true),
@@ -442,13 +420,22 @@ impl EthereumAccount {
 
     /// Get the contract code associated with a contract. A contract can have zero length
     /// contract code associated with it - this is the same for "external" and un-used
-    /// accounts.
+    /// accounts. First check if code is located in this storage, if that fails try to
+    /// retrieve it within the code_storage module.
+    // There is a possibility here to migrate lazily all code in order
+    // to have all legacy contract uses the new code storage.
     pub fn code(&self, host: &impl Runtime) -> Result<Vec<u8>, AccountStorageError> {
         let path = concat(&self.path, &CODE_PATH)?;
 
+        // If we ever do the lazy migration of code for account
+        // (i.e. moving code from account to code_storage) then this
+        // would be dead code.
         match host.store_read_all(&path) {
             Ok(bytes) => Ok(bytes),
-            Err(RuntimeError::PathNotFound) => Ok(vec![]),
+            Err(RuntimeError::PathNotFound) => {
+                let code_hash = self.code_hash(host)?;
+                code_storage::CodeStorage::get_code(host, &code_hash).map_err(Into::into)
+            }
             Err(err) => Err(AccountStorageError::from(err)),
         }
     }
@@ -457,18 +444,23 @@ impl EthereumAccount {
     /// stored when the code of a contract is set.
     pub fn code_hash(&self, host: &impl Runtime) -> Result<H256, AccountStorageError> {
         let path = concat(&self.path, &CODE_HASH_PATH)?;
-        read_h256(host, &path, CODE_HASH_DEFAULT).map_err(AccountStorageError::from)
+        read_h256_be_default(host, &path, CODE_HASH_DEFAULT)
+            .map_err(AccountStorageError::from)
     }
 
     /// Get the size of a contract in number of bytes used for opcodes. This value is
     /// computed and stored when the code of a contract is set.
     pub fn code_size(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
         let path = concat(&self.path, &CODE_PATH)?;
-
-        match host.store_value_size(&path) {
-            Ok(size) => Ok(U256::from(size)),
-            Err(RuntimeError::PathNotFound) => Ok(U256::zero()),
-            Err(err) => Err(AccountStorageError::from(err)),
+        // If we ever do the lazy migration of code for account
+        // (i.e. moving code from account to code_storage) then this
+        // would be dead code.
+        if host.store_has(&path)? == Some(ValueType::Value) {
+            let size = host.store_value_size(&path)?;
+            Ok(size.into())
+        } else {
+            let code_hash = self.code_hash(host)?;
+            code_storage::CodeStorage::code_size(host, &code_hash).map_err(Into::into)
         }
     }
 
@@ -481,21 +473,15 @@ impl EthereumAccount {
         host: &mut impl Runtime,
         code: &[u8],
     ) -> Result<(), AccountStorageError> {
-        let code_hash: H256 = bytes_hash(code);
-        let code_hash_bytes: [u8; WORD_SIZE] = code_hash.into();
-        let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
-
-        host.store_write_all(&code_hash_path, &code_hash_bytes)?;
-
-        let code_path = concat(&self.path, &CODE_PATH)?;
-
-        let store_has_program = host.store_has(&code_path)?;
-
-        if store_has_program.is_some() {
-            host.store_delete(&code_path)?;
+        if self.code_exists(host)? {
+            Err(AccountStorageError::AccountCodeAlreadySet)
+        } else {
+            let code_hash = code_storage::CodeStorage::add(host, code)?;
+            let code_hash_bytes: [u8; WORD_SIZE] = code_hash.into();
+            let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
+            host.store_write_all(&code_hash_path, &code_hash_bytes)
+                .map_err(AccountStorageError::from)
         }
-        host.store_write_all(&code_path, code)
-            .map_err(AccountStorageError::from)
     }
 
     /// Delete all code associated with a contract. Also sets code length and size accordingly
@@ -517,23 +503,12 @@ impl EthereumAccount {
             host.store_has(&code_path)?
         {
             host.store_delete(&code_path)?
+        } else {
+            let code_hash = self.code_hash(host)?;
+            code_storage::CodeStorage::delete(host, &code_hash)?
         }
 
         Ok(())
-    }
-
-    pub fn indexed(&self, host: &impl Runtime) -> Result<bool, DurableStorageError> {
-        let path = concat(&self.path, &INDEXED_PATH)?;
-        Ok(host.store_has(&path)?.is_some())
-    }
-
-    pub fn set_indexed(
-        &self,
-        host: &mut impl Runtime,
-    ) -> Result<(), DurableStorageError> {
-        let path = concat(&self.path, &INDEXED_PATH)?;
-        host.store_write_all(&path, &[0_u8; 0])
-            .map_err(DurableStorageError::from)
     }
 }
 
@@ -552,11 +527,14 @@ mod test {
     use super::*;
     use host::path::RefPath;
     use primitive_types::U256;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used for
+    use tezos_storage::helpers::bytes_hash;
+    use tezos_storage::write_u256_le;
 
     #[test]
     fn test_account_nonce_update() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -592,7 +570,7 @@ mod test {
 
     #[test]
     fn test_zero_account_balance_for_new_accounts() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -630,7 +608,7 @@ mod test {
 
     #[test]
     fn test_account_balance_add() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -674,7 +652,7 @@ mod test {
 
     #[test]
     fn test_account_balance_sub() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -718,7 +696,7 @@ mod test {
 
     #[test]
     fn test_account_balance_underflow() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -760,7 +738,7 @@ mod test {
 
     #[test]
     fn test_account_storage_zero_default() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -787,7 +765,7 @@ mod test {
 
     #[test]
     fn test_account_storage_update() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -828,7 +806,7 @@ mod test {
 
     #[test]
     fn test_account_storage_update_checked() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -909,7 +887,7 @@ mod test {
 
     #[test]
     fn test_account_code_storage_initial_code_is_zero() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -957,7 +935,7 @@ mod test {
     }
 
     fn test_account_code_storage_write_code_aux(sample_code: Vec<u8>) {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -1014,16 +992,17 @@ mod test {
         let sample_code: Vec<u8> = vec![1; 10000];
         test_account_code_storage_write_code_aux(sample_code)
     }
+
     #[test]
-    fn test_account_code_storage_overwrite_code() {
-        let mut host = MockHost::default();
+    fn test_account_code_storage_cant_be_overwritten() {
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
         let a1_path = RefPath::assert_from(b"/asdf");
         let sample_code1: Vec<u8> = (0..100).collect();
+        let sample_code1_hash: H256 = bytes_hash(&sample_code1);
         let sample_code2: Vec<u8> = (0..50).map(|x| 50 - x).collect();
-        let sample_code2_hash: H256 = bytes_hash(&sample_code2);
 
         // Act
         storage
@@ -1038,7 +1017,7 @@ mod test {
         a1.set_code(&mut host, &sample_code1)
             .expect("Could not write code to account");
         a1.set_code(&mut host, &sample_code2)
-            .expect("Could not write code to account");
+            .expect_err("Account storage code can't be overwritten");
 
         storage
             .commit_transaction(&mut host)
@@ -1052,23 +1031,23 @@ mod test {
 
         assert_eq!(
             a1.code(&host).expect("Could not get code for account"),
-            sample_code2
+            sample_code1
         );
         assert_eq!(
             a1.code_size(&host)
                 .expect("Could not get code size for account"),
-            sample_code2.len().into()
+            sample_code1.len().into()
         );
         assert_eq!(
             a1.code_hash(&host)
                 .expect("Could not get code hash for account"),
-            sample_code2_hash
+            sample_code1_hash
         );
     }
 
     #[test]
     fn test_account_code_storage_delete_code() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -1122,7 +1101,7 @@ mod test {
 
     #[test]
     fn test_empty_contract_hash_matches_default() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut storage =
             init_account_storage().expect("Could not create EVM accounts storage API");
 
@@ -1162,6 +1141,192 @@ mod test {
                 .expect("Could not get code size for account"),
             sample_code.len().into()
         );
+        assert_eq!(
+            a1.code_hash(&host)
+                .expect("Could not get code hash for account"),
+            sample_code_hash
+        );
+    }
+
+    #[test]
+    fn test_read_u256_le_default_le() {
+        let mut host = MockKernelHost::default();
+        let path = RefPath::assert_from(b"/value");
+        assert_eq!(
+            read_u256_le_default(&host, &path, U256::from(128)).unwrap(),
+            U256::from(128)
+        );
+
+        host.store_write_all(&path, &[1u8; 20]).unwrap();
+        assert_eq!(
+            read_u256_le_default(&host, &path, U256::zero()).unwrap(),
+            U256::zero()
+        );
+
+        host.store_write_all(
+            &path,
+            &hex::decode(
+                "ff00000000000000000000000000000000000000000000000000000000000000",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            read_u256_le_default(&host, &path, U256::zero()).unwrap(),
+            U256::from(255)
+        );
+    }
+
+    #[test]
+    fn test_write_u256_le_le() {
+        let mut host = MockKernelHost::default();
+        let path = RefPath::assert_from(b"/value");
+
+        write_u256_le(&mut host, &path, U256::from(255)).unwrap();
+        assert_eq!(
+            hex::encode(host.store_read_all(&path).unwrap()),
+            "ff00000000000000000000000000000000000000000000000000000000000000"
+        );
+    }
+
+    #[test]
+    fn test_account_code_storage_can_still_be_addressed_if_exists() {
+        let sample_code: Vec<u8> = (0..100).collect();
+        let sample_code_hash: H256 = bytes_hash(&sample_code);
+
+        let mut host = MockKernelHost::default();
+        let mut storage =
+            init_account_storage().expect("Could not create EVM accounts storage API");
+
+        let a1_path = RefPath::assert_from(b"/asdf");
+
+        // Act
+        storage
+            .begin_transaction(&mut host)
+            .expect("Could not begin transaction");
+
+        let a1 = storage
+            .create_new(&mut host, &a1_path)
+            .expect("Could not create new account")
+            .expect("Account already exists in storage");
+
+        let code_hash_bytes: [u8; WORD_SIZE] = sample_code_hash.into();
+        let code_hash_path =
+            concat(&a1.path, &CODE_HASH_PATH).expect("Could not get code hash path");
+
+        host.store_write_all(&code_hash_path, &code_hash_bytes)
+            .expect("Could not write code hash into code hash path");
+
+        let code_path = concat(&a1.path, &CODE_PATH).expect("Could not get code path");
+
+        host.store_write_all(&code_path, &sample_code)
+            .expect("Could not write code into code path");
+
+        storage
+            .commit_transaction(&mut host)
+            .expect("Could not commit transaction");
+
+        // Assert
+        let a1 = storage
+            .get(&host, &a1_path)
+            .expect("Could not get account")
+            .expect("Account does not exist");
+
+        let code_path = concat(&a1.path, &CODE_PATH).expect("Could not get code path");
+
+        let code = host
+            .store_read_all(&code_path)
+            .expect("Could not read code from code path");
+
+        assert_eq!(code, sample_code);
+
+        assert_eq!(
+            a1.code(&host).expect("Could not get code for account"),
+            sample_code
+        );
+        assert_eq!(
+            a1.code_size(&host)
+                .expect("Could not get code size for account"),
+            sample_code.len().into()
+        );
+        assert_eq!(
+            a1.code_hash(&host)
+                .expect("Could not get code hash for account"),
+            sample_code_hash
+        );
+    }
+
+    #[test]
+    fn test_code_is_deleted() {
+        let sample_code: Vec<u8> = (0..100).collect();
+        let sample_code_hash: H256 = bytes_hash(&sample_code);
+
+        let mut host = MockKernelHost::default();
+        let mut storage =
+            init_account_storage().expect("Could not create EVM accounts storage API");
+
+        let a1_path = RefPath::assert_from(b"/account1");
+
+        storage
+            .begin_transaction(&mut host)
+            .expect("Could not begin transaction");
+
+        let mut a1 = storage
+            .create_new(&mut host, &a1_path)
+            .expect("Could not create new account")
+            .expect("Account already exists in storage");
+
+        a1.set_code(&mut host, &sample_code)
+            .expect("Could not write code to account");
+
+        storage
+            .commit_transaction(&mut host)
+            .expect("Could not commit transaction");
+
+        let a2_path = RefPath::assert_from(b"/account2");
+
+        storage
+            .begin_transaction(&mut host)
+            .expect("Could not begin transaction");
+
+        let mut a2 = storage
+            .create_new(&mut host, &a2_path)
+            .expect("Could not create new account")
+            .expect("Account already exists in storage");
+
+        a2.set_code(&mut host, &sample_code)
+            .expect("Could not write code to account");
+
+        a2.delete_code(&mut host)
+            .expect("Could not delete code for contract");
+
+        assert_eq!(
+            a2.code_hash(&host)
+                .expect("Could not get code hash for account"),
+            CODE_HASH_DEFAULT
+        );
+
+        assert_eq!(
+            a2.code(&host).expect("Could not get code for account"),
+            Vec::<u8>::new()
+        );
+        assert_eq!(
+            a2.code_size(&host)
+                .expect("Could not get code size for account"),
+            U256::zero()
+        );
+
+        assert_eq!(
+            a1.code(&host).expect("Could not get code for account"),
+            sample_code
+        );
+
+        assert_eq!(
+            a1.code_size(&host)
+                .expect("Could not get code size for account"),
+            sample_code.len().into()
+        );
+
         assert_eq!(
             a1.code_hash(&host)
                 .expect("Could not get code hash for account"),

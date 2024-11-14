@@ -29,6 +29,7 @@
    Invocation: dune exec tezt/tests/main.exe -- -f storage_reconstruction.ml
    Subject: Tests the reconstruction mechanism
 *)
+let team = Tag.layer1
 
 let pp_snapshot_export_format fmt v =
   Format.fprintf fmt "%s" ((function Node.Tar -> "tar" | Raw -> "raw") v)
@@ -131,7 +132,7 @@ let test_storage_reconstruction =
   Protocol.register_test
     ~__FILE__
     ~title:(Format.asprintf "storage reconstruction")
-    ~tags:["storage"; "reconstruction"]
+    ~tags:[team; "storage"; "reconstruction"]
   @@ fun protocol ->
   let node_arguments = Node.[Synchronisation_threshold 0] in
   let* node, client =

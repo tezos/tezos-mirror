@@ -1,0 +1,8 @@
+/var/log/tezos/octez-dal-node.log{
+    daily
+    # we use copytruncate to avoid stopping the node.
+    copytruncate
+    rotate 5
+    compress
+    minsize 1M
+}

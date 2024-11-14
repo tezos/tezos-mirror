@@ -21,14 +21,15 @@ cd "$src_dir"
 # shellcheck disable=SC1091
 . "$script_dir"/version.sh
 
+arch="${ARCH:-amd64}"
 image_name="${1:-tezos-}"
 image_version="${2:-latest}"
-build_deps_image_name=${3:-registry.gitlab.com/tezos/opam-repository}
-build_deps_image_version=${4:-$opam_repository_tag}
+ci_image_name=${3:-$ci_image_name}
+ci_image_version=${4:-${arch}--$(./images/image_tag.sh images/ci)}
 executables=${5:-$(cat "$devtools_docker_dir"/executables)}
 commit_short_sha="${6:-$(git rev-parse --short HEAD)}"
 docker_target="${7:-without-evm-artifacts}"
-rust_toolchain_image="$8"
+rust_toolchain_image_name="$8"
 rust_toolchain_image_tag="$9"
 commit_datetime="${10:-$(git show -s --pretty=format:%ci HEAD)}"
 commit_tag="${11:-$(git describe --tags --always)}"
@@ -47,13 +48,13 @@ docker build \
   -f "$dockerfile" \
   --target "$docker_target" \
   --cache-from "$build_image_name:$image_version" \
-  --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-build-dependencies--$build_deps_image_version" \
+  --build-arg "BASE_IMAGE=$ci_image_name" \
+  --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
   --build-arg "GIT_VERSION=${commit_tag}" \
-  --build-arg "RUST_TOOLCHAIN_IMAGE=$rust_toolchain_image" \
+  --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
   "$src_dir"
 
@@ -68,9 +69,9 @@ git log --oneline --decorate "$(git merge-base master HEAD)"~1..HEAD > "$git_his
 docker build \
   -t "${image_name}bare:$image_version" \
   -f "$dockerfile_aux" \
-  --build-arg "BASE_IMAGE=$build_deps_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=runtime-dependencies--$build_deps_image_version" \
-  --build-arg "BASE_IMAGE_VERSION_NON_MIN=runtime-build-dependencies--$build_deps_image_version" \
+  --build-arg "BASE_IMAGE=$ci_image_name" \
+  --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
+  --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
   --build-arg "BUILD_IMAGE=${build_image_name}" \
   --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
   --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \

@@ -73,7 +73,6 @@ and chain_store = {
   chain_state : chain_state Shared.t;
   (* Genesis is only on-disk: read-only except at creation *)
   genesis_block_data : block Stored_data.t;
-  block_watcher : block Lwt_watcher.input;
   validated_block_watcher : block Lwt_watcher.input;
   block_rpc_directories :
     (chain_store * block) Tezos_rpc.Directory.t Protocol_hash.Map.t
@@ -546,7 +545,6 @@ module Block = struct
               in
               return (Some new_chain_state, ()))
         in
-        Lwt_watcher.notify chain_store.block_watcher block ;
         Lwt_watcher.notify
           chain_store.global_store.global_block_watcher
           (chain_store, block) ;
@@ -1497,7 +1495,6 @@ module Chain = struct
         ~initial_data:genesis_block
     in
     let chain_state = Shared.create chain_state in
-    let block_watcher = Lwt_watcher.create_input () in
     let validated_block_watcher = Lwt_watcher.create_input () in
     let block_rpc_directories = Protocol_hash.Table.create 7 in
     let chain_store : chain_store =
@@ -1509,7 +1506,6 @@ module Chain = struct
         chain_state;
         genesis_block_data;
         block_store;
-        block_watcher;
         validated_block_watcher;
         block_rpc_directories;
       }
@@ -1695,8 +1691,6 @@ module Chain = struct
   let validated_watcher chain_store =
     Lwt_watcher.create_stream chain_store.validated_block_watcher
 
-  let watcher chain_store = Lwt_watcher.create_stream chain_store.block_watcher
-
   let get_rpc_directory chain_store block =
     let open Lwt_syntax in
     let* o = Block.read_predecessor_opt chain_store block in
@@ -1833,32 +1827,25 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
       "init: already initialized context in %s"
       context_dir ;
   context_dirs := context_dir :: !context_dirs ;
-  let patch_context =
-    Option.map
-      (fun f ctxt ->
-        let ctxt =
-          Tezos_protocol_environment.Memory_context.wrap_memory_context ctxt
-        in
-        let+ ctxt = f ctxt in
-        Tezos_protocol_environment.Memory_context.unwrap_memory_context ctxt)
-      patch_context
-  in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let*! context_index, commit_genesis =
-    let open Tezos_context_memory in
     match commit_genesis with
     | Some commit_genesis ->
         let*! context_index =
-          Context.init ~readonly:true ?patch_context context_dir
+          Context_ops.init
+            ~kind:`Memory
+            ~readonly:true
+            ?patch_context
+            context_dir
         in
         Lwt.return (context_index, commit_genesis)
     | None ->
         let*! context_index =
-          Context.init ~readonly ?patch_context context_dir
+          Context_ops.init ~kind:`Memory ~readonly ?patch_context context_dir
         in
         let commit_genesis ~chain_id =
-          Context.commit_genesis
+          Context_ops.commit_genesis
             context_index
             ~chain_id
             ~time:genesis.time
@@ -1880,12 +1867,14 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     create_store
       ?block_cache_limit
       store_dir
-      ~context_index:(Context_ops.Memory_index context_index)
+      ~context_index
       ~chain_id
       ~genesis
       ~genesis_context
       ?history_mode
       ~allow_testchains)
+
+let sync ?last_status:_ _store = Stdlib.failwith "sync: unimplemented"
 
 let close_store global_store =
   Lwt_watcher.shutdown_input global_store.protocol_watcher ;
@@ -2089,6 +2078,12 @@ module Unsafe = struct
   let block_of_repr = Fun.id
 end
 
-let v_3_1_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+module Utilities = struct
+  let stat_metadata_cycles _ = Lwt_result_syntax.return_nil
+end
 
-let v_3_2_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+module Upgrade = struct
+  let v_3_1_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+
+  let v_3_2_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit
+end

@@ -132,7 +132,8 @@ module Accounts :
 
 module Get_balance :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.block_param
+    with type input =
+      Ethereum_types.address * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.quantity
 
 module Get_storage_at :
@@ -140,15 +141,15 @@ module Get_storage_at :
     with type input =
       Ethereum_types.address
       * Ethereum_types.quantity
-      * Ethereum_types.block_param
+      * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.hex
 
 module Block_number :
-  METHOD with type input = unit and type output = Ethereum_types.block_height
+  METHOD with type input = unit and type output = Ethereum_types.quantity
 
 module Get_block_by_number :
   METHOD
-    with type input = Ethereum_types.block_param * bool
+    with type input = Ethereum_types.Block_parameter.t * bool
      and type output = Ethereum_types.block
 
 module Get_block_by_hash :
@@ -156,9 +157,15 @@ module Get_block_by_hash :
     with type input = Ethereum_types.block_hash * bool
      and type output = Ethereum_types.block
 
+module Get_block_receipts :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.t
+     and type output = Transaction_receipt.t list
+
 module Get_code :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.block_param
+    with type input =
+      Ethereum_types.address * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.hex
 
 module Gas_price :
@@ -166,7 +173,8 @@ module Gas_price :
 
 module Get_transaction_count :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.block_param
+    with type input =
+      Ethereum_types.address * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.quantity
 
 module Get_block_transaction_count_by_hash :
@@ -176,7 +184,7 @@ module Get_block_transaction_count_by_hash :
 
 module Get_block_transaction_count_by_number :
   METHOD
-    with type input = Ethereum_types.block_param
+    with type input = Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Get_uncle_count_by_block_hash :
@@ -186,13 +194,13 @@ module Get_uncle_count_by_block_hash :
 
 module Get_uncle_count_by_block_number :
   METHOD
-    with type input = Ethereum_types.block_param
+    with type input = Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Get_transaction_receipt :
   METHOD
     with type input = Ethereum_types.hash
-     and type output = Ethereum_types.transaction_receipt option
+     and type output = Transaction_receipt.t option
 
 module Get_transaction_by_hash :
   METHOD
@@ -206,7 +214,7 @@ module Get_transaction_by_block_hash_and_index :
 
 module Get_transaction_by_block_number_and_index :
   METHOD
-    with type input = Ethereum_types.block_param * Ethereum_types.quantity
+    with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
      and type output = Ethereum_types.transaction_object option
 
 module Get_uncle_by_block_hash_and_index :
@@ -216,7 +224,7 @@ module Get_uncle_by_block_hash_and_index :
 
 module Get_uncle_by_block_number_and_index :
   METHOD
-    with type input = Ethereum_types.block_param * Ethereum_types.quantity
+    with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
      and type output = Ethereum_types.block option
 
 module Send_raw_transaction :
@@ -224,19 +232,17 @@ module Send_raw_transaction :
     with type input = Ethereum_types.hex
      and type output = Ethereum_types.hash
 
-module Send_transaction :
-  METHOD
-    with type input = Ethereum_types.transaction
-     and type output = Ethereum_types.hash
-
 module Eth_call :
   METHOD
-    with type input = Ethereum_types.call * Ethereum_types.block_param
+    with type input =
+      Ethereum_types.call
+      * Ethereum_types.Block_parameter.extended
+      * Ethereum_types.state_override
      and type output = Ethereum_types.hash
 
 module Get_estimate_gas :
   METHOD
-    with type input = Ethereum_types.call * Ethereum_types.block_param
+    with type input = Ethereum_types.call * Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Txpool_content :
@@ -251,19 +257,57 @@ module Web3_sha3 :
      and type output = Ethereum_types.hash
 
 module Get_logs :
-  METHOD
-    with type input = Ethereum_types.filter
-     and type output = Ethereum_types.filter_changes list
+  METHOD with type input = Filter.t and type output = Filter.changes list
 
 module Produce_block :
   METHOD
     with type input = Time.Protocol.t
      and type output = Ethereum_types.quantity
 
+module Produce_proposal :
+  METHOD with type input = Time.Protocol.t and type output = unit
+
+module Inject_transaction :
+  METHOD
+    with type input = Ethereum_types.transaction_object * string
+     and type output = unit
+
 module Durable_state_value :
   METHOD
     with type input = Durable_storage_path.path
      and type output = Bytes.t option
+
+module Durable_state_subkeys :
+  METHOD
+    with type input = Durable_storage_path.path
+     and type output = string list
+
+module Eth_max_priority_fee_per_gas :
+  METHOD with type input = unit and type output = Ethereum_types.quantity
+
+module Replay_block :
+  METHOD
+    with type input = Ethereum_types.quantity
+     and type output = Ethereum_types.block
+
+module Trace_transaction :
+  METHOD
+    with type input = Tracer_types.input
+     and type output = Tracer_types.output
+
+module Trace_call :
+  METHOD
+    with type input = Tracer_types.call_input
+     and type output = Tracer_types.output
+
+module Eth_fee_history :
+  METHOD
+    with type input =
+      Ethereum_types.quantity * Ethereum_types.Block_parameter.t * Float.t list
+     and type output = Fee_history.t
+
+module Coinbase :
+  METHOD with type input = unit and type output = Ethereum_types.address
 
 type map_result =
   | Method :
@@ -272,5 +316,7 @@ type map_result =
       -> map_result
   | Unsupported
   | Unknown
+  | Disabled
 
-val map_method_name : string -> map_result
+val map_method_name :
+  restrict:Configuration.restricted_rpcs -> string -> map_result

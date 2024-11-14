@@ -13,7 +13,9 @@ depends: [
   "octez-libs"
   "octez-version"
   "octez-shell-libs"
+  "octez-l2-libs"
   "octez-evm-node-libs" { = version }
+  "octez-rust-deps"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

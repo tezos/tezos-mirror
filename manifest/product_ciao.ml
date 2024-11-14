@@ -12,6 +12,8 @@ open Externals
 
 include Product (struct
   let name = "CIAO"
+
+  let source = ["ci"]
 end)
 
 let ci_lib_gitlab_ci_main =
@@ -30,5 +32,5 @@ let _ci_bin_main =
     ~opam:""
     ~path:"ci/bin"
     ~bisect_ppx:No
-    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; yaml; unix]
+    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; yaml; unix; tezt_core_lib]
     ~release_status:Unreleased

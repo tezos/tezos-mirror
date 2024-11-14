@@ -30,6 +30,7 @@
    Subject:      Detect double baking through the accuser.
 *)
 
+let team = Tag.layer1
 (* This test is duplicated in [remote_tests/double_baking.ml]. Any modification
    to this test should be reported there too. *)
 
@@ -135,7 +136,7 @@ let double_bake =
   Protocol.register_test
     ~__FILE__
     ~title:"double baking with accuser"
-    ~tags:["double"; "baking"; "accuser"; "node"]
+    ~tags:[team; "double"; "baking"; "accuser"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let log_step counter msg =

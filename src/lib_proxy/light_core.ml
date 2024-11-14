@@ -49,13 +49,14 @@ let light_failwith (pgi : Proxy.proxy_getter_input) ?(warn_symbolic = false) msg
       (chain_n_block_to_string pgi.chain pgi.block)
       msg
       (if warn_symbolic && symbolic_block then
-       Format.sprintf
-         ". Because requested block is symbolic: %s (it has no hash), it could \
-          be that the different endpoints are mapping this symbolic identifier \
-          to different concrete blocks. If you are using the 'head' identifier \
-          (or 'head~1', etc.) in a RPC path, replace it with a concrete hash."
-       @@ Block_services.to_string pgi.block
-      else "")
+         Format.sprintf
+           ". Because requested block is symbolic: %s (it has no hash), it \
+            could be that the different endpoints are mapping this symbolic \
+            identifier to different concrete blocks. If you are using the \
+            'head' identifier (or 'head~1', etc.) in a RPC path, replace it \
+            with a concrete hash."
+         @@ Block_services.to_string pgi.block
+       else "")
   in
   let* () = Logger.(emit failing full_msg) in
   failwith "%s" full_msg
@@ -117,7 +118,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
       | ((uri, rpc_context) as hd_endpoint) :: tl_remaining_endpoints -> (
           let* proof_opt =
             Light_proto.merkle_tree
-              Proxy.{rpc_context; chain; block; mode = Client}
+              Proxy.{rpc_context; chain; block}
               key
               leaf_kind
           in

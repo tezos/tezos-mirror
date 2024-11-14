@@ -67,9 +67,9 @@ type 'msg app_message_encoding =
 (** Application-level messages encoding, and version parameters *)
 type 'msg message_config = {
   encoding : 'msg app_message_encoding list;  (** Encoding of the messages. *)
-  chain_name : Distributed_db_version.Name.t;
+  chain_name : Tezos_version.Distributed_db_version.Name.t;
       (** Identifier for this P2p protocol when establishing session. *)
-  distributed_db_versions : Distributed_db_version.t list;
+  distributed_db_versions : Tezos_version.Distributed_db_version.t list;
       (** List of versions supported by this P2p protocol. *)
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4593
          These last two fields aren't logically related to the `msg type,

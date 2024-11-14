@@ -28,36 +28,16 @@
 open Node_context
 
 let lock ~data_dir =
+  let open Lwt_result_syntax in
+  let*! () = Event.acquiring_lock () in
+  let*! () = Lwt_utils_unix.create_dir data_dir in
   let lockfile_path = global_lockfile_path ~data_dir in
-  let lock_aux ~data_dir =
-    let open Lwt_result_syntax in
-    let*! () = Event.acquiring_lock () in
-    let*! () = Lwt_utils_unix.create_dir data_dir in
-    let* lockfile =
-      protect @@ fun () ->
-      Lwt_unix.openfile
-        lockfile_path
-        [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
-        0o644
-      |> Lwt_result.ok
-    in
-    let* () =
-      protect ~on_error:(fun err ->
-          let*! () = Lwt_unix.close lockfile in
-          fail err)
-      @@ fun () ->
-      let*! () = Lwt_unix.lockf lockfile Unix.F_LOCK 0 in
-      return_unit
-    in
-    return lockfile
-  in
-  trace (Rollup_node_errors.Could_not_acquire_lock lockfile_path)
-  @@ lock_aux ~data_dir
+  Lwt_lock_file.lock
+    ~when_locked:
+      (`Fail (Rollup_node_errors.Could_not_acquire_lock lockfile_path))
+    ~filename:lockfile_path
 
-let unlock {lockfile; _} =
-  Lwt.finalize
-    (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
-    (fun () -> Lwt_unix.close lockfile)
+let unlock {lockfile; _} = Lwt_lock_file.unlock lockfile
 
 let update_metadata ({Metadata.rollup_address; _} as metadata) ~data_dir =
   let open Lwt_result_syntax in
@@ -84,15 +64,11 @@ let create_sync_info () =
   }
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
-    ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
-    l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
+    ?log_kernel_debug_file ?last_whitelist_update mode l1_ctxt genesis_info
+    ~(lcc : lcc) ~lpc kind current_protocol
     Configuration.(
-      {
-        sc_rollup_address = rollup_address;
-        l2_blocks_cache_size;
-        dal_node_endpoint;
-        _;
-      } as configuration) =
+      {sc_rollup_address = rollup_address; dal_node_endpoint; _} as
+      configuration) =
   let open Lwt_result_syntax in
   let* lockfile = lock ~data_dir in
   let metadata =
@@ -104,21 +80,11 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     }
   in
   let* () = update_metadata metadata ~data_dir in
-  let* () =
-    Store_migration.maybe_run_migration
-      metadata
-      ~storage_dir:(Configuration.default_storage_dir data_dir)
-      ~index_buffer_size:Configuration.default_index_buffer_size
+  let* store =
+    Node_context.Node_store.init_with_migration mode metadata ~data_dir
   in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
-  in
-  let* store =
-    Node_context.Node_store.load
-      mode
-      ~index_buffer_size
-      ~l2_blocks_cache_size
-      Configuration.(default_storage_dir data_dir)
   in
   let*? (module Plugin : Protocol_plugin_sig.S) =
     Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
@@ -175,10 +141,18 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     Pvm_patches.make kind rollup_address configuration.unsafe_pvm_patches
   in
   let sync = create_sync_info () in
+  Metrics.Info.set_lcc_level_l1 lcc.level ;
+  Metrics.Info.set_lcc_level_local lcc.level ;
+  Option.iter
+    (fun {Commitment.inbox_level = l; _} ->
+      Metrics.Info.set_lpc_level_l1 l ;
+      Metrics.Info.set_lpc_level_local l)
+    lpc ;
   let node_ctxt =
     {
       config = configuration;
-      cctxt = (cctxt :> Client_context.full);
+      cctxt :> Client_context.full;
+      degraded = Reference.new_ false;
       dal_cctxt;
       dac_client;
       data_dir;
@@ -218,13 +192,14 @@ let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
   let*! () = message "Closing context@." in
   let*! () = Context.close context in
   let*! () = message "Closing store@." in
-  let* () = Node_context.Node_store.close store in
+  let*! () = Node_context.Node_store.close store in
   let*! () = message "Releasing lock@." in
   let*! () = unlock node_ctxt in
   return_unit
 
 module For_snapshots = struct
-  let create_node_context cctxt current_protocol store context ~data_dir =
+  let create_node_context cctxt current_protocol store context ~data_dir
+      ~apply_unsafe_patches =
     let open Lwt_result_syntax in
     let loser_mode = Loser_mode.no_failures in
     let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
@@ -239,46 +214,57 @@ module For_snapshots = struct
       | Some m -> Ok m
     in
     let mode = Configuration.Observer in
-    let*? operators =
-      Purpose.make_operator
+    let* operators =
+      Purpose.make_operators
         ~needed_purposes:(Configuration.purposes_of_mode mode)
         []
     in
-    let config =
-      Configuration.
-        {
-          sc_rollup_address = metadata.rollup_address;
-          boot_sector_file = None;
-          operators;
-          rpc_addr = Configuration.default_rpc_addr;
-          rpc_port = Configuration.default_rpc_port;
-          acl = Configuration.default_acl;
-          metrics_addr = None;
-          reconnection_delay = 1.;
-          fee_parameters = Configuration.default_fee_parameters;
-          mode;
-          loser_mode;
-          apply_unsafe_patches = true;
-          unsafe_pvm_patches = [];
-          dal_node_endpoint = None;
-          dac_observer_endpoint = None;
-          dac_timeout = None;
-          batcher = Configuration.default_batcher;
-          injector = Configuration.default_injector;
-          l1_blocks_cache_size;
-          l2_blocks_cache_size;
-          index_buffer_size = Some index_buffer_size;
-          irmin_cache_size = Some irmin_cache_size;
-          prefetch_blocks = None;
-          log_kernel_debug = false;
-          no_degraded = false;
-          gc_parameters = Configuration.default_gc_parameters;
-          history_mode = None;
-          cors = Resto_cohttp.Cors.default;
-          l1_rpc_timeout;
-          loop_retry_delay = 10.;
-          pre_images_endpoint = None;
-        }
+    let* config =
+      let config_file = Configuration.config_filename ~data_dir in
+      let*! exists_config = Lwt_unix.file_exists config_file in
+      if exists_config then
+        let* config = Configuration.load ~data_dir in
+        return {config with apply_unsafe_patches}
+      else
+        return
+        @@ Configuration.
+             {
+               sc_rollup_address = metadata.rollup_address;
+               boot_sector_file = None;
+               operators;
+               rpc_addr = Configuration.default_rpc_addr;
+               rpc_port = Configuration.default_rpc_port;
+               acl = Configuration.default_acl;
+               metrics_addr = None;
+               performance_metrics = false;
+               reconnection_delay = 1.;
+               fee_parameters = Configuration.default_fee_parameters;
+               mode;
+               loser_mode;
+               apply_unsafe_patches;
+               unsafe_pvm_patches = [];
+               execute_outbox_messages_filter =
+                 Configuration.default_execute_outbox_filter;
+               dal_node_endpoint = None;
+               dac_observer_endpoint = None;
+               dac_timeout = None;
+               batcher = Configuration.default_batcher;
+               injector = Configuration.default_injector;
+               l1_blocks_cache_size;
+               l2_blocks_cache_size;
+               index_buffer_size = Some index_buffer_size;
+               irmin_cache_size = Some irmin_cache_size;
+               prefetch_blocks = None;
+               log_kernel_debug = false;
+               no_degraded = false;
+               gc_parameters = Configuration.default_gc_parameters;
+               history_mode = None;
+               cors = Resto_cohttp.Cors.default;
+               l1_rpc_timeout;
+               loop_retry_delay = 10.;
+               pre_images_endpoint = None;
+               bail_on_disagree = false;
+             }
     in
     let*? l1_ctxt =
       Layer1.create
@@ -287,30 +273,33 @@ module For_snapshots = struct
         ~l1_blocks_cache_size
         cctxt
     in
-    let* lcc = Store.Lcc.read store.Store.lcc in
+    let* lcc = Store.State.LCC.get store in
     let lcc =
       match lcc with
-      | Some lcc -> lcc
+      | Some (commitment, level) -> {commitment; level}
       | None ->
           {
             commitment = metadata.genesis_info.commitment_hash;
             level = metadata.genesis_info.level;
           }
     in
-    let* lpc = Store.Lpc.read store.Store.lpc in
+    let* lpc = Store.Commitments.find_lpc store in
     let*! lockfile =
       Lwt_unix.openfile (Filename.temp_file "lock" "") [] 0o644
     in
     let global_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
     let*? unsafe_patches =
-      (* Only consider hardcoded patches for snapshot validation. *)
-      Pvm_patches.make metadata.kind metadata.rollup_address []
+      Pvm_patches.make
+        metadata.kind
+        metadata.rollup_address
+        config.unsafe_pvm_patches
     in
     return
       {
         config;
-        cctxt = (cctxt :> Client_context.full);
+        cctxt :> Client_context.full;
+        degraded = Reference.new_ false;
         dal_cctxt = None;
         dac_client = None;
         data_dir;
@@ -340,8 +329,8 @@ module Internal_for_tests = struct
     let open Lwt_result_syntax in
     let rollup_address = Address.zero in
     let mode = Configuration.Observer in
-    let*? operators =
-      Purpose.make_operator
+    let* operators =
+      Purpose.make_operators
         ~needed_purposes:(Configuration.purposes_of_mode mode)
         []
     in
@@ -361,12 +350,15 @@ module Internal_for_tests = struct
           rpc_port = Configuration.default_rpc_port;
           acl = Configuration.default_acl;
           metrics_addr = None;
+          performance_metrics = false;
           reconnection_delay = 5.;
           fee_parameters = Configuration.default_fee_parameters;
           mode;
           loser_mode;
           apply_unsafe_patches = false;
           unsafe_pvm_patches = [];
+          execute_outbox_messages_filter =
+            Configuration.default_execute_outbox_filter;
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
           dac_timeout = None;
@@ -385,15 +377,22 @@ module Internal_for_tests = struct
           gc_parameters = Configuration.default_gc_parameters;
           history_mode = None;
           cors = Resto_cohttp.Cors.default;
+          bail_on_disagree = false;
         }
     in
     let* lockfile = lock ~data_dir in
+    let genesis_info = {level = 0l; commitment_hash = Commitment.Hash.zero} in
+    let metadata =
+      Metadata.
+        {
+          rollup_address;
+          context_version = Context.Version.version;
+          kind;
+          genesis_info;
+        }
+    in
     let* store =
-      Node_context.Node_store.load
-        Read_write
-        ~index_buffer_size
-        ~l2_blocks_cache_size
-        Configuration.(default_storage_dir data_dir)
+      Node_context.Node_store.init_with_migration Read_write metadata ~data_dir
     in
     let*? (module Plugin : Protocol_plugin_sig.S) =
       Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
@@ -406,7 +405,6 @@ module Internal_for_tests = struct
         (Configuration.default_context_dir data_dir)
         ~cache_size:irmin_cache_size
     in
-    let genesis_info = {level = 0l; commitment_hash = Commitment.Hash.zero} in
     let l1_ctxt = Layer1.Internal_for_tests.dummy cctxt in
     let lcc = Reference.new_ {commitment = Commitment.Hash.zero; level = 0l} in
     let lpc = Reference.new_ None in
@@ -428,7 +426,8 @@ module Internal_for_tests = struct
     return
       {
         config;
-        cctxt = (cctxt :> Client_context.full);
+        cctxt :> Client_context.full;
+        degraded = Reference.new_ false;
         dal_cctxt = None;
         dac_client = None;
         data_dir;
@@ -498,6 +497,6 @@ module Internal_for_tests = struct
       create_node_context cctxt current_protocol ~data_dir Wasm_2_0_0
     in
     let*! () = Context.close node_ctxt.context in
-    let* () = Node_context.Node_store.close node_ctxt.store in
+    let*! () = Node_context.Node_store.close node_ctxt.store in
     return node_ctxt
 end

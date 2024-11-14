@@ -2,12 +2,12 @@
 
 # Simple helper script used by octez-baker systemd service
 
-url="http://localhost:8732"
+url="http://localhost:8732/version"
 max_attempts=30
 wait_seconds=15
 
 check_service() {
-  if command -v curl > /dev/null && curl --output /dev/null --silent --head --fail "$url"; then
+  if command -v curl > /dev/null && curl --output /dev/null --silent --fail "$url"; then
     echo "Service is ready"
     exit 0
   else

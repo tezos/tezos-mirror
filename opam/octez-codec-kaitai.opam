@@ -10,10 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
+  "octez-libs"
   "kaitai-of-data-encoding" { = version }
   "kaitai" { = version }
-  "octez-libs"
   "octez-shell-libs"
   "octez-version"
 ]
@@ -34,6 +33,7 @@ depopts: [
   "octez-protocol-018-Proxford-libs"
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
+  "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [

@@ -94,7 +94,7 @@ type secret_account = {
 }
 
 let secrets =
-  (* Exported from proto_alpha client - TODO : remove when relocated to lib_crypto *)
+  (* Exported from proto_020_PsParisC client - TODO : remove when relocated to lib_crypto *)
   let read_key mnemonic email password =
     match Tezos_client_base.Bip39.of_words mnemonic with
     | None -> assert false

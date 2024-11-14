@@ -1,8 +1,7 @@
 # WARNING!
 # This file is provided as a courtesy and comes with no guarantees that it will
 # continue to work in the future.
-let
-  sources = import ./nix/sources.nix;
+{sources ? import ./nix/sources.nix {}}: let
   pkgs = sources.pkgs;
 
   overlays = pkgs.callPackage ./nix/overlays.nix {};
@@ -13,24 +12,16 @@ let
       pkgs.rustup
       pkgs.wabt
 
-      # Bring Clang into scope in case the stdenv doesn't come with it already.
-      pkgs.clang_16
-
-      # This brings in things like llvm-ar which are needed for Rust WebAssembly
-      # compilation on Mac.
-      # It isn't used by default. Configure the AR environment variable to
-      # make rustc use it.
-      pkgs.llvmPackages_16.bintools
-
       # Cross-compilation for RISC-V
       sources.riscv64Pkgs.clangStdenv.cc
 
       # Formatter/LSP for Cargo manifests (and TOML in general)
       pkgs.taplo
     ]
-    ++ (pkgs.lib.optional pkgs.stdenv.isDarwin sources.riscv64Pkgs.libiconvReal);
+    # On Mac, Rust's standard library needs libiconv
+    ++ pkgs.lib.optional pkgs.stdenv.isDarwin pkgs.libiconv;
 
-  mainPackage = (import ./default.nix).overrideAttrs (old: {
+  mainPackage = (import ./default.nix {inherit sources;}).overrideAttrs (old: {
     # This makes the shell load faster.
     # Usually Nix will try to load the package's source, which in this case
     # is the entire repository. Given the repository is fairly large, and we
@@ -44,23 +35,26 @@ let
       # Set the opam-repository which has the package descriptions.
       (final: prev: {
         repository = prev.repository.override {
-          src = pkgs.callPackage ./nix/opam-repo.nix {};
+          src = sources.opam-repository;
         };
       })
 
       # Specify the constraints we have.
       (final: prev:
         prev.repository.select {
+          opams = [
+            {
+              name = "octez-deps";
+              opam = ./opam/virtual/octez-deps.opam.locked;
+            }
+            {
+              name = "octez-dev-deps";
+              opam = ./opam/virtual/octez-dev-deps.opam;
+            }
+          ];
+
           packageConstraints = [
-            "ocaml=${mainPackage.passthru.ocamlVersion}"
-            "utop=2.9.0"
-            "ocaml-lsp-server>=1.9.0"
-            "merlin"
-            "odoc"
-            "ocp-indent"
-            "js_of_ocaml-compiler"
             "ocamlformat-rpc"
-            "merge-fmt"
           ];
         })
 
@@ -100,9 +94,10 @@ in
 
     inherit (mainPackage) NIX_LDFLAGS NIX_CFLAGS_COMPILE TEZOS_WITHOUT_OPAM OPAM_SWITCH_PREFIX;
 
+    inputsFrom = [mainPackage];
+
     buildInputs = with pkgs;
       kernelPackageSet
-      ++ mainPackage.buildInputs
       ++ [
         nodejs
         cacert
@@ -116,6 +111,7 @@ in
         devPackageSet.ocp-indent
         devPackageSet.merlin
         devPackageSet.utop
+        devPackageSet.odoc
       ]
       ++ (
         if pkgs.stdenv.isDarwin
@@ -132,4 +128,5 @@ in
     CC_wasm32_unknown_unknown = "${clangNoArch}/bin/clang";
     CC_riscv64gc_unknown_linux_gnu = "${clangNoArch}/bin/clang";
     CC_riscv64gc_unknown_none_elf = "${clangNoArch}/bin/clang";
+    CC_riscv64gc_unknown_hermit = "${clangNoArch}/bin/clang";
   }

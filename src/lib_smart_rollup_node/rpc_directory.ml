@@ -93,15 +93,92 @@ module Admin_directory = Make_directory (struct
 
   type context = Node_context.rw
 
-  type subcontext = Node_context.ro
+  type subcontext = Node_context.rw
 
-  let context_of_prefix node_ctxt () =
-    Lwt_result.return (Node_context.readonly node_ctxt)
+  let context_of_prefix node_ctxt () = Lwt_result.return node_ctxt
 end)
 
 let () =
-  Root_directory.register0 Rollup_node_services.Root.health
+  Root_directory.register0 Rollup_node_services.Root.ping
   @@ fun _node_ctxt () () -> Lwt_result_syntax.return_unit
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.health
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let degraded = Reference.get node_ctxt.degraded in
+  let l1_connection = Layer1.get_status node_ctxt.Node_context.l1_ctxt in
+  let* l2_head = Node_context.last_processed_head_opt node_ctxt in
+  let l1_head = Layer1.get_latest_head node_ctxt.l1_ctxt in
+  let l1_blocks_late =
+    match (l1_head, l2_head) with
+    | None, _ | _, None -> 0l
+    | Some l1, Some l2 -> Int32.sub l1.header.level l2.header.level
+  in
+  let publisher_worker =
+    match Publisher.worker_status () with
+    | (`Running | `Crashed _) as st -> [("publisher", st)]
+    | `Not_running -> []
+  in
+  let batcher_worker =
+    match Batcher.worker_status () with
+    | (`Running | `Crashed _) as st -> [("batcher", st)]
+    | `Not_running -> []
+  in
+  let refutation_coordinator_worker =
+    match Refutation_coordinator.worker_status () with
+    | (`Running | `Crashed _) as st -> [("refutation_coordinator", st)]
+    | `Not_running -> []
+  in
+  let refutation_player_workers =
+    Refutation_player.current_games ()
+    |> List.map (fun (opponent, _w) ->
+           ( Format.asprintf
+               "refutation_player (against %a)"
+               Signature.Public_key_hash.pp
+               opponent,
+             `Running ))
+  in
+  let injector_workers =
+    Injector.running_worker_tags ()
+    |> List.map (fun tags ->
+           ( Format.sprintf
+               "injector (%s)"
+               (String.concat ", " (List.map Operation_kind.to_string tags)),
+             `Running ))
+  in
+  let active_workers =
+    publisher_worker @ batcher_worker @ refutation_coordinator_worker
+    @ refutation_player_workers @ injector_workers
+  in
+  let l1_likely_late =
+    match l1_head with
+    | None -> true
+    | Some {header = {timestamp; _}; _} ->
+        Time.Protocol.diff Time.System.(to_protocol @@ now ()) timestamp > 60L
+  in
+  let healthy =
+    (not degraded) && l1_connection = `Connected && l1_blocks_late <= 1l
+    && (not l1_likely_late)
+    && List.for_all (fun (_name, st) -> st = `Running) active_workers
+  in
+  return
+    Rollup_node_services.
+      {
+        healthy;
+        degraded;
+        l1 =
+          {
+            connection = l1_connection;
+            blocks_late = l1_blocks_late;
+            last_seen_head =
+              Option.map
+                (fun Layer1.{hash; level; header = {timestamp; _}} ->
+                  (hash, level, timestamp))
+                l1_head;
+          };
+        active_workers;
+      }
 
 let () =
   Root_directory.register0 Rollup_node_services.Root.version
@@ -294,22 +371,98 @@ let () =
       in
       return_some (commitment, hash, first_published, published)
 
+let get_outbox_content (node_ctxt : _ Node_context.t)
+    (outbox_level, message_indexes) =
+  let open Lwt_result_syntax in
+  let* outbox =
+    let lcc = (Reference.get node_ctxt.lcc).level in
+    let ctxt_block_level = Int32.max lcc outbox_level in
+    let* ctxt_block_hash =
+      Node_context.hash_of_level_opt node_ctxt ctxt_block_level
+    in
+    match ctxt_block_hash with
+    | None -> return_nil
+    | Some ctxt_block_hash ->
+        let* ctxt = Node_context.checkout_context node_ctxt ctxt_block_hash in
+        let* state = Context.PVMState.get ctxt in
+        let*? (module Plugin) =
+          Protocol_plugins.proto_plugin_for_protocol
+            (Reference.get node_ctxt.current_protocol).hash
+        in
+        let*! outbox =
+          Plugin.Pvm.get_outbox_messages node_ctxt state ~outbox_level
+        in
+        return outbox
+  in
+  let messages =
+    List.rev_map
+      (fun i -> (i, List.assoc ~equal:Int.equal i outbox))
+      message_indexes
+    |> List.rev
+  in
+  return (outbox_level, messages)
+
+let () =
+  Local_directory.register0 Rollup_node_services.Local.outbox_pending_executable
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let* outbox_messages =
+    Node_context.get_executable_pending_outbox_messages node_ctxt
+  in
+  List.map_ep (get_outbox_content node_ctxt) outbox_messages
+
+let () =
+  Local_directory.register0
+    Rollup_node_services.Local.outbox_pending_unexecutable
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let* outbox_messages =
+    Node_context.get_unexecutable_pending_outbox_messages node_ctxt
+  in
+  List.map_ep (get_outbox_content node_ctxt) outbox_messages
+
 let () =
   Local_directory.register0 Rollup_node_services.Local.gc_info
   @@ fun node_ctxt () () ->
   let open Lwt_result_syntax in
-  let* {last_gc_level; first_available_level} =
-    Node_context.get_gc_levels node_ctxt
+  let* started_gc_info = Node_context.get_gc_info node_ctxt `Started
+  and* successful_gc_info = Node_context.get_gc_info node_ctxt `Successful
   and* last_context_split_level =
     Node_context.get_last_context_split_level node_ctxt
   in
+  let first_available_level, last_gc_started_at =
+    match started_gc_info with
+    | Some gc -> (gc.gc_target, Some gc.gc_triggered_at)
+    | None -> (node_ctxt.genesis_info.level, None)
+  in
+  let last_successful_gc_target =
+    match successful_gc_info with
+    | Some {gc_target = l; _} -> Some l
+    | None -> None
+  in
   return
     Rollup_node_services.
-      {last_gc_level; first_available_level; last_context_split_level}
+      {
+        first_available_level;
+        last_gc_started_at;
+        last_context_split_level;
+        last_successful_gc_target;
+      }
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.injection
-  @@ fun _node_ctxt () messages -> Batcher.register_messages messages
+  @@ fun _node_ctxt drop_duplicate messages ->
+  Batcher.register_messages ~drop_duplicate messages
+
+let () =
+  Local_directory.register0 Rollup_node_services.Local.dal_batcher_injection
+  @@ fun _node_ctxt () messages ->
+  Dal_injection_queue.register_dal_messages ~messages
+
+let () =
+  Local_directory.register0 Rollup_node_services.Local.dal_slot_indices
+  @@ fun _node_ctxt () slot_indices ->
+  Dal_injection_queue.set_dal_slot_indices slot_indices
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.batcher_queue
@@ -357,6 +510,109 @@ let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
   let cemented = Compare.Int32.(inbox_level <= lcc.level) in
   (finalized, cemented)
 
+let injector_operation_status node_ctxt l1_hash =
+  let open Lwt_result_syntax in
+  match Injector.operation_status l1_hash with
+  | None -> return Rollup_node_services.Unknown
+  | Some (Pending op) -> return (Rollup_node_services.Pending_injection op)
+  | Some (Injected {op; oph; op_index}) ->
+      return (Rollup_node_services.Injected {op = op.operation; oph; op_index})
+  | Some (Included {op; oph; op_index; l1_block; l1_level}) -> (
+      let* finalized, cemented = inbox_info_of_level node_ctxt l1_level in
+      let* commitment_level =
+        commitment_level_of_inbox_level node_ctxt l1_level
+      in
+      match commitment_level with
+      | None ->
+          return
+            (Rollup_node_services.Included
+               {
+                 op = op.operation;
+                 oph;
+                 op_index;
+                 l1_block;
+                 l1_level;
+                 finalized;
+                 cemented;
+               })
+      | Some commitment_level -> (
+          let* block =
+            Node_context.find_l2_block_by_level node_ctxt commitment_level
+          in
+          match block with
+          | None ->
+              (* Commitment not computed yet for inbox *)
+              return
+                (Rollup_node_services.Included
+                   {
+                     op = op.operation;
+                     oph;
+                     op_index;
+                     l1_block;
+                     l1_level;
+                     finalized;
+                     cemented;
+                   })
+          | Some block -> (
+              let commitment_hash =
+                WithExceptions.Option.get
+                  ~loc:__LOC__
+                  block.header.commitment_hash
+              in
+              (* Commitment computed *)
+              let* published_at =
+                Node_context.commitment_published_at_level
+                  node_ctxt
+                  commitment_hash
+              in
+              match published_at with
+              | None | Some {published_at_level = None; _} ->
+                  (* Commitment not published yet *)
+                  return
+                    (Rollup_node_services.Included
+                       {
+                         op = op.operation;
+                         oph;
+                         op_index;
+                         l1_block;
+                         l1_level;
+                         finalized;
+                         cemented;
+                       })
+              | Some
+                  {
+                    first_published_at_level;
+                    published_at_level = Some published_at_level;
+                  } ->
+                  (* Commitment published *)
+                  let* commitment =
+                    Node_context.get_commitment node_ctxt commitment_hash
+                  in
+                  return
+                    (Rollup_node_services.Committed
+                       {
+                         op = op.operation;
+                         oph;
+                         op_index;
+                         l1_block;
+                         l1_level;
+                         finalized;
+                         cemented;
+                         commitment;
+                         commitment_hash;
+                         first_published_at_level;
+                         published_at_level;
+                       }))))
+
+let dal_injected_operations_statuses node_ctxt =
+  let open Lwt_result_syntax in
+  let*? ids = Dal_injection_queue.get_injection_ids () in
+  List.map_es
+    (fun l1_hash ->
+      let* status = injector_operation_status node_ctxt l1_hash in
+      return (l1_hash, status))
+    ids
+
 let () =
   Local_directory.register1 Rollup_node_services.Local.batcher_message
   @@ fun node_ctxt hash () () ->
@@ -369,110 +625,25 @@ let () =
         let return status = return (Some msg, status) in
         match batch_status with
         | Pending_batch -> return Rollup_node_services.Pending_batch
-        | Batched l1_hash -> (
-            match Injector.operation_status l1_hash with
-            | None -> return Rollup_node_services.Unknown
-            | Some (Pending op) ->
-                return (Rollup_node_services.Pending_injection op)
-            | Some (Injected {op; oph; op_index}) ->
-                return
-                  (Rollup_node_services.Injected
-                     {op = op.operation; oph; op_index})
-            | Some (Included {op; oph; op_index; l1_block; l1_level}) -> (
-                let* finalized, cemented =
-                  inbox_info_of_level node_ctxt l1_level
-                in
-                let* commitment_level =
-                  commitment_level_of_inbox_level node_ctxt l1_level
-                in
-                match commitment_level with
-                | None ->
-                    return
-                      (Rollup_node_services.Included
-                         {
-                           op = op.operation;
-                           oph;
-                           op_index;
-                           l1_block;
-                           l1_level;
-                           finalized;
-                           cemented;
-                         })
-                | Some commitment_level -> (
-                    let* block =
-                      Node_context.find_l2_block_by_level
-                        node_ctxt
-                        commitment_level
-                    in
-                    match block with
-                    | None ->
-                        (* Commitment not computed yet for inbox *)
-                        return
-                          (Rollup_node_services.Included
-                             {
-                               op = op.operation;
-                               oph;
-                               op_index;
-                               l1_block;
-                               l1_level;
-                               finalized;
-                               cemented;
-                             })
-                    | Some block -> (
-                        let commitment_hash =
-                          WithExceptions.Option.get
-                            ~loc:__LOC__
-                            block.header.commitment_hash
-                        in
-                        (* Commitment computed *)
-                        let* published_at =
-                          Node_context.commitment_published_at_level
-                            node_ctxt
-                            commitment_hash
-                        in
-                        match published_at with
-                        | None | Some {published_at_level = None; _} ->
-                            (* Commitment not published yet *)
-                            return
-                              (Rollup_node_services.Included
-                                 {
-                                   op = op.operation;
-                                   oph;
-                                   op_index;
-                                   l1_block;
-                                   l1_level;
-                                   finalized;
-                                   cemented;
-                                 })
-                        | Some
-                            {
-                              first_published_at_level;
-                              published_at_level = Some published_at_level;
-                            } ->
-                            (* Commitment published *)
-                            let* commitment =
-                              Node_context.get_commitment
-                                node_ctxt
-                                commitment_hash
-                            in
-                            return
-                              (Rollup_node_services.Committed
-                                 {
-                                   op = op.operation;
-                                   oph;
-                                   op_index;
-                                   l1_block;
-                                   l1_level;
-                                   finalized;
-                                   cemented;
-                                   commitment;
-                                   commitment_hash;
-                                   first_published_at_level;
-                                   published_at_level;
-                                 }))))))
+        | Batched l1_hash ->
+            let* res = injector_operation_status node_ctxt l1_hash in
+            return res)
   in
-
   return status
+
+let () =
+  Local_directory.register1 Rollup_node_services.Local.injector_operation_status
+  @@ fun node_ctxt l1_hash () () -> injector_operation_status node_ctxt l1_hash
+
+let () =
+  Local_directory.register0
+    Rollup_node_services.Local.dal_injected_operations_statuses
+  @@ fun node_ctxt () () -> dal_injected_operations_statuses node_ctxt
+
+let () =
+  Local_directory.register1 Rollup_node_services.Local.forget_dal_injection_id
+  @@ fun _node_ctxt id () () ->
+  Lwt.return @@ Dal_injection_queue.forget_injection_id id
 
 let () =
   Admin_directory.register0 Rollup_node_services.Admin.injector_queues_total
@@ -504,6 +675,13 @@ let () =
 let () =
   Admin_directory.register0 Rollup_node_services.Admin.clear_injector_queues
   @@ fun _node_ctxt tag () -> Injector.clear_queues ?tag ()
+
+let () =
+  Admin_directory.register0 Rollup_node_services.Admin.cancel_gc
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let*! canceled = Node_context.cancel_gc node_ctxt in
+  return canceled
 
 let add_describe dir =
   Tezos_rpc.Directory.register_describe_directory_service

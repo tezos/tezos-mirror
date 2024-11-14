@@ -112,14 +112,22 @@ let rejection_with_proof ~(testnet : unit -> Testnet.t) () =
      [Smart_rollup_refute] operation should be relatively cheap). *)
   let testnet = testnet () in
   let min_balance = Tez.(of_mutez_int 11_000_000_000) in
-  let* client, node = Helpers.setup_octez_node ~testnet () in
+  let* client, node = Scenario_helpers.setup_octez_node ~testnet () in
   let* honest_operator = Client.gen_and_show_keys client in
   let* dishonest_operator = Client.gen_and_show_keys client in
   let* () =
     Lwt.join
       [
-        Helpers.wait_for_funded_key node client min_balance honest_operator;
-        Helpers.wait_for_funded_key node client min_balance dishonest_operator;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance
+          honest_operator;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance
+          dishonest_operator;
       ]
   in
   let* rollup_address =
@@ -256,7 +264,7 @@ let simple_use_case_rollup ~(testnet : unit -> Testnet.t) () =
   let testnet = testnet () in
   let min_balance_operating = Tez.(of_mutez_int 11_000_000_000) in
   let min_balance_batching = Tez.(of_mutez_int 1_000_000) in
-  let* client, node = Helpers.setup_octez_node ~testnet () in
+  let* client, node = Scenario_helpers.setup_octez_node ~testnet () in
   let* msg_sender = get_or_gen_keys ~alias:"msg_sender" client in
   let* operator1 = get_or_gen_keys ~alias:"operator1" client in
   let* operator2 = get_or_gen_keys ~alias:"operator2" client in
@@ -266,12 +274,36 @@ let simple_use_case_rollup ~(testnet : unit -> Testnet.t) () =
   let* () =
     Lwt.join
       [
-        Helpers.wait_for_funded_key node client min_balance_operating operator1;
-        Helpers.wait_for_funded_key node client min_balance_operating operator2;
-        Helpers.wait_for_funded_key node client min_balance_operating accuser;
-        Helpers.wait_for_funded_key node client min_balance_batching batcher1;
-        Helpers.wait_for_funded_key node client min_balance_batching batcher2;
-        Helpers.wait_for_funded_key node client min_balance_batching msg_sender;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance_operating
+          operator1;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance_operating
+          operator2;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance_operating
+          accuser;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance_batching
+          batcher1;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance_batching
+          batcher2;
+        Scenario_helpers.wait_for_funded_key
+          node
+          client
+          min_balance_batching
+          msg_sender;
       ]
   in
   let rollup_alias = "evm_rollup_simple_case" in
@@ -367,13 +399,13 @@ let simple_use_case_rollup ~(testnet : unit -> Testnet.t) () =
     | `Batcher1 ->
         let* _hashes =
           Sc_rollup_node.RPC.call batcher_node1
-          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages
+          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages ()
         in
         unit
     | `Batcher2 ->
         let* _hashes =
           Sc_rollup_node.RPC.call batcher_node2
-          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages
+          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages ()
         in
         unit
     | `Node ->

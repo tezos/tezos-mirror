@@ -2785,6 +2785,13 @@ module Sc_rollup = struct
           Data_encoding.(
             option Sc_rollup.Whitelist.last_whitelist_update_encoding)
         RPC_path.(path_sc_rollup / "last_whitelist_update")
+
+    let consumed_outputs =
+      RPC_service.get_service
+        ~description:"Return the known consumed outputs of a smart rollup."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(list int31)
+        RPC_path.(path_sc_rollup / "consumed_outputs" /: Raw_level.rpc_arg)
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2813,6 +2820,38 @@ module Sc_rollup = struct
           in
           return_some last_whitelist_update
         else return_none)
+
+  let register_consumed_outputs () =
+    let open Lwt_result_syntax in
+    Registration.register2 ~chunked:true S.consumed_outputs
+    @@ fun ctxt address outbox_level () () ->
+    let raw_ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+    let bitset_to_list field =
+      let[@tailrec] rec to_list pos acc field =
+        if Z.equal Z.zero field then acc
+        else
+          let acc = if Z.testbit field 0 then pos :: acc else acc in
+          to_list (pos + 1) acc (Z.shift_right field 1)
+      in
+      to_list 0 [] field
+    in
+    let max_active_levels =
+      Constants_storage.sc_rollup_max_active_outbox_levels raw_ctxt
+    in
+    let level_i = Raw_level.to_int32 outbox_level in
+    let level_index = Int32.rem level_i max_active_levels in
+    let* _ctxt, lvl_bitset_opt =
+      Storage.Sc_rollup.Applied_outbox_messages.find
+        (raw_ctxt, address)
+        level_index
+    in
+    match lvl_bitset_opt with
+    | None -> return []
+    | Some (found_level, bitset) ->
+        if Raw_level_repr.to_int32 found_level = level_i then
+          let indices = bitset_to_list (Bitset.to_z bitset) in
+          return indices
+        else return []
 
   let register_kind () =
     let open Lwt_result_syntax in
@@ -2997,6 +3036,7 @@ module Sc_rollup = struct
     register_inbox () ;
     register_whitelist () ;
     register_last_whitelist_update () ;
+    register_consumed_outputs () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
@@ -4173,6 +4213,17 @@ module Delegates = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "delegated_balance")
+
+    let unstaked_frozen_deposits =
+      RPC_service.get_service
+        ~description:
+          "Returns, for each cycle, the sum of unstaked-but-frozen deposits \
+           for this cycle. Cycles go from the last unslashable cycle to the \
+           current cycle."
+        ~query:RPC_query.empty
+        ~output:
+          (Data_encoding.list Delegate_services.deposit_per_cycle_encoding)
+        RPC_path.(path / "unstaked_frozen_deposits")
   end
 
   let unstake_requests ctxt pkh =
@@ -4287,15 +4338,43 @@ module Delegates = struct
       S.delegated_balance
       (fun ctxt pkh () () ->
         let* () = check_delegate_registered ctxt pkh in
-        overrided_delegated_balance ctxt pkh)
+        overrided_delegated_balance ctxt pkh) ;
+    Registration.register1
+      ~chunked:false
+      S.unstaked_frozen_deposits
+      (fun ctxt pkh () () ->
+        let* () = check_delegate_registered ctxt pkh in
+        let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
+        let last_unslashable_cycle =
+          Option.value ~default:Cycle.root
+          @@ Cycle.sub
+               ctxt_cycle
+               (Constants.slashable_deposits_period ctxt
+               + Constants_repr.max_slashing_period)
+        in
+        let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
+        List.map_es
+          (fun cycle ->
+            let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
+            return Delegate_services.{cycle; deposit})
+          cycles)
 
   let delegated_balance ctxt block pkh =
     RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
 
   let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
+
+  let unstaked_frozen_deposits ctxt block pkh =
+    RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
 end
 
 module Staking = struct
+  let context_path :
+      ( Tezos_protocol_environment__Environment_context.rpc_context,
+        Tezos_protocol_environment__Environment_context.rpc_context )
+      Resto.Path.t =
+    RPC_path.(open_root / "context")
+
   let path =
     RPC_path.(
       open_root / "context" / "delegates" /: Signature.Public_key_hash.rpc_arg)
@@ -4327,6 +4406,20 @@ module Staking = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.bool
         RPC_path.(path / "is_forbidden")
+
+    let total_staked =
+      RPC_service.get_service
+        ~description:
+          "Returns the amount of staked tez by delegates, delegators or \
+           overstaked."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            obj3
+              (req "delegates" Tez_repr.encoding)
+              (req "delegators" Tez_repr.encoding)
+              (req "overstaked" Tez_repr.encoding))
+        RPC_path.(context_path / "total_currently_staked")
   end
 
   let contract_stake ctxt ~delegator_contract ~delegate =
@@ -4352,7 +4445,44 @@ module Staking = struct
     let open Lwt_result_syntax in
     return @@ Delegate.is_forbidden_delegate ctxt pkh
 
+  let currently_staked ctxt =
+    let open Lwt_result_syntax in
+    let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+    Stake_storage.fold_on_active_delegates_with_minimal_stake_es
+      ctxt
+      ~order:`Undefined
+      ~init:(Tez_repr.zero, Tez_repr.zero, Tez_repr.zero)
+      ~f:(fun delegate (own, delegated, overstaked) ->
+        let* full_staking_balance =
+          Stake_storage.get_full_staking_balance ctxt delegate
+        in
+        let delegate_own =
+          Full_staking_balance_repr.own_frozen full_staking_balance
+        in
+        let delegate_delegated =
+          Full_staking_balance_repr.staked_frozen full_staking_balance
+        in
+        let* limits = Delegate_staking_parameters.of_delegate ctxt delegate in
+        let allowed =
+          Full_staking_balance_repr.allowed_staked_frozen
+            ~adaptive_issuance_global_limit_of_staking_over_baking:5
+            ~delegate_limit_of_staking_over_baking_millionth:
+              limits.limit_of_staking_over_baking_millionth
+            full_staking_balance
+        in
+        let*? own = Tez_repr.(own +? delegate_own) in
+        let*? delegated =
+          Tez_repr.(delegated +? min delegate_delegated allowed)
+        in
+        let*? delegate_overstaked =
+          Tez_repr.(max delegate_delegated allowed -? allowed)
+        in
+        let*? overstaked = Tez_repr.(overstaked +? delegate_overstaked) in
+        return (own, delegated, overstaked))
+
   let register () =
+    Registration.register0 ~chunked:false S.total_staked (fun ctxt () () ->
+        currently_staked ctxt) ;
     Registration.register1 ~chunked:false S.is_forbidden (fun ctxt pkh () () ->
         check_is_forbidden ctxt pkh) ;
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
@@ -4366,6 +4496,9 @@ module Staking = struct
 
   let stakers ctxt block pkh =
     RPC_context.make_call1 S.stakers ctxt block pkh () ()
+
+  let is_forbidden ctxt block pkh =
+    RPC_context.make_call1 S.is_forbidden ctxt block pkh () ()
 end
 
 module S = struct
@@ -4471,3 +4604,13 @@ let rpc_services =
     ~strategy:`Pick_right
     rpc_services
     !Registration.patched_services
+
+let get_blocks_preservation_cycles ~get_context =
+  let open Lwt_option_syntax in
+  let constants_key = [Constants_repr.version; "constants"] in
+  let* ctxt = Lwt.map Option.some (get_context ()) in
+  let* bytes = Tezos_protocol_environment.Context.find ctxt constants_key in
+  let*? constants_parametrics =
+    Data_encoding.Binary.of_bytes_opt Constants_parametric_repr.encoding bytes
+  in
+  return constants_parametrics.blocks_preservation_cycles

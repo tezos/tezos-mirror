@@ -16,12 +16,10 @@ depends: [
   "tezos-dal-node-lib" { = version }
   "tezos-dal-node-services" { = version }
   "octez-l2-libs" { = version }
-  "octez-internal-libs" { = version }
-  "prometheus-app" { >= "1.2" }
-  "prometheus" { >= "1.2" }
-  "octez-protocol-018-Proxford-libs" { = version }
-  "octez-protocol-019-PtParisB-libs" { = version }
+  "octez-crawler" { = version }
+  "memtrace"
   "octez-protocol-020-PsParisC-libs" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
 ]
 depopts: [
   "octez-protocol-alpha-libs"

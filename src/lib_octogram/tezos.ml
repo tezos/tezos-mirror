@@ -200,9 +200,6 @@ let wait_for_l1_level_on_endpoint target_level endpoint =
 let wait_for_l1_level cli_endpoint level =
   match cli_endpoint with
   | Client.Node node -> Node.wait_for_level node level
-  | Client.Proxy_server proxy_server ->
-      Proxy_server.as_rpc_endpoint proxy_server
-      |> wait_for_l1_level_on_endpoint level
   | Client.Foreign_endpoint endpoint ->
       wait_for_l1_level_on_endpoint level endpoint
 
@@ -211,6 +208,12 @@ let octez_endpoint state endpoint =
   | Uri.Owned {name = node} ->
       Client.Node (Agent_state.find (Octez_node_k node) state)
   | Remote {endpoint} -> Foreign_endpoint (parse_endpoint endpoint)
+
+let octez_foreign_endpoint state endpoint =
+  match endpoint with
+  | Uri.Owned {name = node} ->
+      Node.as_rpc_endpoint (Agent_state.find (Octez_node_k node) state)
+  | Remote {endpoint} -> parse_endpoint endpoint
 
 let dal_foreign_endpoint state endpoint =
   match endpoint with
@@ -475,7 +478,7 @@ module Start_octez_node = struct
 
   let config_dal_srs node _dal_cryptobox_parameters =
     let config : Tezos_crypto_dal_octez_dal_config.Dal_config.t =
-      {activated = true; use_mock_srs_for_testing = true; bootstrap_peers = []}
+      {activated = true; bootstrap_peers = []}
     in
     Node.Config_file.update
       node
@@ -484,20 +487,19 @@ module Start_octez_node = struct
   let setup_octez_node ~network ~sync_threshold ~path_node ~metrics_port
       ~rpc_port ~net_port ~peers ?name ?snapshot ?dal_cryptobox_parameters () =
     let l1_node_args =
-      Node.
-        [
-          (* By default, Tezt set the difficulty to generate the identity file
-             of the Octez node to 0 (`--expected-pow 0`). The default value
-             used in network like mainnet, Weeklynet etc. is 26 (see
-             `lib_node_config/config_file.ml`). *)
-          Expected_pow 0;
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
+      [
+        (* By default, Tezt set the difficulty to generate the identity file
+           of the Octez node to 0 (`--expected-pow 0`). The default value
+           used in network like mainnet, Weeklynet etc. is 26 (see
+           `lib_node_config/config_file.ml`). *)
+        Node.Expected_pow 0;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
 
-             Use default PoW and add an option to override it. *)
-          Synchronisation_threshold sync_threshold;
-          Network network;
-          Metrics_addr (sf "0.0.0.0:%d" metrics_port);
-        ]
+           Use default PoW and add an option to override it. *)
+        Synchronisation_threshold sync_threshold;
+        Network network;
+        Metrics_addr (sf "0.0.0.0:%d" metrics_port);
+      ]
       @ List.map (fun x -> Node.Peer x) peers
     in
     let node =
@@ -1328,8 +1330,7 @@ module Originate_smart_contract = struct
       conv
         (fun {client_base; wallet; alias; src; script_path; amount; init; wait} ->
           (client_base, (wallet, alias, src, script_path, amount, init, wait)))
-        (fun (client_base, (wallet, alias, src, script_path, amount, init, wait))
-             ->
+        (fun (client_base, (wallet, alias, src, script_path, amount, init, wait)) ->
           {client_base; wallet; alias; src; script_path; amount; init; wait})
         (merge_objs
            (client_base_args_encoding uri_encoding)
@@ -2180,8 +2181,7 @@ module Start_dac_node = struct
                mode;
              } ->
           (path_dac_node, path_client, endpoint, name, wallet, rpc_port, mode))
-        (fun (path_dac_node, path_client, endpoint, name, wallet, rpc_port, mode)
-             ->
+        (fun (path_dac_node, path_client, endpoint, name, wallet, rpc_port, mode) ->
           {path_dac_node; path_client; endpoint; name; wallet; rpc_port; mode})
         (obj7
            (req "path_dac_node" uri_encoding)
@@ -2267,8 +2267,8 @@ module Start_dac_node = struct
           let* committee_members =
             Lwt_list.map_p
               (fun name ->
-                let* account = Client.bls_show_address client ~alias:name in
-                return account.aggregate_public_key)
+                let* account = Client.show_address client ~alias:name in
+                return account.public_key)
               committee_members_aliases
           in
           let dac_node =
@@ -2288,7 +2288,7 @@ module Start_dac_node = struct
             state ;
           return dac_node
       | Member {alias; coordinator} ->
-          let* member_account = Client.bls_show_address client ~alias in
+          let* member_account = Client.show_address client ~alias in
           let coordinator_rpc_host, coordinator_rpc_port =
             dac_rpc_info state `Coordinator coordinator
           in
@@ -2300,7 +2300,7 @@ module Start_dac_node = struct
               ?name:args.name
               ~client
               ~endpoint
-              ~address:member_account.aggregate_public_key_hash
+              ~address:member_account.public_key_hash
               ~coordinator_rpc_host
               ~coordinator_rpc_port
               ()
@@ -2861,7 +2861,7 @@ module Start_octez_dal_node = struct
         ~rpc_port
         ~listen_addr:(mk_addr net_port)
         ~metrics_addr:(mk_addr metrics_port)
-        ~l1_node_endpoint:(octez_endpoint state l1_node_uri)
+        ~l1_node_endpoint:(octez_foreign_endpoint state l1_node_uri)
         ()
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
@@ -3060,8 +3060,6 @@ module Start_octez_baker = struct
           Lwt.return (node_data_dir, fe)
       | None, Client.Node node ->
           Lwt.return (Node.data_dir node, Node.as_rpc_endpoint node)
-      | _, Client.Proxy_server _ ->
-          Test.fail "Proxy_server not supported as a Node endpoint for baking"
       | Some _, Client.Node _ ->
           Test.fail
             "Should not provide both a node data dir and an 'owned' node"
@@ -3288,7 +3286,7 @@ module Publish_dal_slot : Remote_procedure.S = struct
     let* commitment, proof =
       Dal_common.Helpers.(
         make_slot ~slot_size:(positive_int_of_string slot_size) payload
-        |> store_slot ~with_proof:true (Either.Right dal_endpoint))
+        |> store_slot_uri ~slot_index:(int_of_string slot_index) dal_endpoint)
     in
 
     let* publish_to_l1 =

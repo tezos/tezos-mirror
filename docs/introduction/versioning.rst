@@ -21,6 +21,7 @@ When new features are needed by a proposed protocol, or if the protocol API is c
 see :ref:`Protocol environment versions <environment_versions>`.
 The new environment is delivered as part of a new Octez release.
 
+.. _rpc_versioning:
 
 RPC Versioning
 --------------
@@ -70,7 +71,7 @@ For example::
    is now 5 (previously 4). You can still use the previous version
    by calling the RPC with the parameter ?version=4.
 
-As a general rule (that we may break exceptionnaly), changing the
+As a general rule (that we may break exceptionally), changing the
 default version number of an RPC always follows a deprecation period.
 
 Deprecated Version
@@ -83,3 +84,45 @@ For example::
 
    The version 4 for RPC GET chains/main/mempool/pending_operations
    is deprecated and may be removed in the next major release of Octez.
+
+Moreover, the following deprecation policy is applied.
+
+Deprecation Policy
+~~~~~~~~~~~~~~~~~~
+
+As part of our ongoing efforts to improve and streamline our services,
+we have established a deprecation policy for RPC endpoints.
+
+Deprecation: RPC endpoints can be marked as ``DEPRECATED``, which serves as a
+fair warning that these endpoints will soon be turned off. Developers are
+actively encouraged to upgrade their code to use alternative endpoints at this stage.
+
+Sunset: The sunset of an RPC endpoint indicates that it is no longer
+available and supported. This can occur no earlier than ``6`` months
+after the version in which the endpoint was deprecated. For example,
+an RPC endpoint marked as deprecated in January (such as in Octez
+version ``19.x``) could be removed no earlier than July (that could
+correspond to an Octez version ``21.x`` -- depending on the release
+pace).
+
+The ``DEPRECATED`` flag is visible in the RPC endpoint description in the
+:doc:`RPC reference <../shell/rpc>`.
+
+Deprecated RPCs that have passed the sunset date will be deleted. The deleted
+RPCs will be advertised as :doc:`breaking changes <../introduction/breaking_changes>`
+and in the changelog of Octez versions.
+
+Sunset Dates
+""""""""""""
+
+.. When RPCs are set as deprecated, use the following template to
+   announce their sunset dates:
+   `/path/to/rpc_name <../shell/rpc.html#get-path-to-rpc_name>`__
+   <blank line>
+   - Deprecated: vX.X, Month 20xx
+   - Planned Sunset: vX.0 (not before Qx 20xx)
+   - Comment: Use `/new/path/new_name <../shell/rpc.html#get-new-path-new_name>`__ instead..
+
+Currently, the following RPCs are subject to the deprecation policy.
+
+- None

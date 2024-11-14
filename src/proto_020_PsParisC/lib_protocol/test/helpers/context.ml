@@ -29,12 +29,14 @@ open Alpha_context
 
 type t = B of Block.t | I of Incremental.t
 
-let get_alpha_ctxt ?(policy = Block.By_round 0) c =
+(* Begins the construction of a block with the first available baker.
+   Fails if no baker can bake the next block. *)
+let get_alpha_ctxt c =
   let open Lwt_result_syntax in
   match c with
   | I i -> return (Incremental.alpha_ctxt i)
   | B b ->
-      let* i = Incremental.begin_construction ~policy b in
+      let* i = Incremental.begin_construction ~policy:(Block.Excluding []) b in
       return (Incremental.alpha_ctxt i)
 
 let branch = function B b -> b.hash | I i -> (Incremental.predecessor i).hash
@@ -266,7 +268,7 @@ let get_bonus_reward ctxt ~attesting_power =
       ~reward_kind:Baking_reward_bonus_per_slot
   in
   let multiplier = max 0 (attesting_power - consensus_threshold) in
-  return Test_tez.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
+  return Tez_helpers.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
 let get_attesting_reward ctxt ~expected_attesting_power =
   let open Lwt_result_wrap_syntax in
@@ -513,6 +515,9 @@ module Delegate = struct
   let staking_balance ctxt pkh =
     Delegate_services.staking_balance rpc_ctxt ctxt pkh
 
+  let unstaked_frozen_deposits ctxt pkh =
+    Plugin.RPC.Delegates.unstaked_frozen_deposits rpc_ctxt ctxt pkh
+
   let staking_denominator ctxt pkh =
     let open Lwt_result_syntax in
     let+ pseudotokens =
@@ -531,14 +536,11 @@ module Delegate = struct
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
-  let is_forbidden ?policy ctxt pkh =
-    let open Lwt_result_syntax in
-    let* ctxt = get_alpha_ctxt ?policy ctxt in
-    return (Delegate.is_forbidden_delegate ctxt pkh)
+  let is_forbidden ctxt pkh = Plugin.RPC.Staking.is_forbidden rpc_ctxt ctxt pkh
 
-  let stake_for_cycle ?policy ctxt cycle pkh =
+  let stake_for_cycle ctxt cycle pkh =
     let open Lwt_result_wrap_syntax in
-    let* alpha_ctxt = get_alpha_ctxt ?policy ctxt in
+    let* alpha_ctxt = get_alpha_ctxt ctxt in
     let*@ stakes =
       Protocol.Alpha_context.Stake_distribution.Internal_for_tests
       .get_selected_distribution
@@ -745,7 +747,7 @@ let init_with_parameters1 = init_with_parameters_gen T1
 
 let init_with_parameters2 = init_with_parameters_gen T2
 
-let default_raw_context () =
+let raw_context_from_constants constants =
   let open Lwt_result_wrap_syntax in
   let open Tezos_protocol_020_PsParisC_parameters in
   let initial_account = Account.new_account () in
@@ -754,7 +756,6 @@ let default_raw_context () =
       ~balance:(Tez.of_mutez_exn 100_000_000_000L)
       initial_account
   in
-  let* constants, _, _ = Block.prepare_initial_context_params () in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts:[bootstrap_accounts]
@@ -787,3 +788,8 @@ let default_raw_context () =
       ~typecheck_smart_rollup
   in
   return e
+
+let default_raw_context () =
+  let open Lwt_result_wrap_syntax in
+  let* constants, _, _ = Block.prepare_initial_context_params () in
+  raw_context_from_constants constants

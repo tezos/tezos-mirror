@@ -349,13 +349,13 @@ data).
 
 The entrypoint format is as follows:
 
- - one byte ``0`` for entrypoint ``%default``
- - one byte ``1`` for entrypoint ``%root``
- - one byte ``2`` for entrypoint ``%do``
- - one byte ``3`` for entrypoint ``%set_delegate``
- - one byte ``4`` for entrypoint ``%remove_delegate``
- - one byte ``255`` for a named entrypoint, then one byte of entrypoint
-   name size (limited to 31), and the name itself
+- one byte ``0`` for entrypoint ``%default``
+- one byte ``1`` for entrypoint ``%root``
+- one byte ``2`` for entrypoint ``%do``
+- one byte ``3`` for entrypoint ``%set_delegate``
+- one byte ``4`` for entrypoint ``%remove_delegate``
+- one byte ``255`` for a named entrypoint, then one byte of entrypoint
+  name size (limited to 31), and the name itself
 
 Bytes ``5`` to ``254`` are unused and may be used in future update to
 optimize in size frequent calls to common entrypoints.
@@ -367,10 +367,10 @@ In Babylon, smart contracts do not have a manager anymore, and must have a scrip
 
 The following field thus disappear:
 
- - the manager public key (21 bytes),
- - the spendable flag (1 byte),
- - the delegatable flag (1 byte),
- - the presence flag before the script field (1 byte).
+- the manager public key (21 bytes),
+- the spendable flag (1 byte),
+- the delegatable flag (1 byte),
+- the presence flag before the script field (1 byte).
 
 The tags of all manager operations are shifted by ``100``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -379,10 +379,10 @@ Because of the incompatibilities above, all manager operations see
 their tags changed. The transaction format incompatibility between
 Athens and Babylon is made explicit by this change.
 
-  - the reveal operation tag goes from ``7`` to ``107``,
-  - the transaction operation tag goes from ``8`` to ``108``,
-  - the origination operation tag goes from ``9`` to ``109``,
-  - the delegation operation tag goes from ``10`` to ``110``.
+- the reveal operation tag goes from ``7`` to ``107``,
+- the transaction operation tag goes from ``8`` to ``108``,
+- the origination operation tag goes from ``9`` to ``109``,
+- the delegation operation tag goes from ``10`` to ``110``.
 
 Developers who inject transactions in the chain must adapt to this new
 tagging policy. The recommended procedure is to make a dynamic test,

@@ -1,0 +1,132 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name fixtures)
+ (package octez-libs)
+ (libraries
+  octez-libs.resto-directory
+  octez-libs.resto-json
+  lwt)
+ (modules directory services))
+
+(library
+ (name util)
+ (package octez-libs)
+ (libraries
+  alcotest
+  alcotest-lwt
+  lwt)
+ (modules util))
+
+(executable
+ (name acl_unit_test)
+ (libraries
+  octez-libs.resto-acl)
+ (flags
+  (:standard)
+  -open Resto_acl)
+ (modules acl_unit_test))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./acl_unit_test.exe})))
+
+(executable
+ (name acl_integration_test)
+ (libraries
+  lwt
+  lwt.unix
+  octez-libs.json-data-encoding
+  ezjsonm
+  octez-libs.cohttp-lwt
+  octez-libs.cohttp-lwt-unix
+  octez-libs.resto-json
+  octez-libs.resto
+  octez-libs.resto-acl
+  octez-libs.resto-cohttp-server
+  octez-libs.resto-cohttp-client)
+ (modules acl_integration_test))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./acl_integration_test.exe})))
+
+(executable
+ (name chunked_output_integration_test)
+ (libraries
+  lwt
+  lwt.unix
+  octez-libs.json-data-encoding
+  ezjsonm
+  octez-libs.cohttp-lwt
+  octez-libs.cohttp-lwt-unix
+  octez-libs.resto-json
+  octez-libs.resto-acl
+  octez-libs.resto-cohttp-server
+  octez-libs.resto-cohttp-client)
+ (modules chunked_output_integration_test))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./chunked_output_integration_test.exe})))
+
+(executable
+ (name resto_test)
+ (libraries
+  fixtures
+  util
+  octez-libs.resto-directory
+  octez-libs.resto-json
+  octez-libs.json-data-encoding
+  octez-libs.json-data-encoding-bson
+  lwt
+  lwt.unix)
+ (modules resto_test))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./resto_test.exe})))
+
+(executable
+ (name self_serving_client_test)
+ (libraries
+  octez-libs.resto-directory
+  octez-libs.resto-json
+  octez-libs.resto-cohttp-self-serving-client
+  octez-libs.resto-cohttp
+  octez-libs.resto-cohttp-client
+  octez-libs.resto-cohttp-server
+  octez-libs.json-data-encoding
+  ezjsonm
+  lwt
+  lwt.unix)
+ (modules self_serving_client_test))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./self_serving_client_test.exe})))
+
+(executable
+ (name directory_test)
+ (libraries
+  fixtures
+  util
+  octez-libs.resto-directory
+  octez-libs.resto-json
+  octez-libs.resto-cohttp
+  lwt
+  alcotest
+  alcotest-lwt
+  fmt)
+ (modules directory_test))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./directory_test.exe})))

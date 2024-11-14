@@ -151,6 +151,9 @@ let init () =
     Log.warn
       "Grafana is not configured: Grafana dashboards will not be updated."
 
+(* [~team] argument of the test that is currently running. *)
+let current_team : string option ref = ref None
+
 module Alerts : sig
   type category = string
 
@@ -170,17 +173,26 @@ end = struct
    * and dumped on disc on_exit *)
   let last_messages = ref Map.empty
 
-  let default_alert_category = ""
+  (* Encode a [category, team] pair into a string.
+     Technically, there are cases where two pairs could result in the same category,
+     e.g. ["a", "b_c"] and ["a_b", "c"] both result in ["a_b_c"].
+     In practice it should be fine. *)
+  let full_category category =
+    match (category, !current_team) with
+    | None, None -> "_"
+    | Some s, None -> s ^ "_"
+    | None, Some s -> "_" ^ s
+    | Some c, Some t -> c ^ "_" ^ t
 
   let may_send_rate_limit alert_cfg category =
     let now = Unix.gettimeofday () in
-    let c = Option.value ~default:default_alert_category category in
-    match Map.find_opt c !last_messages with
+    let category = full_category category in
+    match Map.find_opt category !last_messages with
     | None -> true
     | Some t -> now >= t +. alert_cfg.rate_limit_per_category
 
   let add category now =
-    let category = Option.value ~default:default_alert_category category in
+    let category = full_category category in
     last_messages := Map.add category now !last_messages
 
   let encode (c, t) = `O [("category", `String c); ("time", `Float t)]
@@ -246,7 +258,7 @@ let with_timeout timeout promise () =
 type current_test = {
   title : string;
   filename : string;
-  team : string option;
+  team : string;
   mutable data_points : InfluxDB.data_point list String_map.t;
   mutable alert_count : int;
 }
@@ -377,7 +389,7 @@ let alert_s ?category ~log message =
         let () = Alerts.dump alert_cfg in
         let slack_webhook_url =
           match !current_test with
-          | Some {team = Some team; _} -> (
+          | Some {team; _} -> (
               match
                 String_map.find_opt team alert_cfg.team_slack_webhook_urls
               with
@@ -558,42 +570,42 @@ module Stats = struct
         fun (a, (b, c)) -> (a, b, c) )
 
   let rec functions : 'a. 'a t -> _ =
-    fun (type a) (stats : a t) ->
-     match stats with
-     | Int func | Float func -> [func]
-     | Pair (a, b) -> functions a @ functions b
-     | Convert (stats, _, _) -> functions stats
+   fun (type a) (stats : a t) ->
+    match stats with
+    | Int func | Float func -> [func]
+    | Pair (a, b) -> functions a @ functions b
+    | Convert (stats, _, _) -> functions stats
 
   let rec get : 'a. _ -> 'a t -> 'a =
-    fun (type a) result_data_point (stats : a t) ->
-     let result : a =
-       match stats with
-       | Int func ->
-           InfluxDB.get
-             (InfluxDB.column_name_of_func func)
-             JSON.as_int
-             result_data_point
-       | Float func ->
-           InfluxDB.get
-             (InfluxDB.column_name_of_func func)
-             JSON.as_float
-             result_data_point
-       | Pair (a, b) -> (get result_data_point a, get result_data_point b)
-       | Convert (stats, _, decode) -> decode (get result_data_point stats)
-     in
-     result
+   fun (type a) result_data_point (stats : a t) ->
+    let result : a =
+      match stats with
+      | Int func ->
+          InfluxDB.get
+            (InfluxDB.column_name_of_func func)
+            JSON.as_int
+            result_data_point
+      | Float func ->
+          InfluxDB.get
+            (InfluxDB.column_name_of_func func)
+            JSON.as_float
+            result_data_point
+      | Pair (a, b) -> (get result_data_point a, get result_data_point b)
+      | Convert (stats, _, decode) -> decode (get result_data_point stats)
+    in
+    result
 
   let show stats values =
     let rec gather : 'a. 'a t -> 'a -> _ =
-      fun (type a) (stats : a t) (values : a) ->
-       match stats with
-       | Int func -> [(InfluxDB.column_name_of_func func, string_of_int values)]
-       | Float func ->
-           [(InfluxDB.column_name_of_func func, string_of_float values)]
-       | Pair (a, b) ->
-           let v, w = values in
-           gather a v @ gather b w
-       | Convert (stats, encode, _) -> gather stats (encode values)
+     fun (type a) (stats : a t) (values : a) ->
+      match stats with
+      | Int func -> [(InfluxDB.column_name_of_func func, string_of_int values)]
+      | Float func ->
+          [(InfluxDB.column_name_of_func func, string_of_float values)]
+      | Pair (a, b) ->
+          let v, w = values in
+          gather a v @ gather b w
+      | Convert (stats, encode, _) -> gather stats (encode values)
     in
     gather stats values
     |> List.map (fun (name, value) -> sf "%s = %s" name value)
@@ -772,20 +784,25 @@ let check_time_preconditions measurement =
   if String.contains measurement '\n' then
     invalid_arg "Long_test.time: newline character in measurement"
 
+let measure_data_points ~repeat ~tags ?(field = "duration") measurement f =
+  let data_points = ref [] in
+  for _ = 1 to repeat do
+    let value = f () in
+    let data_point =
+      InfluxDB.data_point ~tags measurement (field, Float value)
+    in
+    add_data_point data_point ;
+    data_points := data_point :: !data_points
+  done ;
+  !data_points
+
 let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
-    ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
+    ?check ?stddev ?(repeat = 1) ?(tags = []) ?(field = "duration") measurement
+    f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
-    let data_points = ref [] in
-    for _ = 1 to repeat do
-      let duration = f () in
-      let data_point =
-        InfluxDB.data_point ~tags measurement ("duration", Float duration)
-      in
-      add_data_point data_point ;
-      data_points := data_point :: !data_points
-    done ;
+    let data_points = measure_data_points ~repeat ~tags ~field measurement f in
     check_regression
       ?previous_count
       ?minimum_previous_count
@@ -793,12 +810,23 @@ let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
       ?check
       ?stddev
       ~tags
-      ~data_points:!data_points
+      ~data_points
       measurement
-      "duration"
+      field
 
-let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
-    ?tags measurement f =
+let measure ?(repeat = 1) ?(tags = []) ?field measurement f =
+  let _data_points = measure_data_points ~repeat ~tags ?field measurement f in
+  ()
+
+let time ?repeat ?tags measurement f =
+  measure ?repeat ?tags measurement (fun () ->
+      let start = Unix.gettimeofday () in
+      f () ;
+      let stop = Unix.gettimeofday () in
+      stop -. start)
+
+let time_and_check_regression ?previous_count ?minimum_previous_count ?margin
+    ?check ?stddev ?repeat ?tags measurement f =
   measure_and_check_regression
     ?previous_count
     ?minimum_previous_count
@@ -814,21 +842,28 @@ let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
       let stop = Unix.gettimeofday () in
       stop -. start)
 
+let measure_data_points_lwt ~repeat ~tags ?(field = "duration") measurement f =
+  let data_points = ref [] in
+  let* () =
+    Base.repeat repeat @@ fun () ->
+    let* value = f () in
+    let data_point =
+      InfluxDB.data_point ~tags measurement (field, Float value)
+    in
+    add_data_point data_point ;
+    data_points := data_point :: !data_points ;
+    unit
+  in
+  return !data_points
+
 let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
-    ?margin ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
+    ?margin ?check ?stddev ?(repeat = 1) ?(tags = []) ?(field = "duration")
+    measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
-    let data_points = ref [] in
-    let* () =
-      Base.repeat repeat @@ fun () ->
-      let* duration = f () in
-      let data_point =
-        InfluxDB.data_point ~tags measurement ("duration", Float duration)
-      in
-      add_data_point data_point ;
-      data_points := data_point :: !data_points ;
-      unit
+    let* data_points =
+      measure_data_points_lwt ~repeat ~tags ~field measurement f
     in
     check_regression
       ?previous_count
@@ -837,12 +872,25 @@ let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
       ?check
       ?stddev
       ~tags
-      ~data_points:!data_points
+      ~data_points
       measurement
-      "duration"
+      field
 
-let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
-    ?repeat ?tags measurement f =
+let measure_lwt ?(repeat = 1) ?(tags = []) ?field measurement f =
+  let* _data_points =
+    measure_data_points_lwt ~repeat ~tags ?field measurement f
+  in
+  Lwt.return_unit
+
+let time_lwt ?repeat ?tags measurement f =
+  measure_lwt ?repeat ?tags measurement (fun () ->
+      let start = Unix.gettimeofday () in
+      let* () = f () in
+      let stop = Unix.gettimeofday () in
+      Lwt.return (stop -. start))
+
+let time_and_check_regression_lwt ?previous_count ?minimum_previous_count
+    ?margin ?check ?stddev ?repeat ?tags measurement f =
   measure_and_check_regression_lwt
     ?previous_count
     ?minimum_previous_count
@@ -870,11 +918,7 @@ let x86_executor2 = Executor "x86_executor2"
 let block_replay_executor = Executor "block_replay_testing_executor1"
 
 let make_tags team executors tags =
-  let misc_tags =
-    match team with
-    | None -> "long" :: tags
-    | Some team -> "long" :: team :: tags
-  in
+  let misc_tags = "long" :: team :: tags in
   let executor_tags = List.map (fun (Executor x) -> x) executors in
   executor_tags @ misc_tags
 
@@ -901,11 +945,15 @@ let wrap_body title filename team timeout body argument =
       unit)
 
 let register ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
-    ?uses_admin_client ?team ~executors ~timeout body =
+    ?uses_admin_client ~team ~executors ~timeout body =
   if String.contains title '\n' then
     invalid_arg
       "Long_test.register: long test titles cannot contain newline characters" ;
   let tags = make_tags team executors tags in
+  let body () =
+    current_team := Some team ;
+    body ()
+  in
   Test.register
     ~__FILE__
     ~title

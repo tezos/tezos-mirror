@@ -114,7 +114,6 @@ type rpc_context_args = {
       (** How to perform RPC calls. We need such a value, because the proxy mode
           performs RPCs to initialize itself (by requesting the header) and
           also to fill {!Tezos_protocol_environment.Proxy_context} on-demand. *)
-  mode : Proxy.mode;  (** Whether the client or the proxy server is running. *)
   chain : Tezos_shell_services.Block_services.chain;
       (** The chain to provide RPC calls for. *)
   block : Tezos_shell_services.Block_services.block;

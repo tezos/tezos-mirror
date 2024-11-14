@@ -5,13 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type unsafe_patch = Increase_max_nb_ticks of int64
+type unsafe_patch =
+  | Increase_max_nb_ticks of int64
+  | Patch_durable_storage of {key : string; value : string}
 
 type kind = Hardcoded | User_provided
 
 type t = (unsafe_patch * kind) list
 
-let patch_kinds = function Increase_max_nb_ticks _ -> [Kind.Wasm_2_0_0]
+let patch_kinds = function
+  | Increase_max_nb_ticks _ -> [Kind.Wasm_2_0_0]
+  | Patch_durable_storage _ -> [Kind.Wasm_2_0_0]
 
 (* Patches for Etherlink PVM. *)
 let etherlink_patches = [(Increase_max_nb_ticks 50_000_000_000_000L, Hardcoded)]
@@ -33,13 +37,29 @@ let unsafe_patch_encoding =
         (Tag 0)
         ~title:"increase_max_nb_tick"
         (obj1 (req "increase_max_nb_tick" int64))
-        (function Increase_max_nb_ticks ticks -> Some ticks)
+        (function Increase_max_nb_ticks ticks -> Some ticks | _ -> None)
         (fun ticks -> Increase_max_nb_ticks ticks);
+      case
+        (Tag 1)
+        ~title:"patch_durable_storage"
+        (obj1
+           (req
+              "patch_durable_storage"
+              (obj2 (req "key" string) (req "value" (string' Hex)))))
+        (function
+          | Patch_durable_storage {key; value} -> Some (key, value) | _ -> None)
+        (fun (key, value) -> Patch_durable_storage {key; value});
     ]
 
 let pp_unsafe_patch fmt = function
   | Increase_max_nb_ticks nb ->
       Format.fprintf fmt "Increase maximum number of ticks to %#Ld" nb
+  | Patch_durable_storage {key; value} ->
+      Format.fprintf
+        fmt
+        "Rewrites value at %s with %s"
+        key
+        Hex.(of_string value |> show)
 
 let make kind rollup_address user_provided_patches =
   let open Result_syntax in

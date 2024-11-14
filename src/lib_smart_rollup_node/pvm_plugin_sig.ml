@@ -47,6 +47,14 @@ type 'fuel eval_result = {
   num_messages : int;
 }
 
+(* The cache allows cache intermediate states of the PVM in e.g. dissections. *)
+module Tick_state_cache : Aches_lwt.Lache.MAP_RESULT with type key = Z.t =
+  Aches_lwt.Lache.Make_result (Aches.Rache.Transfer (Aches.Rache.LRU) (Z))
+
+type state_cache = (Fuel.Accounted.t eval_state, tztrace) Tick_state_cache.t
+
+let make_state_cache n = Tick_state_cache.create n
+
 module type FUELED_PVM = sig
   type fuel
 
@@ -98,6 +106,12 @@ module type S = sig
     Context.pvmstate ->
     outbox_level:int32 ->
     int option Lwt.t
+
+  val get_outbox_messages :
+    _ Node_context.t ->
+    Context.pvmstate ->
+    outbox_level:int32 ->
+    (int * Outbox_message.summary) list Lwt.t
 
   val produce_serialized_output_proof :
     Node_context.rw ->

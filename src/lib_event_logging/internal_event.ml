@@ -61,6 +61,8 @@ let default_error_fallback_logger =
       Lwt.return_unit)
 
 module Level = struct
+  exception Not_a_level of string
+
   type t = level
 
   let default = Info
@@ -73,7 +75,9 @@ module Level = struct
     | Error -> "error"
     | Fatal -> "fatal"
 
-  let of_string str =
+  let opt_to_string = function Some l -> to_string l | None -> "none"
+
+  let of_string_exn str =
     let str = String.lowercase_ascii str in
     match str with
     | "debug" -> Some Debug
@@ -82,7 +86,8 @@ module Level = struct
     | "warning" -> Some Warning
     | "error" -> Some Error
     | "fatal" -> Some Fatal
-    | _ -> None
+    | "none" -> None
+    | _ -> raise (Not_a_level str)
 
   let encoding =
     let open Data_encoding in
@@ -154,7 +159,7 @@ end = struct
         List.fold_left
           (fun prev elt ->
             match prev with
-            | t :: q when String.equal t elt -> q
+            | t :: q when String.equal t elt || String.equal "_" elt -> q
             | _ -> raise Not_found)
           main.path
           prefix.path
@@ -184,6 +189,8 @@ let register_section section =
   registered_sections :=
     String.Set.add (Section.name section) !registered_sections
 
+type alternative_color = Magenta | Cyan | Green | Blue
+
 module type EVENT_DEFINITION = sig
   type t
 
@@ -198,15 +205,22 @@ module type EVENT_DEFINITION = sig
   val encoding : t Data_encoding.t
 
   val level : level
+
+  val alternative_color : alternative_color option
 end
 
 module type EVENT = sig
   include EVENT_DEFINITION
 
   val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
+
+  val emit_at_top_level : t -> unit
 end
 
 type 'a event_definition = (module EVENT_DEFINITION with type t = 'a)
+
+type top_level_event =
+  | TopLevel : ('a event_definition * 'a) -> top_level_event
 
 module type SINK = sig
   type t
@@ -246,6 +260,8 @@ module All_sinks = struct
 
   let active : active list ref = ref []
 
+  let top_level_events : top_level_event list ref = ref []
+
   let find_registered scheme_to_find =
     List.find
       (function Registered {scheme; _} -> String.equal scheme scheme_to_find)
@@ -280,12 +296,11 @@ module All_sinks = struct
       ~id:"internal-event-activation-error"
       ~title
       ~description
-      ~pp:
-        (fun ppf -> function
-          | Missing_uri_scheme uri ->
-              Format.fprintf ppf "%s: Missing URI scheme %S" title uri
-          | Uri_scheme_not_registered uri ->
-              Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
+      ~pp:(fun ppf -> function
+        | Missing_uri_scheme uri ->
+            Format.fprintf ppf "%s: Missing URI scheme %S" title uri
+        | Uri_scheme_not_registered uri ->
+            Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
       Data_encoding.(
         union
           [
@@ -304,6 +319,17 @@ module All_sinks = struct
           ])
       (function Activation_error reason -> Some reason | _ -> None)
       (fun reason -> Activation_error reason)
+
+  let handle def section v =
+    let handle (type a) sink definition =
+      let open Lwt_result_syntax in
+      let module S = (val definition : SINK with type t = a) in
+      if S.should_handle ?section sink def then S.handle ?section sink def v
+      else return_unit
+    in
+    List.iter_es
+      (function Active {sink; definition; _} -> handle sink definition)
+      !active
 
   let activate uri =
     let open Lwt_result_syntax in
@@ -326,6 +352,11 @@ module All_sinks = struct
               activate scheme definition
         in
         active := act :: !active ;
+        let* () =
+          List.iter_es
+            (fun (TopLevel (ev, x)) -> handle ev None x)
+            (List.rev !top_level_events)
+        in
         return_unit
 
   let close ?(except = fun _ -> false) () =
@@ -351,17 +382,6 @@ module All_sinks = struct
         to_close_list
     in
     Result_syntax.tzjoin close_results
-
-  let handle def section v =
-    let handle (type a) sink definition =
-      let open Lwt_result_syntax in
-      let module S = (val definition : SINK with type t = a) in
-      if S.should_handle ?section sink def then S.handle ?section sink def v
-      else return_unit
-    in
-    List.iter_es
-      (function Active {sink; definition; _} -> handle sink definition)
-      !active
 
   let pp_state fmt () =
     let open Format in
@@ -481,6 +501,12 @@ module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
 
   let emit ?section x = All_sinks.handle (module E) section x
 
+  let emit_at_top_level x =
+    (* Ensure we only register this event to be emitted once *)
+    let ev = TopLevel ((module E), x) in
+    if not (List.mem ~equal:( = ) ev !All_sinks.top_level_events) then
+      All_sinks.top_level_events := ev :: !All_sinks.top_level_events
+
   let () = All_definitions.add (module E)
 end
 
@@ -489,7 +515,11 @@ module Simple = struct
      explicitly splitting the place where the partial application
      takes place. Indeed, it is important that events are declared
      only once. *)
-  type 'a t = {name : string; emit : 'a -> unit tzresult Lwt.t}
+  type 'a t = {
+    name : string;
+    emit : 'a -> unit tzresult Lwt.t;
+    emit_at_top_level : 'a -> unit;
+  }
 
   let emit simple_event parameters =
     Lwt.try_bind
@@ -519,6 +549,9 @@ module Simple = struct
           simple_event.name
           (Printexc.to_string exc) ;
         Lwt.return_unit)
+
+  let emit_at_top_level simple_event parameters =
+    simple_event.emit_at_top_level parameters
 
   let emit__dont_wait__use_with_care simple_event parameters =
     Lwt.dont_wait
@@ -581,90 +614,89 @@ module Simple = struct
      If [never_empty] is [true], always print something.
      This is useful for inline parameters. *)
   let rec pp_human_readable :
-            'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
-    fun (type a) ~never_empty (encoding : a Data_encoding.t) fmt (value : a) ->
-     match encoding.encoding with
-     | Null -> if never_empty then Format.pp_print_string fmt "N/A"
-     | Empty -> if never_empty then Format.pp_print_string fmt "N/A"
-     | Ignore -> if never_empty then Format.pp_print_string fmt "N/A"
-     | Constant name -> pp_print_shortened_string fmt name
-     | Bool -> Format.pp_print_bool fmt value
-     | Int8 -> Format.pp_print_int fmt value
-     | Uint8 -> Format.pp_print_int fmt value
-     | Int16 _ -> Format.pp_print_int fmt value
-     | Uint16 _ -> Format.pp_print_int fmt value
-     | Int31 _ -> Format.pp_print_int fmt value
-     | Int32 _ -> Format.fprintf fmt "%ld" value
-     | Int64 _ -> Format.fprintf fmt "%Ld" value
-     | N -> Format.pp_print_string fmt (Z.to_string value)
-     | Z -> Format.pp_print_string fmt (Z.to_string value)
-     | RangedInt _ -> Format.pp_print_int fmt value
-     | RangedFloat _ -> pp_print_compact_float fmt value
-     | Float -> pp_print_compact_float fmt value
-     | Bytes _ -> pp_print_shortened_string fmt (Bytes.to_string value)
-     | String _ -> pp_print_shortened_string fmt value
-     | Bigstring _ -> Format.pp_print_string fmt "<bigstring>"
-     | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
-     | String_enum (table, _) -> (
-         match Stdlib.Hashtbl.find_opt table value with
-         | None -> if never_empty then Format.pp_print_string fmt "N/A"
-         | Some (name, _) -> pp_print_shortened_string fmt name)
-     | Array _ -> if never_empty then Format.pp_print_string fmt "<array>"
-     | List _ -> if never_empty then Format.pp_print_string fmt "<list>"
-     | Obj (Req {encoding; _} | Dft {encoding; _}) ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Obj (Opt {encoding; _}) ->
-         Option.iter (pp_human_readable ~never_empty encoding fmt) value
-     | Objs _ -> if never_empty then Format.pp_print_string fmt "<obj>"
-     | Tup encoding -> pp_human_readable ~never_empty encoding fmt value
-     | Tups _ -> if never_empty then Format.pp_print_string fmt "<tuple>"
-     | Union
-         {
-           cases =
-             [
-               Case {encoding; proj; _};
-               Case {encoding = {encoding = Null; _}; _};
-             ];
-           _;
-         } -> (
-         (* Probably an [option] type or similar.
-            We only print the value if it is not null,
-            unless [never_empty] is [true]. *)
-         match proj value with
-         | None -> if never_empty then Format.pp_print_string fmt "null"
-         | Some value -> pp_human_readable ~never_empty encoding fmt value)
-     | Union _ -> if never_empty then Format.pp_print_string fmt "<union>"
-     | Mu _ -> if never_empty then Format.pp_print_string fmt "<recursive>"
-     | Conv {proj; encoding; _} ->
-         (* TODO: it may be worth it to take a look at [encoding]
-            before calling [proj], to try and predict whether the value
-            will actually be printed. *)
-         pp_human_readable ~never_empty encoding fmt (proj value)
-     | Describe {encoding; _} ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Splitted {json_encoding; _} -> (
-         (* Generally, [Splitted] nodes imply that the JSON encoding
-            is more human-friendly, as JSON is a human-friendly
-            format. A typical example is Blake2B hashes.
-            So for log outputs we use the JSON encoding.
-            Unfortunately, [Json_encoding.t] is abstract so we have
-            to [construct] the JSON value and continue from here. *)
-         (* TODO: it may be worth it to take a look at [encoding]
-            before constructing the JSON value, to try and predict
-            whether the value will actually be printed (same as [Conv]). *)
-         match Json_encoding.construct json_encoding value with
-         | `Null -> if never_empty then Format.pp_print_string fmt "N/A"
-         | `Bool value -> Format.pp_print_bool fmt value
-         | `Float value -> pp_print_compact_float fmt value
-         | `String value -> pp_print_shortened_string fmt value
-         | `A _ -> if never_empty then Format.pp_print_string fmt "<list>"
-         | `O _ -> if never_empty then Format.pp_print_string fmt "<obj>")
-     | Dynamic_size {encoding; _} ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Check_size {encoding; _} ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Delayed make_encoding ->
-         pp_human_readable ~never_empty (make_encoding ()) fmt value
+        'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
+   fun (type a) ~never_empty (encoding : a Data_encoding.t) fmt (value : a) ->
+    match encoding.encoding with
+    | Null -> if never_empty then Format.pp_print_string fmt "N/A"
+    | Empty -> if never_empty then Format.pp_print_string fmt "N/A"
+    | Ignore -> if never_empty then Format.pp_print_string fmt "N/A"
+    | Constant name -> pp_print_shortened_string fmt name
+    | Bool -> Format.pp_print_bool fmt value
+    | Int8 -> Format.pp_print_int fmt value
+    | Uint8 -> Format.pp_print_int fmt value
+    | Int16 _ -> Format.pp_print_int fmt value
+    | Uint16 _ -> Format.pp_print_int fmt value
+    | Int31 _ -> Format.pp_print_int fmt value
+    | Int32 _ -> Format.fprintf fmt "%ld" value
+    | Int64 _ -> Format.fprintf fmt "%Ld" value
+    | N -> Format.pp_print_string fmt (Z.to_string value)
+    | Z -> Format.pp_print_string fmt (Z.to_string value)
+    | RangedInt _ -> Format.pp_print_int fmt value
+    | RangedFloat _ -> pp_print_compact_float fmt value
+    | Float -> pp_print_compact_float fmt value
+    | Bytes _ -> pp_print_shortened_string fmt (Bytes.to_string value)
+    | String _ -> pp_print_shortened_string fmt value
+    | Bigstring _ -> Format.pp_print_string fmt "<bigstring>"
+    | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
+    | String_enum (table, _) -> (
+        match Stdlib.Hashtbl.find_opt table value with
+        | None -> if never_empty then Format.pp_print_string fmt "N/A"
+        | Some (name, _) -> pp_print_shortened_string fmt name)
+    | Array _ -> if never_empty then Format.pp_print_string fmt "<array>"
+    | List _ -> if never_empty then Format.pp_print_string fmt "<list>"
+    | Obj (Req {encoding; _} | Dft {encoding; _}) ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Obj (Opt {encoding; _}) ->
+        Option.iter (pp_human_readable ~never_empty encoding fmt) value
+    | Objs _ -> if never_empty then Format.pp_print_string fmt "<obj>"
+    | Tup encoding -> pp_human_readable ~never_empty encoding fmt value
+    | Tups _ -> if never_empty then Format.pp_print_string fmt "<tuple>"
+    | Union
+        {
+          cases =
+            [
+              Case {encoding; proj; _}; Case {encoding = {encoding = Null; _}; _};
+            ];
+          _;
+        } -> (
+        (* Probably an [option] type or similar.
+           We only print the value if it is not null,
+           unless [never_empty] is [true]. *)
+        match proj value with
+        | None -> if never_empty then Format.pp_print_string fmt "null"
+        | Some value -> pp_human_readable ~never_empty encoding fmt value)
+    | Union _ -> if never_empty then Format.pp_print_string fmt "<union>"
+    | Mu _ -> if never_empty then Format.pp_print_string fmt "<recursive>"
+    | Conv {proj; encoding; _} ->
+        (* TODO: it may be worth it to take a look at [encoding]
+           before calling [proj], to try and predict whether the value
+           will actually be printed. *)
+        pp_human_readable ~never_empty encoding fmt (proj value)
+    | Describe {encoding; _} ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Splitted {json_encoding; _} -> (
+        (* Generally, [Splitted] nodes imply that the JSON encoding
+           is more human-friendly, as JSON is a human-friendly
+           format. A typical example is Blake2B hashes.
+           So for log outputs we use the JSON encoding.
+           Unfortunately, [Json_encoding.t] is abstract so we have
+           to [construct] the JSON value and continue from here. *)
+        (* TODO: it may be worth it to take a look at [encoding]
+           before constructing the JSON value, to try and predict
+           whether the value will actually be printed (same as [Conv]). *)
+        match Json_encoding.construct json_encoding value with
+        | `Null -> if never_empty then Format.pp_print_string fmt "N/A"
+        | `Bool value -> Format.pp_print_bool fmt value
+        | `Float value -> pp_print_compact_float fmt value
+        | `String value -> pp_print_shortened_string fmt value
+        | `A _ -> if never_empty then Format.pp_print_string fmt "<list>"
+        | `O _ -> if never_empty then Format.pp_print_string fmt "<obj>")
+    | Dynamic_size {encoding; _} ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Check_size {encoding; _} ->
+        pp_human_readable ~never_empty encoding fmt value
+    | Delayed make_encoding ->
+        pp_human_readable ~never_empty (make_encoding ()) fmt value
 
   type parameter =
     | Parameter :
@@ -769,7 +801,7 @@ module Simple = struct
       ~name
       (Data_encoding.With_version.first_version encoding)
 
-  let declare_0 ?section ~name ~msg ?(level = Info) () =
+  let declare_0 ?alternative_color ?section ~name ~msg ?(level = Info) () =
     let section = make_section section in
     let parsed_msg = parse_msg [] msg in
     let module Definition : EVENT_DEFINITION with type t = unit = struct
@@ -787,12 +819,18 @@ module Simple = struct
       let encoding = with_version ~name Data_encoding.unit
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun () -> Event.emit ?section ())}
+    {
+      name;
+      emit = (fun () -> Event.emit ?section ());
+      emit_at_top_level = (fun () -> Event.emit_at_top_level ());
+    }
 
-  let declare_1 (type a) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) =
+  let declare_1 (type a) ?alternative_color ?section ~name ~msg ?(level = Info)
+      ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a = struct
@@ -815,12 +853,18 @@ module Simple = struct
       let encoding = with_version ~name f1_enc
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameter -> Event.emit ?section parameter)}
+    {
+      name;
+      emit = (fun parameter -> Event.emit ?section parameter);
+      emit_at_top_level = (fun parameter -> Event.emit_at_top_level parameter);
+    }
 
-  let declare_2 (type a b) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_2 (type a b) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name; f2_name] msg in
@@ -851,12 +895,18 @@ module Simple = struct
              (Data_encoding.req f2_name f2_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
-  let declare_3 (type a b c) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_3 (type a b c) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) =
     let section = make_section section in
@@ -890,12 +940,18 @@ module Simple = struct
              (Data_encoding.req f3_name f3_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
-  let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_4 (type a b c d) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) =
@@ -933,12 +989,18 @@ module Simple = struct
              (Data_encoding.req f4_name f4_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
-  let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_5 (type a b c d e) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -981,12 +1043,18 @@ module Simple = struct
              (Data_encoding.req f5_name f5_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
-  let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_6 (type a b c d e f) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1032,12 +1100,18 @@ module Simple = struct
              (Data_encoding.req f6_name f6_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
-  let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_7 (type a b c d e f g) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1088,12 +1162,18 @@ module Simple = struct
              (Data_encoding.req f7_name f7_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 
-  let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info) ?pp1
-      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_8 (type a b c d e f g h) ?alternative_color ?section ~name ~msg
+      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1147,9 +1227,15 @@ module Simple = struct
              (Data_encoding.req f8_name f8_enc)
 
       let level = level
+
+      let alternative_color = alternative_color
     end in
     let module Event = Make (Definition) in
-    {name; emit = (fun parameters -> Event.emit ?section parameters)}
+    {
+      name;
+      emit = (fun parameters -> Event.emit ?section parameters);
+      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+    }
 end
 
 module Lwt_worker_logger = struct
@@ -1167,6 +1253,8 @@ module Lwt_worker_logger = struct
     let doc = "Worker started event"
 
     let level = Debug
+
+    let alternative_color = None
   end)
 
   module Ended_event = Make (struct
@@ -1183,6 +1271,8 @@ module Lwt_worker_logger = struct
     let doc = "Worker ended event"
 
     let level = Debug
+
+    let alternative_color = None
   end)
 
   module Failed_event = Make (struct
@@ -1200,6 +1290,8 @@ module Lwt_worker_logger = struct
     let doc = "Worker failed event"
 
     let level = Error
+
+    let alternative_color = None
   end)
 
   let on_event name event =

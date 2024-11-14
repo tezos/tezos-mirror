@@ -111,7 +111,6 @@ module Internal_for_tests : sig
     Node_context.rw ->
     is_first_block:bool ->
     predecessor:Layer1.header ->
-    Layer1.header ->
     string list ->
     (Octez_smart_rollup.Inbox.Hash.t
     * Octez_smart_rollup.Inbox.t

@@ -103,43 +103,34 @@ difference between the current head and the examined proposal is
 more than one block, mostly during the initial bootstrap phase, the
 peer worker launches a *bootstrap pipeline* task.
 
-.. _multi_pass_validation:
-
-A third scheme is planned (but not yet implemented) for validating
-alternative chains: the *multi-pass validator*. This method is quite
-more complex, its goal is to detect erroneous blocks as soon as
-possible, without having to download all the chain data. This process
-will work by first validating the block headers, then the operations
-that act on the fitness, and finally the remaining operations. The
-mechanism is actually a bit more flexible and allows for an arbitrary
-number of lists of operations. The shell will only consider forks of a
-given length, that is exported by the protocol, so that block headers
-and operations are validated in the context of an ancestor block that
-is in a close enough time window. In protocol Alpha, the check
-performed on block headers is that the baking slots, baker signatures,
-and timestamp deltas are right. It can also detect too large fitness
-gaps, as the fitness difference between two consecutive blocks is
-bounded in Alpha. The operations that act on fitness are attestations,
-whose checks consist in verifying the attestation slots and attesters'
-signatures. For that to be sound, the fork limit is set to not allow
-rewinding before the baking and attesting slots are set.
-
-Each of these three peer validator tasks (head increment, bootstrap
-pipeline, or multi-pass) will interact with the distributed DB to get
-the data they need (block headers and operations). When they have
-everything needed for a block, they will call the *block validator*.
+Peer validators interact with the *distributed database* to retrieve block
+headers and operations. The database functions as a cache, returning data
+instantly if available or querying linked peers when it's missing. Once a block
+is complete, peer validators submit it to the *block validator*.
 
 .. _block_validator:
 
-The *block validator* validates blocks (currently in sequence),
-assuming that all the necessary data have already been retrieved from
-the peer-to-peer network. When a block is valid, it will notify the
-corresponding chain validator, that may update its head. In this case,
-the chain validator will propagate this information to its associated
-*prevalidator*, and may decide to kill or spawn the test network
-according to the protocol's decision.
+The block validator processes blocks sequentially, assuming all necessary data
+has already been retrieved from the peer-to-peer network. Blocks are submitted
+through a two-step process:
 
-The validator :ref:`interacts with the protocol <shell_proto_interact>` in order to determine valid blocks.
+- :package-api:`validation<octez-shell-libs/Tezos_validation/Block_validation/index.html#val-validate>` performs a light check doing the minimal computation required to assess with certitude whether a block is well-formed and can be applied in the current context.
+
+- :package-api:`application<octez-shell-libs/Tezos_validation/Block_validation/index.html#val-apply>` computes the resulting context by executing manager operations and, particularly, running smart contracts, which can be computationally expensive.
+
+The block validator advertises a block to peers immediately after validation (if
+successfull). This optimization ensures that blocks are broadcast as quickly as
+possible while still guaranteeing that only valid blocks are shared across the
+network.
+
+Once the block is successfully applied, the chain validator is notified and may
+update its head. The chain validator will then propagate this information to its
+associated prevalidator.
+
+The validator :ref:`relies on the protocol <shell_proto_interact>` for both
+:package-api:`validation<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Validate/index.html#block-validation>`
+and
+:package-api:`application<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Apply/index.html>` functions.
 
 .. _prevalidator_component:
 

@@ -6,7 +6,7 @@ language and a short explanation of how smart contracts are executed
 and interact in the blockchain.
 
 The language is stack-based, with high level data types and primitives,
-and strict static type checking. Its design cherry picks traits from
+and strict static type checking. Its design cherry-picks traits from
 several language families. Vigilant readers will notice direct
 references to Forth, Scheme, ML and Cat.
 
@@ -35,19 +35,28 @@ Semantics of smart contracts and transactions
 ---------------------------------------------
 
 The Tezos ledger currently has two types of accounts that can hold
-tokens (and be the destinations of transactions).
+tokens. Accounts can be used in transactions as senders, to send tokens,
+or as destinations, to receive tokens.
 
-- Implicit account: non-programmable account whose address is
+- User account: non-programmable account whose address is
   the public key hash, prefixed by ``tz`` and one digit.
+  User accounts are sometimes called implicit accounts.
+  A transaction to such an address cannot provide data, except :doc:`tickets <./tickets>`.
 - Smart contract: programmable account associated to some Michelson code,
   whose address is a unique hash, prefixed by ``KT1``.
   A transaction to such
   an address can provide data, and can fail for reasons detailed below.
+  Smart contracts are sometimes called originated accounts.
+
+Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
+<./smart_rollups>`, which cannot hold tokens but can be the destination of transactions.
 
 See :doc:`./accounts` for more details.
 
-Intra-transaction semantics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Smart contract call semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The only way to call a smart contract is to perform a transaction operation whose destination is the address of the smart contract.
 
 Alongside their tokens, smart contracts keep a piece of storage. Both
 are ruled by a specific logic specified by a Michelson program. A
@@ -58,7 +67,7 @@ storage and transfer its tokens.
 The Michelson program receives as input a stack containing a single
 pair whose first element is an input value and second element the
 content of the storage space. It must return a stack containing a
-single pair whose first element is the list of internal operations
+single pair whose first element is the list of operations
 that it wants to emit, and second element is the new contents of the
 storage space. Alternatively, a Michelson program can fail, explicitly
 using a specific opcode, or because something went wrong that could
@@ -71,25 +80,39 @@ and these two components are transformed automatically in a simple and
 deterministic way to an input value. This feature is available both
 for users and from Michelson code. See the dedicated section.
 
-Inter-transaction semantics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Transaction semantics
+~~~~~~~~~~~~~~~~~~~~~
 
-An operation included in the blockchain is a sequence of "external
-operations" signed as a whole by a source address. These operations
-are of three kinds:
+On one hand, a smart call may result from an external operation of kind Transaction.
+External operations are :doc:`blockchain operations <./blocks_ops>` included in a block, signed by a user account.
 
-  - Transactions to transfer tokens to implicit accounts or tokens and
-    parameters to a smart contract (or, optionally, to a specified
-    entrypoint of a smart contract).
-  - Originations to create new smart contracts from its Michelson
-    source code, an initial amount of tokens transferred from the
-    source, and an initial storage contents.
-  - Delegations to assign the tokens of the source to the stake of
-    another implicit account (without transferring any tokens).
+On the other hand, a smart contract call may be emitted as an internal operation of kind Transaction, either when executing another smart contract call or when :ref:`triggering the execution of an outbox message from a smart rollup <triggering_execution_outbox_message>`.
 
-Smart contracts can also emit "internal operations". These are run
-in sequence after the external transaction completes, as in the
-following schema for a sequence of two external operations.
+This section explains the whole semantics of an external transaction, including the execution of the smart contract called directly by it and the others smart contracts called indirectly via emitted internal operations.
+
+The subset of blockchain operations that can be emitted by Michelson programs as internal operations are of the following kinds:
+
+- Transaction transferring:
+
+  * tokens and optionally tickets to a user account, or
+  * tokens and parameters to a smart contract (or, optionally, to a specified
+    entrypoint of a smart contract), or
+  * parameters to a smart rollup.
+
+- Origination creating a new smart contract from its Michelson
+  source code, an initial amount of tokens transferred from the
+  source, and an initial storage content.
+- Delegation assigning the tokens of the sender account to the stake of
+  a user account (without transferring any tokens).
+- :doc:`Contract event <./event>` delivering live information from a smart
+  contract to external applications.
+
+Internal operations are not included in any block, and are not signed.
+
+Internal operations are run in an atomic sequence with the external operation who generated them, right after it, in depth-first order.
+
+Note that :ref:`manager operations batches <manager_operations_batches_alpha>` contain a sequence of external operations signed as a whole by a source user account, which are executed atomically.
+For example, in case of a batch of two external operations, execution proceeds as follows:
 
 ::
 
@@ -97,10 +120,10 @@ following schema for a sequence of two external operations.
     | op 1 | internal ops 1 |  op 2 | internal ops 2 |
     +------+----------------+-------+----------------+
 
-Smart contracts called by internal transactions can in turn also emit
-internal operation. The interpretation of the internal operations
-of a given external operation uses a stack, as in the following
-example, also with two external operations.
+Smart contracts called by internal operations can in turn also emit
+internal operations. The interpreter
+uses a stack of internal operations to perform them in depth-first order, as in the following more detailed
+example, corresponding to the two external operations above.
 
 ::
 
@@ -129,25 +152,25 @@ Failures
 
 All transactions can fail for a few reasons, mostly:
 
-  - Not enough tokens in the source to spend the specified amount.
-  - The script took too many execution steps.
-  - The script failed programmatically using the ``FAILWITH`` instruction.
+- Not enough tokens in the source to spend the specified amount.
+- The script took too many execution steps.
+- The script failed programmatically using the ``FAILWITH`` instruction.
 
 External transactions can also fail for these additional reasons:
 
-  - The signature of the external operations was wrong.
-  - The code or initial storage in an origination did not typecheck.
-  - The parameter in a transfer did not typecheck.
-  - The destination did not exist.
-  - The specified entrypoint did not exist.
+- The signature of the external operations was wrong.
+- The code or initial storage in an origination did not typecheck.
+- The parameter in a transfer did not typecheck.
+- The destination did not exist.
+- The specified entrypoint did not exist.
 
 All these errors cannot happen in internal transactions, as the type
 system catches them at operation creation time. In particular,
-Michelson has two types to talk about other accounts: ``address`` and
+Michelson has two types to talk about other addresses: ``address`` and
 ``contract t``. The ``address`` type merely gives the guarantee that
 the value has the form of a Tezos address. The ``contract t`` type, on
-the other hand, guarantees that the value is indeed a valid, existing
-account whose parameter type is ``t``. To make a transaction from
+the other hand, guarantees that the address is indeed a valid destination of
+transfers whose parameter type is ``t``. To make a transaction from
 Michelson, a value of type ``contract t`` must be provided, and the
 type system checks that the argument to the transaction is indeed of
 type ``t``. Hence, all transactions made from Michelson are well
@@ -157,7 +180,7 @@ In any case, when a failure happens, either total success or total
 failure is guaranteed. If a transaction (internal or external) fails,
 then the whole sequence fails and all the effects up to the failure
 are reverted. These transactions can still be included in blocks, and
-the transaction fees are given to the implicit account who baked the
+the transaction fees are given to the user account who baked the
 block.
 
 Language semantics
@@ -1472,7 +1495,7 @@ that is only well-typed if the current contract has an entrypoint named ``%entry
     :: 'S   ->   contract 'p : 'S
        where   contract 'p is the type of the entrypoint %entrypoint of the current contract
 
-Implicit accounts are considered to have a single ``default``
+User accounts are considered to have a single ``default``
 entrypoint of type ``Unit``.
 
 JSON syntax
@@ -1997,7 +2020,7 @@ The language is implemented in OCaml as follows:
    ``Prim ("If", ...)`` into an ``If``, a ``Prim ("Dup", ...)`` into a
    ``Dup``, etc.
 
-.. michelson_tzt_alpha:
+.. _michelson_tzt_alpha:
 
 TZT, a Syntax extension for writing unit tests
 ----------------------------------------------
@@ -2028,19 +2051,19 @@ scripts, the allowed toplevel primitives are ``parameter``
 ``view`` (optional and repeated). For TZT unit tests, the toplevel
 primitives which can be used are:
 
- - ``input``,
- - ``code``,
- - ``output``,
- - ``now``,
- - ``sender``,
- - ``source``,
- - ``chain_id``,
- - ``self``,
- - ``parameter``,
- - ``amount``,
- - ``balance``,
- - ``other_contracts``, and
- - ``big_maps``.
+- ``input``,
+- ``code``,
+- ``output``,
+- ``now``,
+- ``sender``,
+- ``source``,
+- ``chain_id``,
+- ``self``,
+- ``parameter``,
+- ``amount``,
+- ``balance``,
+- ``other_contracts``, and
+- ``big_maps``.
 
 Mandatory primitives
 ~~~~~~~~~~~~~~~~~~~~
@@ -2120,60 +2143,60 @@ Optional primitives are used to set the execution context for the
 test. Each of the optional primitives can be used at most once, in no
 particular order.
 
- - ``amount`` (optional, defaults to 0): the amount, expressed in
-   mutez, that should be pushed by the `AMOUNT
-   <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__
-   instruction
+- ``amount`` (optional, defaults to 0): the amount, expressed in
+  mutez, that should be pushed by the `AMOUNT
+  <https://tezos.gitlab.io/michelson-reference/#instr-AMOUNT>`__
+  instruction
 
- - ``balance`` (optional, defaults to 0): the balance, expressed in
-   mutez, that should be pushed by the `BALANCE
-   <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__
-   instruction
+- ``balance`` (optional, defaults to 0): the balance, expressed in
+  mutez, that should be pushed by the `BALANCE
+  <https://tezos.gitlab.io/michelson-reference/#instr-BALANCE>`__
+  instruction
 
- - ``now`` (optional, defaults to ``"1970-01-01T00:00:00Z"``): the
-   timestamp that should be pushed by the `NOW
-   <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
-   instruction
+- ``now`` (optional, defaults to ``"1970-01-01T00:00:00Z"``): the
+  timestamp that should be pushed by the `NOW
+  <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
+  instruction
 
- - ``sender`` (optional, defaults to
-   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the sender address
-   that should be pushed by the `SENDER
-   <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__
-   instruction
+- ``sender`` (optional, defaults to
+  ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the sender address
+  that should be pushed by the `SENDER
+  <https://tezos.gitlab.io/michelson-reference/#instr-SENDER>`__
+  instruction
 
- - ``source`` (optional, defaults to
-   ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the source address
-   that should be pushed by the `SOURCE
-   <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__
-   instruction
+- ``source`` (optional, defaults to
+  ``"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"``): the source address
+  that should be pushed by the `SOURCE
+  <https://tezos.gitlab.io/michelson-reference/#instr-SOURCE>`__
+  instruction
 
- - ``chain_id`` (optional, defaults to ``"NetXdQprcVkpaWU"``): the
-   chain identifier that should be pushed by the `CHAIN_ID
-   <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__
-   instruction
+- ``chain_id`` (optional, defaults to ``"NetXdQprcVkpaWU"``): the
+  chain identifier that should be pushed by the `CHAIN_ID
+  <https://tezos.gitlab.io/michelson-reference/#instr-CHAIN_ID>`__
+  instruction
 
- - ``self`` (optional, defaults to
-   ``"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"``): the address that
-   should be pushed by the `SELF
-   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__ and
-   `SELF_ADDRESS
-   <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__
-   instructions
+- ``self`` (optional, defaults to
+  ``"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"``): the address that
+  should be pushed by the `SELF
+  <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__ and
+  `SELF_ADDRESS
+  <https://tezos.gitlab.io/michelson-reference/#instr-SELF_ADDRESS>`__
+  instructions
 
- - ``parameter`` (optional, defaults to ``unit``): the type of the
-   parameter of the contract pushed by the `SELF
-   <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__
-   instruction
+- ``parameter`` (optional, defaults to ``unit``): the type of the
+  parameter of the contract pushed by the `SELF
+  <https://tezos.gitlab.io/michelson-reference/#instr-SELF>`__
+  instruction
 
- - ``other_contracts`` (optional, defaults to ``{}``): mapping between
-   the contract addresses that are assumed to exist and their
-   parameter types (see the :ref:`syntax of other contracts
-   specifications <syntax_of_other_contracts_alpha>`)
+- ``other_contracts`` (optional, defaults to ``{}``): mapping between
+  the contract addresses that are assumed to exist and their
+  parameter types (see the :ref:`syntax of other contracts
+  specifications <syntax_of_other_contracts_alpha>`)
 
- - ``big_maps`` (optional, defaults to ``{}``): mapping between
-   integers representing ``big_map`` indices and descriptions of big
-   maps (see the :ref:`syntax of extra big maps specifications
-   <syntax_of_extra_big_maps_alpha>`)
+- ``big_maps`` (optional, defaults to ``{}``): mapping between
+  integers representing ``big_map`` indices and descriptions of big
+  maps (see the :ref:`syntax of extra big maps specifications
+  <syntax_of_extra_big_maps_alpha>`)
 
 The following test example asserts that the default value for the `NOW
 <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
@@ -2335,25 +2358,25 @@ syntaxes can be used instead of the output stack as the argument of the
 ``output`` toplevel primitive to specify which error the instruction is expected to
 raise:
 
- - ``(StaticError <error description>)``: an error occurred before the
-   instruction was executed; the error description format is
-   unspecified so consider using a :ref:`wildcard
-   <omitting_parts_of_the_output_alpha>` such as ``(StaticError _)``
-   to write portable tests;
+- ``(StaticError <error description>)``: an error occurred before the
+  instruction was executed; the error description format is
+  unspecified so consider using a :ref:`wildcard
+  <omitting_parts_of_the_output_alpha>` such as ``(StaticError _)``
+  to write portable tests;
 
- - ``(Failed <value>)``: the execution reached a ``FAILWITH``
-   instruction and the topmost element of the stack at this point was
-   ``<value>``;
+- ``(Failed <value>)``: the execution reached a ``FAILWITH``
+  instruction and the topmost element of the stack at this point was
+  ``<value>``;
 
- - ``MutezUnderflow``: a mutez subtraction resulted in a negative
-   value. This should only happen in the case of the deprecated
-   ``mutez`` case of the ``SUB`` instruction;
+- ``MutezUnderflow``: a mutez subtraction resulted in a negative
+  value. This should only happen in the case of the deprecated
+  ``mutez`` case of the ``SUB`` instruction;
 
- - ``Overflow``: an overflow was detected. This can happen when an
-   addition or multiplication on type ``mutez`` produces a result
-   which is too large to be represented as a value of type ``mutez``,
-   or when the number of bits to shift using the ``LSL`` or ``LSR``
-   instruction is too large.
+- ``Overflow``: an overflow was detected. This can happen when an
+  addition or multiplication on type ``mutez`` produces a result
+  which is too large to be represented as a value of type ``mutez``,
+  or when the number of bits to shift using the ``LSL`` or ``LSR``
+  instruction is too large.
 
 
 The following example shows how to test a runtime failure; it asserts
@@ -2405,18 +2428,18 @@ and `SET_DELEGATE
 <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ ,
 the following data constructors are added:
 
- - ``Transfer_tokens``,
- - ``Create_contract``, and
- - ``Set_delegate``.
+- ``Transfer_tokens``,
+- ``Create_contract``, and
+- ``Set_delegate``.
 
 They take as arguments the inputs of the corresponding operation
 forging instructions plus a cryptographic nonce represented as a byte
 sequence. The result of ``TRANSFER_TOKENS``, ``CREATE_CONTRACT``,
 and ``SET_DELEGATE`` have respectively the following shapes:
 
- - ``Transfer_tokens <argument> <amount in mutez> <address of destination> <nonce>``,
- - ``Create_contract { <script> } <optional delegate> <initial balance in mutez> <initial storage> <nonce>``, and
- - ``Set_delegate <optional delegate> <nonce>``.
+- ``Transfer_tokens <argument> <amount in mutez> <address of destination> <nonce>``,
+- ``Create_contract { <script> } <optional delegate> <initial balance in mutez> <initial storage> <nonce>``, and
+- ``Set_delegate <optional delegate> <nonce>``.
 
 The computation of the cryptographic nonce is not specified. To write
 portable tests, the nonces appearing in output stack expectations
@@ -2440,8 +2463,8 @@ Syntax of other contracts specifications
 
 The behaviour of the `CONTRACT
 <https://tezos.gitlab.io/michelson-reference/#instr-CONTRACT>`__
-instruction depends on whether or not its input is the address of an
-originated contract accepting the expected type as parameter. To test
+instruction depends on whether or not its input is the address of a
+smart contract accepting the expected type as parameter. To test
 it, the ``other_contract`` toplevel primitive can be used to specify
 which contracts are assumed to be originated and which type they
 accept as parameter.

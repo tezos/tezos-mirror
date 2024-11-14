@@ -12,7 +12,7 @@ code base, so this is not subject to on-chain governance (see
 :doc:`voting procedure <voting>`), but it is still protocol-dependent,
 which means that it may vary with different protocols. For instance,
 the plugin code for protocol Alpha is located in file
-:src:`src/proto_019_PtParisB/lib_plugin/plugin.ml`. Thus, a specific version
+:src:`src/proto_020_PsParisC/lib_plugin/plugin.ml`. Thus, a specific version
 is included in the Octez node for each protocol version (recall that a
 new release of Octez is usually delivered for each new protocol
 proposal, see :doc:`../releases/releases`)
@@ -35,6 +35,7 @@ In turn protocol plugins may, for example:
 - implement some common operations that are customized for each
   protocol (e.g., :ref:`prevalidator_filters_paris`).
 
+.. _prevalidator_filters:
 .. _prevalidator_filters_paris:
 
 Prevalidator filters
@@ -54,6 +55,7 @@ The interface of the prevalidator plugin is described at the :package-api:`mempo
 
 The different kinds of prevalidator filters are described below.
 
+.. _fees_filter:
 .. _fees_filter_paris:
 
 Fees filter
@@ -71,6 +73,7 @@ configuration of your node.
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
+.. _consensus_filter:
 .. _consensus_filter_paris:
 
 Consensus filter
@@ -97,6 +100,7 @@ block proposal as follows:
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
+.. _precheck_filter:
 .. _precheck_filter_paris:
 
 Prechecking of manager operations
@@ -200,6 +204,7 @@ to be the smallest manager operation, with 126 Bytes, so there are at most
 512 * 1024 / 126 = 4161 manager operations per block.
 
 
+.. _active_filter_rpc:
 .. _active_filter_rpc_paris:
 
 Filters RPCs

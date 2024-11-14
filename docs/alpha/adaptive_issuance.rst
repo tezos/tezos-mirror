@@ -1,40 +1,11 @@
 :math:`\newcommand\F[2]{\mathit{#1}\left(#2\right)}`
-:math:`\newcommand{\minR}{\mathit{min_r}}`
-:math:`\newcommand{\maxR}{\mathit{max_r}}`
-:math:`\newcommand{\tmult}{\cdot}`
-:math:`\newcommand\static[1]{\F{static}{#1}}`
-:math:`\newcommand{\sfr}{\frac{1}{1600}}` :math:`\newcommand\tc{\tau_c}`
-:math:`\newcommand\tr{\tau_r}` :math:`\newcommand\grf{\gamma}`
-:math:`\newcommand\dyn[1]{\F{dyn}{#1}}`
-:math:`\newcommand\sgn[1]{\F{sign}{#1}}`
-:math:`\newcommand\dist[1]{\F{distance}{#1}}`
-:math:`\newcommand\DTF{{\Delta t}}`
 :math:`\newcommand\IL[1]{\normalsize{#1}}`
-:math:`\newcommand\MX[2]{\F{max}{#1,#2}}`
-:math:`\newcommand\adr[1]{\F{adaptive}{#1}}`
-:math:`\newcommand\clip[3]{\F{clip}{#1,#2,#3}}`
-:math:`\newcommand\supply[1]{\F{supply}{#1}}`
-:math:`\newcommand\iss[1]{\F{issuance}{#1}}`
-:math:`\newcommand\isb[1]{\F{issuance_{block}}{#1}}`
-:math:`\newcommand\tw{\Sigma_w}`
-:math:`\newcommand\rw[2]{\F{reward_{#1}}{#2}}`
-:math:`\newcommand\tip[2]{\F{tip_{#1}}{#2}}`
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
-:math:`\newcommand{\vdf}{\mathit{VDF}}`
 
-
-=============================
-Adaptive Issuance and Staking
-=============================
-
-This document describes Adaptive Issuance and Staking, two new features (referred hereafter as the Adaptive-Issuance/Staking proposal) which together constitute a major evolution of Tezos’ :doc:`Proof-of-Stake mechanism <proof_of_stake>`.
-
-.. note::
-
-  For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://medium.com/the-aleph/a-walkthrough-of-tezos-new-staking-mechanism-4ff0c50a57a8>`__.
 
 .. _adaptive_issuance_alpha:
 
+=================
 Adaptive Issuance
 =================
 
@@ -57,183 +28,351 @@ The values for participation rewards and
 the LB subsidy, if any, are currently defined by the Tezos protocol using fixed
 constants.
 
-The Adaptive-Issuance/Staking proposal
-introduces the possibility to activate Adaptive Issuance: a mechanism where the amount of
-participation rewards depends on the global **staked funds ratio** – that is, the
+Adaptive Issuance lets the amount of participation rewards depend on
+the global **staked ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
 
 At the end of each blockchain :ref:`cycle <def_cycle_alpha>`, the
-regular issuance is adjusted, to nudge the staked funds ratio towards a
-protocol-defined target (set at 50% in the Adaptive-Issuance/Staking proposal). Participation rewards
-are recomputed to match that budget. When the staked
-funds ratio decreases and diverges from the target, emission rates
-increase, incentivizing participants to stake funds to re-approach the
-target. Conversely, incentives decrease as the ratio increases beyond
-the target.
+regular issuance is adjusted, to nudge the staked ratio towards a
+protocol-defined target (set at 50% starting in the Paris
+protocol). Participation rewards are recomputed to match that
+budget. When the staked ratio decreases and diverges from the target,
+emission rates increase, incentivizing participants to stake funds to
+re-approach the target. Conversely, incentives decrease as the ratio
+increases beyond the target.
+
+.. _adaptive_issuance_rate_alpha:
 
 Adaptive issuance rate
 ----------------------
 
-The :ref:`adaptive issuance rate <adaptive_rate_alpha>` determines, at the end
+The adaptive issuance rate determines, at the end
 of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 3}`. The
 adaptive issuance rate is the sum of a :ref:`static rate <static_rate_alpha>`
-and a :ref:`dynamic rate <dynamic_rate_alpha>`. The final result is clipped to
-ensure nominal emissions remain within :math:`\IL{[\minR,\ \maxR]}` (set
-to [0.05%, 5%] in the Adaptive-Issuance/Staking proposal) of the total supply.
+and a :ref:`dynamic rate <dynamic_rate_alpha>`. This value is kept within
+a minimal and a maximal value, to ensure nominal emissions remain within
+reasonable bounds.
 
-.. figure:: adaptive_rate.png
+.. _staked_ratio_alpha:
 
-  Figure 1. Adaptive issuance rate as a function of the staked funds ratio f.
+Staked ratio
+............
 
-Figure 1 plots the nominal issuance rate and the static rate as a
-function of the staked ratio :math:`\IL{f}`. In the graph above, we
-picked the value 0.0075 (or 0.75%) for the dynamic rate, but this is
-just an example and that number varies dynamically over time.
+The **staked ratio** is the ratio of staked tez to the total supply. It is computed at the end of a given ``cycle``:
 
-The **static rate** is a static mechanism, which approximates `a Dutch
-auction <https://en.wikipedia.org/wiki/Dutch_auction>`__ to compute a
-nominal issuance rate as a function of the staked funds ratio for a
-given cycle. Its value decreases as the staked funds ratio increases,
-and *vice versa*.
+.. code-block:: python
+
+  def staked_ratio(cycle):
+    return total_frozen_stake(cycle + 1 + consensus_rights_delay) / total_supply(cycle)
+
+Where:
+
+- ``consensus_rights_delay`` (2) is the delay in cycles for a delegate to receive rights.
+- ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
+- ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
 .. _static_rate_alpha:
 
-\ **STATIC RATE**\     Let :math:`\IL{f}` be the staked funds ratio at
-the end of cycle :math:`\IL{c}`. Then, the **static rate** is defined
-as:
+Static rate
+...........
 
-.. math::
+The **static rate** is a mechanism which approximates `a Dutch
+auction <https://en.wikipedia.org/wiki/Dutch_auction>`__ to compute a
+nominal issuance rate as a function of the staked ratio for a
+given cycle. Its value decreases as the staked ratio increases.
+The static rate is defined as follows:
 
-  static(f)=\sfr \tmult \frac{1}{f^2}
+.. code-block:: python
 
-The choice of :math:`\IL{\sfr}` as a scaling factor ensures that the
-curve takes reasonable values for plausible staking ratios. Moreover,
-assuming Adaptive Issuance is activated with a dynamic ratio of 0, and
-at current staked funds ratio (that is, ~7.5% of the total supply), this
-factor allows for a smooth transition from current issuance rate
-(~4.6%).
+  def static_rate(cycle):
+    return 1 / 1600 * (1 / (staked_ratio(cycle) ** 2))
 
-The **dynamic reward rate** adjusts itself over time based on the
-distance between the staked funds ratio :math:`\IL{f}` and the 50% (±2%)
-target ratio (:math:`\IL{\tc}` and :math:`\IL{\tr}` parameters below),
-increasing when :math:`\IL{f}` < 48% and decreasing when :math:`\IL{f}`
-> 52%, provided the total issuance rate is not hitting its lower or
-upper limit.
+The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from the issuance rate (~4.6%) from the Oxford protocol (before the activation of Adaptive Issuance).
 
 .. _dynamic_rate_alpha:
 
-\ **DYNAMIC RATE**\     The **dynamic rate** :math:`\IL{\dyn{c}}` is
-defined at the end of cycle :math:`\IL{c}` as:
+Dynamic rate
+............
 
-.. math::
+The **dynamic reward rate** adjusts itself over time based on the distance between the staked ratio and the 50% (±2%) target ratio, increasing when < 48% and decreasing when > 52%. The dynamic rate is defined as follows:
 
-  & \dyn{c}  =\ \dyn{c -1} + \sgn{\tc - \F{f}{c}} \tmult \grf \tmult \dist{\F{f}{c}} \tmult \DTF \\
-  & \dyn{c_0} =\ 0
+.. code-block:: python
 
-:math:`\IL{\dyn{c}}` is then clipped to
-:math:`\IL{\left[ 0, \maxR - \static{\F{f}{c}}\right]}`, ensuring that
-:math:`\IL{\static{\F{f}{c}} + \dyn{c} \leq \maxR}`.
+  def dynamic_rate(cycle):
+    seconds_per_cycle = blocks_per_cycle * minimal_block_delay
+    days_per_cycle = seconds_per_cycle / 86400
+    previous_dynamic = dynamic_rate(cycle - 1)
+    staked_ratio = staked_ratio(cycle)
+    if staked_ratio < 0.48:
+      delta_d = (0.48 - staked_ratio) * growth_rate * days_per_cycle
+    elif staked_ratio > 0.52:
+      delta_d = (0.52 - staked_ratio) * growth_rate * days_per_cycle
+    else:
+      delta_d = 0
+    return previous_dynamic + delta_d
 
-In this formula:
+Where:
 
--  :math:`\IL{c_0}` is the first cycle where Adaptive Issuance is
-   active.
+- ``blocks_per_cycle`` denotes the number of blocks in a Tezos cycle.
+- ``minimal_block_delay`` denotes the minimal duration of a block in seconds.
+- ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
+- ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
 
--  Given a cycle :math:`\IL{c}`, :math:`\IL{\F{f}{c}}` denotes the
-   **staked funds ratio** at the end of the cycle, and
-   :math:`\IL{\dyn{c}}` the value of the dynamic rate computed in that
-   cycle.
+In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_alpha>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_alpha>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
 
--  :math:`\IL{\tc}` = 0.5 and :math:`\IL{\tr}` = 0.02 denote,
-   respectively, the **target staked funds ratio** and the **radius** of
-   the interval centered on the target ratio.
+.. _minimum_and_maximum_rates_alpha:
 
--  :math:`\IL{\grf}` = 0.01, controls the speed at which the dynamic
-   rate adjusts. The value is set so that a one percentage point
-   deviation of the staked funds ratio changes the dynamic rate by 0.01
-   percentage points per day.
+Minimum and maximum rates
+..........................
 
--  :math:`\IL{\dist{\F{f}{c}} = \MX{0}{\left|\F{f}{c} - \tc \right| - \tr}}`
-   denotes the (*absolute*) distance between the staked funds ratio
-   :math:`\IL{\F{f}{c}}` and the interval
-   :math:`\IL{\left[ \tc - \tr, \tc + \tr \right]}`.
+Starting in Paris, the minimum and maximum
+issuance rates will evolve slowly over a set period of time,
+so that the range of possible issuance rate values widens progressively.
 
--  :math:`\IL{\DTF = \frac{24576 \tmult 10}{86400} = 2.8\overline{444}}`,
-   denotes the minimal duration (in days) of a Tezos cycle, assuming all
-   24576 blocks in the cycle are produced at the minimal allowed time –
-   that is, every 10 seconds.
+The following figure describes the progressive maximum and minimum
+values of Adaptive Issuance.
 
--  :math:`\IL{\sgn{\tc - \F{f}{c}} = 1}` if
-   :math:`\IL{\F{f}{c} \leq \tc}` and :math:`-1` otherwise, denotes the
-   sign of the distance between the target ratio :math:`\IL{\tc}` and
-   the staked funds ratio :math:`\IL{\F{f}{c}}`.
 
-In a nutshell, :math:`\IL{\dyn{c}}` increases and decreases by an amount
-proportional to the distance between the target rate and the interval
-:math:`\IL{\left[ \tc - \tr, \tc + \tr \right]}`, while ensuring that
-the adaptive issuance rate is kept within :math:`\IL{[\minR,\ \maxR]}`
-bounds.
+.. figure:: ai-min-max.jpeg
+
+ Figure 1. A gradual widening of the range ensures a smooth transition
+ to Adaptive Issuance.
+
+The schedule consists of three periods:
+
+- an **initial** period, set to 1 month, where the minimum and maximum
+  issuance rates are close to the issuance rate from the Oxford
+  protocol (before the activation of Adaptive Issuance) and stay
+  constant,
+- a **transition** period, set to 5 months, where they evolve linearly, with
+  a decreasing minimum, and an increasing maximum, and
+- a **final** period where the minimum and maximum have reached their
+  final values.
+
+Formally, the functions for the minimum and maximum values are piecewise linear functions of time,
+and can be generally defined as follows:
+
+.. code-block:: python
+
+  def compute_extremum(cycle, initial_value, final_value):
+    trans = transition_period + 1
+    initial_limit = ai_activation_cycle + initial_period
+    trans_limit = initial_limit + trans
+    if cycle <= initial_limit:
+        return initial_value
+    elif cycle >= trans_limit:
+        return final_value
+    else:
+        t = cycle - initial_limit
+        res = (t * (final_value - initial_value) / trans) + initial_value
+        return res
+
+Where:
+
+- ``ai_activation_cycle`` is the first cycle with Adaptive Issuance
+  active, which was cycle 748 on mainnet.
+- ``initial_period`` is a predefined period of time, set to 1 month in Paris.
+- ``transition_period`` is a predefined period of time, set to 5 months in Paris.
+
+The issuance minimum rate for Adaptive Issuance curve is then defined as follows.
+
+.. code-block:: python
+
+  def minimum_rate(cycle):
+    return compute_extremum(cycle, issuance_initial_min, issuance_global_min)
+
+Where:
+
+- ``issuance_initial_min`` (4.5%) is the initial minimum
+  value. The issuance rate is kept
+  above this bound for the initial period.
+- ``issuance_global_min`` (0.25%) is the final value for the lower bound, reached at the end of the transition period.
+
+
+The issuance maximum rate for Adaptive Issuance curve is then defined as follows.
+
+.. code-block:: python
+
+  def maximum_rate(cycle):
+    return compute_extremum(cycle, issuance_initial_max, issuance_global_max)
+
+Where:
+
+- ``issuance_initial_max`` (5.5%) controls the initial maximum
+  value. The issuance rate is kept
+  below this bound for the initial period.
+- ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
+
+.. _adaptive_maximum_alpha:
+
+Adaptive Maximum
+................
+
+In addition to the issuance bounds described above, the Quebec protocol introduces
+another upper bound on the total issuance rate. This new bound, called
+**adaptive maximum**, prevents the issuance rate from taking
+undesirably high values when the staked ratio of the chain is already
+close to the 50% target.
+
+The adaptive maximum is defined as a function of the staked ratio that
+decreases smoothly as the staked ratio grows closer to the 50% target,
+down to a 1% maximal issuance rate when the staked ratio is at 50% or
+above. See the blue curve on Figure 2, as well as a few sample values
+in Figure 3. The exact formula is provided further below.
+
+Thanks to the adaptive maximum, the total issuance rate (static rate +
+dynamic rate) cannot be too far above the static rate (green dashed
+curve). More precisely, the total issuance rate is forced to stay
+between the static rate (green) and the adaptive maximum (blue). In
+other words, the dynamic rate is effectively bounded to stay below the
+red dotted curve, which plots the adaptive maximum minus the static
+rate. Note that this no longer holds if the adaptive maximum gets
+overridden by the minimum issuance, as discussed below.
+
+.. figure:: adaptive_maximum.png
+
+  Figure 2. Adaptive maximum compared to the static rate, in the range from 5% to 50% staked ratio.
+
+.. list-table:: Figure 3. Adaptive maximum: a few data points.
+
+   * - Staked ratio
+     - 5% and below
+     - 10%
+     - 20%
+     - 30%
+     - 40%
+     - 50% and above
+   * - Adaptive maximum issuance (approx.)
+     - 10%
+     - 9.2%
+     - 5.6%
+     - 3%
+     - 1.5%
+     - 1%
+
+The function that defines the adaptive maximum is:
+
+.. code-block:: python
+
+  def adaptive_maximum(r): # r is the staked ratio of the chain
+    if r >= 0.5:
+      return 0.01
+    elif r <= 0.05:
+      return 0.1
+    y = (1 + 9 * ((50 - 100 * r) / 42 ) ** 2 ) / 100
+    if y > 0.1:
+      return 0.1
+    elif y < 0.01:
+      return 0.01
+    else:
+      return y
+
+.. note::
+
+  Until the final value of the :ref:`minimum
+  rate<minimum_and_maximum_rates_alpha>` is reached, it is possible,
+  with a high enough staked ratio, for the corresponding adaptive
+  maximum to be smaller than the minimum rate. If this happens, then
+  the minimum rate takes priority, that is, the total issuance rate
+  (static + dynamic) is set to the minimum rate exactly. This way, the
+  total issuance rate is as close to the adaptive maximum as can be
+  while fully satisfying the minimum rate.
+
+
+.. _issuance_rate_alpha:
+
+Issuance rate
+......................
 
 Finally, as mentioned before, the nominal adaptive issuance rate [1]_
-for a cycle :math:`\IL{c + 3}` is defined as the sum of the static rate
-and the dynamic rate, clipped to stay within 0.05% – 5% range.
+for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum
+of the static rate and the dynamic rate computed for the cycle ``c``,
+bounded within the :ref:`minimum and maximum rates
+<minimum_and_maximum_rates_alpha>`, along with the :ref:`adaptive
+maximum <adaptive_maximum_alpha>`, computed for the cycle ``c + 1``.
 
-.. _adaptive_rate_alpha:
+.. code-block:: python
 
-\ **ADAPTIVE ISSUANCE RATE**\     Let :math:`\F{f}{c}` be the staked
-funds ratio at the end of cycle :math:`\IL{c}`, the **adaptive issuance
-rate** for cycle :math:`\IL{c+3}` is defined as:
+  def issuance_rate(cycle):
+    adjusted_cycle = cycle - consensus_rights_delay
+    static_rate = static_rate(adjusted_cycle - 1)
+    dynamic_rate = dynamic_rate(adjusted_cycle - 1)
+    minimum_rate = minimum_rate(adjusted_cycle)
+    maximum_rate = min(maximum_rate(adjusted_cycle), adaptive_maximum(stake_ratio(adjusted_cycle)))
+    total_rate = static_rate + dynamic_rate
+    return max( min(total_rate, maximum_rate), minimum_rate )
 
-.. math::
-
-  \adr{c + 3} = \clip{\dyn{c} + \static{\F{f}{c}}}{\minR}{\maxR}
 
 .. _adaptive_rewards_alpha:
 
 Adaptive rewards
 ----------------
 
-Before adaptive issuance activation, participation rewards
-are fixed values defined by protocol constants. With the
-proposed mechanism, the :ref:`adaptive issuance rate <adaptive_rate_alpha>`
-provides instead a budget for the whole cycle, which gets allocated
-equally to each block of the cycle and distributed between the various
-rewards, in proportion to their relative :ref:`weights <reward_weights_alpha>`.
+Before Adaptive Issuance activation,
+participation rewards were fixed values defined by protocol
+constants. With the new mechanism, the adaptive issuance rate provides
+instead a budget for the whole cycle, which gets allocated equally to
+each block of the cycle and distributed between the various rewards,
+in proportion to their relative :ref:`weights
+<rewards_weights_alpha>`.
 
-\ **ADAPTIVE ISSUANCE PER BLOCK**\     Let :math:`\supply{c}` be the
-total supply at the end of cycle :math:`\IL{c}`, the **maximal issuance per
-block** for cycle :math:`\IL{c+3}` is defined as:
+.. _rewards_weights_alpha:
 
-.. math::
+Reward weights
+..............
 
-  \isb{c + 3} = \frac{\adr{c + 3}}{3153600} \tmult \supply{c}
+The weights for participation rewards are defined as:
 
-Where 3153600 =
-:math:`\IL{\frac{365 \tmult 24 \tmult 60 \tmult 60}{10}}` is the maximal
-number of blocks produced in a year, given a minimal block time of 10
-seconds.
+- Attestation rewards: 10,240.
+- Fixed baking reward: 5,120.
+- Bonus baking reward: 5,120.
+- Nonce revelation tip: 1.
+- VDF tip: 1.
 
-.. _reward_weights_alpha:
+The total sum ``sum_rewards_weight`` of all weights is 20482.
 
-\ **REWARD WEIGHTS**\     The Adaptive-Issuance/Staking proposal defines the weights for
-participation rewards as:
+.. code-block:: python
 
--  Attestation (formerly, endorsing) rewards : 10,240.
--  Fixed baking reward: 5,120.
--  Bonus baking reward: 5,120.
--  Nonce revelation tip: 1.
--  VDF tip: 1.
+  sum_rewards_weight = (
+    attestation_rewards +
+    fixed_baking_rewards +
+    bonus_baking_rewards +
+    nonce_revelation_tip +
+    vdf_tip)
 
-The total sum of all weights is :math:`\tw` = 20482. The total issuance
-per block, :math:`\IL{\isb{c}}`, is distributed amongst the different
-rewards in proportion to their weight.
+The coefficient to apply for reward computation is defined as follows.
 
-**Consensus rewards.** Since the adoption of Tenderbake, Tezos protocols
-before the Adaptive-Issuance/Staking proposal have rewarded delegates :doc:`for their participation in
-consensus <consensus>`
-with the following rewards per block:
+.. code-block:: python
+
+  def reward_coeff(cycle):
+    rate = issuance_rate(cycle)
+    total_supply = total_supply(cycle - consensus_rights_delay - 1)
+    return (rate / 525600) * total_supply / base_total_issued_per_minute
+
+Where:
+
+- ``base_total_issued_per_minute`` (80007812) is the expected amount of mutez issued per minute.
+- 525600 is the number of minutes per year.
+
+The issuance per block is then distributed amongst the different rewards in proportion to their weight.
+
+.. code-block:: python
+
+  def tez_from_weights(weight):
+    num = weight * minimal_block_delay
+    den = sum_rewards_weight * 60
+    return base_total_issued_per_minute * num / den
+
+  def reward_from_constants(cycle, weight):
+    return tez_from_weights(weight) * reward_coeff(cycle)
+
+
+**Consensus rewards.** Since the adoption of Tenderbake, Tezos
+protocols before Paris have rewarded delegates :doc:`for their
+participation in consensus <consensus>` with the following rewards per
+block:
 
 -  A fixed **baking** reward, given to the delegate which produced the
    *payload* of the block (i.e. choosing transactions, and other
@@ -249,306 +388,50 @@ with the following rewards per block:
 
 We refer to :doc:`the consensus page <consensus>` for
 further insight on the pre-requisites and distribution of these rewards.
-Here, we derive the new formulas which compute their values *per block*
-for a cycle :math:`\IL{c}`:
+Here, we derive the new functions which compute their values per block.
 
-.. math::
+.. code-block:: python
 
-  & \rw{baking}{c} = \rw{bonus}{c} = \frac{5120}{\tw} \tmult \isb{c}
+  def baking_reward_fixed_portion(cycle):
+    return reward_from_constants(cycle, fixed_baking_rewards)
 
-  & \rw{attestation}{c} = \frac{10240}{\tw} \tmult \isb{c}
+  def baking_reward_bonus_per_slot(cycle):
+    bonus_committee_size = consensus_committee_size - consensus_threshold
+    return reward_from_constants(cycle, bonus_baking_rewards) / bonus_committee_size
 
-Note that these formulas change the value of available rewards, but not
-why and how they are awarded. Hence, :math:`\IL{\rw{bonus}{c}}` still
-denotes the maximal value for this reward: the actual reward issued
-depends on the total number of attested slots in a block. Similarly,
-:math:`\IL{\rw{attestation}{c}}` is also a maximal value per block,
-as the basis for computing the share of selected delegate at the end of
-the cycle, the actual allocation of the rewards
-being subject to the existing participation conditions.
+  def attestation_reward_per_slot(cycle):
+    return reward_from_constants(cycle, attestation_rewards) / consensus_committee_size
+
+Where:
+
+- ``consensus_committee_size`` (7000) is the number of attestation slots available in a block.
+- ``consensus_threshold`` (4667) is the required number of attestations for a baker to propose a block.
+
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
 for contributing to :ref:`random seed generation <randomness_generation_alpha>`
 (that is, for revealing nonce seeds and posting VDF proofs) are not paid
-each block, but rather every 192 blocks. The adjusted formulas result:
+each block, but rather every 192 blocks.
 
-.. math::
+.. code-block:: python
 
-  \tip{\vdf}{c} = \tip{nr}{c} = 192 \tmult \frac{1}{\tw} \tmult \isb{c}
+  def seed_nonce_revelation_tip(cycle):
+    return reward_from_constants(cycle, nonce_revelation_tip * blocks_per_commitment)
 
-The Adaptive-Issuance/Staking proposal implements a new `RPC
-endpoint <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
-``/issuance/expected_issuance``, which reports the precomputed values of
-all participation rewards, for the cycle
-corresponding to the queried block level, and the next 3 cycles.
+  def vdf_revelation_tip(cycle):
+    return reward_from_constants(cycle, vdf_tip * blocks_per_commitment)
 
-.. _new_staking_alpha:
+Where:
 
-New Staking mechanism
-=====================
+- ``blocks_per_commitment`` (192) is the interval in blocks between each revelation, both VDF and nonce.
 
-Staking is an evolution of the existing Tezos :doc:`Liquid Proof-of-Stake
-mechanism <proof_of_stake>`. It
-introduces a new role for network participants, called **staker**,
-complementary to the existing :ref:`delegate <def_delegate_alpha>`
-(also known as *baker*) and *delegator* roles. A staker must also be a
-*delegator* – that is, they must first choose a delegate.
 
-When stakers **stake** funds towards a delegate’s **staking**
-**balance**, the associated **baking** and **voting powers** accrue to
-that delegate. Similarly to how delegated funds work, staked funds
-remain within the staker’s account at all times.
+The `RPC endpoint
+<https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
+``/issuance/expected_issuance`` reports the precomputed values of all
+participation rewards for the provided block and the next
+``consensus_rights_delay`` cycles.
 
-Staked and delegated funds **have different weights** in the computation
-of delegates’ baking and voting powers: staked funds (both external
-stakes by stakers and the delegate’s own) count **twice** as much as
-delegated funds.
-
-Unlike delegated funds, staked funds are considered to contribute to the
-security deposit associated with their chosen delegate. Thus, they are
-subject to :ref:`slashing <slashing_alpha>` if
-the delegate misbehaves by :ref:`double-signing <def_double_signing_alpha>`
-block proposals or consensus operations, and are subject to the same
-withdrawal delays – colloquially, they are "frozen".
-
-Stakers are slashed proportionally to their contribution to the
-delegate’s staking balance. To simplify slashing, double-baking
-penalties are now proportional to staked funds: instead of the previous
-fixed sum of 640 tez they are now set to 5% of the delegate’s stake.
-Moreover, denunciation rewards (both for double-baking and
-double-attestations) are reduced from one half to one seventh of the
-slashed funds. The chosen value prevents adversarial delegates from
-abusing the slashing mechanism for profit at the expense of their
-stakers.
-
-*Delegates* :ref:`configure their staking
-policy <staking_policy_configuration_alpha>` by setting staking parameters
-which regulate whether they accept stakers (the default being to reject
-them), and if so, up to which fraction of their total staking balance.
-They can also configure which proportion of the staking rewards from other stakers is set
-to accrue to their own staked balance instead.
-As :ref:`participation rewards <adaptive_rewards_alpha>` are
-automatically shared between delegates and their
-stakers, delegates can use this parameter to collect an *edge* from the
-rewards attributable to their stakers.
-
-If and when the Adaptive-Issuance/Staking proposal activates, freezing and unfreezing of staked funds
-will be controlled directly by delegates and stakers, and will no longer
-be automatic. This entails that staked funds are frozen until manually
-unfrozen by stakers. This is a two step process which spans for at least
-4 cycles (cf. :ref:`Staked funds management <staked_funds_management_alpha>`).
-
-A new user interface is provided for delegates and stakers to interact
-with the mechanism. It is based on four *pseudo-operations*: ``stake``,
-``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
-Pseudo-operations are self-transfers: a transfer operation where the
-destination matches the source – each involving a special entry-point of
-the same name introduced for :ref:`implicit accounts <def_implicit_account_alpha>`.
-This approach was chosen to minimize the work required by wallets,
-custodians, exchanges, and other parties to support the functionality.
-
-**NB** Until :ref:`feature
-activation <feature_activation_alpha>`: only
-*delegates* can stake funds and the relative weight of staked and
-delegated funds remains unchanged. In the current implementation, only
-*implicit accounts* can become stakers. In other words, smart contracts
-cannot stake funds (they can of course still delegate them).
-
-.. _staking_policy_configuration_alpha:
-
-Staking policy configuration
-----------------------------
-
-*Delegates* can configure their staking policy by setting the following
-parameters:
-
--  ``edge_of_baking_over_staking``: a ratio between 0 and 1, whose
-   default value is 1. This parameter determines the fraction of the
-   rewards that accrue to the delegate's frozen deposit – the
-   remainder is shared among its stakers.
--  ``limit_of_staking_over_baking``: a non-negative number, denoting the
-   maximum portion of external stake by stakers over the delegate’s own
-   staked funds. It defaults to 0 – which entails that delegates do not
-   accept external stakes by default. It is moreover capped by a global
-   constant, set to 5 in the Adaptive-Issuance/Staking proposal, which ensures the baker controls a
-   significant part of the stake.
-
-Delegates can modify these staking parameters at all times, using the
-``set_delegate_parameters`` pseudo-operation: that is, by transferring 0
-tez to their own ``set_delegate_parameters`` entry-point. The chosen values for both
-parameters need to be supplied. The new parameters are then applied
-``DELEGATE_PARAMETERS_ACTIVATION_DELAY`` (currently 5) cycles later.
-
-::
-
-   octez-client transfer 0 from <delegate> to  <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth)> (Pair <edge as int value in billionth> Unit)"
-
-or more conveniently::
-
-   octez-client set delegate parameters for  <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
-
-**On overstaking and overdelegation.** Note that if a delegate’s
-``limit_of_staking_over_baking`` is exceeded (that is, the delegate is
-*overstaked*), the exceeding stake is automatically considered as
-*delegation* for the delegate’s baking and voting power calculation, but
-it does remain slashable. The new mechanism does not alter
-*overdelegation* (delegated funds beyond 9 times the delegate’s own
-stake) nor its consequence on voting and baking powers. That is,
-overdelegated funds are not counted towards a delegate baking power, but
-they do increase their voting power.
-
-.. _staked_funds_management_alpha:
-
-Staked funds management
------------------------
-
-Stakers (and delegates) can use the ``stake``, ``unstake``, and
-``finalize_unstake`` pseudo-operations to control their stakes. Figure
-2 illustrates their effect on a staker’s funds. Note that
-while these pseudo-operations change the *state* of the involved funds,
-they remain otherwise within the staker’s account at all times.
-
-.. figure:: staked_funds_transitions.png
-
-  Figure 2: staked funds management using pseudo-operations.
-
-To *stake* funds, a delegator uses the ``stake`` pseudo-operation,
-transferring the chosen amount of **spendable** tez to their own
-``stake`` entry-point. The **staked** tez will then be frozen and
-contribute to their chosen delegate’s staking balance. Note that the
-``stake`` pseudo-operation will fail if the sender account is not
-*delegated*.
-
-::
-
-   octez-client transfer <amount> from <staker> to <staker> --entrypoint stake
-
-or more conveniently::
-
-   octez-client stake <amount> for <staker>
-
-To *unstake* funds, a staker first submits an unstake request with the
-``unstake`` pseudo-operation. This is implemented by transferring the
-chosen amount in tez to their ``unstake`` entry-point::
-
-   octez-client transfer <amount> from <staker> to <staker> --entrypoint unstake
-
-or more conveniently::
-
-   octez-client unstake <amount|"everything"> for <staker>
-
-The requested amount will be **unstaked** but will remain **frozen**.
-After 4 cycles, unstaked frozen tokens are no longer considered at stake
-nor slashable. They are said then to be both **unstaked** and
-**finalizable**.
-
-A staker can retrieve all unstaked and finalizable tokens at any time,
-making them spendable again. This is done using the ``finalize_unstake``
-entrypoint -– that is, by transferring 0 tez to their
-``finalize_unstake`` entry-point::
-
-   octez-client transfer 0 from <staker> to <staker> --entrypoint finalize_unstake
-
-or more conveniently::
-
-   octez-client finalize unstake for <staker>
-
-In some circumstances, unstake and finalize can be done implicitly: any call
-to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending
-unstake requests. Also, as we will see next, change of delegate triggers an
-unstake operation.
-
-Change of delegate
-------------------
-
-When a staker changes its delegate, the operation will trigger an implicit unstake
-request for the full frozen deposit of the staker.
-
-As long as the unstake request is not finalized, the frozen tokens will continue
-to be delegated to the old delegate, however the spending
-balance of the account is accounted in the new delegate's stake.
-It will not be possible to stake with the new delegate as long as there are
-unfinalizable unstake request for token staked with the old delegate.
-
-.. _feature_activation_alpha:
-
-Feature activation vs protocol activation
-=========================================
-
-Should the Adaptive-Issuance/Staking proposal be accepted by the community, and
-once the protocol becomes active on Tezos Mainnet, most of the features
-described in this document will **not** be enabled by default, only
-latent possibilities in the protocol, waiting for a separate activation.
-
-In particular, the following changes will require additional approval
-from delegates via separate feature activation vote mechanism:
-
--  Adaptive issuance – including notably the changes to the computation
-   of consensus rewards.
--  Ability for *delegators* to become *stakers* – until feature
-   activation delegates continue to be the only participants who can
-   **stake** funds.
--  The changes in weight for staked and delegated funds towards the
-   computation of baking and voting rights.
-
-Other changes described earlier would be enabled from the Adaptive-Issuance/Staking proposal’s
-activation:
-
--  The new interface for stake manipulation based on
-   *pseudo-operations*. Note that this entails the deprecation of the
-   ``set/unset deposits limit`` interface and also the end of automatic
-   deposit freezing. On protocol activation, each delegate’s stake is
-   derived from the frozen deposits at the end of the last cycle of
-   Nairobi.
--  The changes in slashing penalties (double-baking penalties are set to
-   5% of the staked funds) and denunciation rewards (they amount to one
-   seventh of slashed funds).
--  Changes to protocol constants. Note that this entails calculating
-   participation rewards using the weight-based
-   formulas, but these are defined so that they match the previous
-   values when :ref:`Adaptive Issuance <adaptive_issuance_alpha>` is not active.
-
-Activation Vote
----------------
-
-We highlight the following principles behind the feature activation vote
-mechanism:
-
--  If and when the Adaptive-Issuance/Staking proposal activates, delegates can start voting for (**On**)
-   or against (**Off**) the feature activation of the changes listed
-   above in each block they bake. They can also abstain with a **Pass**
-   vote.
--  These votes are cast by block-producing delegates, and are included
-   in block headers.
--  Participation is not mandatory, defaulting to **Pass** in the absence
-   of signaling.
--  The feature activation vote has two phases: a *Voting* phase and a
-   subsequent *Adoption* phase.
--  The *Voting* phase is driven by an Exponential moving average (EMA)
-   whose *half-life* is 2 weeks. That is, it takes two weeks for the EMA
-   to raise from 0% to 50% assuming only **On** votes are cast.
--  The target threshold is a supermajority of 80% of **On** votes over
-   **On plus Off** votes.
--  There is no time limit or fixed duration for the Voting phase. It
-   continues as long as the threshold is not met. There is no *quorum*
-   either, the lack of participation (reified as **Pass** votes) is not
-   taken into account by the EMA, and hence only affects the time
-   required to reach the threshold.
--  If the threshold is met, the Voting phase will complete at the end of
-   the current cycle, and the Adoption phase will start at the beginning
-   of the following cycle.
--  The Adoption phase lasts 5 cycles. The beginning of the cycle
-   following the end of the Adoption phase activates the guarded
-   features.
--  There is **no automatic deactivation** of the guarded features once
-   in (and after) the Adoption phase – subsequent votes continue to be
-   counted towards an updated EMA, but without any further effect.
-
-**NB** In the implementation in the Adaptive-Issuance/Staking proposal, the issuance rate
-is computed 3 cycles in advance. Thus, in the first 3 cycles where is
-active, the protocol does not use the :ref:`adaptive reward
-formula <adaptive_rewards_alpha>` and keeps using the current reward
-values.
 
 .. [1]
    Note that if the nominal annual issuance rate is :math:`r`, the

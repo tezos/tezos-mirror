@@ -31,6 +31,14 @@ module Make : functor
   (Base : sig
      val base : Uri.t
 
+     val keep_alive : bool
+
+     val drop_duplicate_on_injection : bool
+
      val smart_rollup_address : string
+
+     val finalized : bool
+
+     val ignore_block_param : bool
    end)
   -> Services_backend_sig.S

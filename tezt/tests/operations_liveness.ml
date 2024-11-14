@@ -12,6 +12,8 @@
    Subject:    Checks liveblocks computation consistency
 *)
 
+let team = Tag.layer1
+
 let check_mempool ?validated ?branch_delayed ?branch_refused ?refused ?outdated
     ?unprocessed client =
   let* mempool = Mempool.get_mempool client in
@@ -67,7 +69,7 @@ let operation_liveness_reorg =
   Protocol.register_test
     ~__FILE__
     ~title:"Check operation liveness reorg"
-    ~tags:[Tag.layer1; "shell"; "liveblocks"; "operations"; "reorg"]
+    ~tags:[team; "shell"; "liveblocks"; "operations"; "reorg"]
   @@ fun protocol ->
   let nodes_args = Node.[Synchronisation_threshold 0; Connections 1] in
   let* node1, client1 =
@@ -242,7 +244,7 @@ let operation_liveness =
   Protocol.register_test
     ~__FILE__
     ~title:"Check operation liveness"
-    ~tags:[Tag.layer1; "shell"; "liveblocks"; "operations"; "mempool"]
+    ~tags:[team; "shell"; "liveblocks"; "operations"; "mempool"]
   @@ fun protocol ->
   let nodes_args = Node.[Synchronisation_threshold 0; Connections 1] in
   let* _node1, client1 =

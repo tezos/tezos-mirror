@@ -7,11 +7,9 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  max_blueprints_lag : int;
-  max_blueprints_ahead : int;
-  max_blueprints_catchup : int;
-  catchup_cooldown : int;
   latest_level_seen : Z.t;
+  config : Configuration.blueprints_publisher_config;
+  keep_alive : bool;
 }
 
 type state = {
@@ -20,6 +18,7 @@ type state = {
   max_blueprints_ahead : Z.t;
   max_blueprints_catchup : Z.t;
   catchup_cooldown : int;
+  keep_alive : bool;
   mutable latest_level_confirmed : Z.t;
       (** The current head of the EVM chain as seen by the rollup node *)
   mutable latest_level_seen : Z.t;
@@ -27,6 +26,7 @@ type state = {
           to layer 1 *)
   mutable cooldown : int;
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
+  enable_dal : bool;
 }
 
 module Types = struct
@@ -87,6 +87,8 @@ module Worker = struct
 
   let catchup_cooldown worker = (state worker).catchup_cooldown
 
+  let keep_alive worker = (state worker).keep_alive
+
   let current_cooldown worker = (state worker).cooldown
 
   let on_cooldown worker = 0 < current_cooldown worker
@@ -95,21 +97,59 @@ module Worker = struct
     let current = current_cooldown worker in
     if on_cooldown worker then set_cooldown worker (current - 1) else ()
 
-  let publish self payload level =
+  let publish_inbox_payload state level payload =
     let open Lwt_result_syntax in
-    let rollup_node_endpoint = rollup_node_endpoint self in
+    let payload = Blueprints_publisher_types.Request.inbox_payload payload in
+    let*! () = Blueprint_events.blueprint_injected_on_inbox level in
+    let () =
+      Prometheus.Counter.inc
+        Metrics.BlueprintChunkSent.on_inbox
+        (Float.of_int (List.length payload))
+    in
+    Rollup_services.publish
+      ~keep_alive:false
+      ~rollup_node_endpoint:state.rollup_node_endpoint
+      payload
+
+  let publish_on_dal state level chunks =
+    let open Lwt_result_syntax in
+    let payloads = Sequencer_blueprint.create_dal_payloads chunks in
+    let nb_chunks = List.length chunks in
+    let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
+    Prometheus.Counter.inc
+      Metrics.BlueprintChunkSent.on_dal
+      (Float.of_int nb_chunks) ;
+    Rollup_services.publish_on_dal
+      ~rollup_node_endpoint:state.rollup_node_endpoint
+      ~messages:payloads
+
+  let publish_on_dal_precondition state use_dal_if_enabled level =
+    state.enable_dal && use_dal_if_enabled && Z.(zero < level)
+
+  let publish self payload level ~use_dal_if_enabled =
+    let open Lwt_result_syntax in
+    let state = state self in
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
-    let*! res = Rollup_services.publish ~rollup_node_endpoint payload in
+    let*! res =
+      (* We do not check if we succeed or not: this will be done when new L2
+         heads come from the rollup node. *)
+      match payload with
+      | Blueprints_publisher_types.Request.Blueprint {chunks; _} ->
+          if publish_on_dal_precondition state use_dal_if_enabled level then
+            publish_on_dal state level chunks
+          else publish_inbox_payload state level payload
+      | _ -> publish_inbox_payload state level payload
+    in
     let*! () =
       match res with
       | Ok _ -> Blueprint_events.blueprint_injected level
-      | Error _ ->
+      | Error trace ->
           (* We have failed to inject the blueprint. This is probably
              the sign that the rollup node is down. It will be injected again
              once the rollup node lag increases to [max_blueprints_lag]. *)
-          Blueprint_events.blueprint_injection_failed level
+          Blueprint_events.blueprint_injection_failed level trace
     in
     match rollup_is_lagging_behind self with
     | No_lag | Needs_republish -> return_unit
@@ -148,13 +188,36 @@ module Worker = struct
     let* () =
       List.iter_es
         (fun (Ethereum_types.Qty current, payload) ->
-          publish worker payload current)
+          publish
+            worker
+            (Blueprints_publisher_types.Request.Inbox payload)
+            current
+            ~use_dal_if_enabled:false)
         blueprints
     in
 
     (* We give ourselves a cooldown window Tezos blocks to inject everything *)
     set_cooldown worker (catchup_cooldown worker) ;
     return_unit
+
+  let retrieve_and_set_latest_level_confirmed self rollup_block_lvl =
+    let open Lwt_result_syntax in
+    let open Rollup_services in
+    let* finalized_current_number =
+      call_service
+        ~keep_alive:(keep_alive self)
+        ~base:(rollup_node_endpoint self)
+        durable_state_value
+        ((), Block_id.Level rollup_block_lvl)
+        {key = Durable_storage_path.Block.current_number}
+        ()
+    in
+    match finalized_current_number with
+    | Some bytes ->
+        let (Qty evm_block_number) = Ethereum_types.decode_number_le bytes in
+        set_latest_level_confirmed self evm_block_number ;
+        return_unit
+    | None -> return_unit
 end
 
 type worker = Worker.infinite Worker.queue Worker.t
@@ -169,14 +232,27 @@ module Handlers = struct
   let on_launch _self ()
       ({
          rollup_node_endpoint;
-         max_blueprints_lag;
-         max_blueprints_ahead;
-         max_blueprints_catchup;
-         catchup_cooldown;
+         config =
+           {
+             max_blueprints_lag;
+             max_blueprints_ahead;
+             max_blueprints_catchup;
+             catchup_cooldown;
+             dal_slots;
+           };
          latest_level_seen;
+         keep_alive;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
+    let* () =
+      match dal_slots with
+      | None -> return_unit
+      | Some dal_slots ->
+          Rollup_services.set_dal_slot_indices
+            ~rollup_node_endpoint
+            ~slot_indices:dal_slots
+    in
     return
       {
         latest_level_confirmed =
@@ -190,6 +266,8 @@ module Handlers = struct
         max_blueprints_ahead = Z.of_int max_blueprints_ahead;
         max_blueprints_catchup = Z.of_int max_blueprints_catchup;
         catchup_cooldown;
+        keep_alive;
+        enable_dal = Option.is_some dal_slots;
       }
 
   let on_request :
@@ -199,10 +277,12 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match request with
     | Publish {level; payload} ->
-        let* () = Worker.publish self payload level in
+        let* () = Worker.publish self payload level ~use_dal_if_enabled:true in
         return_unit
-    | New_l2_head {rollup_head} -> (
-        Worker.set_latest_level_confirmed self rollup_head ;
+    | New_rollup_node_block rollup_block_lvl -> (
+        let* () =
+          Worker.retrieve_and_set_latest_level_confirmed self rollup_block_lvl
+        in
         match Worker.rollup_is_lagging_behind self with
         | (Needs_republish | Needs_lock) when not (Worker.on_cooldown self) ->
             (* The worker needs to republish, it's not in cooldown. *)
@@ -234,21 +314,13 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
-    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen () =
+let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
-      {
-        rollup_node_endpoint;
-        max_blueprints_lag;
-        max_blueprints_ahead;
-        max_blueprints_catchup;
-        catchup_cooldown;
-        latest_level_seen;
-      }
+      {rollup_node_endpoint; config; latest_level_seen; keep_alive}
       (module Handlers)
   in
   let*! () = Blueprint_events.publisher_is_ready () in
@@ -283,8 +355,8 @@ let worker_add_request ~request =
 let publish level payload =
   worker_add_request ~request:(Publish {level; payload})
 
-let new_l2_head rollup_head =
-  worker_add_request ~request:(New_l2_head {rollup_head})
+let new_rollup_block rollup_level =
+  worker_add_request ~request:(New_rollup_node_block rollup_level)
 
 let shutdown () =
   let open Lwt_result_syntax in

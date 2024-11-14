@@ -32,6 +32,8 @@
                  network.
 *)
 
+let team = Tag.layer1
+
 let protocol_path = "src/bin_client/test/proto_test_injection"
 
 let is_static_binary execname =
@@ -45,15 +47,7 @@ let test_injection_and_activation () : unit =
   Test.register
     ~__FILE__
     ~title:"protocol injection and activation"
-    ~tags:
-      [
-        Tag.layer1;
-        "protocol";
-        "injection";
-        "activation";
-        "network";
-        "not_static";
-      ]
+    ~tags:[team; "protocol"; "injection"; "activation"; "network"; "not_static"]
     ~uses:[Constant.octez_protocol_compiler]
   @@ fun () ->
   Log.info "Check protocol compiler and protocol availability" ;
@@ -161,7 +155,7 @@ let test_activation () : unit =
   Test.register
     ~__FILE__
     ~title:"protocol activation (protocol already linked to the node)"
-    ~tags:["protocol"; "activation"]
+    ~tags:[team; "protocol"; "activation"]
   @@ fun () ->
   let protocol_hash = Protocol.demo_noops_hash in
   Log.info "Check that %s is known" protocol_hash ;

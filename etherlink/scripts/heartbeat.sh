@@ -32,15 +32,18 @@ pk1=$4
 addr1=$5
 pk2=$6
 addr2=$7
-node=https://node.ghostnet.etherlink.com
-explorer=https://testnet-explorer.etherlink.com
+observer=http://127.0.0.1:8545
+sequencer=https://node.mainnet.etherlink.com
+explorer=https://explorer.etherlink.com
 
 # 3 mn
 timeout_time=180
 
-confirmation_blocks=2
+confirmation_blocks=0
 
 report="Report:"
+
+submit_report=1
 
 add_report_msg() {
   report+="
@@ -48,26 +51,31 @@ $1"
 }
 
 send_msg() {
-  msg="text=$1"
-  curl --silent \
-    -H "${SLACK_TOKEN}" \
-    -d "${SLACK_COVERAGE_CHANNEL}" \
-    -d "${msg}" \
-    -X POST https://slack.com/api/chat.postMessage -o slack-response.json
+  if [ "$submit_report" -eq 0 ]; then
+    msg="text=$1"
+    curl --silent \
+      -H "${SLACK_TOKEN}" \
+      -d "${SLACK_COVERAGE_CHANNEL}" \
+      -d "${msg}" \
+      -X POST https://slack.com/api/chat.postMessage -o slack-response.json
+  else
+    echo "$msg"
+  fi
 }
 
 add_timeout_msg() {
   network="$1"
-  network_name="${network#https://}"
-  network_name="${network_name%.ghostnet.etherlink.com}"
-  add_report_msg "• <!here> 🚨 *$2 timeouted with endpoint* <${network}|${network_name}>"
+  network_name="$2"
+  op_type="$3"
+  submit_report=0
+  add_report_msg "• <!here> 🚨 *${op_type} timeouted with endpoint* <${network}|${network_name}>"
 }
 
 add_failed_tx_msg() {
   network="$1"
-  op_type="${2}"
-  network_name="${network#https://}"
-  network_name="${network_name%.ghostnet.etherlink.com}"
+  network_name="$2"
+  op_type="$3"
+  submit_report=0
   add_report_msg "• <!here> 🚨 *${op_type} failed with endpoint* <${network}|${network_name}>"
 }
 
@@ -75,20 +83,21 @@ add_not_included_tx_msg() {
   op_type="${1}"
   hash="${2}"
   rpc="${3}"
+  submit_report=0
   add_report_msg "• <!here> 🚨 *${op_type} absent in explorer*."
   add_report_msg "  • hash: '${hash}'"
   add_report_msg "  • rpc status_code: '${rpc}'."
 }
 
 add_good_health_msg() {
-  hash="${1}"
+  hash="$1"
   hash_prefix=$(echo "${hash}" | cut -c 1-18)
   hash_suffix=$(echo "${hash}" | cut -c 63-66)
   network="$2"
-  network_name="${network#https://}"
-  network_name="${network_name%.ghostnet.etherlink.com}"
+  network_name="$3"
+  op_type="$4"
 
-  add_report_msg "• ✅ $3 transaction <${explorer}/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
+  add_report_msg "• ✅ ${op_type} transaction <${explorer}/tx/$hash|${hash_prefix}...${hash_suffix}> using <${network}|${network_name}>"
 }
 
 check_tx_applied() {
@@ -109,30 +118,36 @@ check_tx_applied() {
 submit_tx_and_check() {
   tx_type="$1"
   shift
+  network="$1"
+  shift
+  network_name="$1"
+  shift
   cmd=("$@")
   echo "> " "${cmd[@]}"
   op_hash=$(timeout ${timeout_time} "${cmd[@]}")
   res_code=$?
   echo "${op_hash}"
   if [[ "${res_code}" -eq 124 ]]; then
-    add_timeout_msg "${network}" "${tx_type}"
+    add_timeout_msg "${network}" "${network_name}" "${tx_type}"
   elif [[ "${res_code}" -ne 0 ]]; then
-    add_failed_tx_msg "${network}" "${tx_type}"
+    add_failed_tx_msg "${network}" "${network_name}" "${tx_type}"
   else
     sleep 5 # let time for the explorer to include the tx
     check_tx_applied "${op_hash}" "${tx_type}"
     tx_applied=$?
     if [[ "${tx_applied}" -eq 0 ]]; then
-      add_good_health_msg "${op_hash}" "${network}" "${tx_type}"
+      add_good_health_msg "${op_hash}" "${network}" "${network_name}" "${tx_type}"
     fi
   fi
 }
+
 tx() {
   pk="$1"
   addr="$2"
   network="$3"
+  network_name="$4"
   cmd=(npm exec -- eth transaction:send --pk "${pk}" --to "${addr}" --value 1 --network "${network}" --confirmation-blocks="${confirmation_blocks}")
-  submit_tx_and_check "Transfer" "${cmd[@]}"
+  submit_tx_and_check "Transfer" "${network}" "${network_name}" "${cmd[@]}"
 }
 
 allow_erc20_tx() {
@@ -140,8 +155,9 @@ allow_erc20_tx() {
   pk="$2"
   from="$3"
   network="$4"
+  network_name="$5"
   cmd=(npm exec -- eth contract:send "erc20@${contract}" "approve(\"${from}\",100000000000000)" --network "${network}" --pk "${pk}" --confirmation-blocks="${confirmation_blocks}")
-  submit_tx_and_check "ERC20 approve" "${cmd[@]}"
+  submit_tx_and_check "ERC20 approve" "${network}" "${network_name}" "${cmd[@]}"
 }
 
 erc20_tx() {
@@ -150,15 +166,16 @@ erc20_tx() {
   from="$3"
   to="$4"
   network="$5"
+  network_name="$6"
   cmd=(npm exec -- eth contract:send "erc20@${contract}" "transferFrom(\"${from}\",\"${to}\",100000000000000)" --network "${network}" --pk "${pk}" --confirmation-blocks="${confirmation_blocks}")
-  submit_tx_and_check "ERC20 transferFrom" "${cmd[@]}"
+  submit_tx_and_check "ERC20 transferFrom" "${network}" "${network_name}" "${cmd[@]}"
 }
 
-allow_erc20_tx "${contract}" "${pk1}" "${addr1}" "${node}"
-erc20_tx "${contract}" "${pk1}" "${addr1}" "${addr2}" "${node}"
-allow_erc20_tx "${contract}" "${pk2}" "${addr2}" "${node}"
-erc20_tx "${contract}" "${pk2}" "${addr2}" "${addr1}" "${node}"
+allow_erc20_tx "${contract}" "${pk1}" "${addr1}" "${sequencer}" "sequencer"
+erc20_tx "${contract}" "${pk1}" "${addr1}" "${addr2}" "${sequencer}" "sequencer"
+allow_erc20_tx "${contract}" "${pk2}" "${addr2}" "${observer}" "observer"
+erc20_tx "${contract}" "${pk2}" "${addr2}" "${addr1}" "${observer}" "observer"
 add_report_msg "------------------------"
-tx "${pk1}" "${addr2}" "${node}"
-tx "${pk2}" "${addr1}" "${node}"
+tx "${pk1}" "${addr2}" "${sequencer}" "sequencer"
+tx "${pk2}" "${addr1}" "${observer}" "observer"
 send_msg "${report}"

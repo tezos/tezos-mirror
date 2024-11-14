@@ -8,13 +8,11 @@
  (libraries
   uutf
   zarith
-  zarith_stubs_js
   octez-libs.stdlib
   octez-libs.error-monad
-  data-encoding)
- (inline_tests (flags -verbose) (modes native js))
+  octez-libs.data-encoding)
+ (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
- (js_of_ocaml)
  (flags
   (:standard)
   -open Tezos_stdlib

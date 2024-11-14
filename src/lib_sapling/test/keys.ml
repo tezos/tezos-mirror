@@ -26,7 +26,7 @@ module Vector = struct
     note_nf : R.nullifier;
   }
 
-  let vectors =
+  let vectors () =
     let vector_of_strings sk ask nsk ovk ak nk ivk default_d default_pk_d note_v
         note_r note_cm note_pos note_nf =
       let note_v =
@@ -74,6 +74,8 @@ module Vector = struct
           "%s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s"
           vector_of_strings)
       lines
+
+  let vectors = Lazy.from_fun vectors
 end
 
 type vector_zip32 = {
@@ -95,7 +97,7 @@ type vector_zip32 = {
   dmax : Vk.diversifier option;
 }
 
-let vectors_zip32 =
+let vectors_zip32 () =
   let open R in
   let vector_of_strings ask nsk ovk dk c ak nk ivk xsk xfvk fp d0 d1 d2 dmax =
     let opt s = if s = "None" then None else Some (ba_of_hex s) in
@@ -152,7 +154,9 @@ let vectors_zip32 =
         vector_of_strings)
     lines
 
-let xsks_raw =
+let vectors_zip32 = Lazy.from_fun vectors_zip32
+
+let xsks_raw () =
   List.fold_left
     (fun acc v ->
       match v.xsk with
@@ -162,11 +166,15 @@ let xsks_raw =
           |> Stdlib.Option.get
           |> fun xsk -> xsk :: acc)
     []
-    vectors_zip32
+    (Lazy.force vectors_zip32)
 
-let xsks =
+let xsks_raw = Lazy.from_fun xsks_raw
+
+let xsks () =
   List.map
     (fun x ->
       R.of_zip32_expanded_spending_key x
       |> Core.Wallet.Spending_key.of_bytes |> Stdlib.Option.get)
-    xsks_raw
+    (Lazy.force xsks_raw)
+
+let xsks = Lazy.from_fun xsks

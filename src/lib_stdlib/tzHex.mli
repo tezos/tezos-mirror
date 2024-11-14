@@ -81,7 +81,7 @@ val hexdump_s : ?print_row_numbers:bool -> ?print_chars:bool -> t -> string
 (** [pp fmt t] will output a human-readable hex representation of [t]
     to the formatter [fmt]. *)
 val pp : Format.formatter -> t -> unit
-  [@@ocaml.toplevel_printer]
+[@@ocaml.toplevel_printer]
 
 (** [show t] will return a human-readable hex representation of [t] as
     a string. *)

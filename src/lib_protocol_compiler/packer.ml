@@ -34,7 +34,7 @@ let dump_file oc file =
         oc
         "%s"
         (if len = buflen then Bytes.unsafe_to_string buf
-        else Bytes.sub_string buf 0 len) ;
+         else Bytes.sub_string buf 0 len) ;
       loop ())
   in
   loop () ;

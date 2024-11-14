@@ -28,7 +28,7 @@ type error = Overwrite_forbiden of string | File_not_found of string
 
 (* We need to exit Lwt + tzResult context from Yes_wallet. *)
 let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
-    ~active_bakers_only alias_pkh_pk_list =
+    ~active_bakers_only alias_pkh_pk_list other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -39,9 +39,11 @@ let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
          ?level
          base_dir
          ~active_bakers_only
-         alias_pkh_pk_list)
+         alias_pkh_pk_list
+         other_accounts_pkh)
   with
-  | Ok alias_pkh_pk_list -> alias_pkh_pk_list
+  | Ok alias_pkh_pk_list_and_other_accounts ->
+      alias_pkh_pk_list_and_other_accounts
   | Error trace ->
       Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
       exit 1
@@ -58,7 +60,7 @@ let run_load_contracts ?dump_contracts ?network_opt ?level base_dir =
       exit 1
 
 let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases =
+    ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -68,7 +70,8 @@ let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
          ?network_opt
          base_dir
          ~active_bakers_only
-         ~aliases)
+         ~aliases
+         ~other_accounts_pkh)
   with
   | Ok alias_pkh_pk_list -> alias_pkh_pk_list
   | Error trace ->
@@ -177,6 +180,8 @@ let network_opt_name = "--network"
 
 let level_opt_name = "--level"
 
+let other_accounts_opt_name = "--other-accounts"
+
 let supported_network =
   List.map fst Octez_node_config.Config_file.builtin_blockchain_networks
 
@@ -207,7 +212,9 @@ let usage () =
      if %s <NUM> is used, the first largest bakers that have an accumulated \
      stake of at least <NUM> percent of the total stake are kept@,\
      if %s <%a> is used the store is opened using the right genesis parameter \
-     (default is mainnet) @]@]@,\
+     (default is mainnet) @,\
+     if %s <pkh .. pkh> is used, the generated wallet will also contain the \
+     addresses for the given list of space separated pkh. @]@]@,\
      @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
      computes the total supply form all contracts and commitments. result is \
      printed in stantdard output, optionally informations on all read \
@@ -233,11 +240,38 @@ let usage () =
         ~pp_sep:(fun ppf () -> pp_print_string ppf "|")
         pp_print_string)
     supported_network
+    other_accounts_opt_name
     alias_file_opt_name
     force_opt_name
 
+let parse_accounts str_list =
+  let rec aux acc str_list =
+    match str_list with
+    | [] -> (acc, [])
+    | str :: str_list -> (
+        let pkh_result =
+          Tezos_crypto.Signature.Public_key_hash.of_b58check str
+        in
+        match pkh_result with
+        | Ok pkh -> aux (pkh :: acc) str_list
+        | Error _ -> (acc, str :: str_list))
+  in
+  aux [] str_list
+
+let other_accounts_opt argv =
+  let rec parse acc argv =
+    match argv with
+    | [] -> ([], List.rev acc)
+    | opt :: argv when opt = other_accounts_opt_name ->
+        let accounts, argv_tail = parse_accounts argv in
+        (accounts, List.rev_append acc argv_tail)
+    | opt :: argv -> parse (opt :: acc) argv
+  in
+  parse [] argv
+
 let () =
   let argv = Array.to_list Sys.argv in
+  let other_accounts_pkh, argv = other_accounts_opt argv in
   let staking_share_opt =
     let rec aux argv =
       match argv with
@@ -352,11 +386,12 @@ let () =
       else
         let yes_alias_list =
           run_build_yes_wallet
-            ~staking_share_opt
+            ?staking_share_opt
             ?network_opt
             base_dir
             ~active_bakers_only
             ~aliases
+            ~other_accounts_pkh
         in
         Format.printf
           "@[<h>Number of keys to export:@;<3 0>%d@]@."
@@ -422,14 +457,15 @@ let () =
                 contracts_list)
       | None -> exit 0)
   | [_; "dump"; "staking"; "balances"; "from"; base_dir; "in"; csv_file] ->
-      let alias_pkh_pk_list =
+      let alias_pkh_pk_list, _other_accounts =
         run_load_bakers_public_keys
-          ~staking_share_opt
+          ?staking_share_opt
           ?network_opt
           ?level:level_opt
           base_dir
           ~active_bakers_only
           aliases
+          other_accounts_pkh
       in
 
       let flags =

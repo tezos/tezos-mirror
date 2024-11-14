@@ -5,9 +5,9 @@ This is a package containing some libraries used by the EVM Node of Octez.
 It contains the following libraries:
 
 - {{!module-Evm_node_config}Evm_node_config}: Configuration for the EVM node
+- {{!module-Evm_node_kernels}Evm_node_kernels}: Collections of embedded kernels binaries
 - {{!module-Evm_node_lib_dev}Evm_node_lib_dev}: An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup [dev version]
 - {{!module-Evm_node_lib_dev_encoding}Evm_node_lib_dev_encoding}: EVM encodings for the EVM node and plugin for the WASM Debugger [dev version]
-- {{!module-Evm_node_lib_prod}Evm_node_lib_prod}: An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup [prod version]
-- {{!module-Evm_node_lib_prod_encoding}Evm_node_lib_prod_encoding}: EVM encodings for the EVM node and plugin for the WASM Debugger [prod version]
 - {{!module-Evm_node_migrations}Evm_node_migrations}: SQL migrations for the EVM node store
-- {{!module-Evm_node_sequencer_protobuf}Evm_node_sequencer_protobuf}: gRPC libraries for interacting with a consensus node, generated from protobuf definitions
+- {{!module-Evm_node_wasm_runtime}Evm_node_wasm_runtime}: WASM runtime compatible with the WASM PVM
+- {{!module-Wasm_runtime_callbacks}Wasm_runtime_callbacks}: Callbacks implementing the I/O functions required to implement the host functions of the WASM runtime

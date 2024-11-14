@@ -1,0 +1,30 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+; This file contains a list of protocols to NOT build.
+; It is only used when slim mode is active.
+; Otherwise it is ignored by the build system.
+; For more information, see: scripts/slim-mode.sh
+
+(data_only_dirs
+ proto_001_PtCJ7pwo
+ proto_002_PsYLVpVv
+ proto_003_PsddFKi3
+ proto_004_Pt24m4xi
+ proto_005_PsBABY5H
+ proto_005_PsBabyM1
+ proto_006_PsCARTHA
+ proto_007_PsDELPH1
+ proto_008_PtEdoTez
+ proto_008_PtEdo2Zk
+ proto_009_PsFLoren
+ proto_010_PtGRANAD
+ proto_011_PtHangz2
+ proto_012_Psithaca
+ proto_013_PtJakart
+ proto_014_PtKathma
+ proto_015_PtLimaPt
+ proto_016_PtMumbai
+ proto_017_PtNairob
+ proto_018_Proxford
+ proto_019_PtParisB)

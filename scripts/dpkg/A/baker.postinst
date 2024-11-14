@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Reload to get new init scripts
+systemctl daemon-reload || exit 0

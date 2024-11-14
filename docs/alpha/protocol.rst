@@ -25,6 +25,11 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   baking_power
+
+.. toctree::
+   :maxdepth: 2
+
    consensus
 
 .. toctree::
@@ -80,7 +85,7 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
-   precheck
+   mempool
 
 .. toctree::
    :maxdepth: 2
@@ -116,6 +121,16 @@ Sapling, etc), and some details about its implementation.
    :maxdepth: 2
 
    adaptive_issuance
+
+.. toctree::
+   :maxdepth: 2
+
+   staking
+
+.. toctree::
+   :maxdepth: 2
+
+   adaptive_slashing
 
 .. toctree::
    :maxdepth: 2

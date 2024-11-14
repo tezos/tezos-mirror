@@ -7,13 +7,12 @@
  (libraries
   octez-libs.stdlib
   octez-libs.lwt-result-stdlib
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.error-monad
   octez-libs.event-logging
   octez-libs.test-helpers
   tezt.core
   octez-alcotezt)
- (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

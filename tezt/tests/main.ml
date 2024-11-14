@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -58,10 +59,11 @@ let register_protocol_independent_tests () =
   P2p.register_protocol_independent () ;
   Proxy.register_protocol_independent () ;
   Rpc_tls.register_protocol_independent () ;
+  Scheduled_pipeline_check.register_protocol_independent () ;
   Snoop_codegen.register_protocol_independent () ;
   Snoop_protocol_codegen.register_protocol_independent () ;
   Sc_rollup.register_protocol_independent () ;
-  Risc_v_sandbox.register ()
+  Riscv_sandbox.register ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
@@ -71,12 +73,12 @@ let register_protocol_migration_tests () =
   Protocol_table_update.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
   (if alpha_can_stitch_from_its_predecessor then
-   Protocol.previous_protocol Alpha
-   |> Option.iter @@ fun from_protocol ->
-      Voting.register
-        ~from_protocol
-        ~to_protocol:(Known Alpha)
-        ~loser_protocols:[]) ;
+     Protocol.previous_protocol Alpha
+     |> Option.iter @@ fun from_protocol ->
+        Voting.register
+          ~from_protocol
+          ~to_protocol:(Known Alpha)
+          ~loser_protocols:[]) ;
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Injected_test
@@ -154,6 +156,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Gas_bound.register ~protocols ;
   Global_constants.register ~protocols ;
   Hash_data.register ~protocols ;
+  Http_cache_headers.register ~protocols ;
   Increase_paid_storage.register ~protocols ;
   Injector_test.register ~protocols ;
   Large_metadata.register ~protocols ;
@@ -173,11 +176,9 @@ let register_protocol_tests_that_use_supports_correctly () =
   Operation_size.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
-  Precheck.register ~protocols ;
   Prevalidator.register ~protocols ;
   Protocol_limits.register ~protocols ;
   Proxy.register ~protocols ;
-  Proxy_server_test.register ~protocols ;
   Rpc_process.register ~protocols ;
   RPC_test.register protocols ;
   Rpc_versioning_attestation.register ~protocols ;
@@ -209,19 +210,21 @@ let register_protocol_tests_that_use_supports_correctly () =
   Tenderbake.register ~protocols ;
   Testnet_dictator.register ~protocols ;
   Test_contract_bls12_381.register ~protocols ;
+  Teztale_test.register ~protocols ;
   Ticket_receipt_and_rpc.register ~protocols ;
   Transfer.register ~protocols ;
   Tickets.register ~protocols ;
   Tzip4_view.register ~protocols ;
   Used_paid_storage_spaces.register ~protocols ;
+  Validate.register ~protocols ;
   Vdf_test.register ~protocols ;
   Views.register ~protocols ;
   Zk_rollup.register ~protocols ;
   Tx_sc_rollup.register ~protocols ;
-  Dac.register ~protocols ;
   Timelock.register ~protocols ;
   Tzt_regression.register ~protocols ;
-  Dal.register ~protocols
+  Dal.register ~protocols ;
+  Yes_crypto.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as

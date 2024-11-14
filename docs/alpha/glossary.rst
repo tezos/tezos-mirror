@@ -1,12 +1,14 @@
 Glossary
 ========
 
-This glossary is divided in two sections, the first one concerns Tezos, and
-the second one concerns the `economic protocol`_. The definitions in the latter
-section may be different for other protocol versions.
+This glossary is divided in two sections:
 
-Tezos
------
+- The first section contains Tezos generic terms (i.e., which are not related to a particular protocol), such as Tezos_ or block_.
+- The second section contains terms defined by the `economic protocol`_, such as Tez_/XTZ_, account_, `smart contract`_, or delegate_.
+  The list of terms in this section and/or their definitions may be different for other protocol versions.
+
+Tezos terms
+-----------
 
 _`Block`
     The Tezos blockchain is a linked list of blocks (or actually, a tree when several competing branches exist).
@@ -84,11 +86,18 @@ _`Shell`
     (handling communication between nodes) and the `economic protocol`_ layer
     (handling the context_, operation_ application, scoring, etc.).
 
+_`Tezos`
+    Used either as a noun or an adjective to designate:
+
+    * An open-source project and software (as in, "contributing to the Tezos protocol")
+    * A peer-to-peer network of nodes maintaining a blockchain (as in "a Tezos node")
+    * The specific Tezos chain with the most economic relevance (as in "the Tezos chain"). In particular, the chain whose millionth block had hash `BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7 <https://tzkt.io/BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7>`__
+
 _`Weight`
     See fitness_.
 
-Protocol
---------
+Protocol terms
+--------------
 
 .. _def_accuser_alpha:
 
@@ -109,7 +118,15 @@ _`Account`
     In the context_, each account is associated with a balance (an amount of
     tez available).
 
-    An account can be either an `originated account`_ or an `implicit account`_.
+    An account can be either a `user account`_ or a `smart contract`_.
+
+_`Attesting`
+    When a block_ is created and propagated on the network, delegates that have
+    `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
+    Attestation operations are included in the next block_.
+
+_`Attesting rights`
+    See `baking rights`_.
 
 _`Baker`
     When a delegate_ creates a new block_, it is called the baker of this block.
@@ -146,9 +163,6 @@ _`Burn`
 _`Constant`
     Protocols are parameterized by several parameters called protocol constants, which may vary from one protocol to another or from one network to another.
 
-_`Contract`
-    See account_.
-
 .. _def_cycle_alpha:
 
 _`Cycle`
@@ -166,9 +180,9 @@ _`Cycle`
 .. _def_delegate_alpha:
 
 _`Delegate`
-    An `implicit account`_ that can participate in consensus and in governance.
+    A `user account`_ that can participate in consensus and in governance.
     Actual participation is under further provisions, like having a `minimal stake`_.
-    An implicit account becomes a delegate by registering as such.
+    A user account becomes a delegate by registering as such.
     Through delegation_, other accounts can delegate their rights to a delegate account.
     The delegate's rights are calculated based on its stake_.
     Note that ``tz4`` accounts cannot be delegates.
@@ -195,16 +209,8 @@ _`Failing Noop`
     fails at :ref:`application time<operation_validity_alpha>`, and
     should never appear in :ref:`applied
     blocks<full_application_alpha>`. This operation allows end-users to
-    :ref:`sign arbitrary messages<failing_noop>` which have no
+    :ref:`sign arbitrary messages<failing_noop_alpha>` which have no
     computational semantics.
-
-_`Attesting`
-    When a block_ is created and propagated on the network, delegates that have
-    `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
-    Attestation operations are included in the next block_.
-
-_`Attesting rights`
-    See `baking rights`_.
 
 .. _def_fee_alpha:
 
@@ -225,19 +231,8 @@ _`Gas`
     the execution of a `smart contract`_. Gas is used to measure how
     much computing power is used to execute a `smart contract`_.
 
-.. _def_implicit_account_alpha:
-
 _`Implicit account`
-    An account_ that is linked to a public key. Contrary to a `smart
-    contract`_, an implicit account cannot include a script and it
-    cannot reject incoming transactions.
-
-    If *registered*, an `implicit account`_ can act as a delegate_.
-
-    The address of an implicit account always starts with the
-    letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
-    signature scheme) and finally the hash of the public key.
-    See :doc:`./accounts` for a more detailed explanation on addresses.
+    See `user account`_.
 
 _`Layer 1`
     The primary blockchain i.e. the Tezos chain. Within any blockchain ecosystem, Layer 1 (L1) refers to the main chain to
@@ -248,13 +243,10 @@ _`Layer 1`
 
 _`Layer 2`
     Layer 2 (L2) includes sidechains, rollups, payment channels, etc. that batch their transactions and
-    write to the `layer 1`_ chain. By processing transactions on layer 2 networks,
+    write to the `Layer 1`_ chain. By processing transactions on layer 2 networks,
     greater scalability in speed and throughput can be achieved by the ecosystem overall, since the number of transactions
-    the layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
-    the security of the L1 chain backs those operations. In Tezos there are a number of layer 2 solutions,
-    including :doc:`Smart Optimistic Rollups <smart_rollups>`,
-    validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
-    zkChannels, and sidechains such as `Deku <https://deku.marigold.dev/>`_.
+    the Layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
+    the security of the L1 chain backs those operations. Currently, Layer 2 solutions on Tezos are built as `smart rollup`_\ s.
 
 _`Michelson`
     The built-in language used by a `smart contract`_.
@@ -280,6 +272,58 @@ _`Origination`
     A manager operation_ whose purpose is to create -- that
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
+_`PVM`
+   A PVM (Proof-generating Virtual Machine) is a reference
+   implementation for a device on top of which a `smart rollup`_ can be
+   executed. This reference implementation is part of the `economic
+   protocol`_ and is the unique source of truth regarding the semantics
+   of rollups. The PVM is able to produce proofs enforcing this truth.
+   This ability is used during the final step of a `refutation game`_.
+
+_`Refutation game`
+   A process by which the `economic protocol`_ solves a conflict between two
+   `rollup committer`_\ s.
+   Note that the refutation mechanism used in Tezos `smart rollup`_\ s corresponds to the notion of `fraud proofs <https://academy.binance.com/en/glossary/fraud-proof>`__ used in other blockchain/Layer 2 ecosystems.
+
+_`Refutation period`
+   When the first `rollup commitment`_ for a `rollup commitment period`_ is published, a refutation
+   period of two weeks starts to allow this commitment to be challenged.
+
+_`Roll`
+    deprecated; see `minimal stake`_.
+
+_`Rollup commitment`
+   A claim that the interpretation of all `rollup inbox`_ messages
+   published during a given period, and applied on the state of
+   a parent rollup commitment, led to a given new state by performing a given
+   number of execution steps of the `PVM`_.
+
+_`Rollup commitment period`
+   A period of roughly 15 minutes during which all `rollup inbox`_
+   messages must be processed by the `rollup node`_ state to compute a
+   `rollup commitment`_. A commitment must be published for each commitment
+   period.
+
+_`Rollup committer`
+   A `user account`_ that has published and made a deposit on a
+   `rollup commitment`_.
+
+_`Rollup inbox`
+   A sequence of messages from the Layer 1 to all the `smart rollup`_\ s.
+   The contents of the inbox are determined by the consensus of the
+   `economic protocol`_.
+
+_`Rollup node`
+   A daemon required for deploying and operating `smart rollup`_\ s.
+   The rollup node is responsible for making the rollup progress by publishing `rollup commitment`_\ s and by playing `refutation game`_\ s.
+
+_`Rollup outbox`
+   A sequence of messages from a `smart rollup`_ to the Layer 1.
+   Messages are `smart contract`_ calls, potentially containing tickets.
+   These calls can be triggered only when the related `rollup commitment`_ is
+   cemented (hence, at least two weeks after the actual execution of
+   the operation).
+
 .. _def_round_alpha:
 
 _`Round`
@@ -290,9 +334,6 @@ _`Round`
     the round's corresponding time span. Baking_ outside of one's designated
     round results in an invalid block_.
 
-_`Roll`
-    deprecated; see `minimal stake`_.
-
 _`Smart contract`
     Account_ which is associated to a Michelson_ script.
     They are created with an
@@ -300,8 +341,8 @@ _`Smart contract`
     originated accounts. The address of a smart contract always starts
     with the letters ``KT1``.
 
-_`Smart Optimistic Rollups`
-    Smart optimistic rollups constitute a `layer 2`_ solution that can be used to deploy either a general-purpose polyvalent layer 2 blockchain
+_`Smart Rollup`
+    Smart rollups constitute a `Layer 2`_ solution that can be used to deploy either a general-purpose polyvalent Layer 2 blockchain
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
@@ -313,9 +354,34 @@ _`Stake`
     it. However, there are cases when this is not the case, see
     :ref:`here<active_stake_alpha>` for details.
 
+_`Staker`
+    A `user account`_ that made a security deposit.
+    The user account must have set a delegate.
+    The security deposit accrues to the stake of the user account's delegate and is
+    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_alpha>`.
+
+_`Tez`
+    A unit of the cryptocurrency native to a Tezos_ chain, such as in "I sent you 2 tez." Tez is invariable. It is not capitalized except at the beginning of a sentence or when you would otherwise capitalize a noun.
+    See also XTZ_.
+
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
+
+.. _def_user_account_alpha:
+
+_`User account`
+    An account_ that is linked to a public key. Contrary to a `smart
+    contract`_, a user account cannot include a script and it
+    cannot reject incoming transactions.
+    User accounts are sometimes called "implicit accounts".
+
+    If *registered*, a user account can act as a delegate_.
+
+    The address of a user account always starts with the
+    letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
+    signature scheme) and finally the hash of the public key.
+    See :doc:`./accounts` for a more detailed explanation on addresses.
 
 _`Validation pass`
     An index (a natural number) associated with a particular kind of
@@ -335,3 +401,8 @@ _`Voting listings`
     than the `minimal stake`_ at that moment. For each delegate_, the voting listings
     reflect the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.
+
+_`XTZ`
+    XTZ, tez, or ꜩ (``\ua729``, "Latin small letter tz") is the native currency of Tezos.
+
+    "XTZ" is an ISO-4217-compatible code for representing tez on the most economically relevant Tezos chain. Unless there is a very specific reason to use an ISO code for it, the term tez is preferred. Situations where the ISO code might be useful typically involve accounting systems, exchange rates with other currencies, and anything that might need some sort of standardized code.

@@ -50,7 +50,7 @@ let () =
     (function
       | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
     (fun parameter -> Failed_to_load_trusted_setup parameter)
-  [@@coverage off]
+[@@coverage off]
 
 type initialisation_parameters =
   | Verifier of {is_fake : bool}
@@ -69,18 +69,16 @@ let load_parameters parameters =
 
    An integrity check is run to ensure the validity of the files. *)
 (* TODO catch Failed_to_load_trusted_setup *)
-let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path ~srs_size =
+let initialisation_parameters_from_files ~srsu_g1_path ~srsu_g2_path ~srs_size =
   let open Lwt_syntax in
-  let* srs = Srs.read_srs ~len:srs_size ~srs_g1_path ~srs_g2_path () in
+  let* srs =
+    Srs.read_uncompressed_srs ~len:srs_size ~srsu_g1_path ~srsu_g2_path ()
+  in
   let open Result_syntax in
   Lwt.return
   @@
   match srs with
-  | Error (`End_of_file s) ->
-      tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
-  | Error (`Invalid_point p) ->
-      tzfail
-        (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
+  | Error err -> Lwt_utils_unix.tzfail_of_io_error err
   | Ok srs -> return srs
 
 module Inner = struct
@@ -96,7 +94,7 @@ module Inner = struct
         ~to_raw:to_string
         ~of_raw:of_string_opt
         ~wrap:(fun x -> Data x)
-      [@@coverage off]
+    [@@coverage off]
 
     let raw_encoding = encoding [@@coverage off]
 
@@ -120,12 +118,12 @@ module Inner = struct
            function exposed. We only need the Base58 encoding and the
            rpc_arg. *)
         assert false
-        [@@coverage off]
+      [@@coverage off]
 
       let seeded_hash _ _ =
         (* Same argument. *)
         assert false
-        [@@coverage off]
+      [@@coverage off]
     end)
 
     let of_b58check = of_b58check
@@ -172,7 +170,7 @@ module Inner = struct
         (fun {index; share} -> (index, share))
         (fun (index, share) -> {index; share})
         (tup2 int31 share_encoding)
-      [@@coverage off]
+    [@@coverage off]
 
     let shards_proofs_precomputation_encoding =
       Kate_amortized.preprocess_encoding
@@ -206,7 +204,7 @@ module Inner = struct
          Data_encoding.string)
       (function Invalid_precomputation_hash err -> Some err | _ -> None)
       (function err -> Invalid_precomputation_hash err)
-    [@@coverage off]
+  [@@coverage off]
 
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
   let make_domain n = Domain.build n
@@ -307,7 +305,7 @@ module Inner = struct
           return x
     in
     fun ({redundancy_factor; slot_size; page_size; number_of_shards} as
-        parameters) ->
+         parameters) ->
       (* The cryptobox is deterministically computed from the DAL parameters and
          this computation takes time (on the order of 10ms) so we cache it. *)
       with_cache (parameters, !initialisation_parameters) @@ fun () ->
@@ -343,7 +341,7 @@ module Inner = struct
       in
       let srs_verifier =
         (if is_fake then Srs.Internal_for_tests.get_verifier_srs2
-        else Srs.get_verifier_srs2)
+         else Srs.get_verifier_srs2)
           ~max_polynomial_length
           ~page_length_domain
           ~shard_length
@@ -379,7 +377,7 @@ module Inner = struct
   let parameters
       ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
     {redundancy_factor; slot_size; page_size; number_of_shards}
-    [@@coverage off]
+  [@@coverage off]
 
   let polynomial_degree = Poly.degree
 
@@ -1118,9 +1116,6 @@ module Internal_for_tests = struct
   let init_verifier_dal () =
     initialisation_parameters := Verifier {is_fake = true}
 
-  let init_verifier_dal_default () =
-    initialisation_parameters := Verifier {is_fake = false}
-
   let make_dummy_shards (t : t) ~state =
     Random.set_state state ;
     let rec loop index seq =
@@ -1208,42 +1203,27 @@ module Internal_for_tests = struct
   let slot_as_polynomial_length = Parameters_check.slot_as_polynomial_length
 end
 
+let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) () =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let* initialisation_parameters =
+        let*? srsu_g1_path, srsu_g2_path = find_srs_files () in
+        let* srs_g1, srs_g2 =
+          initialisation_parameters_from_files
+            ~srsu_g1_path
+            ~srsu_g2_path
+            ~srs_size:(1 lsl srs_size_log2)
+        in
+        return (Prover {is_fake = false; srs_g1; srs_g2})
+      in
+      Lwt.return (load_parameters initialisation_parameters))
+    (fun exn -> tzfail (Failed_to_load_trusted_setup (Printexc.to_string exn)))
+
 module Config = struct
-  type t = Dal_config.t = {
-    activated : bool;
-    use_mock_srs_for_testing : bool;
-    bootstrap_peers : string list;
-  }
+  type t = Dal_config.t = {activated : bool; bootstrap_peers : string list}
 
   let encoding : t Data_encoding.t = Dal_config.encoding
 
   let default = Dal_config.default
-
-  let init_verifier_dal dal_config =
-    let open Result_syntax in
-    if dal_config.activated then
-      let initialisation_parameters =
-        Verifier {is_fake = dal_config.use_mock_srs_for_testing}
-      in
-      load_parameters initialisation_parameters
-    else return_unit
-
-  let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
-    let open Lwt_result_syntax in
-    if dal_config.activated then
-      let* initialisation_parameters =
-        if dal_config.use_mock_srs_for_testing then
-          return (Internal_for_tests.parameters_initialisation ())
-        else
-          let*? srs_g1_path, srs_g2_path = find_srs_files () in
-          let* srs_g1, srs_g2 =
-            initialisation_parameters_from_files
-              ~srs_g1_path
-              ~srs_g2_path
-              ~srs_size:(1 lsl srs_size_log2)
-          in
-          return (Prover {is_fake = false; srs_g1; srs_g2})
-      in
-      Lwt.return (load_parameters initialisation_parameters)
-    else return_unit
 end

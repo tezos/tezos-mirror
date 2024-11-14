@@ -47,16 +47,16 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
       | "default" -> ()
       | _ -> Format.fprintf ppf "@,Entrypoint: %s" entrypoint) ;
       (if not (Script_repr.is_unit_parameter parameters) then
-       let expr =
-         WithExceptions.Option.to_exn
-           ~none:(Failure "ill-serialized argument")
-           (Data_encoding.force_decode parameters)
-       in
-       Format.fprintf
-         ppf
-         "@,Parameter: @[<v 0>%a@]"
-         Michelson_v1_printer.print_expr
-         expr) ;
+         let expr =
+           WithExceptions.Option.to_exn
+             ~none:(Failure "ill-serialized argument")
+             (Data_encoding.force_decode parameters)
+         in
+         Format.fprintf
+           ppf
+           "@,Parameter: @[<v 0>%a@]"
+           Michelson_v1_printer.print_expr
+           expr) ;
       pp_result ppf result ;
       Format.fprintf ppf "@]"
   | Origination {delegate; credit; script = {code; storage}; preorigination = _}

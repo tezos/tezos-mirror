@@ -42,90 +42,84 @@ type ('a, 'b) lwt_format = ('a, Format.formatter, unit, 'b Lwt.t) format4
 
 (** [printer] is a class for objects that provide output functions to
     display information to the end-user. *)
-class type printer =
-  object
-    method error : ('a, 'b) lwt_format -> 'a
+class type printer = object
+  method error : ('a, 'b) lwt_format -> 'a
 
-    method warning : ('a, unit) lwt_format -> 'a
+  method warning : ('a, unit) lwt_format -> 'a
 
-    method message : ('a, unit) lwt_format -> 'a
+  method message : ('a, unit) lwt_format -> 'a
 
-    method answer : ('a, unit) lwt_format -> 'a
+  method answer : ('a, unit) lwt_format -> 'a
 
-    method log : string -> ('a, unit) lwt_format -> 'a
-  end
+  method log : string -> ('a, unit) lwt_format -> 'a
+end
 
 (** [prompter] is a class of objects that provide input functions to
     request data from the end-user, whether normal inputs or
     passwords. *)
-class type prompter =
-  object
-    method prompt : ('a, string tzresult) lwt_format -> 'a
+class type prompter = object
+  method prompt : ('a, string tzresult) lwt_format -> 'a
 
-    method prompt_password : ('a, Bytes.t tzresult) lwt_format -> 'a
+  method prompt_password : ('a, Bytes.t tzresult) lwt_format -> 'a
 
-    (** when [multiple_password_retries] is [true], password
+  (** when [multiple_password_retries] is [true], password
         prompt should retries more than once. [true] is the default
         value. *)
-    method multiple_password_retries : bool
-  end
+  method multiple_password_retries : bool
+end
 
-class type io =
-  object
-    inherit printer
+class type io = object
+  inherit printer
 
-    inherit prompter
-  end
+  inherit prompter
+end
 
 (** Operations on the wallet. *)
-class type wallet =
-  object
-    method load_passwords : string Lwt_stream.t option
+class type wallet = object
+  method load_passwords : string Lwt_stream.t option
 
-    (** [read_file path] reads the content of the file given by
+  (** [read_file path] reads the content of the file given by
         [path]. Note that the whole content of the file is loaded into
         memory: you shouldn't read big files using this method. Errors
         that may be returned are implementation-dependent. *)
-    method read_file : string -> string tzresult Lwt.t
+  method read_file : string -> string tzresult Lwt.t
 
-    (** [with_lock f] calls [f ()] exclusively from any other function
+  (** [with_lock f] calls [f ()] exclusively from any other function
         that is wrapped within [with_lock]. *)
-    method with_lock : (unit -> 'a Lwt.t) -> 'a Lwt.t
+  method with_lock : (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-    (** [load alias ~default enc] reads the file corresponding to the
+  (** [load alias ~default enc] reads the file corresponding to the
         [alias], and parses using [encoding]. If the file does not
         exist, then [default] is returned. *)
-    method load :
-      string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
+  method load :
+    string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
 
-    (** [write alias x encoding] writes in a file corresponding to the
+  (** [write alias x encoding] writes in a file corresponding to the
         [alias] the information given by [x] using the [encoding]. *)
-    method write :
-      string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
+  method write :
+    string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 
-    (** [last_modification_time alias] returns the last modification
+  (** [last_modification_time alias] returns the last modification
         time of the file corresponding to the [alias], if the file exists;
         otherwise [None]. *)
-    method last_modification_time : string -> float option tzresult Lwt.t
+  method last_modification_time : string -> float option tzresult Lwt.t
 
-    (** Current base directory. Stores the information of keys (public
+  (** Current base directory. Stores the information of keys (public
         key hashes, public keys, secret keys) and watermarks. *)
-    method get_base_dir : string
-  end
+  method get_base_dir : string
+end
 
 (** Accessor on the chain. *)
-class type chain =
-  object
-    method chain : Shell_services.chain
-  end
+class type chain = object
+  method chain : Shell_services.chain
+end
 
 (** Operations on blocks. *)
-class type block =
-  object
-    method block : Shell_services.block
+class type block = object
+  method block : Shell_services.block
 
-    method confirmations : int option
-  end
+  method confirmations : int option
+end
 
 (** Primitives for input, output and wallet.
     The general organisation of the code in this module is to
@@ -134,61 +128,56 @@ class type block =
     depend on some features, but not all, so that these functions
     can be used in places that only have access to these
     features. *)
-class type io_wallet =
-  object
-    inherit printer
+class type io_wallet = object
+  inherit printer
 
-    inherit prompter
+  inherit prompter
 
-    inherit wallet
-  end
+  inherit wallet
+end
 
 (** Primitives for input, output and RPCs. *)
-class type io_rpcs =
-  object
-    inherit printer
+class type io_rpcs = object
+  inherit printer
 
-    inherit prompter
+  inherit prompter
 
-    inherit Tezos_rpc.Context.generic
-  end
+  inherit Tezos_rpc.Context.generic
+end
 
 (** User interface related operations. *)
-class type ui =
-  object
-    method sleep : float -> unit Lwt.t
+class type ui = object
+  method sleep : float -> unit Lwt.t
 
-    method exit : int -> 'a
+  method exit : int -> 'a
 
-    method now : unit -> Ptime.t
-  end
+  method now : unit -> Ptime.t
+end
 
 (** User experience options. *)
-class type ux_options =
-  object
-    method verbose_rpc_error_diagnostics : bool
-  end
+class type ux_options = object
+  method verbose_rpc_error_diagnostics : bool
+end
 
 (** A comprehensive class type gathering the above class types, that
     is used for #Protocol_client_context.full. *)
-class type full =
-  object
-    inherit printer
+class type full = object
+  inherit printer
 
-    inherit prompter
+  inherit prompter
 
-    inherit wallet
+  inherit wallet
 
-    inherit Tezos_rpc.Context.generic
+  inherit Tezos_rpc.Context.generic
 
-    inherit chain
+  inherit chain
 
-    inherit block
+  inherit block
 
-    inherit ui
+  inherit ui
 
-    inherit ux_options
-  end
+  inherit ux_options
+end
 
 (** A simple printer can be used to implement a printer as it is done
     in class [Client_context_unix.unix_logger]. *)

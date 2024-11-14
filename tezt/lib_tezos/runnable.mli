@@ -70,6 +70,8 @@ module Syntax : sig
   (** Makes fields [value] and [run] available in the environment. *)
   type nonrec ('a, 'b) t = ('a, 'b) t = {value : 'a; run : 'a -> 'b Lwt.t}
 
+  type ('a, 'b) runnable = ('a, 'b) t
+
   (** Same as [run], then continue with the given function. *)
   val ( let*! ) : ('a, 'b) t -> ('b -> 'c Lwt.t) -> 'c Lwt.t
 

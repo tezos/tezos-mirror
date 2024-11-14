@@ -12,11 +12,14 @@ use crate::state::{HostState, NextInput};
 use crate::MockHost;
 use core::{
     cell::RefCell,
+    cmp::min,
+    mem::size_of,
     ptr,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 use tezos_smart_rollup_core::smart_rollup_core::{ReadInputMessageInfo, SmartRollupCore};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::dal_parameters::DAL_PARAMETERS_SIZE;
 use tezos_smart_rollup_host::metadata::METADATA_SIZE;
 use tezos_smart_rollup_host::Error;
 
@@ -25,6 +28,8 @@ impl From<HostState> for MockHost {
         Self {
             info: super::info_for_level(state.curr_level as i32),
             state: RefCell::new(state),
+            debug_log: Box::new(RefCell::new(std::io::stderr())),
+            keep_going: true,
         }
     }
 }
@@ -33,6 +38,46 @@ impl AsMut<HostState> for MockHost {
     fn as_mut(&mut self) -> &mut HostState {
         self.state.get_mut()
     }
+}
+
+unsafe fn reveal_dal_parameters(
+    host: &MockHost,
+    destination_addr: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let params: [u8; DAL_PARAMETERS_SIZE] =
+        host.state.borrow().get_dal_parameters().into();
+    let len = min(max_bytes, params.len());
+    let slice = from_raw_parts_mut(destination_addr, len);
+    slice.copy_from_slice(&params[..len]);
+    len as i32
+}
+
+unsafe fn reveal_dal_page(
+    host: &MockHost,
+    published_level: i32,
+    slot_index: u8,
+    page_index: i16,
+    destination_addr: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let state = host.state.borrow();
+    let params = state.get_dal_parameters();
+    // If the asked level is not old enough, the DAL slot
+    // cannot yet be attested. We return 0 in this case to
+    // mimic the host function.
+    if published_level as u64 + params.attestation_lag > host.level() as u64 {
+        return 0;
+    }
+    let page_size = params.page_size as usize;
+    let len = min(max_bytes, page_size);
+    let start = ((page_index as u64) * params.page_size) as usize;
+    let Some(slot) = state.get_dal_slot(published_level, slot_index) else {
+        return 0;
+    };
+    let slice = from_raw_parts_mut(destination_addr, len);
+    slice.copy_from_slice(&slot[start..start + len]);
+    len as i32
 }
 
 unsafe impl SmartRollupCore for MockHost {
@@ -62,11 +107,9 @@ unsafe impl SmartRollupCore for MockHost {
     }
 
     unsafe fn write_debug(&self, src: *const u8, num_bytes: usize) {
-        let debug_out = from_raw_parts(src, num_bytes).to_vec();
+        let debug_out = from_raw_parts(src, num_bytes);
 
-        let debug = String::from_utf8(debug_out).expect("unexpected non-utf8 debug log");
-
-        eprint!("{}", &debug);
+        self.debug_log.borrow_mut().write_all(debug_out).unwrap();
     }
 
     unsafe fn write_output(&self, src: *const u8, num_bytes: usize) -> i32 {
@@ -184,29 +227,83 @@ unsafe impl SmartRollupCore for MockHost {
     }
 
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32 {
-        assert!(METADATA_SIZE <= max_bytes);
         let metadata: [u8; METADATA_SIZE] =
             self.state.borrow().get_metadata().clone().into();
-        let slice = from_raw_parts_mut(destination_addr, metadata.len());
-        slice.copy_from_slice(metadata.as_slice());
-        metadata.len().try_into().unwrap()
+        let len = min(max_bytes, metadata.len());
+        let slice = from_raw_parts_mut(destination_addr, len);
+        slice.copy_from_slice(&metadata[..len]);
+        len as i32
     }
 
-    #[cfg(feature = "proto-alpha")]
     unsafe fn reveal(
         &self,
-        _payload_addr: *const u8,
-        _payload_len: usize,
-        _destination_addr: *mut u8,
-        _max_bytes: usize,
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
     ) -> i32 {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6171
-        unimplemented!("The `reveal` host function is not yet mocked.")
+        let payload: &[u8] = from_raw_parts(payload_addr, payload_len);
+        if payload.is_empty() {
+            return 0;
+        }
+        let (tag, payload) = payload.split_at(size_of::<u8>());
+        match tag[0] {
+            0 => {
+                // Reveal_raw_data
+                self.reveal_preimage(
+                    payload_addr.add(1),
+                    payload_len.saturating_sub(1),
+                    destination_addr,
+                    max_bytes,
+                )
+            }
+            1 => {
+                // Reveal_metadata
+                self.reveal_metadata(destination_addr, max_bytes)
+            }
+            2 => {
+                // Reveal_dal_page
+
+                const PAYLOAD_SIZE: usize =
+                    size_of::<i32>() + size_of::<u8>() + size_of::<i16>();
+                if payload.len() < PAYLOAD_SIZE {
+                    return 0;
+                }
+
+                let (published_level, remaining) = payload.split_at(size_of::<i32>());
+                let (slot_index, remaining) = remaining.split_at(size_of::<u8>());
+                let (page_index, _) = remaining.split_at(size_of::<i16>());
+
+                let published_level =
+                    i32::from_be_bytes(published_level.try_into().unwrap());
+                let slot_index = slot_index[0];
+                let page_index = i16::from_be_bytes(page_index.try_into().unwrap());
+
+                reveal_dal_page(
+                    self,
+                    published_level,
+                    slot_index,
+                    page_index,
+                    destination_addr,
+                    max_bytes,
+                )
+            }
+            3 => {
+                // Reveal_dal_parameters
+                reveal_dal_parameters(self, destination_addr, max_bytes)
+            }
+            tag => unimplemented!(
+                "The `reveal` host function is not yet mocked for tag {}.",
+                tag
+            ),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+
+    use std::iter::repeat_with;
 
     use super::MockHost;
 
@@ -396,5 +493,129 @@ mod tests {
         assert!(new_size < initial_size);
         assert_ne!(new_value_in_store, initial_value_in_store);
         assert_eq!(new_value_in_store, smaller_value);
+    }
+
+    #[test]
+    fn dal_slot_are_padded_with_zeroes() {
+        let mut mock = MockHost::default();
+        let data = vec![b'v'; 100];
+        let published_level = (mock.level()) as i32;
+        let slot_index = 4;
+        mock.set_dal_slot(published_level, slot_index, &data);
+
+        let dal_parameters = mock.reveal_dal_parameters();
+
+        // First bump the level by attestation_lag so that the slot is old enough to be attested
+        let attestation_lag = dal_parameters.attestation_lag as usize;
+        let () = repeat_with(|| mock.bump_level())
+            .take(attestation_lag + 1)
+            .collect();
+
+        // Read the slot completely
+        let slot_size = dal_parameters.slot_size as usize;
+        let page_size = dal_parameters.page_size as usize;
+        let mut slot = vec![0; slot_size];
+        let number_of_pages = (slot_size / page_size) as i16;
+        let mut offset = 0;
+        for page_index in 0..number_of_pages {
+            let page_len = mock
+                .reveal_dal_page(
+                    published_level,
+                    slot_index,
+                    page_index,
+                    &mut slot[offset..(offset + page_size)],
+                )
+                .expect("Page is expected to be readable");
+            offset += page_len;
+            assert_eq!(page_len, page_size)
+        }
+
+        let data_in_slot = &slot[..100];
+        let padding = &slot[100..];
+
+        assert_eq!(slot.len(), slot_size);
+        assert_eq!(&data, data_in_slot);
+        assert!(padding.iter().all(|b| *b == 0));
+    }
+
+    fn publish_and_fetch_slot(
+        mock: &mut MockHost,
+        published_level: i32,
+        page_buffer: &mut [u8],
+    ) -> usize {
+        let data = vec![b'v'; 100];
+        let slot_index = 4;
+        assert!(
+            published_level > 0,
+            "Cannot publish a slot at a negative level"
+        );
+        mock.set_dal_slot(published_level, slot_index, &data);
+
+        // The slot is in an attestable state, so we can read its content
+        mock.reveal_dal_page(published_level, slot_index, 0, page_buffer)
+            .expect("Reveal of attested slot shouldn't fail")
+    }
+
+    fn assert_unattestable_dal_slot(mock: &mut MockHost, published_level: i32) {
+        let dal_parameters = mock.reveal_dal_parameters();
+        let page_size = dal_parameters.page_size as usize;
+        let mut page_buffer = vec![0; page_size];
+        let page_len = publish_and_fetch_slot(mock, published_level, &mut page_buffer);
+
+        assert_eq!(page_len, 0);
+        assert!(page_buffer.iter().all(|b| *b == 0));
+    }
+
+    fn assert_attestable_dal_slot(mock: &mut MockHost, published_level: i32) {
+        let dal_parameters = mock.reveal_dal_parameters();
+        let page_size = dal_parameters.page_size as usize;
+        let mut page_buffer = vec![0; page_size];
+        let page_len = publish_and_fetch_slot(mock, published_level, &mut page_buffer);
+
+        assert_eq!(page_len, page_size);
+        assert!(page_buffer[..100].iter().all(|b| *b == b'v'));
+    }
+
+    fn bump_levels(mock: &mut MockHost, levels: u32) {
+        repeat_with(|| mock.bump_level())
+            .take(levels as usize)
+            .collect()
+    }
+
+    #[test]
+    fn unattestable_dal_slots_are_empty() {
+        let mut mock = MockHost::default();
+        // We'll use the same slot index and data all along the test, as they
+        // are not relevant..
+
+        let dal_parameters = mock.reveal_dal_parameters();
+        let attestation_lag = dal_parameters.attestation_lag as u32;
+
+        // Let's first test with a DAL slot published before the current level
+        // with the attestation lag exceeded.
+        let published_level = (mock.level() - attestation_lag) as i32;
+        assert_attestable_dal_slot(&mut mock, published_level);
+
+        // Then let's test with a DAL slot where the attestation lag hasn't been
+        // exceeded yet.
+        let published_level = (mock.level() - (attestation_lag - 1)) as i32;
+        assert_unattestable_dal_slot(&mut mock, published_level);
+
+        // Now, let's move forward to the level where it should be attestable
+        bump_levels(&mut mock, attestation_lag - 1);
+        assert_attestable_dal_slot(&mut mock, published_level);
+
+        // The DAL slot will now be published in the future
+        let published_level = (mock.level() + 1) as i32;
+        assert_unattestable_dal_slot(&mut mock, published_level);
+
+        // Now, let's move at the same level, it shouldn't be attestable
+        bump_levels(&mut mock, 1);
+        assert_unattestable_dal_slot(&mut mock, published_level);
+
+        // Finally, let's move forward of `attestation_lag` levels, the DAL slot
+        // should now be available
+        bump_levels(&mut mock, attestation_lag);
+        assert_attestable_dal_slot(&mut mock, published_level);
     }
 }

@@ -5,7 +5,7 @@
 
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
-use tezos_crypto_rs::hash::Signature;
+use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u16_le, append_u256_le, decode_field_u16_le,
     decode_field_u256_le, decode_timestamp,
@@ -33,7 +33,7 @@ impl Encodable for BlueprintWithDelayedHashes {
             timestamp,
         } = self;
         stream.begin_list(4);
-        rlp_helpers::append_h256(stream, *parent_hash);
+        stream.append(parent_hash);
         stream.append_list(delayed_hashes);
         stream.append_list::<Vec<u8>, _>(transactions);
         append_timestamp(stream, *timestamp);
@@ -42,16 +42,11 @@ impl Encodable for BlueprintWithDelayedHashes {
 
 impl Decodable for BlueprintWithDelayedHashes {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 4 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
+        rlp_helpers::check_list(decoder, 4)?;
 
         let mut it = decoder.iter();
         let parent_hash =
-            rlp_helpers::decode_field_h256(&rlp_helpers::next(&mut it)?, "parent_hash")?;
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "parent_hash")?;
         let delayed_hashes =
             rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "delayed_hashes")?;
         let transactions =
@@ -78,7 +73,7 @@ pub struct UnsignedSequencerBlueprint {
 #[derive(PartialEq, Debug, Clone)]
 pub struct SequencerBlueprint {
     pub blueprint: UnsignedSequencerBlueprint,
-    pub signature: Signature,
+    pub signature: UnknownSignature,
 }
 
 impl From<&SequencerBlueprint> for UnsignedSequencerBlueprint {
@@ -104,18 +99,31 @@ impl Encodable for SequencerBlueprint {
         append_u256_le(stream, &self.blueprint.number);
         append_u16_le(stream, &self.blueprint.nb_chunks);
         append_u16_le(stream, &self.blueprint.chunk_index);
-        stream.append(&self.signature.0);
+        stream.append(&self.signature.as_ref());
+    }
+}
+
+impl Decodable for UnsignedSequencerBlueprint {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_list(decoder, 4)?;
+        let mut it = decoder.iter();
+        let chunk = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
+        let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+        let nb_chunks = decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
+        let chunk_index =
+            decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
+        Ok(Self {
+            chunk,
+            number,
+            nb_chunks,
+            chunk_index,
+        })
     }
 }
 
 impl Decodable for SequencerBlueprint {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 5 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
+        rlp_helpers::check_list(decoder, 5)?;
         let mut it = decoder.iter();
         let chunk = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
         let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
@@ -124,7 +132,7 @@ impl Decodable for SequencerBlueprint {
             decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
         let bytes: Vec<u8> =
             rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "signature")?;
-        let signature = Signature::try_from(bytes.as_slice())
+        let signature = UnknownSignature::try_from(bytes.as_slice())
             .map_err(|_| DecoderError::Custom("Invalid signature encoding"))?;
         let blueprint = UnsignedSequencerBlueprint {
             chunk,
@@ -147,7 +155,7 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use primitive_types::{H160, U256};
     use rlp::Encodable;
-    use tezos_crypto_rs::hash::Signature;
+    use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_ethereum::rlp_helpers::FromRlpBytes;
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
@@ -197,7 +205,7 @@ mod tests {
             transactions,
         };
         let chunk = rlp::Encodable::rlp_bytes(&blueprint);
-        let signature = Signature::from_base58_check(
+        let signature = UnknownSignature::from_base58_check(
             "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
         ).expect("signature decoding should work");
 

@@ -167,8 +167,8 @@ let classify op =
   | None -> `Bad
   | Some pass ->
       let open Operation_repr in
-      if pass = consensus_pass then `Consensus
-        (* TODO filter outdated consensus ops ? *)
+      if pass = consensus_pass then
+        `Consensus (* TODO filter outdated consensus ops ? *)
       else if pass = voting_pass then `Votes
       else if pass = anonymous_pass then `Anonymous
       else if pass = manager_pass then `Managers

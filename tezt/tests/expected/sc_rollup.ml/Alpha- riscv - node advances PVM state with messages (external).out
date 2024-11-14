@@ -1,0 +1,746 @@
+
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type bytes with kernel kernel:src/riscv/assets/riscv-dummy.elf:75ba32c0c1f4a02b181f3429650919ec109cfa2e1622cbaf586640b3fed543f7 --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1933.839 units (will add 100 for safety)
+Estimated storage: 6552 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000545
+    Expected counter: 1
+    Gas limit: 2034
+    Storage limit: 6572 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000545
+      payload fees(the block proposer) ....... +ꜩ0.000545
+    Smart rollup origination:
+      Kind: riscv
+      Parameter type: bytes
+      Kernel Blake2B hash: '38643eb033dfcc8598d7959d35dcabb811ceb05c07e426d3e914f4cc77a8f07b'
+      This smart rollup origination was successfully applied
+      Consumed gas: 1933.806
+      Storage size: 6552 bytes
+      Address: [SMART_ROLLUP_HASH]
+      Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.638
+        storage fees ........................... +ꜩ1.638
+
+Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"0"
+
+
+./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.597 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000271
+    Expected counter: 1
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000271
+      payload fees(the block proposer) ....... +ꜩ0.000271
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.530
+
+[src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
+[0][WARN] Unable to read entropy! Fallback to a naive implementation!
+Hello World
+
+I am [SMART_ROLLUP_HASH]
+RollupMetadata {
+    raw_rollup_address: [
+        229,
+        76,
+        84,
+        7,
+        95,
+        137,
+        54,
+        133,
+        253,
+        114,
+        167,
+        75,
+        67,
+        174,
+        45,
+        71,
+        226,
+        100,
+        66,
+        116,
+    ],
+    origination_level: 2,
+}
+[09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        49,
+        32,
+        54,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"967807"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"967807"
+
+
+./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.597 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000271
+    Expected counter: 2
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000271
+      payload fees(the block proposer) ....... +ꜩ0.000271
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.530
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        50,
+        32,
+        56,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1000231"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1000231"
+
+
+./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 3
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        51,
+        32,
+        49,
+        48,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1033788"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1033788"
+
+
+./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 4
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        52,
+        32,
+        49,
+        50,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1067345"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1067345"
+
+
+./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 5
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        53,
+        32,
+        49,
+        52,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1100902"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1100902"
+
+
+./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 6
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        54,
+        32,
+        49,
+        54,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1134459"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1134459"
+
+
+./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 7
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        55,
+        32,
+        49,
+        56,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1168016"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1168016"
+
+
+./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 8
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        56,
+        32,
+        50,
+        48,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1201573"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1201573"
+
+
+./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.635 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000272
+    Expected counter: 9
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000272
+      payload fees(the block proposer) ....... +ꜩ0.000272
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.569
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        57,
+        32,
+        50,
+        50,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1235130"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1235130"
+
+
+./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
+Node is bootstrapped.
+Estimated gas: 170.673 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000273
+    Expected counter: 10
+    Gas limit: 271
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000273
+      payload fees(the block proposer) ....... +ꜩ0.000273
+    Smart rollup messages submission:
+      This smart rollup messages submission was successfully applied
+      Consumed gas: 170.607
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InforPerLevel)
+
+External(
+    [
+        49,
+        48,
+        32,
+        50,
+        52,
+        32,
+        43,
+        32,
+        118,
+        97,
+        108,
+        117,
+        101,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/head/total_ticks
+200 OK
+"1269820"
+

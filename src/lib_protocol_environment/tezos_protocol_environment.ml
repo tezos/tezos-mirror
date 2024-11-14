@@ -26,6 +26,7 @@
 
 module Context = Environment_context.Context
 module Register = Environment_context.Register
+module Environment_profiler = Environment_profiler
 
 let err_implementation_mismatch =
   Environment_context.err_implementation_mismatch
@@ -62,7 +63,9 @@ module V9 = Environment_V9
 module V10 = Environment_V10
 module V11 = Environment_V11
 module V12 = Environment_V12
+module V13 = Environment_V13
 module Memory_context = Memory_context
+module Brassaia_memory_context = Brassaia_memory_context
 module Proxy_context = Proxy_context
 module Proxy_delegate = Proxy_delegate
 

@@ -42,32 +42,20 @@ let block_header_data_encoding = Header.encoding
 
 type block_header_metadata = State.t
 
-let block_header_metadata_encoding_with_legacy_attestation_name =
-  State.encoding
-
 let block_header_metadata_encoding = State.encoding
 
 type operation_data = Proto_operation.t
 
 let operation_data_encoding = Proto_operation.encoding
 
-let operation_data_encoding_with_legacy_attestation_name =
-  operation_data_encoding
-
 type operation_receipt = Receipt.t
 
 let operation_receipt_encoding = Receipt.encoding
-
-let operation_receipt_encoding_with_legacy_attestation_name =
-  operation_receipt_encoding
 
 let operation_data_and_receipt_encoding =
   (* we could merge data and receipt encoding for a lighter json *)
   Data_encoding.(
     obj2 (req "data" Proto_operation.encoding) (req "receipt" Receipt.encoding))
-
-let operation_data_and_receipt_encoding_with_legacy_attestation_name =
-  operation_data_and_receipt_encoding
 
 type operation = {
   shell : Operation.shell_header;

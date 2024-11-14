@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -68,7 +68,8 @@ module Impl : Pvm_sig.S = struct
     type t = |
 
     let of_patch (p : Pvm_patches.unsafe_patch) =
-      match p with Increase_max_nb_ticks _ -> assert false
+      match p with
+      | Increase_max_nb_ticks _ | Patch_durable_storage _ -> assert false
 
     let apply _state (x : t) = match x with _ -> .
   end
@@ -107,6 +108,53 @@ module Impl : Pvm_sig.S = struct
       else Lwt.return (state, step)
     in
     go initial_state 0L
+
+  (** Arith PVM Mutable API works by holding a reference to an immutable state 
+      and wrapping all immutable functionality around the reference *)
+  module Mutable_state :
+    Pvm_sig.MUTABLE_STATE_S
+      with type hash = hash
+       and type t = Ctxt_wrapper.mut_state = struct
+    type t = tree ref
+
+    type hash = Sc_rollup.State_hash.t
+
+    let get_tick state = get_tick !state
+
+    let state_hash state = state_hash !state
+
+    let is_input_state ~is_reveal_enabled state =
+      is_input_state ~is_reveal_enabled !state
+
+    let set_input input state =
+      let open Lwt_syntax in
+      let* imm_state = set_input input !state in
+      state := imm_state ;
+      return_unit
+
+    let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled
+        ?stop_at_snapshot ~max_steps mut_state =
+      let open Lwt_syntax in
+      let* imm_state, steps =
+        eval_many
+          ~reveal_builtins
+          ~write_debug
+          ~is_reveal_enabled
+          ?stop_at_snapshot
+          ~max_steps
+          !mut_state
+      in
+      mut_state := imm_state ;
+      return steps
+
+    module Internal_for_tests = struct
+      let insert_failure state =
+        let open Lwt_syntax in
+        let* imm_state = Internal_for_tests.insert_failure !state in
+        state := imm_state ;
+        return_unit
+    end
+  end
 end
 
 include Impl

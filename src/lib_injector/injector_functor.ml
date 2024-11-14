@@ -99,14 +99,11 @@ module Make (Parameters : PARAMETERS) = struct
 
   type injected_l1_op_content = {
     level : int32;
-    inj_ops : Inj_operation.Id.t list;
+    inj_ops : Id.t list;
     signer_pkh : Signature.public_key_hash;
   }
 
-  type included_l1_op_content = {
-    level : int32;
-    inj_ops : Inj_operation.Id.t list;
-  }
+  type included_l1_op_content = {level : int32; inj_ops : Id.t list}
 
   type status =
     | Pending of POperation.t
@@ -118,14 +115,14 @@ module Make (Parameters : PARAMETERS) = struct
       (struct
         let name = "operations_queue"
       end)
-      (Inj_operation.Id)
+      (Id)
       (struct
         include Inj_operation
 
         let persist o = Parameters.persist_operation o.operation
       end)
 
-  module Injected_operations = Inj_operation.Id.Table
+  module Injected_operations = Id.Table
   module Injected_ophs = Operation_hash.Table
 
   (** The part of the state which gathers information about injected
@@ -139,7 +136,7 @@ module Make (Parameters : PARAMETERS) = struct
             (i.e. an L1 operation). *)
   }
 
-  module Included_operations = Inj_operation.Id.Table
+  module Included_operations = Id.Table
   module Included_in_blocks = Block_hash.Table
 
   (** The part of the state which gathers information about
@@ -161,7 +158,7 @@ module Make (Parameters : PARAMETERS) = struct
     cctxt : Client_context.full;
         (** The client context which is used to perform the injections. *)
     l1_ctxt : Layer_1.t;  (** Monitoring of L1 heads.  *)
-    signers : signer list;  (** The signers for this worker. *)
+    mutable signers : signer list;  (** The signers for this worker. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
           purposes. *)
@@ -213,6 +210,12 @@ module Make (Parameters : PARAMETERS) = struct
     let emit3 e state ?(signers = state.signers) x y z =
       emit e (signers_alias signers, state.tags, x, y, z)
   end
+
+  module Metrics = Metrics.Make (struct
+    module Tag = Parameters.Tag
+
+    let registry = Parameters.metrics_registry
+  end)
 
   let last_head_encoding =
     let open Data_encoding in
@@ -503,6 +506,14 @@ module Make (Parameters : PARAMETERS) = struct
       (fun s -> not @@ Signature.Public_key_hash.Set.mem s.pkh used_signers)
       state.signers
 
+  let rotate_signers state ~used_signers =
+    let used_signers, unused_signers =
+      List.partition
+        (fun s -> Signature.Public_key_hash.Set.mem s.pkh used_signers)
+        state.signers
+    in
+    state.signers <- unused_signers @ used_signers
+
   (** [simulate_operations state operations] simulates the
       injection of [operations] and returns a triple [(op, ops, results)] where
       [op] is the packed operation with the adjusted limits, [ops] is the prefix
@@ -639,39 +650,51 @@ module Make (Parameters : PARAMETERS) = struct
             operations
     in
     let*? operations_results, raw_op = simulation_result in
-    let failure = ref false in
+    let failure = ref None in
     let* rev_non_failing_operations =
       List.fold_left_es
         (fun acc (op, {status; _}) ->
           match status with
           | Unsuccessful (Failed error) ->
-              failure := true ;
+              failure := Some (op.Inj_operation.operation, error) ;
               let+ () = register_error state ~signers:[signer] op error in
               acc
-          | Successful
-          | Unsuccessful (Backtracked | Skipped | Other_branch | Never_included)
-            ->
+          | Successful -> return (op :: acc)
+          | Unsuccessful
+              ((Backtracked | Skipped | Other_branch | Never_included) as
+               err_status) -> (
               (* Not known to be failing *)
-              return (op :: acc))
+              let*! retry =
+                Parameters.retry_unsuccessful_operation
+                  state.state
+                  op.operation
+                  err_status
+                  ?reason:!failure
+              in
+              match retry with
+              | Retry -> return (op :: acc)
+              | Abort _ | Forget -> return acc))
         []
         operations_results
     in
-    if !failure then
-      (* We try to inject without the failing operation. *)
-      let operations = List.rev rev_non_failing_operations in
-      inject_operations_for_signer state signer operations
-    else
-      (* Inject on node for real *)
-      let+ oph =
-        trace (Step_failed "injection")
-        @@ inject_on_node ~nb:(List.length operations) state signer raw_op
-      in
-      let operations =
-        List.map
-          (fun (op, {index_in_batch; _}) -> (index_in_batch, op))
-          operations_results
-      in
-      (oph, operations)
+    match !failure with
+    | Some (_, err) ->
+        (* We try to inject without the failing operation. *)
+        let operations = List.rev rev_non_failing_operations in
+        if operations = [] then fail err
+        else inject_operations_for_signer state signer operations
+    | None ->
+        (* Inject on node for real *)
+        let+ oph =
+          trace (Step_failed "injection")
+          @@ inject_on_node ~nb:(List.length operations) state signer raw_op
+        in
+        let operations =
+          List.map
+            (fun (op, {index_in_batch; _}) -> (index_in_batch, op))
+            operations_results
+        in
+        (oph, operations)
 
   (** Retrieve as many batch of operations from the queue while batch
       size remains below the size limit. *)
@@ -810,11 +833,13 @@ module Make (Parameters : PARAMETERS) = struct
         | `Ignored operations_to_drop ->
             (* Injection failed but we ignore the failure. *)
             let*! () =
-              Event.(emit1 ~signers:[signer] dropped_operations)
-                state
-                (List.map
-                   (fun o -> o.Inj_operation.operation)
-                   operations_to_drop)
+              List.iter_s
+                (fun Inj_operation.{operation; errors; _} ->
+                  Event.(emit2 ~signers:[signer] dropped_operation)
+                    state
+                    operation
+                    errors.last_error)
+                operations_to_drop
             in
             let* () =
               List.iter_es
@@ -839,6 +864,13 @@ module Make (Parameters : PARAMETERS) = struct
           inject_pending_operations_round state signer operations_to_inject)
         signers_and_ops
     in
+    let used_signers =
+      List.fold_left
+        (fun acc (s, _) -> Signature.Public_key_hash.Set.add s.pkh acc)
+        Signature.Public_key_hash.Set.empty
+        signers_and_ops
+    in
+    rotate_signers state ~used_signers ;
     let*? total_np_op =
       List.fold_left
         (fun res injected_res ->
@@ -1062,6 +1094,17 @@ module Make (Parameters : PARAMETERS) = struct
         | Forget -> return_unit)
       (List.rev expired_infos)
 
+  let set_metrics state =
+    Metrics.wrap @@ fun () ->
+    let tags = Tags.to_seq state.tags |> List.of_seq in
+    Metrics.set_queue_size tags (Op_queue.length state.queue) ;
+    Metrics.set_injected_operations_size
+      tags
+      (Injected_operations.length state.injected.injected_operations) ;
+    Metrics.set_included_operations_size
+      tags
+      (Included_operations.length state.included.included_operations)
+
   (** [on_new_tezos_head state head] is called when there is a new Tezos
       head. It first reverts any blocks that are in the alternative branch of
       the reorganization and then registers the effect of the new branch (the
@@ -1070,6 +1113,7 @@ module Make (Parameters : PARAMETERS) = struct
       ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
+    set_metrics state ;
     let*! reorg =
       match state.last_seen_head with
       | None ->
@@ -1391,7 +1435,7 @@ module Make (Parameters : PARAMETERS) = struct
         tags
         {
           signers;
-          cctxt = (cctxt :> Client_context.full);
+          cctxt :> Client_context.full;
           l1_ctxt;
           head_protocols;
           data_dir;
@@ -1406,6 +1450,9 @@ module Make (Parameters : PARAMETERS) = struct
     let () = Tags.iter (fun tag -> Tags_table.add tags_table tag worker) tags in
     return_unit
 
+  let register_metrics_gauges tags =
+    Metrics.wrap @@ fun () -> List.iteri Metrics.add_gauge tags
+
   let register_disjoint_signers (cctxt : #Client_context.full) l1_ctxt ~data_dir
       retention_period ~allowed_attempts ~injection_ttl state
       (signers :
@@ -1414,13 +1461,13 @@ module Make (Parameters : PARAMETERS) = struct
         * Parameters.Tag.t list)
         list) =
     let open Lwt_result_syntax in
-    let rec aux registered_signers registered_tags = function
-      | [] -> return_unit
-      | (signers, strategy, tags) :: rest ->
+    let rec aux registered_signers registered_tags tags_list = function
+      | [] -> return tags_list
+      | (signers, strategy, tags_l) :: rest ->
           let* () =
             check_signer_is_not_already_registered registered_signers signers
           in
-          let tags = Tags.of_list tags in
+          let tags = Tags.of_list tags_l in
           let*? () = check_tag_is_not_already_registered registered_tags tags in
           let*? () = Inj_proto.check_registered_proto_clients state in
           let* head_protocols = protocols_of_head cctxt in
@@ -1444,18 +1491,21 @@ module Make (Parameters : PARAMETERS) = struct
               registered_signers
           in
           let registered_tags = Tags.union tags registered_tags in
-          aux registered_signers registered_tags rest
+          aux registered_signers registered_tags (tags_l :: tags_list) rest
     in
-    aux Signature.Public_key_hash.Set.empty Tags.empty signers
+    let+ tags = aux Signature.Public_key_hash.Set.empty Tags.empty [] signers in
+    register_metrics_gauges tags
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(allowed_attempts = 10) ?(injection_ttl = 120) l1_ctxt state ~signers =
+      ?(allowed_attempts = 10) ?(injection_ttl = 120) ?(collect_metrics = false)
+      l1_ctxt state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     assert (allowed_attempts >= 0) ;
     assert (injection_ttl > 0) ;
+    Metrics.produce_metrics collect_metrics ;
     let* () =
       register_disjoint_signers
         (cctxt : #Client_context.full)
@@ -1492,6 +1542,10 @@ module Make (Parameters : PARAMETERS) = struct
     let workers = Worker.list table in
     (* Don't shutdown L1 monitoring otherwise worker shutdown hangs *)
     List.iter_p (fun (_signer, w) -> Worker.shutdown w) workers
+
+  let running_worker_tags () =
+    Worker.list table
+    |> List.map (fun (tags, _w) -> Tags.to_seq tags |> List.of_seq)
 
   let op_status_in_worker state l1_hash =
     match Op_queue.find_opt state.queue l1_hash with

@@ -28,14 +28,12 @@ module Alpha_block_services =
   Block_services.Make (Lifted_protocol) (Lifted_protocol)
 
 (** Client RPC context *)
-class type rpc_context =
-  object
-    inherit Tezos_rpc.Context.generic
+class type rpc_context = object
+  inherit Tezos_rpc.Context.generic
 
-    inherit
-      [Shell_services.chain * Shell_services.block] Environment.RPC_context
-                                                    .simple
-  end
+  inherit
+    [Shell_services.chain * Shell_services.block] Environment.RPC_context.simple
+end
 
 (** The class [wrap_rpc_context] is a wrapper class used by the proxy
     mode clients. From a general-purpose RPC_context.generic [t], the
@@ -81,24 +79,22 @@ class wrap_rpc_context (t : Tezos_rpc.Context.generic) : rpc_context =
     usage, the type may be coerced into one of its following ascendants
     to serve for explicit operations on blocks, chain or daemon for
     instance. *)
-class type full =
-  object
-    (** The class Client_context.full provides I/O services for the
+class type full = object
+  (** The class Client_context.full provides I/O services for the
         client, the wallet, etc. *)
-    inherit Client_context.full
+  inherit Client_context.full
 
-    (** Base interface provided to call RPCs, i.e., communication
+  (** Base interface provided to call RPCs, i.e., communication
         with the node. A client context is defined by mapping all
         RPCs protocol-generic to a specific protocol. *)
-    inherit
-      [Shell_services.chain * Shell_services.block] Environment.RPC_context
-                                                    .simple
+  inherit
+    [Shell_services.chain * Shell_services.block] Environment.RPC_context.simple
 
-    (** Protocol RPCs exposed through the environment (using
+  (** Protocol RPCs exposed through the environment (using
         an additional chainpath). *)
-    inherit
-      [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
-  end
+  inherit
+    [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
+end
 
 (** From a [Client_context.full], the class allows to call RPCs from
     the node and those defined by the protocol. *)

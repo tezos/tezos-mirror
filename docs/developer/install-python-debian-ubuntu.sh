@@ -65,20 +65,20 @@ pyenv --version
 [ "$PYENV_VIRTUALENV_INIT" = "1" ]
 
 ##
-## Install python 3.11.8 through pyenv
+## Install python 3.12.3 through pyenv
 ##
 ## References:
 ##  - https://github.com/pyenv/pyenv#usage
 
 # [install python through pyenv]
-pyenv install 3.11.8
-pyenv global 3.11.8
+pyenv install 3.12.3
+pyenv global 3.12.3
 
 # [print python version]
-python --version # should output 3.11.8
+python --version # should output 3.12.3
 
 # [verify python version]
-[ "$(python --version)" = "Python 3.11.8" ]
+[ "$(python --version)" = "Python 3.12.3" ]
 
 ##
 ## Install poetry
@@ -88,16 +88,16 @@ python --version # should output 3.11.8
 
 # [install poetry]
 curl -sSL https://install.python-poetry.org -o install-poetry.py
-python install-poetry.py --version 1.2.2 --yes
+python install-poetry.py --version 1.8.3 --yes
 
 # [setup shell for poetry]
 export PATH=$PATH:$HOME/.local/bin
 
 # [print poetry version]
-poetry --version # should output 1.2.2
+poetry --version # should output 1.8.3
 
 # [verify poetry version]
-[ "$(poetry --version)" = "Poetry (version 1.2.2)" ]
+[ "$(poetry --version)" = "Poetry (version 1.8.3)" ]
 
 ##
 ## Test installing Octez python development dependencies
@@ -112,4 +112,4 @@ poetry install
 poetry run sphinx-build --version # should output 4.2.0
 
 # [verify sphinx-build version]
-[ "$(poetry run sphinx-build --version)" = "sphinx-build 4.2.0" ]
+[ "$(poetry run sphinx-build --version)" = "sphinx-build 7.3.7" ]

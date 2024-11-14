@@ -9,5 +9,4 @@
   lwt
   octez-libs.lwt-result-stdlib.bare.sigs
   octez-libs.lwt-result-stdlib.bare.structs
-  octez-libs.lwt-result-stdlib.traced.functor-outputs)
- (js_of_ocaml))
+  octez-libs.lwt-result-stdlib.traced.functor-outputs))

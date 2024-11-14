@@ -35,6 +35,6 @@ val check_consistency :
 val fix_consistency :
   ?history_mode:History_mode.t ->
   [`Chain_dir] Naming.directory ->
-  Context.index ->
+  Context_ops.index ->
   Genesis.t ->
   unit tzresult Lwt.t

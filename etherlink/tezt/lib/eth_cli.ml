@@ -40,7 +40,7 @@ let spawn_command ?expect_failure command =
 let spawn_command_and_read_json_opt command decode =
   let* output = spawn_command_and_read_string command in
   let json = JSON.parse ~origin:"eth-cli RPC" output in
-  if JSON.is_null json then return None else json |> decode |> some
+  if JSON.is_null json then return None else json |> decode |> Lwt.return
 
 let spawn_command_and_read_json command decode =
   let* opt = spawn_command_and_read_json_opt command decode in
@@ -70,24 +70,34 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
     @ Cli_arg.optional_arg "data" Fun.id data
     @ Cli_arg.optional_arg "gas" Z.to_string gas_limit
     @ Cli_arg.optional_arg "gasPrice" Wei.to_string gas_price)
-    JSON.as_string
+    JSON.as_string_opt
 
 let transaction_get ~endpoint ~tx_hash =
   spawn_command_and_read_json_opt
     ["transaction:get"; tx_hash; "--network"; endpoint]
-    Transaction.transaction_object_of_json
+    (fun json -> Some (Transaction.transaction_object_of_json json))
 
 let get_block ~block_id ~endpoint =
   spawn_command_and_read_json
     ["block:get"; block_id; "--network"; endpoint]
-    Block.of_json
+    (fun json -> Some (Block.of_json json))
 
 let block_number ~endpoint =
   spawn_command_and_read_json
     ["block:number"; "--network"; endpoint]
-    JSON.as_int
+    JSON.as_int_opt
 
 let add_abi ~label ~abi () = spawn_command ["abi:add"; label; abi]
+
+let update_abi ~label ~abi () = spawn_command ["abi:update"; label; abi]
+
+let show_abi ~label () =
+  let* abi = spawn_command_and_read_string ["abi:show"; label] in
+  return abi
+
+let check_abi ~label () =
+  let* abi_list = spawn_command_and_read_string ["abi:list"] in
+  return (String.split_on_char '\n' abi_list |> List.mem label)
 
 let deploy ~source_private_key ~endpoint ~abi ~bin =
   let decode json =
@@ -96,7 +106,7 @@ let deploy ~source_private_key ~endpoint ~abi ~bin =
       json |-> "receipt" |-> "contractAddress" |> as_string
     in
     let tx_hash = json |-> "receipt" |-> "transactionHash" |> as_string in
-    (contract_address, tx_hash)
+    Some (contract_address, tx_hash)
   in
   spawn_command_and_read_json
     [
@@ -112,7 +122,7 @@ let deploy ~source_private_key ~endpoint ~abi ~bin =
     decode
 
 let contract_send ?(expect_failure = false) ~source_private_key ~endpoint
-    ~abi_label ~address ~method_call ?value ?gas () =
+    ~abi_label ~address ~method_call ?value ?gas ?gas_price () =
   let command =
     [
       "contract:send";
@@ -125,9 +135,10 @@ let contract_send ?(expect_failure = false) ~source_private_key ~endpoint
     ]
     @ Cli_arg.optional_arg "value" Wei.to_string value
     @ Cli_arg.optional_arg "gas" Int.to_string gas
+    @ Cli_arg.optional_arg "gasPrice" Int.to_string gas_price
   in
   if expect_failure then spawn_command_and_read_string ~expect_failure command
-  else spawn_command_and_read_json command JSON.as_string
+  else spawn_command_and_read_json command JSON.as_string_opt
 
 let contract_call ?(expect_failure = false) ~endpoint ~abi_label ~address
     ~method_call () =
@@ -145,7 +156,11 @@ let contract_call ?(expect_failure = false) ~endpoint ~abi_label ~address
 let get_receipt ~endpoint ~tx =
   spawn_command_and_read_json_opt
     ["transaction:get"; tx; "--network"; endpoint]
-    (fun j -> JSON.(j |-> "receipt") |> Transaction.transaction_receipt_of_json)
+    JSON.(
+      fun j ->
+        j |-> "receipt" |> fun json ->
+        if JSON.is_null json then None
+        else Some (Transaction.transaction_receipt_of_json json))
 
 let encode_method ~abi_label ~method_ =
   let* data =

@@ -16,10 +16,10 @@ use crate::{
 };
 use aurora_engine_modexp::modexp;
 use evm::{Context, ExitError, ExitReason, ExitSucceed, Transfer};
-use host::runtime::Runtime;
 use primitive_types::U256;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Debug;
+use tezos_evm_runtime::runtime::Runtime;
 
 fn calculate_iteration_count(exp_length: u64, exp_highp: &U256) -> u64 {
     let mut iteration_count: u64 = 0;
@@ -121,7 +121,9 @@ pub fn modexp_precompile<Host: Runtime>(
 
     // cast exponent length to usize, it does not make sense to handle larger values.
     let Ok(exp_len) = usize::try_from(exp_len) else {
-        return Ok(modexp_mod_overflow_exit("exponent length: modexp mod overflow"));
+        return Ok(modexp_mod_overflow_exit(
+            "exponent length: modexp mod overflow",
+        ));
     };
 
     // Used to extract ADJUSTED_EXPONENT_LENGTH.
@@ -212,11 +214,10 @@ mod tick {
 
 #[cfg(test)]
 mod tests {
-    use evm::ExitReason;
     use primitive_types::H160;
 
     use crate::{
-        handler::ExtendedExitReason, precompiles::test_helpers::execute_precompiled,
+        handler::ExecutionResult, precompiles::test_helpers::execute_precompiled,
     };
 
     struct ModexpTestCase {
@@ -394,25 +395,26 @@ mod tests {
                 &input,
                 None,
                 Some(100_000_000),
+                true,
             );
 
             assert!(result.is_ok());
             let outcome = result.unwrap();
-            assert!(outcome.is_success);
-            assert_eq!(hex::encode(outcome.result.unwrap()), test.expected,);
+            assert!(outcome.is_success());
+            assert_eq!(hex::encode(outcome.output().unwrap()), test.expected);
         }
     }
 
     #[test]
     fn test_modexp_empty_input() {
         let result =
-            execute_precompiled(H160::from_low_u64_be(5), &[], None, Some(100_000));
+            execute_precompiled(H160::from_low_u64_be(5), &[], None, Some(100_000), true);
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
 
-        assert_eq!("", hex::encode(outcome.result.unwrap()));
+        assert_eq!("", hex::encode(outcome.output().unwrap()));
     }
 
     // All the tests for ecAdd, ecMul, ecPrecompile were taken from:
@@ -429,14 +431,15 @@ mod tests {
             &input_overflow,
             None,
             Some(100_000),
+            true,
         );
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        match outcome.reason {
-            ExtendedExitReason::Exit(ExitReason::Error(_)) => (),
+        match outcome.result {
+            ExecutionResult::Error(_) => (),
             _ => panic!("The execution should exit with an error."),
         }
-        assert!(outcome.result.is_none());
+        assert!(outcome.output().is_none());
     }
 }

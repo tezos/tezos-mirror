@@ -29,7 +29,10 @@ module CS = Plonk.Circuit
 open Helpers
 
 module Poseidon_test
-    (Mec : Plompiler__Hash_sig.P_HASH) (P : functor (L : LIB) -> sig
+    (Mec : Plompiler__Hash_sig.P_HASH)
+    (P : functor
+      (L : LIB)
+      -> sig
       val digest :
         ?input_length:int -> L.scalar list L.repr -> L.scalar L.repr L.t
     end)

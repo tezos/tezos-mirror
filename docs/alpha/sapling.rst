@@ -29,8 +29,8 @@ On the other hand a viewing key can willingly be shared with a third
 party, for example with an auditor for regulatory compliance purposes.
 
 A viewing key can also derive several diversified addresses.
-An address can be used to receive funds, much like the address of an
-implicit account.
+An address can be used to receive funds, much like the address of a
+user account.
 
 Additionally *proving keys* can be used to allow the creation of proofs,
 thus revealing private information, without being able to spend funds.
@@ -40,7 +40,7 @@ transaction and produce the zero-knowledge proofs, which are
 computationally too intensive for an embedded device.
 
 More details can be found in the `specification document
-<https://github.com/zcash/zips/blob/main/protocol/sapling.pdf>`_.
+<https://zips.z.cash/protocol/protocol.pdf>`_.
 
 Shielded transactions
 ~~~~~~~~~~~~~~~~~~~~~
@@ -309,10 +309,10 @@ Fees issue
 
 The Sapling integration in Tezos exhibits a privacy issue that Z-cash doesn't have. When
 interacting with a shielded pool one interacts with a smart contract
-via a normal transaction and therefore have to pay fees from an
-implicit account.
+via a normal transaction and therefore have to pay fees from a
+user account.
 One could guess that private transactions whose fees are paid by the
-same implicit account are from the same user.
+same user account are from the same user.
 This can be mitigated by making a service that act as a proxy by
 forwarding the user transactions and paying its fees. The user would
 then include in the transaction a shielded output for the service that
@@ -358,7 +358,7 @@ It can be generated from a mnemonic using `BIP39
 that it can be recovered in case of loss using the mnemonic.
 Alternatively it is possible to derive new keys from existing ones
 using `ZIP32
-<https://github.com/zcash/zips/blob/main/zip-0032.rst>`_, a Sapling
+<https://github.com/zcash/zips/blob/main/zips/zip-0032.rst>`_, a Sapling
 variant of `BIP32
 <https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki>`_ for
 hierarchical deterministic wallets. As usual, in this case it is

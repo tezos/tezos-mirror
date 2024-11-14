@@ -1,26 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -145,6 +128,19 @@ module type T = sig
         been successfully validated by the protocol. *)
     val fee_needed_to_overtake :
       op_to_overtake:operation -> candidate_op:operation -> int64 option
+
+    (** Protocol context *)
+    type ctxt
+
+    (** Return the protocol context *)
+    val get_context :
+      Tezos_protocol_environment.Context.t ->
+      head:Block_header.shell_header ->
+      ctxt tzresult Lwt.t
+
+    (** Return the sources from the operation *)
+    val sources_from_operation :
+      ctxt -> operation -> Signature.public_key_hash list Lwt.t
   end
 end
 
@@ -154,6 +150,11 @@ module type RPC = sig
 
   val rpc_services :
     Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.directory
+
+  (** Return the number of blocks preservation cycles from protocol constants. *)
+  val get_blocks_preservation_cycles :
+    get_context:(unit -> Tezos_protocol_environment.Context.t Lwt.t) ->
+    int option Lwt.t
 end
 
 (** To use when no registered plugin is found. This module is
@@ -178,6 +179,21 @@ module type METRICS = sig
     Fitness.t ->
     (cycle:float -> consumed_gas:float -> round:float -> unit) ->
     unit Lwt.t
+end
+
+(** Protocol specific plugin to expose helper functions in the
+    implementation of Http cache headers RPC middleware. *)
+module type HTTP_CACHE_HEADERS = sig
+  val hash : Protocol_hash.t
+
+  (** [get_round_end_time ctx curr_header] gets the time at which the
+    current round ends which is the time at which the next round starts.
+    Useful to get an estimate of when the next block should arrive.
+*)
+  val get_round_end_time :
+    get_context:(unit -> Tezos_protocol_environment.Context.t Lwt.t) ->
+    Tezos_base.Block_header.shell_header ->
+    Time.System.t option Lwt.t
 end
 
 (** Empty metrics module. All metrics are -1. *)
@@ -206,6 +222,9 @@ val register_rpc : (module RPC) -> unit
 (** Register a metrics plugin module *)
 val register_metrics : (module METRICS) -> unit
 
+(** Register a Http_cache_headers plugin module *)
+val register_http_cache_headers_plugin : (module HTTP_CACHE_HEADERS) -> unit
+
 (** Register a Shell_helpers plugin module *)
 val register_shell_helpers : (module SHELL_HELPERS) -> unit
 
@@ -232,6 +251,10 @@ val find_metrics : Protocol_hash.t -> (module METRICS) option
 
 (** Same as [find_metrics] but returns [Undefined_metrics_plugin] if not found *)
 val safe_find_metrics : Protocol_hash.t -> (module METRICS) Lwt.t
+
+(** Looks for a http cache headers plugin module for a specific protocol *)
+val find_http_cache_headers :
+  Protocol_hash.t -> (module HTTP_CACHE_HEADERS) option
 
 (** Looks for a shell helpers plugin module for a specific protocol *)
 val find_shell_helpers : Protocol_hash.t -> (module SHELL_HELPERS) option

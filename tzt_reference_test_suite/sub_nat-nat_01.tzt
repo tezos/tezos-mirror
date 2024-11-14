@@ -1,0 +1,3 @@
+code { SUB } ;
+input { Stack_elt nat 2 ; Stack_elt nat 5 } ;
+output { Stack_elt int -3 }

@@ -32,7 +32,7 @@ val get_keys :
   Tezos_crypto.Aggregate_signature.public_key_hash ->
   (Tezos_crypto.Aggregate_signature.public_key_hash
   * Tezos_crypto.Aggregate_signature.public_key option
-  * Client_keys.aggregate_sk_uri option)
+  * Client_keys.sk_uri option)
   tzresult
   Lwt.t
 
@@ -49,7 +49,7 @@ val get_public_key :
 val can_verify :
   Tezos_crypto.Aggregate_signature.public_key_hash
   * Tezos_crypto.Aggregate_signature.public_key option
-  * Client_keys.aggregate_sk_uri option ->
+  * Client_keys.sk_uri option ->
   bool
 
 (** [can_sign (pkh, pk_opt, sk_uri_opt)] checks whether the secret key URI
@@ -57,5 +57,5 @@ val can_verify :
 val can_sign :
   Tezos_crypto.Aggregate_signature.public_key_hash
   * Tezos_crypto.Aggregate_signature.public_key option tzresult
-  * Client_keys.aggregate_sk_uri option ->
+  * Client_keys.sk_uri option ->
   bool

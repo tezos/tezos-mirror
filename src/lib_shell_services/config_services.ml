@@ -48,15 +48,24 @@ module Network = struct
       Tezos_rpc.Path.(path / "network" / "dal")
 end
 
-let history_mode_encoding =
-  Data_encoding.(obj1 (req "history_mode" History_mode.encoding))
+module History_mode_services = struct
+  let history_mode_encoding =
+    Data_encoding.(
+      obj2
+        (req "history_mode" History_mode.encoding)
+        (opt "blocks_preservation_cycles" (ranged_int 0 255)))
 
-let history_mode =
-  Tezos_rpc.Service.get_service
-    ~description:"Returns the history mode of the node's underlying storage."
-    ~query:Tezos_rpc.Query.empty
-    ~output:history_mode_encoding
-    Tezos_rpc.Path.(path / "history_mode")
+  let history_mode =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Returns the history mode of the node's underlying storage. In full or \
+         rolling mode, it provides the values of `additional_cycles` and \
+         `blocks_preservation_cycles`. The sum of these values is the total \
+         number of stored cycles."
+      ~query:Tezos_rpc.Query.empty
+      ~output:history_mode_encoding
+      Tezos_rpc.Path.(path / "history_mode")
+end
 
 module Logging = struct
   let configure =
@@ -73,3 +82,6 @@ let user_activated_upgrades cctxt =
 
 let dal_config cctxt =
   Tezos_rpc.Context.make_call Network.dal_config cctxt () () ()
+
+let history_mode cctxt =
+  Tezos_rpc.Context.make_call History_mode_services.history_mode cctxt () () ()

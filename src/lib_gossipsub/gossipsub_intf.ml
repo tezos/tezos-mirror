@@ -48,6 +48,8 @@ module type AUTOMATON_SUBCONFIG = sig
         id. Message ids should be defined so that this function can be
         implemented. *)
     val get_topic : t -> Topic.t
+
+    val valid : t -> [`Valid | `Unknown | `Outdated | `Invalid]
   end
 
   module Message : sig
@@ -442,16 +444,16 @@ module type MESSAGE_CACHE = sig
 
   module Time : TIME
 
-  (** A sliding window cache that stores published messages and their first seen
-    time. The module also keeps track of the number of accesses to a message by
-    a peer, thus indirectly tracking the number of IWant requests a peer makes
-    for the same message between two heartbeats.
+  (** A sliding window cache that stores published messages, their first seen
+      time, and their senders. The module also keeps track of the number of
+      accesses to a message by a peer, thus indirectly tracking the number of
+      IWant requests a peer makes for the same message between two heartbeats.
 
-    The module assumes that no two different messages have the same message
-    id. However, the cache stores duplicates; for instance, if [add_message id
-    msg topic] is called exactly twice, then [msg] will appear twice in
-    [get_message_ids_to_gossip]'s result (assuming not more than [gossip_slots]
-    shifts have been executed in the meanwhile). *)
+      The module assumes that no two different messages have the same message
+      id. However, the cache stores duplicates; for instance, if [add_message
+      peer id msg topic] is called exactly twice, then [msg] will appear twice
+      in [get_message_ids_to_gossip]'s result (assuming not more than
+      [gossip_slots] shifts have been executed in the meanwhile). *)
   type t
 
   (** [create ~history_slots ~gossip_slots ~seen_message_slots] creates two
@@ -481,8 +483,11 @@ module type MESSAGE_CACHE = sig
 
   (** Add message to the most recent cache slot. If the message already exists
       in the cache, the message is not overridden, instead a duplicate message
-      id is stored (the message itself is only stored once). *)
-  val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
+      id is stored (the message itself is only stored once). The [peer] argument
+      represents the message sender. It is [None] in case the message is
+      produced and not received (thus it has no sender). *)
+  val add_message :
+    peer:Peer.t option -> Message_id.t -> Message.t -> Topic.t -> t -> t
 
   (** Get the message associated to the given message id, increase the access
       counter for the peer requesting the message, and also returns the updated
@@ -496,10 +501,12 @@ module type MESSAGE_CACHE = sig
       messages in the output. *)
   val get_message_ids_to_gossip : Topic.t -> t -> Message_id.t list
 
-  (** [get_first_seen_time message_id t] returns the time the message with [message_id]
-      was first seen. Returns [None] if the message was not seen during the period
-      covered by the sliding window. *)
-  val get_first_seen_time : Message_id.t -> t -> Time.t option
+  (** [get_first_seen_time_and_senders message_id t] returns the time the
+      message with [message_id] was first seen and the senders of that message
+      during the tracked sliding window. Returns [None] if the message was not
+      seen during the period covered by the sliding window. *)
+  val get_first_seen_time_and_senders :
+    Message_id.t -> t -> (Time.t * Peer.Set.t) option
 
   (** [seen_message message_id t] returns [true] if the message was seen during the
       period covered by the sliding window and returns [false] if otherwise. *)
@@ -533,6 +540,8 @@ module type AUTOMATON = sig
 
     (** Computes the topic of the given message id. *)
     val get_topic : t -> Topic.t
+
+    val valid : t -> [`Valid | `Unknown | `Outdated | `Invalid]
   end
 
   (** Module for message *)
@@ -563,7 +572,12 @@ module type AUTOMATON = sig
 
   (** The types of payloads for inputs to the gossipsub automaton. *)
 
-  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+  type add_peer = {
+    direct : bool;
+    outbound : bool;
+    peer : Peer.t;
+    bootstrap : bool;
+  }
 
   type remove_peer = {peer : Peer.t}
 
@@ -694,8 +708,10 @@ module type AUTOMATON = sig
         (** Received a message from a remote peer for a topic we are not
             subscribed to (called "unknown topic" in the Go implementation). *)
     | Invalid_message : [`Receive_message] output
-    | Unknown_validity : [`Receive_message] output
         (** Attempting to publish a message that is invalid. *)
+    | Unknown_validity : [`Receive_message] output
+        (** Validity cannot be decided yet. *)
+    | Outdated : [`Receive_message] output  (** The message is outdated. *)
     | Already_joined : [`Join] output
         (** Attempting to join a topic we already joined. *)
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
@@ -880,7 +896,12 @@ module type AUTOMATON = sig
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig
-    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
+    type connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+      outbound : bool;
+      bootstrap : bool;
+    }
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -899,6 +920,7 @@ module type AUTOMATON = sig
         Peer.t ->
         direct:bool ->
         outbound:bool ->
+        bootstrap:bool ->
         t ->
         [`added of t | `already_known]
 
@@ -1148,6 +1170,7 @@ module type WORKER = sig
     | Heartbeat
     | P2P_input of p2p_input
     | App_input of app_input
+    | Check_unknown_messages
 
   (** [make ~events_logging ~bootstrap_points rng limits parameters] initializes
       a new Gossipsub automaton with the given arguments. Then, it initializes
@@ -1225,6 +1248,8 @@ module type WORKER = sig
           (** Count received app messages that are known to be invalid. *)
       mutable count_recv_unknown_validity_app_messages : int64;
           (** Count received app messages we won't validate. *)
+      mutable count_recv_outdated_app_messages : int64;
+          (** Count received app messages that are outdated. *)
       mutable count_recv_grafts : int64;
           (** Count successfully received & processed grafts. *)
       mutable count_recv_prunes : int64;

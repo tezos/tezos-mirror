@@ -1,18 +1,15 @@
 # WARNING!
 # This file is provided as a courtesy and comes with no guarantees that it will
 # continue to work in the future.
-let
-  sources = import ./nix/sources.nix;
+{sources ? import ./nix/sources.nix {}}: let
   pkgs = sources.pkgs;
 
   overlays = pkgs.callPackage ./nix/overlays.nix {};
-  tezos-opam-repository = pkgs.callPackage ./nix/tezos-opam-repo.nix {};
-  opam-repository = pkgs.callPackage ./nix/opam-repo.nix {};
 
   packageSet = pkgs.opamPackages.overrideScope' (pkgs.lib.composeManyExtensions [
     # Set the opam-repository which has the package descriptions.
     (final: prev: {
-      repository = prev.repository.override {src = opam-repository;};
+      repository = prev.repository.override {src = sources.opam-repository;};
     })
 
     # First overlay simply picks the package versions from Tezos'
@@ -47,11 +44,17 @@ let
   fakeOpamSwitchPrefix =
     pkgs.runCommand
     "fake-opam-switch-prefix"
-    {}
+    {
+      buildInputs = with pkgs; [
+        curl
+        cacert
+      ];
+    }
     ''
       mkdir -p $out/share/zcash-params
-      cp ${tezos-opam-repository}/zcash-params/sapling-output.params $out/share/zcash-params
-      cp ${tezos-opam-repository}/zcash-params/sapling-spend.params $out/share/zcash-params
+      cp ${./images/ci/zcash-params}/* $out/share/zcash-params
+
+      OPAM_SWITCH_PREFIX="$out" ${./scripts}/install_dal_trusted_setup.sh
     '';
 
   mkFrameworkFlags = frameworks:
@@ -65,6 +68,15 @@ let
       )
       frameworks
     );
+
+  llvmPackages = pkgs.llvmPackages_16;
+
+  libtoolAliasDarwin =
+    # On Darwin we need a little help to bring `libtool` into scope.
+    pkgs.runCommand "libtool-alias" {} ''
+      mkdir -p $out/bin
+      ln -s ${llvmPackages.bintools-unwrapped}/bin/llvm-libtool-darwin $out/bin/libtool
+    '';
 in
   pkgs.stdenv.mkDerivation {
     name = "tezos";
@@ -89,7 +101,22 @@ in
 
     hardeningDisable = ["stackprotector"];
 
-    buildInputs = packages ++ [pkgs.makeWrapper];
+    buildInputs =
+      packages
+      ++ (with pkgs; [
+        makeWrapper
+        cacert
+
+        # Bring Clang into scope in case the stdenv doesn't come with it already.
+        llvmPackages.clang
+
+        # This brings in things like llvm-ar which are needed for Rust WebAssembly
+        # compilation on Mac. It isn't used by default. Configure the AR environment variable to
+        # make rustc use it.
+        # This package also brings objcopy, libtoool and ranlib which are used.
+        llvmPackages.bintools
+      ])
+      ++ pkgs.lib.optional pkgs.stdenv.isDarwin libtoolAliasDarwin;
 
     # Disable OPAM usage in Makefile.
     TEZOS_WITHOUT_OPAM = true;
@@ -100,7 +127,7 @@ in
     src = pkgs.lib.sources.cleanSourceWith {
       filter = name: type:
         if type == "directory"
-        then name != "_build" && name != "target"
+        then name != "_build" && name != "target" && name != ".direnv"
         else true;
       src = pkgs.lib.sources.cleanSource ./.;
     };
@@ -109,7 +136,7 @@ in
     dontCheck = true;
 
     buildPhase = ''
-      make experimental-release
+      CARGO_HOME=$TMPDIR/.cargo make experimental-release
     '';
 
     installPhase = ''

@@ -44,13 +44,34 @@ let blueprint_injection =
     ~level:Info
     ("level", Data_encoding.n)
 
-let blueprint_injection_failure =
+let blueprint_injection_on_inbox =
   declare_1
     ~section
+    ~name:"blueprint_injection_on_inbox"
+    ~msg:"Injecting on the shared inbox a blueprint for level {level}"
+    ~level:Debug
+    ("level", Data_encoding.n)
+
+let blueprint_injection_on_DAL =
+  declare_2
+    ~section
+    ~name:"blueprint_injection_on_DAL"
+    ~msg:
+      "Injecting on the DAL a blueprint for level {level} containing \
+       {nb_chunks} chunks"
+    ~level:Debug
+    ("level", Data_encoding.n)
+    ("nb_chunks", Data_encoding.int31)
+
+let blueprint_injection_failure =
+  declare_2
+    ~section
     ~name:"blueprint_injection_failure"
-    ~msg:"Injecting a blueprint for level {level} failed"
+    ~msg:"Injecting a blueprint for level {level} failed with {trace}"
+    ~pp2:Error_monad.pp_print_trace
     ~level:Error
     ("level", Data_encoding.n)
+    ("trace", Error_monad.trace_encoding)
 
 let blueprint_catchup =
   declare_2
@@ -105,7 +126,13 @@ let publisher_shutdown () = emit publisher_shutdown ()
 
 let blueprint_injected level = emit blueprint_injection level
 
-let blueprint_injection_failed level = emit blueprint_injection_failure level
+let blueprint_injected_on_inbox level = emit blueprint_injection_on_inbox level
+
+let blueprint_injected_on_DAL ~level ~nb_chunks =
+  emit blueprint_injection_on_DAL (level, nb_chunks)
+
+let blueprint_injection_failed level trace =
+  emit blueprint_injection_failure (level, trace)
 
 let blueprint_applied (level, hash) = emit blueprint_application (level, hash)
 

@@ -31,7 +31,6 @@ module Time = Tezos_base.Time.System
 (** Values that can be passed to the client's [--endpoint] argument *)
 type endpoint =
   | Node of Node.t  (** A full-fledged node *)
-  | Proxy_server of Proxy_server.t  (** A proxy server *)
   | Foreign_endpoint of Endpoint.t  (** A service not managed by Tezt *)
 
 (** Values that can be passed to the client's [--adaptive-issuance-vote] argument *)
@@ -133,6 +132,7 @@ val create :
   ?base_dir:string ->
   ?endpoint:endpoint ->
   ?media_type:media_type ->
+  ?dal_node:Dal_node.t ->
   unit ->
   t
 
@@ -144,6 +144,7 @@ val create_with_mode :
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
+  ?dal_node:Dal_node.t ->
   mode ->
   t
 
@@ -155,6 +156,13 @@ val get_mode : t -> mode
     we wanna keep a client's wallet. This is impossible if we created
     a new client from scratch. *)
 val set_mode : mode -> t -> unit
+
+(** Get a client's Dal node. *)
+val get_dal_node : t -> Dal_node.t option
+
+(** [with_dal_node t dal_node] returns the client [t] with its
+    Dal node updated to [dal_node]. *)
+val with_dal_node : ?dal_node:Dal_node.t -> t -> t
 
 (** Write the [--sources] file used by the light mode. *)
 val write_sources_file :
@@ -262,10 +270,11 @@ module Spawn : sig
 end
 
 (** Run [octez-client rpc list]. *)
-val rpc_list : ?endpoint:endpoint -> t -> string Lwt.t
+val rpc_list : ?endpoint:endpoint -> ?hooks:Process.hooks -> t -> string Lwt.t
 
 (** Same as [rpc_list], but do not wait for the process to exit. *)
-val spawn_rpc_list : ?endpoint:endpoint -> t -> Process.t
+val spawn_rpc_list :
+  ?endpoint:endpoint -> ?hooks:Process.hooks -> t -> Process.t
 
 (** Run [octez-client rpc schema]. *)
 val rpc_schema :
@@ -548,6 +557,7 @@ val empty_mempool_file : ?filename:string -> unit -> string
     If you want to wait until the node switches its head to the baked block,
     consider using {!bake_for_and_wait} below. *)
 val bake_for :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -579,6 +589,7 @@ val bake_for :
     @param level_before If provided, check that the node is at this
     level before baking. *)
 val bake_for_and_wait :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -600,6 +611,7 @@ val bake_for_and_wait :
 
 (** Same as {!bake_for_and_wait}, but return the new level. *)
 val bake_for_and_wait_level :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -622,6 +634,7 @@ val bake_for_and_wait_level :
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?keys:string list ->
@@ -657,7 +670,7 @@ val bake_until_level :
   be different from the target cycle if the "blocks_per_cycle" value changes
   during the execution, for instance because of a protocol migration.
 
-  Fail if the node is already at [target_cycle] or higher. 
+  Fail if the node is already at [target_cycle] or higher.
 
   @param keys See {!bake_for}.
 
@@ -670,8 +683,7 @@ val bake_until_cycle :
 val bake_until_cycle_end :
   target_cycle:int -> ?keys:string list -> ?node:Node.t -> t -> unit Lwt.t
 
-(** Run [octez-client attest for]. Run [octez-client endorse for] for protocol
-    older than 018.
+(** Run [octez-client attest for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val attest_for :
@@ -691,8 +703,7 @@ val spawn_attest_for :
   t ->
   Process.t
 
-(** Run [octez-client preattest for]. Run [octez-client preendorse for] for
-    protocol older than 018.
+(** Run [octez-client preattest for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val preattest_for :
@@ -786,10 +797,6 @@ val add_address : ?force:bool -> t -> alias:string -> src:string -> unit Lwt.t
 val spawn_add_address :
   ?force:bool -> t -> alias:string -> src:string -> Process.t
 
-(** Run [octez-client bls gen keys <alias>]. *)
-val bls_gen_keys :
-  ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
-
 (** Run [octez-client activate accoung <alias> with <activation_key>]. *)
 val activate_account :
   ?wait:string -> t -> alias:string -> activation_key:string -> unit Lwt.t
@@ -798,50 +805,9 @@ val activate_account :
 val spawn_activate_account :
   ?wait:string -> t -> alias:string -> activation_key:string -> Process.t
 
-(** Run [octez-client bls list keys].
-
-    Returns the known BLS aliases associated to their public key hash.
-
-    Fails if the format is not of the form [<alias>: <public key hash>]. *)
-val bls_list_keys : ?hooks:Process.hooks -> t -> (string * string) list Lwt.t
-
-(** Run [octez-client bls show address <alias>] and parse
-    the output into an [Account.aggregate_key].
-    E.g. for [~alias:"bls_account"] the command yields:
-{v
-      Hash: tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn
-      Public Key: BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV
-      Secret Key: aggregate_unencrypted:BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq
-v}
-    which becomes:
-{[
-    {
-      aggregate_alias = "bls_account";
-      aggregate_public_key_hash = "tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn";
-      aggregate_public_key =
-        "BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV";
-      aggregate_secret_key =
-        Unencrypted "BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq";
-    }
-]} *)
-val bls_show_address :
-  ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
-
-(** A helper to run [octez-client bls gen keys] followed by
-    [octez-client bls show address] to get the generated key. *)
-val bls_gen_and_show_keys : ?alias:string -> t -> Account.aggregate_key Lwt.t
-
-(** Run [octez-client bls import secret key <account.aggregate_alias>
-    <account.aggregate_secret_key>]. *)
-val bls_import_secret_key :
-  ?hooks:Process.hooks ->
-  ?force:bool ->
-  Account.aggregate_key ->
-  t ->
-  unit Lwt.t
-
 (** Run [octez-client transfer amount from giver to receiver]. *)
 val transfer :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
@@ -865,6 +831,7 @@ val transfer :
 
 (** Same as [transfer], but do not wait for the process to exit. *)
 val spawn_transfer :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
@@ -1181,6 +1148,7 @@ val drain_delegate :
 
     Avoid this function when using [originate_contract_at] is possible. *)
 val originate_contract :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
@@ -1199,6 +1167,7 @@ val originate_contract :
 
 (** Same as [originate_contract], but do not wait for the process to exit. *)
 val spawn_originate_contract :
+  ?env:string String_map.t ->
   ?hooks:Process.hooks ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
@@ -2477,6 +2446,7 @@ val init_with_node :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
+  ?node_name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
@@ -2484,6 +2454,7 @@ val init_with_node :
   ?nodes_args:Node.argument list ->
   ?keys:Account.key list ->
   ?rpc_external:bool ->
+  ?dal_node:Dal_node.t ->
   [`Client | `Light | `Proxy] ->
   unit ->
   (Node.t * t) Lwt.t
@@ -2506,6 +2477,7 @@ val init_with_protocol :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
+  ?node_name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
@@ -2518,6 +2490,7 @@ val init_with_protocol :
   ?timestamp:timestamp ->
   ?keys:Account.key list ->
   ?rpc_external:bool ->
+  ?dal_node:Dal_node.t ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
@@ -2558,6 +2531,7 @@ val init_light :
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
+  ?dal_node:Dal_node.t ->
   unit ->
   (t * Node.t * Node.t) Lwt.t
 

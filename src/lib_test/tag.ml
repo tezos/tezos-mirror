@@ -41,4 +41,16 @@ let tezos2 = "tezos2"
 
 let etherlink = "etherlink"
 
+let base = "base"
+
+let shell = "shell"
+
+let encodings = "encodings"
+
+let services = "services"
+
+let unix = "unix"
+
 let slow = "slow"
+
+let cloud = "cloud"

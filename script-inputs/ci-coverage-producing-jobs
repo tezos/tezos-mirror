@@ -1,0 +1,8 @@
+tezt-flaky
+tezt-time-sensitive
+tezt-memory-4k
+tezt-memory-3k
+tezt
+oc.unit:proto-x86_64
+oc.unit:other-x86_64
+oc.unit:non-proto-x86_64

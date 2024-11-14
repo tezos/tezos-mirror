@@ -40,6 +40,8 @@
             of `hash data` remain constant over time.
 *)
 
+let team = Tag.layer1
+
 (* These hooks must be attached to every process that should be captured for
    regression testing. Not plugged for negative tests, since octez-client
    shows its manpage, which will change overtime. *)
@@ -53,7 +55,7 @@ let test_good_hash_data =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"hash data ... of type ... (good)"
-    ~tags:["hash"; "data"; "mockup"]
+    ~tags:[team; "hash"; "data"; "mockup"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -150,7 +152,7 @@ let test_bad_hash_data =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"hash data ... of type ... (bad)"
-    ~tags:["hash"; "data"; "mockup"]
+    ~tags:[team; "hash"; "data"; "mockup"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -180,7 +182,7 @@ let test_ugly_hash_data =
   Protocol.register_test
     ~__FILE__
     ~title:"hash data ... of type ... (ugly)"
-    ~tags:["hash"; "data"; "mockup"]
+    ~tags:[team; "hash"; "data"; "mockup"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

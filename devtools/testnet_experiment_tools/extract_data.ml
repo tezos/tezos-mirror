@@ -249,8 +249,8 @@ let commands =
          searched_blocks_arg
          output_directory_arg)
       (fixed ["extract"])
-      (fun (profiling_reports_directory, search_blocks, output_directory) _cctxt
-      ->
+      (fun
+        (profiling_reports_directory, search_blocks, output_directory) _cctxt ->
         match
           (profiling_reports_directory, search_blocks, output_directory)
         with

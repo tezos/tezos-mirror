@@ -39,7 +39,12 @@ sys.path.insert(0, os.path.abspath('.') + '/_extensions')
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.extlinks', 'tezos_custom_roles', 'michelsonlexer']
+extensions = [
+    'sphinx.ext.extlinks',
+    'tezos_custom_roles',
+    'michelsonlexer',
+    'sphinxcontrib.jquery',
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -77,7 +82,7 @@ release = (
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -88,7 +93,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'oxford',
+    'paris',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
@@ -109,19 +114,32 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "sphinx_book_theme"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-html_theme_options = {'logo_only': True, 'sticky_navigation': False}
+html_theme_options = {
+    'path_to_docs': 'docs/',
+    'repository_url': 'https://gitlab.com/tezos/tezos',
+    'repository_branch': 'master',
+    'use_repository_button': True,
+    'use_issues_button': True,
+    'use_download_button': False,
+    'use_fullscreen_button': True,
+}
+
+html_theme_options["analytics"] = {
+    "google_analytics_id": "G-KT3Z3X4Y82",
+}
+
 html_logo = "logo.svg"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-
+html_title = "Octez & Protocol products documentation"
 html_css_files = [
     'css/custom.css',
 ]
@@ -218,17 +236,23 @@ texinfo_documents = [
 
 # -- Ignore fragments in linkcheck
 
+# Check the existence of given anchors (suffixes of the form "#label") in URLs
 linkcheck_anchors = False
+# linkcheck_report_timeouts_as_broken = False  # (default)
+# linkcheck_timeout = 30  # (default)
+linkcheck_retries = 2
 linkcheck_ignore = [
     # links which may fail for lack of access rights:
-    'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/',
-    r'http(s)?://localhost:\d+/?',
+    r'^https://gitlab\.com/nomadic-labs/tezos/-/merge_requests/',
+    r'^http(s)?://localhost:\d+/?',
+    r'^https://grafana\.nomadic-labs\.cloud/',
     # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',
     # flaky servers, to remove one day if they got more predictable
     r'^https://opentezos\.com/',
-    r'^https://crates.io/crates/tezos-smart-rollup',
+    r'^https://crates\.io/crates/tezos-smart-rollup',
+    r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
 ]
 linkcheck_allowed_redirects = dict(
     [
@@ -247,8 +271,16 @@ linkcheck_allowed_redirects = dict(
             r'https://github\.com/serokell/tezos-packaging/releases/tag/.*',
         ),
         (
-            r'https://www.reddit.com/r/tezos/',
-            r'https://www.reddit.com/r/tezos/[?]rdt=[0-9]+',
+            r'https://www\.reddit\.com/r/tezos/',
+            r'https://www\.reddit\.com/r/tezos/[?]rdt=[0-9]+',
+        ),
+        (
+            r'https://ocaml\.org/api/.*',
+            r'https://ocaml\.org/manual/[0-9.]+/api/.*',
+        ),
+        (
+            r'https://ocaml\.org/manual/.*',
+            r'https://ocaml\.org/manual/[0-9.]+/.*',
         ),
         # 2. permanent redidections, maybe fix one day
         (r'https://bitheap\.org/cram/', r'https://github\.com/aiiie/cram'),
@@ -262,3 +294,9 @@ html_domain_indices = False
 default_role = 'default'
 
 html_favicon = 'favicon.ico'
+
+# Suppress some specific warnings
+# suppress_warnings = [
+#     'toc.not_readable',
+#     'ref.doc',
+# ]

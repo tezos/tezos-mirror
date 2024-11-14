@@ -38,8 +38,9 @@ val get_global_block_outbox :
     address of the node. *)
 val get_global_smart_rollup_address : unit -> string RPC_core.t
 
-(** RPC: [GET global/block/<block>]. *)
-val get_global_block : ?block:string -> unit -> JSON.t RPC_core.t
+(** RPC: [GET global/block/<block>?outbox]. *)
+val get_global_block :
+  ?block:string -> ?outbox:bool -> unit -> JSON.t RPC_core.t
 
 (** RPC: [GET global/block/<block>/inbox]. *)
 val get_global_block_inbox :
@@ -136,7 +137,12 @@ val get_local_last_published_commitment : unit -> commitment_info RPC_core.t
 val get_local_commitments :
   commitment_hash:string -> unit -> commitment_info RPC_core.t
 
-type gc_info = {last_gc_level : int; first_available_level : int}
+type gc_info = {
+  first_available_level : int;
+  last_gc_started_at : int option;
+  last_context_split_level : int option;
+  last_successful_gc_target : int option;
+}
 
 (** RPC: [GET local/gc_info] returns garbage collection information. *)
 val get_local_gc_info : unit -> gc_info RPC_core.t
@@ -162,10 +168,21 @@ val get_global_block_durable_state_value :
   unit ->
   'a RPC_core.t
 
-(** RPC: [POST local/batcher/injection] injects the [messages] in the queue the rollup
-    node's batcher and returns the list of message hashes injected. *)
+(** RPC: [POST local/batcher/injection] injects the [messages] in the
+    queue the rollup node's batcher and returns the list of message
+    hashes injected. *)
 val post_local_batcher_injection :
-  messages:string list -> string list RPC_core.t
+  ?drop_duplicate:bool -> messages:string list -> unit -> string list RPC_core.t
+
+(** RPC: [POST local/dal/batcher/injection] injects the given
+    [messages] in the rollup node's DAL queue. *)
+val post_local_dal_batcher_injection : messages:string list -> unit RPC_core.t
+
+(** RPC: [POST local/dal/slot/indices] sets the given DAL [slot_indices] to be
+    used when injecting DAL slots. *)
+val post_dal_slot_indices : slot_indices:int list -> unit RPC_core.t
+
+val get_dal_injected_operations_statuses : unit -> JSON.t list RPC_core.t
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
@@ -176,3 +193,13 @@ val outbox_proof_simple :
   message_index:int ->
   unit ->
   outbox_proof option RPC_core.t
+
+type outbox_msg = {message_index : int; message : JSON.t}
+
+(** RPC: [GET /local/outbox/pending/executable] *)
+val get_local_outbox_pending_executable :
+  unit -> (int * outbox_msg list) list RPC_core.t
+
+(** RPC: [GET /local/outbox/pending/unexecutable] *)
+val get_local_outbox_pending_unexecutable :
+  unit -> (int * outbox_msg list) list RPC_core.t

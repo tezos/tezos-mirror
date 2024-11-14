@@ -27,32 +27,45 @@ be predicted too much in advance.
 Delegation and Staking
 ----------------------
 
-A *delegate* is any :ref:`implicit account <def_implicit_account_alpha>` registered as
+A *delegate* is any :ref:`user account <def_user_account_alpha>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
 operation emitter (its signer). Note that ``tz4`` accounts cannot be registered
 as delegates.
 
-Any :ref:`account <def_account_alpha>` (implicit or originated) can specify a delegate
-through a delegation operation.  Any account can change or revoke its delegate
+Any :ref:`account <def_account_alpha>` (user account or smart contract) can specify a delegate
+through a delegation operation.  Any non-delegate account can change or revoke its delegate
 at any time, again through a delegation operation. However, the change only
 becomes effective after ``CONSENSUS_RIGHTS_DELAY + 2`` :ref:`cycles <def_cycle_alpha>`.  The
 value ``CONSENSUS_RIGHTS_DELAY`` is a :ref:`protocol constant
-<protocol_constants_alpha>`.
+<protocol_constants_alpha>`. A delegate cannot stop self-delegating.
 
-A delegate participates in consensus and in governance with a weight
-proportional to their *delegated stake* -- that is, the balance
-of all the accounts that delegate to it, including the balance of the delegate itself. To
-participate in consensus or in governance, a
-delegate needs to have at least a minimal stake, which is given by the
-``MINIMAL_STAKE`` :ref:`protocol constant
-<protocol_constants_alpha>` and a minimal frozen stake given by the
-``MINIMAL_FROZEN_STAKE`` :ref:`protocol constant
-<protocol_constants_alpha>`.
+A delegate participates in consensus and in governance in proportion
+to their *baking power* and *voting power* respectively.
 
-Delegates place security deposits that may be forfeited in case they do not
-follow (some particular rules of) the protocol. Security deposits are deduced
-from the delegates' own balance.
+- The voting power of a delegate is the total amount of tez owned by
+  all the accounts that delegate to it (including the delegate
+  itself), with no distinctions made between :doc:`staked<staking>`
+  and non-staked tez.
+
+- The baking power is similar, except that non-staked tez
+  are weighted less than :doc:`staked<staking>` tez, and there are additional
+  considerations such as overstaking and overdelegation. See the
+  :doc:`Baking Power<baking_power>` page for more details.
+
+Moreover, to participate in consensus and governance, the delegate
+needs to be :ref:`active<active_delegate_alpha>` and to meet
+:ref:`minimal balance requirements<minimal_baking_power_alpha>`.
+
+Delegates and delegators may :doc:`stake<staking>` their tez. Staked
+tez are security deposits that may be forfeited in case the baker does
+not follow (some particular rules of) the protocol. Besides, as
+mentioned above, staked tez are weighted higher than non-staked tez
+when computing the baking power.
+
+
+Consensus key
+^^^^^^^^^^^^^
 
 The key used by a delegate to sign blocks and consensus operations is called the
 *consensus key*. By default, this is the delegate's private key, called its
@@ -89,8 +102,9 @@ the past ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. That is, in cycles ``n``, ``n-1`
 Delegates' rights selection
 ---------------------------
 
-Tezos being proof-of-stake, the delegates' rights are selected at random based on their
-stake. In what follows we detail the selection mechanism used in Tezos.
+Tezos being proof-of-stake, the delegates' rights are selected at
+random based on their :doc:`baking power<baking_power>`. Let us detail
+the selection mechanism used in Tezos.
 
 .. _random_seed_alpha:
 
@@ -104,6 +118,7 @@ values in the protocol, in particular for selecting delegates to participate in 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
 .. _rights_alpha:
+.. _slots_alpha:
 
 Slot selection
 ^^^^^^^^^^^^^^
@@ -146,7 +161,7 @@ Proof-of-stake parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_CYCLE``
-     - 24576 blocks
+     - 30720 blocks
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 2 cycles
    * - ``MINIMAL_STAKE``

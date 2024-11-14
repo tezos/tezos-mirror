@@ -30,6 +30,8 @@
    Subject:      Test monitor_operations RPC
 *)
 
+let team = Tag.layer1
+
 let get_monitor_operations_hashes output_monitor =
   let open JSON in
   let output_monitor_length = String.length output_monitor in
@@ -75,7 +77,7 @@ let monitor_operations =
   Protocol.register_test
     ~__FILE__
     ~title:"Test monitor_operations RPC"
-    ~tags:["monitor"; "operations"]
+    ~tags:[team; "monitor"; "operations"]
   @@ fun protocol ->
   (* Step 1 *)
   (* initialize the node and the client *)

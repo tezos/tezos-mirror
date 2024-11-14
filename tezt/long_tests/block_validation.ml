@@ -30,6 +30,8 @@
    Subject: Benchmarking the validation of blocks
 *)
 
+let team = Team.layer1
+
 (** This module contains benchmarks that are used to prevent the regression
     of performance in the block validation processing.
 
@@ -513,6 +515,7 @@ let register ~executors () =
     ~__FILE__
     ~title:Benchmark.chunk_title
     ~tags:["shell"; "validation"; "block"; "chunk"; Tag.ci_disabled]
+    ~team
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -522,6 +525,7 @@ let register ~executors () =
     ~__FILE__
     ~title:Benchmark.specific_title
     ~tags:["shell"; "validation"; "block"; "specific"; Tag.ci_disabled]
+    ~team
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -534,6 +538,7 @@ let register ~executors () =
     ~__FILE__
     ~title:Benchmark.subparts_title
     ~tags:["shell"; "validation"; "block"; "subpart"; Tag.ci_disabled]
+    ~team
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -553,6 +558,7 @@ let register_semantic_regression_test ~executors () =
     ~__FILE__
     ~title:"shell.validation.replay"
     ~tags:["shell"; "validation"; "replay"]
+    ~team
     ~timeout:(Long_test.Hours 7)
     ~executors
   @@ Semantic.replay ~seed ~chunk_size:500 ~runtime:Mtime.Span.(6 * hour)

@@ -95,16 +95,16 @@ let protocol_alpha_parameters_template =
 
 let network_activation_parameters_templates protocol_hash =
   match protocol_hash with
-  | Tezt_tezos.Protocol.ParisB ->
-      Some
-        (Filename.concat
-           network_parameters_templates_dir
-           "proto_019_PtParisB_mainnet.json")
   | Tezt_tezos.Protocol.ParisC ->
       Some
         (Filename.concat
            network_parameters_templates_dir
            "proto_020_PsParisC_mainnet.json")
+  | Tezt_tezos.Protocol.Quebec ->
+      Some
+        (Filename.concat
+           network_parameters_templates_dir
+           "proto_021_PsQuebec_mainnet.json")
   | Tezt_tezos.Protocol.Alpha ->
       (* Fetching the network parameters from the src/proto_alpha directory,
          to be sure that we are in synch with current protocl parameters. *)
@@ -241,10 +241,10 @@ module Local = struct
     let* block, time = genesis () in
     let genesis = Tezos_base.Genesis.{block; time; protocol} in
     let chain_name =
-      Tezos_base.Distributed_db_version.Name.of_string network_name
+      Tezos_version.Distributed_db_version.Name.of_string network_name
     in
     let sandboxed_chain_name =
-      Tezos_base.Distributed_db_version.Name.of_string @@ network_name
+      Tezos_version.Distributed_db_version.Name.of_string @@ network_name
       ^ "_SANDBOXED"
     in
     let client = Client.create ~base_dir:output_dir () in
@@ -264,12 +264,7 @@ module Local = struct
           user_activated_upgrades = [];
           user_activated_protocol_overrides = [];
           default_bootstrap_peers = [];
-          dal_config =
-            {
-              activated = false;
-              use_mock_srs_for_testing = false;
-              bootstrap_peers = [];
-            };
+          dal_config = {activated = false; bootstrap_peers = []};
           genesis_parameters =
             Some
               {

@@ -1,0 +1,97 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name resto)
+ (public_name octez-libs.resto)
+ (libraries
+  uri
+  logs.fmt
+  fmt.tty)
+ (wrapped false)
+ (modules resto))
+
+(library
+ (name resto_directory)
+ (public_name octez-libs.resto-directory)
+ (libraries
+  lwt
+  octez-libs.resto)
+ (wrapped false)
+ (modules resto_directory))
+
+(library
+ (name resto_cohttp)
+ (public_name octez-libs.resto-cohttp)
+ (libraries
+  octez-libs.resto
+  octez-libs.resto-directory
+  octez-libs.cohttp-lwt)
+ (modules media_type cors))
+
+(library
+ (name resto_acl)
+ (public_name octez-libs.resto-acl)
+ (libraries
+  octez-libs.resto
+  uri)
+ (modules acl))
+
+(library
+ (name resto_cohttp_server)
+ (public_name octez-libs.resto-cohttp-server)
+ (libraries
+  octez-libs.resto
+  octez-libs.resto-directory
+  octez-libs.resto-acl
+  octez-libs.resto-cohttp
+  octez-libs.cohttp-lwt-unix
+  conduit-lwt-unix)
+ (flags
+  (:standard)
+  -open Resto_acl
+  -open Resto_cohttp)
+ (modules server))
+
+(library
+ (name resto_cohttp_client)
+ (public_name octez-libs.resto-cohttp-client)
+ (libraries
+  octez-libs.resto
+  octez-libs.resto-directory
+  octez-libs.resto-cohttp
+  uri
+  lwt)
+ (flags
+  (:standard)
+  -open Resto_cohttp)
+ (modules client))
+
+(library
+ (name resto_cohttp_self_serving_client)
+ (public_name octez-libs.resto-cohttp-self-serving-client)
+ (libraries
+  octez-libs.resto
+  octez-libs.resto-directory
+  octez-libs.resto-acl
+  octez-libs.resto-cohttp
+  octez-libs.resto-cohttp-client
+  octez-libs.resto-cohttp-server
+  uri
+  lwt)
+ (flags
+  (:standard)
+  -open Resto_acl
+  -open Resto_cohttp
+  -open Resto_cohttp_client)
+ (modules self_serving_client))
+
+(library
+ (name resto_json)
+ (public_name octez-libs.resto-json)
+ (libraries
+  octez-libs.json-data-encoding
+  octez-libs.json-data-encoding-bson
+  octez-libs.resto)
+ (wrapped false)
+ (modules resto_json))

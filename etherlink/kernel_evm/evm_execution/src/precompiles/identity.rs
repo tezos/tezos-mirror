@@ -8,9 +8,9 @@ use crate::precompiles::tick_model;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use evm::{Context, Transfer};
 use evm::{ExitReason, ExitSucceed};
-use host::runtime::Runtime;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Debug;
+use tezos_evm_runtime::runtime::Runtime;
 
 // Implementation of 0x02 precompiled (identity)
 pub fn identity_precompile<Host: Runtime>(
@@ -22,7 +22,7 @@ pub fn identity_precompile<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Debug, "Calling identity precompile");
     let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_identity(input.len())?, handler);
+        fail_if_too_much!(tick_model::ticks_of_identity(input.len()), handler);
 
     let size = input.len() as u64;
     let data_word_size = (size + 31) / 32;

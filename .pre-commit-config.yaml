@@ -5,7 +5,7 @@ repos:
     rev: v3.2.0
     hooks:
       - id: trailing-whitespace
-        exclude: ".*\\.t|tezt/tests/expected"
+        exclude: ".*\\.t$|tezt/tests/expected"
       - id: end-of-file-fixer
         exclude: "tezt/tests/expected|tezt/records|tzt_reference_test_suite|src/proto_[0-9][0-9][0-9]_.*/lib_protocol|src/proto_[0-9][0-9][0-9]_.*/parameters/dune|opam/"
   - repo: https://github.com/koalaman/shellcheck-precommit
@@ -13,6 +13,11 @@ repos:
     hooks:
       - id: shellcheck
         args: [ "--external-sources" ]
+  - repo: https://github.com/google/go-jsonnet
+    rev: v0.20.0
+    hooks:
+      - id: jsonnet-format
+      - id: jsonnet-lint
   - repo: https://github.com/cisagov/pre-commit-shfmt
     rev: v0.0.2
     hooks:

@@ -44,5 +44,8 @@ module Commitments_history = struct
       ~description:"Returns the DAL skip list cell of the given hash"
       ~query:Query.empty
       ~output:Dal.Slots_history.encoding
-      Path.(open_root / "commitments_history" / "hash" /: cell_hash_arg)
+      Path.(
+        open_root
+        / Protocol_hash.to_b58check Protocol.hash
+        / "commitments_history" / "hash" /: cell_hash_arg)
 end

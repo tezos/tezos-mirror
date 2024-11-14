@@ -15,7 +15,6 @@ depends: [
   "octez-node-config" { = version }
   "lwt" { >= "5.7.0" }
   "lwt-exit"
-  "prometheus-app" { >= "1.2" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

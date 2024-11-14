@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test)
+ (libraries
+  octez-libs.prometheus
+  octez-libs.prometheus-app
+  alcotest
+  alcotest-lwt))
+
+(rule (alias runtest) (package octez-libs) (action (run %{dep:./test.exe})))

@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_mem)
+ (public_name octez-libs.brassaia.mem)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.brassaia
+  logs
+  lwt)
+ (preprocess (pps octez-libs.ppx_brassaia.internal))
+ (flags
+  (:standard)
+  -w -68))

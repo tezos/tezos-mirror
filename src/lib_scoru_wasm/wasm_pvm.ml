@@ -284,13 +284,14 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     in
     encode pvm tree
 
-  let compute_step_many ?reveal_builtins ?write_debug ?stop_at_snapshot
+  let compute_step_many ?reveal_builtins ?hooks ?write_debug ?stop_at_snapshot
       ~wasm_entrypoint ~max_steps tree =
     let open Lwt.Syntax in
     let* pvm_state = decode tree in
     let* pvm_state, executed_ticks =
       Wasm_vm.compute_step_many
         ?reveal_builtins
+        ?hooks
         ?write_debug
         ?stop_at_snapshot
         ~wasm_entrypoint
@@ -363,6 +364,14 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let pvm_state = {pvm_state with max_nb_ticks = n} in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let durable_set ~key ~value tree =
+      let open Lwt_syntax in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let key = Durable.key_of_string_exn key in
+      let* durable = Durable.set_value_exn pvm_state.durable key value in
+      let pvm_state = {pvm_state with durable} in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
   end
 
   module Internal_for_tests = struct
@@ -429,33 +438,15 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
       pvm.buffers.input
 
-    let compute_step_many_with_hooks ?reveal_builtins ?write_debug
-        ?after_fast_exec ?stop_at_snapshot ~wasm_entrypoint ~max_steps tree =
-      let open Lwt.Syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
-      let* pvm_state, ticks =
-        Wasm_vm.Internal_for_tests.compute_step_many_with_hooks
-          ?reveal_builtins
-          ?write_debug
-          ?after_fast_exec
-          ?stop_at_snapshot
-          ~wasm_entrypoint
-          ~max_steps
-          pvm_state
-      in
-      let+ tree =
-        Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
-      in
-      (tree, ticks)
-
-    let compute_step_many_until ~wasm_entrypoint ?max_steps ?reveal_builtins
-        ?write_debug should_compute tree =
+    let compute_step_many_until ~wasm_entrypoint ?max_steps ?hooks
+        ?reveal_builtins ?write_debug should_compute tree =
       let open Lwt.Syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* pvm_state, ticks =
         Wasm_vm.compute_step_many_until
           ~wasm_entrypoint
           ?max_steps
+          ?hooks
           ?reveal_builtins
           ?write_debug
           should_compute

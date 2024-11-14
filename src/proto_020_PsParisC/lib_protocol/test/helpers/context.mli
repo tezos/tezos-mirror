@@ -30,6 +30,8 @@ open Environment
 
 type t = B of Block.t | I of Incremental.t
 
+val get_alpha_ctxt : t -> context tzresult Lwt.t
+
 val branch : t -> Block_hash.t
 
 val pred_branch : t -> Block_hash.t
@@ -282,6 +284,11 @@ module Delegate : sig
 
   val staking_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
 
+  val unstaked_frozen_deposits :
+    t ->
+    public_key_hash ->
+    Protocol.Delegate_services.deposit_per_cycle list tzresult Lwt.t
+
   val staking_denominator : t -> public_key_hash -> Z.t tzresult Lwt.t
 
   val frozen_deposits_limit :
@@ -297,17 +304,9 @@ module Delegate : sig
   val participation :
     t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t
 
-  (** This function might begin constructing a block. Use [policy] to
-      specify a valid baker for the new block (default [By_round 0]) *)
-  val is_forbidden :
-    ?policy:Block.baker_policy -> t -> public_key_hash -> bool tzresult Lwt.t
+  val is_forbidden : t -> public_key_hash -> bool tzresult Lwt.t
 
-  val stake_for_cycle :
-    ?policy:Block.baker_policy ->
-    t ->
-    Cycle.t ->
-    public_key_hash ->
-    stake tzresult Lwt.t
+  val stake_for_cycle : t -> Cycle.t -> public_key_hash -> stake tzresult Lwt.t
 end
 
 module Sc_rollup : sig
@@ -456,3 +455,8 @@ val init_with_parameters2 :
 (** [default_raw_context] returns a [Raw_context.t] for use in tests
     below [Alpha_context] *)
 val default_raw_context : unit -> Raw_context.t tzresult Lwt.t
+
+(** [raw_context_from_constants] returns a [Raw_context.t] for use in tests
+    below [Alpha_context] *)
+val raw_context_from_constants :
+  Constants.Parametric.t -> Raw_context.t tzresult Lwt.t

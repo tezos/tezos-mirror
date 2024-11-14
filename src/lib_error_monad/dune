@@ -7,11 +7,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.stdlib
-  data-encoding
+  octez-libs.data-encoding
   lwt-canceler
   lwt
   octez-libs.lwt-result-stdlib)
- (js_of_ocaml)
  (flags
   (:standard)
   -open Tezos_stdlib

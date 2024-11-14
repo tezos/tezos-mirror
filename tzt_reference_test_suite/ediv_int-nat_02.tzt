@@ -1,0 +1,3 @@
+code { EDIV } ;
+input { Stack_elt int 23 ; Stack_elt nat 7 } ;
+output { Stack_elt (option (pair int nat)) (Some (Pair 3 2)) }

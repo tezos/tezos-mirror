@@ -19,6 +19,9 @@ open Valid_operations_generators
 open Protocol
 open Alpha_context
 
+let register_test =
+  Tezt_helpers.register_test ~__FILE__ ~file_tags:["validation"; "operation"]
+
 (** Values of number of bootstraps to create.*)
 
 let default_nb_bootstrap = 7
@@ -137,6 +140,4 @@ let tests =
     voting_periods
   |> Qcheck2_helpers.qcheck_wrap_lwt
 
-let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("covalidity", tests)]
-  |> Lwt_main.run
+let () = List.iter (fun (s, _, f) -> register_test ~title:s f) tests

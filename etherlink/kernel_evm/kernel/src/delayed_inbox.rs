@@ -2,20 +2,25 @@
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 
 use crate::{
+    bridge::Deposit,
     current_timestamp,
     event::Event,
-    inbox::{Deposit, Transaction, TransactionContent},
+    inbox::{Transaction, TransactionContent},
     linked_list::LinkedList,
     storage,
 };
 use anyhow::Result;
+use evm_execution::fa_bridge::deposit::FaDeposit;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
-    rlp_helpers, transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
+    rlp_helpers,
+    transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
+    tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+use tezos_smart_rollup_host::path::RefPath;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
@@ -31,11 +36,20 @@ pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
 // Tag that indicates the delayed transaction is a deposit.
 pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
 
+// Tag that indicates the delayed transaction is a FA deposit.
+pub const DELAYED_FA_DEPOSIT_TAG: u8 = 0x03;
+
 /// Hash of a transaction
 ///
 /// It represents the key of the transaction in the delayed inbox.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Hash(pub [u8; TRANSACTION_HASH_SIZE]);
+
+impl From<TransactionHash> for Hash {
+    fn from(v: TransactionHash) -> Self {
+        Self(v)
+    }
+}
 
 impl Encodable for Hash {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -65,6 +79,7 @@ impl AsRef<[u8]> for Hash {
 pub enum DelayedTransaction {
     Ethereum(EthereumTransactionCommon),
     Deposit(Deposit),
+    FaDeposit(FaDeposit),
 }
 
 impl Encodable for DelayedTransaction {
@@ -78,6 +93,10 @@ impl Encodable for DelayedTransaction {
             DelayedTransaction::Deposit(delayed_deposit) => {
                 stream.append(&DELAYED_DEPOSIT_TAG);
                 stream.append(delayed_deposit);
+            }
+            DelayedTransaction::FaDeposit(delayed_fa_deposit) => {
+                stream.append(&DELAYED_FA_DEPOSIT_TAG);
+                stream.append(delayed_fa_deposit);
             }
         }
     }
@@ -103,6 +122,10 @@ impl Decodable for DelayedTransaction {
             DELAYED_DEPOSIT_TAG => {
                 let deposit = Deposit::decode(&payload)?;
                 Ok(DelayedTransaction::Deposit(deposit))
+            }
+            DELAYED_FA_DEPOSIT_TAG => {
+                let fa_deposit = FaDeposit::decode(&payload)?;
+                Ok(DelayedTransaction::FaDeposit(fa_deposit))
             }
             _ => Err(DecoderError::Custom("unknown tag")),
         }
@@ -172,6 +195,7 @@ impl DelayedInbox {
             TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
             TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
+            TransactionContent::FaDeposit(fa_deposit) => DelayedTransaction::FaDeposit(fa_deposit)
         };
         let item = DelayedInboxItem {
             transaction,
@@ -204,21 +228,19 @@ impl DelayedInbox {
                 tx_hash: tx_hash.0,
                 content: TransactionContent::Deposit(deposit),
             },
+            DelayedTransaction::FaDeposit(fa_deposit) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::FaDeposit(fa_deposit),
+            },
         }
     }
 
-    pub fn find_and_remove_transaction<Host: Runtime>(
+    pub fn find_transaction<Host: Runtime>(
         &mut self,
         host: &mut Host,
         tx_hash: Hash,
     ) -> Result<Option<(Transaction, Timestamp)>> {
-        log!(
-            host,
-            Info,
-            "Removing transaction {} from the delayed inbox",
-            hex::encode(tx_hash)
-        );
-        let tx = self.0.remove(host, &tx_hash)?.map(
+        let tx = self.0.find(host, &tx_hash)?.map(
             |DelayedInboxItem {
                  transaction,
                  timestamp,
@@ -332,8 +354,23 @@ impl DelayedInbox {
         })
     }
 
-    pub fn delete<Host: Runtime>(&mut self, host: &mut Host) -> Result<()> {
-        self.0.delete(host)
+    /// Deletes a transaction from the delayed inbox. It does not check if
+    /// a transaction is removed or not. The only property ensured by the
+    /// function is that the transaction is not part of the delayed inbox
+    /// after the call.
+    pub fn delete<Host: Runtime>(
+        &mut self,
+        host: &mut Host,
+        tx_hash: Hash,
+    ) -> Result<()> {
+        log!(
+            host,
+            Info,
+            "Removing transaction {} from the delayed inbox",
+            hex::encode(tx_hash)
+        );
+        let _found = self.0.remove(host, &tx_hash)?;
+        Ok(())
     }
 }
 
@@ -344,14 +381,13 @@ mod tests {
     use crate::current_timestamp;
     use crate::inbox::Transaction;
     use primitive_types::{H160, U256};
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
     use crate::inbox::TransactionContent::{Ethereum, EthereumDelayed};
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
-
-    use tezos_smart_rollup_mock::MockHost;
 
     fn address_from_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
@@ -383,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_delayed_inbox_roundtrip() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
 
@@ -398,7 +434,7 @@ mod tests {
             DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
-            .find_and_remove_transaction(&mut host, Hash(tx.tx_hash))
+            .find_transaction(&mut host, Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
@@ -406,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_delayed_inbox_roundtrip_error_non_delayed() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
 

@@ -387,19 +387,19 @@ let forge_shielded_cmd =
       let file = Option.value ~default:sapling_transaction_file file in
       cctxt#message "Writing transaction to %s@." file >>= fun () ->
       (if use_json_format then
-       save_json_to_file
-         (Data_encoding.Json.construct UTXO.transaction_encoding transaction)
-         file
-      else
-        let bytes =
-          Hex.of_bytes
-            (Data_encoding.Binary.to_bytes_exn
-               UTXO.transaction_encoding
-               transaction)
-        in
-        let file = open_out_bin file in
-        Printf.fprintf file "0x%s" (Hex.show bytes) ;
-        close_out file) ;
+         save_json_to_file
+           (Data_encoding.Json.construct UTXO.transaction_encoding transaction)
+           file
+       else
+         let bytes =
+           Hex.of_bytes
+             (Data_encoding.Binary.to_bytes_exn
+                UTXO.transaction_encoding
+                transaction)
+         in
+         let file = open_out_bin file in
+         Printf.fprintf file "0x%s" (Hex.show bytes) ;
+         close_out file) ;
       return_unit)
 
 let submit_shielded_cmd =
@@ -455,18 +455,18 @@ let submit_shielded_cmd =
       >>= fun () ->
       let open Context in
       (if use_json_format then
-       Lwt_utils_unix.Json.read_file filename >>=? fun json ->
-       return @@ Data_encoding.Json.destruct UTXO.transaction_encoding json
-      else
-        Lwt_utils_unix.read_file filename >>= fun hex ->
-        let hex =
-          (* remove 0x *)
-          String.sub hex 2 (String.length hex - 2)
-        in
-        return
-        @@ Data_encoding.Binary.of_bytes_exn
-             UTXO.transaction_encoding
-             Hex.(to_bytes_exn (`Hex hex)))
+         Lwt_utils_unix.Json.read_file filename >>=? fun json ->
+         return @@ Data_encoding.Json.destruct UTXO.transaction_encoding json
+       else
+         Lwt_utils_unix.read_file filename >>= fun hex ->
+         let hex =
+           (* remove 0x *)
+           String.sub hex 2 (String.length hex - 2)
+         in
+         return
+         @@ Data_encoding.Binary.of_bytes_exn
+              UTXO.transaction_encoding
+              Hex.(to_bytes_exn (`Hex hex)))
       >>=? fun transaction ->
       return (sapling_transaction_as_arg transaction) >>=? fun contract_input ->
       let chain = cctxt#chain and block = cctxt#block in
@@ -721,12 +721,12 @@ let commands () =
             | None -> cctxt#error "Account %s not found" name
             | Some account ->
                 (if verbose then
-                 cctxt#answer
-                   "@[<v 2>Received Sapling transactions for %s@,@[<v>%a@]@]"
-                   name
-                   Context.Account.pp_unspent
-                   account
-                else Lwt.return_unit)
+                   cctxt#answer
+                     "@[<v 2>Received Sapling transactions for %s@,@[<v>%a@]@]"
+                     name
+                     Context.Account.pp_unspent
+                     account
+                 else Lwt.return_unit)
                 >>= fun () ->
                 cctxt#answer
                   "Total Sapling funds %a%s"

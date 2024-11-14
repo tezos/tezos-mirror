@@ -10,10 +10,13 @@
 open Manifest
 open Externals
 open Internals
+open Product_data_encoding
 open Product_octez
 
 include Product (struct
   let name = "client-libs"
+
+  let source = ["client-libs"]
 end)
 
 let kaitai =
@@ -21,7 +24,7 @@ let kaitai =
     "kaitai"
     ~path:"client-libs/kaitai-ocaml/src"
     ~release_status:Unreleased
-    ~preprocess:[pps ppx_sexp_conv]
+    ~preprocess:(pps ppx_sexp_conv)
     ~deps:[yaml; sexplib]
     ~dune:Dune.[ocamllex "lexer"; menhir "parser"]
     ~synopsis:"OCaml library for reading Kaitai spec files"
@@ -86,7 +89,7 @@ let _octez_codec_kaitai =
            (fun protocol ->
              let link =
                match Protocol.number protocol with
-               | Alpha -> true
+               | Dev -> true
                | V number -> number >= 005
                | Other -> false
              in

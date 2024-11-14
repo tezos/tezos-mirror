@@ -25,7 +25,7 @@ Prerequisites
 To experiment with the commands described in this section, we use
 the `Weeklynet <https://teztnets.com/weeklynet-about>`_.
 In this section, we assume that ``${OPERATOR_ADDR}`` is a valid
-implicit account on Weeklynet owned by the reader.
+user account on Weeklynet owned by the reader.
 
 Notice that you need a specific development version of Octez to
 participate to Weeklynet. This version is either available from
@@ -81,7 +81,7 @@ This can be checked by:
    octez-client bootstrapped
    octez-client rpc get /chains/main/blocks/head/protocols
 
-In case you do not already have an implicit account, you can generate one with:
+In case you do not already have a user account, you can generate one with:
 
 .. code:: sh
 
@@ -194,8 +194,6 @@ First, we need to decide on a mode the rollup node will run:
    rollup node will accept transactions in its queue and batch them on
    the Layer 1.
 
-.. _rollup_batcher:
-
 #. ``batcher`` means that the rollup node will accept transactions in
    its queue and batch them on the Layer 1. In this mode, the rollup
    node follows the Layer 1 chain, but it does not update its state
@@ -212,14 +210,14 @@ First, we need to decide on a mode the rollup node will run:
 
 #. ``accuser`` follows the layer1-chain and computes commitments but does not
    publish them. Only when a conflicting commitment (published by another
-   staker) is detected will the "accuser node" publish a commitment and
+   committer) is detected will the "accuser node" publish a commitment and
    participate in the subsequent refutation game.
 
-#. ``bailout`` mode is designed to assist stakers in recovering their bonds.
+#. ``bailout`` mode is designed to assist committers in recovering their bonds.
    It functions as a slightly modified version of "Accuser", differing in that it does not post any new
    commitments but instead focuses on defending the ones that have been previously
    submitted. When operating in bailout mode, the expectation is to initiate a recover bond
-   operation when the operator is no longer staked on any commitment. If the node detects that this
+   operation when the operator is no longer staking on any commitment. If the node detects that this
    operation has been successful, it can gratefully exit.
 
 #. ``custom`` mode refers to a mode where the users individually select which
@@ -248,26 +246,25 @@ The table below summarises the modes and their associated purposes:
 +-------------+------------+----------+------------+------------+------------------+
 |             | Operating  | Batching | Cementing  | Recovering | Executing_outbox |
 +=============+============+==========+============+============+==================+
-| Operator    | Yes        | Yes      | Yes        | No         | Yes[^1]_         |
+| Operator    | Yes        | Yes      | Yes        | No         | Yes [#f1]_       |
 +-------------+------------+----------+------------+------------+------------------+
-| Maintenance | Yes        | No       | Yes        | No         | Yes[^1]_         |
+| Maintenance | Yes        | No       | Yes        | No         | Yes [#f1]_       |
 +-------------+------------+----------+------------+------------+------------------+
-| Bailout     | Yes[^2]_   | No       | Yes        | Yes        | No               |
+| Bailout     | Yes [#f2]_ | No       | Yes        | Yes        | No               |
 +-------------+------------+----------+------------+------------+------------------+
-| Accuser     | Yes [^3]_  | No       | No         | No         | No               |
+| Accuser     | Yes [#f3]_ | No       | No         | No         | No               |
 +-------------+------------+----------+------------+------------+------------------+
 | Batcher     | No         | Yes      | No         | No         | No               |
 +-------------+------------+----------+------------+------------+------------------+
 | Observer    | No         | No       | No         | No         | No               |
 +-------------+------------+----------+------------+------------+------------------+
 
-.. [^1] If and only it's a private rollup. In that case, only the
+.. [#f1] If and only it's a private rollup. In that case, only the
        whitelist update outbox message are injected.
-.. [^2] A rollup node in bailout mode won't publish any new commitments but only
+.. [#f2] A rollup node in bailout mode won't publish any new commitments but only
        defends the one published by the operator if they are refuted.
-.. [^3] An accuser node will publish commitments only when it detects
+.. [#f3] An accuser node will publish commitments only when it detects
        conflicts; for such cases it must make a deposit of 10,000 tez.
-
 
 Then to run the rollup node, use the following command:
 
@@ -304,14 +301,15 @@ capping the number of L2 messages that the rollup node's batcher
 purpose can inject per block to the maximum size of one L1 operation's
 maximal size (e.g., 32kb on mainnet).
 
+.. _rollup_batcher_keys:
+
 To bypass that limitation and inject multiple
 ``smart_rollup_add_messages`` L1 operations within a single L1 block,
 it is possible to provide multiple keys for the batcher purpose of a
 rollup node. At each block, the rollup node will use as many keys as
 possible to inject a corresponding number of queued L2 messages into
-the L1 rollup inbox[^1].
-
-[^1]: The order of the batches of L2 messages is not guaranteed to be
+the L1 rollup inbox.
+The order of the batches of L2 messages is not guaranteed to be
 preserved by the rollup node nor by the octez node mempool.
 
 The way to provide multiple batcher keys on the command line is:
@@ -858,10 +856,10 @@ The available options are:
      - Description
    * - Singlepass
      - ``singlepass``
-     - `When to use Singlepass <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-singlepass#when-to-use-singlepass>`_
+     - `When to use Singlepass <https://github.com/wasmerio/wasmer/tree/main/lib/compiler-singlepass#when-to-use-singlepass>`_
    * - Cranelift
      - ``cranelift``
-     - `When to use Cranelift <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-cranelift#when-to-use-cranelift>`_
+     - `When to use Cranelift <https://github.com/wasmerio/wasmer/tree/main/lib/compiler-cranelift#when-to-use-cranelift>`_
 
 Note that while the rollup node is generally capable of using Wasmer's
 LLVM-based compiler, Octez does not currently ship with it.
@@ -1016,7 +1014,13 @@ upgrades. The WASM PVM will upgrade itself when it reads the
 +--------------+----------------+
 | Nairobi      | 2.0.0-r1       |
 +--------------+----------------+
-| Alpha        | 2.0.0-r1       |
+| Oxford2      | 2.0.0-r2       |
++--------------+----------------+
+| Paris        | 2.0.0-r4       |
++--------------+----------------+
+| Quebec       | 2.0.0-r5       |
++--------------+----------------+
+| Alpha        | 2.0.0-r5       |
 +--------------+----------------+
 
 The changes in each WASM PVM version can be found by searching for string "PVM" in the corresponding protocol's changelog, section ``Smart Rollups`` (e.g. `this section <../protocols/alpha.html#smart-rollups>`__ for protocol Alpha).
@@ -1050,17 +1054,23 @@ reboots for each Tezos level.
 A call to ``kernel_run`` cannot take an arbitrary amount of time to
 complete, because diverging computations are not compatible with the
 optimistic rollup infrastructure of Tezos.
-To dodge the halting
-problem, the reference interpreter of WASM (used during the refutation game)
-enforces a bound on the number of ticks used in a call to
-``kernel_run``. Once the maximum number of ticks is reached, the
-execution of ``kernel_run`` is trapped (*i.e.*, interrupted with an
-error).
-In turn, the fast execution engine does not enforce this time limit. Hence,
-it is the responsibility of the kernel developer to implement a ``kernel_run`` which does not exceed its tick budget.
+It is the responsibility of the kernel developers to ensure the computation
+time necessary to track their rollup is bounded and reasonable, for two
+reasons:
 
+1. If a kernel requires more time than the time between two Tezos blocks, then
+   a rollup node is doomed to lag behind the Layer 1 chain it is tracking.
+2. If a single ``kernel_run`` takes too much time to compute, then it becomes
+   difficult to protect the resulting commitment. This is because the WASM PVM
+   interpreter has not been optimized for speed but for producing small
+   execution step proofs.
 
-The current bound is set to 11,000,000,000 ticks.
+Kernel developers are expected to design their kernel such that it addresses
+these two constraints.
+
+The WASM PVM does enforce a limit on the number of ticks available per
+``kernel_run``, but it is arbitrary high enough (50 trillion) that it becomes
+virtually impossible to exceed it.
 ``octez-smart-rollup-wasm-debugger`` is probably the best tool available to
 verify the ``kernel_run`` function does not take more ticks than authorized.
 
@@ -1473,9 +1483,9 @@ with the following schema:
 
   [
     [ { "payload" : <Michelson data>,
-        "sender" : <Contract hash of the originated contract for the rollup, optional>,
-        "source" : <Implicit account sending the message, optional>
-        "destination" : <Smart rollup address> }
+        "sender" : <Smart contract sending to the rollup, optional>,
+        "source" : <User account sending the message, optional>
+        "destination" : <Smart rollup address, optional> }
       ..
       // or
       { "external" : <hexadecimal payload> }
@@ -1662,7 +1672,7 @@ required, and output some information about the run.
     Full execution with padding: 22000000000 ticks
 
 Each cycle is a call of the ``kernel_run`` function.
-For each cycle, the number of _effective_ ticks used is shown (ticks corresponding
+For each cycle, the number of *effective* ticks used is shown (ticks corresponding
 to execution, and not used for padding), along with the duration in seconds.
 
 It is also possible to show the outbox for any given level (``show

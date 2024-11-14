@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   repr
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.bls12-381-polynomial
   octez-libs.crypto)
  (preprocess (pps ppx_repr))

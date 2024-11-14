@@ -1,15 +1,13 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
-
 (library
  (name tezos_crypto)
  (public_name octez-libs.crypto)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.stdlib
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.lwt-result-stdlib
   lwt
   octez-libs.hacl
@@ -18,10 +16,9 @@
   octez-libs.rpc
   aches
   zarith
-  zarith_stubs_js
   bls12-381
-  octez-libs.bls12-381-signature)
- (js_of_ocaml)
+  octez-libs.bls12-381-signature
+  octez-libs.event-logging)
  (flags
   (:standard)
   -open Tezos_stdlib

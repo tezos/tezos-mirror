@@ -32,8 +32,7 @@ val get_chain_id_opt :
 val get_chain_store_exn :
   Store.t -> Chain_services.chain -> Store.chain_store Lwt.t
 
-val get_checkpoint : Store.t -> Chain_services.chain -> Block_hash.t Lwt.t
-
-val rpc_directory : Validator.t -> Store.chain_store Tezos_rpc.Directory.t
+val rpc_directory_without_validator :
+  unit -> Store.chain_store Tezos_rpc.Directory.t
 
 val build_rpc_directory : Validator.t -> unit Tezos_rpc.Directory.t

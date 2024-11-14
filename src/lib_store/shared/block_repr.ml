@@ -110,8 +110,7 @@ let contents_encoding =
               operations_metadata_hashes;
             } ->
          (header, operations, block_metadata_hash, operations_metadata_hashes))
-       (fun (header, operations, block_metadata_hash, operations_metadata_hashes)
-            ->
+       (fun (header, operations, block_metadata_hash, operations_metadata_hashes) ->
          {header; operations; block_metadata_hash; operations_metadata_hashes})
        (obj4
           (req "header" (dynamic_size Block_header.encoding))
@@ -224,7 +223,7 @@ let legacy_encoding =
 let with_contents
     {header; operations; block_metadata_hash; operations_metadata_hashes} f =
   f header operations block_metadata_hash operations_metadata_hashes
-  [@@ocaml.inline]
+[@@ocaml.inline]
 
 let with_metadata
     {
@@ -240,7 +239,7 @@ let with_metadata
     last_preserved_block_level
     block_metadata
     operations_metadata
-  [@@ocaml.inline]
+[@@ocaml.inline]
 
 let contents_equal c1 c2 =
   with_contents c1 @@ fun h1 o1 b1 omh1 ->

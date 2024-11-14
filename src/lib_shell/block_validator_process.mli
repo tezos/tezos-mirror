@@ -73,7 +73,7 @@ val reconfigure_event_logging :
 (** [apply_block bvp predecessor header ops] checks the liveness of the
     operations and then call [Block_validation.apply]
 
-    [should_precheck] when set, triggers the block prechecking before applying
+    [should_validate] when set, triggers the block validation before applying
     it, see [Block_validation.apply].
 
     If [simulate] is true, the context resulting from the application
@@ -81,7 +81,7 @@ val reconfigure_event_logging :
 *)
 val apply_block :
   ?simulate:bool ->
-  ?should_precheck:bool ->
+  ?should_validate:bool ->
   t ->
   Store.chain_store ->
   predecessor:Store.Block.t ->
@@ -100,9 +100,9 @@ val preapply_block :
   Block_validation.operation list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
-(** [precheck_block bvp chain_store ~predecessor header hash ops] is a wrapper
-    for [Block_validation.precheck]. *)
-val precheck_block :
+(** [validate_block bvp chain_store ~predecessor header hash ops] is a
+   wrapper for [Block_validation.validate]. *)
+val validate_block :
   t ->
   Store.chain_store ->
   predecessor:Store.Block.t ->

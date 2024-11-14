@@ -22,7 +22,6 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  octez-protocol-018-Proxford-libs.dac
   tezos-dac-lib
   tezos-dac-client-lib
   octez-shell-libs.shell-services
@@ -33,7 +32,7 @@
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tree-encoding
-  data-encoding
+  octez-libs.data-encoding
   octez-internal-libs.irmin_pack
   octez-internal-libs.irmin_pack.unix
   octez-internal-libs.irmin
@@ -60,7 +59,6 @@
   -open Tezos_protocol_018_Proxford_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_018_Proxford
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
   -open Tezos_shell_services

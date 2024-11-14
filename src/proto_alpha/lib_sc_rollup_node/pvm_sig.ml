@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -26,6 +26,40 @@
 
 open Protocol
 open Alpha_context
+
+(** Mutable API for the PVM. 
+    - PVM functions which update the state in-place instead of returning a new state.
+    
+    This API helps the RISC-V PVM avoid unnecessary state copying. *)
+module type MUTABLE_STATE_S = sig
+  type t
+
+  type hash
+
+  val get_tick : t -> Sc_rollup.Tick.t Lwt.t
+
+  val state_hash : t -> hash Lwt.t
+
+  val is_input_state :
+    is_reveal_enabled:Sc_rollup.is_reveal_enabled ->
+    t ->
+    Sc_rollup.input_request Environment.Lwt.t
+
+  val set_input : Sc_rollup.input -> t -> unit Lwt.t
+
+  val eval_many :
+    reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
+    write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
+    is_reveal_enabled:Sc_rollup.is_reveal_enabled ->
+    ?stop_at_snapshot:bool ->
+    max_steps:int64 ->
+    t ->
+    int64 Lwt.t
+
+  module Internal_for_tests : sig
+    val insert_failure : t -> unit Lwt.t
+  end
+end
 
 (** Desired module type of a PVM from the L2 node's perspective *)
 module type S = sig
@@ -101,6 +135,10 @@ module type S = sig
       state ->
       ('a, repo, tree) Context_sigs.t Lwt.t
   end
+
+  (** Mutable state API which allows updating the PVM state in-place. *)
+  module Mutable_state :
+    MUTABLE_STATE_S with type hash = hash and type t = Ctxt_wrapper.mut_state
 
   (** Inspect durable state using a more specialised way of reading the
       PVM state.

@@ -135,8 +135,8 @@ let remove oph ({pending; hashes; status_and_priority_of} as t) =
       {
         pending =
           (if Map.is_empty mp then
-           Priority_map.remove status_and_priority pending
-          else Priority_map.add status_and_priority mp pending);
+             Priority_map.remove status_and_priority pending
+           else Priority_map.add status_and_priority mp pending);
         hashes = Sized_set.remove oph hashes;
         status_and_priority_of = Map.remove oph status_and_priority_of;
       }

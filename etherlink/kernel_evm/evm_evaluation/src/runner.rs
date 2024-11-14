@@ -137,7 +137,9 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
         }
         account.balance_add(host, info.balance).unwrap();
         write_host!(host, "Balance for {} was added : {}", address, info.balance);
-        account.set_code(host, &info.code).unwrap();
+        if !info.code.is_empty() {
+            account.set_code(host, &info.code).unwrap();
+        }
         write_host!(host, "Code was set for {}", address);
         for (index, value) in info.storage.iter() {
             account.set_storage(host, index, value).unwrap();
@@ -211,8 +213,8 @@ fn execute_transaction(
     let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
     let caller = env.tx.caller.to_fixed_bytes().into();
     let call_data = env.tx.data.to_vec();
-    let gas_limit = Some(env.tx.gas_limit);
-    let transaction_value = Some(env.tx.value);
+    let gas_limit = env.tx.gas_limit;
+    let transaction_value = env.tx.value;
     let pay_for_gas = true; // always, for now
 
     write_host!(
@@ -222,7 +224,7 @@ fn execute_transaction(
                     \t- gas: {} gas\n\
                     \t- value: {} wei",
         string_of_hexa(&env.tx.data),
-        gas_limit.unwrap(),
+        gas_limit,
         env.tx.value
     );
     run_transaction(
@@ -234,13 +236,14 @@ fn execute_transaction(
         address,
         caller,
         call_data,
-        gas_limit,
+        Some(gas_limit),
         env.tx.gas_price,
         transaction_value,
         pay_for_gas,
         u64::MAX, // don't account for ticks during the test
         false,
         true,
+        None,
     )
 }
 
@@ -263,7 +266,7 @@ fn check_results(
         Ok(execution_outcome_opt) => {
             let outcome_status = match execution_outcome_opt {
                 Some(execution_outcome) => {
-                    if execution_outcome.is_success {
+                    if execution_outcome.is_success() {
                         "[SUCCESS]"
                     } else {
                         "[FAILURE]"
@@ -318,7 +321,7 @@ pub fn run_test(
         if output.log {
             write_out!(output_file, "Running unit test: {}", name);
         }
-        let precompiles = precompile_set::<EvalHost>();
+        let precompiles = precompile_set::<EvalHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
 
         let filler_source = prepare_filler_source(&host, &unit, opt)?;
@@ -329,7 +332,10 @@ pub fn run_test(
         // post and execution
         for (spec_name, tests) in &unit.post {
             let config = match spec_name {
-                SpecName::Shanghai => Config::shanghai(),
+                SpecName::Shanghai => Config {
+                    call_stack_limit: 256,
+                    ..Config::shanghai()
+                },
                 // TODO: enable future configs when parallelization is enabled.
                 // Other tests are ignored
                 _ => continue,

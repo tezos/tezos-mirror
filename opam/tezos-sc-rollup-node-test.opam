@@ -10,18 +10,15 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
+  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "octez-libs" {with-test}
-  "tezos-protocol-018-Proxford" {with-test}
-  "octez-protocol-018-Proxford-libs" {with-test}
-  "octez-smart-rollup-node-Proxford" {with-test}
-  "octez-alcotezt" {with-test}
-  "tezos-protocol-019-PtParisB" {with-test}
-  "octez-protocol-019-PtParisB-libs" {with-test}
-  "octez-smart-rollup-node-PtParisB" {with-test}
   "tezos-protocol-020-PsParisC" {with-test}
   "octez-protocol-020-PsParisC-libs" {with-test}
   "octez-smart-rollup-node-PsParisC" {with-test}
+  "octez-alcotezt" {with-test}
+  "tezos-protocol-021-PsQuebec" {with-test}
+  "octez-protocol-021-PsQuebec-libs" {with-test}
+  "octez-smart-rollup-node-PsQuebec" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}

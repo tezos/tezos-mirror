@@ -311,7 +311,7 @@ let inject_operation chain_db h op =
     h
     op
 
-let inject_prechecked_block chain_db hash block_header operations =
+let inject_validated_block chain_db hash block_header operations =
   Store.Block.store_validated_block
     chain_db.reader_chain_db.chain_store
     ~hash
@@ -331,7 +331,8 @@ let commit_protocol db h p =
     [Distributed_db_requester.Raw_*.t] has been properly created before it is
     possible to use it *)
 module Make
-    (Table : Requester.REQUESTER) (Kind : sig
+    (Table : Requester.REQUESTER)
+    (Kind : sig
       type t
 
       val proj : t -> Table.t
@@ -471,7 +472,7 @@ module Advertise = struct
       chain_db.reader_chain_db.active_connections
       (Message.Current_head (chain_id, Store.Block.header head, mempool))
 
-  let prechecked_head chain_db ?(mempool = Mempool.empty) header =
+  let validated_head chain_db ?(mempool = Mempool.empty) header =
     let p2p = chain_db.global_db.p2p in
     let acceptable_version conn =
       let {Network_version.distributed_db_version; _} =

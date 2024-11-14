@@ -6,11 +6,8 @@ open Source
 (* Errors & Tracing *)
 
 module Script = Error.Make ()
-
 module Abort = Error.Make ()
-
 module Assert = Error.Make ()
-
 module IO = Error.Make ()
 
 exception Abort = Abort.Error
@@ -346,7 +343,7 @@ let lookup category map x_opt at =
     IO.error
       at
       (if key = "" then "no " ^ category ^ " defined"
-      else "unknown " ^ category ^ " " ^ key)
+       else "unknown " ^ category ^ " " ^ key)
 
 let lookup_script = lookup "script" scripts
 
@@ -362,7 +359,7 @@ let lookup_instance name at =
           IO.error
             at
             (if key = "" then "no " ^ category ^ " defined"
-            else "unknown " ^ category ^ " " ^ key)
+             else "unknown " ^ category ^ " " ^ key)
       | exn -> Lwt.reraise exn)
 
 let lookup_registry module_name item_name =

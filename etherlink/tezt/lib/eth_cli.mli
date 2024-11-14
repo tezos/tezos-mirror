@@ -34,7 +34,7 @@ val balance : account:string -> endpoint:string -> Wei.t Lwt.t
     Wei) from [source_private_key] to [to_public_key], sends the raw
     transaction to the JSON-RPI API server listening at [endpoint].
     It is allowed to optionally provide:
-    - [data] The raw data field of the transaction. 
+    - [data] The raw data field of the transaction.
       NB: Consider using [contract_send] instead of this function.
     - [gas_limit] The gas limit of the transaction. Will be estimated if not specified.
     - [gas_price] The gas price of the transaction, in wei. Defaults to 1 gwei. *)
@@ -61,6 +61,18 @@ val transaction_get :
     used by the client to register the ABI in memory so it can be refered to
     later.*)
 val add_abi : label:string -> abi:string -> unit -> unit Lwt.t
+
+(** [update_abi ~label ~abi ()] update an ABI (Application Binary Interface) in
+    the client. [abi] should be a path to the json file. [label] is a string
+    used by the client to register the ABI in memory so it can be refered to
+    later.*)
+val update_abi : label:string -> abi:string -> unit -> unit Lwt.t
+
+(** [check_abi ~label ()] checks if an ABI is registered in the client. *)
+val check_abi : label:string -> unit -> bool Lwt.t
+
+(** [show_abi] ~label () returns the ABI registered in the client. *)
+val show_abi : label:string -> unit -> string Lwt.t
 
 (** [deploy ~source_private_key ~endpoint ~abi ~bin] crafts and sign a
     transaction deploying [bin] whose interface [abi] is registered in the
@@ -102,6 +114,7 @@ val contract_send :
   method_call:string ->
   ?value:Wei.t ->
   ?gas:int ->
+  ?gas_price:int ->
   unit ->
   string Lwt.t
 

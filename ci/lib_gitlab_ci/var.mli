@@ -27,3 +27,8 @@ val make : string -> t
 
     [encode @@ make "foo"] is ["$foo"]. *)
 val encode : t -> string
+
+(** The name of a variable.
+
+    [encode @@ make "foo"] is ["foo"]. *)
+val name : t -> string

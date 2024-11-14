@@ -35,6 +35,8 @@ open Protocol
 open Storage_functors
 open Storage_sigs
 
+let register_test = Tezt_helpers.register_test ~__FILE__ ~file_tags:["storage"]
+
 module Int32 = struct
   type t = int32
 
@@ -217,26 +219,16 @@ let test_register_indexed_subcontext_2 () =
   in
   must_failwith f_prog error
 
-let tests =
-  [
-    Alcotest_lwt.test_case
-      "register single data in existing path"
-      `Quick
-      (fun _ -> test_register_single_data);
-    Alcotest_lwt.test_case
-      "register named subcontext in existing path"
-      `Quick
-      (fun _ -> test_register_named_subcontext);
-    Alcotest_lwt.test_case
-      "register indexed subcontext in existing path"
-      `Quick
-      (fun _ -> test_register_indexed_subcontext);
-    Alcotest_lwt.test_case
-      "register indexed subcontext with existing indexed subcontext"
-      `Quick
-      (fun _ -> test_register_indexed_subcontext_2);
-  ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("storage description", tests)]
-  |> Lwt_main.run
+  register_test
+    ~title:"register single data in existing path"
+    test_register_single_data ;
+  register_test
+    ~title:"register named subcontext in existing path"
+    test_register_named_subcontext ;
+  register_test
+    ~title:"register indexed subcontext in existing path"
+    test_register_indexed_subcontext ;
+  register_test
+    ~title:"register indexed subcontext with existing indexed subcontext"
+    test_register_indexed_subcontext_2

@@ -16,7 +16,7 @@ val received_upgrade : string -> unit Lwt.t
 
 (** [pending_upgrade upgrade] advertises that the EVM node is aware that an
     upgrade is pending. *)
-val pending_upgrade : Ethereum_types.Upgrade.t -> unit Lwt.t
+val pending_upgrade : Evm_events.Upgrade.t -> unit Lwt.t
 
 (** [applied_upgrade root_hash level] advertises that the kernel of the EVM
     node successfully upgraded to [root_hash] with the [level]th blueprint. *)
@@ -68,3 +68,24 @@ val event_kernel_log :
   level:kernel_log_level -> kind:kernel_log_kind -> msg:string -> unit Lwt.t
 
 val retrying_connect : endpoint:Uri.t -> delay:float -> unit Lwt.t
+
+(** [preload_kernel version] advertizes the EVM node has preloaded in the
+    module cache the kernel [version]. *)
+val preload_kernel : string -> unit Lwt.t
+
+val patched_state : string -> Ethereum_types.quantity -> unit Lwt.t
+
+(** [predownload_kernel root_hash] advertizes the EVM node has
+    downloaded all preimages under [root_hash]. *)
+val predownload_kernel : Hex.t -> unit Lwt.t
+
+(** [sandbox_started level] advertizes that sandbox mode started on top of
+    level [level]. *)
+val sandbox_started : Z.t -> unit Lwt.t
+
+val cannot_fetch_time_between_blocks :
+  Configuration.time_between_blocks -> tztrace -> unit Lwt.t
+
+val invalid_node_da_fees : node_da_fees:Z.t -> kernel_da_fees:Z.t -> unit Lwt.t
+
+val deprecation_note : string -> unit Lwt.t

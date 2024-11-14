@@ -34,6 +34,9 @@
 open Adaptive_issuance_helpers
 module Cycle = Protocol.Alpha_context.Cycle
 
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["ai"; "ai_launch"]
+
 let assert_level ~loc (blk : Block.t) expected =
   let current_level = blk.header.shell.level in
   Assert.equal_int32 ~loc current_level expected
@@ -110,7 +113,7 @@ let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
    - the launch cycle is not reset before it is reached,
    - once the launch cycle is reached, staking is allowed,
    - staking increases total_frozen_stake. *)
-let test_launch threshold expected_vote_duration () =
+let test_launch threshold expected_vote_duration =
   let open Lwt_result_wrap_syntax in
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
@@ -389,7 +392,7 @@ let test_launch threshold expected_vote_duration () =
    - the EMA of the adaptive issuance vote reaches the threshold after the
      expected duration,
    - the feature does not activate. *)
-let test_does_not_launch_without_feature_flag threshold vote_duration () =
+let test_does_not_launch_without_feature_flag threshold vote_duration =
   let open Lwt_result_wrap_syntax in
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
@@ -545,28 +548,23 @@ let test_launch_without_vote () =
   in
   return_unit
 
-let tests =
-  [
-    Tztest.tztest
+let () =
+  register_test
+    ~title:
       "Launch with force_activation feature flag set activates AI immediately"
-      `Quick
-      test_launch_without_vote;
-    Tztest.tztest
-      "the EMA reaches the vote threshold at the expected level and adaptive \
-       issuance launches (very low threshold, vote enabled)"
-      `Quick
-      (test_launch
-         1000000l (* This means that the threshold is set at 0.05% *)
-         88l);
-    Tztest.tztest
-      "the EMA reaches the vote threshold at the expected level and adaptive \
-       issuance does not launch (very low threshold, vote disabled)"
-      `Quick
-      (test_does_not_launch_without_feature_flag
-         1000000l (* This means that the threshold is set at 0.05% *)
-         88l);
-  ]
+    test_launch_without_vote
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive issuance launch", tests)]
-  |> Lwt_main.run
+  register_test
+    ~title:"expected EMA and AI launches (very low threshold, vote enabled)"
+  @@ fun () ->
+  test_launch 1000000l (* This means that the threshold is set to 0.05% *) 110l
+
+let () =
+  register_test
+    ~title:
+      "expected EMA and AI does not launch (very low threshold, vote disabled)"
+  @@ fun () ->
+  test_does_not_launch_without_feature_flag
+    1000000l (* This means that the threshold is set to 0.05% *)
+    110l

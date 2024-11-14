@@ -44,11 +44,14 @@ type options = {
   public_addr : P2p_point.Id.t option;
       (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
-  profiles : Types.profiles option;
+  profile : Profile_manager.t option;
       (** Profiles of the DAL node used for tracking shards. *)
   metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)
   peers : string list;  (** DAL nodes to connect to. *)
   history_mode : Configuration_file.history_mode option;
+  service_name : string option;
+      (** Name of the service provided by this node. *)
+  service_namespace : string option;  (** Namespace for the service. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

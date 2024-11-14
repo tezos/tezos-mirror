@@ -65,7 +65,7 @@ type additional_info = Tezos_version_parser.additional_info =
 val string_of_additional_info : additional_info -> string
 
 (** Product information. *)
-type product = Tezos_version_parser.product = Octez | Etherlink
+type product = Tezos_version_parser.product = Octez | Octez_evm_node
 
 (** Convert the product information to a string. *)
 val string_of_product : product -> string
@@ -110,6 +110,12 @@ val pp : Format.formatter -> t -> unit
 
     Same as [pp] but does not print the product name. *)
 val pp_simple : Format.formatter -> t -> unit
+
+(** A Version printer compatible with command line argments.
+
+    Same as [pp] but print the product name in lowercase and followed by a dash
+    instead of a space. *)
+val pp_arg : Format.formatter -> t -> unit
 
 (** Parse an Octez version.
 

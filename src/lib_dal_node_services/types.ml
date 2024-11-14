@@ -102,6 +102,11 @@ module Message_id = struct
   }
 
   let compare id {level; slot_index; commitment; shard_index; pkh} =
+    (* If you change the semantics of this function, consider the effect it can
+       have on handling shards in the future. Currently, this ordering is used to
+       know the priority of when a shard should be handled. Shards with a lower
+       level should be handled first when handling shards that were received in the
+       future. *)
     let c = Int32.compare id.level level in
     if c <> 0 then c
     else
@@ -290,6 +295,7 @@ module Slot_id = struct
   end
 
   module Set = Set.Make (Comparable)
+  module Map = Map.Make (Comparable)
 end
 
 type slot_id = Slot_id.t
@@ -298,12 +304,7 @@ type slot_set = {slots : bool list; published_level : int32}
 
 type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
-type header_status =
-  [ `Waiting_attestation
-  | `Attested
-  | `Unattested
-  | `Not_selected
-  | `Unseen_or_not_finalized ]
+type header_status = [`Waiting_attestation | `Attested | `Unattested]
 
 type shard_index = int
 
@@ -313,24 +314,7 @@ type slot_header = {
   status : header_status;
 }
 
-type operator_profile =
-  | Attester of Tezos_crypto.Signature.public_key_hash
-  | Producer of {slot_index : int}
-  | Observer of {slot_index : int}
-
-type operator_profiles = operator_profile list
-
-type profiles = Bootstrap | Operator of operator_profiles | Random_observer
-
-let merge_profiles ~lower_prio ~higher_prio =
-  match (lower_prio, higher_prio) with
-  | Bootstrap, Bootstrap -> Bootstrap
-  | Operator _, Bootstrap -> Bootstrap
-  | Bootstrap, Operator op -> Operator op
-  | Operator op1, Operator op2 -> Operator (op1 @ op2)
-  | Random_observer, Random_observer -> Random_observer
-  | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
-  | (Operator _ | Bootstrap), Random_observer -> Random_observer
+type profile = Bootstrap | Operator of Operator_profile.t | Random_observer
 
 type with_proof = {with_proof : bool}
 
@@ -376,6 +360,9 @@ let attestable_slots_encoding : attestable_slots Data_encoding.t =
         (function () -> Not_in_committee);
     ]
 
+(* Note: this encoding is used to store statuses on disk using the
+   [Key_value_store] module. As such, it's important that this is a
+   fixed-size encoding. *)
 let header_status_encoding : header_status Data_encoding.t =
   let open Data_encoding in
   union
@@ -383,33 +370,21 @@ let header_status_encoding : header_status Data_encoding.t =
       case
         ~title:"waiting_attestation"
         (Tag 0)
-        (obj1 (req "status" (constant "waiting_attestation")))
+        (constant "waiting_attestation")
         (function `Waiting_attestation -> Some () | _ -> None)
         (function () -> `Waiting_attestation);
       case
         ~title:"attested"
         (Tag 1)
-        (obj1 (req "status" (constant "attested")))
+        (constant "attested")
         (function `Attested -> Some () | _ -> None)
         (function () -> `Attested);
       case
         ~title:"unattested"
         (Tag 2)
-        (obj1 (req "status" (constant "unattested")))
+        (constant "unattested")
         (function `Unattested -> Some () | _ -> None)
         (function () -> `Unattested);
-      case
-        ~title:"not_selected"
-        (Tag 3)
-        (obj1 (req "status" (constant "not_selected")))
-        (function `Not_selected -> Some () | _ -> None)
-        (function () -> `Not_selected);
-      case
-        ~title:"unseen_or_not_finalized"
-        (Tag 4)
-        (obj1 (req "status" (constant "unseen")))
-        (function `Unseen_or_not_finalized -> Some () | _ -> None)
-        (function () -> `Unseen_or_not_finalized);
     ]
 
 let slot_header_encoding =
@@ -419,39 +394,11 @@ let slot_header_encoding =
     (fun (slot_id, (commitment, status)) -> {slot_id; commitment; status})
     (merge_objs
        slot_id_encoding
-       (merge_objs
-          (obj1 (req "commitment" Cryptobox.Commitment.encoding))
-          header_status_encoding))
+       (obj2
+          (req "commitment" Cryptobox.Commitment.encoding)
+          (req "status" header_status_encoding)))
 
-let operator_profile_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"Attester with pkh"
-        (Tag 0)
-        (obj2
-           (req "kind" (constant "attester"))
-           (req
-              "public_key_hash"
-              Tezos_crypto.Signature.Public_key_hash.encoding))
-        (function Attester attest -> Some ((), attest) | _ -> None)
-        (function (), attest -> Attester attest);
-      case
-        ~title:"Slot producer"
-        (Tag 1)
-        (obj2 (req "kind" (constant "producer")) (req "slot_index" int31))
-        (function Producer {slot_index} -> Some ((), slot_index) | _ -> None)
-        (function (), slot_index -> Producer {slot_index});
-      case
-        ~title:"observer"
-        (Tag 2)
-        (obj2 (req "kind" (constant "observer")) (req "slot_index" int31))
-        (function Observer {slot_index} -> Some ((), slot_index) | _ -> None)
-        (function (), slot_index -> Observer {slot_index});
-    ]
-
-let profiles_encoding =
+let profile_encoding =
   let open Data_encoding in
   union
     [
@@ -462,11 +409,11 @@ let profiles_encoding =
         (function Bootstrap -> Some () | _ -> None)
         (function () -> Bootstrap);
       case
-        ~title:"Operator"
+        ~title:"Controller"
         (Tag 2)
         (obj2
-           (req "kind" (constant "operator"))
-           (req "operator_profiles" (list operator_profile_encoding)))
+           (req "kind" (constant "controller"))
+           (req "controller_profiles" Operator_profile.encoding))
         (function
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)
@@ -490,7 +437,7 @@ let with_proof_encoding =
 
 let header_status_arg =
   let destruct s =
-    let s = `O [("status", `String s)] in
+    let s = `String s in
     try Ok (Data_encoding.Json.destruct header_status_encoding s)
     with _ -> Error "Cannot parse header status value"
   in
@@ -506,13 +453,27 @@ let char =
     ~construct:(fun c -> String.make 1 c)
     ()
 
+let option_int =
+  Resto.Arg.make
+    ~name:"optional int"
+    ~destruct:(function
+      | "" -> Ok None
+      | str -> (
+          try Ok (Some (int_of_string str))
+          with Failure _ -> Error "int expected"))
+    ~construct:(function None -> "" | Some i -> string_of_int i)
+    ()
+
 let slot_query =
   let open Tezos_rpc.Query in
-  query (fun padding ->
+  query (fun padding slot_index ->
       object
         method padding = padding
+
+        method slot_index = slot_index
       end)
   |+ field "padding" char '\x00' (fun obj -> obj#padding)
+  |+ field "slot_index" option_int None (fun obj -> obj#slot_index)
   |> seal
 
 let wait_query =
@@ -559,7 +520,7 @@ let opt_header_status_query =
 
 module Store = struct
   (** Data kind stored in DAL. *)
-  type kind = Commitment | Header_status | Slot_id | Slot | Profile
+  type kind = Commitment | Header_status | Slot_id | Slot | Shard | Profile
 
   let encoding : kind Data_encoding.t =
     Data_encoding.string_enum
@@ -568,6 +529,7 @@ module Store = struct
         ("header_status", Header_status);
         ("slot_id", Slot_id);
         ("slot", Slot);
+        ("shard", Shard);
         ("profile", Profile);
       ]
 
@@ -630,17 +592,25 @@ module P2P = struct
 end
 
 module Gossipsub = struct
-  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
+  type connection = {
+    topics : Topic.t list;
+    direct : bool;
+    outbound : bool;
+    bootstrap : bool;
+  }
 
   let connection_encoding =
     let open Data_encoding in
     conv
-      (fun {topics; direct; outbound} -> (topics, direct, outbound))
-      (fun (topics, direct, outbound) -> {topics; direct; outbound})
-      (obj3
+      (fun {topics; direct; outbound; bootstrap} ->
+        (topics, direct, outbound, bootstrap))
+      (fun (topics, direct, outbound, bootstrap) ->
+        {topics; direct; outbound; bootstrap})
+      (obj4
          (req "topics" (list Topic.encoding))
          (req "direct" bool)
-         (req "outbound" bool))
+         (req "outbound" bool)
+         (req "bootstrap" bool))
 end
 
 module Version = struct
@@ -668,4 +638,31 @@ module Version = struct
       (fun {network_version} -> network_version)
       (fun network_version -> {network_version})
       (obj1 (req "network_version" network_version_encoding))
+end
+
+module Health = struct
+  type status = Up | Degraded | Down | Ok | Ko
+
+  let status_encoding =
+    Data_encoding.string_enum
+      [
+        ("up", Up);
+        ("degraded", Degraded);
+        ("down", Down);
+        ("ok", Ok);
+        ("ko", Ko);
+      ]
+
+  type t = {status : status; checks : (string * status) list}
+
+  let checks_encoding =
+    let open Data_encoding in
+    list (obj2 (req "name" string) (req "status" status_encoding))
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {status; checks} -> (status, checks))
+      (fun (status, checks) -> {status; checks})
+      (obj2 (req "status" status_encoding) (req "checks" checks_encoding))
 end

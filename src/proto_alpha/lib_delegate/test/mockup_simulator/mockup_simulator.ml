@@ -337,13 +337,13 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
           {
             current_protocol =
               (if
-               Block_hash.equal hash genesis_block_hash
-               || is_predecessor_of_genesis
-              then Protocol_hash.zero
-              else Protocol.hash);
+                 Block_hash.equal hash genesis_block_hash
+                 || is_predecessor_of_genesis
+               then Protocol_hash.zero
+               else Protocol.hash);
             next_protocol =
               (if is_predecessor_of_genesis then Protocol_hash.zero
-              else Protocol.hash);
+               else Protocol.hash);
           }
 
     let may_lie_on_proto_level block x =

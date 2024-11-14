@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_riscv_sandbox)
+ (package tezt-riscv-sandbox)
+ (libraries
+  octez-libs.tezt-wrapper
+  tezt-tezos)
+ (flags
+  (:standard)
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base))

@@ -73,6 +73,13 @@ let is_acceptable_proposal_for_current_level state
          is a predecessor therefore the proposal is valid *)
       return Valid_proposal
 
+(* This function retrieves the branch of the predecessor's predecessor (block
+   finalized) instead of the predecessor. This is done to avoid having consensus
+   operation branched on block that are not part of the canonical chain
+   anymore. *)
+let get_branch_from_proposal (proposal : proposal) =
+  proposal.predecessor.shell.predecessor
+
 let make_consensus_vote_batch state proposal kind =
   let level =
     Raw_level.of_int32 state.level_state.current_level |> function
@@ -89,7 +96,9 @@ let make_consensus_vote_batch state proposal kind =
       (Delegate_slots.own_delegates state.level_state.delegate_slots)
   in
   (* The branch is the latest finalized block. *)
-  let batch_branch = state.level_state.latest_proposal.predecessor.hash in
+  let batch_branch =
+    get_branch_from_proposal state.level_state.latest_proposal
+  in
   Baking_state.make_unsigned_consensus_vote_batch
     kind
     batch_content
@@ -523,9 +532,9 @@ let prepare_block_to_bake ~attestations ?last_proposal
   let kind = Fresh operation_pool in
   let* () = Events.(emit preparing_fresh_block (delegate, round)) in
   let force_apply =
-    state.global_state.config.force_apply || Round.(round <> zero)
-    (* This is used as a safety net by applying blocks on round > 0, in case
-       validation-only did not produce a correct round-0 block. *)
+    (* This is used as a safety net by applying blocks in case validation-only
+       did not produce correct block. *)
+    Round.(round >= state.global_state.config.force_apply_from_round)
   in
   let block_to_bake : block_to_bake =
     {predecessor; round; delegate; kind; force_apply}
@@ -628,9 +637,9 @@ let propose_block_action state delegate round ~last_proposal =
         Reproposal {consensus_operations; payload_hash; payload_round; payload}
       in
       let force_apply =
-        true
-        (* This is used as a safety net by applying blocks on round > 0, in case
-           validation-only did not produce a correct round-0 block. *)
+        (* This is used as a safety net by applying blocks in case validation-only
+           did not produce correct block. *)
+        Round.(round >= state.global_state.config.force_apply_from_round)
       in
       let block_to_bake =
         {predecessor = proposal.predecessor; round; delegate; kind; force_apply}
@@ -733,14 +742,74 @@ let prepare_attest_action state proposal =
   in
   Prepare_attestations {attestations}
 
-let inject_early_arrived_attestations state =
-  let early_attestations = state.round_state.early_attestations in
-  match early_attestations with
-  | [] -> Lwt.return (state, Watch_quorum)
-  | first_signed_attestation :: _ as unbatched_signed_attestations -> (
-      let new_round_state = {state.round_state with early_attestations = []} in
-      let new_state = {state with round_state = new_round_state} in
-      let batch_branch = state.level_state.latest_proposal.predecessor.hash in
+(* This function is called once a prequorum has been reached. *)
+let may_inject_attestations state ~first_signed_attestation
+    ~other_signed_attestations =
+  let open Lwt_syntax in
+  let emit_discarding_unexpected_attestation_event
+      ?(payload : attestable_payload option) attestation =
+    let {
+      vote_consensus_content = {level; round = att_round; block_payload_hash; _};
+      delegate;
+      _;
+    } =
+      attestation.unsigned_consensus_vote
+    in
+    let att_level = Raw_level.to_int32 level in
+    match payload with
+    | None ->
+        Events.(
+          emit
+            discarding_unexpected_attestation_without_prequorum_payload
+            (delegate, att_level, att_round))
+    | Some payload ->
+        Events.(
+          emit
+            discarding_unexpected_attestation_with_different_prequorum_payload
+            ( delegate,
+              block_payload_hash,
+              att_level,
+              att_round,
+              payload.proposal.block.payload_hash ))
+  in
+  let check_payload state attestation do_action =
+    match state.level_state.attestable_payload with
+    | None ->
+        (* No attestable payload, either the prequorum has not been reached yet,
+           or an other issue occurred, we cannot inject the attestations. *)
+        let* () = emit_discarding_unexpected_attestation_event attestation in
+        do_nothing state
+    | Some payload ->
+        if
+          not
+            Block_payload_hash.(
+              payload.proposal.block.payload_hash
+              = attestation.unsigned_consensus_vote.vote_consensus_content
+                  .block_payload_hash)
+        then
+          (* Attestable payload found in the state but it is different from the
+             one in the attestation operation, we cannot inject the
+             attestation. *)
+          let* () =
+            emit_discarding_unexpected_attestation_event ~payload attestation
+          in
+          do_nothing state
+        else do_action
+  in
+  match other_signed_attestations with
+  | [] ->
+      check_payload state first_signed_attestation
+      @@
+      let signed_attestations =
+        make_singleton_consensus_vote_batch first_signed_attestation
+      in
+      Lwt.return (state, Inject_attestations {signed_attestations})
+  | _ :: _ -> (
+      check_payload state first_signed_attestation
+      @@
+      let batch_branch =
+        get_branch_from_proposal state.level_state.latest_proposal
+      in
       let batch_content =
         let vote_consensus_content =
           first_signed_attestation.unsigned_consensus_vote
@@ -756,11 +825,25 @@ let inject_early_arrived_attestations state =
         Attestation
         batch_content
         ~batch_branch
-        unbatched_signed_attestations
+        (first_signed_attestation :: other_signed_attestations)
       |> function
       | Ok signed_attestations ->
-          Lwt.return (new_state, Inject_attestations {signed_attestations})
-      | Error _err -> (* Unreachable *) do_nothing new_state)
+          Lwt.return (state, Inject_attestations {signed_attestations})
+      | Error _err -> (* Unreachable *) do_nothing state)
+
+(* This function tries to inject attestations already prepared if the
+   prequorum is reached. *)
+let may_inject_early_forged_attestations state =
+  let early_attestations = state.round_state.early_attestations in
+  match early_attestations with
+  | [] -> Lwt.return (state, Watch_quorum)
+  | first_signed_attestation :: other_signed_attestations ->
+      let new_round_state = {state.round_state with early_attestations = []} in
+      let new_state = {state with round_state = new_round_state} in
+      may_inject_attestations
+        new_state
+        ~first_signed_attestation
+        ~other_signed_attestations
 
 let prequorum_reached_when_awaiting_preattestations state candidate
     preattestations =
@@ -818,7 +901,7 @@ let prequorum_reached_when_awaiting_preattestations state candidate
     else
       (* We already triggered preemptive attestation forging, we
          either have those already or we are waiting for them. *)
-      inject_early_arrived_attestations new_state
+      may_inject_early_forged_attestations new_state
 
 let quorum_reached_when_waiting_attestations state candidate attestation_qc =
   let open Lwt_syntax in
@@ -906,7 +989,55 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   let new_state = update_current_phase new_state Idle in
   do_nothing new_state
 
-let handle_arriving_attestation state signed_attestation =
+let handle_forged_preattestation state signed_preattestation =
+  let open Lwt_syntax in
+  let {
+    vote_consensus_content =
+      {
+        level;
+        round = att_round;
+        block_payload_hash = att_payload_hash;
+        slot = _;
+      };
+    delegate;
+    _;
+  } =
+    signed_preattestation.unsigned_consensus_vote
+  in
+  let att_level = Raw_level.to_int32 level in
+  let check_payload state preattestation do_action =
+    match state.level_state.attestable_payload with
+    | None ->
+        (* No attestable payload set, we are free to inject the
+           preattestations *)
+        do_action
+    | Some payload ->
+        if
+          not
+            Block_payload_hash.(
+              payload.proposal.block.payload_hash
+              = preattestation.unsigned_consensus_vote.vote_consensus_content
+                  .block_payload_hash)
+        then
+          (* The preattestation payload does not match the one set in the
+             state, we cannot inject the preattestation. *)
+          let* () =
+            Events.(
+              emit
+                discarding_unexpected_preattestation_with_different_payload
+                ( delegate,
+                  att_payload_hash,
+                  att_level,
+                  att_round,
+                  payload.proposal.block.payload_hash ))
+          in
+          do_nothing state
+        else do_action
+  in
+  check_payload state signed_preattestation
+  @@ Lwt.return (state, Inject_preattestation {signed_preattestation})
+
+let handle_forged_attestation state signed_attestation =
   let open Lwt_syntax in
   let {
     vote_consensus_content =
@@ -950,12 +1081,12 @@ let handle_arriving_attestation state signed_attestation =
         let new_state = {state with round_state = new_round_state} in
         do_nothing new_state
     | Idle | Awaiting_attestations | Awaiting_application ->
-        (* For these three phases, we have necessarily already reached the
-           prequorum: we are safe to inject. *)
-        let signed_attestations =
-          make_singleton_consensus_vote_batch signed_attestation
-        in
-        Lwt.return (state, Inject_attestations {signed_attestations})
+        (* For these three phases, we should have already reached the prequorum.
+           If this is not the case, the attestations will not be injected. *)
+        may_inject_attestations
+          state
+          ~first_signed_attestation:signed_attestation
+          ~other_signed_attestations:[]
 
 let handle_forge_event state forge_event =
   match forge_event with
@@ -965,9 +1096,9 @@ let handle_forge_event state forge_event =
           Inject_block
             {prepared_block; force_injection = false; asynchronous = true} )
   | Preattestation_ready signed_preattestation ->
-      Lwt.return (state, Inject_preattestation {signed_preattestation})
+      handle_forged_preattestation state signed_preattestation
   | Attestation_ready signed_attestation ->
-      handle_arriving_attestation state signed_attestation
+      handle_forged_attestation state signed_attestation
 
 (* Hypothesis:
    - The state is not to be modified outside this module
@@ -1079,10 +1210,20 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
         preattestation_qc
   | Awaiting_attestations, Quorum_reached (candidate, attestation_qc) ->
       quorum_reached_when_waiting_attestations state candidate attestation_qc
-  (* Unreachable cases *)
-  | Idle, (Prequorum_reached _ | Quorum_reached _)
-  | Awaiting_preattestations, Quorum_reached _
-  | (Awaiting_application | Awaiting_attestations), Prequorum_reached _
-  | Awaiting_application, Quorum_reached _ ->
-      (* This cannot/should not happen *)
+  (* Unreachable cases modulo concurrency. *)
+  | ( (Idle | Awaiting_application | Awaiting_attestations),
+      Prequorum_reached (candidate, _operations_pqc) ) ->
+      (* Unexpected prequorum reached, we do not lock on it and discard it. *)
+      let* () =
+        Events.(
+          emit discarding_unexpected_prequorum_reached (candidate.hash, phase))
+      in
+      do_nothing state
+  | ( (Idle | Awaiting_preattestations | Awaiting_application),
+      Quorum_reached (candidate, _operations_qc) ) ->
+      (* Unexpected quorum reached, we discard it. *)
+      let* () =
+        Events.(
+          emit discarding_unexpected_quorum_reached (candidate.hash, phase))
+      in
       do_nothing state

@@ -296,15 +296,29 @@ Types `COMPARE` isn't tested for:
 
 ### `EDIV: nat : nat`
 
-***None***
+- [ediv_nat-nat_00.tzt](ediv_nat-nat_00.tzt)
+- [ediv_nat-nat_01.tzt](ediv_nat-nat_01.tzt)
+- [ediv_nat-nat_02.tzt](ediv_nat-nat_02.tzt)
+- [ediv_nat-nat_03.tzt](ediv_nat-nat_03.tzt)
+- [ediv_nat-nat_04.tzt](ediv_nat-nat_04.tzt)
 
 ### `EDIV: nat : int`
 
-***None***
+- [ediv_nat-int_00.tzt](ediv_nat-int_00.tzt)
+- [ediv_nat-int_01.tzt](ediv_nat-int_01.tzt)
+- [ediv_nat-int_02.tzt](ediv_nat-int_02.tzt)
+- [ediv_nat-int_03.tzt](ediv_nat-int_03.tzt)
+- [ediv_nat-int_04.tzt](ediv_nat-int_04.tzt)
+- [ediv_nat-int_05.tzt](ediv_nat-int_05.tzt)
 
 ### `EDIV: int : nat`
 
-***None***
+- [ediv_int-nat_00.tzt](ediv_int-nat_00.tzt)
+- [ediv_int-nat_01.tzt](ediv_int-nat_01.tzt)
+- [ediv_int-nat_02.tzt](ediv_int-nat_02.tzt)
+- [ediv_int-nat_03.tzt](ediv_int-nat_03.tzt)
+- [ediv_int-nat_04.tzt](ediv_int-nat_04.tzt)
+- [ediv_int-nat_05.tzt](ediv_int-nat_05.tzt)
 
 ### `EDIV: int : int`
 
@@ -312,14 +326,11 @@ Types `COMPARE` isn't tested for:
 - [ediv_int-int_01.tzt](ediv_int-int_01.tzt)
 - [ediv_int-int_02.tzt](ediv_int-int_02.tzt)
 - [ediv_int-int_03.tzt](ediv_int-int_03.tzt)
-
-Missing edge cases:
-
-- No division of positive over positive
-- No division of negative over negative
-- No division of zero over non-zero
-- No division of zero over zero
-- No division with the result of 1
+- [ediv_int-int_04.tzt](ediv_int-int_04.tzt)
+- [ediv_int-int_05.tzt](ediv_int-int_05.tzt)
+- [ediv_int-int_06.tzt](ediv_int-int_06.tzt)
+- [ediv_int-int_07.tzt](ediv_int-int_07.tzt)
+- [ediv_int-int_08.tzt](ediv_int-int_08.tzt)
 
 ### `EDIV: mutez : nat`
 
@@ -337,11 +348,8 @@ Missing edge cases:
 - [ediv_mutez-mutez_01.tzt](ediv_mutez-mutez_01.tzt)
 - [ediv_mutez-mutez_02.tzt](ediv_mutez-mutez_02.tzt)
 - [ediv_mutez-mutez_03.tzt](ediv_mutez-mutez_03.tzt)
-
-Missing edge cases:
-
-- No division of zero over non-zero
-- No division of zero over zero
+- [ediv_mutez-mutez_04.tzt](ediv_mutez-mutez_04.tzt)
+- [ediv_mutez-mutez_05.tzt](ediv_mutez-mutez_05.tzt)
 
 ### `EQ`
 
@@ -399,38 +407,47 @@ Missing edge cases:
 
 ### `LSL: nat : nat`
 
-- [lsl_00.tzt](lsl_00.tzt)
-- [lsl_01.tzt](lsl_01.tzt)
-- [lsl_02.tzt](lsl_02.tzt)
-- [lsl_03.tzt](lsl_03.tzt)
-- [lsl_04.tzt](lsl_04.tzt)
-- [lsl_05.tzt](lsl_05.tzt)
-- [lsl_06.tzt](lsl_06.tzt)
-
-Missing edge cases:
-
-- No zero shift test for non-zero argument
+- [lsl_nat_00.tzt](lsl_nat_00.tzt)
+- [lsl_nat_01.tzt](lsl_nat_01.tzt)
+- [lsl_nat_02.tzt](lsl_nat_02.tzt)
+- [lsl_nat_03.tzt](lsl_nat_03.tzt)
+- [lsl_nat_04.tzt](lsl_nat_04.tzt)
+- [lsl_nat_05.tzt](lsl_nat_05.tzt)
+- [lsl_nat_06.tzt](lsl_nat_06.tzt)
+- [lsl_nat_07.tzt](lsl_nat_07.tzt)
+- [lsl_nat_08.tzt](lsl_nat_08.tzt)
 
 ### `LSL: bytes : nat`
 
-***None***
+- [lsl_bytes_00.tzt](lsl_bytes_00.tzt)
+- [lsl_bytes_01.tzt](lsl_bytes_01.tzt)
+- [lsl_bytes_02.tzt](lsl_bytes_02.tzt)
+- [lsl_bytes_03.tzt](lsl_bytes_03.tzt)
+- [lsl_bytes_04.tzt](lsl_bytes_04.tzt)
+- [lsl_bytes_05.tzt](lsl_bytes_05.tzt)
+- [lsl_bytes_06.tzt](lsl_bytes_06.tzt)
 
 ### `LSR: nat : nat`
 
-- [lsr_00.tzt](lsr_00.tzt)
-- [lsr_01.tzt](lsr_01.tzt)
-- [lsr_02.tzt](lsr_02.tzt)
-- [lsr_03.tzt](lsr_03.tzt)
-- [lsr_04.tzt](lsr_04.tzt)
-- [lsr_05.tzt](lsr_05.tzt)
-
-Missing edge cases:
-
-- No zero shift test for non-zero argument
+- [lsr_nat_00.tzt](lsr_nat_00.tzt)
+- [lsr_nat_01.tzt](lsr_nat_01.tzt)
+- [lsr_nat_02.tzt](lsr_nat_02.tzt)
+- [lsr_nat_03.tzt](lsr_nat_03.tzt)
+- [lsr_nat_04.tzt](lsr_nat_04.tzt)
+- [lsr_nat_05.tzt](lsr_nat_05.tzt)
+- [lsr_nat_06.tzt](lsr_nat_06.tzt)
+- [lsr_nat_07.tzt](lsr_nat_07.tzt)
 
 ### `LSR: bytes : nat`
 
-***None***
+- [lsr_bytes_00.tzt](lsr_bytes_00.tzt)
+- [lsr_bytes_01.tzt](lsr_bytes_01.tzt)
+- [lsr_bytes_02.tzt](lsr_bytes_02.tzt)
+- [lsr_bytes_03.tzt](lsr_bytes_03.tzt)
+- [lsr_bytes_04.tzt](lsr_bytes_04.tzt)
+- [lsr_bytes_05.tzt](lsr_bytes_05.tzt)
+- [lsr_bytes_06.tzt](lsr_bytes_06.tzt)
+- [lsr_bytes_07.tzt](lsr_bytes_07.tzt)
 
 ### `LT`
 
@@ -560,26 +577,38 @@ Missing edge cases:
 
 ### `SUB: nat : nat`
 
-***None***
+- [sub_nat-nat_00.tzt](sub_nat-nat_00.tzt)
+- [sub_nat-nat_01.tzt](sub_nat-nat_01.tzt)
+- [sub_nat-nat_02.tzt](sub_nat-nat_02.tzt)
+- [sub_nat-nat_03.tzt](sub_nat-nat_03.tzt)
+- [sub_nat-nat_04.tzt](sub_nat-nat_04.tzt)
 
 ### `SUB: nat : int`
 
-***None***
+- [sub_nat-int_00.tzt](sub_nat-int_00.tzt)
+- [sub_nat-int_01.tzt](sub_nat-int_01.tzt)
+- [sub_nat-int_02.tzt](sub_nat-int_02.tzt)
+- [sub_nat-int_03.tzt](sub_nat-int_03.tzt)
+- [sub_nat-int_04.tzt](sub_nat-int_04.tzt)
+- [sub_nat-int_05.tzt](sub_nat-int_05.tzt)
 
 ### `SUB: int : nat`
 
-***None***
+- [sub_int-nat_00.tzt](sub_int-nat_00.tzt)
+- [sub_int-nat_01.tzt](sub_int-nat_01.tzt)
+- [sub_int-nat_02.tzt](sub_int-nat_02.tzt)
+- [sub_int-nat_03.tzt](sub_int-nat_03.tzt)
+- [sub_int-nat_04.tzt](sub_int-nat_04.tzt)
+- [sub_int-nat_05.tzt](sub_int-nat_05.tzt)
 
 ### `SUB: int : int`
 
 - [sub_int-int_00.tzt](sub_int-int_00.tzt)
 - [sub_int-int_01.tzt](sub_int-int_01.tzt)
-
-Missing edge cases:
-
-- No subtraction of 0
-- No subtraction from 0
-- No subtraction of negative integers
+- [sub_int-int_02.tzt](sub_int-int_02.tzt)
+- [sub_int-int_03.tzt](sub_int-int_03.tzt)
+- [sub_int-int_04.tzt](sub_int-int_04.tzt)
+- [sub_int-int_05.tzt](sub_int-int_05.tzt)
 
 ### `SUB: timestamp : int`
 
@@ -589,28 +618,19 @@ Missing edge cases:
 - [sub_timestamp-int_03.tzt](sub_timestamp-int_03.tzt)
 - [sub_timestamp-int_04.tzt](sub_timestamp-int_04.tzt)
 
-Missing edge cases:
-
-- No subtraction of zero
-- No subtraction from zero
-
 ### `SUB: timestamp : timestamp`
 
 - [sub_timestamp-timestamp_00.tzt](sub_timestamp-timestamp_00.tzt)
 - [sub_timestamp-timestamp_01.tzt](sub_timestamp-timestamp_01.tzt)
 - [sub_timestamp-timestamp_02.tzt](sub_timestamp-timestamp_02.tzt)
 - [sub_timestamp-timestamp_03.tzt](sub_timestamp-timestamp_03.tzt)
-
-Missing edge cases:
-
-- No test for realistic timestamps producing negative difference
+- [sub_timestamp-timestamp_04.tzt](sub_timestamp-timestamp_04.tzt)
 
 ### `SUB_MUTEZ`
 
-***None***, but there are tests for the deprecated `SUB: mutez : mutez`:
+- [sub_mutez_00.tzt](sub_mutez_00.tzt)
+- [sub_mutez_01.tzt](sub_mutez_01.tzt)
 
-- [sub_mutez-mutez_00.tzt](sub_mutez-mutez_00.tzt)
-- [sub_mutez-mutez_01.tzt](sub_mutez-mutez_01.tzt)
 
 ## Boolean operations
 
@@ -1316,9 +1336,6 @@ Instructions with no tests:
 - `COMPARE: unit : unit`
 - `DUP n`
 - `DUP`
-- `EDIV: int : nat`
-- `EDIV: nat : int`
-- `EDIV: nat : nat`
 - `EMIT`
 - `GET n`
 - `GET_AND_UPDATE: kty : option vty : big_map kty vty`
@@ -1330,8 +1347,6 @@ Instructions with no tests:
 - `LAMBDA_REC`
 - `LAMBDA`
 - `LEVEL`
-- `LSL: bytes : nat`
-- `LSR: bytes : nat`
 - `MAP: option ty`
 - `MIN_BLOCK_TIME`
 - `MUL: bls12_381_fr : bls12_381_fr`
@@ -1354,10 +1369,6 @@ Instructions with no tests:
 - `SAPLING_VERIFY_UPDATE`
 - `SELF_ADDRESS`
 - `SPLIT_TICKET`
-- `SUB_MUTEZ`
-- `SUB: int : nat`
-- `SUB: nat : int`
-- `SUB: nat : nat`
 - `SWAP`
 - `TICKET`
 - `TOTAL_VOTING_POWER`
@@ -1387,20 +1398,11 @@ Instructions with missing edge cases:
 - `DROP n` for n = 1
 - `DUG n` for n = 0
 - `DUG n` for n = 1
-- `EDIV: int : int` negative / negative
-- `EDIV: int : int` positive / positive
-- `EDIV: int : int` with result 1
-- `EDIV: int : int` zero / non-zero
-- `EDIV: int : int` zero / zero
-- `EDIV: mutez : mutez` zero / non-zero
-- `EDIV: mutez : mutez` zero / zero
 - `IF_CONS` -- check that stack tail is preserved
 - `IF_LEFT` -- check that stack tail is preserved
 - `IF_NONE` -- check that stack tail is preserved
 - `IF` -- check that stack tail is preserved
 - `ISNAT` for positive argument
-- `LSL: nat : nat` zero shift for non-zero argument
-- `LSR: nat : nat` zero shift for non-zero argument
 - `MUL: int : int` 0 * x
 - `MUL: int : int` negative * negative
 - `MUL: int : int` negative * positive
@@ -1422,10 +1424,4 @@ Instructions with missing edge cases:
 - `PUSH` for more pushable types
 - `SENDER` when sender != source
 - `SET_DELEGATE` with `None`
-- `SUB: int : int` 0 - x
-- `SUB: int : int` x - 0
-- `SUB: int : int` x - negative
-- `SUB: timestamp : int` 0 - x
-- `SUB: timestamp : int` x - 0
-- `SUB: timestamp : timestamp` realistic timestamps with negative difference
 - `UNPACK` standalone tests (without `PACK`)

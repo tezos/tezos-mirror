@@ -1,12 +1,16 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
+stages:
+- publish_release
+
 docker:promote_to_latest:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: publish_release
   tags:
   - gcp
   dependencies: []
+  timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -14,5 +18,5 @@ docker:promote_to_latest:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 24.0.6
+    DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"

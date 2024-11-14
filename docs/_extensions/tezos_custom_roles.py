@@ -166,7 +166,7 @@ def src_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
     if not Path(TEZOS_HOME, file).exists():
         msg = [
             inliner.reporter.warning(
-                f'source file {file} does not exist in the repo', line=lineno
+                f'source file {file} doesn\'t exist in the repo', line=lineno
             )
         ]
     else:

@@ -455,7 +455,9 @@ let test_compute_min_max () =
     f ~reward_params ~launch_cycle ~new_cycle
   in
   let compute_min = compute_aux ~f:compute_min in
-  let compute_max = compute_aux ~f:compute_max in
+  let compute_max =
+    compute_aux ~f:(compute_max ~issuance_ratio_min:Q.zero ~stake_ratio:Q.zero)
+  in
   let assert_eq_on_interval ~loc ~f ~from ~to_ expected =
     assert (List.length expected = to_ - from + 1) ;
     let actual = Stdlib.List.init (to_ - from + 1) (fun i -> f (i + from)) in
@@ -538,12 +540,12 @@ let test_compute_min_max () =
   let* () =
     let initial_period = 5 in
     let transition_period = 5 in
-    let issuance_ratio_initial_min = Q.(7 // 100) in
-    let issuance_ratio_final_min = Q.(1 // 100) in
-    (* Min increases by 1/100th per cycle *)
-    let issuance_ratio_initial_max = Q.(1 // 10) in
-    let issuance_ratio_final_max = Q.(7 // 10) in
-    (* Max increases by 1/10th per cycle *)
+    let issuance_ratio_initial_min = Q.(7 // 1000) in
+    let issuance_ratio_final_min = Q.(1 // 1000) in
+    (* Min decreases by 1/1000th per cycle *)
+    let issuance_ratio_initial_max = Q.(1 // 100) in
+    let issuance_ratio_final_max = Q.(7 // 100) in
+    (* Max increases by 1/100th per cycle *)
     let compute_min =
       compute_min
         ~initial_period
@@ -569,7 +571,7 @@ let test_compute_min_max () =
         ~from:0
         ~to_:15
         ((issuance_ratio_initial_min *+ 6)
-        @ Q.[6 // 100; 5 // 100; 4 // 100; 3 // 100; 2 // 100]
+        @ Q.[6 // 1000; 5 // 1000; 4 // 1000; 3 // 1000; 2 // 1000]
         @ (issuance_ratio_final_min *+ 5))
     in
     let* () =
@@ -579,11 +581,108 @@ let test_compute_min_max () =
         ~from:0
         ~to_:15
         ((issuance_ratio_initial_max *+ 6)
-        @ Q.[2 // 10; 3 // 10; 4 // 10; 5 // 10; 6 // 10]
+        @ Q.[2 // 100; 3 // 100; 4 // 100; 5 // 100; 6 // 100]
         @ (issuance_ratio_final_max *+ 5))
     in
     return_unit
   in
+  return_unit
+
+let test_dyn_max () =
+  let open Delegate.Rewards.Internal_for_tests in
+  let open Lwt_result_wrap_syntax in
+  let assert_eq_list ~loc a b =
+    Assert.assert_equal_list ~loc Q.equal "" Q.pp_print a b
+  in
+  let assert_geq_list ~loc a b =
+    Assert.assert_equal_list ~loc Q.geq "" Q.pp_print a b
+  in
+  (* initial_period = 10, transition_period = 50, initial_max = 55/1000, final_max = 10/100 *)
+  let reward_params =
+    Default_parameters.constants_test.adaptive_issuance.adaptive_rewards_params
+  in
+  let dyn_max stake_ratio = dyn_max ~stake_ratio in
+  let compute_min new_cycle =
+    let new_cycle = Cycle_repr.of_int32_exn new_cycle in
+    compute_min
+      ~reward_params
+      ~launch_cycle:(Some (Cycle_repr.of_int32_exn 0l))
+      ~new_cycle
+  in
+  let compute_max new_cycle stake_ratio =
+    let issuance_ratio_min = compute_min new_cycle in
+    let new_cycle = Cycle_repr.of_int32_exn new_cycle in
+    compute_max
+      ~issuance_ratio_min
+      ~reward_params
+      ~launch_cycle:(Some (Cycle_repr.of_int32_exn 0l))
+      ~new_cycle
+      ~stake_ratio
+  in
+  let mapping =
+    Q.
+      [
+        (-1 // 100, 10 // 100);
+        (0 // 100, 10 // 100);
+        (1 // 100, 10 // 100);
+        (5 // 100, 10 // 100);
+        (7_91 // 100_00, 10 // 100);
+        (10 // 100, 449 // 4900);
+        (15 // 100, 29 // 400);
+        (20 // 100, 137 // 2450);
+        (30 // 100, 149 // 4900);
+        (40 // 100, 37 // 2450);
+        (49_9 // 100_0, 19601 // 1960000);
+        (50 // 100, 1 // 100);
+        (100 // 100, 1 // 100);
+        (222 // 100, 1 // 100);
+      ]
+  in
+  let actual, expected =
+    List.map (fun (x, y) -> (dyn_max x, y)) mapping |> List.split
+  in
+  let* () = assert_eq_list ~loc:__LOC__ actual expected in
+  (* initial period *)
+  let compute_max_1 = compute_max 5l in
+  let min_1 = compute_min 5l in
+  let actual, expected =
+    List.map
+      (fun (x, _) ->
+        ( compute_max_1 x,
+          Compare.Q.max
+            (Compare.Q.min (dyn_max x) reward_params.issuance_ratio_initial_max)
+            min_1 ))
+      mapping
+    |> List.split
+  in
+  let* () = assert_eq_list ~loc:__LOC__ actual expected in
+  (* transition period *)
+  let compute_max_2 = compute_max 30l in
+  let min_2 = compute_min 30l in
+  let dyn_max_list, compute_max_list =
+    List.map
+      (fun (x, _) ->
+        ( compute_max_2 x,
+          Compare.Q.max (Compare.Q.min (dyn_max x) (compute_max_2 Q.zero)) min_2
+        ))
+      mapping
+    |> List.split
+  in
+  let* () = assert_geq_list ~loc:__LOC__ dyn_max_list compute_max_list in
+  (* final period *)
+  let compute_max_3 = compute_max 80l in
+  let min_3 = compute_min 80l in
+  let actual, expected =
+    List.map
+      (fun (x, _) ->
+        ( compute_max_3 x,
+          Compare.Q.max
+            (Compare.Q.min (dyn_max x) reward_params.issuance_ratio_final_max)
+            min_3 ))
+      mapping
+    |> List.split
+  in
+  let* () = assert_eq_list ~loc:__LOC__ actual expected in
   return_unit
 
 let tests =
@@ -609,6 +708,7 @@ let tests =
         "adaptive issuance - min/max coeff computation"
         `Quick
         test_compute_min_max;
+      tztest "adaptive issuance - dyn max computation" `Quick test_dyn_max;
     ]
 
 let () =

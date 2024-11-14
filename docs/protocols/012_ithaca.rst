@@ -14,8 +14,6 @@ The code can be found in the :src:`src/proto_012_Psithaca` directory of the
 This page documents the changes brought by protocol Ithaca with respect
 to Hangzhou.
 
-.. contents::
-
 New Environment Version (V4)
 ----------------------------
 

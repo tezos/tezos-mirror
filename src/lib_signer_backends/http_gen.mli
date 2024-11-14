@@ -27,7 +27,8 @@ module Make (N : sig
   val scheme : string
 end) : sig
   module Make
-      (RPC_client : RPC_client.S) (P : sig
+      (RPC_client : RPC_client.S)
+      (P : sig
         val authenticate :
           Tezos_crypto.Signature.Public_key_hash.t list ->
           Bytes.t ->

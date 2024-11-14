@@ -14,12 +14,11 @@ depends: [
   "caqti"
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
   "lwt" { >= "5.7.0" }
   "octez-protocol-alpha-libs" { = version }
   "octez-shell-libs" { = version }
   "tezos-protocol-alpha" { = version }
-  "tezt" { >= "4.0.0" & < "5.0.0" }
+  "tezt" { >= "4.1.0" & < "5.0.0" }
   "tezt-tezos" { = version }
   "uri" { >= "3.1.0" }
 ]

@@ -7,7 +7,7 @@ etherlink_dir="$script_dir/.."
 tezos_dir="$etherlink_dir/.."
 commit=$(git rev-parse HEAD)
 
-rust_image=${rust_image:-"registry.gitlab.com/tezos/tezos/rust-toolchain"}
+rust_image=${rust_image:-"us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"}
 rust_image_tag=${rust_image_tag:-"master"}
 platform=${platform:-"linux/amd64"}
 
@@ -60,7 +60,7 @@ options:
 - evm_config_file_path: input the config for the evm kernel installer (default=etherlink/config/dev.yaml)
 - output_dir: directory where the wasm files (kernels, preimages) will be copied (default=etherlink/kernels-${commit})
 env_options:
-- rust_image (default="registry.gitlab.com/tezos/tezos/rust-toolchain")
+- rust_image (default="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain")
 - rust_image_tag (default="master")
 - platform (default="linux/amd64")
 This script builds evm kernels and preimages using the configuration given in <evm_config_file_path>.

@@ -136,6 +136,7 @@ defprim! {
     amount,
     balance,
     MutezOverflow,
+    Overflow,
     GeneralOverflow,
     StaticError,
     #[token("self")]

@@ -23,14 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-class type full =
-  object
-    inherit Client_context.full
+class type full = object
+  inherit Client_context.full
 
-    inherit
-      [Shell_services.chain * Shell_services.block] Environment.RPC_context
-                                                    .simple
-  end
+  inherit
+    [Shell_services.chain * Shell_services.block] Environment.RPC_context.simple
+end
 
 class wrap_full (t : Client_context.full) : full =
   object

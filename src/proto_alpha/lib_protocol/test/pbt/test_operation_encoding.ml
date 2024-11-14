@@ -62,10 +62,4 @@ let () =
     [
       ( "roundtrip",
         qcheck_wrap [test_operation Alpha_context.Operation.encoding] );
-      ( "legacy : roundtrip",
-        qcheck_wrap
-          [
-            test_operation
-              Alpha_context.Operation.encoding_with_legacy_attestation_name;
-          ] );
     ]

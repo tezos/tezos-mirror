@@ -45,6 +45,8 @@ type level = Debug | Info | Notice | Warning | Error | Fatal
 
 (** Module to manipulate values of type {!level}.  *)
 module Level : sig
+  exception Not_a_level of string
+
   (** Alias of {!level}. *)
   type t = level
 
@@ -53,7 +55,14 @@ module Level : sig
 
   val to_string : t -> string
 
-  val of_string : string -> t option
+  (** [opt_to_string o] will return [to_string o] if [t] is [Some o] and ["none"] otherwise  *)
+  val opt_to_string : t option -> string
+
+  (** [of_string_exn s] will
+      - return [Some level] if [s] represents a {!level},
+      - return [None] if [s] is ["none"]
+      - raise Not_a_level if [s] is not a proper level *)
+  val of_string_exn : string -> t option
 
   val encoding : t Data_encoding.t
 
@@ -88,6 +97,10 @@ val get_registered_sections : unit -> string Seq.t
 
 val register_section : Section.t -> unit
 
+(** Alternative colors usable in console logs. Yellow and Red are already used
+  for Warning/alerts log levels*)
+type alternative_color = Magenta | Cyan | Green | Blue
+
 (** Parameters defining an inspectable type of events. *)
 module type EVENT_DEFINITION = sig
   type t
@@ -118,6 +131,8 @@ module type EVENT_DEFINITION = sig
 
   (** Return the preferred {!type-level} for a given event instance. *)
   val level : level
+
+  val alternative_color : alternative_color option
 end
 
 (** Events created with {!Make} provide the {!EVENT} API. *)
@@ -127,6 +142,10 @@ module type EVENT = sig
   (** Output an event of type {!t}, if no sinks are listening the
       function won't be applied. *)
   val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
+
+  (** Registers an event of type {!t} to be output when event sinks activate.
+      Does not output anything if called after sink activation. *)
+  val emit_at_top_level : t -> unit
 end
 
 (** Build an event from an event-definition. *)
@@ -243,6 +262,9 @@ module Simple : sig
   (** Emit an instance of an event. *)
   val emit : 'a t -> 'a -> unit Lwt.t
 
+  (** Emit an instance of an event if called at toplevel *)
+  val emit_at_top_level : 'a t -> 'a -> unit
+
   (** Emit an instance of an event but do not wait for completion. Only use if
       you really need to not wait for logging resolution before continuing. May
       cause increased memory usage and out-of-order log messages. *)
@@ -250,6 +272,7 @@ module Simple : sig
 
   (** Declare an event with no parameters. *)
   val declare_0 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -259,6 +282,7 @@ module Simple : sig
 
   (** Declare an event with one parameter. *)
   val declare_1 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -269,6 +293,7 @@ module Simple : sig
 
   (** Declare an event with two parameters. *)
   val declare_2 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -281,6 +306,7 @@ module Simple : sig
 
   (** Declare an event with three parameters. *)
   val declare_3 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -295,6 +321,7 @@ module Simple : sig
 
   (** Declare an event with four parameters. *)
   val declare_4 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -311,6 +338,7 @@ module Simple : sig
 
   (** Declare an event with five parameters. *)
   val declare_5 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -329,6 +357,7 @@ module Simple : sig
 
   (** Declare an event with six parameters. *)
   val declare_6 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -349,6 +378,7 @@ module Simple : sig
 
   (** Declare an event with seven parameters. *)
   val declare_7 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->
@@ -371,6 +401,7 @@ module Simple : sig
 
   (** Declare an event with eight parameters. *)
   val declare_8 :
+    ?alternative_color:alternative_color ->
     ?section:string list ->
     name:string ->
     msg:string ->

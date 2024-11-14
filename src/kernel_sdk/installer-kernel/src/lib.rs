@@ -23,6 +23,8 @@ mod instr;
 use crate::instr::read_instruction_bytes;
 use core::panic::PanicInfo;
 use instr::read_config_program_size;
+#[cfg(feature = "entrypoint")]
+use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_instr;
@@ -38,10 +40,8 @@ const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
 const AUXILIARY_CONFIG_INTERPRETATION_PATH: RefPath =
     RefPath::assert_from(b"/__installer_kernel/auxiliary/kernel/boot.wasm");
 
-#[cfg(all(feature = "entrypoint", target_arch = "wasm32"))]
-tezos_smart_rollup::kernel_entry!(installer);
-
 /// Installer.
+#[cfg_attr(feature = "entrypoint", entrypoint::main)]
 pub fn installer<Host: Runtime>(host: &mut Host) {
     if let Err(e) = install_kernel(host, KERNEL_BOOT_PATH) {
         Runtime::write_debug(host, e)

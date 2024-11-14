@@ -78,17 +78,17 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
     = function
   | Ok (Some ty) ->
       (if emacs then
-       cctxt#message
-         "@[<v 2>((entrypoint . %s) (type . %a))@]@."
-         entrypoint
-         Michelson_v1_emacs.print_expr
-         ty
-      else
-        cctxt#message
-          "@[<v 2>Entrypoint %s: %a@]@."
-          entrypoint
-          Michelson_v1_printer.print_expr
-          ty)
+         cctxt#message
+           "@[<v 2>((entrypoint . %s) (type . %a))@]@."
+           entrypoint
+           Michelson_v1_emacs.print_expr
+           ty
+       else
+         cctxt#message
+           "@[<v 2>Entrypoint %s: %a@]@."
+           entrypoint
+           Michelson_v1_printer.print_expr
+           ty)
       >>= fun () -> return_unit
   | Ok None ->
       cctxt#message
@@ -139,37 +139,37 @@ let print_entrypoints_list (cctxt : #Client_context.printer)
     ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name = function
   | Ok entrypoint_list ->
       (if emacs then
-       cctxt#message
-         "@[<v 2>(@[%a@])@."
-         (Format.pp_print_list
-            ~pp_sep:Format.pp_print_cut
-            (fun ppf (entrypoint, ty) ->
-              Format.fprintf
-                ppf
-                "@[<v 2>( ( entrypoint . %s ) ( type . @[%a@]))@]"
-                entrypoint
-                Michelson_v1_emacs.print_expr
-                ty))
-         entrypoint_list
-      else
-        cctxt#message
-          "@[<v 2>Entrypoints%a%a: @,%a@]@."
-          (Format.pp_print_option (fun ppf ->
-               Format.fprintf ppf " for contract %a" Contract.pp))
-          contract
-          (Format.pp_print_option (fun ppf ->
-               Format.fprintf ppf " for script %s"))
-          script_name
-          (Format.pp_print_list
-             ~pp_sep:Format.pp_print_cut
-             (fun ppf (entrypoint, ty) ->
-               Format.fprintf
-                 ppf
-                 "@[<v 2>%s: @[%a@]@]"
-                 entrypoint
-                 Michelson_v1_printer.print_expr
-                 ty))
-          entrypoint_list)
+         cctxt#message
+           "@[<v 2>(@[%a@])@."
+           (Format.pp_print_list
+              ~pp_sep:Format.pp_print_cut
+              (fun ppf (entrypoint, ty) ->
+                Format.fprintf
+                  ppf
+                  "@[<v 2>( ( entrypoint . %s ) ( type . @[%a@]))@]"
+                  entrypoint
+                  Michelson_v1_emacs.print_expr
+                  ty))
+           entrypoint_list
+       else
+         cctxt#message
+           "@[<v 2>Entrypoints%a%a: @,%a@]@."
+           (Format.pp_print_option (fun ppf ->
+                Format.fprintf ppf " for contract %a" Contract.pp))
+           contract
+           (Format.pp_print_option (fun ppf ->
+                Format.fprintf ppf " for script %s"))
+           script_name
+           (Format.pp_print_list
+              ~pp_sep:Format.pp_print_cut
+              (fun ppf (entrypoint, ty) ->
+                Format.fprintf
+                  ppf
+                  "@[<v 2>%s: @[%a@]@]"
+                  entrypoint
+                  Michelson_v1_printer.print_expr
+                  ty))
+           entrypoint_list)
       >>= fun () -> return_unit
   | Error errs -> on_errors errs
 
@@ -177,40 +177,40 @@ let print_unreachables (cctxt : #Client_context.printer)
     ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name = function
   | Ok unreachable ->
       (if emacs then
-       cctxt#message
-         "@[<v 2>(@[%a@])@."
-         (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf path ->
-              Format.fprintf
-                ppf
-                "@[<h>( unreachable-path . %a )@]"
-                (Format.pp_print_list
-                   ~pp_sep:Format.pp_print_space
-                   (fun ppf prim ->
-                     Format.pp_print_string ppf
-                     @@ Michelson_v1_primitives.string_of_prim prim))
-                path))
-         unreachable
-      else
-        match unreachable with
-        | [] -> cctxt#message "@[<v 2>None.@]@."
-        | _ ->
-            cctxt#message
-              "@[<v 2>Unreachable paths in the argument%a%a: @[%a@]@."
-              (Format.pp_print_option (fun ppf ->
-                   Format.fprintf ppf " of contract %a" Contract.pp))
-              contract
-              (Format.pp_print_option (fun ppf ->
-                   Format.fprintf ppf " of script %s"))
-              script_name
-              (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf ->
-                   Format.fprintf
-                     ppf
-                     "@[<h> %a @]"
-                     (Format.pp_print_list
-                        ~pp_sep:(fun ppf _ -> Format.pp_print_string ppf "/")
-                        (fun ppf prim ->
-                          Format.pp_print_string ppf
-                          @@ Michelson_v1_primitives.string_of_prim prim))))
-              unreachable)
+         cctxt#message
+           "@[<v 2>(@[%a@])@."
+           (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf path ->
+                Format.fprintf
+                  ppf
+                  "@[<h>( unreachable-path . %a )@]"
+                  (Format.pp_print_list
+                     ~pp_sep:Format.pp_print_space
+                     (fun ppf prim ->
+                       Format.pp_print_string ppf
+                       @@ Michelson_v1_primitives.string_of_prim prim))
+                  path))
+           unreachable
+       else
+         match unreachable with
+         | [] -> cctxt#message "@[<v 2>None.@]@."
+         | _ ->
+             cctxt#message
+               "@[<v 2>Unreachable paths in the argument%a%a: @[%a@]@."
+               (Format.pp_print_option (fun ppf ->
+                    Format.fprintf ppf " of contract %a" Contract.pp))
+               contract
+               (Format.pp_print_option (fun ppf ->
+                    Format.fprintf ppf " of script %s"))
+               script_name
+               (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf ->
+                    Format.fprintf
+                      ppf
+                      "@[<h> %a @]"
+                      (Format.pp_print_list
+                         ~pp_sep:(fun ppf _ -> Format.pp_print_string ppf "/")
+                         (fun ppf prim ->
+                           Format.pp_print_string ppf
+                           @@ Michelson_v1_primitives.string_of_prim prim))))
+               unreachable)
       >>= fun () -> return_unit
   | Error errs -> on_errors errs

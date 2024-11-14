@@ -6,8 +6,9 @@
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
 const fs = require('fs');
+const path = require('node:path')
 const RUN_TRANSACTION_OVERHEAD = 560_000
-const OUTPUT = 'tick_per_gas.png'
+const filename = 'tick_per_gas.png'
 
 module.exports = { process_record, draw_tick_per_gas, init_graphs }
 
@@ -46,7 +47,8 @@ function add_data(record, dataset) {
     dataset.push({ x: record.run_transaction_ticks, y: record.gas_cost, r: radius(record) })
 }
 
-async function draw_tick_per_gas(infos) {
+async function draw_tick_per_gas(infos, dirname) {
+    let filepath = path.format({ dir: dirname, base:filename})
     const width = 1000; //px
     const height = 1000; //px
     const backgroundColour = 'white'; // Uses https://www.w3schools.com/tags/canvas_fillstyle.asp
@@ -72,8 +74,8 @@ async function draw_tick_per_gas(infos) {
         }
     }
     const buffer = await chartJSNodeCanvas.renderToBuffer(configuration);
-    fs.writeFileSync(OUTPUT, buffer, 'base64');
-    console.info(`Output graph ${OUTPUT}`)
+    fs.writeFileSync(filepath, buffer, 'base64');
+    console.info(`Output graph ${filepath}`)
 }
 
 function radius(record) {

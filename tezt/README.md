@@ -17,9 +17,6 @@ interface files (suffix `mli`). Both APIs are also available online at
 
 This directory contains the following subdirectories:
 
-- `lib` defines an OCaml library named `tezt` which contains the test
-  framework. It is independent from Octez and from the Tezos protocols.
-
 - `lib_tezos` defines another OCaml library named `tezt-tezos` which
   is specific to Octez, complementing the above with Octez-specific
   features.
@@ -54,7 +51,7 @@ This directory contains the following subdirectories:
 
 - `snoop` defines an OCaml executable that performs benchmarks for gas.
 
-- `_regressions` defines a set of output expected from a call to an
+- `tests/expected/` defines a set of output expected from a call to an
   RPC or from some OCaml value serialized to JSON. If a file
   is added into this repository, it should be also added in the
   regression test which can be either `tests/RPC_test.ml` or

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,6 +31,8 @@ type repo
 
 (** The type of trees stored in the context, i.e. the actual data. *)
 type tree
+
+type mut_state = tree ref
 
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
@@ -61,7 +64,7 @@ module Tree :
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!type:commit} hash. *)
-type hash = Context_hash.t
+type hash
 
 (** The type of commits for the context. *)
 type commit
@@ -70,10 +73,16 @@ val impl_name : string
 
 val equality_witness : (repo, tree) Context_sigs.equality_witness
 
+val from_imm : tree -> mut_state
+
+val to_imm : mut_state -> tree
+
 (** [load cache_size path] initializes from disk a context from [path].
     [cache_size] allows to change the LRU cache size of Irmin
     (100_000 by default at irmin-pack/config.ml *)
 val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
+
+val reload : ro_index -> unit
 
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index
@@ -121,6 +130,10 @@ val gc :
     if a GC is running for [index]. *)
 val is_gc_finished : [> `Write] index -> bool
 
+(** [cancel_gc index] stops the Irmin GC if it is currently running for
+    [index]. It returns [true] if a GC was canceled. *)
+val cancel_gc : [> `Write] index -> bool
+
 (** [wait_gc_completion index] will return a blocking thread if a
     GC run is currently ongoing. *)
 val wait_gc_completion : [> `Write] index -> unit Lwt.t
@@ -134,6 +147,10 @@ val wait_gc_completion : [> `Write] index -> unit Lwt.t
     Note: there is no associated [import_snapshot] function as the import
     consist in copying the exported Irmin store. *)
 val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
+
+val context_hash_of_hash : hash -> Smart_rollup_context_hash.t
+
+val hash_of_context_hash : Smart_rollup_context_hash.t -> hash
 
 (** Module for generating and verifying proofs for a context *)
 module Proof (Hash : sig

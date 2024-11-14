@@ -6,5 +6,4 @@
  (public_name octez-alcotezt)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezt.core)
- (js_of_ocaml))
+  tezt.core))

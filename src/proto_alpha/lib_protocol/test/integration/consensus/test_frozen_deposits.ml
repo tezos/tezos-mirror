@@ -478,7 +478,7 @@ let test_cannot_bake_with_zero_deposits_limit () =
   (* N.B. there is no non-zero frozen deposits value for which one cannot bake:
      even with a small deposit one can still bake, though with a smaller probability
      (because the frozen deposits value impacts the active stake and the active
-     stake is the one used to determine baking/endorsing rights. *)
+     stake is the one used to determine baking/attesting rights. *)
   let* operation =
     Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
   in
@@ -675,7 +675,7 @@ let test_deposits_unfrozen_after_deactivation () =
           ~loc:__LOC__
           frozen_deposits
           (if is_deactivated then frozen_deposits_when_deactivated
-          else initial_frozen_deposits)
+           else initial_frozen_deposits)
       in
       loop b (pred n)
   in

@@ -52,6 +52,8 @@ module Attempt_logging = Internal_event.Make (struct
       text
 
   let level = Internal_event.Error
+
+  let alternative_color = None
 end)
 
 module RetryClient :
@@ -60,25 +62,39 @@ module RetryClient :
 
   let clone_body = function `Stream s -> `Stream (Lwt_stream.clone s) | x -> x
 
-  let call ?ctx ?headers ?body ?chunked meth uri =
+  let call_with_closefn ?ctx ?headers ?body ?chunked meth uri =
     let rec call_and_retry_on_502 attempt delay =
       let open Lwt_syntax in
-      let* response, ansbody =
-        Cohttp_lwt_unix.Client.call ?ctx ?headers ?body ?chunked meth uri
+      let* res, closefn =
+        Cohttp_lwt_unix.Client.call_with_closefn
+          ?ctx
+          ?headers
+          ?body
+          ?chunked
+          meth
+          uri
       in
+      let* response, ansbody = res in
       let status = Cohttp.Response.status response in
       match status with
       | `Bad_gateway ->
           let log_ansbody = clone_body ansbody in
           let* text = Cohttp_lwt.Body.to_string log_ansbody in
           let* _ = Attempt_logging.emit {attempt; delay; text} in
-          if attempt >= 10 then return (response, ansbody)
+          if attempt >= 10 then return (res, closefn)
           else
             let* () = Lwt_unix.sleep delay in
             call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
-      | _ -> return (response, ansbody)
+      | _ -> return (res, closefn)
     in
     call_and_retry_on_502 1 0.
+
+  let call ?ctx ?headers ?body ?chunked meth uri =
+    let open Lwt_syntax in
+    let* res, _closefn =
+      call_with_closefn ?ctx ?headers ?body ?chunked meth uri
+    in
+    res
 end
 
 include RPC_client.Make (Resto_cohttp_client.Client.OfCohttp (RetryClient))

@@ -64,6 +64,7 @@ let proto_name : Tezos_scoru_wasm.Pvm_input_kind.protocol -> string = function
   | Oxford -> "Oxford"
   | ParisB -> "ParisB"
   | ParisC -> "ParisC"
+  | Quebec -> "Quebec"
   | Proto_alpha -> "Proto_alpha"
 
 let tests =
@@ -74,7 +75,7 @@ let tests =
          If you end up here because of this, please add a protocol migration
          test for you new version. *)
       (match from_version with
-      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 -> ()) ;
+      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 | V5 | V6 -> ()) ;
       tztest
         (sf
            "protocol migration message handling by the WASM PVM (%s)"
@@ -85,7 +86,8 @@ let tests =
            ~to_version
            ~after_protocol_activation:protocol))
     [
-      (V2, V4, Proto_alpha);
+      (V4, V5, Proto_alpha);
+      (V4, V5, Quebec);
       (V2, V4, ParisB);
       (V2, V4, ParisC);
       (V1, V2, Oxford);

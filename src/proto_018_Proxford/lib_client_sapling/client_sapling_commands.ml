@@ -398,19 +398,19 @@ let forge_shielded_cmd =
       let file = Option.value ~default:sapling_transaction_file file in
       let*! () = cctxt#message "Writing transaction to %s@." file in
       (if use_json_format then
-       save_json_to_file
-         (Data_encoding.Json.construct UTXO.transaction_encoding transaction)
-         file
-      else
-        let bytes =
-          Hex.of_bytes
-            (Data_encoding.Binary.to_bytes_exn
-               UTXO.transaction_encoding
-               transaction)
-        in
-        let file = open_out_bin file in
-        Printf.fprintf file "0x%s" (Hex.show bytes) ;
-        close_out file) ;
+         save_json_to_file
+           (Data_encoding.Json.construct UTXO.transaction_encoding transaction)
+           file
+       else
+         let bytes =
+           Hex.of_bytes
+             (Data_encoding.Binary.to_bytes_exn
+                UTXO.transaction_encoding
+                transaction)
+         in
+         let file = open_out_bin file in
+         Printf.fprintf file "0x%s" (Hex.show bytes) ;
+         close_out file) ;
       return_unit)
 
 let submit_shielded_cmd =

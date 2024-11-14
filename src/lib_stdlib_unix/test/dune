@@ -11,7 +11,9 @@
   octez-libs.event-logging
   octez-libs.test-helpers
   qcheck-alcotest
-  octez-alcotezt)
+  octez-alcotezt
+  tezt-bam)
+ (preprocess (pps bam-ppx))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -40,7 +42,7 @@
  (alias runtest)
  (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

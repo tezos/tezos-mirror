@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -45,28 +45,15 @@ extern crate alloc;
 /// # #[cfg(doc)]
 /// kernel_entry!(run);
 /// ```
+#[deprecated]
 #[macro_export]
 macro_rules! kernel_entry {
     ($kernel_run: expr) => {
-        /// The `kernel_run` function is called by the wasm host at regular intervals.
-        #[cfg(target_arch = "wasm32")]
-        #[no_mangle]
-        pub extern "C" fn kernel_run() {
-            $crate::set_panic_hook();
-            use $crate::RollupHost;
-            let mut host = unsafe { RollupHost::new() };
-            $kernel_run(&mut host)
-        }
-
-        #[cfg(all(target_arch = "riscv64", target_os = "hermit"))]
-        pub fn main() -> ! {
-            $crate::set_panic_hook();
-            use $crate::RollupHost;
-            let mut host = unsafe { RollupHost::new() };
-            loop {
-                // TODO #6727: Capture and recover panics.
-                $kernel_run(&mut host);
-            }
+        #[tezos_smart_rollup::entrypoint::main]
+        fn __tezos_wrapper_kernel_entrypoint(
+            host: &mut impl tezos_smart_rollup::prelude::Runtime,
+        ) {
+            $kernel_run(host);
         }
     };
 }
@@ -80,3 +67,10 @@ pub(crate) mod host;
 #[doc(hidden)]
 #[cfg(feature = "experimental-host-in-memory-store")]
 pub use host::RollupHostWithInMemoryStorage as RollupHost;
+
+mod kernel_entrypoint;
+mod panic_protection;
+
+#[doc(hidden)]
+#[allow(unused_imports)]
+pub use kernel_entrypoint::*;

@@ -108,13 +108,27 @@ type connection_status =
   | Connected of connection_info
   | Connecting of connection_info Lwt_condition.t
 
+(** Cache structure for predecessors. *)
+module Precessor_cache = struct
+  include
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
+
+  type nonrec t = Block_hash.t t
+
+  let max_cached = 65536 (* 2MB *)
+
+  let create () = create max_cached
+end
+
 type t = {
   name : string;
+  chain : Tezos_shell_services.Chain_services.chain;
   protocols : Protocol_hash.t list option;
   reconnection_delay : float;
-  cctxt : Client_context.full;
+  cctxt : Tezos_rpc.Context.generic;
   mutable last_seen : (Block_hash.t * Block_header.t) option;
   mutable status : connection_status;
+  cache : Precessor_cache.t;
 }
 
 let is_running c =
@@ -123,7 +137,8 @@ let is_running c =
   | Connected _ | Connecting _ -> true
 
 let rec do_connect ~count ~previous_status
-    ({name; protocols; reconnection_delay = delay; cctxt; _} as l1_ctxt) =
+    ({name; protocols; reconnection_delay = delay; cctxt; chain; _} as l1_ctxt)
+    =
   assert (match l1_ctxt.status with Connecting _ -> true | _ -> false) ;
   let open Lwt_syntax in
   let* () =
@@ -143,10 +158,18 @@ let rec do_connect ~count ~previous_status
       Lwt_unix.sleep delay
   in
   let* res =
-    Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
+    Tezos_shell_services.Monitor_services.heads ?protocols cctxt chain
   in
   match res with
   | Ok (heads, stopper) ->
+      let heads =
+        Lwt_stream.map
+          (fun ((hash, Tezos_base.Block_header.{shell = {predecessor; _}; _}) as
+                head) ->
+            Precessor_cache.replace l1_ctxt.cache hash predecessor ;
+            head)
+          heads
+      in
       let consumer =
         Lwt_stream.iter_s
           (fun ((hash, Tezos_base.Block_header.{shell = {level; _}; _}) as head) ->
@@ -190,20 +213,22 @@ let connect l1_ctxt =
       Lwt_condition.wait c
   | Disconnected -> do_connect l1_ctxt
 
-let create ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
+let create ~name ~chain ~reconnection_delay ?protocols cctxt =
   {
     name;
-    cctxt = (cctxt :> Client_context.full);
+    chain;
+    cctxt;
     reconnection_delay;
     protocols;
     last_seen = None;
     status = Disconnected;
+    cache = Precessor_cache.create ();
   }
 
-let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
+let start ~name ~chain ~reconnection_delay ?protocols cctxt =
   let open Lwt_syntax in
   let* () = Layer1_event.starting ~name in
-  let l1_ctxt = create ~name ~reconnection_delay ?protocols cctxt in
+  let l1_ctxt = create ~name ~chain ~reconnection_delay ?protocols cctxt in
   let* (_ : connection_info) = connect l1_ctxt in
   return l1_ctxt
 
@@ -353,6 +378,12 @@ let wait_first l1_ctxt =
 
 let get_latest_head l1_ctxt = l1_ctxt.last_seen
 
+let get_status l1_ctxt =
+  match l1_ctxt.status with
+  | Connected _ -> `Connected
+  | Connecting _ -> `Reconnecting
+  | Disconnected -> `Disconnected
+
 (** [predecessors_of_blocks hashes] given a list of successive block hashes,
     from newest to oldest, returns an associative list that associates a hash to
     its predecessor in this list. *)
@@ -360,56 +391,54 @@ let predecessors_of_blocks hashes =
   let rec aux next = function [] -> [] | x :: xs -> (next, x) :: aux x xs in
   match hashes with [] -> [] | x :: xs -> aux x xs
 
-(** [get_predecessor block_hash] returns the predecessor block hash of
-    some [block_hash] through an RPC to the Tezos node. To limit the
-    number of RPCs, this information is requested for a batch of hashes
-    and cached locally. *)
-let get_predecessor =
-  let max_cached = 65536 in
-  let hard_max_read = max_cached in
-  (* 2MB *)
-  let module HM =
-    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
-  in
-  let cache = HM.create max_cached in
-  fun ~max_read
-      cctxt
-      (chain : Tezos_shell_services.Chain_services.chain)
-      ancestor ->
-    let open Lwt_result_syntax in
-    (* Don't read more than the hard limit in one RPC call. *)
-    let max_read = min max_read hard_max_read in
-    (* But read at least two because the RPC also returns the head. *)
-    let max_read = max max_read 2 in
-    match HM.find_opt cache ancestor with
-    | Some pred -> return_some pred
-    | None -> (
-        let* blocks =
-          Tezos_shell_services.Chain_services.Blocks.list
-            cctxt
-            ~chain
-            ~heads:[ancestor]
-            ~length:max_read
-            ()
-        in
-        match blocks with
-        | [ancestors] -> (
-            List.iter
-              (fun (h, p) -> HM.replace cache h p)
-              (predecessors_of_blocks ancestors) ;
-            match HM.find_opt cache ancestor with
-            | None ->
-                (* This could happen if ancestors was empty, but it shouldn't be. *)
-                return_none
-            | Some predecessor -> return_some predecessor)
-        | _ -> return_none)
+(** [get_predecessor ~max_read state block_hash] returns the predecessor block
+    hash of some [block_hash] through an RPC to the Tezos node. To limit the
+    number of RPCs, this information is requested for a batch of hashes (of size
+    [max_read]) and cached locally. *)
+let get_predecessor ~max_read state ancestor =
+  let open Lwt_result_syntax in
+  (* Don't read more than the hard limit in one RPC call. *)
+  let max_read = min max_read Precessor_cache.max_cached in
+  (* But read at least two because the RPC also returns the head. *)
+  let max_read = max max_read 2 in
+  match Precessor_cache.find_opt state.cache ancestor with
+  | Some pred -> return_some pred
+  | None -> (
+      let* blocks =
+        Tezos_shell_services.Chain_services.Blocks.list
+          state.cctxt
+          ~chain:state.chain
+          ~heads:[ancestor]
+          ~length:max_read
+          ()
+      in
+      match blocks with
+      | [ancestors] -> (
+          List.iter
+            (fun (h, p) -> Precessor_cache.replace state.cache h p)
+            (predecessors_of_blocks ancestors) ;
+          match Precessor_cache.find_opt state.cache ancestor with
+          | None ->
+              (* This could happen if ancestors was empty, but it shouldn't
+                 be. *)
+              let* pred =
+                Tezos_shell_services.Chain_services.Blocks.hash
+                  state.cctxt
+                  ~chain:state.chain
+                  ~block:(`Hash (ancestor, 1))
+                  ()
+              in
+              Precessor_cache.replace state.cache ancestor pred ;
+              return_some pred
+          | Some predecessor -> return_some predecessor)
+      | _ -> return_none)
 
 let get_predecessor_opt ?(max_read = 8) state (hash, level) =
   let open Lwt_result_syntax in
   if level = 0l then return_none
   else
     let level = Int32.pred level in
-    let+ hash = get_predecessor ~max_read state.cctxt state.cctxt#chain hash in
+    let+ hash = get_predecessor ~max_read state hash in
     Option.map (fun hash -> (hash, level)) hash
 
 let get_predecessor ?max_read state ((hash, _) as head) =
@@ -506,13 +535,24 @@ module Internal_for_tests = struct
   let dummy cctxt =
     {
       name = "dummy_layer_1_for_tests";
+      chain = `Main;
       reconnection_delay = 5.0;
-      cctxt = (cctxt :> Client_context.full);
+      cctxt;
       protocols = None;
       last_seen = None;
       status = Disconnected;
+      cache = Precessor_cache.create ();
     }
 end
+
+let timeout_promise service timeout =
+  let open Lwt_syntax in
+  let* () = Lwt_unix.sleep timeout in
+  let path = Tezos_rpc.(Service.Internal.to_service service).path in
+  let path =
+    Tezos_rpc.Service.Internal.from_path path |> Tezos_rpc.Path.to_string
+  in
+  Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
 
 let client_context_with_timeout (obj : #Client_context.full) timeout :
     Client_context.full =
@@ -528,16 +568,33 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
           'i ->
           'o tzresult Lwt.t =
       fun service params query body ->
-        let timeout_promise =
-          let* () = Lwt_unix.sleep timeout in
-          let path = Tezos_rpc.(Service.Internal.to_service service).path in
-          let path =
-            Tezos_rpc.Service.Internal.from_path path
-            |> Tezos_rpc.Path.to_string
-          in
-          Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
-        in
-        Lwt.pick [obj#call_service service params query body; timeout_promise]
+        Lwt.pick
+          [
+            obj#call_service service params query body;
+            timeout_promise service timeout;
+          ]
+
+    method! call_streamed_service
+        : 'm 'p 'q 'i 'o.
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
+          (unit -> unit) tzresult Lwt.t =
+      fun service ~on_chunk ~on_close params query body ->
+        Lwt.pick
+          [
+            obj#call_streamed_service
+              service
+              ~on_chunk
+              ~on_close
+              params
+              query
+              body;
+            timeout_promise service timeout;
+          ]
 
     method! generic_media_type_call meth ?body uri =
       let timeout_promise =

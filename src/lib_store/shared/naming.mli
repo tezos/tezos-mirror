@@ -77,7 +77,12 @@ val chain_dir :
 
 val lockfile : [`Chain_dir] directory -> [`Lockfile] file
 
+val block_store_lockfile : [`Chain_dir] directory -> [`Lockfile] file
+
 val gc_lockfile : [`Chain_dir] directory -> [`Gc_lockfile] file
+
+val stored_data_lockfile :
+  [`Chain_dir] directory -> [`Stored_data_lockfile] file
 
 val reconstruction_lock_file :
   [`Chain_dir] directory -> [`Reconstruction_lockfile] file
@@ -93,12 +98,6 @@ val protocol_levels_file :
   [< `Chain_dir] directory ->
   ( [`Protocol_levels],
     Protocol_levels.protocol_info Protocol_levels.t )
-  encoded_file
-
-val legacy_protocol_levels_file :
-  [< `Chain_dir] directory ->
-  ( [`Protocol_levels],
-    Protocol_levels.Legacy.activation_block Protocol_levels.Legacy.t )
   encoded_file
 
 val genesis_block_file :

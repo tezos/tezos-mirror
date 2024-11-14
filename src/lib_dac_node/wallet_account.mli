@@ -52,7 +52,7 @@ module Committee_member : sig
       committee members. *)
   type t = {
     public_key_hash : Tezos_crypto.Aggregate_signature.public_key_hash;
-    secret_key_uri : Client_keys.aggregate_sk_uri;
+    secret_key_uri : Client_keys.sk_uri;
   }
 
   (** [of_committee_member_address pkh wallet_cctxt] constructs a value of

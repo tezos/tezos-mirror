@@ -57,7 +57,12 @@ module Automaton_config :
   module Subconfig = struct
     module Peer = Types.Peer
     module Topic = Types.Topic
-    module Message_id = Types.Message_id
+
+    module Message_id = struct
+      include Types.Message_id
+
+      let valid message_id = message_valid ~message_id ()
+    end
 
     module Message = struct
       include Types.Message

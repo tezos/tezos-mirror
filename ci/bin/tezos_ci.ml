@@ -1,14 +1,24 @@
 open Gitlab_ci.Util
 
+let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
+
 module Cli = struct
+  type action = Write | List_pipelines
+
   type config = {
     mutable verbose : bool;
     mutable inline_source_info : bool;
     mutable remove_extra_files : bool;
+    mutable action : action;
   }
 
   let config =
-    {verbose = false; inline_source_info = false; remove_extra_files = false}
+    {
+      verbose = false;
+      inline_source_info = false;
+      remove_extra_files = false;
+      action = Write;
+    }
 
   let verbose fmt =
     Format.kasprintf (if config.verbose then print_endline else fun _ -> ()) fmt
@@ -30,7 +40,7 @@ module Cli = struct
         [
           ( "--verbose",
             Arg.Unit (fun () -> config.verbose <- true),
-            " Show debug output, including the location of each generated job.."
+            " Show debug output, including the location of each generated job."
           );
           ( "--inline-source-info",
             Arg.Unit (fun () -> config.inline_source_info <- true),
@@ -38,6 +48,9 @@ module Cli = struct
           ( "--remove-extra-files",
             Arg.Unit (fun () -> config.remove_extra_files <- true),
             " Remove files that are neither generated nor excluded." );
+          ( "--list-pipelines",
+            Arg.Unit (fun () -> config.action <- List_pipelines),
+            " List registered pipelines." );
         ]
     in
     Arg.parse
@@ -48,14 +61,46 @@ module Cli = struct
       (sf "Usage: %s [options]\n\nOptions are:" Sys.argv.(0))
 end
 
-type tezos_job = {
-  job : Gitlab_ci.Types.job;
+module Stage = struct
+  type t = Stage of {name : string; index : int}
+
+  let stages : t list ref = ref []
+
+  let register name =
+    let stage = Stage {name; index = List.length !stages} in
+    if
+      List.exists
+        (fun (Stage {name = name'; index = _}) -> name' = name)
+        !stages
+    then failwith "[Stage.register] attempted to register stage %S twice" name
+    else (
+      stages := stage :: !stages ;
+      stage)
+
+  let name (Stage {name; index = _}) = name
+
+  let index (Stage {name = _; index}) = index
+end
+
+type tezos_image =
+  | Internal of {
+      image : Gitlab_ci.Types.image;
+      builder_amd64 : tezos_job;
+      builder_arm64 : tezos_job option;
+    }
+  | External of Gitlab_ci.Types.image
+
+and tezos_job = {
+  job : Gitlab_ci.Types.generic_job;
   source_position : string * int * int * int;
+  stage : Stage.t;
+  image_builders : tezos_job list;
 }
 
-let map_job (tezos_job : tezos_job)
-    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
-  {tezos_job with job = f tezos_job.job}
+let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
+  match generic_job with Job {name; _} | Trigger_job {name; _} -> name
+
+let name_of_tezos_job tezos_job = name_of_generic_job tezos_job.job
 
 let tezos_job_to_config_elements (j : tezos_job) =
   let source_comment =
@@ -65,9 +110,7 @@ let tezos_job_to_config_elements (j : tezos_job) =
       [Gitlab_ci.Types.Comment source_info]
     else []
   in
-  source_comment @ [Gitlab_ci.Types.Job j.job]
-
-let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
+  source_comment @ [Gitlab_ci.Types.Generic_job j.job]
 
 let header =
   {|# This file was automatically generated, do not edit.
@@ -75,208 +118,427 @@ let header =
 
 |}
 
-let external_files = ref String_set.empty
+let generated_files = ref String_set.empty
 
 let to_file ~filename config =
-  if String_set.mem filename !external_files then
-    failwith
-      "Attempted to write external file %s twice -- perhaps you need to set \
-       filename_suffix when using [job_external]?"
-      filename
+  if String_set.mem filename !generated_files then
+    failwith "Attempted to write file %s twice." filename
   else (
-    external_files := String_set.add filename !external_files ;
+    generated_files := String_set.add filename !generated_files ;
     Gitlab_ci.To_yaml.to_file ~header ~filename config)
 
 let () = Printexc.register_printer @@ function Failure s -> Some s | _ -> None
 
-module Stage = struct
-  type t = Stage of string
-
-  let stages : t list ref = ref []
-
-  let register name =
-    let stage = Stage name in
-    if List.mem stage !stages then
-      failwith "[Stage.register] attempted to register stage %S twice" name
-    else (
-      stages := stage :: !stages ;
-      stage)
-
-  let name (Stage name) = name
-
-  let to_string_list () = List.map name (List.rev !stages)
-end
-
 module Pipeline = struct
-  type t = {
+  type pipeline = {
     name : string;
+    description : string;
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
+    auto_cancel : Gitlab_ci.Types.auto_cancel option;
     jobs : tezos_job list;
   }
 
+  type child_pipeline = {
+    name : string;
+    description : string;
+    auto_cancel : Gitlab_ci.Types.auto_cancel option;
+    jobs : tezos_job list;
+  }
+
+  type t = Pipeline of pipeline | Child_pipeline of child_pipeline
+
   let pipelines : t list ref = ref []
 
-  let filename : name:string -> string =
+  let name = function Pipeline {name; _} | Child_pipeline {name; _} -> name
+
+  let description = function
+    | Pipeline {description; _} | Child_pipeline {description; _} -> description
+
+  let jobs = function
+    | Child_pipeline {jobs; _} -> jobs
+    | Pipeline {jobs; _} -> jobs
+
+  let set_jobs jobs = function
+    | Child_pipeline pl -> Child_pipeline {pl with jobs}
+    | Pipeline pl -> Pipeline {pl with jobs}
+
+  let path : name:string -> string =
    fun ~name -> sf ".gitlab/ci/pipelines/%s.yml" name
 
-  let register ?variables ?(jobs = []) name if_ =
-    let pipeline : t = {variables; if_; name; jobs} in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
-       check that stages have not been crossed. *)
-    if List.exists (fun {name = name'; _} -> name' = name) !pipelines then
+  let register_raw pipeline =
+    if List.exists (fun pipeline' -> name pipeline = name pipeline') !pipelines
+    then
       failwith
         "[Pipeline.register] attempted to register pipeline %S twice"
-        name
+        (name pipeline)
     else pipelines := pipeline :: !pipelines
+
+  let register ?variables ?auto_cancel ~description ~jobs name if_ =
+    register_raw
+      (Pipeline {variables; if_; name; jobs; auto_cancel; description})
+
+  let register_child ?auto_cancel ~description ~jobs name =
+    let child_pipeline = {name; jobs; auto_cancel; description} in
+    register_raw (Child_pipeline child_pipeline) ;
+    child_pipeline
 
   let all () = List.rev !pipelines
 
   (* Perform a set of static checks on the full pipeline before writing it. *)
-  let precheck {name = pipeline_name; jobs; _} =
-    let job_by_name : (string, Gitlab_ci.Types.job) Hashtbl.t =
-      Hashtbl.create 5
-    in
+  let precheck pipeline =
+    let pipeline_name = name pipeline in
+    let jobs = jobs pipeline in
+    (* TODO: Have to figure out:
+       - is it possible to have a [needs:] on a trigger job?
+       - is it possible to get artifacts from a trigger job (i.e. like from it's child pipeline?) *)
+    let job_by_name : (string, tezos_job) Hashtbl.t = Hashtbl.create 5 in
     (* Populate [job_by_name] and check that no two different jobs have the same name. *)
     List.iter
-      (fun ({job; _} : tezos_job) ->
-        match Hashtbl.find_opt job_by_name job.name with
-        | None -> Hashtbl.add job_by_name job.name job
+      (fun (job : tezos_job) ->
+        let name = name_of_tezos_job job in
+        match Hashtbl.find_opt job_by_name name with
+        | None -> Hashtbl.add job_by_name name job
         | Some _ ->
-            failwith
-              "[%s] the job '%s' is included twice"
-              pipeline_name
-              job.name)
+            failwith "[%s] the job '%s' is included twice" pipeline_name name)
       jobs ;
     (* Check usage of [needs:] & [depends:] *)
-    Fun.flip List.iter jobs @@ fun {job; _} ->
+    Fun.flip List.iter jobs @@ fun tezos_job ->
+    let job = tezos_job.job in
+    let job_name = name_of_generic_job job in
     (* Get the [needs:] / [dependencies:] of job *)
-    let opt_set l = String_set.of_list (Option.value ~default:[] l) in
     let needs =
+      let needs =
+        match job with
+        | Job {needs; _} -> needs
+        | Trigger_job {needs; _} -> needs
+      in
       (* The mandatory set of needs *)
-      job.needs |> Option.value ~default:[]
-      |> List.filter_map (fun Gitlab_ci.Types.{job; optional} ->
-             if not optional then Some job else None)
-      |> String_set.of_list
+      match needs with
+      | Some needs ->
+          Some
+            (needs
+            |> List.filter_map (fun Gitlab_ci.Types.{job; optional} ->
+                   if not optional then Some job else None)
+            |> String_set.of_list)
+      | None -> None
     in
-    let dependencies = opt_set job.dependencies in
+    let dependencies =
+      match job with
+      | Job {dependencies; _} ->
+          String_set.of_list @@ Option.value ~default:[] dependencies
+      | Trigger_job _ -> String_set.empty
+    in
+    (* Check that jobs in [needs:]/[dependencies:] jobs are defined *)
+    (let dep_needs =
+       String_set.union
+         dependencies
+         (Option.value ~default:String_set.empty needs)
+     in
+     Fun.flip String_set.iter dep_needs @@ fun need ->
+     match Hashtbl.find_opt job_by_name need with
+     | Some _needed_job ->
+         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
+            check rule implication *)
+         ()
+     | None ->
+         failwith
+           "[%s] job '%s' has a need on '%s' which is not defined in this \
+            pipeline."
+           pipeline_name
+           job_name
+           need) ;
     (* Check that dependencies are a subset of needs.
        Note: this is already enforced by the smart constructor {!job}
        defined below. Is it redundant? Nothing enforces the usage of
        this smart constructor at this point.*)
-    String_set.iter
-      (fun dependency ->
-        if not (String_set.mem dependency needs) then
-          failwith
-            "[%s] the job '%s' has a [dependency:] on '%s' which is not \
-             included in it's [need:]"
-            pipeline_name
-            job.name
-            dependency)
-      dependencies ;
-    (* Check that needed jobs (which thus includes dependencies) are defined *)
-    ( Fun.flip String_set.iter needs @@ fun need ->
-      match Hashtbl.find_opt job_by_name need with
-      | Some _needed_job ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
-             check rule implication *)
-          ()
-      | None ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
-             handle optional needs *)
-          failwith
-            "[%s] job '%s' has a need on '%s' which is not defined in this \
-             pipeline."
-            pipeline_name
-            job.name
-            need ) ;
+    (match needs with
+    | Some needs ->
+        String_set.iter
+          (fun dependency ->
+            if not (String_set.mem dependency needs) then
+              failwith
+                "[%s] the job '%s' has a [dependency:] on '%s' which is not \
+                 included in it's [need:]"
+                pipeline_name
+                job_name
+                dependency)
+          dependencies
+    | None ->
+        (* If the job has no needs, then it suffices that the dependency is in
+           an anterior stage. *)
+        String_set.iter
+          (fun dependency ->
+            (* We use [find] instead of [find_opt] *)
+            let dependency_job = Hashtbl.find job_by_name dependency in
+            if Stage.(index dependency_job.stage >= index tezos_job.stage) then
+              failwith
+                "[%s] the job '%s' has a [dependency:] on '%s' which is not in \
+                 an anterior stage."
+                pipeline_name
+                job_name
+                dependency)
+          dependencies) ;
     (* Check that all [dependencies:] are on jobs that produce artifacts *)
     ( Fun.flip String_set.iter dependencies @@ fun dependency ->
-      match Hashtbl.find_opt job_by_name dependency with
-      | Some {artifacts = Some {paths = Some (_ :: _); _}; _}
-      | Some {artifacts = Some {reports = Some {dotenv = Some _; _}; _}; _} ->
+      let job =
+        match Hashtbl.find_opt job_by_name dependency with
+        | Some {job; _} -> job
+        | None ->
+            (* This case is precluded by the dependency analysis above. *)
+            assert false
+      in
+      match job with
+      | Job {artifacts = Some {paths = Some (_ :: _); _}; _}
+      | Job {artifacts = Some {reports = Some {dotenv = Some _; _}; _}; _} ->
           (* This is fine: we depend on a job that define non-report artifacts, or a dotenv file. *)
           ()
-      | Some _ ->
+      | Job _ ->
           failwith
-            "[%s] the job '%s' has a [dependency:] on '%s' which produces \
-             neither regular, [paths:] artifacts or a dotenv report."
+            "[%s] the job '%s' has a [dependency:] on a job '%s' which \
+             produces neither regular, [paths:] artifacts or a dotenv report."
             pipeline_name
-            job.name
+            job_name
             dependency
-      | None ->
-          (* This case is precluded by the dependency analysis above. *)
-          assert false ) ;
-
+      | Trigger_job _ ->
+          failwith
+            "[%s] the job '%s' has a [dependency:] on a trigger job '%s', but \
+             trigger jobs cannot produce artifacts."
+            pipeline_name
+            job_name
+            dependency ) ;
     ()
 
-  let write () =
-    all ()
-    |> List.iter @@ fun ({name; jobs; _} as pipeline) ->
-       if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
-         precheck pipeline ;
-       match jobs with
-       | [] -> ()
-       | _ :: _ ->
-           let filename = filename ~name in
-           List.iter
-             (fun tezos_job ->
-               let source_file, source_line, _, _ = tezos_job.source_position in
-               Cli.verbose
-                 "%s:%d: generates '%s' for pipeline '%s' in %s"
-                 source_file
-                 source_line
-                 tezos_job.job.name
-                 name
-                 filename)
-             jobs ;
-           let config = List.concat_map tezos_job_to_config_elements jobs in
-           to_file ~filename config
+  (* Pre-process the pipeline:
 
+     - Find usage of internal images. For each internal image
+       dependency, add the appropriate builder job to the pipeline. *)
+  let add_image_builders (pipeline : t) =
+    (* Note: one job can create many different image paths.
+
+       If two different image paths are required that are built by the
+       same job, then make sure it is only include once. *)
+    let image_builders =
+      (* TODO: we currently do not support image_builders that use internal images *)
+      (* [image_builder_jobs] maps image builder job names to the actual job. *)
+      let image_builder_jobs : (string, tezos_job) Hashtbl.t =
+        Hashtbl.create 5
+      in
+      let image_dependencies =
+        List.concat_map
+          (fun {image_builders; _} -> image_builders)
+          (jobs pipeline)
+      in
+      ( Fun.flip List.iter image_dependencies @@ fun builder ->
+        let builder_name = name_of_tezos_job builder in
+        Hashtbl.replace image_builder_jobs builder_name builder ) ;
+      image_builder_jobs |> Hashtbl.to_seq_values |> List.of_seq
+    in
+    set_jobs (image_builders @ jobs pipeline) pipeline
+
+  (* Splits the set of registered non-child pipelines into workflow
+     rules and includes. Used by the function [write]. *)
   let workflow_includes () :
       Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list =
     let workflow_rule_of_pipeline = function
-      | {name; if_; variables; jobs = _} ->
-          (* Add [PIPELINE_TYPE] to the variables of the workflow rules, so
-             that it can be added to the pipeline [name] *)
+      | {name; if_; variables; auto_cancel; _} ->
+          (* Add [PIPELINE_TYPE] to the variables of the workflow
+             rules, so that it can be added to the pipeline [name] *)
           let variables =
             ("PIPELINE_TYPE", name) :: Option.value ~default:[] variables
           in
-          workflow_rule ~if_ ~variables ~when_:Always ()
+          workflow_rule ?auto_cancel ~if_ ~variables ~when_:Always ()
     in
     let include_of_pipeline = function
-      | {name; if_; variables = _; jobs = _} ->
+      | {name; if_; _} ->
           (* Note that variables associated to the pipeline are not
              set in the include rule, they are set in the workflow
              rule *)
           let rule = include_rule ~if_ ~when_:Always () in
-          Gitlab_ci.Types.{local = filename ~name; rules = [rule]}
+          Gitlab_ci.Types.{local = path ~name; rules = [rule]}
     in
-    let pipelines = all () in
+    let pipelines =
+      all ()
+      |> List.filter_map (function
+             | Pipeline pipeline -> Some pipeline
+             | Child_pipeline _ -> None)
+    in
     let workflow =
       let rules = List.map workflow_rule_of_pipeline pipelines in
-      Gitlab_ci.Types.{rules; name = Some "[$PIPELINE_TYPE] $CI_COMMIT_TITLE"}
+      Gitlab_ci.Types.
+        {
+          rules;
+          name = Some "[$PIPELINE_TYPE] $CI_COMMIT_TITLE";
+          auto_cancel = None;
+        }
     in
     let includes = List.map include_of_pipeline pipelines in
     (workflow, includes)
+
+  let write ?default ?variables ~filename () =
+    (* Write all registered the pipelines *)
+    ( Fun.flip List.iter (all ()) @@ fun pipeline ->
+      let pipeline = add_image_builders pipeline in
+      let jobs = jobs pipeline in
+      let name = name pipeline in
+      if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
+        precheck pipeline ;
+      if jobs = [] then
+        failwith "[Pipeline.write] pipeline '%s' contains no jobs!" name ;
+      let filename = path ~name in
+      List.iter
+        (fun tezos_job ->
+          let job_name = name_of_tezos_job tezos_job in
+          let source_file, source_line, _, _ = tezos_job.source_position in
+          Cli.verbose
+            "%s:%d: generates '%s' for pipeline '%s' in %s"
+            source_file
+            source_line
+            job_name
+            name
+            filename)
+        jobs ;
+      let stages =
+        let stages : (string, int) Hashtbl.t = Hashtbl.create 5 in
+        List.iter
+          (fun job ->
+            Hashtbl.replace
+              stages
+              (Stage.name job.stage)
+              (Stage.index job.stage))
+          jobs ;
+        Hashtbl.to_seq stages |> List.of_seq
+        |> List.sort (fun (_n1, idx1) (_n2, idx2) -> Int.compare idx1 idx2)
+        |> List.map fst
+      in
+      let prepend_config =
+        (match pipeline with
+        | Pipeline _ -> []
+        | Child_pipeline _ ->
+            Gitlab_ci.Types.
+              [
+                Workflow
+                  {
+                    rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
+                    name = None;
+                    auto_cancel = None;
+                  };
+              ])
+        @ [Stages stages]
+      in
+      let config =
+        prepend_config @ List.concat_map tezos_job_to_config_elements jobs
+      in
+      to_file ~filename config ) ;
+    (* Write top-level configuration. *)
+    let workflow, includes = workflow_includes () in
+    let config =
+      let open Gitlab_ci.Types in
+      (* Dummy job.
+
+         This fixes the "configuration must contain at least one
+         visible job" error in GitLab when using includes.
+
+         For more info, see: https://gitlab.com/gitlab-org/gitlab/-/issues/341693 *)
+      let job_dummy : job =
+        Gitlab_ci.Util.job
+          ~rules:[job_rule ~if_:Rules.never ()]
+          ~name:"dummy_job"
+            (* The dummy job must be included in all pipelines. However,
+               we do not know which stages are included in a given
+               pipeline. The default stage ["test"] might not
+               exist. Therefore we put it in the special [.pre] stage
+               which always exists
+               ({{:https://docs.gitlab.com/ee/ci/yaml/#stage-pre}ref}). *)
+          ~stage:".pre"
+          ~script:[{|echo "This job will never execute"|}]
+          ()
+      in
+      [Workflow workflow]
+      @ Option.fold ~none:[] ~some:(fun default -> [Default default]) default
+      @ Option.fold
+          ~none:[]
+          ~some:(fun variables -> [Variables variables])
+          variables
+      @ [Generic_job (Job job_dummy); Include includes]
+    in
+    to_file ~filename config ;
+    ()
+
+  let list_pipelines () =
+    let pipelines = all () in
+    let open Format in
+    open_vbox 0 ;
+    Printf.printf "Registered pipeline types:\n\n" ;
+    ( Fun.flip List.iter pipelines @@ fun pipeline ->
+      let pipeline = add_image_builders pipeline in
+      let jobs = jobs pipeline in
+      let name = name pipeline in
+      let filename = path ~name in
+      printf " - '%s' (%s): %d job(s)@," name filename (List.length jobs) ;
+      printf "@,@[<2>  %a@]@,@," pp_print_text (description pipeline) ) ;
+    close_box () ;
+    print_flush ()
 end
 
 module Image = struct
-  type t = Gitlab_ci.Types.image
+  type t = tezos_image
 
-  let images : t String_map.t ref = ref String_map.empty
+  (* Track image builders to avoid name collisions. *)
+  let image_builders : (string, tezos_job) Hashtbl.t = Hashtbl.create 5
 
-  let register ~name ~image_path =
-    let image : t = Image image_path in
-    if String_map.mem name !images then
-      failwith "[Image.register] attempted to register image %S twice" name
-    else (
-      images := String_map.add name image !images ;
-      image)
+  let mk_external ~image_path : t = External (Image image_path)
 
-  let name (Gitlab_ci.Types.Image name) = name
+  let mk_internal ?image_builder_arm64 ~image_builder_amd64 ~image_path () : t =
+    let image =
+      Internal
+        {
+          builder_amd64 = image_builder_amd64;
+          builder_arm64 = image_builder_arm64;
+          image = Image image_path;
+        }
+    in
+    let register_builder image_builder =
+      let builder_name = name_of_tezos_job image_builder in
+      match Hashtbl.find_opt image_builders builder_name with
+      | None -> Hashtbl.add image_builders builder_name image_builder
+      | Some image_builder' when image_builder = image_builder' -> ()
+      | Some _ ->
+          failwith
+            "The image builder '%s' for image '%s' was registered twice with \
+             differing definitions."
+            builder_name
+            image_path
+    in
+    (match
+       ( name_of_tezos_job image_builder_amd64,
+         Option.map name_of_tezos_job image_builder_arm64 )
+     with
+    | name, Some name' when name = name' ->
+        failwith
+          "The the image builders for multi-arch image '%s' must have distinct \
+           names (both are called '%s')."
+          image_path
+          name
+    | _ -> ()) ;
+    register_builder image_builder_amd64 ;
+    Option.iter register_builder image_builder_arm64 ;
+    image
 
-  let all () = String_map.bindings !images
+  let image = function Internal {image; _} | External image -> image
+end
+
+module Changeset = struct
+  type t = String_set.t
+
+  let make = String_set.of_list
+
+  let encode changeset =
+    changeset |> String_set.elements |> List.sort String.compare
+
+  let union = String_set.union
+
+  let ( @ ) = union
 end
 
 type arch = Amd64 | Arm64
@@ -285,6 +547,34 @@ let arch_to_string = function Amd64 -> "x86_64" | Arm64 -> "arm64"
 
 let arch_to_string_alt = function Amd64 -> "amd64" | Arm64 -> "arm64"
 
+let dynamic_tag_var = Gitlab_ci.Var.make "TAGS"
+
+type tag =
+  | Gcp
+  | Gcp_arm64
+  | Gcp_dev
+  | Gcp_dev_arm64
+  | Gcp_tezt
+  | Gcp_tezt_dev
+  | Aws_specific
+  | Dynamic
+
+let string_of_tag = function
+  | Gcp -> "gcp"
+  | Gcp_arm64 -> "gcp_arm64"
+  | Gcp_dev -> "gcp_dev"
+  | Gcp_dev_arm64 -> "gcp_dev_arm64"
+  | Gcp_tezt -> "gcp_tezt"
+  | Gcp_tezt_dev -> "gcp_tezt_dev"
+  | Aws_specific -> "aws_specific"
+  | Dynamic -> Gitlab_ci.Var.encode dynamic_tag_var
+
+(** The architecture of the runner associated to a tag . *)
+let arch_of_tag = function
+  | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
+  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Aws_specific -> Some Amd64
+  | Dynamic -> None
+
 type dependency =
   | Job of tezos_job
   | Optional of tezos_job
@@ -292,54 +582,15 @@ type dependency =
 
 type dependencies = Staged of tezos_job list | Dependent of dependency list
 
-type git_strategy = Fetch | Clone | No_strategy
+let dependencies_add_artifact_dependency dependencies tezos_job =
+  match dependencies with
+  | Staged jobs -> Staged (tezos_job :: jobs)
+  | Dependent dependencies -> Dependent (Artifacts tezos_job :: dependencies)
 
-let enc_git_strategy = function
-  | Fetch -> "fetch"
-  | Clone -> "clone"
-  | No_strategy -> "none"
-
-let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
-    ?interruptible ?(dependencies = Staged []) ?services ?variables ?rules
-    ?timeout ?tags ?git_strategy ?when_ ?coverage ?retry ?parallel ~__POS__
-    ~image ~stage ~name script : tezos_job =
-  (match (rules, when_) with
-  | Some _, Some _ ->
-      failwith
-        "[job] do not use [when_] and [rules] at the same time in job '%s' -- \
-         it's confusing."
-        name
-  | _ -> ()) ;
-  let tags =
-    Some
-      (match (arch, tags) with
-      | Some arch, None ->
-          [(match arch with Amd64 -> "gcp" | Arm64 -> "gcp_arm64")]
-      | None, Some tags -> tags
-      | None, None ->
-          (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
-          ["gcp"]
-      | Some _, Some _ ->
-          failwith
-            "[job] cannot specify both [arch] and [tags] at the same time in \
-             job '%s'."
-            name)
-  in
-  let stage = Some (Stage.name stage) in
-  (match (parallel : Gitlab_ci.Types.parallel option) with
-  | Some (Vector n) when n < 2 ->
-      failwith
-        "[job] the argument [parallel] must be at least 2 or omitted, in job \
-         '%s'."
-        name
-  | Some (Matrix []) ->
-      failwith
-        "[job] the argument [matrix] must be at a non empty list of variables, \
-         in job '%s'."
-        name
-  | _ -> ()) ;
+(* Resolve {!dependencies} into a pair of [needs:] and [dependencies:] *)
+let resolve_dependencies job_name dependencies =
   let needs, dependencies =
-    let name {job = {name; _}; _} = name in
+    let name = name_of_tezos_job in
     match dependencies with
     | Staged dependencies -> (None, List.map name dependencies)
     | Dependent dependencies ->
@@ -370,8 +621,99 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
         "[job] attempted to add %d [needs] to the job '%s' -- GitLab imposes a \
          limit of 50."
         (List.length needs)
+        job_name
+  | _ -> ()) ;
+  (needs, dependencies)
+
+type git_strategy = Fetch | Clone | No_strategy
+
+let enc_git_strategy = function
+  | Fetch -> "fetch"
+  | Clone -> "clone"
+  | No_strategy -> "none"
+
+let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
+    ?interruptible ?(dependencies = Staged []) ?(image_dependencies = [])
+    ?services ?variables ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
+    ?git_strategy ?coverage ?retry ?parallel ~__POS__ ~image ~stage ~name script
+    : tezos_job =
+  (* The tezos/tezos CI uses singleton tags for its runners. *)
+  let tag =
+    match (arch, tag) with
+    | Some arch, None -> ( match arch with Amd64 -> Gcp | Arm64 -> Gcp_arm64)
+    | None, Some tag -> tag
+    | None, None ->
+        (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
+        Gcp
+    | Some _, Some _ ->
+        failwith
+          "[job] cannot specify both [arch] and [tags] at the same time in job \
+           '%s'."
+          name
+  in
+  if rules == Some [] then
+    failwith "The job '%s' cannot have empty [rules]." name ;
+  let arch = if Option.is_some arch then arch else arch_of_tag tag in
+  (match (image, arch) with
+  | Internal {image = Image image_path; _}, None ->
+      failwith
+        "[job] the job '%s' has tag '%s' whose architecture is not statically \
+         known cannot use the image '%s' since it is Internal. Set a static \
+         tag or use an external image."
+        name
+        (string_of_tag tag)
+        image_path
+  | _ -> ()) ;
+  let tags = Some [string_of_tag tag] in
+  (match (parallel : Gitlab_ci.Types.parallel option) with
+  | Some (Vector n) when n < 2 ->
+      failwith
+        "[job] the argument [parallel] must be at least 2 or omitted, in job \
+         '%s'."
+        name
+  | Some (Matrix []) ->
+      failwith
+        "[job] the argument [matrix] must be at a non empty list of variables, \
+         in job '%s'."
         name
   | _ -> ()) ;
+  let image_dependencies =
+    (match image with Internal _ -> [image] | External _ -> [])
+    @ image_dependencies
+  in
+  let dependencies, image_builders =
+    (Fun.flip List.iter image_dependencies @@ function
+     | External (Image image_path) ->
+         failwith
+           "It doesn't make any sense for job %s to depend on the external \
+            image %s"
+           name
+           image_path
+     | Internal _ -> ()) ;
+    let add_builder (dependencies, image_builders) = function
+      | External _ -> (dependencies, image_builders)
+      | Internal {builder_amd64; builder_arm64; _} ->
+          let builder =
+            match (arch, builder_arm64) with
+            | Some Amd64, _ -> builder_amd64
+            | Some Arm64, Some builder_arm64 -> builder_arm64
+            | Some Arm64, None ->
+                failwith "requested arm64 image for which there is no builder"
+            | None, _ -> failwith "unknown arch"
+          in
+          let image_builders = builder :: image_builders in
+          let dependencies =
+            match dependencies with
+            | Staged artifact_dependencies ->
+                Staged (builder :: artifact_dependencies)
+            | Dependent dependencies ->
+                Dependent (Artifacts builder :: dependencies)
+          in
+          (dependencies, image_builders)
+    in
+    List.fold_left add_builder (dependencies, []) image_dependencies
+  in
+  let needs, dependencies = resolve_dependencies name dependencies in
   let variables =
     match git_strategy with
     | Some strategy ->
@@ -381,10 +723,19 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     | None -> variables
   in
   (match retry with
-  | Some retry when retry < 0 || retry > 2 ->
+  | Some Gitlab_ci.Types.{max; when_ = _} when max < 0 || max > 2 ->
       failwith
-        "Invalid [retry] value '%d' for job '%s': must be 0, 1 or 2."
-        retry
+        "Invalid [retry:max] value '%d' for job '%s': must be 0, 1 or 2."
+        max
+        name
+  | _ -> ()) ;
+  (match
+     (Sys.getenv_opt Gitlab_ci.Predefined_vars.(show gitlab_user_login), tag)
+   with
+  | Some "nomadic-margebot", (Gcp_dev | Gcp_dev_arm64) ->
+      failwith
+        "[job] Attempting to merge a CI configuration using development \
+         runners (job: %s)"
         name
   | _ -> ()) ;
   let job : Gitlab_ci.Types.job =
@@ -395,7 +746,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       artifacts;
       before_script;
       cache;
-      image = Some image;
+      image = Some (Image.image image);
       interruptible;
       needs;
       (* Note that [dependencies] is always filled, because we want to
@@ -406,61 +757,62 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       rules;
       script;
       services;
-      stage;
+      stage = Some (Stage.name stage);
       variables;
-      timeout;
+      timeout = Some timeout;
       tags;
-      when_;
+      when_ = None;
       coverage;
       retry;
       parallel;
     }
   in
-  {job; source_position = __POS__}
+  {job = Job job; source_position = __POS__; stage; image_builders}
 
-let job_external ?directory ?filename_suffix (tezos_job : tezos_job) : tezos_job
-    =
-  let job = tezos_job.job in
-  let stage =
-    match job.stage with
-    | Some stage -> stage
-    | None ->
-        (* Test is the name of the default stage in GitLab CI *)
-        "test"
-  in
-  let basename =
-    match filename_suffix with
-    | None -> tezos_job.job.name
-    | Some suffix -> job.name ^ "-" ^ suffix
-  in
-  let directory = ".gitlab/ci/jobs" // Option.value ~default:stage directory in
-  if not (Sys.file_exists directory && Sys.is_directory directory) then
+let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
+    Pipeline.
+      {name = child_pipeline_name; jobs = _; auto_cancel = _; description = _} :
+    tezos_job =
+  let job_name = "trigger:" ^ child_pipeline_name in
+  let needs, dependencies = resolve_dependencies job_name dependencies in
+  if dependencies != [] then
     failwith
-      "[job_external] attempted to write job '%s' to non-existing directory \
-       '%s'"
-      job.name
-      directory ;
-  let filename = (directory // basename) ^ ".yml" in
-  let config = tezos_job_to_config_elements tezos_job in
-  let source_file, source_line, _, _ = tezos_job.source_position in
-  Cli.verbose
-    "%s:%d: generates '%s' in %s"
-    source_file
-    source_line
-    job.name
-    filename ;
-  to_file ~filename config ;
-  tezos_job
+      "[trigger_job] trigger job '%s' has artifact-dependencies, which is not \
+       allowed by GitLab CI."
+      job_name ;
+  let trigger_job =
+    Gitlab_ci.Util.trigger_job
+      ?needs
+      ?rules
+      ~stage:(Stage.name stage)
+      ~name:job_name
+      (Pipeline.path ~name:child_pipeline_name)
+  in
+  {
+    job = Trigger_job trigger_job;
+    source_position = __POS__;
+    stage;
+    image_builders = [];
+  }
 
-let jobs_external ~path (tezos_jobs : tezos_job list) : tezos_job list =
-  let filename = sf ".gitlab/ci/jobs/%s" path in
-  let config = List.map (fun {job; _} -> Gitlab_ci.Types.Job job) tezos_jobs in
-  to_file ~filename config ;
-  tezos_jobs
+let map_non_trigger_job ?error_on_trigger (tezos_job : tezos_job)
+    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
+  match tezos_job.job with
+  | Job job -> {tezos_job with job = Job (f job)}
+  | _ -> (
+      match error_on_trigger with
+      | None -> tezos_job
+      | Some error_on_trigger -> failwith "%s" error_on_trigger)
 
 let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
     (tezos_job : tezos_job) =
-  map_job tezos_job @@ fun (job : Gitlab_ci.Types.job) ->
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[add_artifacts] attempting to add artifact to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun (job : Gitlab_ci.Types.job) ->
   match job.artifacts with
   | None ->
       {
@@ -536,7 +888,13 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
 
 let append_variables ?(allow_overwrite = false) new_variables
     (tezos_job : tezos_job) : tezos_job =
-  map_job tezos_job @@ fun job ->
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_variables] attempting to append variables to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
   let variables =
     let old_variables, new_variables =
       List.fold_left
@@ -586,13 +944,13 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
     String_set.filter (fun x -> not (exclude x)) all_files
   in
   let error_generated_and_excluded =
-    String_set.filter exclude !external_files
+    String_set.filter exclude !generated_files
   in
   String_set.iter
     (Cli.error "%s: generated but is excluded")
     error_generated_and_excluded ;
   let error_not_generated =
-    String_set.diff all_non_excluded_files !external_files
+    String_set.diff all_non_excluded_files !generated_files
   in
   String_set.iter
     (fun file ->
@@ -617,3 +975,54 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         \  rm %s"
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
+
+let append_script script tezos_job =
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_script] attempting to append script to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job -> {job with script = job.script @ script}
+
+let append_cache cache tezos_job =
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_cache] attempting to append a cache to trigger job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
+  let caches = Option.value ~default:[] job.cache in
+  {job with cache = Some (caches @ [cache])}
+
+let append_before_script script tezos_job =
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_before_script] attempting to append before_script to trigger \
+          job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
+  let before_script = Option.value ~default:[] job.before_script in
+  {job with before_script = Some (before_script @ script)}
+
+let append_after_script script tezos_job =
+  map_non_trigger_job
+    ~error_on_trigger:
+      (sf
+         "[append_after_script] attempting to append after_script to trigger \
+          job '%s'"
+         (name_of_tezos_job tezos_job))
+    tezos_job
+  @@ fun job ->
+  let after_script = Option.value ~default:[] job.after_script in
+  {job with after_script = Some (after_script @ script)}
+
+(* The reason we don't use [error_on_trigger] here is that this is intended to be
+   used with [List.map] on a whole pipeline, and it's just more convenient to
+   not have to filter out the trigger job to then put it back. *)
+let with_interruptible value tezos_job =
+  map_non_trigger_job tezos_job @@ fun job ->
+  {job with interruptible = Some value}

@@ -129,6 +129,7 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
   let* predecessor_state =
     state_of_head (module Plugin) node_ctxt ctxt predecessor
   in
+  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind predecessor_state in
   let* eval_result =
     Plugin.Pvm.Fueled.Free.eval_block_inbox
       ~fuel:(Fuel.Free.of_ticks 0L)
@@ -144,7 +145,6 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
     Delayed_write_monad.apply node_ctxt eval_result
   in
   let*! ctxt = Context.PVMState.set ctxt state in
-  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind predecessor_state in
   (* Produce events. *)
   let*! () =
     Interpreter_event.transitioned_pvm inbox_level state_hash tick num_messages
@@ -186,7 +186,9 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
   let module Plugin = (val plugin) in
   let*! tick = Plugin.Pvm.get_tick node_ctxt.kind state in
   let*! state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
-  let* messages = Messages.get node_ctxt block.header.inbox_witness in
+  let* messages =
+    Node_context.get_messages node_ctxt block.header.inbox_witness
+  in
   return
     Pvm_plugin_sig.
       {
@@ -234,35 +236,32 @@ let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
   let result_state = Delayed_write_monad.ignore result_state in
   return result_state
 
-(* The cache allows cache intermediate states of the PVM in e.g. dissections. *)
-module Tick_state_cache =
-  Aches_lwt.Lache.Make
-    (Aches.Rache.Transfer
-       (Aches.Rache.LRU)
-       (struct
-         type t = Z.t * Block_hash.t
+(* Global cache to share states between different parallel refutation games. *)
+let global_tick_state_cache =
+  Pvm_plugin_sig.make_state_cache 64 (* size of 2 dissections *)
 
-         let equal (t1, b1) (t2, b2) = Z.equal t1 t2 && Block_hash.(b1 = b2)
-
-         let hash (tick, block) = (Z.hash tick * 13) + Block_hash.hash block
-       end))
-
-let tick_state_cache = Tick_state_cache.create 64 (* size of 2 dissections *)
-
-(* Memoized version of [state_of_tick_aux]. *)
-let memo_state_of_tick_aux plugin node_ctxt ~start_state
+(* Memoized version of [state_of_tick_aux] using global cache. *)
+let global_memo_state_of_tick_aux plugin node_ctxt ~start_state
     (event : Sc_rollup_block.t) tick =
-  Tick_state_cache.bind_or_put
-    tick_state_cache
-    (tick, event.header.block_hash)
-    (fun (tick, _hash) ->
-      state_of_tick_aux plugin node_ctxt ~start_state event tick)
+  Pvm_plugin_sig.Tick_state_cache.bind_or_put
+    global_tick_state_cache
+    tick
+    (state_of_tick_aux plugin node_ctxt ~start_state event)
+    Lwt.return
+
+(* Memoized version of [state_of_tick_aux] using both global and local caches. *)
+let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
+    (event : Sc_rollup_block.t) tick =
+  Pvm_plugin_sig.Tick_state_cache.bind_or_put
+    state_cache
+    tick
+    (global_memo_state_of_tick_aux plugin node_ctxt ~start_state event)
     Lwt.return
 
 (** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
     end_state] for [tick] if [tick] happened before
     [level]. Otherwise, returns [None].*)
-let state_of_tick plugin node_ctxt ?start_state ~tick level =
+let state_of_tick plugin node_ctxt state_cache ?start_state ~tick level =
   let open Lwt_result_syntax in
   let min_level =
     match start_state with
@@ -282,6 +281,13 @@ let state_of_tick plugin node_ctxt ?start_state ~tick level =
              The failures/loser mode does not work properly when restarting
              from intermediate states. *)
           state_of_tick_aux plugin node_ctxt ~start_state:None event tick
-        else memo_state_of_tick_aux plugin node_ctxt ~start_state event tick
+        else
+          memo_state_of_tick_aux
+            plugin
+            node_ctxt
+            state_cache
+            ~start_state
+            event
+            tick
       in
       return_some result_state

@@ -7,7 +7,6 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   zarith
-  zarith_stubs_js
   bls12-381
   octez-libs.plonk
   octez-libs.crypto-dal
@@ -20,8 +19,11 @@
   octez-proto-libs.protocol-environment.structs
   octez-libs.micheline
   octez-libs.tezos-context.memory
+  octez-libs.tezos-context-brassaia.memory
   octez-l2-libs.scoru-wasm
   octez-libs.event-logging)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Plonk

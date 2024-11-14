@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 module Make (Wasm : Wasm_utils_intf.S) = struct
+  let write_debug_default = Commands.write_debug_default
+
   module Commands = Commands.Make (Wasm)
 
   let parse_binary_module name module_ =
@@ -88,12 +90,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       wrapped_tree
       tree
 
-  (* Starting point of the module after reading the kernel file: parsing,
-     typechecking and linking for safety before feeding kernel to the PVM, then
-     installation into a tree for the PVM interpreter. *)
-  let handle_module ?installer_config ?tree version binary name module_ =
+  let check_kernel ~binary ~name version module_ =
     let open Lwt_result_syntax in
-    let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
     let* ast =
       Repl_helpers.trap_exn (fun () ->
           if binary then parse_binary_module name module_
@@ -102,6 +100,15 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let* () = typecheck_module ast in
     let* () = import_pvm_host_functions ~version () in
     let* _ = link ast in
+    return_unit
+
+  (* Starting point of the module after reading the kernel file: parsing,
+     typechecking and linking for safety before feeding kernel to the PVM, then
+     installation into a tree for the PVM interpreter. *)
+  let handle_module ?installer_config ?tree version binary name module_ =
+    let open Lwt_result_syntax in
+    let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
+    let* () = check_kernel ~binary ~name version module_ in
     let*! tree =
       Wasm.initial_tree
         ~version
@@ -120,39 +127,51 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let*! tree = Wasm.eval_until_input_requested tree in
     return tree
 
+  (** [read_kernel_from_file path] returns the contents stored in [path],
+      along with a boolean hinting if the contents is expected to be binary
+      ([true]) or text ([false]). *)
+  let read_kernel_from_file kernel_path =
+    let open Lwt_result_syntax in
+    if Filename.(check_suffix kernel_path ".hex") then
+      let*! content = Repl_helpers.read_file kernel_path in
+      let*? content =
+        match Hex.to_string (`Hex content) with
+        | Some content -> Ok (content, true)
+        | None -> error_with "%S is not a valid hexadecimal file" kernel_path
+      in
+      return content
+    else
+      let*! content = Repl_helpers.read_file kernel_path in
+      let*? binary =
+        if Filename.check_suffix kernel_path ".wasm" then Ok true
+        else if Filename.check_suffix kernel_path ".wast" then Ok false
+        else error_with "Kernels should have .wasm or .wast file extension"
+      in
+      return (content, binary)
+
   let start ?installer_config ?tree version file =
     let open Lwt_result_syntax in
     let module_name = Filename.(file |> basename |> chop_extension) in
-    let* buffer, binary =
-      if Filename.(check_suffix file ".hex") then
-        let*! content = Repl_helpers.read_file file in
-        let*? content =
-          match Hex.to_string (`Hex content) with
-          | Some content -> Ok content
-          | None -> error_with "%S is not a valid hexadecimal file" file
-        in
-        return (content, true)
-      else
-        let*! content = Repl_helpers.read_file file in
-        let*? binary =
-          if Filename.check_suffix file ".wasm" then Ok true
-          else if Filename.check_suffix file ".wast" then Ok false
-          else error_with "Kernels should have .wasm or .wast file extension"
-        in
-        return (content, binary)
-    in
+    let* buffer, binary = read_kernel_from_file file in
     handle_module ?installer_config ?tree version binary module_name buffer
 
   (* REPL main loop: reads an input, does something out of it, then loops. *)
   let repl tree inboxes level config =
     let open Lwt_result_syntax in
+    let write_debug = write_debug_default config in
     let rec loop tree inboxes level =
       let*! () = Lwt_io.printf "> " in
       let*! input = Option.catch_s (fun () -> Lwt_io.read_line Lwt_io.stdin) in
       match input with
       | Some command ->
           let* ctx =
-            Commands.handle_command command config tree inboxes level
+            Commands.handle_command
+              ~write_debug
+              command
+              config
+              tree
+              inboxes
+              level
           in
           Option.fold_f
             ~none:(fun () -> return tree)
@@ -295,6 +314,14 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let open Tezos_clic in
     switch ~doc:"Hides the kernel debug messages." ~long:"no-kernel-debug" ()
 
+  let timings_file_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:"Write timed debug messages to this file"
+      ~long:"timings-file"
+      ~placeholder:"timings.log"
+      (Tezos_clic.parameter (fun _ -> Lwt_result.return))
+
   let flamecharts_directory_arg =
     let open Tezos_clic in
     arg
@@ -326,7 +353,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
 
   let global_options =
     Tezos_clic.(
-      args10
+      args11
         wasm_arg
         input_arg
         rollup_arg
@@ -336,7 +363,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         no_kernel_debug_flag
         plugins_arg
         installer_config_arg
-        flamecharts_directory_arg)
+        flamecharts_directory_arg
+        timings_file_arg)
 
   let handle_plugin_file f =
     try Dynlink.loadfile f with
@@ -360,7 +388,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
              no_kernel_debug_flag,
              plugins,
              installer_config,
-             flamecharts_directory ),
+             flamecharts_directory,
+             timings_file ),
            _ ) =
       Tezos_clic.parse_global_options global_options () args
     in
@@ -376,6 +405,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         ?preimage_directory
         ?dal_pages_directory
         ?flamecharts_directory
+        ?timings_file
         ~kernel_debug:(not no_kernel_debug_flag)
         ()
     in

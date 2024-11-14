@@ -140,13 +140,13 @@ let check_samples protocols =
   protocol_sample "operation" ;
   protocol_sample
     ~title:"operation_with_legacy"
-    ~supports:Protocol.(From_protocol 19)
+    ~supports:Protocol.(Between_protocols (number ParisC, number ParisC))
     "operation_with_legacy_attestation_name" ;
   protocol_sample "operation.raw" ;
   protocol_sample "operation.unsigned" ;
   protocol_sample
     ~title:"operation_with_legacy.unsigned"
-    ~supports:Protocol.(From_protocol 19)
+    ~supports:Protocol.(Between_protocols (number ParisC, number ParisC))
     "operation_with_legacy_attestation_name.unsigned" ;
   protocol_sample "period" ;
   protocol_sample "raw_level" ;

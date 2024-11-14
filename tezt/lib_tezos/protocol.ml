@@ -25,13 +25,13 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = ParisB | ParisC | Alpha
+type t = Quebec | ParisC | Alpha
 
-let all = [ParisB; ParisC; Alpha]
+let all = [Quebec; ParisC; Alpha]
 
 let encoding =
   Data_encoding.string_enum
-    [("parisb", ParisB); ("parisc", ParisC); ("alpha", Alpha)]
+    [("parisc", ParisC); ("alpha", Alpha); ("quebec", Quebec)]
 
 type constants =
   | Constants_sandbox
@@ -45,13 +45,13 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | ParisB -> "Parisb" | ParisC -> "Parisc"
+let name = function Alpha -> "Alpha" | Quebec -> "Quebec" | ParisC -> "Parisc"
 
-let number = function ParisB -> 019 | ParisC -> 020 | Alpha -> 021
+let number = function ParisC -> 020 | Quebec -> 021 | Alpha -> 022
 
 let directory = function
+  | Quebec -> "proto_021_PsQuebec"
   | Alpha -> "proto_alpha"
-  | ParisB -> "proto_019_PtParisB"
   | ParisC -> "proto_020_PsParisC"
 
 (* Test tags must be lowercase. *)
@@ -59,8 +59,9 @@ let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | ParisB -> "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ"
   | ParisC -> "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
+  | Quebec -> "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+(* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -84,6 +85,7 @@ let protocol_dependent_uses ~tag ~path =
     Uses.make
       ~tag:(tag ^ String.lowercase_ascii protocol)
       ~path:(path ^ protocol)
+      ()
   in
   (* Make sure [Uses.lookup] knows about all executables even before tests
      actually registers themselves. *)
@@ -254,7 +256,7 @@ let write_parameter_file :
             [
               `String
                 (if is_revealed then account.public_key
-                else account.public_key_hash);
+                 else account.public_key_hash);
               `String
                 (string_of_int
                    (Option.value ~default:4000000000000 default_balance));
@@ -270,9 +272,9 @@ let write_parameter_file :
   Lwt.return output_file
 
 let previous_protocol = function
-  | Alpha -> Some ParisB
-  | ParisC -> Some ParisB
-  | ParisB -> None
+  | Alpha -> Some Quebec
+  | Quebec -> Some ParisC
+  | ParisC -> None
 
 let has_predecessor p = previous_protocol p <> None
 
@@ -325,14 +327,28 @@ let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
-let add_to_test_parameters protocol title tags uses =
+let add_to_test_parameters ?(additional_tags = fun _ -> []) protocol title tags
+    uses =
   let uses = match uses with None -> [] | Some uses -> uses protocol in
-  (name protocol ^ ": " ^ title, tag protocol :: tags, uses)
+  (* To help automatic generation of regression files during stabilisation we ensure
+     protocol_name is always of at least size of "alpha" by adding '-' trailing
+     chars to it if needed *)
+  let protocol_name =
+    name protocol
+    ^ String.make
+        (max 0 (String.length (name Alpha) - String.length (name protocol)))
+        '-'
+  in
+  ( protocol_name ^ ": " ^ title,
+    (tag protocol :: tags) @ additional_tags protocol,
+    uses )
 
 let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
-    ?uses_admin_client ?supports body protocols =
+    ?uses_admin_client ?supports ?additional_tags body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  let title, tags, uses =
+    add_to_test_parameters ?additional_tags protocol title tags uses
+  in
   Test.register
     ~__FILE__
     ~title
@@ -344,9 +360,12 @@ let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     (fun () -> body protocol)
 
 let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
-    ?uses_admin_client ?supports ?team ~executors ~timeout body protocols =
+    ?uses_admin_client ?supports ~team ~executors ~timeout ?additional_tags body
+    protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  let title, tags, uses =
+    add_to_test_parameters ?additional_tags protocol title tags uses
+  in
   Long_test.register
     ~__FILE__
     ~title
@@ -355,15 +374,17 @@ let register_long_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     ?uses_node
     ?uses_client
     ?uses_admin_client
-    ?team
+    ~team
     ~executors
     ~timeout
     (fun () -> body protocol)
 
 let register_regression_test ~__FILE__ ~title ~tags ?uses ?uses_node
-    ?uses_client ?uses_admin_client ?supports body protocols =
+    ?uses_client ?uses_admin_client ?supports ?additional_tags body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let title, tags, uses = add_to_test_parameters protocol title tags uses in
+  let title, tags, uses =
+    add_to_test_parameters ?additional_tags protocol title tags uses
+  in
   Regression.register
     ~__FILE__
     ~title

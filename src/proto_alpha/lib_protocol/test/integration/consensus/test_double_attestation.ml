@@ -323,10 +323,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
       frozen_deposits_right_after
   in
   let* is_forbidden =
-    Context.Delegate.is_forbidden
-      ~policy:(Block.By_account baker)
-      (B blk_with_evidence2)
-      delegate
+    Context.Delegate.is_forbidden (B blk_with_evidence2) delegate
   in
   let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
@@ -354,7 +351,6 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let* base_reward = Context.get_baking_reward_fixed_portion (B genesis) in
   let* to_liquid =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      ~policy:(By_account baker)
       (B b)
       (Block.current_cycle b)
       delegate
@@ -438,10 +434,7 @@ let test_two_double_attestation_evidences_staggered () =
     frozen_deposits_after ;
   let* () = Assert.not_equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after in
   let* is_forbidden =
-    Context.Delegate.is_forbidden
-      ~policy:(Block.By_account baker)
-      (B blk_with_evidence2)
-      delegate
+    Context.Delegate.is_forbidden (B blk_with_evidence2) delegate
   in
   let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
@@ -514,10 +507,7 @@ let test_two_double_attestation_evidences_consecutive_cycles () =
     frozen_deposits_after ;
   let* () = Assert.not_equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after in
   let* is_forbidden =
-    Context.Delegate.is_forbidden
-      ~policy:(Block.By_account baker)
-      (B blk_with_evidence2)
-      delegate
+    Context.Delegate.is_forbidden (B blk_with_evidence2) delegate
   in
   let* () = Assert.is_true ~loc:__LOC__ is_forbidden in
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
@@ -672,8 +662,8 @@ let test_freeze_more_with_low_balance =
     | [d1; d2] ->
         return
           (if Signature.Public_key_hash.equal account d1.delegate then d1
-          else if Signature.Public_key_hash.equal account d2.delegate then d2
-          else assert false)
+           else if Signature.Public_key_hash.equal account d2.delegate then d2
+           else assert false)
             .slots
     | _ -> assert false
     (* there are exactly two attesters for this test. *)

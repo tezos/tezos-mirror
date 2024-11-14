@@ -11,7 +11,7 @@
   caqti
   caqti-dynload
   caqti-lwt.unix
-  data-encoding
+  octez-libs.data-encoding
   lwt
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client.commands
@@ -20,7 +20,8 @@
   tezt
   tezt-tezos
   tezt-tezos.tezt-performance-regression
-  uri)
+  uri
+  octez-libs.test-helpers)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
@@ -30,7 +31,8 @@
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos
-  -open Tezt_tezos_tezt_performance_regression))
+  -open Tezt_tezos_tezt_performance_regression
+  -open Tezos_test_helpers))
 
 (rule
  (targets sql.ml)

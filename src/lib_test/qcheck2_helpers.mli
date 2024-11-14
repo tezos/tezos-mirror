@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* This module is deprecated, use [Qcheck2_helpers_no_alcotest] and
+   [Qcheck_tezt]. *)
+
 (** Wrap QCheck tests into Alcotest. *)
 val qcheck_wrap :
   ?verbose:bool ->

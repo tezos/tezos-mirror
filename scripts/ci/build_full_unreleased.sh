@@ -5,8 +5,7 @@ set -eu
 eval "$(opam env)"
 
 # We remove protocols not needed for tests in order to speed up the CI.
-old_protocol_store=$(mktemp -d)
-./scripts/remove-old-protocols.sh "$old_protocol_store"
+./scripts/slim-mode.sh on
 . ./scripts/version.sh
 
 # 1. Actually build.

@@ -1,0 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name lib_teztale_server)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.prometheus-app
+  octez-libs.base
+  lwt.unix
+  lib_teztale_base)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Lib_teztale_base))

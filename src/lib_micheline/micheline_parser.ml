@@ -549,7 +549,7 @@ let rec parse ?(check = true) errors tokens stack =
   | ( (Wrapped _ | Unwrapped _) :: _,
       {token = Open_paren; _}
       :: ({token = Int _ | String _ | Bytes _ | Annot _ | Close_paren; _} as
-         token)
+          token)
       :: rem )
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = Int _ | String _ | Bytes _; _}

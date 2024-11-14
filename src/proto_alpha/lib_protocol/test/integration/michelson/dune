@@ -76,7 +76,7 @@
   (glob_files patched_contracts/*)
   (glob_files_rec ../../../../../../michelson_test_scripts/*))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

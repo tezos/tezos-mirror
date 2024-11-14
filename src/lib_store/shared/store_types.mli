@@ -29,9 +29,6 @@ module Block_store_status : sig
   (** The type used to describe the status of the store. *)
   type t
 
-  (* Getters *)
-  val get_value : t Stored_data.t -> int Lwt.t
-
   (* Setters *)
 
   val set_idle_status : t Stored_data.t -> unit tzresult Lwt.t
@@ -43,6 +40,8 @@ module Block_store_status : sig
   val is_idle : t -> bool
 
   val is_merging : t -> bool
+
+  val get_status_value : t -> int
 
   (* Initialisers *)
 
@@ -183,3 +182,12 @@ module Protocol_levels : sig
     val encoding : activation_block t Data_encoding.t
   end
 end
+
+type metadata_stat = {
+  block_level : Int32.t;
+  block_metadata_size : Int64.t;
+  operation_metadata_arity : int list;
+  operation_metadata_size : Int64.t;
+  manager_operation_metadata_sizes : int list;
+  too_large_operation_metadata_count : Int64.t;
+}

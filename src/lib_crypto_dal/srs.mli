@@ -54,8 +54,8 @@ val ensure_srs_validity :
 
 exception Failed_to_load_trusted_setup of string
 
-(** Returns SRS₁ of size [len] (by default, 2²¹) read from the file given by
-   [path]. May raise [Failed_to_load_trusted_setup] exception *)
+(** Returns {m SRS_{1}} of size [len] (by default, {m 2^{21}}) read from the
+    file given by [path]. May raise [Failed_to_load_trusted_setup] exception *)
 val read_srs :
   ?len:int ->
   srs_g1_path:string ->
@@ -63,6 +63,18 @@ val read_srs :
   unit ->
   ( Kzg.Bls.Srs_g1.t * Kzg.Bls.Srs_g2.t,
     [> `End_of_file of string | `Invalid_point of int] )
+  result
+  Lwt.t
+
+(** Returns {m SRS_{1}} of size [len] (by default, {m 2^{21}}) read from the
+    file given by [path]. May raise [Failed_to_load_trusted_setup] exception *)
+val read_uncompressed_srs :
+  ?len:int ->
+  srsu_g1_path:string ->
+  srsu_g2_path:string ->
+  unit ->
+  ( Kzg.Bls.Srs_g1.t * Kzg.Bls.Srs_g2.t,
+    [> `Close | `Open] Lwt_utils_unix.io_error )
   result
   Lwt.t
 
@@ -90,12 +102,14 @@ module Internal_for_tests : sig
         format. Run with
          [let _ = Lwt_main.run
            @@ Srs.Internal_for_tests.(
-            print_verifier_srs_from_file ~zcash_g1_path ~zcash_g2_path) ()]
-        This function can be used to add points in srs_g1 & srs_g2 in Zcash_srs *)
+            print_verifier_srs_from_file ~srs_g1_path ~srs_g2_path ~dest_path) ()]
+        This function writes points of srs_g1 & srs_g2 in [dest_path] that can
+        be added in Zcash_srs *)
   val print_verifier_srs_from_file :
     ?max_srs_size:int ->
     srs_g1_path:string ->
     srs_g2_path:string ->
+    dest_path:string ->
     unit ->
     (unit, [> `End_of_file of string | `Invalid_point of int]) result Lwt.t
 end

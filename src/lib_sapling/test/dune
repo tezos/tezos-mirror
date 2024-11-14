@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
-
 (library
  (name src_lib_sapling_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
@@ -15,7 +13,7 @@
   octez-libs.base.unix
   octez-libs.stdlib
   octez-libs.stdlib-unix
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.base-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -38,24 +36,6 @@
   example))
 
 (executable
- (name test_js)
- (modes js)
- (libraries
-  octez-libs.tezos-sapling
-  octez-libs.hacl)
- (js_of_ocaml)
- (link_flags
-  (:standard)
-  (-linkall))
- (modules test_js))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (enabled_if false)
- (action (run node %{dep:./test_js.bc.js})))
-
-(executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
@@ -71,7 +51,7 @@
  (package octez-libs)
  (deps vectors.csv vectors-zip32.csv)
  (enabled_if false)
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

@@ -49,9 +49,11 @@ type t = {
   size : int32;
   gasLimit : int64;
   gasUsed : int64;
-  timestamp : int32;
+  timestamp : Tezos_base.Time.Protocol.t;
   transactions : transactions;
   uncles : string list;
+  baseFeePerGas : int64;
+  prevRandao : string;
 }
 
 (** Extracts a block {!t} from a JSON. *)

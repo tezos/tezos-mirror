@@ -22,16 +22,14 @@
   octez-shell-libs.store
   octez-shell-libs.store.unix-reconstruction
   octez-shell-libs.store.unix-snapshots
-  octez-libs.tezos-context
   octez-shell-libs.validation
-  octez-shell-libs.shell-context
   octez-libs.tezos-workers
   octez-shell-libs.protocol-updater
   cmdliner
   fmt.cli
   fmt.tty
   tls-lwt
-  prometheus-app.unix
+  octez-libs.prometheus-app.unix
   lwt-exit
   uri
   octez-libs.base.p2p-identity-file
@@ -135,12 +133,22 @@
   (select void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer from
    (octez-protocol-017-PtNairob-libs.plugin-registerer -> void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer.empty)
    (-> void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer.empty))
-  tezos-protocol-018-Proxford.embedded-protocol
-  octez-protocol-018-Proxford-libs.plugin-registerer
-  tezos-protocol-019-PtParisB.embedded-protocol
-  octez-protocol-019-PtParisB-libs.plugin-registerer
+  (select void_for_linking-tezos-protocol-018-Proxford-embedded-protocol from
+   (tezos-protocol-018-Proxford.embedded-protocol -> void_for_linking-tezos-protocol-018-Proxford-embedded-protocol.empty)
+   (-> void_for_linking-tezos-protocol-018-Proxford-embedded-protocol.empty))
+  (select void_for_linking-octez-protocol-018-Proxford-libs-plugin-registerer from
+   (octez-protocol-018-Proxford-libs.plugin-registerer -> void_for_linking-octez-protocol-018-Proxford-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-018-Proxford-libs-plugin-registerer.empty))
+  (select void_for_linking-tezos-protocol-019-PtParisB-embedded-protocol from
+   (tezos-protocol-019-PtParisB.embedded-protocol -> void_for_linking-tezos-protocol-019-PtParisB-embedded-protocol.empty)
+   (-> void_for_linking-tezos-protocol-019-PtParisB-embedded-protocol.empty))
+  (select void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer from
+   (octez-protocol-019-PtParisB-libs.plugin-registerer -> void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer.empty))
   tezos-protocol-020-PsParisC.embedded-protocol
   octez-protocol-020-PsParisC-libs.plugin-registerer
+  tezos-protocol-021-PsQuebec.embedded-protocol
+  octez-protocol-021-PsQuebec-libs.plugin-registerer
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
    (tezos-protocol-alpha.embedded-protocol -> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty))
@@ -169,7 +177,6 @@
   -open Tezos_store_unix_reconstruction
   -open Tezos_store_unix_snapshots
   -open Tezos_validation
-  -open Tezos_shell_context
   -open Tezos_workers
   -open Tezos_protocol_updater
   -open Tezos_base_p2p_identity_file))
@@ -210,6 +217,10 @@
    (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-017-PtNairob-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer.empty "")
+   (write-file void_for_linking-tezos-protocol-018-Proxford-embedded-protocol.empty "")
+   (write-file void_for_linking-octez-protocol-018-Proxford-libs-plugin-registerer.empty "")
+   (write-file void_for_linking-tezos-protocol-019-PtParisB-embedded-protocol.empty "")
+   (write-file void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-alpha-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty ""))))
 

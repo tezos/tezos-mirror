@@ -63,6 +63,8 @@ let injector_operation_to_manager :
       Manager
         (Sc_rollup_execute_outbox_message
            {rollup; cemented_commitment; output_proof})
+  | Publish_dal_commitment _ ->
+      Stdlib.failwith "Publish_dal_commitment not supported in Oxford"
 
 let injector_operation_of_manager :
     type kind.
@@ -427,6 +429,14 @@ module Proto_client = struct
           (to_string mempool_default)
       else Ok ()
     in
+    (* copied from removed Oxford’s mempool module *)
+    let default_minimal_fees =
+      match Tez.of_mutez 100L with None -> assert false | Some t -> t
+    in
+    (* copied from removed Oxford’s mempool module *)
+    let default_minimal_nanotez_per_gas_unit = Q.of_int 100 in
+    (* copied from removed Oxford’s mempool module *)
+    let default_minimal_nanotez_per_byte = Q.of_int 1000 in
     let check purpose
         {
           minimal_fees;
@@ -443,8 +453,7 @@ module Proto_client = struct
           "minimal_fees"
           Int64.compare
           Int64.to_string
-          (Protocol.Alpha_context.Tez.to_mutez
-             Plugin.Mempool.default_minimal_fees)
+          (Protocol.Alpha_context.Tez.to_mutez default_minimal_fees)
           minimal_fees.mutez
       and+ () =
         check_value
@@ -452,7 +461,7 @@ module Proto_client = struct
           "minimal_nanotez_per_byte"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_byte
+          default_minimal_nanotez_per_byte
           minimal_nanotez_per_byte
       and+ () =
         check_value
@@ -460,7 +469,7 @@ module Proto_client = struct
           "minimal_nanotez_per_gas_unit"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+          default_minimal_nanotez_per_gas_unit
           minimal_nanotez_per_gas_unit
       in
       ()

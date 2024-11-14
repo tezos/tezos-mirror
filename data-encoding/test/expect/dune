@@ -1,7 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name data_encoding_expect_tests)
- (inline_tests)
- (libraries data_encoding zarith zarith_stubs_js ezjsonm bigstringaf)
- (package data-encoding)
- (preprocess
-  (pps ppx_expect)))
+ (package octez-libs)
+ (libraries
+  octez-libs.data-encoding
+  zarith
+  ezjsonm
+  bigstringaf)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect)))

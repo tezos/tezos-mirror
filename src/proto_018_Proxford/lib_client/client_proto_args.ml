@@ -271,11 +271,13 @@ let init_arg =
     string_parameter
 
 let other_contracts_parameter =
-  Tezos_clic.parameter (fun _ source ->
+  file_or_text_parameter
+    ~from_text:(fun _ source ->
       let open Lwt_result_syntax in
       let* micheline, source = parse_micheline_parameter source in
       let*? l = Michelson_v1_stack.parse_other_contracts ~source micheline in
       return l)
+    ()
 
 let other_contracts_arg =
   Tezos_clic.arg
@@ -286,11 +288,13 @@ let other_contracts_arg =
     other_contracts_parameter
 
 let extra_big_maps_parameter =
-  Tezos_clic.parameter (fun _ source ->
+  file_or_text_parameter
+    ~from_text:(fun _ source ->
       let open Lwt_result_syntax in
       let* micheline, source = parse_micheline_parameter source in
       let*? l = Michelson_v1_stack.parse_extra_big_maps ~source micheline in
       return l)
+    ()
 
 let extra_big_maps_arg =
   Tezos_clic.arg
@@ -1042,14 +1046,15 @@ let fee_parameter_args =
            | None -> cctxt#error "Bad burn cap"))
   in
   Tezos_clic.map_arg
-    ~f:
-      (fun _cctxt
-           ( minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap ) ->
+    ~f:(fun
+        _cctxt
+        ( minimal_fees,
+          minimal_nanotez_per_byte,
+          minimal_nanotez_per_gas_unit,
+          force_low_fee,
+          fee_cap,
+          burn_cap )
+      ->
       return
         {
           Injection.minimal_fees;

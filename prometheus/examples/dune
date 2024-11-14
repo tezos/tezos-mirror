@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name example)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.prometheus
+  octez-libs.prometheus-app.unix
+  cmdliner
+  octez-libs.cohttp-lwt
+  octez-libs.cohttp-lwt-unix))

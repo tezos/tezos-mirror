@@ -27,7 +27,8 @@
 type cctxt = Dal_node_client.cctxt
 
 let get_commitments_history_hash_content (cctxt : cctxt) hash =
-  cctxt#call_service
+  Dal_node_client.call
+    cctxt
     (Tezos_rpc.Service.prefix
        Tezos_rpc.Path.(root / "plugin")
        Dal_services.Commitments_history.hash_content)

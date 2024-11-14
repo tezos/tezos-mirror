@@ -37,26 +37,55 @@ let shards_store_lru_size =
   irmin_internals_entries_per_toplevel_entry * number_of_slots
   * number_of_remembered_levels
 
+(* There is no real rationale for the slot and status parts of the
+   store; we just put low-enough values to avoid consuming too many
+   file descriptors. *)
+let slots_store_lru_size = 64
+
+let status_store_lru_size = 64
+
 (* Fewer cache sizes should be enough in practice,
    but we cache 50 since each cache entry has quite a small memory footprint. *)
 let committee_cache_size = 50
 
-(* The size of the cache of 1024 entries (one per slot) is chosen such
-   that: if a DAL node stores the shard proofs of 128 slots per level,
-   the cache will be able to store the proofs for 8 levels, which
-   should be quite sufficient with the current attestation lag.
+(* The size of the shard cache is chosen large enough to enable
+   publishing slots on 5 slot indices.  We need to keep shards in
+   the cache for at least three levels (if the commitment is published
+   immediately, one level to include the publication + 2 levels to
+   finalize it) but a few more levels may be needed if the commitment
+   is not published immediately so we consider a cache large enough to
+   keep the shards for 5 levels. *)
+let cache_size =
+  let number_of_levels_to_keep = 5 in
+  let number_of_slots = 5 in
+  number_of_levels_to_keep * number_of_slots
 
-   A shard proof takes 52 bytes with the current encoding (could be improved
-   to 48), so the maximum memory footprint of the cache is dominated by (keys
-   size is negligible):
-
-   1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
-let shards_proofs_cache_size = 1024
+(* This cache is being used for the validation of message ids, in particular messages in
+   the future, it does not have to be big. We take 100 which sounds reasonable. *)
+let slot_id_cache_size = 100
 
 let shards_verification_sampling_frequency = 100
 
-let amplification_random_delay_min = 1.
+let amplification_random_delay_min = 10.0
 
-let amplification_random_delay_max = 2.
+let amplification_random_delay_max = 20.0
 
 let amplification_timeout = 120.
+
+(* Initial reconnection delay to L1 node from the DAL crawler in seconds. See
+   {!layer_1.start} in lib_crawler for more details. *)
+let initial_l1_crawler_reconnection_delay = 5.
+
+(* Controls the size of the blocks cache in the L1 crawler. It is used in
+   {!Crawler.start}. *)
+let crawler_l1_blocks_cache_size = 64
+
+(* Number of times that block processing is retried in the L1 crawler in case a disconnection
+   error is encountered while retrieving data from L1 outside the
+   {!Layer1.iter_heads} callback. *)
+let crawler_retries_on_disconnection = 5
+
+(* Sleep delay before retrying processing a block in the L1 crawler in case a
+   disconnection error is encountered while retrieving data from L1 outside the
+   {!Layer1.iter_heads} callback. *)
+let crawler_re_processing_delay = 5.

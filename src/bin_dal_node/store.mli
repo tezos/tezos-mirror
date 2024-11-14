@@ -5,215 +5,175 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module handles the on-disk storage of the DAL node. We use
-    two key-value stores: the [Key_value_store] module from
-    lib_stdlib_unix (for storing shards) and Irmin (for everything
-    else). *)
+(** This module handles the on-disk storage of the DAL node. We rely
+    on the [Key_value_store] module from lib_stdlib_unix. *)
 
 open Cryptobox
 
-type t (* This is the Irmin part of the store *)
-
-module Value_size_hooks : sig
-  (** [set_share_size size] sets the size of shard shares. This
-      function must be called once, before [init] is used. *)
-  val set_share_size : int -> unit
-end
-
 module Shards : sig
-  (** A shard of some commitment consist in a shard index (a number
+  (** A shard of some slot id consist in a shard index (a number
       between 0 and the number_of_shards protocol parameter) and a
       share. The shard store is a mapping associating 0 or 1 share to
-      each (commitment, shard index) pair.  *)
+      each (slot_id, shard index) pair.  *)
 
   type t
 
-  (** [are_shards_available store commitment shard_indices] returns
+  (** [are_shards_available store slot_id shard_indices] returns
       true IFF a share is stored for each given shard index of the
-      given commitment.  *)
-  val are_shards_available : t -> commitment -> int list -> bool tzresult Lwt.t
+      given slot id.  *)
+  val are_shards_available :
+    t -> Types.slot_id -> int list -> bool tzresult Lwt.t
 
-  (** [save_and_notify store commitment shards] adds to the
-      shard store all the given shards of the given commitment. The
-      [watcher] is notified. *)
-  val save_and_notify :
-    t -> commitment -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
+  (** [write_all store slot_id shards] adds to the shard store all the given
+      shards of the given slot id. *)
+  val write_all :
+    t -> Types.slot_id -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
 
-  (** [read_value store commitment shard_index] returns the associated
-     share when the shard is available or an error when it is not.  *)
-  val read_value : t -> commitment -> int -> share tzresult Lwt.t
+  (** [read store slot_id shard_id] gets the shard associated to
+    [slot_id] at the range [shard_id]. *)
+  val read :
+    t ->
+    Types.slot_id ->
+    int ->
+    (Cryptobox.shard, [> Errors.not_found | Errors.other]) result Lwt.t
 
-  (** Same as [read_value] but for a sequence of shards. *)
-  val read_values :
-    t -> (commitment * int) Seq.t -> (commitment * int * share tzresult) Seq_s.t
-
-  (** Same as [read_values] but for all possible shards of the given commitment. *)
+  (** Same as [read_values] but for all possible shards of the given slot id. *)
   val read_all :
     t ->
-    commitment ->
+    Types.slot_id ->
     number_of_shards:int ->
-    (commitment * int * share tzresult) Seq_s.t
+    (Types.slot_id * int * share tzresult) Seq_s.t
 
-  (** [count_values store commitment] returns the number of shards
-      which are stored for the given commitment. *)
-  val count_values : t -> commitment -> int tzresult Lwt.t
+  (** [count_values store slot_id] returns the number of shards
+      which are stored for the given slot id. *)
+  val count_values : t -> Types.slot_id -> int tzresult Lwt.t
 
-  (** [remove store commitment] removes the shards associated to the given
-      commitment from the store *)
-  val remove : t -> commitment -> unit tzresult Lwt.t
+  (** [remove store slot_id] removes the shards associated to the given
+      slot id from the store *)
+  val remove : t -> Types.slot_id -> unit tzresult Lwt.t
 end
 
-module Shard_proofs_cache : sig
-  (** Shard proofs are not stored on disk because we can recompute
-      them. This computation is quite costly though so we cache the
-      result in memory. *)
+module Slots : sig
+  (** A store of slots, indexed by slot id. *)
 
-  type 'a t
+  type t
 
-  (** Returns the element associated to the commitment in the shard proofs cache, or [None] if
-      there is none. *)
-  val find_opt : 'a t -> commitment -> 'a option
+  (** [add_slot store ~slot_size slot_content slot_id] adds a mapping from the
+      given slot id to the given slot content. *)
+  val add_slot :
+    t ->
+    slot_size:int ->
+    bytes ->
+    Types.slot_id ->
+    (unit, [> Errors.other]) result Lwt.t
+
+  (** [find_slot store ~slot_size slot_id] returns the slot associated to some
+      slot id or [Error `Not_found] if no slot is associated. *)
+  val find_slot :
+    t ->
+    slot_size:int ->
+    Types.slot_id ->
+    (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
+
+  val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
 end
 
-type node_store = private {
-  store : t; (* The Irmin part *)
-  shard_store : Shards.t;
-  in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
-      (* The length of the array is the number of shards per slot *)
-}
+module Slot_id_cache : sig
+  type t
 
-(** [save_shard_proofs store commitment shard_proofs] replaces in
-      the shard proof cache all the shard proofs for the given
-      commitment with the given ones. *)
-val save_shard_proofs : node_store -> commitment -> shard_proof array -> unit
+  val add : number_of_slots:int -> t -> Dal_plugin.slot_header -> unit
 
-val init : Configuration_file.t -> node_store tzresult Lwt.t
+  val find_opt : t -> Types.slot_id -> commitment option
+end
 
-module Legacy : sig
-  (** The Irmin part of the storage is considered legacy because we
-      want to move everything to the KV store. *)
+module Statuses : sig
+  (** A store keeping the attestation status of slot ids. *)
 
-  (**
-     We have two concise ways to refer to a slot:
-
-     - a commitment uniquely identifies the content of the slot, it is
-       useful to prove properties about the slot length and the shards.
-
-     - a slot identifier gives at which level and at which index the
-       slot was published. It only makes sense for slots which have been
-       published in some block or at least whose publication in a block
-       has been attempted.
-
-     The Irmin part of the store provides a bidirectional mapping
-     between commitments and slot identifiers, it also maps to these
-     identifiers the following pieces of information:
-
-     - the content of the slot,
-     - the status of the publication operation (accepted or not),
-     - the attestation status (see Types.header_status).
-
-  *)
-
-  (** [add_slot_by_commitment store cryptobox slot_content commitment]
-      adds a mapping from the given commitment to the given slot
-      content. The given cryptobox is only used to get the size of the
-      slot content, no cryptographic verification is performed by this
-      function. *)
-  val add_slot_by_commitment :
-    node_store -> Cryptobox.t -> bytes -> commitment -> unit Lwt.t
-
-  (** [associate_slot_id_with_commitment store commitment slot_id]
-      adds an entry to the bidirectional mapping between commitments
-      and slot identifiers. The status is initialized to
-      [`Unseen_or_not_finalized].
-
-      This function is only used by RPCs.
-  *)
-  val associate_slot_id_with_commitment :
-    node_store -> commitment -> Types.slot_id -> unit Lwt.t
-
-  (** [exists_slot_by_commitment store cryptobox commitment] returns
-      true IFF a slot is associated to the given commitment. *)
-  val exists_slot_by_commitment :
-    node_store -> Cryptobox.t -> commitment -> bool Lwt.t
-
-  (** [find_slot_by_commitment store cryptobox commitment] returns the
-      slot associated to some commitment or an error if no slot is
-      associated. *)
-  val find_slot_by_commitment :
-    node_store ->
-    Cryptobox.t ->
-    commitment ->
-    (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
-    Lwt.t
-
-  (** [add_slot_headers ~number_of_slots ~block_level slot_headers
-      store] adds all the given slot headers at the given block level,
-      updating the bidirectional mapping between commitments and slot
-      identifiers. For each slot header, the associated operation
-      application result indicates if the slot header should be
-      considered as accepted (the publication operation has succeeded)
-      or not. In the accepted case, the associated status is
-      [`Waiting_attestation], otherwise it is [`Not_selected]. *)
-  val add_slot_headers :
-    number_of_slots:int ->
-    block_level:int32 ->
-    (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
-    node_store ->
-    unit tzresult Lwt.t
+  type t
 
   (** [update_selected_slot_headers_statuses ~block_level
-      ~attestation_lag ~number_of_slots attested store] updates the
-      status of all accepted slots at level [block_level -
-      attestation_lag] to either `Attested (when present in the
-      [attested] list) or `Unattested (when absent). *)
+      ~attestation_lag ~number_of_slots attested is_attested store]
+      updates the status of all accepted slots at level [block_level -
+      attestation_lag] to either `Attested ([attested] returns [true])
+      or `Unattested (when [attested] returns [false]). *)
   val update_selected_slot_headers_statuses :
     block_level:int32 ->
     attestation_lag:int ->
     number_of_slots:int ->
-    int list ->
-    node_store ->
-    unit Lwt.t
+    (int -> bool) ->
+    t ->
+    unit tzresult Lwt.t
 
-  (** [get_commitment_by_published_level_and_index ~level ~slot_index
-      store] returns the commitment associated to the given slot
-      identifier in the bidirectional mapping. *)
-  val get_commitment_by_published_level_and_index :
-    level:int32 ->
-    slot_index:int ->
-    node_store ->
-    ( commitment,
-      [> `Decoding_failed of Types.Store.kind * tztrace | `Not_found] )
-    result
-    Lwt.t
+  (** [get_slot_status ~slot_id store] returns the status associated
+      to the given accepted [slot_id], or [None] if no status is
+      associated to the [slot_id]. *)
+  val get_slot_status :
+    slot_id:Types.slot_id ->
+    t ->
+    (Types.header_status, [> Errors.other | Errors.not_found]) result Lwt.t
 
-  (** [get_commitment_headers commitment ?slot_level ?slot_index
-      store] returns all the slot headers (slot identifiers and
-      statuses) associated to the given commitment. The optional
-      arguments can be used for filtering; when set, only the
-      slot headers for the provided level or slot index are
-      considered. *)
-  val get_commitment_headers :
-    commitment ->
-    ?slot_level:int32 ->
-    ?slot_index:int ->
-    node_store ->
-    ( Types.slot_header list,
-      [> `Decoding_failed of Types.Store.kind * tztrace] )
-    result
-    Lwt.t
-
-  (** [get_published_level_headers ~published_level ?header_status
-      store] returns all the slot headers (commitments, slot
-      identifiers, and statuses) of the slots published at the given
-      level. The optional argument ?header_status can be used to
-      restrict the output to only the headers with the given status. *)
-  val get_published_level_headers :
-    published_level:int32 ->
-    ?header_status:Types.header_status ->
-    node_store ->
-    ( Types.slot_header list,
-      [> `Decoding_failed of Types.Store.kind * tztrace] )
-    result
-    Lwt.t
+  (** [remove_level_status ~level store] removes the status of all the
+      slot ids published at the given level. *)
+  val remove_level_status : level:int32 -> t -> unit tzresult Lwt.t
 end
+
+module Skip_list_cells : module type of Skip_list_cells_store
+
+module Commitment_indexed_cache : sig
+  type 'a t
+
+  (** Returns the element associated to the commitment in the cache,
+      or [None] if there is none. *)
+  val find_opt : 'a t -> commitment -> 'a option
+end
+
+module Last_processed_level : Single_value_store.S with type value = int32
+
+module First_seen_level : Single_value_store.S with type value = int32
+
+type t = private {
+  slot_header_statuses : Statuses.t;  (** Statuses store *)
+  shards : Shards.t;  (** Shards store *)
+  slots : Slots.t;  (** Slots store *)
+  skip_list_cells : Skip_list_cells.t;  (** Skip list cells store *)
+  cache :
+    (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
+    Commitment_indexed_cache.t;
+      (* The length of the array is the number of shards per slot *)
+  finalized_commitments : Slot_id_cache.t;
+      (** Cache of commitments indexed by level and then by slot id. The maximum
+          number of levels is given by {!Constants.slot_id_cache_size}. No more
+          than [number_of_slots] commitments can be stored per level. *)
+  last_processed_level : Last_processed_level.t;
+      (** Last processed level store *)
+  first_seen_level : First_seen_level.t;  (** First seen level store *)
+}
+
+(** [cache_entry store commitment entry] adds or replace an entry to
+    the cache with key [commitment]. *)
+val cache_entry :
+  t ->
+  commitment ->
+  Cryptobox.slot ->
+  Cryptobox.share array ->
+  Cryptobox.shard_proof array ->
+  unit
+
+val init : Configuration_file.t -> t tzresult Lwt.t
+
+(** [add_slot_headers ~number_of_slots ~block_level slot_headers store]
+    processes the [slot_headers] published at [block_level]. Concretely, for
+    each slot header successfully applied in the L1 block,
+
+    - It is added to disk store {!slot_header_statuses} with a
+    [`Waiting_attestation] status (indexed by slot_id);
+
+    - It is added to the 2D memory cache {!finalized_commitments}, indexed by
+    publication level and slots indices.
+*)
+val add_slot_headers :
+  number_of_slots:int ->
+  block_level:int32 ->
+  (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
+  t ->
+  unit tzresult Lwt.t

@@ -33,8 +33,6 @@
 
 open P2p_test_utils
 
-let p2p_peer_id_typ = Check.comparable P2p_peer.Id.pp P2p_peer.Id.compare
-
 (** [connect ?target_id ?proof_of_work_target sched addr port] connect
     and performs [P2p_socket.authenticate] with the given
     [proof_of_work_target] (also checking that the remote point is the
@@ -47,7 +45,7 @@ let connect ?proof_of_work_target ?(target_id = id1) sched addr port id =
   let*! id1 = target_id in
   Check.is_false info.incoming ~error_msg:"Message should be outgoing" ;
   Check.(info.peer_id = id1.peer_id)
-    p2p_peer_id_typ
+    Tzcheck.p2p_peer_id
     ~error_msg:"expected value = %R, got %L" ;
   return auth_fd
 
@@ -87,7 +85,7 @@ let nack_test () =
     Check.is_true info.incoming ~error_msg:"Message should be incomming." ;
     let*! id2 in
     Check.(info.peer_id = id2.peer_id)
-      p2p_peer_id_typ
+      Tzcheck.p2p_peer_id
       ~error_msg:"Expected value = %R, got %L" ;
     let*! () = P2p_socket.nack auth_fd P2p_rejection.No_motive [] in
     sync ch

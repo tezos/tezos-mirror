@@ -19,6 +19,7 @@ const commander = require('commander');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
@@ -99,7 +100,6 @@ exports.send = function (player, contract_addr, amount, data, options = {}) {
 
 const print_list = function (src, mode, blueprint_number) {
     const txs = src.slice();
-    console.log("[")
     let data = txs.join(" ");
     let messages = mode.sequencer_key ?
         chunk_data_into_blueprint(data, blueprint_number, mode.sequencer_key) :
@@ -108,40 +108,79 @@ const print_list = function (src, mode, blueprint_number) {
         seperator = (j < messages.length - 1) ? "," : "";
         console.log(`{"external": "${messages[j]}"}${seperator}`);
     }
-    console.log("]");
     return txs.length
 }
 
 function temporary_data_file(data) {
     const tmp_dir = os.tmpdir();
-    const tmp_file = path.join(tmp_dir, "chunker_data");
+    const tmp_file = path.join(tmp_dir, `chunker_data_${uuidv4()}`);
 
     fs.writeFileSync(tmp_file, data);
     return tmp_file;
 }
 
-function chunk_data_gen(data, extra_args){
-    let tmp_data_file = temporary_data_file(data, "--devmode")
-    run_chunker_command = `${CHUNKER} chunk data file:${tmp_data_file} --devmode ${extra_args}`;
+function chunk_data_gen(data, extra_args) {
+    let tmp_data_file = temporary_data_file(data)
+    run_chunker_command = `${CHUNKER} chunk data file:${tmp_data_file} ${extra_args}`;
     // The buffer for the output is chosen really big to prevent ENOBUF errors, as the output is proportional to the input
-    chunked_message = new Buffer.from(execSync(run_chunker_command, { maxBuffer : data.length * 5 })).toString();
+    chunked_message = new Buffer.from(execSync(run_chunker_command, { maxBuffer: data.length * 5 })).toString();
     fs.unlinkSync(tmp_data_file);
     return chunked_message.split("\n").slice(1, -1);
 }
 
-const chunk_data = function (src) {
+const chunk_data = function(src) {
     return chunk_data_gen(src, "");
 }
 
-const chunk_data_into_blueprint = function (src, number, sequencer_key) {
+const chunk_data_into_blueprint = function(src, number, sequencer_key) {
     let extra_args = `--as-blueprint --number ${number} --timestamp ${number} --sequencer-key text:${sequencer_key}`;
     return chunk_data_gen(src, extra_args);
 }
 
-exports.print_bench = function (src, mode = {}) {
+function split_blueprints(blueprints) {
+    return blueprints.flatMap((bp) => bp.map((tx) => [tx]))
+}
+
+function print_raw_txs(src) {
+    const txs = src.slice();
+    txs.forEach(element => {
+        console.log(element)
+    });
+
+}
+
+function print_delayed(tx) {
+    console.log(`{"payload" : "Left (Right 0x${tx})", "sender" : "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT" }`)
+}
+
+function print_delayed_bench(scenario) {
+    console.log('[')
+    for (const bp of scenario) {
+        console.log('[')
+        for (let i = 0; i < bp.length; i++) {
+            if (i != 0) console.log(',');
+            print_delayed(bp[i])
+        }
+        console.log(']')
+    }
+    console.log(']')
+}
+
+exports.print_bench = function(src, mode = {}) {
+    if (mode.extra.raw) {
+        print_raw_txs(src);
+        return;
+
+    }
+    if (mode.extra.delayed) {
+        print_delayed_bench(src);
+        return;
+    }
     let number = 0;
-    const inputs = src.slice();
+    let inputs = src.slice();
     console.log("[")
+    console.log("[")
+    if (mode.extra.multiBlueprint) inputs = split_blueprints(inputs)
     while (inputs.length > 1) {
         let txs_length = print_list(inputs.shift(), mode, number)
         console.log(",");
@@ -149,16 +188,10 @@ exports.print_bench = function (src, mode = {}) {
     }
     print_list(inputs.shift(), mode, number)
     console.log("]")
+    console.log("]")
 }
 
-exports.print_raw_txs = function (src) {
-    const txs = src.slice();
-    txs.forEach(element => {
-        console.log(element)
-    });
-
-}
-exports.encode_number = function (n) {
+exports.encode_number = function(n) {
 
     let s = "00000000000000000000000000000000"
     var zeroFilled = (s + n.toString(16)).slice(-32)
@@ -166,10 +199,13 @@ exports.encode_number = function (n) {
 }
 
 // Generate the commands for each benchmarks to use a sequencer or not.
-exports.bench_args = function (argv, extra_options = []) {
+exports.bench_args = function(argv, extra_options = []) {
     let commands =
         commander
             .usage("[OPTIONS]")
+            .option('--multi-blueprint', 'Put each transaction in one blueprint', false)
+            .option('--raw', 'Print raw transaction', false)
+            .option('--delayed', 'Print delayed transaction', false)
             .option('--sequencer <private key>',
                 'Generates a chunked blueprint signed with <private key>');
 

@@ -281,16 +281,18 @@ module Make_table (H : H) = struct
     t
 end
 
-module Make_queue (N : sig
-  val name : string
-end)
-(K : Tezos_crypto.Intfs.HASH) (V : sig
-  type t
+module Make_queue
+    (N : sig
+      val name : string
+    end)
+    (K : Tezos_crypto.Intfs.HASH)
+    (V : sig
+      type t
 
-  val encoding : t Data_encoding.t
+      val encoding : t Data_encoding.t
 
-  val persist : t -> bool
-end) =
+      val persist : t -> bool
+    end) =
 struct
   module Q = Hash_queue.Make (K) (V)
 

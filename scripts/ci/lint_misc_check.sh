@@ -1,19 +1,12 @@
 #!/bin/sh
 
-set -eu
+set -eux
 
 # misc linting
-find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +
+make check-opam-linting
 
-# Check that python environment is synchronized with the image's.
-diff poetry.lock /home/tezos/poetry.lock
-diff pyproject.toml /home/tezos/pyproject.toml
-
-make check-linting
-
-# python checks
-make check-python-linting
-make check-python-typecheck
+scripts/lint.sh --check-scripts
+scripts/lint.sh --check-rust-toolchain
 
 # Ensure that all unit tests are restricted to their opam package
 make lint-tests-pkg
@@ -25,9 +18,3 @@ make lint-tests-pkg
 #- ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
 # check that the hack-module patch applies cleanly
 git apply devtools/protocol-print/add-hack-module.patch
-
-# check that yes-wallet builds correctly
-dune build devtools/yes_wallet/yes_wallet.exe
-
-# check that the patch-yes_node.sh applies correctly
-scripts/patch-yes_node.sh --dry-run

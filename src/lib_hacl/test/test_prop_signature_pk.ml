@@ -37,10 +37,11 @@ open Qcheck2_helpers
 
 open QCheck2
 
-module Pk_Properties (Desc : sig
-  val name : string
-end)
-(X : Hacl.SIGNATURE) =
+module Pk_Properties
+    (Desc : sig
+      val name : string
+    end)
+    (X : Hacl.SIGNATURE) =
 struct
   (** Checks that [pk_of_bytes_without_validation] and [pk_of_bytes] have
       the same output on valid public keys and always return a Some. *)

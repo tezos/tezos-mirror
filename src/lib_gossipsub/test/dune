@@ -1,9 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_gossipsub)
+(library
+ (name src_lib_gossipsub_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   fmt
   octez-libs.base
   octez-libs.base.unix
@@ -11,13 +13,38 @@
   tezt
   qcheck-core
   octez-libs.test-helpers)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_gossipsub
-  -open Tezos_test_helpers))
+  -open Tezos_test_helpers)
+ (modules
+  test_gossipsub
+  test_integration_worker
+  test_message_cache
+  test_pbt
+  test_unit
+  test_gossipsub_shared
+  gossipsub_pbt_generators
+  default_limits))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_gossipsub_test_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
  (package octez-libs)
- (action (run %{dep:./test_gossipsub.exe})))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

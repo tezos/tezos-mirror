@@ -7,7 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  octez-smart-rollup-wasm-debugger-plugin)
+  octez-smart-rollup-wasm-debugger-plugin
+  re)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives))

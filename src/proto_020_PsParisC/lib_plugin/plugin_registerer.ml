@@ -39,6 +39,12 @@ module Metrics = struct
   let hash = Registerer.Registered.hash
 end
 
+module Http_cache_headers = struct
+  include Plugin.Http_cache_headers
+
+  let hash = Registerer.Registered.hash
+end
+
 module Shell_helpers = struct
   include Plugin.Shell_helpers
 
@@ -50,5 +56,8 @@ let () = Protocol_plugin.register_validation_plugin (module Validation)
 let () = Protocol_plugin.register_rpc (module RPC)
 
 let () = Protocol_plugin.register_metrics (module Metrics)
+
+let () =
+  Protocol_plugin.register_http_cache_headers_plugin (module Http_cache_headers)
 
 let () = Protocol_plugin.register_shell_helpers (module Shell_helpers)

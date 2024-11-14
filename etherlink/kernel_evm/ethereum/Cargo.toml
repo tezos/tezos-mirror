@@ -21,9 +21,10 @@ ethbloom.workspace = true
 rlp.workspace = true
 hex.workspace = true
 
+bytes.workspace = true
+
 sha3.workspace = true
 tezos_crypto_rs.workspace = true
-tezos_data_encoding = "0.5"
 libsecp256k1.workspace = true
 
 tezos-smart-rollup-encoding.workspace = true

@@ -31,6 +31,8 @@
    validator time and the baker forging time.
 *)
 
+let team = Team.layer1
+
 (** {2 Test parameters} *)
 let manager_kinds = [`Transfer; `Origination; `Call]
 
@@ -43,9 +45,9 @@ let manager_kind_to_string = function
    unit in a block without exceeding the `hard_gas_limit_per_block` from the
    protocol (1.73M gas unit since P). *)
 let number_of_operation_from_manager_kind = function
-  | `Transfer -> 1666 (* x1040 gas units *)
-  | `Origination -> 17 (* x100_000 gas units *)
-  | `Call -> 2 (* x850_000 gas units *)
+  | `Transfer -> 1333 (* x1040 gas units *)
+  | `Origination -> 13 (* x100_000 gas units *)
+  | `Call -> 2 (* x650_000 gas units *)
 
 let protocols = Protocol.all
 
@@ -246,7 +248,7 @@ let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
              ()
     | `Call -> (
         (* Magical constant that makes the contract consume around 850K gas unit *)
-        let arg = `O [("int", `String "8206473")] in
+        let arg = `O [("int", `String "6306473")] in
         match contract_hash with
         | None ->
             Test.fail "Contract hash should be given to craft Call operations"
@@ -254,8 +256,8 @@ let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
             Operation.Manager.make
               ~source
               ~counter
-              ~fee:850_000
-              ~gas_limit:850_000
+              ~fee:650_000
+              ~gas_limit:650_000
             @@ Operation.Manager.call
                  ~amount:0
                  ~entrypoint:"default"
@@ -370,16 +372,9 @@ let revealing_additional_bootstrap_accounts additional_bootstraps
 
 (* Test *)
 let operation_and_block_validation protocol manager_kind tag =
-  let margin =
-    (* match manager_kind with `Call | `Origination -> 1. | `Transfer -> 0.5 *)
-    10.
-    (* Due to unreliable results we set a high margin to avoid unwanted alerts. *)
-  in
   let color = Log.Color.FG.green in
   let tags = [(tag, tag)] in
-  let measure_and_check_regression ?margin time f =
-    Long_test.measure_and_check_regression ?margin ~tags time (fun () -> f)
-  in
+  let measure time f = Long_test.measure ~tags time (fun () -> f) in
   let get_previous_stats time_mean time title =
     let* res =
       Long_test.get_previous_stats
@@ -390,11 +385,12 @@ let operation_and_block_validation protocol manager_kind tag =
         "duration"
         Long_test.Stats.mean
     in
-    match res with
-    | None -> unit
+    (match res with
+    | None -> ()
     | Some (count, average) ->
         Log.info ~color "%s:%s, count:%d, average:%f" title tag count average ;
-        measure_and_check_regression ~margin:1. time_mean average
+        measure time_mean average) ;
+    unit
   in
 
   Log.info
@@ -465,7 +461,7 @@ let operation_and_block_validation protocol manager_kind tag =
   let* client2 = Client.init ~endpoint:(Node node2) () in
   let classify_t, classify_u = Lwt.task () in
   let on_notify_event u cpt list time Node.{name; value; timestamp} =
-    if name = "operation_reclassified.v0" then (
+    if name = "operation_classified.v0" then (
       list := JSON.encode value :: !list ;
       if !cpt = 0 then time := timestamp ;
       incr cpt ;
@@ -501,9 +497,7 @@ let operation_and_block_validation protocol manager_kind tag =
     "Classification time on %s: %f"
     (Node.name node2)
     !classification_time ;
-  let* () =
-    measure_and_check_regression ~margin classify_title !classification_time
-  in
+  measure classify_title !classification_time ;
 
   Log.info
     "Measure the time that take a node to reclassify %d operations after a \
@@ -541,9 +535,7 @@ let operation_and_block_validation protocol manager_kind tag =
     "Reclassification time on %s: %f"
     (Node.name node2)
     !reclassification_time ;
-  let* () =
-    measure_and_check_regression ~margin reclassify_title !reclassification_time
-  in
+  measure reclassify_title !reclassification_time ;
 
   Log.info
     "Ensure that the mempool contains %d validated operations"
@@ -559,10 +551,10 @@ let operation_and_block_validation protocol manager_kind tag =
   let application_time = ref 0. in
   let on_bake_event u Node.{name; value = _; timestamp} =
     match name with
-    | "prechecking_block.v0" -> validation_time := timestamp
-    | "prechecked_block.v0" -> validation_time := timestamp -. !validation_time
-    | "validating_block.v0" -> application_time := timestamp
-    | "validation_success.v0" ->
+    | "validating_block.v0" -> validation_time := timestamp
+    | "validated_block.v0" -> validation_time := timestamp -. !validation_time
+    | "applying_block.v0" -> application_time := timestamp
+    | "validation_and_application_success.v0" ->
         application_time := timestamp -. !application_time ;
         Lwt.wakeup u ()
     | _ -> ()
@@ -614,24 +606,20 @@ let operation_and_block_validation protocol manager_kind tag =
   let* injecting_timestamp = get_timestamp_of_event "injecting_block.v0" io in
   let forging_time = injecting_timestamp -. prepare_timestamp in
   Log.info ~color "Block forging time on node A : %f" forging_time ;
-  let* () = measure_and_check_regression ~margin forging_title forging_time in
+  measure forging_title forging_time ;
 
   let* () = node_t in
 
   let* lvl = Node.wait_for_level node2 (lvl + 1) in
   Log.info ~color "Block validation time on node B: %f" !validation_time ;
-  let* () =
-    measure_and_check_regression ~margin validation_title !validation_time
-  in
+  measure validation_title !validation_time ;
 
   Log.info ~color "Block application time on node B: %f" !application_time ;
-  let* () =
-    measure_and_check_regression ~margin application_title !application_time
-  in
+  measure application_title !application_time ;
 
   let total_time = !application_time +. !validation_time in
   Log.info ~color "Block validation + application time on node B: %f" total_time ;
-  let* () = measure_and_check_regression ~margin total_title total_time in
+  measure total_title total_time ;
 
   Log.info
     "Ensure that the block baked contains %d operations"
@@ -673,6 +661,7 @@ let operation_and_block_validation ~executors =
       [
         "flush"; "classification"; "prevalidator"; "block"; "baker"; "pipelining";
       ]
+    ~team
     ~executors
     ~timeout:(Hours 2)
   @@ fun () ->

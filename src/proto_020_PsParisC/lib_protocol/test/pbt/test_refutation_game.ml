@@ -488,8 +488,8 @@ module Dissection = struct
       ~name:"gen_dissection produces a valid dissection"
       ~print
       ~gen
-      (fun (dissection, new_dissection, default_number_of_sections, our_states)
-      ->
+      (fun
+        (dissection, new_dissection, default_number_of_sections, our_states) ->
         let open Lwt_syntax in
         match new_dissection with
         | None -> return (final_dissection ~our_states dissection)
@@ -538,16 +538,17 @@ module Dissection = struct
         "distance < nb_of_sections => (len dissection = succ (dist dissection))"
       ~gen:
         (let open Gen in
-        let* number_of_sections = gen_num_sections in
-        let* ticks = 3 -- (number_of_sections - 1) in
-        let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states =
-          gen_our_states (initial_of_dissection dissection) (succ ticks)
-        in
-        let* new_dissection, start_hash, stop_hash =
-          gen_dissection ~number_of_sections ~our_states dissection
-        in
-        return (new_dissection, start_hash, stop_hash, number_of_sections, ticks))
+         let* number_of_sections = gen_num_sections in
+         let* ticks = 3 -- (number_of_sections - 1) in
+         let* dissection = gen_initial_dissection ~ticks () in
+         let* our_states =
+           gen_our_states (initial_of_dissection dissection) (succ ticks)
+         in
+         let* new_dissection, start_hash, stop_hash =
+           gen_dissection ~number_of_sections ~our_states dissection
+         in
+         return
+           (new_dissection, start_hash, stop_hash, number_of_sections, ticks))
       (fun ( dissection,
              start_chunk,
              stop_chunk,
@@ -571,16 +572,16 @@ module Dissection = struct
       ~name:"distance >= nb_of_sections => (len dissection = nb_of_sections"
       ~gen:
         (let open Gen in
-        let* number_of_sections = gen_num_sections in
-        let* ticks = number_of_sections -- 1_000 in
-        let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states =
-          gen_our_states (initial_of_dissection dissection) (succ ticks)
-        in
-        let* new_dissection, start_chunk, stop_chunk =
-          gen_dissection ~number_of_sections ~our_states dissection
-        in
-        return (new_dissection, start_chunk, stop_chunk, number_of_sections))
+         let* number_of_sections = gen_num_sections in
+         let* ticks = number_of_sections -- 1_000 in
+         let* dissection = gen_initial_dissection ~ticks () in
+         let* our_states =
+           gen_our_states (initial_of_dissection dissection) (succ ticks)
+         in
+         let* new_dissection, start_chunk, stop_chunk =
+           gen_dissection ~number_of_sections ~our_states dissection
+         in
+         return (new_dissection, start_chunk, stop_chunk, number_of_sections))
       (fun (dissection, start_chunk, stop_chunk, default_number_of_sections) ->
         truncate_and_check_error
           dissection
@@ -598,22 +599,22 @@ module Dissection = struct
       ~name:"dissection.start_chunk can not change"
       ~gen:
         (let open Gen in
-        let* number_of_sections = gen_num_sections in
-        let* ticks = gen_nonfinal_initial_dissection_ticks in
-        let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states =
-          gen_our_states (initial_of_dissection dissection) (succ ticks)
-        in
-        let* new_dissection, start_chunk, stop_chunk =
-          gen_dissection ~number_of_sections ~our_states dissection
-        in
-        let* new_state_hash = gen_random_hash in
-        return
-          ( new_dissection,
-            start_chunk,
-            stop_chunk,
-            number_of_sections,
-            new_state_hash ))
+         let* number_of_sections = gen_num_sections in
+         let* ticks = gen_nonfinal_initial_dissection_ticks in
+         let* dissection = gen_initial_dissection ~ticks () in
+         let* our_states =
+           gen_our_states (initial_of_dissection dissection) (succ ticks)
+         in
+         let* new_dissection, start_chunk, stop_chunk =
+           gen_dissection ~number_of_sections ~our_states dissection
+         in
+         let* new_state_hash = gen_random_hash in
+         return
+           ( new_dissection,
+             start_chunk,
+             stop_chunk,
+             number_of_sections,
+             new_state_hash ))
       (fun ( dissection,
              start_chunk,
              stop_chunk,
@@ -645,16 +646,16 @@ module Dissection = struct
       ~name:"dissection.stop_chunk must change"
       ~gen:
         (let open Gen in
-        let* number_of_sections = gen_num_sections in
-        let* ticks = gen_nonfinal_initial_dissection_ticks in
-        let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states =
-          gen_our_states (initial_of_dissection dissection) (succ ticks)
-        in
-        let* new_dissection, start_chunk, stop_chunk =
-          gen_dissection ~number_of_sections ~our_states dissection
-        in
-        return (new_dissection, start_chunk, stop_chunk, number_of_sections))
+         let* number_of_sections = gen_num_sections in
+         let* ticks = gen_nonfinal_initial_dissection_ticks in
+         let* dissection = gen_initial_dissection ~ticks () in
+         let* our_states =
+           gen_our_states (initial_of_dissection dissection) (succ ticks)
+         in
+         let* new_dissection, start_chunk, stop_chunk =
+           gen_dissection ~number_of_sections ~our_states dissection
+         in
+         return (new_dissection, start_chunk, stop_chunk, number_of_sections))
       (fun (dissection, start_chunk, stop_chunk, default_number_of_sections) ->
         let open Lwt_syntax in
         let check_failure_on_same_stop_hash stop_hash =
@@ -690,16 +691,16 @@ module Dissection = struct
         "start_chunk.tick and stop_chunk.tick can not change in the dissection"
       ~gen:
         (let open Gen in
-        let* number_of_sections = gen_num_sections in
-        let* ticks = gen_nonfinal_initial_dissection_ticks in
-        let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states =
-          gen_our_states (initial_of_dissection dissection) (succ ticks)
-        in
-        let* new_dissection, start_chunk, stop_chunk =
-          gen_dissection ~number_of_sections ~our_states dissection
-        in
-        return (new_dissection, start_chunk, stop_chunk, number_of_sections))
+         let* number_of_sections = gen_num_sections in
+         let* ticks = gen_nonfinal_initial_dissection_ticks in
+         let* dissection = gen_initial_dissection ~ticks () in
+         let* our_states =
+           gen_our_states (initial_of_dissection dissection) (succ ticks)
+         in
+         let* new_dissection, start_chunk, stop_chunk =
+           gen_dissection ~number_of_sections ~our_states dissection
+         in
+         return (new_dissection, start_chunk, stop_chunk, number_of_sections))
       (fun (dissection, start_chunk, stop_chunk, default_number_of_sections) ->
         let open Lwt_syntax in
         let expected_error dissection =
@@ -747,29 +748,29 @@ module Dissection = struct
       ~name:"dissection must be well distributed"
       ~gen:
         (let open Gen in
-        (* The test is not general enough to support all kind of number of
-           sections. *)
-        let number_of_sections =
-          Tezos_protocol_020_PsParisC_parameters.Default_parameters
-          .constants_mainnet
-            .sc_rollup
-            .number_of_sections_in_dissection
-        in
-        let* picked_section = 0 -- (number_of_sections - 2) in
-        let* ticks = 100 -- 1_000 in
-        let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states =
-          gen_our_states (initial_of_dissection dissection) (succ ticks)
-        in
-        let* new_dissection, start_chunk, stop_chunk =
-          gen_dissection ~number_of_sections ~our_states dissection
-        in
-        return
-          ( new_dissection,
-            start_chunk,
-            stop_chunk,
-            number_of_sections,
-            picked_section ))
+         (* The test is not general enough to support all kind of number of
+            sections. *)
+         let number_of_sections =
+           Tezos_protocol_020_PsParisC_parameters.Default_parameters
+           .constants_mainnet
+             .sc_rollup
+             .number_of_sections_in_dissection
+         in
+         let* picked_section = 0 -- (number_of_sections - 2) in
+         let* ticks = 100 -- 1_000 in
+         let* dissection = gen_initial_dissection ~ticks () in
+         let* our_states =
+           gen_our_states (initial_of_dissection dissection) (succ ticks)
+         in
+         let* new_dissection, start_chunk, stop_chunk =
+           gen_dissection ~number_of_sections ~our_states dissection
+         in
+         return
+           ( new_dissection,
+             start_chunk,
+             stop_chunk,
+             number_of_sections,
+             picked_section ))
       (fun ( dissection,
              start_chunk,
              stop_chunk,
@@ -1493,15 +1494,16 @@ let test_game ?(count = 10) ~p1_strategy ~p2_strategy () =
       p2_strategy
   in
   qcheck_make_lwt_res
-    ~print:
-      (fun ( _block,
-             _rollup,
-             _commitment_level,
-             _lcc,
-             p1_client,
-             p2_client,
-             p1_start,
-             _payloads_per_levels ) ->
+    ~print:(fun
+        ( _block,
+          _rollup,
+          _commitment_level,
+          _lcc,
+          p1_client,
+          p2_client,
+          p1_start,
+          _payloads_per_levels )
+      ->
       Format.asprintf
         "@[<v>@,@[<v 2>p1:@,%a@]@,@[<v 2>p2:@,%a@]@,%s@,@]"
         pp_player_client

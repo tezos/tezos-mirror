@@ -1,0 +1,7 @@
+# Required in order to build OCaml bindings with ocaml-rs on MacOS
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
+
+[profile.profiling]
+inherits = "release"
+debug = true

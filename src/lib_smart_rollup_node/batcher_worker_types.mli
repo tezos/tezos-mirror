@@ -29,11 +29,18 @@
 module Request : sig
   (** Type of requests accepted by the batcher worker. *)
   type ('a, 'b) t =
-    | Register : string list -> (L2_message.id list, error trace) t
-        (** Request to register new L2 messages in the queue. *)
+    | Register : {
+        messages : string list;
+        drop_duplicate : bool;
+      }
+        -> (L2_message.id list, error trace) t
+        (** Request to register new L2 messages in the queue. if
+            [drop_duplicate] is [true], then the elements of
+            [messages] already processed by the batcher, with
+            [drop_duplicate = true], are dropped. *)
     | Produce_batches : (unit, error trace) t
-        (** Request to produce new messages batches and submit them to
-            the injector. *)
+        (** Request to produce new messages batches and
+             submit them to the injector. *)
 
   type view = View : _ t -> view
 

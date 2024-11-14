@@ -86,6 +86,12 @@ module type T = sig
 
   val remove_operation : t -> Operation_hash.t -> t
 
+  val get_context :
+    chain_store ->
+    predecessor:Store.Block.t ->
+    timestamp:Time.Protocol.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t
+
   module Internal_for_tests : sig
     val get_mempool_operations : t -> protocol_operation Operation_hash.Map.t
 
@@ -381,6 +387,24 @@ module MakeAbstract
     let mempool = Proto.Mempool.remove_operation state.mempool oph in
     let bounding_state = Bounding.remove_operation state.bounding_state oph in
     {state with mempool; bounding_state}
+
+  let get_context chain_store ~predecessor ~timestamp =
+    let open Lwt_result_syntax in
+    let* context = Chain_store.context chain_store predecessor in
+    let chain_id = Chain_store.chain_id chain_store in
+    let predecessor_hash = Store.Block.hash predecessor in
+    let predecessor = (Store.Block.header predecessor).shell in
+    let* value_of_key =
+      Proto.value_of_key
+        ~chain_id
+        ~predecessor_context:context
+        ~predecessor_timestamp:predecessor.Block_header.timestamp
+        ~predecessor_level:predecessor.level
+        ~predecessor_fitness:predecessor.fitness
+        ~predecessor:predecessor_hash
+        ~timestamp
+    in
+    Context.load_cache predecessor_hash context `Lazy value_of_key
 
   module Internal_for_tests = struct
     let get_mempool_operations {mempool; _} = Proto.Mempool.operations mempool

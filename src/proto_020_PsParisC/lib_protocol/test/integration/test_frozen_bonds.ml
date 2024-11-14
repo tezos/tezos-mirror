@@ -15,7 +15,10 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
+
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["frozen_bonds"]
 
 let big_random_amount () =
   match Tez.of_mutez (Int64.add 100_000L (Random.int64 1_000_000L)) with
@@ -708,61 +711,38 @@ let test_delegate_freeze_slash_undelegate () =
       in
       return_unit)
 
-let tests =
-  Tztest.
-    [
-      tztest
-        "frozen bonds - delegate then freeze"
-        `Quick
-        test_delegate_then_freeze_deposit;
-      tztest
-        "frozen bonds - freeze then delegate"
-        `Quick
-        test_freeze_deposit_then_delegate;
-      tztest
-        "frozen bonds - contract remains allocated, user is not a delegate"
-        `Quick
-        (test_allocated_when_frozen_deposits_exists ~user_is_delegate:false);
-      tztest
-        "frozen bonds - contract remains allocated, user is a delegate"
-        `Quick
-        (test_allocated_when_frozen_deposits_exists ~user_is_delegate:true);
-      tztest
-        "frozen bonds - total stake, user is not a delegate"
-        `Quick
-        (test_total_stake ~user_is_delegate:false);
-      tztest
-        "frozen bonds - total stake, user is a delegate"
-        `Quick
-        (test_total_stake ~user_is_delegate:true);
-      tztest "frozen bonds - delegated balance" `Quick test_delegated_balance;
-      tztest "frozen bonds - test rpcs" `Quick test_rpcs;
-      tztest
-        "delegate, freeze, unfreeze, undelegate"
-        `Quick
-        test_delegate_freeze_unfreeze_undelegate;
-      tztest
-        "delegate, freeze, undelegate, unfreeze"
-        `Quick
-        test_delegate_freeze_undelegate_unfreeze;
-      tztest
-        "delegate, double freeze, undelegate, unfreeze"
-        `Quick
-        test_delegate_double_freeze_undelegate_unfreeze;
-      tztest
-        "delegate, freeze, redelegate, unfreeze"
-        `Quick
-        test_delegate_freeze_redelegate_unfreeze;
-      tztest
-        "delegate, freeze, unfreeze, freeze, redelegate"
-        `Quick
-        test_delegate_freeze_unfreeze_freeze_redelegate;
-      tztest
-        "delegate, freeze, slash, undelegate"
-        `Quick
-        test_delegate_freeze_slash_undelegate;
-    ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("frozen bonds", tests)]
-  |> Lwt_main.run
+  register_test ~title:"delegate then freeze" test_delegate_then_freeze_deposit ;
+  register_test ~title:"freeze then delegate" test_freeze_deposit_then_delegate ;
+  register_test
+    ~title:"contract remains allocated, user is not a delegate"
+    (test_allocated_when_frozen_deposits_exists ~user_is_delegate:false) ;
+  register_test
+    ~title:"contract remains allocated, user is a delegate"
+    (test_allocated_when_frozen_deposits_exists ~user_is_delegate:true) ;
+  register_test
+    ~title:"total stake, user is not a delegate"
+    (test_total_stake ~user_is_delegate:false) ;
+  register_test
+    ~title:"total stake, user is a delegate"
+    (test_total_stake ~user_is_delegate:true) ;
+  register_test ~title:"delegated balance" test_delegated_balance ;
+  register_test ~title:"test rpcs" test_rpcs ;
+  register_test
+    ~title:"delegate, freeze, unfreeze, undelegate"
+    test_delegate_freeze_unfreeze_undelegate ;
+  register_test
+    ~title:"delegate, freeze, undelegate, unfreeze"
+    test_delegate_freeze_undelegate_unfreeze ;
+  register_test
+    ~title:"delegate, double freeze, undelegate, unfreeze"
+    test_delegate_double_freeze_undelegate_unfreeze ;
+  register_test
+    ~title:"delegate, freeze, redelegate, unfreeze"
+    test_delegate_freeze_redelegate_unfreeze ;
+  register_test
+    ~title:"delegate, freeze, unfreeze, freeze, redelegate"
+    test_delegate_freeze_unfreeze_freeze_redelegate ;
+  register_test
+    ~title:"delegate, freeze, slash, undelegate"
+    test_delegate_freeze_slash_undelegate

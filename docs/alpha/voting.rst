@@ -101,11 +101,23 @@ might be introduced, a different selection mechanism may be used, the quorum
 requirement might differ, etc.
 
 
+.. _voting_power_alpha:
+
 Voting Power
 ------------
 
-When supporting a proposal or casting a Yea, Nay, or Pass ballot, each delegate
-has a voting power equal to its *stake*. More precisely, the voting power of a delegate during a voting period is its :ref:`staking balance <active_stake_alpha>`, measured in *mutez*, sampled at the beginning of the period. (Note that this is opposed to validator selection for consensus, which is based on the active stake, and sampled at the end of a previous cycle.)
+When supporting a proposal or casting a Yea, Nay, or Pass ballot, each
+delegate has a **voting power** equal to the amount of tez owned by
+all its delegators (including the delegate itself of course), no
+matter whether they are :doc:`staked<staking>` or not.
+
+More precisely, the voting power of a delegate during a voting period
+is the sum of its :ref:`total_staked<total_staked_alpha>` and
+:ref:`total_delegated<total_delegated_alpha>` amounts, measured in
+*mutez*, and snapshotted at the beginning of the voting period. (Note
+the differences from the validator selection for consensus, which is
+based on the more complex :doc:`baking power<baking_power>` instead,
+and sampled at the end of an earlier cycle.)
 
 
 Super-majority and Quorum

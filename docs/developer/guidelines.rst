@@ -167,6 +167,8 @@ Here are a few tips and guidelines on using docstrings.
 - Docstrings in ``.mli`` and ``.ml`` files are handled the same, so do not omit documenting the interfaces in the latter files.
 
 For more information on using docstrings, see the ``odoc`` `documentation for library authors <https://ocaml.github.io/odoc/odoc_for_authors.html>`__.
+In particular, it contains a `cheatsheet <https://ocaml.github.io/odoc/cheatsheet.html>`__ that may be useful.
+
 
 Docstrings errors
 """""""""""""""""
@@ -286,10 +288,11 @@ They complement the code with details at a *different level of abstraction*, thu
   Such comments are written at a higher level of discourse than the code, and provide a basis to understand the provided asbtractions and underlying concepts, and to reason about them.
   For example:
 
-    * An implementation comment inside a module or function body may explain the overall goal and provide a conceptual framework in which the details of the code may be easily understood.
-      Typically, the comment will explain *what* the code is doing, and possibly *why* (e.g., in which context the code is called), rather than *how* it is done --  this can be usually seen in the code itself.
+  * An implementation comment inside a module or function body may explain the overall goal and provide a conceptual framework in which the details of the code may be easily understood.
 
-    * A comment on the interface provided by a library may describe the solution provided for the given problem domain, how the different functions may be combined together, some limitations of the library (e.g. in terms of concurrency), etc.
+    Typically, the comment will explain *what* the code is doing, and possibly *why* (e.g., in which context the code is called), rather than *how* it is done --  this can be usually seen in the code itself.
+
+  * A comment on the interface provided by a library may describe the solution provided for the given problem domain, how the different functions may be combined together, some limitations of the library (e.g. in terms of concurrency), etc.
 
 Comments maintainability
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -396,35 +399,42 @@ Logging Levels
 --------------
 
 The Octez libraries use a logging library with 5 different verbosity *levels*
-defined in ``src/lib_event_logging/internal_event.mli`` for shell and
+defined in ``src/lib_event_logging/internal_event.mli`` for the shell and
 ``src/lib_protocol_environment/sigs/v3/logging.mli`` for protocol code.
 
 It is important to choose the appropriate level for each event in the code to
 avoid flooding the node administrator with too much information.
 
-These are the rules-of-thumb that we use in the code to decide the appropriate
+These are the rules of thumb that we use in the code to decide the appropriate
 level (here listed from most to least verbose) for each event:
 
-- ``Debug`` level -- the most verbose -- it is used by developers to follow
-  the flow of execution of the node at the lowest granularity.
-- ``Info`` level is about all the additional information that you might want to
-  have, but they are not important to have if your node is running OK
-  (and definitely do not require any action).
+- ``Debug`` level, the most verbose, is used by developers to follow
+  the flow of execution of the node at the lowest granularity. Feel free to add
+  detailed info while staying reasonable, as emitting too many logs can be
+  costly even if they are not printed anywhere.
+- ``Info`` level contains additional information that you might want to
+  have, but these logs are not important to have if your node is running OK
+  (and definitely do not require any action). These logs are stored in the
+  daily logs (by default) that devs may want to look for more technical info but should not
+  be too verbose to prevent the log files from growing too large.
 - ``Notice`` level (the default) should be about things that the node
-  admin should be concerned, but that does not require any action.
+  admin should be concerned, but do not require any action. These logs
+  are printed on stdout and should be short, concise, noise-free, and easy to
+  read and understand for a non-developer. They should indicate progress and
+  surprising behavior.
 
-The two following levels are used to provide information to the node
-administrator of possible problems and errors:
+The two following levels are used to alert the node
+administrator about potential problems and errors:
 
-- ``Warning`` level are all those events that might require the attention of
-  the node administrator, and can reveal potential anomalies in the workings of
-  the node.
-- ``Error`` level are all those events that require an intervention of the node
-  administrator or that signal some exceptional circumstance.
+- ``Warning`` level are all those events that might require the node
+  administrator's attention and can reveal potential anomalies in the node's
+  operation.
+- ``Error`` level are all those events that require an intervention from the node
+  administrator or signal exceptional circumstances.
 
 There is another level ``Fatal`` with the highest priority but it is rarely
-relevant. Specifically, ``Fatal`` should be reserved for errors that can
-absolutely not be recovered. All logging at the ``Fatal`` level should be
+relevant. Specifically, ``Fatal`` should be reserved for errors that
+absolutely cannot be recovered. All logging at the ``Fatal`` level should be
 immediately followed by a call to ``Lwt_exit.exit_and_raise``.
 
 Note that a library is never able to decide whether a certain condition is fatal
@@ -432,6 +442,94 @@ or not. Indeed, the application that calls into the library may not consider the
 function call as essential to the continuation of the application's main
 purpose. Consequently, ``Fatal`` should never be used within libraries.
 
+Logging Guidelines
+------------------
+
+Make logs for higher severity levels actionable
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Logs with levels ``Fatal``, ``Error``, and ``Warning`` should be actionable.
+Ensure the log provides sufficient information for debugging and reproduction
+if possible. Include object type, identity (variable and value that identifies
+the context, such as ``pid: 123``), state, error code and other
+critical info if applicable. 
+
+Examples of actionable log:
+
+.. code-block:: bash
+
+    (error code E1007) file ~/.octez-node/config.json is not valid JSON, please remove it and reconfigure your node with 'octez-node config init'
+
+.. code-block:: bash
+
+    [pid:42825][rpc_middleware] : (16) got conn closed, but shutdown callback not found
+
+Example of poor logs:
+
+.. code-block:: bash
+
+    unexpected error
+
+.. code-block:: bash
+
+    cannot parse configuration
+
+Avoid impacting performance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Carefully consider the balance between the performance impact and the need
+for debug capabilities.
+
+- Be cautious about logging in performance-critical sections of the code to
+  avoid unnecessary overhead.
+- Ensure that calculations done solely for logging are performed within the log
+  statement itself, ensuring they are only executed if the logs are enabled.
+
+Make logs readable
+~~~~~~~~~~~~~~~~~~
+
+Print out states and error codes as a plain text unless the state is well
+known as a number. Good examples are ``Enabled`` and ``404``.
+
+Maintain consistency in ``Debug`` logs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``Debug`` logs are often extensive, so prepare them for easier analysis:
+
+- Maintain a consistent style for formatting states and identities, allowing
+  easy log filtering. For example, if you choose to write ``pid: 123``, stick
+  to it and avoid using ``pid=123`` elsewhere for the same context.
+- Place identities in the same order, making it easier to filter logs by
+  multiple parameters simultaneously. For example, use ``conn: 123, pid: 456``.
+- Prefer a table style for logs. Group identities at the beginning of the line
+  and follow with a clear description.
+- Make the log originator easily identifyable. Enabling ``Debug`` logs typically
+  triggers logs from multiple components and logical areas. Ensure it is easy
+  to filter out logs belonging to one logical area or one log originator.
+
+Example of consistent logs:
+
+.. code-block:: bash
+
+    Jun 07 18:11:41.604: [pid:95779][resto] server (18) got conn closed
+    Jun 07 18:11:41.606: [pid:95662][node_run_cmd] (6) got conn closed
+    Jun 07 18:11:41.606: [pid:95662][resto] server (6) got conn closed
+    Jun 07 18:11:41.606: [pid:95662][resto] server (6) closed bound streamed connection
+
+Example of poor logs:
+
+.. code-block:: bash
+
+    May 29 12:15:59.267: started
+    May 29 12:15:59.267: requester worker timout
+    May 29 12:16:31.467: connection closed 3
+    May 29 12:16:31.468: (4) received request
+
+Privacy and Security
+~~~~~~~~~~~~~~~~~~~~
+
+Avoid logging sensitive information. Ensure that logs do not expose private
+data, keys, or personally identifiable information (PII).
 
 Code formatting
 ---------------

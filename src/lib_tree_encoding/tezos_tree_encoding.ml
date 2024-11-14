@@ -234,8 +234,8 @@ module Lazy_map_encoding = struct
         D.map
           (fun (origin, produce_value) -> Map.create ?origin ~produce_value ())
           (let open D.Syntax in
-          let+ produce_value = D.lazy_mapping to_key value.decode in
-          produce_value)
+           let+ produce_value = D.lazy_mapping to_key value.decode in
+           produce_value)
       in
       {encode; decode}
   end
@@ -297,10 +297,10 @@ module Lazy_vector_encoding = struct
           (fun ((origin, produce_value), len, head) ->
             Vector.create ~produce_value ~first_key:head ?origin len)
           (let open D.Syntax in
-          let+ x = D.scope ["contents"] (D.lazy_mapping to_key value.decode)
-          and+ y = D.scope ["length"] with_key.decode
-          and+ z = D.scope ["head"] with_key.decode in
-          (x, y, z))
+           let+ x = D.scope ["contents"] (D.lazy_mapping to_key value.decode)
+           and+ y = D.scope ["length"] with_key.decode
+           and+ z = D.scope ["head"] with_key.decode in
+           (x, y, z))
       in
       {encode; decode}
   end
@@ -345,9 +345,9 @@ module CBV_encoding = struct
         D.map
           (fun ((origin, get_chunk), len) -> CBV.create ?origin ~get_chunk len)
           (let open D.Syntax in
-          let+ x = D.scope ["contents"] @@ D.lazy_mapping to_key chunk.decode
-          and+ y = D.value ["length"] Data_encoding.int64 in
-          (x, y))
+           let+ x = D.scope ["contents"] @@ D.lazy_mapping to_key chunk.decode
+           and+ y = D.value ["length"] Data_encoding.int64 in
+           (x, y))
       in
       {encode; decode}
   end

@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_context_brassaia_helpers)
+ (public_name octez-libs.tezos-context-brassaia.helpers)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.stdlib
+  octez-libs.tezos-context-brassaia.encoding
+  octez-libs.context.sigs
+  octez-libs.tezos-context-brassaia.merkle_proof_encoding
+  octez-libs.brassaia
+  octez-libs.brassaia_pack)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib))

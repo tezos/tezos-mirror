@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_test_helpers)
+ (public_name octez-libs.brassaia_test_helpers)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-alcotezt
+  astring
+  fmt
+  octez-libs.brassaia
+  jsonm
+  logs
+  lwt
+  mtime
+  mtime.clock.os)
+ (preprocess (pps octez-libs.ppx_brassaia.internal))
+ (flags
+  (:standard)
+  -w -66-68
+  -open Octez_alcotezt))

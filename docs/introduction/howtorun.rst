@@ -5,10 +5,11 @@ Running Octez
 
 In this section, we discuss how to take part in the protocol that runs
 the network.
-There are two main ways to participate: delegating
-your coins and running a delegate.
+There are three main ways to participate: delegating
+your coins, staking, and running a delegate.
 The main advantage of delegating your coins is simplicity.
-The second way allows to participate more actively in the protocol, by baking blocks and voting, but is more demanding; however, the extra effort is compensated by more rewards in tez.
+Staking your coins is also as simple, but significantly increases the potential rewards modulo some slightly increased risks.
+The third way allows to participate more actively in the protocol, by baking blocks and voting, but is more demanding; however, the extra effort is compensated by more rewards in tez.
 
 To learn more about the protocol refer to :doc:`this page <../active/protocol_overview>`.
 
@@ -24,15 +25,15 @@ If you don't want to deal with the complexity of running your own
 delegate, you can always take part in the protocol by delegating your
 coins to one.
 
-Both implicit accounts and smart contracts can have a
-delegate. Setting or resetting the delegate of an implicit account is
+Both user accounts and smart contracts can have a
+delegate. Setting or resetting the delegate of a user account is
 achieved by the following command:
 
 ::
 
-   octez-client set delegate for <implicit_account> to <delegate>
+   octez-client set delegate for <user_account> to <delegate>
 
-where ``<implicit_account>`` is the address or alias of the implicit
+where ``<user_account>`` is the address or alias of the user
 account to delegate and ``<delegate>`` is the address or alias of the
 delegate (which has to be :ref:`registered<DelegateRegistration>`).
 
@@ -40,9 +41,7 @@ To stop a delegation, the following command can be used:
 
 ::
 
-   octez-client withdraw delegate from <implicit_account>
-
-
+   octez-client withdraw delegate from <user_account>
 
 Smart contract can also delegate the tokens they hold to registered
 delegates. The initial delegate of a smart contract can be set at
@@ -59,10 +58,10 @@ delegation is by using the ``SET_DELEGATE`` Michelson instruction (see
 details).
 
 
-Notice that only implicit accounts can be delegates, so your delegate
+Notice that only user accounts can be delegates, so your delegate
 must be a *tz* address.
 
-Funds in implicit accounts which are not registered as delegates
+Funds in user accounts which are not registered as delegates
 do not participate in baking.
 
 Note that delegating coins doesn't mean that a delegate can spend
@@ -70,6 +69,44 @@ them, they only add to its delegated balance.
 In turn, delegators can freely spend their own funds in spite of the active delegation (they are not locked, like in other PoS algorithms).
 Technically, delegation is a link between a delegator account and a delegate account, meaning that *all* the funds of the former are delegated to the latter, until the delegation is withdrawn.
 When a delegator spends their tokens, the delegated balance of their delegate decreases; conversely, when they receive tokens the delegated balance of their delegate increases.
+
+Since the activation of the :ref:`new staking mechanism <new_staking>`,
+50% of your total funds count towards your delegator's baking power (before the staking mechanism, 100% of your total funds counted towards your delegator baking power). The delegated funds still count for 100% for the voting power, just like before the activation of the new staking mechanism.
+
+
+Staking your coins
+------------------
+
+Since the activation of the new :ref:`staking mechanism <new_staking>`,
+if you don't want to deal with the complexity of running your own
+delegate, you can also take part in the protocol by staking part of your
+coins to accrue to your delegate’s staking power.
+
+Only user accounts (not smart contracts) can stake funds.
+
+Funds can only be staked to your current delegate. Therefore, staking requires previously declaring a delegate.
+Setting or resetting the delegate of a user account is done as for delegating, see above.
+
+The delegate has no control over your stake: cannot spend it nor unstake it, so your deposit remains yours and under your control.
+Staked coins cannot be spent by yourself, either; but you can unstake them later.
+Your staked funds add to your delegate's staking balance (so staked funds count twice as much as delegated funds).
+In turn, your staked funds are frozen and subject to slashing in case of misbehavior of your delegate such as double signing, similarly to the delegate's own staked funds.
+In compensation of this risk assumed by stakers, they may receive some part of the delegate's rewards, the exact proportion being settable by the delegate.
+
+As opposed to delegation (where you always delegate all your funds), as a staker you can choose a specific amount from your balance to stake, as follows::
+
+  octez-client stake <amount> for <staker>
+
+Later on, you can unstake part or all of your staked funds::
+
+  octez-client unstake <amount|"everything"> for <staker>
+
+The requested amount will immediately be unstaked, however it will remain frozen for some period (4 cycles), and only after that the funds are said to be both unstaked and finalizable.
+At that point, the staker can make them spendable again as follows::
+
+  octez-client finalize unstake for <staker>
+
+For more details on the staking interface, see :ref:`staked_funds_management`.
 
 
 Running a delegate
@@ -81,32 +118,35 @@ attest. A delegate is also responsible for taking part in the
 :doc:`governance process<../active/voting>`.
 
 Rights for baking and attesting are randomly assigned
-to delegates proportionally to their :ref:`active stake<active_stake>`,
-which usually is the same as their staking balance,
-that is, their own balance plus their delegated balance.
+to delegates proportionally to their :doc:`baking power <../alpha/baking_power>`,
+which usually is their own staked funds plus the funds staked by external stakers, plus half of their total delegation.
 
-A :ref:`minimal active stake<def_minimal_stake>` of 6kꜩ
-is required for participating in consensus and in governance.
+A :ref:`minimal active stake<def_minimal_stake>`
+is required for participating in consensus and in governance as a delegate.
 
-.. warning::
+Delegates are required to freeze some of their funds into
+a security deposit (called their own stake), at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`).
+This can be done via the same commands used by external stakers in the previous section.
+Since the activation of the new :ref:`staking mechanism <new_staking>`,
+a delegate may choose to accept (or not) staked funds from external stakers.
+Both the delegate's own stake and the stake from external stakers can be
+:ref:`slashed<slashing>` (that is, partially lost), when the delegate misbehaves by double-signing.
 
-  Starting with the Adaptive-Issuance/Staking proposal, the staking mechanism changes, see :doc:`../alpha/adaptive_issuance`. The rest of this page assumes the current staking mechanism in the active protocol.
+Delegates can set two parameters by configuring their :ref:`staking policy <staking_policy_configuration>`:
 
-Delegates are required to freeze around 10% of their active stake into
-a security deposit (more precisely, it's 10% of the maximum active
-stake during the last 7 cycles). A delegate is
-:ref:`slashed<slashing>`, that is, it looses funds from its
-security deposits when it misbehaves by double-signing. The funds in
-the security deposit come from the delegate's account. In case a
-delegate is over-delegated (that is, its own balance does not cover
-10% of its staking balance), the delegate's active balance is then set
-to be 10 times its own balance. Delegates can set an upper limit to their
-frozen deposits with the following command:
+- the maximum ratio of external stake over their own stake: a factor between 0 and 5, by default 0, which means that:
 
-::
+  + for any factor *f*, the delegate accepts *f* times its own stake from external stakers
+  + by default, delegates don't allow external staking
+- the proportion of rewards kept by the delegator (the rest being paid to external stakers): a factor between 0 and 1, by default 1.
 
-   octez-client set deposits limit for <delegate> to <limit>
+These paramaters are configured as follows::
 
+  octez-client set delegate parameters for  <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
+
+
+If the delegated funds exceed 9 times the delegate’s own stake, the delegate is *overdelegated*. If the staked funds from external stakers exceed the proportion defined by the delegate, the delegate is *overstaked*.
+See details and consequences in :ref:`staking_policy_configuration`.
 
 On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
 you are lucky to obtain more than the minimum required to be a
@@ -121,7 +161,7 @@ Register and check your rights
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To run a delegate, you first need to register as one using
-your implicit account::
+your user account::
 
    octez-client register key bob as delegate
 
@@ -198,6 +238,10 @@ However, it is safe (and actually necessary) to temporarily run two bakers just 
 
 The baker uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 
+.. warning::
+
+    When running a baker, it is recommended to carefully save the nonces generated by the baker as part of the :doc:`consensus protocol <../active/consensus>`, to be able to reveal the nonces before the end of the cycle even if the baker is restarted (e.g., on another machine), so as to avoid losing :ref:`attestation rewards <slashing>`.
+
 Accuser
 ~~~~~~~
 
@@ -218,6 +262,11 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
 The accuser uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 
+DAL node
+~~~~~~~~
+
+When running a delegate, it is recommended to also run a :doc:`Data Availability Layer (DAL) node <../shell/dal_overview>` to support data transmission across the network, see :doc:`../shell/dal_run`.
+
 Docker
 ~~~~~~
 
@@ -227,14 +276,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-Proxford``, you can
+For instance, if the name is ``mainnet_baker-PtParisB``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-Proxford
+    docker logs mainnet_baker-PtParisB
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-Proxford -f
+    docker logs mainnet_baker-PtParisB -f
 
 This allows you to know if you baked.
 You should see lines such as::

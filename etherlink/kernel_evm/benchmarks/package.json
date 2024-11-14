@@ -13,7 +13,10 @@
         "csv-parse": "5.5.0",
         "csv-stringify": "^6.4.2",
         "commander": "^11.0.0",
-        "ml-regression-multivariate-linear": "^2.0.4"
+        "ml-regression-multivariate-linear": "^2.0.4",
+        "uuid": "^9.0.1",
+        "pdfkit": "^0.14.0",
+        "tmp": "^0.2.2"
     },
     "optionalDependencies": {
         "chartjs-node-canvas": "^4.1.6",

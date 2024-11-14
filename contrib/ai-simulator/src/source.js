@@ -61,22 +61,6 @@ const ratio_target = bigRat(50, 100);
  */
 const ratio_radius = bigRat(2, 100);
 
-/* Helpers */
-
-const safe_get = (array, cycle) => {
-  if (cycle < 0) {
-    throw new Error(
-      `Querying data for a negative cycle (${cycle}) is not allowed.`,
-    );
-  }
-  if (cycle >= array.length) {
-    throw new Error(
-      `Querying data for a cycle (${cycle}) that is beyond the maximum cycle, defined as ${array.length}.`,
-    );
-  }
-  return array[cycle];
-};
-
 /**
  * The Adaptive Issuance simulator.
  * @typedef {Object} Simulator
@@ -203,9 +187,10 @@ export class Simulator {
   total_staked_balance(cycle) {
     if (cycle <= this.config.proto.consensus_rights_delay + 1) {
       return bigInt(
-        this.#storage_total_staked[
-          this.config.proto.consensus_rights_delay + 1
-        ],
+        this.#storage_total_staked_mask[cycle] ??
+          this.#storage_total_staked[
+            this.config.proto.consensus_rights_delay + 1
+          ],
       );
     }
     // staked balances are set with adjusted cycles
@@ -294,12 +279,28 @@ export class Simulator {
   }
 
   set_staked_ratio_at(cycle, value) {
-    const ratio = bigRat.clip(bigRat(value), bigRat.zero, bigRat.one);
-    const total_supply = this.total_supply(cycle);
-    const res = ratio.multiply(total_supply).ceil();
-    const i = cycle + this.config.proto.consensus_rights_delay + 1;
-    this.#storage_total_staked_mask[i] = res;
+    this.#prepare_for(cycle);
+    this.#storage_issuance_bonus = [];
     this.#storage_cache_index = Math.min(cycle, this.#storage_cache_index);
+
+    const ratio = bigRat.clip(bigRat(value), bigRat.zero, bigRat.one);
+    const i = cycle + this.config.proto.consensus_rights_delay + 1;
+
+    const total_supply = this.#storage_total_supply[i];
+    const total_staked = this.#storage_total_staked[i];
+    const total_delegated = this.#storage_total_delegated[i];
+
+    const new_value = ratio.multiply(total_supply).ceil();
+
+    const diff_staked = new_value - total_staked;
+    const diff_delegated = this.#storage_total_delegated[i] - diff_staked;
+
+    const new_delegated = Math.max(diff_delegated, 0);
+    const new_staked =
+      diff_delegated < 0 ? new_value + diff_delegated : new_value;
+
+    this.#storage_total_staked_mask[i] = new_staked;
+    this.#storage_total_delegated_mask[i] = new_delegated;
   }
 
   staked_ratio_for_next_cycle(cycle) {
@@ -322,10 +323,10 @@ export class Simulator {
   }
 
   dynamic_rate_for_next_cycle(cycle) {
-    if (cycle <= this.config.chain.ai_activation_cycle) {
+    if (cycle < this.config.chain.ai_activation_cycle) {
       return bigRat.zero;
     }
-    if (this.#storage_issuance_bonus[cycle] != null) {
+    if (this.#storage_issuance_bonus[cycle]) {
       return bigRat(this.#storage_issuance_bonus[cycle]);
     }
     const previous_bonus = this.dynamic_rate_for_next_cycle(cycle - 1);
@@ -529,7 +530,9 @@ export class Simulator {
 
     const delegated = this.total_delegated_balance(cycle - 1);
 
-    const staked = this.total_staked_balance(cycle);
+    const staked = this.total_staked_balance(
+      cycle + this.config.proto.consensus_rights_delay,
+    );
 
     if (this.is_ai_activated(cycle)) {
       const ratio_for_delegated = bigRat(delegated).divide(
@@ -686,7 +689,7 @@ export class Simulator {
  * @return {Delegate}. A delegate.
  */
 export class Delegate {
-  #storage_cache_index = -1;
+  #storage_cache_index = 0;
   #registration_cycle = null;
 
   #storage_own_staked_balance = [0];
@@ -697,6 +700,7 @@ export class Delegate {
   #storage_own_staked_balance_mask = [];
   #storage_third_party_staked_balance_mask = [];
   #storage_own_spendable_balance_mask = [];
+  #storage_third_party_delegated_balance_mask = [];
 
   constructor(simulator, config) {
     this.simulator = simulator;
@@ -704,7 +708,7 @@ export class Delegate {
   }
 
   clear() {
-    this.#storage_cache_index = -1;
+    this.#storage_cache_index = 0;
     this.#storage_own_staked_balance = [0];
     this.#storage_third_party_staked_balance = [0];
     this.#storage_own_spendable_balance = [0];
@@ -733,7 +737,10 @@ export class Delegate {
   }
 
   #third_party_delegated_balance(cycle) {
-    return this.#storage_third_party_delegated_balance[cycle];
+    return (
+      this.#storage_third_party_delegated_balance_mask[cycle] ??
+      this.#storage_third_party_delegated_balance[cycle]
+    );
   }
 
   // The storage_cache_index is used to register what are the values
@@ -747,7 +754,7 @@ export class Delegate {
   }
 
   set_third_party_delegated_balance(cycle, value) {
-    this.#storage_third_party_delegated_balance[cycle] = value;
+    this.#storage_third_party_delegated_balance_mask[cycle] = value;
     this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
 
@@ -757,6 +764,9 @@ export class Delegate {
   }
 
   set_third_party_staked_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
     this.#storage_third_party_staked_balance_mask[cycle] = value;
     this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
@@ -801,7 +811,7 @@ export class Delegate {
 
     const considered_staked = bigInt.min(
       own_staked.add(third_party_staked),
-      max_third_party_staked,
+      own_staked.add(max_third_party_staked),
     );
 
     const stake_diff = max_third_party_staked.minus(third_party_staked);
@@ -810,7 +820,10 @@ export class Delegate {
       ? bigInt.zero
       : stake_diff.negate();
 
-    const available_staked = stake_diff.isPositive() ? stake_diff : bigInt.zero;
+    const available_staked =
+      this.simulator.is_ai_activated(cycle) && stake_diff.isPositive()
+        ? stake_diff
+        : bigInt.zero;
 
     const own_delegated = bigInt(this.#own_spendable_balance(cycle));
     const third_party_delegated = bigInt(
@@ -821,7 +834,7 @@ export class Delegate {
       .add(third_party_delegated)
       .add(over_staked);
 
-    const max_delegated = considered_staked.times(9);
+    const max_delegated = own_staked.times(9);
 
     const delegated_diff = max_delegated.minus(extended_delegated);
 
@@ -880,13 +893,16 @@ export class Delegate {
 
     const ratio_denum = considered_staked.times(2).add(considered_delegated);
 
-    const ratio_for_staking = ratio_denum.isZero()
-      ? bigRat.zero
-      : bigRat(considered_staked.times(2)).divide(ratio_denum);
+    const ratio_for_staking =
+      ratio_denum.isZero() || !this.simulator.is_ai_activated(adjusted_cycle)
+        ? bigRat.zero
+        : bigRat(considered_staked.times(2)).divide(ratio_denum);
 
     const ratio_for_delegating = ratio_denum.isZero()
       ? bigRat.zero
-      : bigRat(considered_delegated).divide(ratio_denum);
+      : !this.simulator.is_ai_activated(adjusted_cycle)
+        ? bigRat.one
+        : bigRat(considered_delegated).divide(ratio_denum);
 
     return { baking_power, ratio_for_staking, ratio_for_delegating };
   }
@@ -924,24 +940,15 @@ export class Delegate {
       estimated_number_of_attestations *
       this.simulator.attestation_reward_per_slot(cycle);
 
-    const { baking_power: previous_baking_power } = this.baking_power(
-      cycle - 1,
-    );
-
-    const previous_estimated_number_of_blocks_baked = previous_baking_power
-      .times(this.simulator.config.proto.blocks_per_cycle)
-      .ceil()
-      .valueOf();
-
     const estimated_rewards_for_nonce_revelation =
-      previous_estimated_number_of_blocks_baked *
+      (estimated_number_of_blocks_baked /
+        this.simulator.config.proto.blocks_per_commitment) *
       this.simulator.seed_nonce_revelation_tip(cycle);
 
-    const estimated_rewards_for_vdf_revelation = baking_power.isZero()
-      ? 0
-      : (this.simulator.config.proto.blocks_per_cycle /
-          this.simulator.config.proto.blocks_per_commitment) *
-        this.simulator.vdf_revelation_tip(cycle);
+    const estimated_rewards_for_vdf_revelation =
+      (estimated_number_of_blocks_baked /
+        this.simulator.config.proto.blocks_per_commitment) *
+      this.simulator.vdf_revelation_tip(cycle);
 
     const estimated_total_rewards =
       estimated_rewards_for_fixed_portion_baking +
@@ -958,17 +965,6 @@ export class Delegate {
       estimated_total_rewards,
     );
 
-    const estimated_rewards_from_edge_of_baking_over_staking =
-      estimated_rewards_from_staking
-        .times(this.config.delegate_policy.edge_of_baking_over_staking)
-        .ceil()
-        .valueOf();
-
-    const reduced_estimated_rewards_from_staking =
-      estimated_rewards_from_staking.minus(
-        estimated_rewards_from_edge_of_baking_over_staking,
-      );
-
     const { own_staked, considered_staked } = this.delegate_info(cycle);
 
     const ratio_own_stake = considered_staked.isZero()
@@ -980,14 +976,24 @@ export class Delegate {
       : bigRat.one.minus(ratio_own_stake);
 
     const estimated_rewards_from_own_staking = ratio_own_stake
-      .times(reduced_estimated_rewards_from_staking)
+      .times(estimated_rewards_from_staking)
       .ceil()
       .valueOf();
 
-    const estimated_rewards_from_third_party_staking = ratio_third_party_stake
-      .times(reduced_estimated_rewards_from_staking)
-      .ceil()
-      .valueOf();
+    const estimated_rewards_from_third_party_staking_raw =
+      ratio_third_party_stake.times(estimated_rewards_from_staking);
+
+    const estimated_rewards_from_edge_of_baking_over_staking =
+      estimated_rewards_from_third_party_staking_raw
+        .times(this.config.delegate_policy.edge_of_baking_over_staking)
+        .ceil()
+        .valueOf();
+
+    const estimated_rewards_from_third_party_staking =
+      estimated_rewards_from_third_party_staking_raw
+        .minus(estimated_rewards_from_edge_of_baking_over_staking)
+        .ceil()
+        .valueOf();
 
     return {
       estimated_number_of_blocks_baked,
@@ -1006,31 +1012,91 @@ export class Delegate {
   }
 
   #compute_new_balances(cycle) {
-    const rewards = this.estimated_rewards(cycle);
+    if (cycle < 0) {
+      return; // should not happen
+    }
 
-    this.#storage_own_staked_balance[cycle + 1] =
-      this.#storage_own_staked_balance_mask[cycle + 1] ??
-      this.#storage_own_staked_balance[cycle] +
-        rewards.estimated_rewards_from_own_staking +
-        rewards.estimated_rewards_from_edge_of_baking_over_staking;
+    if (cycle == 0) {
+      this.#storage_own_staked_balance[0] =
+        this.#storage_own_staked_balance_mask[0] ?? 0;
 
-    this.#storage_third_party_staked_balance[cycle + 1] =
-      this.#storage_third_party_staked_balance_mask[cycle + 1] ??
-      this.#storage_third_party_staked_balance[cycle] +
-        rewards.estimated_rewards_from_third_party_staking;
+      this.#storage_third_party_staked_balance[0] =
+        this.#storage_third_party_staked_balance_mask[0] ?? 0;
 
-    this.#storage_own_spendable_balance[cycle + 1] =
-      this.#storage_own_spendable_balance_mask[cycle + 1] ??
-      this.#storage_own_spendable_balance[cycle] +
-        rewards.estimated_rewards_from_delegating;
+      this.#storage_own_spendable_balance[0] =
+        this.#storage_own_spendable_balance_mask[0] ?? 0;
 
-    this.#storage_third_party_delegated_balance[cycle + 1] =
-      this.#storage_third_party_delegated_balance[cycle + 1] ??
-      this.#storage_third_party_delegated_balance[cycle];
+      this.#storage_third_party_delegated_balance[0] =
+        this.#storage_third_party_delegated_balance_mask[0] ?? 0;
+
+      return;
+    }
+
+    const rewards = this.estimated_rewards(cycle - 1);
+
+    if (!this.simulator.is_ai_activated(cycle)) {
+      const previous_own_staked_balance =
+        this.#storage_own_staked_balance[cycle - 1];
+
+      const previous_third_party_delegated =
+        this.#storage_third_party_delegated_balance[cycle - 1];
+
+      const previous_own_spendable_balance =
+        this.#storage_own_spendable_balance[cycle - 1];
+
+      const previous_total_delegated =
+        previous_own_spendable_balance + previous_third_party_delegated;
+
+      const new_own_staked_balance = Math.round(
+        (1 / 10) *
+          (previous_own_staked_balance +
+            previous_total_delegated +
+            rewards.estimated_total_rewards),
+      );
+
+      const new_own_spendable_balance =
+        previous_own_spendable_balance -
+        (previous_own_staked_balance - new_own_staked_balance);
+
+      this.#storage_own_staked_balance[cycle] =
+        this.#storage_own_staked_balance_mask[cycle] ?? new_own_staked_balance;
+
+      this.#storage_own_spendable_balance[cycle] =
+        this.#storage_own_spendable_balance_mask[cycle] ??
+        new_own_spendable_balance;
+
+      this.#storage_third_party_delegated_balance[cycle] =
+        this.#storage_third_party_delegated_balance_mask[cycle] ??
+        this.#storage_third_party_delegated_balance[cycle - 1];
+
+      this.#storage_third_party_staked_balance[cycle] =
+        this.#storage_third_party_staked_balance_mask[cycle] ??
+        this.#storage_third_party_staked_balance[cycle - 1];
+    } else {
+      this.#storage_own_staked_balance[cycle] =
+        this.#storage_own_staked_balance_mask[cycle] ??
+        this.#storage_own_staked_balance[cycle - 1] +
+          rewards.estimated_rewards_from_own_staking +
+          rewards.estimated_rewards_from_edge_of_baking_over_staking;
+
+      this.#storage_third_party_staked_balance[cycle] =
+        this.#storage_third_party_staked_balance_mask[cycle] ??
+        this.#storage_third_party_staked_balance[cycle - 1] +
+          rewards.estimated_rewards_from_third_party_staking;
+
+      this.#storage_own_spendable_balance[cycle] =
+        this.#storage_own_spendable_balance_mask[cycle] ??
+        this.#storage_own_spendable_balance[cycle - 1] +
+          rewards.estimated_rewards_from_delegating;
+
+      this.#storage_third_party_delegated_balance[cycle] =
+        this.#storage_third_party_delegated_balance_mask[cycle] ??
+        this.#storage_third_party_delegated_balance[cycle - 1];
+    }
   }
 
   #prepare_for(cycle) {
-    for (let i = this.#storage_cache_index + 1; i < cycle; i++) {
+    for (let i = this.#storage_cache_index; i <= cycle; i++) {
       this.#compute_new_balances(i);
       this.#storage_cache_index++;
     }
@@ -1054,5 +1120,53 @@ export class Delegate {
   third_party_delegated_balance(cycle) {
     this.#prepare_for(cycle);
     return this.#third_party_delegated_balance(cycle);
+  }
+
+  ratio_own_staked_spendable_balance(cycle) {
+    this.#prepare_for(cycle);
+    return (
+      100 *
+      (this.#own_staked_balance(cycle) /
+        (this.#own_staked_balance(cycle) + this.#own_spendable_balance(cycle)))
+    );
+  }
+
+  ratio_third_party_staked_delegated_balance(cycle) {
+    this.#prepare_for(cycle);
+    return (
+      100 *
+      (this.#third_party_staked_balance(cycle) /
+        (this.#third_party_delegated_balance(cycle) +
+          this.#third_party_staked_balance(cycle)))
+    );
+  }
+
+  set_ratio_own_staked_spendable_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
+    const staked = this.#own_staked_balance(cycle);
+    const spendable = this.#own_spendable_balance(cycle);
+    const den = staked + spendable;
+    const new_staked = Math.round((value / 100) * den);
+    const new_spendable = den - new_staked;
+    this.set_own_staked_balance(cycle, new_staked);
+    this.set_own_spendable_balance(cycle, new_spendable);
+  }
+
+  set_ratio_third_party_staked_delegated_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
+    if (this.config.delegate_policy.limit_of_staking_over_baking == 0) {
+      return;
+    }
+    const staked = this.#third_party_staked_balance(cycle);
+    const delegated = this.#third_party_delegated_balance(cycle);
+    const den = staked + delegated;
+    const new_staked = Math.round((value / 100) * den);
+    const new_delegated = den - new_staked;
+    this.set_third_party_staked_balance(cycle, new_staked);
+    this.set_third_party_delegated_balance(cycle, new_delegated);
   }
 }

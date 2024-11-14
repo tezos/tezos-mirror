@@ -6,9 +6,3 @@
  (public_name tezos-tooling)
  (instrumentation (backend bisect_ppx))
  (modules))
-
-(executable
- (name node_wrapper)
- (libraries
-  unix)
- (modules node_wrapper))

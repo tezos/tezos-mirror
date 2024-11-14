@@ -20,6 +20,8 @@ val kernel_logs_directory : data_dir:string -> string
     [simulation] adds a prefix to the event to differenciate the logs.
 *)
 val execute :
+  ?wasm_pvm_fallback:bool ->
+  ?profile:bool ->
   ?kind:Events.kernel_log_kind ->
   data_dir:string ->
   ?log_file:string ->
@@ -36,6 +38,13 @@ val init : kernel:string -> t tzresult Lwt.t
     state. *)
 val modify : key:string -> value:string -> t -> t Lwt.t
 
+(** [delete ~kind evm_state key] delete the value/directory at [key] *)
+val delete : kind:Tezos_scoru_wasm.Durable.kind -> t -> string -> t Lwt.t
+
+(** [exists evm_state key] returns [true] if a value or a tree/subtree
+    exists under [key] in [evm_state], [false] otherwise. *)
+val exists : t -> string -> bool Lwt.t
+
 (** [inspect evm_state key] returns the value stored under [key] in
     [evm_state], if any. *)
 val inspect : t -> string -> bytes option Lwt.t
@@ -49,6 +58,7 @@ val subkeys : t -> string -> string trace Lwt.t
     [kernel_run]) with [input] within the inbox of [evm_state], and
     returns [input.insights_requests]. *)
 val execute_and_inspect :
+  ?wasm_pvm_fallback:bool ->
   data_dir:string ->
   ?wasm_entrypoint:string ->
   config:Config.config ->
@@ -58,13 +68,13 @@ val execute_and_inspect :
 
 (** [current_block_height evm_state] returns the height of the latest block
     produced by the kernel. *)
-val current_block_height : t -> Ethereum_types.block_height Lwt.t
+val current_block_height : t -> Ethereum_types.quantity Lwt.t
 
 (** Same as {!current_block_height} for the block hash. *)
 val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
 
 type apply_result =
-  | Apply_success of t * Ethereum_types.block_height * Ethereum_types.block_hash
+  | Apply_success of {evm_state : t; block : Ethereum_types.block}
   | Apply_failure
 
 (** [apply_blueprint ~data-dir ~config state payload] applies the
@@ -76,6 +86,9 @@ type apply_result =
     {!kernel_logs_directory}.
 *)
 val apply_blueprint :
+  ?wasm_pvm_fallback:bool ->
+  ?log_file:string ->
+  ?profile:bool ->
   data_dir:string ->
   config:Config.config ->
   t ->
@@ -89,3 +102,22 @@ val flag_local_exec : t -> t Lwt.t
 (** [clear_delayed_inbox evm_state] removes the delayed inbox from the current
     EVM state. *)
 val clear_delayed_inbox : t -> t Lwt.t
+
+val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
+
+(** [irmin_store_path ~data_dir] returns the path wherein the Irmin store is
+    expected to be located, relatively to the data directory. *)
+val irmin_store_path : data_dir:string -> string
+
+val preload_kernel : t -> unit Lwt.t
+
+(** [get_delayed_inbox_item state hash] returns the delayed inbox content behind
+    the hash [hash]. It fails if the hash does not exist or if the value
+    cannot be decoded. *)
+val get_delayed_inbox_item :
+  t -> Ethereum_types.hash -> Evm_events.Delayed_transaction.t tzresult Lwt.t
+
+(**[clear_block_storage block state] removes the parent of [block], and all
+   durable storage information stored for [block], if this function is called
+   they need to be store elsewhere, mainly it consists in transactions. *)
+val clear_block_storage : Ethereum_types.block -> t -> t Lwt.t

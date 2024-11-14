@@ -2,6 +2,39 @@
 ; Edit file manifest/main.ml instead.
 
 (library
+ (name octez_smart_rollup_node_store)
+ (public_name octez-l2-libs.octez-smart-rollup-node-lib.store)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-l2-libs.layer2_store
+  octez-l2-libs.rollup_node_sqlite_migrations
+  octez-l2-libs.sqlite
+  octez-l2-libs.smart-rollup)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_stdlib_unix
+  -open Tezos_layer2_store
+  -open Octez_sqlite
+  -open Octez_smart_rollup)
+ (modules
+  store_version
+  sql_store
+  store_sig
+  store_v0
+  store_v1
+  store_v2
+  store_v3
+  store_v4
+  store_v5
+  store
+  store_migration))
+
+(library
  (name octez_smart_rollup_node)
  (public_name octez-smart-rollup-node-lib)
  (instrumentation (backend bisect_ppx))
@@ -12,19 +45,17 @@
   octez-libs.crypto
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  cohttp-lwt-unix
+  octez-libs.cohttp-lwt-unix
   tezos-openapi
   octez-node-config
-  prometheus-app
-  camlzip
-  tar
-  tar-unix
+  octez-libs.prometheus-app
   tezos-dal-node-lib
   tezos-dac-lib
   tezos-dac-client-lib
   octez-injector
   octez-version.value
   octez-l2-libs.layer2_store
+  octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-crawler
   octez-libs.tezos-workers
   octez-l2-libs.smart-rollup)
@@ -42,6 +73,21 @@
   -open Octez_injector
   -open Tezos_version_value
   -open Tezos_layer2_store
+  -open Octez_smart_rollup_node_store
   -open Octez_crawler
   -open Tezos_workers
-  -open Octez_smart_rollup))
+  -open Octez_smart_rollup)
+ (modules
+  (:standard
+   \
+   store_version
+   sql_store
+   store_sig
+   store_v0
+   store_v1
+   store_v2
+   store_v3
+   store_v4
+   store_v5
+   store
+   store_migration)))

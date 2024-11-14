@@ -50,7 +50,7 @@ for specfile in "$myhome"/*spec.in; do
   #
   rpm_name=${OCTEZ_PKGNAME}-${pg}
   init_name=${OCTEZ_REALNAME}-${pg}
-  rpm_vers=$(echo "${pkg_vers}" | tr -d '~')
+  rpm_vers=$(echo "${pkg_vers}" | tr -d '~' | tr '-' '_')
   rpm_fullname="${rpm_name}-${rpm_vers}-${OCTEZ_PKGREV}.${rpm_arch}.rpm"
 
   binaries=$(fixBinaryList "${common}/${pg}-binaries")

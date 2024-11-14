@@ -31,6 +31,8 @@
                  and [--votefile] options.
 *)
 
+let team = Tag.layer1
+
 let default_votefile = "per_block_votes.json"
 
 let ensure_removal path p =
@@ -105,7 +107,7 @@ let test_all_per_block_votes =
   Protocol.register_test
     ~__FILE__
     ~title:"liquidity baking with per-block votes"
-    ~tags:["liquidity"; "baking"; "votes"]
+    ~tags:[team; "liquidity"; "baking"; "votes"]
     ~supports:
       (Protocol.Between_protocols (Protocol.number Alpha, Protocol.number Alpha))
     ~uses:(fun protocol -> [Protocol.baker protocol])

@@ -19,10 +19,10 @@ let add_pending_transaction :
     ~description:"Add a pending operation to the injector queue"
     ~query:Tezos_rpc.Query.empty
     ~input:Injector_server_operation.encoding
-    ~output:Inj_operation.Id.encoding
+    ~output:Injector_sigs.Id.encoding
     Tezos_rpc.Path.(root / "add_pending_transaction")
 
-type op_query = {op_id : Inj_operation.Id.t}
+type op_query = {op_id : Injector_sigs.Id.t}
 
 let op_id_arg =
   Tezos_rpc.Arg.make
@@ -30,8 +30,8 @@ let op_id_arg =
     ~descr:"Id of operation in injector"
     ~destruct:(fun s ->
       Result.map_error (fun e -> Format.asprintf "%a" pp_print_trace e)
-      @@ Injector_server.Inj_operation.Id.of_b58check s)
-    ~construct:Injector_server.Inj_operation.Id.to_b58check
+      @@ Injector_sigs.Id.of_b58check s)
+    ~construct:Injector_sigs.Id.to_b58check
     ()
 
 let injector_op_query : op_query Tezos_rpc.Query.t =

@@ -129,12 +129,17 @@ let run ~data_dir (cctxt : Client_context.full) =
     }
   in
   let* (Configuration.{rpc_address; rpc_port; data_dir = _; block_delay; signer}
-       as config) =
+        as config) =
     Configuration.load ~data_dir
   in
   let*? signers = make_signers_for_transactions signer block_delay in
+  let chain = cctxt#chain in
   let*! l1_ctxt =
-    Octez_crawler.Layer_1.start ~name:"injector" ~reconnection_delay:2.0 cctxt
+    Octez_crawler.Layer_1.start
+      ~name:"injector"
+      ~chain
+      ~reconnection_delay:2.0
+      (cctxt :> Tezos_rpc.Context.generic)
   in
   let* () = Injector_server.init cctxt l1_ctxt ~data_dir state ~signers in
   let*! () = Event.(emit accepting_requests) ("HTTP", config.rpc_port) in

@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V12.Make(Name)()\n")))
+   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V13.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_alpha)
@@ -218,8 +218,8 @@
   Sc_rollup_commitment_storage
   Sc_rollup_outbox_storage
   Sc_rollup_whitelist_storage
-  Sc_rollup_stake_storage
   Sc_rollup_storage
+  Sc_rollup_stake_storage
   Dal_slot_storage
   Sc_rollup_refutation_storage
   Zk_rollup_errors
@@ -285,8 +285,6 @@
   Services_registration
   Constants_services
   Sapling_services
-  Contract_services
-  Delegate_services
   Voting_services
   Dal_services
   Adaptive_issuance_services
@@ -518,8 +516,8 @@
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
-  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
@@ -585,8 +583,6 @@
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
   sapling_services.ml
-  contract_services.ml contract_services.mli
-  delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
   adaptive_issuance_services.ml adaptive_issuance_services.mli
@@ -819,8 +815,8 @@
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
-  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
@@ -886,8 +882,6 @@
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
   sapling_services.ml
-  contract_services.ml contract_services.mli
-  delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
   adaptive_issuance_services.ml adaptive_issuance_services.mli
@@ -1104,8 +1098,8 @@
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
-  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
@@ -1171,8 +1165,6 @@
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
   sapling_services.ml
-  contract_services.ml contract_services.mli
-  delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
   adaptive_issuance_services.ml adaptive_issuance_services.mli

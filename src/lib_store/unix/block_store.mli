@@ -350,6 +350,25 @@ val load :
   readonly:bool ->
   block_store tzresult Lwt.t
 
+val lock_block_store : t -> unit Lwt.t
+
+val unlock_block_store : t -> unit Lwt.t
+
+(** [sync ?last_status block_store] updates the [block_store] internal
+    file descriptors so that the return block store points to the
+    latest fds. This is useful to keep track of a block store opened
+    in readonly mode that is updated by another read/write
+    instance.
+    If [last_status] is provided, it gives a hint about the previous
+    sync call and may avoid unnecessary synchronizations. As a result,
+    a promise to cleanup resources is returned. This closure must be
+    evaluated after switching to the synchronized block_store to close
+    former resources and avoid leaks. *)
+val sync :
+  last_status:Block_store_status.t ->
+  t ->
+  (t * Block_store_status.t * (unit -> unit Lwt.t)) tzresult Lwt.t
+
 (** [register_gc_callback block_store callback] installs a [callback]
    that may be triggered during a block store merge in order to
    garbage-collect old contexts. *)
@@ -376,6 +395,11 @@ val close : block_store -> unit Lwt.t
 (** [may_recover_merge block_store] recovers, if needed, from a
    [block_store] where the merge procedure was interrupted. *)
 val may_recover_merge : block_store -> unit tzresult Lwt.t
+
+(** Utility function that aims to give an overview of the shape of the
+    store's metadata. *)
+val stat_metadata_cycles :
+  t -> (string * metadata_stat list) list tzresult Lwt.t
 
 (** Upgrade the block_store_status *)
 val v_3_1_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t

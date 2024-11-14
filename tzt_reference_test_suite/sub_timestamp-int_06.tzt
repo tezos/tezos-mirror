@@ -1,0 +1,3 @@
+code { SUB } ;
+input { Stack_elt timestamp "2024-04-16T10:09:57+02:00" ; Stack_elt int 0 } ;
+output { Stack_elt timestamp "2024-04-16T10:09:57+02:00" }

@@ -1,0 +1,62 @@
+[workspace]
+resolver = "2"
+members = ["lib", "sandbox"]
+exclude = ["jstz", "dummy_kernel", "tests"]
+
+[workspace.dependencies]
+bincode = "1.3.3"
+color-eyre = "0.6.2"
+comfy-table = "7.1.1"
+crossterm = "0.27.0"
+derive_more = "0.99.17"
+ed25519-dalek = "2.1.0"
+enum-tag = "0.3.0"
+goblin = "0.7.1"
+ieee-apsqrt = "0.1.1"
+itertools = "0.12.1"
+lazy_static = "1.4.0"
+meansd = "2.1.0"
+num_enum = "0.7.2"
+numfmt = "1.1.1"
+ocaml = "1.0.1"
+ocaml-build = "1.0.0"
+paste = "1.0.14"
+proptest = "1.4.0"
+quanta = "0.12.3"
+rand = "0.8.5"
+ratatui = "0.26.1"
+rustc_apfloat = "0.2.0"
+serde_json = "1.0.115"
+sha2 = "0.10.8"
+tempfile = "3.10.1"
+tezos-smart-rollup-constants.path = "../kernel_sdk/constants"
+tezos-smart-rollup-encoding.path = "../kernel_sdk/encoding"
+tezos-smart-rollup-utils.path = "../kernel_sdk/utils"
+thiserror = "1.0.57"
+vm-fdt = "0.3.0"
+goldenfile = "1.7.1"
+arbitrary-int = "1.2.7"
+
+[workspace.dependencies.tezos-smart-rollup]
+path = "../kernel_sdk/sdk"
+features = ["utils"]
+
+[workspace.dependencies.tezos_crypto_rs]
+version = "0.6.0"
+default-features = false
+
+[workspace.dependencies.strum]
+version = "0.26.1"
+features = ["derive"]
+
+[workspace.dependencies.clap]
+version = "4.4.6"
+features = ["derive"]
+
+[workspace.dependencies.serde]
+version = "1.0.197"
+features = ["derive"]
+
+[workspace.dependencies.hex]
+version = "0.4.3"
+features = ["serde"]

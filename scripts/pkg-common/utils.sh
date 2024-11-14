@@ -44,9 +44,6 @@ protocols=$(tr '\n' ' ' < $proto_file | sed -e 's/ $//g')
 
 # Variables
 #
-# Where the zcash files are
-zcashdir="_opam/share/zcash-params"
-#
 # Package maintainer
 OCTEZ_PKGMAINTAINER=${OCTEZ_PKGMAINTAINER:-package@nomadic-labs.com}
 #
@@ -115,21 +112,25 @@ warnings() {
 
 getOctezVersion() {
 
-  if ! version=$(dune exec src/lib_version/exe/octez_print_version.exe -- --json 2> /dev/null); then
-    echo "Cannot get version. Try eval \`opam env\`?" >&2
-    exit 1
-  fi
-  major=$(echo "$version" | jq -r .major)
-  minor=$(echo "$version" | jq -r .minor)
-  info=$(echo "$version" | jq -r .info)
-  short_hash=$(echo "$version" | jq -r .hash)
+  . scripts/ci/octez-packages-version.sh
 
-  case $info in
-  *dev)
-    RET="$major.$minor$info+$short_hash"
+  # provide defaults for local compilation
+  COMMIT_SHORT_SHA=${CI_COMMIT_SHORT_SHA:-$(git rev-parse --short HEAD)}
+
+  case "$RELEASETYPE" in
+  ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
+    # rpm version do not accept '-' as a character
+    # https://rpm-software-management.github.io/rpm/manual/spec.html
+    RET=$(echo "$VERSION" | tr '-' '~')
+    ;;
+  SoftRelease)
+    RET=$(date +'%Y%m%d%H%M')+$(echo "${CI_COMMIT_TAG:-}" | tr '-' '_')
+    ;;
+  Master | TestBranch)
+    RET=$(date +'%Y%m%d%H%M')+$COMMIT_SHORT_SHA
     ;;
   *)
-    RET="$major.$minor$info"
+    RET=$(date +'%Y%m%d%H%M')+$COMMIT_SHORT_SHA
     ;;
   esac
 
@@ -175,13 +176,15 @@ fixBinaryList() {
 zcashParams() {
   _pkgzcash=$1
   _zcashtgt=$2
+  # Where the zcash files are
+  _zcashdir=${3:-"_opam/share/zcash-params"}
 
   if [ -f "${_pkgzcash}" ]; then
     zcashstuff=$(cat "${_pkgzcash}" 2> /dev/null)
     echo "=> Zcash"
     mkdir -p "${_zcashtgt}"
     for shr in ${zcashstuff}; do
-      cp "${zcashdir}/${shr}" \
+      cp "${_zcashdir}/${shr}" \
         "${_zcashtgt}"
     done
   fi

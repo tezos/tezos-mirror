@@ -41,6 +41,12 @@ let commit_info_encoding =
     (fun (commit_hash, commit_date) -> {commit_hash; commit_date})
     (obj2 (req "commit_hash" string) (req "commit_date" string))
 
+let commit_info_pp f ({commit_hash; _} : commit_info) =
+  Format.fprintf f "%s" commit_hash
+
+let commit_info_pp_short f ({commit_hash; _} : commit_info) =
+  Format.fprintf f "%s" (String.sub commit_hash 0 8)
+
 (* Locally defined encoding for Version.additional_info *)
 let additional_info_encoding =
   let open Data_encoding in
@@ -109,3 +115,45 @@ let encoding =
        (req "version" version_encoding)
        (req "network_version" Network_version.encoding)
        (req "commit_info" (option commit_info_encoding)))
+
+let commit_info_equivalent c1 c2 =
+  let c1 = String.lowercase_ascii c1.commit_hash in
+  let c2 = String.lowercase_ascii c2.commit_hash in
+  String.starts_with ~prefix:c1 c2 || String.starts_with ~prefix:c2 c1
+
+let partially_compare (v1 : Version.t) (c1 : commit_info option)
+    (v2 : Version.t) (c2 : commit_info option) =
+  let is_dev (v : Tezos_version_parser.t) =
+    let open Tezos_version_parser in
+    match v.additional_info with
+    | Dev | Beta_dev _ | RC_dev _ -> true
+    | Beta _ | RC _ | Release -> false
+  in
+  let is_commit_equal =
+    match (c1, c2) with
+    | None, _ | _, None -> None
+    | Some x, Some y -> Some (commit_info_equivalent x y)
+  in
+  let version_comparison =
+    if v1 = v2 then Some 0
+    else if v1.product <> v2.product || is_dev v1 || is_dev v2 then None
+    else
+      let major_comp = Int.compare v1.major v2.major in
+      if major_comp <> 0 then Some major_comp
+      else
+        let minor_comp = Int.compare v1.minor v2.minor in
+        if minor_comp <> 0 then Some minor_comp
+        else
+          match (v1.additional_info, v2.additional_info) with
+          | Beta n1, Beta n2 | RC n1, RC n2 -> Some (Int.compare n1 n2)
+          | Beta _, (RC _ | Release) | RC _, Release -> Some (-1)
+          | Release, (RC _ | Beta _) | RC _, Beta _ -> Some 1
+          | _, _ -> None
+  in
+  match (is_commit_equal, version_comparison) with
+  | None, Some 0 ->
+      if is_dev v1 then (* dev versions need to have commit_info *) None
+      else Some 0
+  | Some true, Some 0 -> Some 0
+  | Some false, Some 0 -> None
+  | _, x -> x

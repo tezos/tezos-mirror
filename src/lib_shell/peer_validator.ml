@@ -28,6 +28,8 @@
 
 open Peer_validator_worker_state
 
+module Profiler = (val Profiler.wrap Shell_profiling.chain_validator_profiler)
+
 module Name = struct
   type t = Chain_id.t * P2p_peer.Id.t
 
@@ -158,66 +160,73 @@ let validate_new_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
   let pv = Worker.state w in
   let block_received = (pv.peer_id, hash) in
-  let*! () = Events.(emit fetching_operations_for_head) block_received in
-  let* operations =
-    List.map_ep
-      (fun i ->
-        protect ~canceler:(Worker.canceler w) (fun () ->
-            Distributed_db.Operations.fetch
-              ~timeout:pv.parameters.limits.block_operations_timeout
-              pv.parameters.chain_db
-              ~peer:pv.peer_id
-              (hash, i)
-              header.shell.operations_hash))
-      (0 -- (header.shell.validation_passes - 1))
+  let[@warning "-26"] sym_prefix l =
+    "peer_validator"
+    :: Block_hash.to_short_b58check hash
+    :: "validate new head" :: l
   in
-  (* We redo a check for the fitness here because while waiting for the
-     operations, a new head better than this block might be validated. *)
-  only_if_fitness_increases w header hash @@ function
-  | `Known_valid | `Lower_fitness ->
-      (* If the block is known valid or if the fitness does not increase
-         we need to clear the fetched operation of the block from the ddb *)
-      List.iter
+  let*! () = Events.(emit fetching_operations_for_head) block_received in
+  (let* operations =
+     (List.map_ep
         (fun i ->
-          Distributed_db.Operations.clear_or_cancel
+          protect ~canceler:(Worker.canceler w) (fun () ->
+              Distributed_db.Operations.fetch
+                ~timeout:pv.parameters.limits.block_operations_timeout
+                pv.parameters.chain_db
+                ~peer:pv.peer_id
+                (hash, i)
+                header.shell.operations_hash))
+        (0 -- (header.shell.validation_passes - 1))
+      [@profiler.span_s sym_prefix ["operation fetching"]])
+   in
+   (* We redo a check for the fitness here because while waiting for the
+      operations, a new head better than this block might be validated. *)
+   only_if_fitness_increases w header hash @@ function
+   | `Known_valid | `Lower_fitness ->
+       (* If the block is known valid or if the fitness does not increase
+          we need to clear the fetched operation of the block from the ddb *)
+       List.iter
+         (fun i ->
+           Distributed_db.Operations.clear_or_cancel
+             pv.parameters.chain_db
+             (hash, i))
+         (0 -- (header.shell.validation_passes - 1)) ;
+       return_unit
+   | `Ok -> (
+       let*! () = Events.(emit requesting_new_head_validation) block_received in
+       let*! v =
+         (Block_validator.validate_and_apply
+            ~notify_new_block:pv.parameters.notify_new_block
+            ~advertise_after_validation:true
+            pv.parameters.block_validator
             pv.parameters.chain_db
-            (hash, i))
-        (0 -- (header.shell.validation_passes - 1)) ;
-      return_unit
-  | `Ok -> (
-      let*! () = Events.(emit requesting_new_head_validation) block_received in
-      let*! v =
-        Block_validator.precheck_and_apply
-          ~notify_new_block:pv.parameters.notify_new_block
-          ~precheck_and_notify:true
-          pv.parameters.block_validator
-          pv.parameters.chain_db
-          hash
-          header
-          operations
-      in
-      match v with
-      | Invalid errs ->
-          (* This will convert into a kickban when treated by [on_error] --
-             or, at least, by a worker termination which will close the
-             connection. *)
-          Lwt.return_error errs
-      | Unapplicable_after_precheck _errs ->
-          let*! () =
-            Events.(emit ignoring_prechecked_invalid_block) block_received
-          in
-          (* We do not kickban the peer if the block received was
-             successfully prechecked but invalid -- this means that he
-             could have propagated a precheckable block before terminating
-             its validation *)
-          return_unit
-      | Valid ->
-          let*! () = Events.(emit new_head_validation_end) block_received in
-          let meta =
-            Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
-          in
-          Peer_metadata.incr meta Valid_blocks ;
-          return_unit)
+            hash
+            header
+            operations [@profiler.span_s sym_prefix ["validate"]])
+       in
+       match v with
+       | Invalid errs ->
+           (* This will convert into a kickban when treated by [on_error] --
+              or, at least, by a worker termination which will close the
+              connection. *)
+           Lwt.return_error errs
+       | Inapplicable_after_validation _errs ->
+           let*! () =
+             Events.(emit ignoring_inapplicable_block) block_received
+           in
+           (* We do not kickban the peer if the block received was
+              successfully validated but inapplicable -- this means that he
+              could have propagated a validated block before terminating
+              its application *)
+           return_unit
+       | Valid ->
+           let*! () = Events.(emit new_head_validation_end) block_received in
+           let meta =
+             Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+           in
+           Peer_metadata.incr meta Valid_blocks ;
+           return_unit))
+  [@profiler.span_s sym_prefix ["validate new head"]]
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
@@ -232,6 +241,15 @@ let assert_acceptable_head w hash (header : Block_header.t) =
 
 let may_validate_new_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
+  let () =
+    (()
+    [@profiler.mark
+      [
+        "peer_validator";
+        Block_hash.to_short_b58check hash;
+        "may validate new head";
+      ]])
+  in
   let pv = Worker.state w in
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   let*! valid_block = Store.Block.is_known_valid chain_store hash in
@@ -269,6 +287,17 @@ let may_validate_new_head w hash (header : Block_header.t) =
     only_if_fitness_increases w header hash @@ function
     | `Known_valid | `Lower_fitness -> return_unit
     | `Ok ->
+        let () =
+          (()
+          [@profiler.mark
+            [
+              "peer_validator";
+              Block_hash.to_short_b58check hash;
+              "may validate new head";
+              "validate new head";
+            ]])
+        in
+
         let* () = assert_acceptable_head w hash header in
         validate_new_head w hash header
 
@@ -423,7 +452,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
         return_ok_unit
     | Distributed_db.Operations.Canceled _ :: _ -> (
         (* Given two nodes A and B (remote). This may happen if A
-           prechecks a block, sends it to B. B prechecks a block, sends
+           validates a block, sends it to B. B validates a block, sends
            it to A. A tries to fetch operations of the block to B, in
            the meantime, A validates the block and cancels the fetching.
         *)

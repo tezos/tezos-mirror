@@ -15,6 +15,7 @@ use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
+use std::cmp::min;
 use tezos_crypto_rs::blake2b::digest as blake2bdigest;
 use typed_arena::Arena;
 
@@ -42,9 +43,9 @@ pub enum InterpretError<'a> {
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
     FailedWith(Type, TypedValue<'a>),
-    /// Encountered an argument outside of the bounds defined in the documentation
-    #[error("Argument out of bounds")]
-    ArgOutOfBounds,
+    /// Encountered an argument outside of the bounds defined in the documentation. We keep the message prompted by the octez implementaiton.
+    #[error("Overflow")]
+    Overflow,
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
@@ -554,7 +555,7 @@ fn interpret_one<'a>(
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(256u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
+                    return Err(InterpretError::Overflow);
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
@@ -566,7 +567,7 @@ fn interpret_one<'a>(
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(64000u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
+                    return Err(InterpretError::Overflow);
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
@@ -601,7 +602,7 @@ fn interpret_one<'a>(
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(256u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
+                    return Err(InterpretError::Overflow);
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
@@ -612,15 +613,11 @@ fn interpret_one<'a>(
                 let o1 = pop!(V::Bytes);
                 let o2 = pop!(V::Nat);
 
-                if o2 > BigUint::from(64000u16) {
-                    return Err(InterpretError::ArgOutOfBounds);
-                }
-
                 let o2_usize = o2.to_usize().unwrap();
                 ctx.gas
                     .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
 
-                let byte_shifts = o2_usize / 8;
+                let byte_shifts = min(o2_usize / 8, o1.len());
                 let bit_shifts = o2_usize % 8;
 
                 let need_carry = bit_shifts > 0;

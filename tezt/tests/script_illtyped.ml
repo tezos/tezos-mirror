@@ -30,6 +30,8 @@
    Subject:      Test Michelson script typechecking failures
 *)
 
+let team = Tag.layer1
+
 let test_deprecated_typecheck script ~legacy =
   Protocol.register_test
     ~__FILE__
@@ -38,7 +40,7 @@ let test_deprecated_typecheck script ~legacy =
          "Test Deprecated Typecheck %s - %s"
          (if legacy then "in Legacy" else "Breaks")
          (Michelson_script.name_s script))
-    ~tags:["client"; "script"; "michelson"; "typechecking"]
+    ~tags:[team; "client"; "script"; "michelson"; "typechecking"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -62,7 +64,7 @@ let test_ill_typecheck script error_pattern =
   Protocol.register_test
     ~__FILE__
     ~title:(sf "Test Ill Typecheck - %s" script)
-    ~tags:["client"; "script"; "michelson"; "typechecking"]
+    ~tags:[team; "client"; "script"; "michelson"; "typechecking"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

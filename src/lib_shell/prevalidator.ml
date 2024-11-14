@@ -27,6 +27,8 @@
 (** Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
 
+module Profiler = (val Profiler.wrap Shell_profiling.mempool_profiler)
+
 (** Argument that will be provided to {!Worker.MakeGroup} to create
     the prevalidator worker. *)
 module Name = struct
@@ -159,6 +161,7 @@ type 'prevalidation_t parameters = {
     'prevalidation_t tzresult Lwt.t;
       (** Create a new empty prevalidation state, recycling some elements
             of the provided previous prevalidation state. *)
+  chain_store : Store.chain_store;
 }
 
 (** The type needed for the implementation of [Make] below, but
@@ -329,11 +332,15 @@ module Make_s
         (Unit.catch_s (fun () ->
              Events.(emit ban_operation_encountered) (origin, oph))) ;
       true)
-    else
-      Classification.is_in_mempool oph shell.classification <> None
-      || Operation_hash.Set.mem oph shell.live_operations
-      || Pending_ops.mem oph shell.pending
-      || Classification.is_known_unparsable oph shell.classification
+    else if Classification.is_in_mempool oph shell.classification <> None then
+      true [@profiler.mark ["is already handled"; "is_classified"]]
+    else if Operation_hash.Set.mem oph shell.live_operations then true
+      [@profiler.mark ["is already handled"; "is_live_operation"]]
+    else if Pending_ops.mem oph shell.pending then true
+      [@profiler.mark ["is already handled"; "is_pending"]]
+    else if Classification.is_known_unparsable oph shell.classification then
+      true [@profiler.mark ["is already handled"; "is_known_unparsable"]]
+    else false [@profiler.mark ["not already handled"]]
 
   let advertise (shell : ('operation_data, _) types_state_shell) mempool =
     let open Lwt_syntax in
@@ -374,15 +381,16 @@ module Make_s
 
   let pre_filter pv ~notifier parsed_op : pre_filter_result Lwt.t =
     let open Lwt_syntax in
-    let+ v =
+    let* v =
       Prevalidation_t.pre_filter pv.validation_state pv.config parsed_op
     in
     match v with
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
       ->
         handle_classification ~notifier pv.shell (parsed_op, errs) ;
-        Drop
-    | `Passed_prefilter priority -> Priority priority
+        let* () = Events.(emit operation_classified) parsed_op.hash in
+        return Drop
+    | `Passed_prefilter priority -> return (Priority priority)
 
   let set_mempool shell mempool =
     shell.mempool <- mempool ;
@@ -455,14 +463,23 @@ module Make_s
             match
               (status_and_priority.status, status_and_priority.priority)
             with
-            | Fresh, _ | Reclassified, High -> true
-            | Reclassified, Medium | Reclassified, Low _ ->
+            | Fresh, _ -> true [@profiler.mark ["Freshly validated operation"]]
+            | Reclassified, High ->
+                true [@profiler.mark ["reclassified high priority operation"]]
+            | Reclassified, Medium ->
+                false
+                [@profiler.mark ["reclassified medium priority operation"]]
+            | Reclassified, Low _ ->
                 (* Reclassified operations with medium and low priority are not
                    reclassified *)
                 false
+                [@profiler.mark ["reclassified low priority operation"]]
           in
           Some (op.hash, is_advertisable)
-      | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ -> None
+      | `Branch_refused _ -> None [@profiler.mark ["branch_refused operation"]]
+      | `Branch_delayed _ -> None [@profiler.mark ["branch_delayed operation"]]
+      | `Refused _ -> None [@profiler.mark ["refused operation"]]
+      | `Outdated _ -> None [@profiler.mark ["outdated operation"]]
     in
     return (v_state, validated_operation, to_handle)
 
@@ -498,33 +515,41 @@ module Make_s
             (* Using Error as an early-return mechanism *)
             Lwt.return_error
               (acc_validation_state, advertisable_mempool, validated_mempool)
-          else (
-            shell.pending <- Pending_ops.remove oph shell.pending ;
-            let* new_validation_state, validated_operation, to_handle =
-              classify_operation
-                shell
-                ~config
-                ~validation_state:acc_validation_state
-                status_and_priority
-                op
+          else
+            (* Defined as a function to avoid an useless allocation *)
+            let[@warning "-26"] section () =
+              match status_and_priority.priority with
+              | High -> "classify consensus operation "
+              | Medium -> "classify voting/anonymous operation"
+              | Low _ -> "classify manager operation"
             in
-            let+ () = Events.(emit operation_reclassified) oph in
-            List.iter (handle_classification ~notifier shell) to_handle ;
-            let advertisable_mempool, validated_mempool =
-              match validated_operation with
-              | None -> (advertisable_mempool, validated_mempool)
-              | Some (oph, true) ->
-                  ( Mempool.cons_valid oph advertisable_mempool,
-                    Mempool.cons_valid oph validated_mempool )
-              | Some (oph, false) ->
-                  ( advertisable_mempool,
-                    Mempool.cons_valid oph validated_mempool )
-            in
-            Ok
-              ( new_validation_state,
-                advertisable_mempool,
-                validated_mempool,
-                limit - 1 )))
+            ((shell.pending <- Pending_ops.remove oph shell.pending ;
+              let* new_validation_state, validated_operation, to_handle =
+                classify_operation
+                  shell
+                  ~config
+                  ~validation_state:acc_validation_state
+                  status_and_priority
+                  op
+              in
+              List.iter (handle_classification ~notifier shell) to_handle ;
+              let+ () = Events.(emit operation_classified) oph in
+              let advertisable_mempool, validated_mempool =
+                match validated_operation with
+                | None -> (advertisable_mempool, validated_mempool)
+                | Some (oph, true) ->
+                    ( Mempool.cons_valid oph advertisable_mempool,
+                      Mempool.cons_valid oph validated_mempool )
+                | Some (oph, false) ->
+                    ( advertisable_mempool,
+                      Mempool.cons_valid oph validated_mempool )
+              in
+              Ok
+                ( new_validation_state,
+                  advertisable_mempool,
+                  validated_mempool,
+                  limit - 1 ))
+            [@profiler.aggregate_s section ()]))
         shell.pending
         ( state,
           Mempool.empty,
@@ -546,19 +571,28 @@ module Make_s
     let open Lwt_syntax in
     if not (Mempool.is_empty advertisable_mempool) then
       (* We only advertise newly classified operations. *)
-      advertise pv_shell advertisable_mempool ;
+      advertise
+        pv_shell
+        advertisable_mempool [@profiler.aggregate_f "advertise mempool"] ;
     if Mempool.is_empty validated_mempool then Lwt.return_unit
     else
       let our_mempool =
         let known_valid =
-          Operation_hash.Set.union
-            validated_mempool.known_valid
-            pv_shell.mempool.known_valid
+          (Operation_hash.Set.union
+             validated_mempool.known_valid
+             pv_shell.mempool.known_valid
+           [@profiler.aggregate_f "union validated hashes"])
         in
-        {Mempool.known_valid; pending = Pending_ops.hashes pv_shell.pending}
+        let pending =
+          (Pending_ops.hashes
+             pv_shell.pending [@profiler.aggregate_f "pending hashes"])
+        in
+        {Mempool.known_valid; pending}
       in
-      let* _res = set_mempool pv_shell our_mempool in
-      Lwt.pause ()
+      let* _res =
+        (set_mempool pv_shell our_mempool [@profiler.aggregate_s "set mempool"])
+      in
+      (Lwt.pause () [@profiler.aggregate_s "pause"])
 
   let handle_unprocessed pv =
     let open Lwt_syntax in
@@ -567,11 +601,12 @@ module Make_s
     else
       let* () = Events.(emit processing_operations) () in
       let* validation_state, advertisable_mempool, validated_mempool =
-        classify_pending_operations
-          ~notifier
-          pv.shell
-          pv.config
-          pv.validation_state
+        (classify_pending_operations
+           ~notifier
+           pv.shell
+           pv.config
+           pv.validation_state
+         [@profiler.aggregate_s "classify pending operations"])
       in
       pv.validation_state <- validation_state ;
       update_advertised_mempool_fields
@@ -626,16 +661,18 @@ module Make_s
       match peer with Some peer -> Events.Peer peer | None -> Leftover
     in
     let spawn_fetch_operation ~notify_arrival =
-      ignore
-        (Unit.catch_s (fun () ->
-             fetch_operation ~notify_arrival shell ?peer oph))
+      (ignore
+         (Unit.catch_s (fun () ->
+              fetch_operation ~notify_arrival shell ?peer oph))
+       [@profiler.aggregate_f "fetching thread"])
     in
     if Operation_hash.Set.mem oph shell.fetching then
       (* If the operation is already being fetched, we notify the DDB
          that another peer may also be requested for the resource. In
          any case, the initial fetching thread will still be resolved
          and push an arrived worker request. *)
-      spawn_fetch_operation ~notify_arrival:false
+      spawn_fetch_operation
+        ~notify_arrival:false [@profiler.mark ["already fetching"]]
     else if not (already_handled ~origin shell oph) then (
       shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
       spawn_fetch_operation ~notify_arrival:true)
@@ -767,6 +804,7 @@ module Make_s
                   in
                   (* Call handle & update_advertised_mempool only if op is accepted *)
                   List.iter (handle_classification ~notifier pv.shell) to_handle ;
+                  let*! () = Events.(emit operation_classified) oph in
                   pv.validation_state <- validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)
@@ -777,8 +815,8 @@ module Make_s
                         update_advertised_mempool_fields
                           pv.shell
                           (if is_advertisable then
-                           Mempool.cons_valid oph Mempool.empty
-                          else Mempool.empty)
+                             Mempool.cons_valid oph Mempool.empty
+                           else Mempool.empty)
                           (Mempool.cons_valid oph Mempool.empty)
                   in
                   let*! () = Events.(emit operation_injected) oph in
@@ -806,7 +844,11 @@ module Make_s
 
     let on_notify (shell : ('operation_data, _) types_state_shell) peer mempool
         =
-      let may_fetch_operation = may_fetch_operation shell (Some peer) in
+      let may_fetch_operation =
+        (may_fetch_operation
+           shell
+           (Some peer) [@profiler.aggregate_f "may_fetch_operation"])
+      in
       let () =
         Operation_hash.Set.iter may_fetch_operation mempool.Mempool.known_valid
       in
@@ -827,10 +869,10 @@ module Make_s
       pv.shell.timestamp <- timestamp_system ;
       let timestamp = Time.System.to_protocol timestamp_system in
       let* validation_state =
-        pv.shell.parameters.flush
-          ~head:new_predecessor
-          ~timestamp
-          pv.validation_state
+        (pv.shell.parameters.flush
+           ~head:new_predecessor
+           ~timestamp
+           pv.validation_state [@profiler.aggregate_s "flush state"])
       in
       pv.validation_state <- validation_state ;
       let*! new_pending_operations =
@@ -850,22 +892,25 @@ module Make_s
       let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
           (fun oph op (pending, nb_pending) ->
-            let*! v =
-              pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
-            in
-            match v with
-            | Drop -> Lwt.return (pending, nb_pending)
-            | Priority ((High | Medium | Low _) as priority) ->
-                (* Here, an operation injected in this node with High priority will
-                   now get its approriate priority. *)
-                let status =
-                  (* If the operation has not yet been classified we set its
-                     status to Fresh *)
-                  if Pending_ops.mem oph pv.shell.pending then Pending_ops.Fresh
-                  else Reclassified
-                in
-                Lwt.return
-                  (Pending_ops.add op {status; priority} pending, nb_pending + 1))
+            (let*! v =
+               pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
+             in
+             match v with
+             | Drop -> Lwt.return (pending, nb_pending)
+             | Priority ((High | Medium | Low _) as priority) ->
+                 (* Here, an operation injected in this node with High priority will
+                    now get its approriate priority. *)
+                 let status =
+                   (* If the operation has not yet been classified we set its
+                      status to Fresh *)
+                   if Pending_ops.mem oph pv.shell.pending then
+                     Pending_ops.Fresh
+                   else Reclassified
+                 in
+                 Lwt.return
+                   ( Pending_ops.add op {status; priority} pending,
+                     nb_pending + 1 ))
+            [@profiler.aggregate_s "flushed operations"])
           new_pending_operations
           (Pending_ops.empty, 0)
       in
@@ -1001,6 +1046,25 @@ module Make
       Prevalidation_t.config_encoding
       pv.config
 
+  let fetch_context pv =
+    let open Lwt_result_syntax in
+    let*! ctxt_e =
+      let* context =
+        Prevalidation_t.get_context
+          pv.shell.parameters.chain_store
+          ~predecessor:pv.shell.predecessor
+          ~timestamp:(Time.System.to_protocol pv.shell.timestamp)
+      in
+      Proto.Plugin.get_context
+        context
+        ~head:(Store.Block.header pv.shell.predecessor).shell
+    in
+    match ctxt_e with
+    | Error errs ->
+        let*! () = Events.(emit pending_operation_context_error) errs in
+        Lwt.return_none
+    | Ok ctxt -> Lwt.return_some ctxt
+
   let filter_validation_passes allowed_validation_passes
       (op : protocol_operation) =
     match allowed_validation_passes with
@@ -1011,257 +1075,329 @@ module Make
         | Some validation_pass ->
             List.mem ~equal:Compare.Int.equal validation_pass validation_passes)
 
+  let filter_sources ctxt sources (op : protocol_operation) =
+    let open Lwt_syntax in
+    match (ctxt, sources) with
+    | None, _ | _, [] -> return_true
+    | Some ctxt, sources ->
+        let+ op_sources = Proto.Plugin.sources_from_operation ctxt op in
+        List.exists
+          (fun source ->
+            List.mem ~equal:Signature.Public_key_hash.equal source sources)
+          op_sources
+
+  let filter_operation_hashes ophs oph =
+    if ophs = [] then true else List.mem ~equal:Operation_hash.equal oph ophs
+
   let build_rpc_directory w =
     lazy
       (let open Lwt_result_syntax in
-      let dir : state Tezos_rpc.Directory.t ref =
-        ref Tezos_rpc.Directory.empty
-      in
-      let module Proto_services = Block_services.Make (Proto) (Proto) in
-      dir :=
-        Tezos_rpc.Directory.register
-          !dir
-          (Proto_services.S.Mempool.get_filter Tezos_rpc.Path.open_root)
-          (fun pv params () ->
-            return (get_config_json ~include_default:params#include_default pv)) ;
-      dir :=
-        Tezos_rpc.Directory.register
-          !dir
-          (Proto_services.S.Mempool.set_filter Tezos_rpc.Path.open_root)
-          (fun pv () obj ->
-            let open Lwt_syntax in
-            let* () =
-              try
-                let config =
-                  Data_encoding.Json.destruct
-                    Prevalidation_t.config_encoding
-                    obj
-                in
-                pv.config <- config ;
-                Lwt.return_unit
-              with _ -> Events.(emit invalid_mempool_filter_configuration) ()
-            in
-            (* We return [get_config_json pv] rather than [obj] in
-               order to show omitted fields (which have been reset to
-               their default values), and also in case [obj] is invalid. *)
-            return_ok (get_config_json pv)) ;
-      (* Ban an operation (from its given hash): remove it from the
-         mempool if present. Add it to the set pv.banned_operations
-         to prevent it from being fetched/processed/injected in the
-         future.
-         Note: If the baker has already received the operation, then
-         it's necessary to restart it manually to flush the operation
-         from it. *)
-      dir :=
-        Tezos_rpc.Directory.register
-          !dir
-          (Proto_services.S.Mempool.ban_operation Tezos_rpc.Path.open_root)
-          (fun _pv () oph ->
-            let open Lwt_result_syntax in
-            let*! r = Worker.Queue.push_request_and_wait w (Request.Ban oph) in
-            match r with
-            | Error (Closed None) -> fail [Worker_types.Terminated]
-            | Error (Closed (Some errs)) -> fail errs
-            | Error (Request_error err) -> fail err
-            | Error (Any exn) -> fail [Exn exn]
-            | Ok () -> return_unit) ;
-      (* Unban an operation (from its given hash): remove it from the
-         set pv.banned_operations (nothing happens if it was not banned). *)
-      dir :=
-        Tezos_rpc.Directory.register
-          !dir
-          (Proto_services.S.Mempool.unban_operation Tezos_rpc.Path.open_root)
-          (fun pv () oph ->
-            pv.shell.banned_operations <-
-              Operation_hash.Set.remove oph pv.shell.banned_operations ;
-            return_unit) ;
-      (* Unban all operations: clear the set pv.banned_operations. *)
-      dir :=
-        Tezos_rpc.Directory.register
-          !dir
-          (Proto_services.S.Mempool.unban_all_operations
-             Tezos_rpc.Path.open_root)
-          (fun pv () () ->
-            pv.shell.banned_operations <- Operation_hash.Set.empty ;
-            return_unit) ;
-      dir :=
-        Tezos_rpc.Directory.gen_register
-          !dir
-          (Proto_services.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
-          (fun pv params () ->
-            let validated =
-              if params#validated then
-                Classification.Sized_map.to_map
-                  pv.shell.classification.validated
-                |> Operation_hash.Map.to_seq
-                |> Seq.filter_map (fun (oph, op) ->
+       let dir : state Tezos_rpc.Directory.t ref =
+         ref Tezos_rpc.Directory.empty
+       in
+       let module Proto_services = Block_services.Make (Proto) (Proto) in
+       dir :=
+         Tezos_rpc.Directory.register
+           !dir
+           (Proto_services.S.Mempool.get_filter Tezos_rpc.Path.open_root)
+           (fun pv params () ->
+             return (get_config_json ~include_default:params#include_default pv)) ;
+       dir :=
+         Tezos_rpc.Directory.register
+           !dir
+           (Proto_services.S.Mempool.set_filter Tezos_rpc.Path.open_root)
+           (fun pv () obj ->
+             let open Lwt_syntax in
+             let* () =
+               try
+                 let config =
+                   Data_encoding.Json.destruct
+                     Prevalidation_t.config_encoding
+                     obj
+                 in
+                 pv.config <- config ;
+                 Lwt.return_unit
+               with _ -> Events.(emit invalid_mempool_filter_configuration) ()
+             in
+             (* We return [get_config_json pv] rather than [obj] in
+                order to show omitted fields (which have been reset to
+                their default values), and also in case [obj] is invalid. *)
+             return_ok (get_config_json pv)) ;
+       (* Ban an operation (from its given hash): remove it from the
+          mempool if present. Add it to the set pv.banned_operations
+          to prevent it from being fetched/processed/injected in the
+          future.
+          Note: If the baker has already received the operation, then
+          it's necessary to restart it manually to flush the operation
+          from it. *)
+       dir :=
+         Tezos_rpc.Directory.register
+           !dir
+           (Proto_services.S.Mempool.ban_operation Tezos_rpc.Path.open_root)
+           (fun _pv () oph ->
+             let open Lwt_result_syntax in
+             let*! r = Worker.Queue.push_request_and_wait w (Request.Ban oph) in
+             match r with
+             | Error (Closed None) -> fail [Worker_types.Terminated]
+             | Error (Closed (Some errs)) -> fail errs
+             | Error (Request_error err) -> fail err
+             | Error (Any exn) -> fail [Exn exn]
+             | Ok () -> return_unit) ;
+       (* Unban an operation (from its given hash): remove it from the
+          set pv.banned_operations (nothing happens if it was not banned). *)
+       dir :=
+         Tezos_rpc.Directory.register
+           !dir
+           (Proto_services.S.Mempool.unban_operation Tezos_rpc.Path.open_root)
+           (fun pv () oph ->
+             pv.shell.banned_operations <-
+               Operation_hash.Set.remove oph pv.shell.banned_operations ;
+             return_unit) ;
+       (* Unban all operations: clear the set pv.banned_operations. *)
+       dir :=
+         Tezos_rpc.Directory.register
+           !dir
+           (Proto_services.S.Mempool.unban_all_operations
+              Tezos_rpc.Path.open_root)
+           (fun pv () () ->
+             pv.shell.banned_operations <- Operation_hash.Set.empty ;
+             return_unit) ;
+       dir :=
+         Tezos_rpc.Directory.gen_register
+           !dir
+           (Proto_services.S.Mempool.pending_operations
+              Tezos_rpc.Path.open_root)
+           (fun pv params () ->
+             let open Lwt_syntax in
+             let sources =
+               List.map_e Signature.Public_key_hash.of_b58check params#sources
+             in
+             let ophs =
+               List.map_e Operation_hash.of_b58check params#operation_hash
+             in
+             match (sources, ophs) with
+             | Error errs, _ | _, Error errs -> Tezos_rpc.Answer.fail errs
+             | Ok sources, Ok ophs ->
+                 let* ctxt =
+                   if sources = [] then Lwt.return_none else fetch_context pv
+                 in
+                 let filter oph protocol res =
+                   let* is_in_sources = filter_sources ctxt sources protocol in
+                   if
+                     is_in_sources
+                     && filter_validation_passes
+                          params#validation_passes
+                          protocol
+                     && filter_operation_hashes ophs oph
+                   then return @@ Some (oph, res)
+                   else return_none
+                 in
+                 let* validated =
+                   if params#validated then
+                     let filtered_seq =
+                       Lwt_seq.filter_map_s
+                         (fun (oph, op) -> filter oph op.protocol op.protocol)
+                         (Lwt_seq.of_seq
+                            (Classification.Sized_map.to_map
+                               pv.shell.classification.validated
+                            |> Operation_hash.Map.to_seq))
+                     in
+                     Lwt_seq.to_list filtered_seq
+                   else return_nil
+                 in
+                 let process_map map =
+                   let open Operation_hash in
+                   let seq =
+                     Lwt_seq.filter_map_s
+                       (fun (oph, (op, error)) ->
+                         filter oph op.protocol (op.protocol, error))
+                       (Lwt_seq.of_seq (Map.to_seq map))
+                   in
+                   let* l = Lwt_seq.to_list seq in
+                   return @@ Map.of_seq @@ List.to_seq l
+                 in
+                 let* refused =
+                   if params#refused then
+                     process_map
+                       (Classification.map pv.shell.classification.refused)
+                   else Lwt.return Operation_hash.Map.empty
+                 in
+                 let* outdated =
+                   if params#outdated then
+                     process_map
+                       (Classification.map pv.shell.classification.outdated)
+                   else Lwt.return Operation_hash.Map.empty
+                 in
+                 let* branch_refused =
+                   if params#branch_refused then
+                     process_map
+                       (Classification.map
+                          pv.shell.classification.branch_refused)
+                   else Lwt.return Operation_hash.Map.empty
+                 in
+                 let* branch_delayed =
+                   if params#branch_delayed then
+                     process_map
+                       (Classification.map
+                          pv.shell.classification.branch_delayed)
+                   else Lwt.return Operation_hash.Map.empty
+                 in
+                 let* unprocessed =
+                   let open Operation_hash in
+                   Map.fold_s
+                     (fun oph {protocol; _} acc ->
+                       let* is_in_sources =
+                         filter_sources ctxt sources protocol
+                       in
                        if
-                         filter_validation_passes
-                           params#validation_passes
-                           op.protocol
-                       then Some (oph, op.protocol)
-                       else None)
-                |> List.of_seq
-              else []
-            in
-            let process_map map =
-              let open Operation_hash in
-              Map.filter_map
-                (fun _oph (op, error) ->
-                  if
-                    filter_validation_passes
-                      params#validation_passes
-                      op.protocol
-                  then Some (op.protocol, error)
-                  else None)
-                map
-            in
-            let refused =
-              if params#refused then
-                process_map (Classification.map pv.shell.classification.refused)
-              else Operation_hash.Map.empty
-            in
-            let outdated =
-              if params#outdated then
-                process_map
-                  (Classification.map pv.shell.classification.outdated)
-              else Operation_hash.Map.empty
-            in
-            let branch_refused =
-              if params#branch_refused then
-                process_map
-                  (Classification.map pv.shell.classification.branch_refused)
-              else Operation_hash.Map.empty
-            in
-            let branch_delayed =
-              if params#branch_delayed then
-                process_map
-                  (Classification.map pv.shell.classification.branch_delayed)
-              else Operation_hash.Map.empty
-            in
-            let unprocessed =
-              Operation_hash.Map.filter_map
-                (fun _ {protocol; _} ->
-                  if filter_validation_passes params#validation_passes protocol
-                  then Some protocol
-                  else None)
-                (Pending_ops.operations pv.shell.pending)
-            in
-            let pending_operations =
-              {
-                Proto_services.Mempool.validated;
-                refused;
-                outdated;
-                branch_refused;
-                branch_delayed;
-                unprocessed;
-              }
-            in
-            Tezos_rpc.Answer.return (params#version, pending_operations)) ;
-      dir :=
-        Tezos_rpc.Directory.register
-          !dir
-          (Proto_services.S.Mempool.request_operations Tezos_rpc.Path.open_root)
-          (fun pv t () ->
-            pv.shell.parameters.tools.send_get_current_head ?peer:t#peer_id () ;
-            return_unit) ;
-      dir :=
-        Tezos_rpc.Directory.gen_register
-          !dir
-          (Proto_services.S.Mempool.monitor_operations Tezos_rpc.Path.open_root)
-          (fun pv params () ->
-            Lwt_mutex.with_lock pv.lock @@ fun () ->
-            let op_stream, stopper =
-              Lwt_watcher.create_stream pv.operation_stream
-            in
-            (* First call : retrieve the current set of op from the mempool *)
-            let validated_seq =
-              if params#validated then
-                Classification.Sized_map.to_map
-                  pv.shell.classification.validated
-                |> Operation_hash.Map.to_seq
-                |> Seq.map (fun (hash, {protocol; _}) ->
-                       ((hash, protocol), None))
-              else Seq.empty
-            in
-            let process_error_map map =
-              let open Operation_hash in
-              map |> Map.to_seq
-              |> Seq.map (fun (hash, (op, error)) ->
-                     ((hash, op.protocol), Some error))
-            in
-            let refused_seq =
-              if params#refused then
-                process_error_map
-                  (Classification.map pv.shell.classification.refused)
-              else Seq.empty
-            in
-            let branch_refused_seq =
-              if params#branch_refused then
-                process_error_map
-                  (Classification.map pv.shell.classification.branch_refused)
-              else Seq.empty
-            in
-            let branch_delayed_seq =
-              if params#branch_delayed then
-                process_error_map
-                  (Classification.map pv.shell.classification.branch_delayed)
-              else Seq.empty
-            in
-            let outdated_seq =
-              if params#outdated then
-                process_error_map
-                  (Classification.map pv.shell.classification.outdated)
-              else Seq.empty
-            in
-            let filter ((_, op), _) =
-              filter_validation_passes params#validation_passes op
-            in
-            let current_mempool =
-              Seq.append outdated_seq branch_delayed_seq
-              |> Seq.append branch_refused_seq
-              |> Seq.append refused_seq |> Seq.append validated_seq
-              |> Seq.filter filter |> List.of_seq
-            in
-            let current_mempool = ref (Some current_mempool) in
-            let filter_result = function
-              | `Validated -> params#validated
-              | `Refused _ -> params#refused
-              | `Outdated _ -> params#outdated
-              | `Branch_refused _ -> params#branch_refused
-              | `Branch_delayed _ -> params#branch_delayed
-            in
-            let rec next () =
-              let open Lwt_syntax in
-              match !current_mempool with
-              | Some mempool ->
-                  current_mempool := None ;
-                  Lwt.return_some (params#version, mempool)
-              | None -> (
-                  let* o = Lwt_stream.get op_stream in
-                  match o with
-                  | Some (kind, op)
-                    when filter_result kind
+                         is_in_sources
                          && filter_validation_passes
                               params#validation_passes
-                              op.protocol ->
-                      let errors =
-                        match kind with
-                        | `Validated -> None
-                        | `Branch_delayed errors
-                        | `Branch_refused errors
-                        | `Refused errors
-                        | `Outdated errors ->
-                            Some errors
-                      in
-                      Lwt.return_some
-                        (params#version, [((op.hash, op.protocol), errors)])
-                  | Some _ -> next ()
-                  | None -> Lwt.return_none)
-            in
-            let shutdown () = Lwt_watcher.shutdown stopper in
-            Tezos_rpc.Answer.return_stream {next; shutdown}) ;
-      !dir)
+                              protocol
+                         && filter_operation_hashes ophs oph
+                       then return @@ Map.add oph protocol acc
+                       else return acc)
+                     (Pending_ops.operations pv.shell.pending)
+                     Map.empty
+                 in
+                 let pending_operations =
+                   {
+                     Proto_services.Mempool.validated;
+                     refused;
+                     outdated;
+                     branch_refused;
+                     branch_delayed;
+                     unprocessed;
+                   }
+                 in
+                 Tezos_rpc.Answer.return (params#version, pending_operations)) ;
+       dir :=
+         Tezos_rpc.Directory.register
+           !dir
+           (Proto_services.S.Mempool.request_operations
+              Tezos_rpc.Path.open_root)
+           (fun pv t () ->
+             pv.shell.parameters.tools.send_get_current_head ?peer:t#peer_id () ;
+             return_unit) ;
+       dir :=
+         Tezos_rpc.Directory.gen_register
+           !dir
+           (Proto_services.S.Mempool.monitor_operations
+              Tezos_rpc.Path.open_root)
+           (fun pv params () ->
+             Lwt_mutex.with_lock pv.lock @@ fun () ->
+             let open Lwt_syntax in
+             let sources =
+               List.map_e Signature.Public_key_hash.of_b58check params#sources
+             in
+             match sources with
+             | Error errs -> Tezos_rpc.Answer.fail errs
+             | Ok sources ->
+                 let op_stream, stopper =
+                   Lwt_watcher.create_stream pv.operation_stream
+                 in
+                 (* First call : retrieve the current set of op from the mempool *)
+                 let validated_seq =
+                   if params#validated then
+                     Classification.Sized_map.to_map
+                       pv.shell.classification.validated
+                     |> Operation_hash.Map.to_seq
+                     |> Seq.map (fun (hash, {protocol; _}) ->
+                            ((hash, protocol), None))
+                   else Seq.empty
+                 in
+                 let process_error_map map =
+                   let open Operation_hash in
+                   map |> Map.to_seq
+                   |> Seq.map (fun (hash, (op, error)) ->
+                          ((hash, op.protocol), Some error))
+                 in
+                 let refused_seq =
+                   if params#refused then
+                     process_error_map
+                       (Classification.map pv.shell.classification.refused)
+                   else Seq.empty
+                 in
+                 let branch_refused_seq =
+                   if params#branch_refused then
+                     process_error_map
+                       (Classification.map
+                          pv.shell.classification.branch_refused)
+                   else Seq.empty
+                 in
+                 let branch_delayed_seq =
+                   if params#branch_delayed then
+                     process_error_map
+                       (Classification.map
+                          pv.shell.classification.branch_delayed)
+                   else Seq.empty
+                 in
+                 let outdated_seq =
+                   if params#outdated then
+                     process_error_map
+                       (Classification.map pv.shell.classification.outdated)
+                   else Seq.empty
+                 in
+                 let* ctxt =
+                   if sources = [] then Lwt.return_none else fetch_context pv
+                 in
+                 let filter ((_, op), _) =
+                   let* is_in_sources = filter_sources ctxt sources op in
+                   return
+                     (filter_validation_passes params#validation_passes op
+                     && is_in_sources)
+                 in
+                 let* current_mempool =
+                   Seq.append outdated_seq branch_delayed_seq
+                   |> Seq.append branch_refused_seq
+                   |> Seq.append refused_seq |> Seq.append validated_seq
+                   |> Lwt_seq.of_seq |> Lwt_seq.filter_s filter
+                   |> Lwt_seq.to_list
+                 in
+                 let current_mempool = ref (Some current_mempool) in
+                 let filter_result = function
+                   | `Validated -> params#validated
+                   | `Refused _ -> params#refused
+                   | `Outdated _ -> params#outdated
+                   | `Branch_refused _ -> params#branch_refused
+                   | `Branch_delayed _ -> params#branch_delayed
+                 in
+                 let rec next () =
+                   match !current_mempool with
+                   | Some mempool ->
+                       current_mempool := None ;
+                       Lwt.return_some (params#version, mempool)
+                   | None -> (
+                       let* o = Lwt_stream.get op_stream in
+                       match o with
+                       | Some (kind, op) ->
+                           let* is_in_sources =
+                             filter_sources ctxt sources op.protocol
+                           in
+                           if
+                             filter_validation_passes
+                               params#validation_passes
+                               op.protocol
+                             && is_in_sources && filter_result kind
+                           then
+                             let errors =
+                               match kind with
+                               | `Validated -> None
+                               | `Branch_delayed errors
+                               | `Branch_refused errors
+                               | `Refused errors
+                               | `Outdated errors ->
+                                   Some errors
+                             in
+                             Lwt.return_some
+                               ( params#version,
+                                 [((op.hash, op.protocol), errors)] )
+                           else next ()
+                       | None -> Lwt.return_none)
+                 in
+                 let shutdown () = Lwt_watcher.shutdown stopper in
+                 Tezos_rpc.Answer.return_stream {next; shutdown}) ;
+       !dir)
 
   (** Module implementing the events at the {!Worker} level. Contrary
       to {!Requests}, these functions depend on [Worker]. *)
@@ -1281,13 +1417,18 @@ module Make
           (r, request_error) result Lwt.t -> (r, request_error) result Lwt.t =
        fun r ->
         let open Lwt_syntax in
-        let* () = handle_unprocessed pv in
+        let* () =
+          (handle_unprocessed pv [@profiler.aggregate_s "handle_unprocessed"])
+        in
         r
       in
       post_processing
       @@
       match request with
-      | Request.Flush (hash, event, live_blocks, live_operations) ->
+      | Request.Flush (hash, event, live_blocks, live_operations) -> (
+          ()
+          [@profiler.stop]
+          [@profiler.record Format.sprintf "%s" (Block_hash.to_b58check hash)] ;
           Requests.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
              Rebase the advertisement instead. *)
@@ -1300,24 +1441,29 @@ module Make
           in
           Lwt_mutex.with_lock pv.lock
           @@ fun () : (r, error trace) result Lwt.t ->
-          Requests.on_flush
-            ~handle_branch_refused
-            pv
-            block
-            live_blocks
-            live_operations
+          (Requests.on_flush
+             ~handle_branch_refused
+             pv
+             block
+             live_blocks
+             live_operations [@profiler.aggregate_s "on_flush"]))
       | Request.Notify (peer, mempool) ->
-          Requests.on_notify pv.shell peer mempool ;
-          return_unit
+          (Requests.on_notify pv.shell peer mempool ;
+           return_unit)
+          [@profiler.aggregate_f "on_notify"]
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject {op; force} -> Requests.on_inject pv ~force op
-      | Request.Arrived (oph, op) -> Requests.on_arrived pv oph op
+      | Request.Inject {op; force} ->
+          Requests.on_inject pv ~force op [@profiler.aggregate_s "on_inject"]
+      | Request.Arrived (oph, op) ->
+          Requests.on_arrived pv oph op [@profiler.aggregate_s "on_arrived"]
       | Request.Advertise ->
-          Requests.on_advertise pv.shell ;
-          return_unit
-      | Request.Ban oph -> Requests.on_ban pv oph
+          (Requests.on_advertise pv.shell ;
+           return_unit)
+          [@profiler.aggregate_s "on_advertise"]
+      | Request.Ban oph ->
+          Requests.on_ban pv oph [@profiler.aggregate_s "on_ban"]
 
     let on_close w =
       let pv = Worker.state w in
@@ -1339,6 +1485,11 @@ module Make
       let chain_store = Distributed_db.chain_store chain_db in
       let flush = Prevalidation_t.flush (Distributed_db.chain_store chain_db) in
       let*! head = Store.Chain.current_head chain_store in
+      let () =
+        (()
+        [@profiler.record
+          Format.sprintf "%s" (Block_hash.to_b58check (Store.Block.hash head))])
+      in
       let*! mempool = Store.Chain.mempool chain_store in
       let*! live_blocks, live_operations =
         Store.Chain.live_blocks chain_store
@@ -1358,7 +1509,7 @@ module Make
           }
       in
       let classification = Classification.create classification_parameters in
-      let parameters = {limits; tools = Arg.tools; flush} in
+      let parameters = {limits; tools = Arg.tools; chain_store; flush} in
       let shell =
         {
           classification;

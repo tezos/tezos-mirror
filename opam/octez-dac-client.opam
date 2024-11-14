@@ -14,9 +14,8 @@ depends: [
   "octez-shell-libs" { = version }
   "tezos-dac-lib" { = version }
   "tezos-dac-client-lib" { = version }
-  "octez-protocol-018-Proxford-libs" { = version }
-  "octez-protocol-019-PtParisB-libs" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
 ]
 depopts: [
   "octez-protocol-alpha-libs"

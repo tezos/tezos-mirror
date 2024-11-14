@@ -275,10 +275,6 @@ let reporter ?prefix () =
   Irmin.Export_for_backends.Logging.reporter ~filter_src ?prefix
     (module Mtime_clock)
 
-let () =
-  Logs.set_level (Some Logs.Debug);
-  Logs.set_reporter (reporter ())
-
 let line ppf ?color c =
   let line = String.v ~len:80 (fun _ -> c) in
   match color with

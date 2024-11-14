@@ -22,11 +22,13 @@ The following steps are roughly the steps taken in the `V6 bootstrap MR <https:/
 
    * Copy the directory ``src/lib_protocol_environment/sigs/v<N-1>`` into ``src/lib_protocol_environment/sigs/v<N>``.
 
+   * Update the ``ocamlformat`` configuration file :src:`src/lib_protocol_environment/sigs/.ocamlformat-ignore`.
+
    * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.in.ml`` into ``src/lib_protocol_environment/sigs/v<N>.in.ml`` and change any reference from ``v<N-1>`` to ``v<N>`` in the copied file.
 
-2. Make the new environment buildable by updating ``manifest/main.ml``:
+2. Make the new environment buildable by updating :src:`manifest/product_octez.ml`:
 
-   * Bump the ``latest_environment_number`` in ``manifest/main.ml``.
+   * Bump the ``latest_environment_number`` in :src:`manifest/product_octez.ml`.
 
    * Run ``make -C manifest``.
 
@@ -59,11 +61,21 @@ The following steps are roughly the steps taken in the `V6 bootstrap MR <https:/
 
 7. Adapt demo protocols to the new environment:
 
-   * Modify the required environment in ``src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL`` and ``src/proto_demo_counter/lib_protocol/TEZOS_PROTOCOL``.
+   * Modify the required environment in :src:`src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL` and :src:`src/proto_demo_counter/lib_protocol/TEZOS_PROTOCOL`.
+
+   * Run ``make -C manifest`` to regenerate :src:`src/proto_demo_noops/lib_protocol/dune` and :src:`src/proto_demo_counter/lib_protocol/dune`.
 
    * Verify they both compile with ``dune build @src/proto_demo_noops/runtest_compile_protocol`` and ``dune build @src/proto_demo_counter/runtest_compile_protocol``.
 
-8. Commit all those changes and open an MR with your changes.
+8. Change the following files, adding references to ``V<N>`` to match the references to ``V<N-1>``:
+
+   * :src:`src/lib_protocol_environment/tezos_protocol_environment.ml`
+
+   * ``src/lib_protocol_updater/registered_protocol.ml[i]``
+
+   * ``src/lib_protocol_compiler/registerer/tezos_protocol_registerer.ml[i]``
+
+9. Commit all those changes and open an MR with your changes.
 
 It is recommended that you test your work more comprehensively offline. To that end, follow the instructions below on how to activate the environment, and then run the protocol tests locally. Do not commit the changes or at least, do not push the changes.
 
@@ -93,13 +105,7 @@ The new environment should only be activated after the last release that precede
 How to activate
 ^^^^^^^^^^^^^^^^
 
-To activate the environment you will need to change the following files, adding references to ``V<N>`` to match the references to ``V<N-1>``:
-
-* ``src/lib_protocol_environment/tezos_protocol_environment.ml[i]``
-* ``src/lib_protocol_updater/registered_protocol.ml[i]``
-* ``src/lib_protocol_compiler/registerer/tezos_protocol_registerer.ml[i]``
-
-Bump environment version in:
+To activate the environment, you will need to bump environment version in:
 
 * ``src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL``
 * ``tezt/tests/voting.ml`` (in the embedded ``TEZOS_PROTOCOL``)

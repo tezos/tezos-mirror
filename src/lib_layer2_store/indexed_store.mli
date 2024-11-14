@@ -116,6 +116,10 @@ module type INDEXABLE_STORE = sig
 
   (** [is_gc_finished t] returns [true] if there is no GC running. *)
   val is_gc_finished : 'a t -> bool
+
+  (** [cancel_gc t] stops the currently ongoing GC if any. It returns [true] if
+      a GC was canceled. *)
+  val cancel_gc : 'a t -> bool Lwt.t
 end
 
 (** An index store mapping keys to values. Keys are associated to optional
@@ -198,6 +202,10 @@ module type INDEXED_FILE = sig
 
   (** [is_gc_finished t] returns [true] if there is no GC running. *)
   val is_gc_finished : 'a t -> bool
+
+  (** [cancel_gc t] stops the currently ongoing GC if any. It returns [true] if
+      a GC was canceled. *)
+  val cancel_gc : 'a t -> bool Lwt.t
 end
 
 (** Same as {!INDEXED_FILE} but where headers are extracted from values. *)
@@ -255,7 +263,10 @@ module Make_indexable (_ : NAME) (K : INDEX_KEY) (V : Index.Value.S) :
 module Make_indexable_removable (_ : NAME) (K : INDEX_KEY) (V : Index.Value.S) :
   INDEXABLE_REMOVABLE_STORE with type key := K.t and type value := V.t
 
-module Make_indexed_file (_ : NAME) (K : INDEX_KEY) (V : ENCODABLE_VALUE_HEADER) :
+module Make_indexed_file
+    (_ : NAME)
+    (K : INDEX_KEY)
+    (V : ENCODABLE_VALUE_HEADER) :
   INDEXED_FILE
     with type key := K.t
      and type value := V.t
@@ -263,7 +274,8 @@ module Make_indexed_file (_ : NAME) (K : INDEX_KEY) (V : ENCODABLE_VALUE_HEADER)
 
 module Make_simple_indexed_file
     (_ : NAME)
-    (K : INDEX_KEY) (V : sig
+    (K : INDEX_KEY)
+    (V : sig
       include ENCODABLE_VALUE_HEADER
 
       val header : t -> Header.t

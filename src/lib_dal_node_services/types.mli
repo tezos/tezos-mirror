@@ -38,7 +38,11 @@ type page_index = int
 module Slot_id : sig
   type t = {slot_level : level; slot_index : slot_index}
 
+  module Comparable : Stdlib.Set.OrderedType with type t = t
+
   module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
 end
 
 type slot_id = Slot_id.t
@@ -217,53 +221,18 @@ type header_status =
   | `Attested  (** The slot header was included in an L1 block and attested. *)
   | `Unattested
     (** The slot header was included in an L1 block but not timely attested. *)
-  | `Not_selected
-    (** The slot header was included in an L1 block but was not selected as
-          the slot header for that slot index. *)
-  | `Unseen_or_not_finalized
-    (** The slot header was not seen in a *final* L1 block. This could only
-        happen if the RPC `PATCH /commitments/<commitment>` was called but the
-        corresponding slot header was not included in a final block. In turn,
-        this means that the publish operation was not sent (yet) to L1, or sent
-        but not included (yet) in a block, or included in a not (yet) final
-        block. *)
   ]
-
-(** Profiles that operate on shards/slots. *)
-type operator_profile =
-  | Attester of Tezos_crypto.Signature.public_key_hash
-      (** [Attester pkh] downloads all shards assigned to [pkh].
-            Used by bakers to attest availability of their assigned shards. *)
-  | Producer of {slot_index : int}
-      (** [Producer {slot_index}] produces/publishes slot for slot index [slot_index]. *)
-  | Observer of {slot_index : int}
-      (** [Observer {slot_index}] observes slot for slot index
-          [slot_index]: collects the shards corresponding to some slot
-          index, reconstructs slots when enough shards are seen, and
-          republishes missing shards. *)
-
-(** List of operator profiles. It may contain dupicates as it represents profiles
-      provided by the user in unprocessed form. *)
-type operator_profiles = operator_profile list
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6958
-   Unify the {profiles} type with the one from `src/bin_dal_node/profile_manager.ml` *)
 
 (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in. *)
-type profiles =
+type profile =
   | Bootstrap
       (** The bootstrap profile facilitates peer discovery in the DAL
-      network.  Note that bootstrap nodes are incompatible with
-      attester/producer/observer profiles as bootstrap nodes are
-      expected to connect to all the meshes with degree 0. *)
-  | Operator of operator_profiles
+          network.  Note that bootstrap nodes are incompatible with
+          attester/producer/observer profiles as bootstrap nodes are
+          expected to connect to all the meshes with degree 0. *)
+  | Operator of Operator_profile.t
   | Random_observer
-
-(* Merge the two sets of profiles. In case of incompatibility (that is, case
-   [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
-   priority. *)
-val merge_profiles : lower_prio:profiles -> higher_prio:profiles -> profiles
 
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)
@@ -279,7 +248,8 @@ type with_proof = {with_proof : bool}
 
 val slot_id_query : (level option * shard_index option) Resto.Query.t
 
-val slot_query : < padding : char > Resto.Query.t
+val slot_query :
+  < padding : char ; slot_index : slot_index option > Resto.Query.t
 
 val wait_query : < wait : bool > Resto.Query.t
 
@@ -297,18 +267,16 @@ val slot_id_encoding : slot_id Data_encoding.t
 
 val header_status_encoding : header_status Data_encoding.t
 
-val profiles_encoding : profiles Data_encoding.t
+val profile_encoding : profile Data_encoding.t
 
 val with_proof_encoding : with_proof Data_encoding.t
-
-val operator_profile_encoding : operator_profile Data_encoding.t
 
 val attestable_slots_encoding : attestable_slots Data_encoding.t
 
 module Store : sig
   (** [stored_data] is the kind of data being encoded/decoded. This
     datatype is used to get better events UX. *)
-  type kind = Commitment | Header_status | Slot_id | Slot | Profile
+  type kind = Commitment | Header_status | Slot_id | Slot | Shard | Profile
 
   val encoding : kind Data_encoding.t
 
@@ -369,7 +337,12 @@ end
 module Gossipsub : sig
   (** See {!Tezos_gossipsub.Introspection.connection}. Ideally we should reuse
       that type, but that would require a new dependency to be added. *)
-  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
+  type connection = {
+    topics : Topic.t list;
+    direct : bool;
+    outbound : bool;
+    bootstrap : bool;
+  }
 
   val connection_encoding : connection Data_encoding.t
 end
@@ -381,4 +354,12 @@ module Version : sig
   val make : network_version:Network_version.t -> t
 
   include ENCODABLE with type t := t
+end
+
+module Health : sig
+  type status = Up | Degraded | Down | Ok | Ko
+
+  type t = {status : status; checks : (string * status) list}
+
+  val encoding : t Data_encoding.t
 end

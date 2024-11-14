@@ -53,10 +53,11 @@ module type MONAD = sig
   val bind : 'a t -> ('a -> 'b t) -> 'b t
 end
 
-module Monad (State : sig
-  type t
-end)
-(M : MONAD) =
+module Monad
+    (State : sig
+      type t
+    end)
+    (M : MONAD) =
 struct
   type nonrec 'a t = State.t -> ('a * State.t) M.t
 

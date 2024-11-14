@@ -7,7 +7,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 (** {2 Constants} *)
 
@@ -405,7 +405,7 @@ let init_ctxt_only ctxtreq =
     .parameters_of_constants
       {Context.default_test_constants with consensus_threshold = 0}
   in
-  let*? _cryptobox =
+  let* _cryptobox =
     Dal_helpers.mk_cryptobox initial_params.constants.dal.cryptobox_parameters
   in
   let* block, contracts =
@@ -992,35 +992,52 @@ let select_op (op_req : operation_req) (infos : infos) =
   in
   mk_op op_req infos
 
-let make_tztest ?(fmt = Format.std_formatter) name test subjects info_builder =
-  let open Lwt_result_syntax in
-  Tztest.tztest name `Quick (fun () ->
+let make_test
+    ~(register_test :
+       title:string ->
+       ?additional_tags:string trace ->
+       ?slow:bool ->
+       (unit -> (unit, tztrace) result Lwt.t) ->
+       unit) name test (subjects : manager_operation_kind list) info_builder =
+  List.iter
+    (fun kind ->
+      let title = sf "%s: %s" name (kind_to_string kind) in
+      register_test ~title @@ fun () ->
+      let open Lwt_syntax in
       let* infos = info_builder () in
-      List.iter_es
-        (fun kind ->
-          Format.fprintf fmt "%s: %s@." name (kind_to_string kind) ;
-          test infos kind)
-        subjects)
+      let infos =
+        match infos with
+        | Error errs ->
+            Tezt.Test.fail "Error: %a" Error_monad.pp_print_trace errs
+        | Ok infos -> infos
+      in
+      test infos kind)
+    subjects
 
-let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects
-    info_builder =
-  let open Lwt_result_syntax in
-  Tztest.tztest name `Quick (fun () ->
-      let* infos = info_builder () in
-      List.iter_es
-        (fun kind1 ->
-          let k1s = kind_to_string kind1 in
-          List.iter_es
-            (fun kind2 ->
-              Format.fprintf
-                fmt
-                "%s: [%s ; %s]@."
-                name
-                k1s
-                (kind_to_string kind2) ;
-              test infos kind1 kind2)
-            subjects)
+let make_test_batched
+    ~(register_test :
+       title:string ->
+       ?additional_tags:string trace ->
+       ?slow:bool ->
+       (unit -> (unit, tztrace) result Lwt.t) ->
+       unit) name test subjects info_builder =
+  List.iter
+    (fun kind1 ->
+      let k1s = kind_to_string kind1 in
+      List.iter
+        (fun kind2 ->
+          let title = sf "%s: [%s ; %s]" name k1s (kind_to_string kind2) in
+          register_test ~title @@ fun () ->
+          let* infos = info_builder () in
+          let infos =
+            match infos with
+            | Error errs ->
+                Tezt.Test.fail "Error: %a" Error_monad.pp_print_trace errs
+            | Ok infos -> infos
+          in
+          test infos kind1 kind2)
         subjects)
+    subjects
 
 (** {2 Diagnostic helpers.} *)
 

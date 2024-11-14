@@ -34,7 +34,7 @@
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tree-encoding
-  data-encoding
+  octez-libs.data-encoding
   octez-internal-libs.irmin_pack
   octez-internal-libs.irmin_pack.unix
   octez-internal-libs.irmin
@@ -44,6 +44,7 @@
   octez-smart-rollup-node-lib
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
+  octez-riscv-pvm
   octez-libs.crypto-dal
   octez-version.value)
  (library_flags (:standard -linkall))

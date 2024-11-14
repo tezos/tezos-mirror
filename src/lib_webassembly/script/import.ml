@@ -1,7 +1,6 @@
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 open Source
 open Ast
-
 module Unknown = Error.Make ()
 
 exception Unknown = Unknown.Error (* indicates unknown import name *)

@@ -31,21 +31,28 @@
     Subject:    Multiple operations can be grouped in one ensuring their
                 deterministic application.
 
-                If an invalid operation is present in this group of
-                operations, the previously applied operations are
-                backtracked leaving the context unchanged and the
-                following operations are skipped. Fees attributed to the
-                operations are collected by the baker nonetheless.
+                Only manager operations are allowed in batches of more
+                than one operation. This file only tests batches where
+                all operations belong to the same manager. See
+                {!Test_host_operation} for tests involving multiple
+                managers.
 
-                Only manager operations are allowed in multiple transactions.
-                They must all belong to the same manager as there is only one
-                signature.
+                For single-manager batches, if an invalid operation is
+                present in this group of operations then the
+                previously applied operations are backtracked, leaving
+                the context unchanged, and the following operations
+                are skipped. Fees attributed to the operations are
+                collected by the baker nonetheless.
+
+                There may be overlap with
+                [lib_protocol/test/integration/validate/test_validation_batch.ml].
 *)
 
 open Protocol
 open Alpha_context
+open Error_helpers
 
-let ten_tez = Test_tez.of_int 10
+let ten_tez = Tez_helpers.of_int 10
 
 let gas_limit = Op.Custom_gas (Alpha_context.Gas.Arith.integral_of_int_exn 3000)
 
@@ -72,7 +79,7 @@ let test_multiple_transfers () =
       (I inc)
       c1
       c1_old_balance
-      (Test_tez.of_int 10)
+      (Tez_helpers.of_int 10)
   in
   let* () =
     Assert.balance_was_credited
@@ -80,7 +87,7 @@ let test_multiple_transfers () =
       (I inc)
       c2
       c2_old_balance
-      (Test_tez.of_int 10)
+      (Tez_helpers.of_int 10)
   in
   return_unit
 
@@ -103,7 +110,7 @@ let test_multiple_origination_and_delegation () =
           ~counter:(Manager_counter.Internal_for_tests.of_int i)
           ~fee:Tez.zero
           ~script:Op.dummy_script
-          ~credit:(Test_tez.of_int 10)
+          ~credit:(Tez_helpers.of_int 10)
           (B blk)
           c1)
       (1 -- n)
@@ -148,21 +155,21 @@ let test_multiple_origination_and_delegation () =
   in
   (* Previous balance - (Credit (n * 10tz) + Origination cost (n tz)) *)
   let*? origination_burn =
-    Test_tez.(cost_per_byte *? Int64.of_int origination_size)
+    Tez_helpers.(cost_per_byte *? Int64.of_int origination_size)
   in
   let*? origination_total_cost =
-    Test_tez.(origination_burn *? Int64.of_int n)
+    Tez_helpers.(origination_burn *? Int64.of_int n)
   in
-  let*? t = Test_tez.( *? ) Op.dummy_script_cost 10L in
-  let*? t = Test_tez.( +? ) (Test_tez.of_int (10 * n)) t in
-  let*? total_cost = Test_tez.( +? ) origination_total_cost t in
+  let*? t = Tez_helpers.( *? ) Op.dummy_script_cost 10L in
+  let*? t = Tez_helpers.( +? ) (Tez_helpers.of_int (10 * n)) t in
+  let*? total_cost = Tez_helpers.( +? ) origination_total_cost t in
   let* () =
     Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   in
   List.iter_es
     (fun c ->
       let c = Contract.Originated c in
-      Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
+      Assert.balance_is ~loc:__LOC__ (I inc) c (Tez_helpers.of_int 10))
     new_contracts
 
 let expect_apply_failure =
@@ -185,7 +192,7 @@ let test_failing_operation_in_the_middle () =
   let* blk, (c1, c2) = Context.init2 () in
   let* op1 = Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one in
   let* op2 =
-    Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Test_tez.max_tez
+    Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez_helpers.max_tez
   in
   let* op3 = Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one in
   let operations = [op1; op2; op3] in
@@ -232,7 +239,7 @@ let test_failing_operation_in_the_middle_with_fees () =
   let open Lwt_result_syntax in
   let* blk, (c1, c2) = Context.init2 () in
   let* op1 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one in
-  let* op2 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Test_tez.max_tez in
+  let* op2 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez_helpers.max_tez in
   let* op3 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one in
   let operations = [op1; op2; op3] in
   let* operation = Op.combine_operations ~source:c1 (B blk) operations in
@@ -274,7 +281,7 @@ let test_failing_operation_in_the_middle_with_fees () =
       (I inc)
       c1
       c1_old_balance
-      (Test_tez.of_int 3)
+      (Tez_helpers.of_int 3)
   in
   let* () = Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance in
   return_unit
@@ -301,44 +308,17 @@ let test_wrong_signature_in_the_middle () =
     Op.transaction ~gas_limit ~fee:Tez.one (B b) c2 c1 Tez.one
   in
   let operations = [op1; op2; op3] in
-
   let* operation =
     Op.combine_operations ~spurious_operation ~source:c1 (B b) operations
   in
-  let expect_failure = function
-    | Environment.Ecoproto_error
-        (Validate_errors.Manager.Inconsistent_sources as err)
-      :: _ ->
-        Assert.test_error_encodings err ;
-        return_unit
-    | _ ->
-        failwith
-          "Packed operation has invalid source in the middle : operation \
-           expected to fail."
-  in
   let* inc = Incremental.begin_construction b in
-  let* (_inc : Incremental.t) =
+  let* (_ : Incremental.t) =
+    let expect_failure =
+      expect_inconsistent_sources ~loc:__LOC__ ~first_source:c1 ~source:c2
+    in
     Incremental.add_operation ~expect_failure inc operation
   in
   return_unit
-
-let expect_inconsistent_counters list =
-  let open Lwt_result_syntax in
-  if
-    List.exists
-      (function
-        | Environment.Ecoproto_error
-            Validate_errors.Manager.Inconsistent_counters ->
-            true
-        | _ -> false)
-      list
-  then return_unit
-  else
-    failwith
-      "Packed operation has inconsistent counters : operation expected to fail \
-       but got errors: %a."
-      Error_monad.pp_print_trace
-      list
 
 let test_inconsistent_counters () =
   let open Lwt_result_syntax in
@@ -405,18 +385,26 @@ let test_inconsistent_counters () =
   (* Gap in counter in the following op *)
   let* op = Op.batch_operations ~source:c1 (B b) [op1; op2; op4] in
   let* (_ : Incremental.t) =
-    Incremental.add_operation
-      ~expect_failure:expect_inconsistent_counters
-      inc
-      op
+    let expect_failure =
+      expect_inconsistent_counters_int
+        ~loc:__LOC__
+        ~source:c1
+        ~previous_counter:3
+        ~counter:5
+    in
+    Incremental.add_operation ~expect_failure inc op
   in
   (* Same counter used twice in the following op *)
   let* op = Op.batch_operations ~source:c1 (B b) [op1; op2; op2'] in
   let* (_ : Incremental.t) =
-    Incremental.add_operation
-      ~expect_failure:expect_inconsistent_counters
-      inc
-      op
+    let expect_failure =
+      expect_inconsistent_counters_int
+        ~loc:__LOC__
+        ~source:c1
+        ~previous_counter:3
+        ~counter:3
+    in
+    Incremental.add_operation ~expect_failure inc op
   in
   return_unit
 

@@ -483,11 +483,11 @@ let baker_early_preattestation_test =
     "%s have proposed, both baker have pre-attested for their delegates%s"
     (Baker.name baker1)
     (if preattestation_should_be_validated then
-     " and the pqc is reached. Ensure that the pre-attestations are injected \
-      in the nodes as validated operation"
-    else
-      ". Ensure that the pre-attestations are injected in the nodes as \
-       branch_delayed operation") ;
+       " and the pqc is reached. Ensure that the pre-attestations are injected \
+        in the nodes as validated operation"
+     else
+       ". Ensure that the pre-attestations are injected in the nodes as \
+        branch_delayed operation") ;
 
   let expected_preattestations status_a status_b =
     List.of_seq

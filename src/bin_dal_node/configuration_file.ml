@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Version history:
+   - 0: initial version, comes with octez v20 release
+   - 1: changed format of 'profile' field; added 'version' field *)
+let current_version = 1
+
 type neighbor = {addr : string; port : int}
 
 type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Full
@@ -66,9 +71,12 @@ type t = {
   expected_pow : float;
   network_name : string;
   endpoint : Uri.t;
-  metrics_addr : P2p_point.Id.t;
-  profiles : Types.profiles;
+  metrics_addr : P2p_point.Id.t option;
+  profile : Profile_manager.t;
   history_mode : history_mode;
+  version : int;
+  service_name : string option;
+  service_namespace : string option;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -113,9 +121,12 @@ let default =
     expected_pow = default_expected_pow;
     network_name = default_network_name;
     endpoint = default_endpoint;
-    metrics_addr = default_metrics_addr;
+    metrics_addr = None;
     history_mode = default_history_mode;
-    profiles = Operator [];
+    profile = Profile_manager.empty;
+    version = current_version;
+    service_name = None;
+    service_namespace = None;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -154,7 +165,10 @@ let encoding : t Data_encoding.t =
            endpoint;
            metrics_addr;
            history_mode;
-           profiles;
+           profile;
+           version;
+           service_name;
+           service_namespace;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -166,7 +180,7 @@ let encoding : t Data_encoding.t =
           network_name,
           endpoint,
           metrics_addr ),
-        (history_mode, profiles) ))
+        (history_mode, profile, version, service_name, service_namespace) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -177,7 +191,7 @@ let encoding : t Data_encoding.t =
              network_name,
              endpoint,
              metrics_addr ),
-           (history_mode, profiles) ) ->
+           (history_mode, profile, version, service_name, service_namespace) ) ->
       {
         data_dir;
         rpc_addr;
@@ -190,7 +204,10 @@ let encoding : t Data_encoding.t =
         endpoint;
         metrics_addr;
         history_mode;
-        profiles;
+        profile;
+        version;
+        service_name;
+        service_namespace;
       })
     (merge_objs
        (obj10
@@ -242,9 +259,9 @@ let encoding : t Data_encoding.t =
           (dft
              "metrics-addr"
              ~description:"The point for the DAL node metrics server"
-             P2p_point.Id.encoding
-             default_metrics_addr))
-       (obj2
+             (Encoding.option P2p_point.Id.encoding)
+             None))
+       (obj5
           (dft
              "history_mode"
              ~description:"The history mode for the DAL node"
@@ -253,8 +270,172 @@ let encoding : t Data_encoding.t =
           (dft
              "profiles"
              ~description:"The Octez DAL node profiles"
-             Types.profiles_encoding
-             (Operator []))))
+             Profile_manager.encoding
+             Profile_manager.empty)
+          (req "version" ~description:"The configuration file version" int31)
+          (dft
+             "service_name"
+             ~description:"Name of the service"
+             (Data_encoding.option Data_encoding.string)
+             None)
+          (dft
+             "service_namespace"
+             ~description:"Namespace for the service"
+             (Data_encoding.option Data_encoding.string)
+             None)))
+
+module V0 = struct
+  type t = {
+    data_dir : string;
+    rpc_addr : P2p_point.Id.t;
+    neighbors : neighbor list;
+    listen_addr : P2p_point.Id.t;
+    public_addr : P2p_point.Id.t;
+    peers : string list;
+    expected_pow : float;
+    network_name : string;
+    endpoint : Uri.t;
+    metrics_addr : P2p_point.Id.t;
+    profile : Profile_manager.t;
+    history_mode : history_mode;
+  }
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {
+             data_dir;
+             rpc_addr;
+             listen_addr;
+             public_addr;
+             neighbors;
+             peers;
+             expected_pow;
+             network_name;
+             endpoint;
+             metrics_addr;
+             history_mode;
+             profile;
+           } ->
+        ( ( data_dir,
+            rpc_addr,
+            listen_addr,
+            public_addr,
+            neighbors,
+            peers,
+            expected_pow,
+            network_name,
+            endpoint,
+            metrics_addr ),
+          (history_mode, profile) ))
+      (fun ( ( data_dir,
+               rpc_addr,
+               listen_addr,
+               public_addr,
+               neighbors,
+               peers,
+               expected_pow,
+               network_name,
+               endpoint,
+               metrics_addr ),
+             (history_mode, profile) ) ->
+        {
+          data_dir;
+          rpc_addr;
+          listen_addr;
+          public_addr;
+          neighbors;
+          peers;
+          expected_pow;
+          network_name;
+          endpoint;
+          metrics_addr;
+          history_mode;
+          profile;
+        })
+      (merge_objs
+         (obj10
+            (dft
+               "data-dir"
+               ~description:"Location of the data dir"
+               string
+               default_data_dir)
+            (dft
+               "rpc-addr"
+               ~description:"RPC address"
+               P2p_point.Id.encoding
+               default_rpc_addr)
+            (dft
+               "net-addr"
+               ~description:"P2P address of this node"
+               P2p_point.Id.encoding
+               default_listen_addr)
+            (dft
+               "public-addr"
+               ~description:"P2P address of this node"
+               P2p_point.Id.encoding
+               default_listen_addr)
+            (dft
+               "neighbors"
+               ~description:"DAL Neighbors"
+               (list neighbor_encoding)
+               default_neighbors)
+            (dft
+               "peers"
+               ~description:"P2P addresses of remote peers"
+               (list string)
+               default_peers)
+            (dft
+               "expected-pow"
+               ~description:"Expected P2P identity's PoW"
+               float
+               default_expected_pow)
+            (dft
+               "network-name"
+               ~description:"The name that identifies the network"
+               string
+               default_network_name)
+            (dft
+               "endpoint"
+               ~description:"The Tezos node endpoint"
+               endpoint_encoding
+               default_endpoint)
+            (dft
+               "metrics-addr"
+               ~description:"The point for the DAL node metrics server"
+               P2p_point.Id.encoding
+               default_metrics_addr))
+         (obj2
+            (dft
+               "history_mode"
+               ~description:"The history mode for the DAL node"
+               history_mode_encoding
+               default_history_mode)
+            (dft
+               "profiles"
+               ~description:"The Octez DAL node profiles"
+               Profile_manager.encoding
+               Profile_manager.empty)))
+end
+
+let from_v0 v0 =
+  {
+    data_dir = v0.V0.data_dir;
+    rpc_addr = v0.rpc_addr;
+    listen_addr = v0.listen_addr;
+    public_addr = v0.public_addr;
+    neighbors = v0.neighbors;
+    peers = v0.peers;
+    expected_pow = v0.expected_pow;
+    network_name = v0.network_name;
+    endpoint = v0.endpoint;
+    metrics_addr = Some v0.metrics_addr;
+    history_mode = v0.history_mode;
+    profile = v0.profile;
+    version = current_version;
+    service_name = None;
+    service_namespace = None;
+  }
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
@@ -292,15 +473,23 @@ let save config =
 
 let load ~data_dir =
   let open Lwt_result_syntax in
-  let+ json =
+  let* json =
     let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
     match json with
     | Ok json -> return json
     | Error (Exn _ :: _ as e) -> fail e
     | Error e -> fail e
   in
-  let config = Data_encoding.Json.destruct encoding json in
-  {config with data_dir}
+  let* config =
+    Lwt.catch
+      (fun () -> Data_encoding.Json.destruct encoding json |> return)
+      (fun _e ->
+        Data_encoding.Json.destruct V0.encoding json |> from_v0 |> return)
+  in
+  let config = {config with data_dir} in
+  (* We save the config so that its format is that of the latest version. *)
+  let* () = save config in
+  return config
 
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 

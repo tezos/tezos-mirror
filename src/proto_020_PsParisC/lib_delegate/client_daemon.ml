@@ -56,11 +56,29 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
   in
   Node_rpc.await_protocol_activation cctxt ~chain ()
 
+let may_start_profiler baking_dir =
+  match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
+  | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode) ->
+      let max_lod =
+        match mode with
+        | "detailed" -> Profiler.Detailed
+        | "verbose" -> Profiler.Verbose
+        | _ -> Profiler.Terse
+      in
+      let profiler_maker ~name =
+        Profiler.instance
+          Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
+          Filename.Infix.((baking_dir // name) ^ "_profiling.txt", max_lod)
+      in
+      Baking_profiler.init profiler_maker
+  | _ -> ()
+
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
-      ?extra_operations ?dal_node_endpoint ?pre_emptive_forge_time ?force_apply
-      ?context_path ?state_recorder ~chain ~keep_alive delegates =
+      ?extra_operations ?dal_node_endpoint ?dal_node_timeout_percentage
+      ?pre_emptive_forge_time ?force_apply ?context_path ?state_recorder ~chain
+      ~keep_alive delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades =
@@ -109,6 +127,7 @@ module Baker = struct
           ?votes
           ?extra_operations
           ?dal_node_endpoint
+          ?dal_node_timeout_percentage
           ~pre_emptive_forge_time
           ?force_apply
           ?context_path
@@ -132,11 +151,7 @@ module Baker = struct
             let*! _ = Lwt_canceler.cancel canceler in
             Lwt.return_unit)
       in
-      let* () =
-        let* dal_config = Node_rpc.fetch_dal_config cctxt in
-        let*? () = Cryptobox.Config.init_verifier_dal dal_config in
-        return_unit
-      in
+      let () = may_start_profiler cctxt#get_base_dir in
       let consumer = Protocol_logging.make_log_message_consumer () in
       Lifted_protocol.set_log_message_consumer consumer ;
       Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates

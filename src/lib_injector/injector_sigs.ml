@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Id = Tezos_crypto.Hashed.Injector_operations_hash
+
 (** Defines the strategy for a worker. *)
 type injection_strategy =
   [ `Each_block  (** Inject pending operations after each new L1 block *)
@@ -98,9 +100,6 @@ end
 module type INJECTOR_OPERATION = sig
   type operation
 
-  (** Hash with b58check encoding iop(53), for ids of injector operations *)
-  module Id : Tezos_crypto.Intfs.HASH
-
   (** Alias for L1 operations ids *)
   type id = Id.t
 
@@ -147,7 +146,11 @@ module type PARAMETERS = sig
   (** Action (see {!retry_action}) to be taken on unsuccessful operation (see
       {!unsuccessful_status}). *)
   val retry_unsuccessful_operation :
-    state -> Operation.t -> unsuccessful_status -> retry_action Lwt.t
+    state ->
+    Operation.t ->
+    ?reason:Operation.t * error trace ->
+    unsuccessful_status ->
+    retry_action Lwt.t
 
   (** The tag of a manager operation. This is used to send operations to the
       correct queue automatically (when signer is not provided) and to recover
@@ -165,6 +168,8 @@ module type PARAMETERS = sig
   (** Indicate which operations should be persisted on disk to be reinjected
       upon restart.  *)
   val persist_operation : Operation.t -> bool
+
+  val metrics_registry : Prometheus.CollectorRegistry.t
 end
 
 module type PROTOCOL_CLIENT = sig
@@ -296,6 +301,9 @@ module type S = sig
       [injection_ttl] is the number of blocks after which an operation that is
       injected but never include is retried.
 
+      [collect_metrics] will allow the prometheus to register metrics for the
+      injector.
+
       Each pkh's list and tag list of [signers] must be disjoint. *)
   val init :
     #Client_context.full ->
@@ -303,6 +311,7 @@ module type S = sig
     ?retention_period:int ->
     ?allowed_attempts:int ->
     ?injection_ttl:int ->
+    ?collect_metrics:bool ->
     Layer_1.t ->
     state ->
     signers:
@@ -311,7 +320,7 @@ module type S = sig
 
   (** Add an operation as pending injection in the injector. It returns the id
       of the operation in the injector queue. *)
-  val add_pending_operation : operation -> Inj_operation.Id.t tzresult Lwt.t
+  val add_pending_operation : operation -> Id.t tzresult Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending
@@ -326,8 +335,11 @@ module type S = sig
   (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t
 
+  (** List of currently running injectors with their respective tags. *)
+  val running_worker_tags : unit -> tag list list
+
   (** The status of an operation in the injector. *)
-  val operation_status : Inj_operation.Id.t -> status option
+  val operation_status : Id.t -> status option
 
   (** Returns the total operations per worker queue and in total. This function
       is constant time excepted for the injectors iteration.  *)

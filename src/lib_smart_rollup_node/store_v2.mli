@@ -55,6 +55,49 @@ module Commitments :
      and type value := Octez_smart_rollup.Commitment.t
      and type header := unit
 
+module Outbox_messages : sig
+  type +'a t
+
+  val load : path:string -> 'a Store_sigs.mode -> 'a t tzresult Lwt.t
+
+  val readonly : [> `Read] t -> [`Read] t
+
+  val by_outbox_level :
+    [> `Read] t -> outbox_level:int32 -> (int * bool) list tzresult Lwt.t
+
+  val pending :
+    [> `Read] t ->
+    min_level:int32 ->
+    max_level:int32 ->
+    (int32 * int list) list tzresult Lwt.t
+
+  val register_new_outbox_messages :
+    [> `Read | `Write] t ->
+    outbox_level:int32 ->
+    indexes:int list ->
+    unit tzresult Lwt.t
+
+  val register_missing_outbox_messages :
+    [> `Read | `Write] t ->
+    outbox_level:int32 ->
+    indexes:int list ->
+    unit tzresult Lwt.t
+
+  val set_outbox_message_executed :
+    [> `Read | `Write] t ->
+    outbox_level:int32 ->
+    index:int ->
+    unit tzresult Lwt.t
+
+  val iter :
+    [> `Read] t ->
+    (outbox_level:int32 ->
+    messages:int list ->
+    executed_messages:int list ->
+    unit tzresult Lwt.t) ->
+    unit tzresult Lwt.t
+end
+
 (** Storage containing the last cemented commitment. *)
 module Lcc : sig
   type lcc = {commitment : Commitment.Hash.t; level : int32}
@@ -113,9 +156,10 @@ end
 (** Level at which context was last split. *)
 module Last_context_split : SINGLETON_STORE with type value := int32
 
+type history_mode = Archive | Full
+
 (** History mode of the rollup node. *)
-module History_mode :
-  SINGLETON_STORE with type value := Configuration.history_mode
+module History_mode : SINGLETON_STORE with type value := history_mode
 
 type +'a store = {
   l2_blocks : 'a L2_blocks.t;
@@ -123,6 +167,7 @@ type +'a store = {
   inboxes : 'a Inboxes.t;
   commitments : 'a Commitments.t;
   commitments_published_at_level : 'a Commitments_published_at_level.t;
+  outbox_messages : 'a Outbox_messages.t;
   l2_head : 'a L2_head.t;
   last_finalized_level : 'a Last_finalized_level.t;
   lcc : 'a Lcc.t;
@@ -131,6 +176,7 @@ type +'a store = {
   protocols : 'a Protocols.t;
   irmin_store : 'a Irmin_store.t;
   gc_levels : 'a Gc_levels.t;
+  successful_gc_levels : 'a Gc_levels.t;
   last_context_split_level : 'a Last_context_split.t;
   history_mode : 'a History_mode.t;
 }
@@ -139,3 +185,7 @@ include Store_sig.S with type 'a store := 'a store
 
 (** [is_gc_finished t] returns [true] if there is no GC running. *)
 val is_gc_finished : 'a t -> bool
+
+(** [cancel_gc t] stops any currently ongoing GC. It returns [true] if a GC was
+    canceled. *)
+val cancel_gc : 'a t -> bool Lwt.t

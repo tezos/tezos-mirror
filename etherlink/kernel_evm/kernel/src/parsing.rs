@@ -6,19 +6,21 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS;
-use crate::configuration::TezosContracts;
-use crate::delayed_inbox::DelayedInbox;
+use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::tick_model::constants::{
     TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE, TICKS_FOR_DELAYED_MESSAGES,
     TICKS_PER_DEPOSIT_PARSING,
 };
 use crate::{
-    inbox::{Deposit, Transaction, TransactionContent},
+    bridge::Deposit,
+    dal_slot_import_signal::DalSlotImportSignals,
+    inbox::{Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
     upgrade::KernelUpgrade,
     upgrade::SequencerUpgrade,
 };
-use primitive_types::{H160, U256};
+use evm_execution::fa_bridge::deposit::FaDeposit;
+use evm_execution::fa_bridge::TICKS_PER_FA_DEPOSIT_PARSING;
 use rlp::Encodable;
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeySignatureVerifier};
@@ -26,9 +28,9 @@ use tezos_ethereum::{
     rlp_helpers::FromRlpBytes,
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
     tx_common::EthereumTransactionCommon,
-    wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::{
     contract::Contract,
     inbox::{
@@ -38,7 +40,6 @@ use tezos_smart_rollup_encoding::{
     public_key::PublicKey,
 };
 use tezos_smart_rollup_host::input::Message;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 /// On an option, either the value, or if `None`, interrupt and return the
 /// default value of the return type instead.
@@ -66,7 +67,6 @@ pub fn split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {
 }
 
 pub const SIMULATION_TAG: u8 = u8::MAX;
-const EVM_NODE_DELAYED_INPUT_TAG: u8 = u8::MAX - 1;
 
 const SIMPLE_TRANSACTION_TAG: u8 = 0;
 
@@ -75,6 +75,8 @@ const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
 const TRANSACTION_CHUNK_TAG: u8 = 2;
 
 const SEQUENCER_BLUEPRINT_TAG: u8 = 3;
+
+pub const DAL_SLOT_IMPORT_SIGNAL_TAG: u8 = 4;
 
 const FORCE_KERNEL_UPGRADE_TAG: u8 = 0xff;
 
@@ -112,12 +114,14 @@ pub enum ProxyInput {
 pub enum SequencerInput {
     DelayedInput(Box<Transaction>),
     SequencerBlueprint(SequencerBlueprint),
+    DalSlotImportSignals(DalSlotImportSignals),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Input<Mode> {
     ModeSpecific(Mode),
     Deposit(Deposit),
+    FaDeposit(FaDeposit),
     Upgrade(KernelUpgrade),
     SequencerUpgrade(SequencerUpgrade),
     RemoveSequencer,
@@ -172,6 +176,8 @@ pub trait Parsable {
         Self: std::marker::Sized;
 
     fn on_deposit(context: &mut Self::Context);
+
+    fn on_fa_deposit(context: &mut Self::Context);
 }
 
 impl ProxyInput {
@@ -269,12 +275,61 @@ impl Parsable for ProxyInput {
     }
 
     fn on_deposit(_: &mut Self::Context) {}
+
+    fn on_fa_deposit(_: &mut Self::Context) {}
+}
+
+pub struct BufferTransactionChunks {
+    pub total: u8,
+    pub accumulated: u8,
+    pub chunks: Vec<u8>,
 }
 
 pub struct SequencerParsingContext {
     pub sequencer: PublicKey,
     pub delayed_bridge: ContractKt1Hash,
     pub allocated_ticks: u64,
+    pub dal_configuration: Option<DalConfiguration>,
+    // Delayed inbox transactions may come in chunks. If the buffer is
+    // [Some _] a chunked transaction is being parsed,
+    pub buffer_transaction_chunks: Option<BufferTransactionChunks>,
+}
+
+pub fn parse_unsigned_blueprint_chunk(
+    bytes: &[u8],
+) -> Option<UnsignedSequencerBlueprint> {
+    // Parse an unsigned sequencer blueprint
+    let unsigned_seq_blueprint: UnsignedSequencerBlueprint =
+        parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+
+    if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
+        return None;
+    }
+
+    Some(unsigned_seq_blueprint)
+}
+
+pub fn parse_blueprint_chunk(
+    bytes: &[u8],
+    sequencer: &PublicKey,
+) -> Option<SequencerBlueprint> {
+    // Parse the sequencer blueprint
+    let seq_blueprint: SequencerBlueprint =
+        parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+
+    // Creates and encodes the unsigned blueprint:
+    let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
+    if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
+        return None;
+    }
+
+    let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
+
+    let correctly_signed = sequencer
+        .verify_signature(&seq_blueprint.signature.clone().into(), &bytes)
+        .unwrap_or(false);
+
+    correctly_signed.then_some(seq_blueprint)
 }
 
 impl SequencerInput {
@@ -289,30 +344,137 @@ impl SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
-        // Parse the sequencer blueprint
-        let seq_blueprint: SequencerBlueprint =
-            parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
-
-        // Creates and encodes the unsigned blueprint:
-        let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
-        if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
-            return InputResult::Unparsable;
-        }
-        let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
-        // The sequencer signs the hash of the blueprint.
-        let msg = tezos_crypto_rs::blake2b::digest_256(&bytes).unwrap();
-
-        let correctly_signed = context
-            .sequencer
-            .verify_signature(&seq_blueprint.signature, &msg)
-            .unwrap_or(false);
-
-        if correctly_signed {
+        if let Some(seq_blueprint) = parse_blueprint_chunk(bytes, &context.sequencer) {
             InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(
                 seq_blueprint,
             )))
         } else {
             InputResult::Unparsable
+        }
+    }
+
+    pub fn parse_dal_slot_import_signal(
+        bytes: &[u8],
+        context: &mut SequencerParsingContext,
+    ) -> InputResult<Self> {
+        // Inputs are 4096 bytes longs at most, and even in the future they
+        // should be limited by the size of native words of the VM which is
+        // 32bits.
+        // TODO: Define the tick model as this is temporary.
+        // https://gitlab.com/tezos/tezos/-/issues/7455
+        context.allocated_ticks = context
+            .allocated_ticks
+            .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
+
+        let Some(dal) = &context.dal_configuration else {
+            return InputResult::Unparsable;
+        };
+
+        // Parse the signals
+        let signed_signals: DalSlotImportSignals =
+            parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+
+        // Check if all slot indices are valid
+        for unsigned_signal in &signed_signals.signals.0 {
+            for slot_index in &unsigned_signal.slot_indices.0 {
+                if !dal.slot_indices.contains(slot_index) {
+                    return InputResult::Unparsable;
+                }
+            }
+        }
+
+        // Encode the entire list of unsigned signals
+        let bytes = signed_signals.signals.rlp_bytes().to_vec();
+
+        // Verify the signature against the entire encoded list
+        let correctly_signed = context
+            .sequencer
+            .verify_signature(&signed_signals.signature.clone().into(), &bytes)
+            .unwrap_or(false);
+
+        if correctly_signed {
+            InputResult::Input(Input::ModeSpecific(Self::DalSlotImportSignals(
+                signed_signals,
+            )))
+        } else {
+            InputResult::Unparsable
+        }
+    }
+}
+
+mod delayed_chunked_transaction {
+
+    // This module implements the fairly simple logic of messaging protocol
+    // for delayed transactions that does not fit in a single inbox message.
+    //
+    // The protocol is the following:
+    //
+    // [NEW_CHUNK_TAG; <len>] => Message announcing the number of chunks. The
+    // <len> next messages will be the chunks.
+    // [CHUNK_TAG; <payload>] => Message containing one chunk.
+    //
+    // We consider that all messages are transmitted within a single
+    // L1 operation, but in several inbox messages.
+
+    use crate::parsing::BufferTransactionChunks;
+    use sha3::{Digest, Keccak256};
+    use tezos_ethereum::{
+        transaction::TransactionHash, tx_common::EthereumTransactionCommon,
+    };
+
+    pub const NEW_CHUNK_TAG: u8 = 0x0;
+    pub const CHUNK_TAG: u8 = 0x1;
+
+    pub fn parse_new_chunk(
+        bytes: &[u8],
+        buffer_transaction_chunks: &mut Option<BufferTransactionChunks>,
+    ) {
+        if let [len] = bytes {
+            // Overwrites any existing transaction chunks buffer. It's the
+            // responsibility of the contract to send correct values.
+            *buffer_transaction_chunks = Some(BufferTransactionChunks {
+                total: *len,
+                accumulated: 0,
+                chunks: vec![],
+            })
+        }
+    }
+
+    pub fn parse_chunk(
+        bytes: &[u8],
+        buffer_transaction_chunks_opt: &mut Option<BufferTransactionChunks>,
+    ) -> Option<(EthereumTransactionCommon, TransactionHash)> {
+        match buffer_transaction_chunks_opt {
+            None => {
+                // Again, it's the responsibility of the contract to respect
+                // the message protocol.
+                None
+            }
+            Some(buffer_transaction_chunks) => {
+                buffer_transaction_chunks.chunks.extend(bytes);
+                buffer_transaction_chunks.accumulated += 1;
+
+                if buffer_transaction_chunks.total
+                    == buffer_transaction_chunks.accumulated
+                {
+                    // Transaction is complete
+                    let res = match EthereumTransactionCommon::from_bytes(
+                        &buffer_transaction_chunks.chunks,
+                    ) {
+                        Ok(transaction) => {
+                            let tx_hash: TransactionHash =
+                                Keccak256::digest(&buffer_transaction_chunks.chunks)
+                                    .into();
+                            Some((transaction, tx_hash))
+                        }
+                        Err(_) => None,
+                    };
+                    *buffer_transaction_chunks_opt = None;
+                    res
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -329,6 +491,9 @@ impl Parsable for SequencerInput {
         match *tag {
             SEQUENCER_BLUEPRINT_TAG => {
                 Self::parse_sequencer_blueprint_input(input, context)
+            }
+            DAL_SLOT_IMPORT_SIGNAL_TAG => {
+                Self::parse_dal_slot_import_signal(input, context)
             }
             _ => InputResult::Unparsable,
         }
@@ -347,8 +512,28 @@ impl Parsable for SequencerInput {
         if context.delayed_bridge.as_ref() != source.as_ref() {
             return InputResult::Unparsable;
         };
-        let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
-        let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
+
+        let (tag, remaining) = parsable!(bytes.split_first());
+
+        let (tx, tx_hash) = parsable!(match *tag {
+            delayed_chunked_transaction::NEW_CHUNK_TAG => {
+                delayed_chunked_transaction::parse_new_chunk(
+                    remaining,
+                    &mut context.buffer_transaction_chunks,
+                );
+                None
+            }
+            delayed_chunked_transaction::CHUNK_TAG =>
+                delayed_chunked_transaction::parse_chunk(
+                    remaining,
+                    &mut context.buffer_transaction_chunks,
+                ),
+            _ => {
+                let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
+                let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
+                Some((tx, tx_hash))
+            }
+        });
 
         InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
             Transaction {
@@ -362,6 +547,12 @@ impl Parsable for SequencerInput {
         context.allocated_ticks = context
             .allocated_ticks
             .saturating_sub(TICKS_PER_DEPOSIT_PARSING);
+    }
+
+    fn on_fa_deposit(context: &mut Self::Context) {
+        context.allocated_ticks = context
+            .allocated_ticks
+            .saturating_sub(TICKS_PER_FA_DEPOSIT_PARSING);
     }
 }
 
@@ -385,7 +576,7 @@ impl<Mode: Parsable> InputResult<Mode> {
     ///
     // External message structure :
     // FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
-    fn parse_external(
+    pub fn parse_external(
         input: &[u8],
         smart_rollup_address: &[u8],
         context: &mut Mode::Context,
@@ -416,58 +607,74 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
+    fn parse_fa_deposit<Host: Runtime>(
+        host: &mut Host,
+        ticket: FA2_1Ticket,
+        routing_info: MichelsonBytes,
+        inbox_level: u32,
+        inbox_msg_id: u32,
+        context: &mut Mode::Context,
+    ) -> Self {
+        // Account for tick at the beginning of the deposit, in case it fails
+        // directly. We prefer to overapproximate rather than under approximate.
+        Mode::on_fa_deposit(context);
+        match FaDeposit::try_parse(ticket, routing_info, inbox_level, inbox_msg_id) {
+            Ok(fa_deposit) => {
+                log!(host, Debug, "Parsed from input: {}", fa_deposit.display());
+                InputResult::Input(Input::FaDeposit(fa_deposit))
+            }
+            Err(err) => {
+                log!(
+                    host,
+                    Debug,
+                    "FA deposit ignored because of parsing errors: {}",
+                    err
+                );
+                InputResult::Unparsable
+            }
+        }
+    }
+
     fn parse_deposit<Host: Runtime>(
         host: &mut Host,
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
-        ticketer: &Option<ContractKt1Hash>,
+        inbox_level: u32,
+        inbox_msg_id: u32,
         context: &mut Mode::Context,
     ) -> Self {
         // Account for tick at the beginning of the deposit, in case it fails
         // directly. We prefer to overapproximate rather than under approximate.
         Mode::on_deposit(context);
-        match &ticket.creator().0 {
-            Contract::Originated(kt1) if Some(kt1) == ticketer.as_ref() => (),
-            _ => {
-                log!(host, Info, "Deposit ignored because of different ticketer");
-                return InputResult::Unparsable;
+        match Deposit::try_parse(ticket, receiver, inbox_level, inbox_msg_id) {
+            Ok(deposit) => {
+                log!(host, Info, "Parsed from input: {}", deposit.display());
+                Self::Input(Input::Deposit(deposit))
             }
-        };
-
-        // Amount
-        let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
-        // We use the `U256::from_little_endian` as it takes arbitrary long
-        // bytes. Afterward it's transform to `u64` to use `eth_from_mutez`, it's
-        // obviously safe as we deposit CTEZ and the amount is limited by
-        // the XTZ quantity.
-        let amount: u64 = U256::from_little_endian(&amount_bytes).as_u64();
-        let amount: U256 = eth_from_mutez(amount);
-
-        // EVM address
-        let receiver_bytes = receiver.0;
-        if receiver_bytes.len() != std::mem::size_of::<H160>() {
-            log!(
-                host,
-                Info,
-                "Deposit ignored because of invalid receiver address"
-            );
-            return InputResult::Unparsable;
+            Err(err) => {
+                log!(
+                    host,
+                    Info,
+                    "Deposit ignored because of parsing errors: {}",
+                    err
+                );
+                Self::Unparsable
+            }
         }
-        let receiver = H160::from_slice(&receiver_bytes);
-
-        let content = Deposit { amount, receiver };
-        log!(host, Info, "Deposit of {} to {}.", amount, receiver);
-        Self::Input(Input::Deposit(content))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn parse_internal_transfer<Host: Runtime>(
         host: &mut Host,
         transfer: Transfer<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
         context: &mut Mode::Context,
+        inbox_level: u32,
+        inbox_msg_id: u32,
+        enable_fa_deposits: bool,
     ) -> Self {
-        if transfer.destination.hash().0 != smart_rollup_address {
+        if transfer.destination.hash().as_ref() != smart_rollup_address {
             log!(
                 host,
                 Info,
@@ -481,13 +688,44 @@ impl<Mode: Parsable> InputResult<Mode> {
         match transfer.payload {
             MichelsonOr::Left(left) => match left {
                 MichelsonOr::Left(MichelsonPair(receiver, ticket)) => {
-                    Self::parse_deposit(
-                        host,
-                        ticket,
-                        receiver,
-                        &tezos_contracts.ticketer,
-                        context,
-                    )
+                    match &ticket.creator().0 {
+                        Contract::Originated(kt1) => {
+                            if Some(kt1) == tezos_contracts.ticketer.as_ref() {
+                                Self::parse_deposit(
+                                    host,
+                                    ticket,
+                                    receiver,
+                                    inbox_level,
+                                    inbox_msg_id,
+                                    context,
+                                )
+                            } else if enable_fa_deposits {
+                                Self::parse_fa_deposit(
+                                    host,
+                                    ticket,
+                                    receiver,
+                                    inbox_level,
+                                    inbox_msg_id,
+                                    context,
+                                )
+                            } else {
+                                log!(
+                                    host,
+                                    Info,
+                                    "FA deposit ignored because the feature is disabled"
+                                );
+                                InputResult::Unparsable
+                            }
+                        }
+                        _ => {
+                            log!(
+                                host,
+                                Info,
+                                "Deposit ignored because of invalid ticketer"
+                            );
+                            InputResult::Unparsable
+                        }
+                    }
                 }
                 MichelsonOr::Right(MichelsonBytes(bytes)) => {
                     Mode::parse_internal_bytes(source, &bytes, context)
@@ -508,6 +746,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn parse_internal<Host: Runtime>(
         host: &mut Host,
         message: InternalInboxMessage<RollupType>,
@@ -515,6 +754,8 @@ impl<Mode: Parsable> InputResult<Mode> {
         tezos_contracts: &TezosContracts,
         context: &mut Mode::Context,
         level: u32,
+        msg_id: u32,
+        enable_fa_deposits: bool,
     ) -> Self {
         match message {
             InternalInboxMessage::InfoPerLevel(info) => {
@@ -526,6 +767,9 @@ impl<Mode: Parsable> InputResult<Mode> {
                 smart_rollup_address,
                 tezos_contracts,
                 context,
+                level,
+                msg_id,
+                enable_fa_deposits,
             ),
             _ => InputResult::Unparsable,
         }
@@ -537,20 +781,12 @@ impl<Mode: Parsable> InputResult<Mode> {
         smart_rollup_address: [u8; 20],
         tezos_contracts: &TezosContracts,
         context: &mut Mode::Context,
+        enable_fa_deposits: bool,
     ) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = parsable!(bytes.split_first());
         if *input_tag == SIMULATION_TAG {
             return Self::parse_simulation(remaining);
-        };
-        if *input_tag == EVM_NODE_DELAYED_INPUT_TAG {
-            let mut delayed_inbox = DelayedInbox::new(host).unwrap();
-            if let Ok(transaction) = Transaction::from_rlp_bytes(remaining) {
-                delayed_inbox
-                    .save_transaction(host, transaction, 0.into(), 0u32)
-                    .unwrap();
-            }
-            return InputResult::Unparsable;
         };
 
         match InboxMessage::<RollupType>::parse(bytes) {
@@ -565,6 +801,8 @@ impl<Mode: Parsable> InputResult<Mode> {
                     tezos_contracts,
                     context,
                     input.level,
+                    input.id,
+                    enable_fa_deposits,
                 ),
             },
             Err(_) => InputResult::Unparsable,
@@ -575,14 +813,14 @@ impl<Mode: Parsable> InputResult<Mode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::input::Message;
-    use tezos_smart_rollup_mock::MockHost;
 
     const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
 
     #[test]
     fn parse_unparsable_transaction() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
         assert_eq!(
@@ -598,6 +836,7 @@ mod tests {
                     kernel_security_governance: None,
                 },
                 &mut (),
+                false,
             ),
             InputResult::Unparsable
         )

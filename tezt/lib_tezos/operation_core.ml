@@ -146,17 +146,19 @@ let spawn_inject ?(force = false) ?protocol ?signature t client =
   in
   return (Client.RPC.spawn client @@ inject_rpc (Data (`String op)))
 
-let inject ?(request = `Inject) ?force ?protocol ?signature ?error t client :
-    [`OpHash of string] Lwt.t =
+let inject ?(dont_wait = false) ?(request = `Inject) ?force ?protocol ?signature
+    ?error t client : [`OpHash of string] Lwt.t =
   let waiter =
-    let mode = Client.get_mode client in
-    match Client.mode_to_endpoint mode with
-    | None -> Test.fail "Operation.inject: Endpoint expected"
-    | Some (Proxy_server _ | Foreign_endpoint _) ->
-        Test.fail
-          "Operation.inject: Node endpoint expected instead of proxy server or \
-           foreign endpoint"
-    | Some (Node node) -> Node.wait_for_request ~request node
+    if dont_wait then Lwt.return_unit
+    else
+      let mode = Client.get_mode client in
+      match Client.mode_to_endpoint mode with
+      | None -> Test.fail "Operation.inject: Endpoint expected"
+      | Some (Foreign_endpoint _) ->
+          Test.fail
+            "Operation.inject: Node endpoint expected instead of foreign \
+             endpoint"
+      | Some (Node node) -> Node.wait_for_request ~request node
   in
   let* runnable = spawn_inject ?force ?protocol ?signature t client in
   match error with
@@ -204,10 +206,9 @@ let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
     let mode = Client.get_mode client in
     match Client.mode_to_endpoint mode with
     | None -> Test.fail "Operation.inject: Endpoint expected"
-    | Some (Proxy_server _ | Foreign_endpoint _) ->
+    | Some (Foreign_endpoint _) ->
         Test.fail
-          "Operation.inject: Node endpoint expected instead of proxy server or \
-           foreign endpoint"
+          "Operation.inject: Node endpoint expected instead of foreign endpoint"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
   let rpc =
@@ -266,34 +267,28 @@ module Consensus = struct
   type dal_content = {attestation : bool array}
 
   type t =
-    | CPreattestation of {use_legacy_name : bool; consensus : consensus_content}
-    | CAttestation of {
-        use_legacy_name : bool;
-        consensus : consensus_content;
-        dal : dal_content option;
-      }
+    | CPreattestation of {consensus : consensus_content}
+    | CAttestation of {consensus : consensus_content; dal : dal_content option}
 
-  let consensus ~use_legacy_name ~kind ~slot ~level ~round ~block_payload_hash =
+  let consensus ~kind ~slot ~level ~round ~block_payload_hash =
     let consensus = {slot; level; round; block_payload_hash} in
     match kind with
-    | Preattestation -> CPreattestation {use_legacy_name; consensus}
+    | Preattestation -> CPreattestation {consensus}
     | Attestation {with_dal} ->
         assert (with_dal = false) ;
-        CAttestation {use_legacy_name; consensus; dal = None}
+        CAttestation {consensus; dal = None}
 
-  let attestation ~use_legacy_name ~slot ~level ~round ~block_payload_hash
-      ?dal_attestation () =
+  let attestation ~slot ~level ~round ~block_payload_hash ?dal_attestation () =
     let consensus = {slot; level; round; block_payload_hash} in
     CAttestation
       {
-        use_legacy_name;
         consensus;
         dal = Option.map (fun attestation -> {attestation}) dal_attestation;
       }
 
-  let preattestation ~use_legacy_name ~slot ~level ~round ~block_payload_hash =
+  let preattestation ~slot ~level ~round ~block_payload_hash =
     let consensus = {slot; level; round; block_payload_hash} in
-    CPreattestation {use_legacy_name; consensus}
+    CPreattestation {consensus}
 
   let string_of_bool_vector dal_attestation =
     let aux (acc, n) b =
@@ -302,21 +297,18 @@ module Consensus = struct
     in
     Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
 
-  let kind_to_string kind ~use_legacy_name =
-    let name = function true -> "endorsement" | false -> "attestation" in
+  let kind_to_string kind =
     match kind with
     | Attestation {with_dal} ->
-        name use_legacy_name ^ if with_dal then "_with_dal" else ""
-    | Preattestation -> Format.sprintf "pre%s" (name use_legacy_name)
+        "attestation" ^ if with_dal then "_with_dal" else ""
+    | Preattestation -> Format.sprintf "preattestation"
 
   let json = function
-    | CAttestation {use_legacy_name; consensus; dal} ->
+    | CAttestation {consensus; dal} ->
         let with_dal = Option.is_some dal in
         `O
           ([
-             ( "kind",
-               Ezjsonm.string
-                 (kind_to_string (Attestation {with_dal}) ~use_legacy_name) );
+             ("kind", Ezjsonm.string (kind_to_string (Attestation {with_dal})));
              ("slot", Ezjsonm.int consensus.slot);
              ("level", Ezjsonm.int consensus.level);
              ("round", Ezjsonm.int consensus.round);
@@ -330,11 +322,10 @@ module Consensus = struct
                 ( "dal_attestation",
                   Ezjsonm.string (string_of_bool_vector attestation) );
               ])
-    | CPreattestation {use_legacy_name; consensus} ->
+    | CPreattestation {consensus} ->
         `O
           [
-            ( "kind",
-              Ezjsonm.string (kind_to_string Preattestation ~use_legacy_name) );
+            ("kind", Ezjsonm.string (kind_to_string Preattestation));
             ("slot", Ezjsonm.int consensus.slot);
             ("level", Ezjsonm.int consensus.level);
             ("round", Ezjsonm.int consensus.round);
@@ -399,22 +390,21 @@ module Anonymous = struct
   type nonrec t =
     | Double_consensus_evidence of {
         kind : double_consensus_evidence_kind;
-        use_legacy_name : bool;
         op1 : t * Tezos_crypto.Signature.t;
         op2 : t * Tezos_crypto.Signature.t;
       }
 
-  let double_consensus_evidence ~kind ~use_legacy_name
-      (({kind = op1_kind; _}, _) as op1) (({kind = op2_kind; _}, _) as op2) =
+  let double_consensus_evidence ~kind (({kind = op1_kind; _}, _) as op1)
+      (({kind = op2_kind; _}, _) as op2) =
     match (kind, op1_kind, op2_kind) with
     | ( Double_attestation_evidence,
         Consensus {kind = Attestation {with_dal = false}; _},
         Consensus {kind = Attestation {with_dal = false}; _} ) ->
-        Double_consensus_evidence {kind; use_legacy_name; op1; op2}
+        Double_consensus_evidence {kind; op1; op2}
     | ( Double_preattestation_evidence,
         Consensus {kind = Preattestation; _},
         Consensus {kind = Preattestation; _} ) ->
-        Double_consensus_evidence {kind; use_legacy_name; op1; op2}
+        Double_consensus_evidence {kind; op1; op2}
     | _, _, _ ->
         Test.fail "Invalid arguments to create a double_consensus_evidence"
 
@@ -424,14 +414,13 @@ module Anonymous = struct
   let double_preattestation_evidence =
     double_consensus_evidence ~kind:Double_preattestation_evidence
 
-  let kind_to_string kind ~use_legacy_name =
+  let kind_to_string kind =
     sf
       "double_%s_evidence"
       (Consensus.kind_to_string
          (match kind with
          | Double_attestation_evidence -> Attestation {with_dal = false}
-         | Double_preattestation_evidence -> Preattestation)
-         ~use_legacy_name)
+         | Double_preattestation_evidence -> Preattestation))
 
   let denunced_op_json (op, signature) =
     `O
@@ -442,12 +431,12 @@ module Anonymous = struct
       ]
 
   let json = function
-    | Double_consensus_evidence {kind; use_legacy_name; op1; op2} ->
+    | Double_consensus_evidence {kind; op1; op2} ->
         let op1 = denunced_op_json op1 in
         let op2 = denunced_op_json op2 in
         `O
           [
-            ("kind", Ezjsonm.string (kind_to_string kind ~use_legacy_name));
+            ("kind", Ezjsonm.string (kind_to_string kind));
             ("op1", op1);
             ("op2", op2);
           ]
@@ -492,7 +481,6 @@ module Anonymous = struct
       let consensus =
         Consensus.consensus
           ~kind:(as_consensus_kind kind)
-          ~use_legacy_name:false
           ~slot
           ~level:misbehaviour_level
           ~round:misbehaviour_round
@@ -508,12 +496,7 @@ module Anonymous = struct
       if String.compare oph1 oph2 < 1 then (op1, op2) else (op2, op1)
     in
     let* op1_sign = sign op1 client and* op2_sign = sign op2 client in
-    return
-      (double_consensus_evidence
-         ~kind
-         ~use_legacy_name:false
-         (op1, op1_sign)
-         (op2, op2_sign))
+    return (double_consensus_evidence ~kind (op1, op1_sign) (op2, op2_sign))
 end
 
 module Voting = struct
@@ -829,9 +812,9 @@ module Manager = struct
         make ?source ?fee ?gas_limit ?storage_limit ~counter payload)
       payloads
 
-  let inject ?request ?force ?branch ?signer ?error managers client =
+  let inject ?dont_wait ?request ?force ?branch ?signer ?error managers client =
     let* op = operation ?branch ?signer managers client in
-    inject ?request ?force ?error op client
+    inject ?dont_wait ?request ?force ?error op client
 
   let get_branch ?chain ?(offset = 2) client =
     let block = sf "head~%d" offset in

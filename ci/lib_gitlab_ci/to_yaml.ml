@@ -59,14 +59,25 @@ let enc_when_job : when_job -> value = function
   | On_success -> `String "on_success"
   | Manual -> `String "manual"
 
+let enc_when_trigger_job : when_trigger_job -> value = function
+  | Always -> `String "always"
+  | On_success -> `String "on_success"
+  | On_failure -> `String "on_failure"
+
+let enc_auto_cancel {on_new_commit; on_job_failure} =
+  `O
+    ((if on_new_commit then [("on_new_commit", `String "all")] else [])
+    @ if on_job_failure then [("on_job_failure", `String "all")] else [])
+
 let enc_workflow_rule : workflow_rule -> value =
- fun {changes; if_; variables; when_} ->
+ fun {changes; if_; variables; when_; auto_cancel} ->
   obj_flatten
     [
       opt "changes" strings changes;
       opt "if" enc_if if_;
       opt "variables" enc_variables variables;
       key "when" enc_when_workflow when_;
+      opt "auto_cancel" enc_auto_cancel auto_cancel;
     ]
 
 let enc_allow_failure_rule (allow_failure : allow_failure_rule) : value =
@@ -125,16 +136,48 @@ let enc_job_rules : job_rule list -> value = array enc_job_rule
 let enc_include_rules : include_rule list -> value = array enc_include_rule
 
 let enc_workflow : workflow -> value = function
-  | {name; rules} ->
-      obj_flatten [opt "name" string name; key "rules" enc_workflow_rules rules]
+  | {name; rules; auto_cancel} ->
+      obj_flatten
+        [
+          opt "name" string name;
+          key "rules" enc_workflow_rules rules;
+          opt "auto_cancel" enc_auto_cancel auto_cancel;
+        ]
 
 let enc_stages stages : value = strings stages
 
 let enc_image (Image image) = string image
 
-let enc_default ({image; interruptible} : default) : value =
+let enc_retry : retry -> value =
+  let enc_failure_type failure_type =
+    let failure_type =
+      match failure_type with
+      | Unknown_failure -> "unknown_failure"
+      | Script_failure -> "script_failure"
+      | Api_failure -> "api_failure"
+      | Stuck_or_timeout_failure -> "stuck_or_timeout_failure"
+      | Runner_system_failure -> "runner_system_failure"
+      | Runner_unsupported -> "runner_unsupported"
+      | Stale_schedule -> "stale_schedule"
+      | Job_execution_timeout -> "job_execution_timeout"
+      | Archived_failure -> "archived_failure"
+      | Unmet_prerequisites -> "unmet_prerequisites"
+      | Scheduler_failure -> "scheduler_failure"
+      | Data_integrity_failure -> "data_integrity_failure"
+    in
+    `String failure_type
+  in
+  fun {max; when_} ->
+    if when_ = [] then int max
+    else `O [("max", int max); ("when", array enc_failure_type when_)]
+
+let enc_default ({image; interruptible; retry} : default) : value =
   obj_flatten
-    [opt "image" enc_image image; opt "interruptible" bool interruptible]
+    [
+      opt "image" enc_image image;
+      opt "interruptible" bool interruptible;
+      opt "retry" enc_retry retry;
+    ]
 
 let enc_coverage : coverage_report -> value =
  fun {coverage_format; path} ->
@@ -169,8 +212,21 @@ let enc_artifacts : artifacts -> value =
     ]
 
 let enc_cache : cache -> value =
- fun {key = k; paths} ->
-  obj_flatten [key "key" string k; key "paths" strings paths]
+ fun {key = k; paths; policy} ->
+  obj_flatten
+    [
+      key "key" string k;
+      key "paths" strings paths;
+      key
+        "policy"
+        (fun policy ->
+          `String
+            (match policy with
+            | Pull -> "pull"
+            | Push -> "push"
+            | Pull_push -> "pull-push"))
+        policy;
+    ]
 
 let enc_service ({name} : service) : value = `String name
 
@@ -251,9 +307,23 @@ let enc_job : job -> value =
       opt "artifacts" enc_artifacts artifacts;
       opt "when" enc_when_job when_;
       opt "coverage" string coverage;
-      opt "retry" int retry;
+      opt "retry" enc_retry retry;
       opt "parallel" enc_parallel parallel;
     ]
+
+let enc_trigger_job : trigger_job -> value =
+  let enc_trigger_include trigger_include =
+    `O [("include", `String trigger_include)]
+  in
+  fun {name = _; stage; when_; rules; needs; trigger_include} ->
+    obj_flatten
+      [
+        opt "stage" string stage;
+        opt "rules" enc_job_rules rules;
+        opt "needs" enc_needs needs;
+        opt "when" enc_when_trigger_job when_;
+        key "trigger" enc_trigger_include trigger_include;
+      ]
 
 let enc_includes : include_ list -> value =
  fun includes ->
@@ -273,7 +343,8 @@ let config_element : config_element -> (string * value) option = function
   | Stages ss -> Some ("stages", enc_stages ss)
   | Variables vars -> Some ("variables", enc_variables vars)
   | Default def -> Some ("default", enc_default def)
-  | Job j -> Some (j.name, enc_job j)
+  | Generic_job (Job j) -> Some (j.name, enc_job j)
+  | Generic_job (Trigger_job j) -> Some (j.name, enc_trigger_job j)
   | Include i -> Some ("include", enc_includes i)
   | Comment _ -> None
 

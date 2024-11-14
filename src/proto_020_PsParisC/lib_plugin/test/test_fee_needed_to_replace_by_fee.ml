@@ -95,24 +95,24 @@ let test_manager_ops config (op_to_replace, fee_r, gas_r)
     (fst candidate_op, Helpers.set_fee fee (snd candidate_op))
   in
   (if fee_needed > 0L then
-   let fee_smaller = Int64.pred fee_needed in
-   match
-     Plugin.Mempool.conflict_handler
-       config
-       ~existing_operation:op_to_replace
-       ~new_operation:(with_fee fee_smaller)
-   with
-   | `Keep -> ()
-   | `Replace ->
-       Test.fail
-         ~__LOC__
-         "Adjusted candidate_op: {fee=%Ldmutez; gas=%d} with fee smaller than \
-          fee_needed should not be allowed to replace op_to_replace: \
-          {fee=%dmutez; gas=%d}"
-         fee_smaller
-         gas_c
-         fee_r
-         gas_r) ;
+     let fee_smaller = Int64.pred fee_needed in
+     match
+       Plugin.Mempool.conflict_handler
+         config
+         ~existing_operation:op_to_replace
+         ~new_operation:(with_fee fee_smaller)
+     with
+     | `Keep -> ()
+     | `Replace ->
+         Test.fail
+           ~__LOC__
+           "Adjusted candidate_op: {fee=%Ldmutez; gas=%d} with fee smaller \
+            than fee_needed should not be allowed to replace op_to_replace: \
+            {fee=%dmutez; gas=%d}"
+           fee_smaller
+           gas_c
+           fee_r
+           gas_r) ;
   match
     Plugin.Mempool.conflict_handler
       config

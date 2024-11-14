@@ -204,8 +204,8 @@ and infer_cmd_one_shot local_model_name workload_data solver
             let s = perform_report () in
             Lwt_main.run
               (let open Lwt_syntax in
-              let* _nwritten = Lwt_utils_unix.create_file output_file s in
-              Lwt.return_unit) ;
+               let* _nwritten = Lwt_utils_unix.create_file output_file s in
+               Lwt.return_unit) ;
             Format.eprintf "Produced report on %s@." output_file
       in
       process_output measure local_model_name problem solution infer_opts
@@ -492,8 +492,8 @@ and infer_for_measurements ?local_model_name measurements
       let s = Report.to_latex report in
       Lwt_main.run
         (let open Lwt_syntax in
-        let* _nwritten = Lwt_utils_unix.create_file output_file s in
-        Lwt.return_unit) ;
+         let* _nwritten = Lwt_utils_unix.create_file output_file s in
+         Lwt.return_unit) ;
       Format.eprintf "Produced report on %s@." output_file
   | _ -> assert false) ;
   solution
@@ -619,7 +619,7 @@ let codegen_cmd solution_fn model_name codegen_options =
       stdout_or_file codegen_options.save_to (fun ppf ->
           Format.fprintf ppf "%a@." Codegen.pp_code code)
 
-(** It returns [(destination, code list) map] *)
+(** Returns [(destination, code list) map] *)
 let generate_code_for_models sol models codegen_options =
   (* The order of the models is pretty random.  It is better to sort them. *)
   let models =
@@ -926,25 +926,14 @@ module Auto_build = struct
         mich_fn ;
       None)
 
-  let get_head_context_hash data_dir =
-    match
-      Lwt_main.run @@ Tezos_shell_benchmarks.Io_helpers.load_head_block data_dir
-    with
-    | Error e ->
-        Format.eprintf
-          "Error: %a@."
-          Tezos_error_monad.Error_monad.pp_print_trace
-          e ;
-        Format.eprintf "Failed to find a Tezos context at %s@." data_dir ;
-        exit 1
-    | Ok res -> res
-
   (* Assumes the data files are found in [_snoop/tezos_node] *)
   let make_io_read_random_key_benchmark_config dest ns =
     let open Tezos_shell_benchmarks.Io_benchmarks.Read_random_key_bench in
     let data_dir = "_snoop/tezos-node" in
     let context_dir = Filename.concat data_dir "context" in
-    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    let level, block_hash, context_hash =
+      Tezos_shell_benchmarks.Io_helpers.get_head_block_from_context_dir data_dir
+    in
     Format.eprintf
       "Using %s, Context_hash: %a; Block: %ld %a@."
       context_dir
@@ -968,7 +957,9 @@ module Auto_build = struct
     let open Tezos_shell_benchmarks.Io_benchmarks.Write_random_keys_bench in
     let data_dir = "_snoop/tezos-node" in
     let context_dir = Filename.concat data_dir "context" in
-    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    let level, block_hash, context_hash =
+      Tezos_shell_benchmarks.Io_helpers.get_head_block_from_context_dir data_dir
+    in
     Format.eprintf
       "Using %s, Context_hash: %a; Block: %ld %a@."
       context_dir

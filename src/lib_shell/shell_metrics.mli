@@ -90,13 +90,14 @@ end
 module Block_validator : sig
   type t = {
     already_commited_blocks_count : Prometheus.Counter.t;
-    outdated_blocks_count : Prometheus.Counter.t;
+    already_known_invalid_blocks_count : Prometheus.Counter.t;
     validated_blocks_count : Prometheus.Counter.t;
     validation_errors_count : Prometheus.Counter.t;
+    commit_block_failed_count : Prometheus.Counter.t;
     preapplied_blocks_count : Prometheus.Counter.t;
     preapplication_errors_count : Prometheus.Counter.t;
-    validation_errors_after_precheck_count : Prometheus.Counter.t;
-    precheck_failed_count : Prometheus.Counter.t;
+    application_errors_after_validation_count : Prometheus.Counter.t;
+    validation_failed_count : Prometheus.Counter.t;
     worker_timestamps : Worker.timestamps;
     worker_counters : Worker.counters;
   }

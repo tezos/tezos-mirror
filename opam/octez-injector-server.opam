@@ -13,18 +13,15 @@ depends: [
   "octez-libs" { = version }
   "octez-injector" { = version }
   "octez-shell-libs" { = version }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
 ]
 depopts: [
-  "tezos-injector-018-Proxford"
-  "tezos-injector-019-PtParisB"
   "tezos-injector-020-PsParisC"
+  "tezos-injector-021-PsQuebec"
   "tezos-injector-alpha"
 ]
 conflicts: [
-  "tezos-injector-018-Proxford" { != version }
-  "tezos-injector-019-PtParisB" { != version }
   "tezos-injector-020-PsParisC" { != version }
+  "tezos-injector-021-PsQuebec" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [

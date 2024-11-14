@@ -55,6 +55,14 @@ module Event = struct
       ("address", Data_encoding.string)
       ~pp1:Format.pp_print_string
 
+  let tx_data_size_limit_reached =
+    declare_0
+      ~section
+      ~name:"tx_data_size_limit_reached"
+      ~msg:"The transaction data size is beyond the allowed threshold."
+      ~level:Info
+      ()
+
   let transaction_injected =
     declare_1
       ~section
@@ -103,13 +111,17 @@ let add_transaction ~transaction =
   Internal_event.Simple.emit Event.add_transaction transaction
 
 let invalid_transaction ~transaction =
-  Internal_event.Simple.emit Event.invalid_transaction transaction
+  let Ethereum_types.(Hex tx_str) = transaction in
+  Internal_event.Simple.emit Event.invalid_transaction tx_str
 
 let users_threshold_reached =
   Internal_event.Simple.emit Event.users_threshold_reached
 
 let txs_per_user_threshold_reached ~address =
   Internal_event.Simple.emit Event.txs_per_user_threshold_reached address
+
+let tx_data_size_limit_reached =
+  Internal_event.Simple.emit Event.tx_data_size_limit_reached
 
 let transaction_injection_failed trace =
   Internal_event.Simple.emit Event.transaction_injection_failed trace

@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name prometheus)
+ (public_name octez-libs.prometheus)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  lwt
+  astring
+  asetmap
+  re))

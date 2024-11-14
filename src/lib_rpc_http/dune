@@ -8,7 +8,7 @@
  (libraries
   octez-libs.base
   octez-libs.rpc
-  resto-cohttp
+  octez-libs.resto-cohttp
   uri)
  (flags
   (:standard)
@@ -21,7 +21,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  resto-cohttp-client
+  octez-libs.resto-cohttp-client
   octez-libs.rpc
   octez-libs.rpc-http)
  (flags
@@ -37,8 +37,8 @@
  (libraries
   octez-libs.stdlib-unix
   octez-libs.base
-  cohttp-lwt-unix
-  resto-cohttp-client
+  octez-libs.cohttp-lwt-unix
+  octez-libs.resto-cohttp-client
   octez-libs.rpc
   octez-libs.rpc-http-client)
  (flags
@@ -54,9 +54,9 @@
  (libraries
   octez-libs.base
   octez-libs.stdlib-unix
-  cohttp-lwt-unix
-  resto-cohttp-server
-  resto-acl
+  octez-libs.cohttp-lwt-unix
+  octez-libs.resto-cohttp-server
+  octez-libs.resto-acl
   octez-libs.rpc
   octez-libs.rpc-http)
  (flags

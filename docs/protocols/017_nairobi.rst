@@ -7,8 +7,6 @@ to Mumbai (see :ref:`naming_convention`).
 The code can be found in directory :src:`src/proto_017_PtNairob` of the ``master``
 branch of Octez.
 
-.. contents::
-
 New Environment Version (V9)
 ----------------------------
 

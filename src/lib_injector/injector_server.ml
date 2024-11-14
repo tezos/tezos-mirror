@@ -86,7 +86,8 @@ module Parameters :
 
   let persist_operation _ = true
 
-  let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =
+  let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) ?reason:_
+      status =
     let open Lwt_syntax in
     match status with
     | Backtracked | Skipped | Other_branch ->
@@ -102,6 +103,8 @@ module Parameters :
     | Never_included ->
         (* Forget operations that are never included *)
         return Forget
+
+  let metrics_registry = Prometheus.CollectorRegistry.create ()
 end
 
 include Injector_functor.Make (Parameters)

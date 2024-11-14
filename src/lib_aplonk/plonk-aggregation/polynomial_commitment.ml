@@ -104,7 +104,7 @@ struct
 
     let rename _f cmt = cmt
 
-    let commit_single pp = PC.Commitment.commit_single pp.pc
+    let commit_single ?shift pp = PC.Commitment.commit_single ?shift pp.pc
 
     let empty = Pack.empty_commitment
 

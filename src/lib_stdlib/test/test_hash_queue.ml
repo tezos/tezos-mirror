@@ -85,28 +85,40 @@ let test_replace_incr_length () =
 
 let test_peek () =
   let q = init_queue 10 10 in
-  Assert.Int.Option.equal ~loc:__LOC__ (Some 0) (Queue.peek q)
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 0) (Queue.peek q |> Option.map snd)
 
 let test_peek_empty () =
   let q = Queue.create 10 in
-  Assert.is_none ~pp:Format.pp_print_int ~loc:__LOC__ (Queue.peek q)
+  Assert.is_none
+    ~pp:Format.pp_print_int
+    ~loc:__LOC__
+    (Queue.peek q |> Option.map snd)
 
 let test_peek_at_most () =
   let q = init_queue 10 10 in
-  Assert.Int.List.equal ~loc:__LOC__ [0; 1; 2] (Queue.peek_at_most q 3)
+  Assert.Int.List.equal
+    ~loc:__LOC__
+    [0; 1; 2]
+    (Queue.peek_at_most q 3 |> List.map snd)
 
 let test_peek_at_most_above_length () =
   let q = init_queue 3 2 in
-  Assert.Int.List.equal ~loc:__LOC__ [0; 1] (Queue.peek_at_most q 3)
+  Assert.Int.List.equal
+    ~loc:__LOC__
+    [0; 1]
+    (Queue.peek_at_most q 3 |> List.map snd)
 
 let test_peek_at_most_above_capacity () =
   let q = init_queue 3 3 in
-  Assert.Int.List.equal ~loc:__LOC__ [0; 1; 2] (Queue.peek_at_most q 4)
+  Assert.Int.List.equal
+    ~loc:__LOC__
+    [0; 1; 2]
+    (Queue.peek_at_most q 4 |> List.map snd)
 
 let test_take () =
   let q = init_queue 10 10 in
-  Assert.Int.Option.equal ~loc:__LOC__ (Some 0) (Queue.take q) ;
-  Assert.Int.Option.equal ~loc:__LOC__ (Some 1) (Queue.peek q) ;
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 0) (Queue.take q |> Option.map snd) ;
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 1) (Queue.peek q |> Option.map snd) ;
   Assert.Int.equal ~loc:__LOC__ 9 (Queue.length q)
 
 let test_take_empty () =
@@ -115,19 +127,28 @@ let test_take_empty () =
 
 let test_take_at_most () =
   let q = init_queue 10 10 in
-  Assert.Int.List.equal ~loc:__LOC__ [0; 1; 2] (Queue.take_at_most q 3) ;
-  Assert.Int.Option.equal ~loc:__LOC__ (Some 3) (Queue.peek q) ;
+  Assert.Int.List.equal
+    ~loc:__LOC__
+    [0; 1; 2]
+    (Queue.take_at_most q 3 |> List.map snd) ;
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 3) (Queue.peek q |> Option.map snd) ;
   Assert.Int.equal ~loc:__LOC__ 7 (Queue.length q)
 
 let test_take_at_most_above_length () =
   let q = init_queue 10 2 in
-  Assert.Int.List.equal ~loc:__LOC__ (Queue.take_at_most q 3) [0; 1] ;
+  Assert.Int.List.equal
+    ~loc:__LOC__
+    (Queue.take_at_most q 3 |> List.map snd)
+    [0; 1] ;
   Assert.is_none ~loc:__LOC__ (Queue.peek q) ;
   Assert.Int.equal ~loc:__LOC__ 0 (Queue.length q)
 
 let test_take_at_most_above_capacity () =
   let q = init_queue 3 3 in
-  Assert.Int.List.equal ~loc:__LOC__ (Queue.take_at_most q 4) [0; 1; 2] ;
+  Assert.Int.List.equal
+    ~loc:__LOC__
+    (Queue.take_at_most q 4 |> List.map snd)
+    [0; 1; 2] ;
   Assert.is_none ~loc:__LOC__ (Queue.peek q) ;
   Assert.Int.equal ~loc:__LOC__ 0 (Queue.length q)
 
@@ -136,7 +157,7 @@ let test_replace_above_capacity () =
   let length_before = Queue.length q in
   Queue.replace q "new_key" 10 ;
   Assert.Int.equal ~loc:__LOC__ length_before (Queue.length q) ;
-  Assert.Int.Option.equal ~loc:__LOC__ (Some 1) (Queue.peek q) ;
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 1) (Queue.peek q |> Option.map snd) ;
   Assert.is_none
     ~pp:Format.pp_print_int
     ~loc:__LOC__

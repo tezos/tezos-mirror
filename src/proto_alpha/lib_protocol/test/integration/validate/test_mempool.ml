@@ -35,6 +35,9 @@ open Protocol
 open Alpha_context
 module Mempool = Mempool_validation
 
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["validation"; "mempool"]
+
 let extract_values ctxt (b : Block.t) =
   let predecessor_level =
     Level.from_raw ctxt (Raw_level.of_int32_exn b.header.shell.level)
@@ -378,18 +381,14 @@ let test_remove_operation () =
   let empty_mempool = Mempool.remove_operation mempool (fst op1) in
   assert_empty_mempool ~__LOC__ empty_mempool
 
-let tests =
-  [
-    Tztest.tztest "simple" `Quick test_simple;
-    Tztest.tztest "incompatible mempool" `Quick test_imcompatible_mempool;
-    Tztest.tztest "merge" `Quick test_merge;
-    Tztest.tztest "adding invalid operation" `Quick test_add_invalid_operation;
-    Tztest.tztest
-      "adding operation with conflict handler"
-      `Quick
-      test_add_and_replace;
-    Tztest.tztest "remove operations" `Quick test_remove_operation;
-  ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("mempool", tests)] |> Lwt_main.run
+  List.iter
+    (fun (title, f) -> register_test ~title f)
+    [
+      ("simple", test_simple);
+      ("incompatible mempool", test_imcompatible_mempool);
+      ("merge", test_merge);
+      ("adding invalid operation", test_add_invalid_operation);
+      ("adding operation with conflict handler", test_add_and_replace);
+      ("remove operations", test_remove_operation);
+    ]

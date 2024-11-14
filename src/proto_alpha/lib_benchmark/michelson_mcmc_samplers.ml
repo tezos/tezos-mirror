@@ -102,6 +102,13 @@ let load ~filename =
         err ;
       exit 1
 
+let append ~filename ~terms =
+  if not (Sys.file_exists filename) then save ~filename ~terms
+  else
+    let previous_terms = load ~filename in
+    let all_terms = previous_terms @ terms in
+    save ~filename ~terms:all_terms
+
 (* Helpers *)
 
 let base_type_to_michelson_type (typ : Type.Base.t) =
@@ -211,7 +218,8 @@ end
 
 module Make_code_sampler
     (Michelson_base : Michelson_samplers_base.S)
-    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S)
+    (X : sig
       val rng_state : Random.State.t
 
       val target_size : int
@@ -270,7 +278,8 @@ end
 
 module Make_data_sampler
     (Michelson_base : Michelson_samplers_base.S)
-    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S)
+    (X : sig
       val rng_state : Random.State.t
 
       val target_size : int

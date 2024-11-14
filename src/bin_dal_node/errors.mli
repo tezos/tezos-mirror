@@ -23,22 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Extention of the open type [error] with the errors that could be raised by
+(** Extension of the open type [error] with the errors that could be raised by
     the DAL node. *)
 type error +=
   | Decoding_failed of Types.Store.kind
   | Profile_incompatibility
   | Invalid_slot_index of {slot_index : int; number_of_slots : int}
+  | Cryptobox_initialisation_failed of string
+  | Not_enough_history of {stored_levels : int; minimal_levels : int}
+  | Not_enough_l1_history of {stored_cycles : int; minimal_cycles : int}
+  | Amplificator_initialization_failed
 
 (** The errors below are used to extend tzresult/tztrace monad/errors with Some
     specific errors on which we'd like to match in the DAL node's code. *)
-
-(** We would like to match decoding errors as they are sometimes expected
-    (e.g. when decoding data from the network) and we want to enable callers to
-    catch and handle them. On the other hand, encoding errors only happen in
-    unexpected circumstances (e.g. out of memory) so we don't expect callers to
-    catch and handle them. *)
-type decoding = [`Decoding_failed of Types.Store.kind * tztrace]
 
 (** We would like to match [`Not_found] as we would want to return 404 HTTP code
     to clients. *)
@@ -47,6 +44,13 @@ type not_found = [`Not_found]
 (** We will use [`Other] to wrap other {!tztrace} errors in the new
     polymorphic-variants based monad. *)
 type other = [`Other of tztrace]
+
+(** [not_found] is an alias for [`Not_found]. *)
+val not_found : [> not_found]
+
+(** [decoding_failed kind trace] produces the error trace
+    [Decoding_failed kind :: trace] and wraps it with [`Other]. *)
+val decoding_failed : Types.Store.kind -> tztrace -> [> other]
 
 (** [other l] wraps the give tztrace [l] in [`Other]. *)
 val other : tztrace -> [> other]
@@ -70,21 +74,12 @@ val other_lwt_result : 'a tzresult Lwt.t -> ('a, [> other]) result Lwt.t
     - If it yields a value [Error `Not_found], the function returns an Lwt monad
     whose payload is [Ok (None)] so that {!Tezos_rpc_http} returns 404 HTTP code.
 
-    - If it yields a value [Error `Decoding_failed], the function returns an Lwt
-    monad whose payload is the tzresult of [Decoding_failed] concatenated to the
-    tztrance carried by [`Decoding_failed].
-
     - Otherwise, it yields a value [Error `Other u]. In this case, the function
-    returns an Lwt monad whose payload is [Error u].
-
-    Note that an {!Event.decoding_data_failed} is emitted. in case a
-    [`Decoding_failed] is encountered. *)
+    returns an Lwt monad whose payload is [Error u]. *)
 val to_option_tzresult :
-  ?none:(([< decoding | not_found | other] as 'b) -> bool) ->
-  ('a, 'b) result Lwt.t ->
-  'a option tzresult Lwt.t
+  ('a, [< not_found | other]) result Lwt.t -> 'a option tzresult Lwt.t
 
 (** [to_tzresult v] is quite similar to {!to_option_tzresult}. Except that the
     [`Not_found] case cannot happen, in which case the use of [option] for the
     non-failing case is not needed. *)
-val to_tzresult : ('a, [< decoding | other]) result Lwt.t -> 'a tzresult Lwt.t
+val to_tzresult : ('a, [< other]) result Lwt.t -> 'a tzresult Lwt.t

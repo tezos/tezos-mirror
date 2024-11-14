@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:  Gossipsub
-   Invocation: dune exec test/test_gossipsub.exe -- --file test_unit.ml
+   Invocation: dune exec src/lib_gossipsub/test/main.exe -- --file test_unit.ml
    Subject:    Unit tests for gossipsub
 *)
 
@@ -154,7 +154,14 @@ let add_and_subscribe_peers (topics : Topic.t list) (peers : Peer.t list)
   List.fold_left
     (fun state peer ->
       let state, output =
-        GS.add_peer {direct = direct peer; outbound = outbound peer; peer} state
+        GS.add_peer
+          {
+            direct = direct peer;
+            outbound = outbound peer;
+            peer;
+            bootstrap = false;
+          }
+          state
       in
       assert_output ~__LOC__ output Peer_added ;
       subscribe_peer_to_topics peer topics state)
@@ -599,7 +606,8 @@ let test_receiving_message rng limits parameters =
   in
   let peers_to_route =
     match output with
-    | Already_received | Not_subscribed | Invalid_message | Unknown_validity ->
+    | Already_received | Not_subscribed | Invalid_message | Unknown_validity
+    | Outdated ->
         Test.fail ~__LOC__ "Handling of received message should succeed."
     | Route_message {to_route} -> to_route
   in
@@ -616,6 +624,127 @@ let test_receiving_message rng limits parameters =
     ~peer:sender
     ~expected_message:message
     state ;
+  unit
+
+(** Test for !13156. It checks that sending a duplicate does not increase the
+    score (in particular, it does not reduce the P3 penalty).
+
+    To test P3, we need to "enable" it for some peer, that is, make and maintain
+    the peer "active" (see [mesh_message_deliveries_active] in
+    [Peer_score.topic_status]). This is done by grafting the peer, setting the
+    [mesh_message_deliveries_activation] parameter to be small enough (it cannot
+    be set to 0 though), and performing a heartbeat. We also set
+    [mesh_message_deliveries_window] such that [Time.(current <=
+    window_upper_bound)] holds in
+    [Peer_score.duplicate_message_delivered]. Finally, we ensure that the peer
+    is not pruned during the heartbeat (because otherwise it becomes
+    P3-inactive), by making sure it has a positive score (and thus higher than
+    the other peers).
+
+    A heartbeat is necessary in order to set [mesh_message_deliveries_active] to
+    [true] (otherwise the P3 score is 0), and this flag is only updated in
+    [Peers_score.refresh_stats] (so only during a heartbeat).
+
+    It might be possible to simplify this setup (for instance, by having just
+    one peer in the mesh?). *)
+let test_message_duplicate_score_bug rng _limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Test message duplicate score bug"
+    ~tags:["gossipsub"; "duplicate_score_bug"]
+  @@ fun () ->
+  (* Ignore decays, for simplicity; they are used when refreshing score during
+     the heartbeat. *)
+  let limits =
+    Default_limits.default_limits
+      ~first_message_deliveries_decay:1.
+      ~mesh_message_deliveries_decay:1.
+      ~mesh_message_deliveries_activation:(Milliseconds.of_int_s 1)
+      ~mesh_message_deliveries_window:(Milliseconds.of_int_s 2)
+      ~mesh_message_deliveries_threshold:3
+      ~time_in_mesh_cap:0. (* disable P1 *)
+      ()
+  in
+  let topic = "test" in
+  let peers = make_peers ~number:(many_peers limits) in
+  let state =
+    init_state
+      ~rng
+      ~limits
+      ~parameters
+      ~peers
+      ~topics:[topic]
+      ~to_join:(fun _ -> true)
+      ~to_subscribe:(fun _ -> true)
+      ()
+  in
+  let view = GS.Introspection.view state in
+  let mesh = GS.Introspection.get_peers_in_topic_mesh topic view in
+  let sender =
+    match List.hd mesh with
+    | None -> Test.fail ~__LOC__ "no peer in mesh"
+    | Some peer -> peer
+  in
+  Log.info "The sender is peer %d" sender ;
+  let message = "some_data" in
+  let state, _ = GS.handle_graft {peer = sender; topic} state in
+  (* Receive a message for a joined topic. *)
+  let state, output =
+    GS.handle_receive_message {sender; topic; message_id = 0; message} state
+  in
+  let () =
+    match output with
+    | Already_received | Not_subscribed | Invalid_message | Unknown_validity
+    | Outdated ->
+        Test.fail ~__LOC__ "Handling of received message should succeed."
+    | Route_message _ -> ()
+  in
+  (* Send one more message so that [sender]'s P2 score is greater than its P3
+     score. In this way its score is positive, and [sender] is not pruned. *)
+  let state, _ =
+    GS.handle_receive_message {sender; topic; message_id = 1; message} state
+  in
+  (* Send the first message again. *)
+  let per_topic_score_limits =
+    (GS.Score.Internal_for_tests.get_topic_params limits.score_limits) topic
+  in
+  let mesh_message_deliveries_activation =
+    per_topic_score_limits.mesh_message_deliveries_activation
+  in
+  let one_sec = Milliseconds.of_int_s 1 in
+  Time.elapse @@ Milliseconds.add mesh_message_deliveries_activation one_sec ;
+  let state, _ = GS.heartbeat state in
+  assert_mesh_inclusion ~__LOC__ ~topic ~peer:sender ~is_included:true state ;
+  let state, output =
+    GS.handle_receive_message {sender; topic; message_id = 0; message} state
+  in
+  let () =
+    match output with
+    | Already_received -> ()
+    | Not_subscribed | Invalid_message | Unknown_validity | Outdated
+    | Route_message _ ->
+        Test.fail ~__LOC__ "Handling should fail with Already_received."
+  in
+  let expected_score =
+    let p2 =
+      let first_message_deliveries = 2. in
+      first_message_deliveries
+      *. per_topic_score_limits.first_message_deliveries_weight
+    in
+    let p3 =
+      let penalty =
+        let deficit =
+          float_of_int per_topic_score_limits.mesh_message_deliveries_threshold
+          -. 2.
+        in
+        deficit *. deficit
+      in
+      penalty *. per_topic_score_limits.mesh_message_deliveries_weight
+    in
+    Log.info "expected p2 = %.2f expected p3 = %.2f" p2 p3 ;
+    p2 +. p3
+  in
+  assert_peer_score ~__LOC__ ~expected_score sender state ;
   unit
 
 (** Tests that we do not route the message when receiving a message
@@ -649,7 +778,8 @@ let test_receiving_message_for_unsusbcribed_topic rng limits parameters =
     GS.handle_receive_message {sender; topic; message_id; message} state
   in
   match output with
-  | Already_received | Route_message _ | Invalid_message | Unknown_validity ->
+  | Already_received | Route_message _ | Invalid_message | Unknown_validity
+  | Outdated ->
       Test.fail
         ~__LOC__
         "Handling of received message should fail with [Not_subscribed]."
@@ -1105,10 +1235,14 @@ let test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters =
   let inbound_peer = 99 in
   let outbound_peer = 98 in
   let state, _ =
-    GS.add_peer {direct = false; outbound = false; peer = inbound_peer} state
+    GS.add_peer
+      {direct = false; outbound = false; peer = inbound_peer; bootstrap = false}
+      state
   in
   let state, _ =
-    GS.add_peer {direct = false; outbound = true; peer = outbound_peer} state
+    GS.add_peer
+      {direct = false; outbound = true; peer = outbound_peer; bootstrap = false}
+      state
   in
   (* Send grafts. *)
   let state, _ = GS.handle_graft {peer = inbound_peer; topic} state in
@@ -1878,7 +2012,9 @@ let test_heartbeat_scenario rng limits parameters =
   let topic = "topic" in
   let peer = 0 in
   let s = GS.make rng limits parameters in
-  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  let s, output =
+    GS.add_peer {direct = false; outbound = false; peer; bootstrap = false} s
+  in
   assert_output ~__LOC__ output Peer_added ;
   let s, output = GS.handle_subscribe {topic; peer} s in
   assert_output ~__LOC__ output Subscribed ;
@@ -1898,7 +2034,9 @@ let test_heartbeat_scenario rng limits parameters =
       ~__LOC__) ;
   assert_mesh_size ~__LOC__ ~topic ~expected_size:0 s ;
   let peer = 1 in
-  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  let s, output =
+    GS.add_peer {direct = false; outbound = false; peer; bootstrap = false} s
+  in
   assert_output ~__LOC__ output Peer_added ;
   let s, output = GS.handle_subscribe {peer; topic} s in
   assert_output ~__LOC__ output Subscribed ;
@@ -2290,7 +2428,7 @@ let test_scoring_p7_grafts_before_backoff rng _limits parameters =
   unit
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
-   Add test the described test scenario *)
+   Add test for the described test scenario *)
 
 let register rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
@@ -2300,6 +2438,7 @@ let register rng limits parameters =
   test_publish_without_flood_publishing rng limits parameters ;
   test_receiving_message_for_unsusbcribed_topic rng limits parameters ;
   test_receiving_message rng limits parameters ;
+  test_message_duplicate_score_bug rng limits parameters ;
   test_fanout rng limits parameters ;
   test_handle_graft_for_joined_topic rng limits parameters ;
   test_handle_graft_for_not_joined_topic rng limits parameters ;

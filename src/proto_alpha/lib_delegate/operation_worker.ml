@@ -27,6 +27,8 @@ open Protocol_client_context
 open Protocol
 open Alpha_context
 
+module Profiler = (val Profiler.wrap Baking_profiler.operation_worker_profiler)
+
 module Events = struct
   include Internal_event.Simple
 
@@ -55,7 +57,7 @@ module Events = struct
     declare_2
       ~section
       ~name:"pqc_reached"
-      ~level:Debug
+      ~level:Info
       ~msg:
         "prequorum reached (voting power: {voting_power}, {preattestations} \
          preattestations)"
@@ -85,7 +87,7 @@ module Events = struct
     declare_2
       ~section
       ~name:"qc_reached"
-      ~level:Debug
+      ~level:Info
       ~msg:
         "quorum reached (voting power: {voting_power}, {attestations} \
          attestations)"
@@ -117,6 +119,14 @@ module Events = struct
       ~name:"starting_new_monitoring"
       ~level:Debug
       ~msg:"starting new monitoring"
+      ()
+
+  let resetting_monitoring =
+    declare_0
+      ~section
+      ~name:"resetting_monitoring"
+      ~level:Debug
+      ~msg:"resetting monitoring after a mempool flush"
       ()
 
   let end_of_stream =
@@ -245,14 +255,14 @@ type t = {
 let monitor_operations (cctxt : #Protocol_client_context.full) =
   let open Lwt_result_syntax in
   let* operation_stream, stream_stopper =
-    Alpha_block_services.Mempool.monitor_operations
-      cctxt
-      ~chain:cctxt#chain
-      ~validated:true
-      ~branch_delayed:true
-      ~branch_refused:false
-      ~refused:false
-      ()
+    (Alpha_block_services.Mempool.monitor_operations
+       cctxt
+       ~chain:cctxt#chain
+       ~validated:true
+       ~branch_delayed:true
+       ~branch_refused:false
+       ~refused:false
+       () [@profiler.record_s "monitor_operations RPC"])
   in
   let operation_stream =
     Lwt_stream.map
@@ -260,11 +270,11 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
       operation_stream
   in
   let* shell_header =
-    Shell_services.Blocks.Header.shell_header
-      cctxt
-      ~chain:cctxt#chain
-      ~block:(`Head 0)
-      ()
+    (Shell_services.Blocks.Header.shell_header
+       cctxt
+       ~chain:cctxt#chain
+       ~block:(`Head 0)
+       () [@profiler.record_s "shell_header RPC"])
   in
   let round =
     match Fitness.(round_from_raw shell_header.fitness) with
@@ -300,19 +310,21 @@ let is_valid_consensus_content (candidate : candidate) consensus_content =
 let cancel_monitoring state = state.proposal_watched <- None
 
 let reset_monitoring state =
+  let open Lwt_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
+  let* () = Events.(emit resetting_monitoring ()) in
   match state.proposal_watched with
-  | None -> Lwt.return_unit
+  | None -> return_unit
   | Some (Pqc_watch pqc_watched) ->
       pqc_watched.current_voting_power <- 0 ;
       pqc_watched.preattestations_count <- 0 ;
       pqc_watched.preattestations_received <- Preattestation_set.empty ;
-      Lwt.return_unit
+      return_unit
   | Some (Qc_watch qc_watched) ->
       qc_watched.current_voting_power <- 0 ;
       qc_watched.attestations_count <- 0 ;
       qc_watched.attestations_received <- Attestation_set.empty ;
-      Lwt.return_unit
+      return_unit
 
 let update_monitoring ?(should_lock = true) state ops =
   let open Lwt_syntax in
@@ -569,20 +581,36 @@ let update_operations_pool state (head_level, head_round) =
 let create ?(monitor_node_operations = true)
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
-  let state = make_initial_state ~monitor_node_operations () in
+  let state =
+    (make_initial_state
+       ~monitor_node_operations
+       () [@profiler.record_f "make initial state"])
+  in
   (* TODO should we continue forever ? *)
   let rec worker_loop () =
-    let* result = monitor_operations cctxt in
+    let* result =
+      (monitor_operations cctxt [@profiler.record_s "monitor operations"])
+    in
     match result with
     | Error err -> Events.(emit loop_failed err)
     | Ok (head, operation_stream, op_stream_stopper) ->
+        ()
+        [@profiler.stop]
+        [@profiler.record
+          Format.sprintf
+            "level : %ld, round : %s"
+            (fst head)
+            (Int32.to_string @@ Round.to_int32 @@ snd head)] ;
         let* () = Events.(emit starting_new_monitoring ()) in
         state.canceler <- Lwt_canceler.create () ;
         Lwt_canceler.on_cancel state.canceler (fun () ->
-            op_stream_stopper () ;
-            cancel_monitoring state ;
+            op_stream_stopper () [@profiler.record_f "stream stopped"] ;
+            cancel_monitoring
+              state [@profiler.record_f "cancel monitoring state"] ;
             return_unit) ;
-        update_operations_pool state head ;
+        update_operations_pool
+          state
+          head [@profiler.record_f "update operations pool"] ;
         let rec loop () =
           let* ops = Lwt_stream.get operation_stream in
           match ops with
@@ -590,16 +618,25 @@ let create ?(monitor_node_operations = true)
               (* When the stream closes, it means a new head has been set,
                  we reset the monitoring and flush current operations *)
               let* () = Events.(emit end_of_stream ()) in
-              op_stream_stopper () ;
-              let* () = reset_monitoring state in
+              op_stream_stopper () [@profiler.record_f "stream stopped"] ;
+              let* () =
+                (reset_monitoring
+                   state [@profiler.record_s "reset monitoring state"])
+              in
+              () [@profiler.stop] ;
               worker_loop ()
           | Some ops ->
-              state.operation_pool <-
-                Operation_pool.add_operations state.operation_pool ops ;
-              let* () = update_monitoring state ops in
+              (state.operation_pool <-
+                Operation_pool.add_operations state.operation_pool ops)
+              [@profiler.aggregate_f "add operations"] ;
+              let* () =
+                (update_monitoring
+                   state
+                   ops [@profiler.aggregate_f "update monitoring state"])
+              in
               loop ()
         in
-        loop ()
+        (loop () [@profiler.record_s "operations processing"])
   in
   Lwt.dont_wait
     (fun () ->

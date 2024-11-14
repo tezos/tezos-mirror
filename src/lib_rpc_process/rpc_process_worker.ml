@@ -1,27 +1,26 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type error += RPC_process_init_too_slow
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"rpc_process_worker.RPC_process_init_too_slow"
+    ~title:"RPC process init too slow"
+    ~description:"RPC process init too slow"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "RPC process init timeout: too slow to start. This is certainly due to \
+         the slow DAL initialization.")
+    Data_encoding.unit
+    (function RPC_process_init_too_slow -> Some () | _ -> None)
+    (fun () -> RPC_process_init_too_slow)
 
 module Event = struct
   include Internal_event.Simple
@@ -179,7 +178,23 @@ let run_server t () =
       Parameters.parameters_encoding
       t.external_process_parameters
   in
-  let* () = Socket.recv init_socket_fd Data_encoding.unit in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6579
+     Workaround: increase default timeout. If the timeout is still not
+     enough and an Lwt_unix.Timeout is triggered, we display a
+     comprehensive message.
+  *)
+  let timeout = Ptime.Span.of_int_s 120 in
+  let* () =
+    protect
+      (fun () -> Socket.recv ~timeout init_socket_fd Data_encoding.unit)
+      ~on_error:(function
+        | err
+          when List.exists
+                 (function Exn Lwt_unix.Timeout -> true | _ -> false)
+                 err ->
+            tzfail RPC_process_init_too_slow
+        | e -> fail e)
+  in
   let*! () = Lwt_unix.close init_socket_fd in
   let*! () = Event.(emit rpc_process_started) pid in
   t.server <- Some process ;

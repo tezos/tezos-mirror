@@ -1,0 +1,6 @@
+[build]
+target = "riscv64gc-unknown-hermit"
+
+[profile.profiling]
+inherits = "release"
+debug = true

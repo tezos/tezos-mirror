@@ -1,25 +1,33 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
+use crate::block::GENESIS_PARENT_HASH;
+use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::inbox::{Transaction, TransactionContent};
-use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
-use crate::storage::{
-    self, read_current_block_number, read_rlp, store_read_slice, store_rlp,
+use crate::sequencer_blueprint::{
+    BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
+use crate::storage::read_last_info_per_level_timestamp;
 use crate::{delayed_inbox, DelayedInbox};
-use primitive_types::{H256, U256};
+use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_storage::{
+    error::Error as GenStorageError, read_rlp, store_read_slice, store_rlp,
+};
 
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
@@ -124,14 +132,14 @@ fn store_blueprint_nb_chunks<Host: Runtime>(
 
 pub fn store_sequencer_blueprint<Host: Runtime>(
     host: &mut Host,
-    blueprint: SequencerBlueprint,
+    blueprint: UnsignedSequencerBlueprint,
 ) -> Result<(), Error> {
-    let blueprint_path = blueprint_path(blueprint.blueprint.number)?;
-    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.blueprint.nb_chunks)?;
+    let blueprint_path = blueprint_path(blueprint.number)?;
+    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
     let blueprint_chunk_path =
-        blueprint_chunk_path(&blueprint_path, blueprint.blueprint.chunk_index)?;
-    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.blueprint.chunk);
-    store_rlp(&store_blueprint, host, &blueprint_chunk_path)
+        blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
+    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
+    store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
 }
 
 pub fn store_inbox_blueprint_by_number<Host: Runtime>(
@@ -143,24 +151,26 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime>(
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
-    store_rlp(&store_blueprint, host, &chunk_path)
+    store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
 }
 
 pub fn store_inbox_blueprint<Host: Runtime>(
     host: &mut Host,
     blueprint: Blueprint,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     let number = read_next_blueprint_number(host)?;
-    store_inbox_blueprint_by_number(host, blueprint, number)
+    Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
 }
 
 #[inline(always)]
-pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    match read_current_block_number(host) {
-        Err(Error::Storage(StorageError::Runtime(RuntimeError::HostErr(
-            tezos_smart_rollup_host::Error::StoreNotAValue,
-        )))) => Ok(U256::zero()),
-        Err(err) => Err(err),
+pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> anyhow::Result<U256> {
+    match block_storage::read_current_number(host) {
+        Err(err) => match err.downcast_ref() {
+            Some(GenStorageError::Runtime(RuntimeError::PathNotFound)) => {
+                Ok(U256::zero())
+            }
+            _ => Err(err),
+        },
         Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
     }
 }
@@ -175,7 +185,7 @@ pub fn store_immediate_blueprint<Host: Runtime>(
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
-    store_rlp(&store_blueprint, host, &chunk_path)
+    store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
@@ -190,32 +200,16 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 
 /// Possible errors when validating a blueprint
 /// Only used for test, as all errors are handled in the same way
+#[cfg_attr(feature = "benchmark", allow(dead_code))]
 #[derive(Debug, PartialEq)]
 pub enum BlueprintValidity {
     Valid(Blueprint),
     InvalidParentHash,
+    TimestampFromPast,
+    TimestampFromFuture,
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
     BlueprintTooLarge,
-}
-
-/// Check that the parent hash of the [blueprint_with_hashes] is equal
-/// to the current block hash
-fn valid_parent_hash<Host: Runtime>(
-    host: &Host,
-    blueprint_with_hashes: &BlueprintWithDelayedHashes,
-) -> bool {
-    let genesis_parent = |_| {
-        H256::from_slice(
-            &hex::decode(
-                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            )
-            .unwrap(),
-        )
-    };
-    let current_block_hash =
-        storage::read_current_block_hash(host).unwrap_or_else(genesis_parent);
-    current_block_hash == blueprint_with_hashes.parent_hash
 }
 
 fn fetch_delayed_txs<Host: Runtime>(
@@ -227,7 +221,7 @@ fn fetch_delayed_txs<Host: Runtime>(
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
     for tx_hash in blueprint_with_hashes.delayed_hashes {
-        let tx = delayed_inbox.find_and_remove_transaction(host, tx_hash)?;
+        let tx = delayed_inbox.find_transaction(host, tx_hash)?;
         // This is overestimated, as the transactions cannot be chunked in the
         // delayed bridge.
         total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;
@@ -267,28 +261,84 @@ fn fetch_delayed_txs<Host: Runtime>(
     ))
 }
 
+// Default value is 5 minutes. The rationale for 5 minutes is that we have
+// only the timestamp from the predecessor block, and we want the rollup to
+// accept blocks even if the chain is impacted by high rounds (e.g. > 10).
+// The predecessor block timestamp can be completely off and we do not
+// wish to refuse such blueprints.
+pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
+
 fn parse_and_validate_blueprint<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
+    evm_node_flag: bool,
+    max_blueprint_lookahead_in_seconds: i64,
 ) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
-    match rlp::decode(bytes) {
+    match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
+            let head = block_storage::read_current(host);
+            let (head_hash, head_timestamp) = match head {
+                Ok(block) => (block.hash, block.timestamp),
+                Err(_) => (GENESIS_PARENT_HASH, Timestamp::from(0)),
+            };
+
             // Validate parent hash
-            if !valid_parent_hash(host, &blueprint_with_hashes) {
-                Ok((BlueprintValidity::InvalidParentHash, bytes.len()))
-            } else {
-                // Fetch delayed transactions
-                fetch_delayed_txs(
-                    host,
-                    blueprint_with_hashes,
-                    delayed_inbox,
-                    current_blueprint_size,
-                )
+            #[cfg(not(feature = "benchmark"))]
+            if head_hash != blueprint_with_hashes.parent_hash {
+                return Ok((BlueprintValidity::InvalidParentHash, bytes.len()));
             }
+
+            // Validate parent timestamp
+            #[cfg(not(feature = "benchmark"))]
+            if blueprint_with_hashes.timestamp < head_timestamp {
+                return Ok((BlueprintValidity::TimestampFromPast, bytes.len()));
+            }
+
+            // The timestamp must be within  max_blueprint_lookahead_in_seconds
+            // of the current view of the L1 timestamp.
+            //
+            // That means that the sequencer cannot produce blueprints too much
+            // in the future. If the L1 timestamp is not progressing i.e.
+            // the network is stuck, the sequencer will have to reinject the
+            // blueprint when the L1 timestamp is finally greater than
+            // blueprint timestamp.
+            //
+            // All this prevents the sequencer to manipulate too much the
+            // timestamps.
+            #[cfg(not(feature = "benchmark"))]
+            {
+                let last_seen_l1_timestamp = read_last_info_per_level_timestamp(host)?;
+                let accepted_bound = Timestamp::from(
+                    last_seen_l1_timestamp
+                        .i64()
+                        .saturating_add(max_blueprint_lookahead_in_seconds),
+                );
+
+                // In the sequencer we don't have a valid `last_seen_l1_timesteamp`
+                // so it must not fails on this.
+                if !evm_node_flag && blueprint_with_hashes.timestamp > accepted_bound {
+                    log!(
+                        host,
+                        Debug,
+                        "Accepted bound is {}, Blueprint.timestamp is {}",
+                        accepted_bound,
+                        blueprint_with_hashes.timestamp
+                    );
+                    return Ok((BlueprintValidity::TimestampFromFuture, bytes.len()));
+                }
+            }
+
+            // Fetch delayed transactions
+            fetch_delayed_txs(
+                host,
+                blueprint_with_hashes,
+                delayed_inbox,
+                current_blueprint_size,
+            )
         }
     }
 }
@@ -341,16 +391,29 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     }
     match &mut config.mode {
         ConfigurationMode::Proxy => Ok((None, size)),
-        ConfigurationMode::Sequencer { delayed_inbox, .. } => {
+        ConfigurationMode::Sequencer {
+            delayed_inbox,
+            evm_node_flag,
+            max_blueprint_lookahead_in_seconds,
+            ..
+        } => {
             let validity = parse_and_validate_blueprint(
                 host,
                 chunks.concat().as_slice(),
                 delayed_inbox,
                 size,
+                *evm_node_flag,
+                *max_blueprint_lookahead_in_seconds,
             )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
             {
+                log!(
+                    host,
+                    Benchmarking,
+                    "Number of transactions in blueprint: {}",
+                    blueprint.transactions.len()
+                );
                 Ok((Some(blueprint), size_with_delayed_transactions))
             } else {
                 invalidate_blueprint(host, blueprint_path, &validity.0)?;
@@ -369,6 +432,12 @@ pub fn read_next_blueprint<Host: Runtime>(
     let exists = host.store_has(&blueprint_path)?.is_some();
     if exists {
         let nb_chunks = read_blueprint_nb_chunks(host, &blueprint_path)?;
+        log!(
+            host,
+            Benchmarking,
+            "Number of chunks in blueprint: {}",
+            nb_chunks
+        );
         let n_subkeys = host.store_count_subkeys(&blueprint_path)?;
         let available_chunks = n_subkeys as u16 - 1;
         if available_chunks == nb_chunks {
@@ -388,6 +457,13 @@ pub fn read_next_blueprint<Host: Runtime>(
             Ok((None, 0))
         }
     } else {
+        log!(host, Benchmarking, "Number of chunks in blueprint: {}", 0);
+        log!(
+            host,
+            Benchmarking,
+            "Number of transactions in blueprint: {}",
+            0
+        );
         Ok((None, 0))
     }
 }
@@ -409,20 +485,19 @@ pub fn clear_all_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 mod tests {
 
     use super::*;
-    use crate::configuration::TezosContracts;
+    use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
-    use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
+    use crate::storage::store_last_info_per_level_timestamp;
     use crate::Timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
-    use tezos_crypto_rs::hash::Signature;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
 
-    #[test]
-    fn test_invalid_sequencer_blueprint_is_removed() {
-        let mut host = MockHost::default();
+    fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
+        let mut host = MockKernelHost::default();
         let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         let delayed_bridge: ContractKt1Hash =
@@ -432,13 +507,25 @@ mod tests {
             "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
         )
         .unwrap();
+        let dal = if enable_dal {
+            Some(DalConfiguration {
+                slot_indices: vec![5],
+            })
+        } else {
+            None
+        };
         let mut config = Configuration {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Sequencer {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
+                dal,
+                evm_node_flag: false,
+                max_blueprint_lookahead_in_seconds: 100_000i64,
             },
+            limits: Limits::default(),
+            enable_fa_bridge: false,
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);
@@ -458,19 +545,15 @@ mod tests {
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
-        let signature = Signature::from_base58_check(
-          "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
-      ).expect("signature decoding should work");
 
-        let seq_blueprint = SequencerBlueprint {
-            blueprint: UnsignedSequencerBlueprint {
-                chunk: blueprint_with_hashes_bytes.clone().into(),
-                number: U256::from(0),
-                nb_chunks: 1u16,
-                chunk_index: 0u16,
-            },
-            signature,
+        let seq_blueprint = UnsignedSequencerBlueprint {
+            chunk: blueprint_with_hashes_bytes.clone().into(),
+            number: U256::from(0),
+            nb_chunks: 1u16,
+            chunk_index: 0u16,
         };
+
+        store_last_info_per_level_timestamp(&mut host, Timestamp::from(40)).unwrap();
 
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
@@ -480,6 +563,8 @@ mod tests {
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
             0,
+            false,
+            500,
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(
@@ -521,18 +606,12 @@ mod tests {
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_parent_hash);
-        let signature = Signature::from_base58_check(
-          "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
-      ).expect("signature decoding should work");
 
-        let seq_blueprint = SequencerBlueprint {
-            blueprint: UnsignedSequencerBlueprint {
-                chunk: blueprint_with_hashes_bytes.clone().into(),
-                number: U256::from(0),
-                nb_chunks: 1u16,
-                chunk_index: 0u16,
-            },
-            signature,
+        let seq_blueprint = UnsignedSequencerBlueprint {
+            chunk: blueprint_with_hashes_bytes.clone().into(),
+            number: U256::from(0),
+            nb_chunks: 1u16,
+            chunk_index: 0u16,
         };
 
         let mut delayed_inbox =
@@ -543,6 +622,8 @@ mod tests {
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
             0,
+            false,
+            500,
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
@@ -563,5 +644,15 @@ mod tests {
         // The blueprint 0 should have been removed
         let exists = host.store_has(&blueprint_path).unwrap().is_some();
         assert!(!exists)
+    }
+
+    #[test]
+    fn test_invalid_sequencer_blueprint_is_removed_without_dal() {
+        test_invalid_sequencer_blueprint_is_removed(false)
+    }
+
+    #[test]
+    fn test_invalid_sequencer_blueprint_is_removed_with_dal() {
+        test_invalid_sequencer_blueprint_is_removed(true)
     }
 }

@@ -44,6 +44,24 @@ module Commitment : sig
   type t = Tezos_crypto_dal.Cryptobox.Verifier.commitment
 
   val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val pp_short : Format.formatter -> t -> unit
+
+  val to_b58check : t -> string
+
+  val of_b58check_opt : string -> t option
+
+  val of_b58check : string -> t Error_monad.tzresult
+end
+
+(** A slot commitment proof, same as protocol slot commitments' proofs through
+    environment. *)
+module Commitment_proof : sig
+  type t = Tezos_crypto_dal.Cryptobox.Verifier.commitment_proof
+
+  val encoding : t Data_encoding.t
 end
 
 module Slot_header : sig

@@ -1,41 +1,36 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name json_data_encoding_stdlib)
- (public_name json-data-encoding.stdlib)
- (modules json_data_encoding_stdlib list_override)
- (synopsis "Type-safe encoding to and decoding from JSON")
- (libraries uri)
- (js_of_ocaml)
- (wrapped false))
+ (public_name octez-libs.json-data-encoding.stdlib)
+ (libraries
+  uri)
+ (wrapped false)
+ (modules json_data_encoding_stdlib list_override))
 
 (library
  (name json_data_encoding)
- (public_name json-data-encoding)
+ (public_name octez-libs.json-data-encoding)
+ (libraries
+  uri
+  hex
+  octez-libs.json-data-encoding.stdlib)
+ (wrapped false)
  (flags
-  (:standard -open Json_data_encoding_stdlib))
- (modules json_encoding json_query json_repr json_schema)
- (synopsis "Type-safe encoding to and decoding from JSON")
- (libraries uri hex json_data_encoding_stdlib)
- (js_of_ocaml)
- (wrapped false))
+  (:standard)
+  -open Json_data_encoding_stdlib)
+ (modules json_encoding json_query json_repr json_schema))
 
 (library
  (name json_data_encoding_bson)
- (public_name json-data-encoding-bson)
+ (public_name octez-libs.json-data-encoding-bson)
+ (libraries
+  octez-libs.json-data-encoding
+  ocplib-endian
+  octez-libs.json-data-encoding.stdlib)
+ (wrapped false)
  (flags
-  (:standard -open Json_data_encoding_stdlib))
- (modules json_repr_bson)
- (synopsis "BSON representation of JSON documents")
- (libraries json-data-encoding ocplib-endian json_data_encoding_stdlib)
- (js_of_ocaml)
- (wrapped false))
-
-(library
- (name json_data_encoding_browser)
- (public_name json-data-encoding-browser)
- (flags
-  (:standard -open Js_of_ocaml -open Json_data_encoding_stdlib))
- (modules json_repr_browser)
- (synopsis "Native browser representation of JSON documents")
- (libraries json-data-encoding js_of_ocaml json_data_encoding_stdlib)
- (js_of_ocaml)
- (wrapped false))
+  (:standard)
+  -open Json_data_encoding_stdlib)
+ (modules json_repr_bson))

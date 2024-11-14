@@ -588,7 +588,7 @@ let expand_compare original =
       ( _,
         (( "IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT" | "IFCMPGT" | "IFCMPLE"
          | "IFCMPGE" | "IFEQ" | "IFNEQ" | "IFLT" | "IFGT" | "IFLE" | "IFGE" ) as
-        str),
+         str),
         args,
         [] ) ->
       error (Invalid_arity (str, List.length args, 2))
@@ -596,7 +596,7 @@ let expand_compare original =
       ( _,
         (( "IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT" | "IFCMPGT" | "IFCMPLE"
          | "IFCMPGE" | "IFEQ" | "IFNEQ" | "IFLT" | "IFGT" | "IFLE" | "IFGE" ) as
-        str),
+         str),
         [],
         _ :: _ ) ->
       error (Unexpected_macro_annotation str)

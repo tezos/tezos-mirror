@@ -1,0 +1,18 @@
+[package]
+name = "inbox-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap.workspace = true
+hex.workspace = true
+jstz_crypto.workspace = true
+jstz_proto.workspace = true
+tezos-smart-rollup.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+http.workspace = true
+bincode.workspace = true
+regex.workspace = true
+tezos_data_encoding.workspace = true

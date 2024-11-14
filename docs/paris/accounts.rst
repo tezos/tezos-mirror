@@ -11,7 +11,7 @@ addresses:
     ``tz3`` or ``tz4``.
   - A smart contract is a programmable account, associated with some Michelson code.
     A transaction to such
-    an address can provide data, and can fail, according to the :ref:`transaction semantics <transaction_semantics_oxford>`. Its address is a unique hash that depends on
+    an address can provide data, and can fail, according to the :ref:`transaction semantics <transaction_semantics_paris>`. Its address is a unique hash that depends on
     the operation that led to its creation, prefixed by ``KT1``.
 
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups

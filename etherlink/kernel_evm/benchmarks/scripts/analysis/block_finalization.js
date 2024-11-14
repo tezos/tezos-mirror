@@ -5,15 +5,32 @@
 const path = require('node:path')
 module.exports = { print_analysis }
 const utils = require("./utils")
+const pdfUtils = require("./pdf_utils")
 const OUTPUT = 'block_finalization_data.csv'
-const UPPER_BOUND = 125000000
+const UPPER_BOUND = 125_000_000
+const MODEL = {
+    intercept: UPPER_BOUND,
+    coef: 0,
+}
 
-function print_analysis(infos, dir = "analysis_result") {
-    let mlr = utils.make_lr(infos.block_finalization, (x) => x.nb_tx, (y) => y.block_finalize)
-    console.log(`Linear Regression: ${utils.print_lr(mlr, "nbtx")} `)
+function print_analysis(infos, dir = "analysis_result", doc) {
+    pdfUtils.h1("Block finalization", doc);
+    let data = infos.block_finalization
+    let errors = utils.print_page(data, {
+        fx: (d) => d.nb_tx,
+        fy: (d) => d.block_finalize,
+        model: MODEL,
+        labels: {
+            title: "Tick model for finalizing a block",
+            x: "Number of transactions in the block",
+        },
+        context: {
+            csv_filepath: OUTPUT,
+            csv_columns: ["benchmark_name", "inbox_size", "nb_tx", "block_finalize"],
+            dir,
+            doc
+        }
+    });
+    return errors;
 
-    utils.print_csv(dir, OUTPUT, infos.block_finalization, ["benchmark_name", "inbox_size", "nb_tx", "block_finalize"])
-
-    console.log(`current model: Y = ${UPPER_BOUND} `)
-    return utils.print_summary_errors(infos.block_finalization, datum => { return datum.block_finalize - UPPER_BOUND })
 }

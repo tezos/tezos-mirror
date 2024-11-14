@@ -7,7 +7,7 @@
  (package octez-codec-kaitai)
  (instrumentation (backend bisect_ppx))
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   kaitai-of-data-encoding
   kaitai
   octez-libs.base
@@ -67,6 +67,9 @@
   (select void_for_linking-octez-protocol-020-PsParisC-libs-client from
    (octez-protocol-020-PsParisC-libs.client -> void_for_linking-octez-protocol-020-PsParisC-libs-client.empty)
    (-> void_for_linking-octez-protocol-020-PsParisC-libs-client.empty))
+  (select void_for_linking-octez-protocol-021-PsQuebec-libs-client from
+   (octez-protocol-021-PsQuebec-libs.client -> void_for_linking-octez-protocol-021-PsQuebec-libs-client.empty)
+   (-> void_for_linking-octez-protocol-021-PsQuebec-libs-client.empty))
   (select void_for_linking-octez-protocol-alpha-libs-client from
    (octez-protocol-alpha-libs.client -> void_for_linking-octez-protocol-alpha-libs-client.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client.empty)))
@@ -103,6 +106,7 @@
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-019-PtParisB-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-020-PsParisC-libs-client.empty "")
+   (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client.empty ""))))
 
 (cram (deps codec.exe) (package octez-codec-kaitai))

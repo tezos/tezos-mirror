@@ -76,8 +76,6 @@ val validate_block :
 
 val shutdown : t -> unit Lwt.t
 
-val valid_block_watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
-
 val received_block_watcher :
   t -> Block_hash.t Lwt_stream.t * Lwt_watcher.stopper
 

@@ -156,6 +156,13 @@ let string_parameter =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) x ->
       Lwt_result.return x)
 
+let hex_parameter =
+  Tezos_clic.parameter (fun (cctxt : Client_context.full) h ->
+      let open Lwt_result_syntax in
+      match Hex.to_string (`Hex h) with
+      | None -> cctxt#error "Parameter is not a valid hex-encoded string"
+      | Some b -> return b)
+
 let int_parameter =
   Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
       try Lwt_result.return (int_of_string p)
@@ -199,6 +206,15 @@ struct
         "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9933)"
       ~doc:(Format.sprintf "The address of the %s metrics server." binary_name)
       string_parameter
+
+  let enable_performance_metrics_arg :
+      (bool, Client_context.full) Tezos_clic.arg =
+    Tezos_clic.switch
+      ~long:"enable-performance-metrics"
+      ~doc:
+        "Enable performance metrics when the metrics server is started \
+         (requires lsof, disabled by default)."
+      ()
 
   let dac_observer_endpoint_arg =
     Tezos_clic.arg
@@ -369,7 +385,7 @@ let index_buffer_size_arg =
     ~placeholder:"<nb_entries>"
     ~doc:
       "The maximum cache size in memory before it is flushed to disk, used for \
-       indexes of the store."
+       indexes of the store. (Deprecated)"
     positive_int_parameter
 
 let irmin_cache_size_arg =
@@ -405,10 +421,8 @@ let gc_frequency_arg =
     ~long:"gc-frequency"
     ~placeholder:"blocks"
     ~doc:
-      (Format.sprintf
-         "The number of blocks between each launch of the garbage collection. \
-          Default value is %ld."
-         Configuration.default_gc_parameters.frequency_in_blocks)
+      "The number of blocks between each launch of the garbage collection. \
+       Default is protocol constant challenge_window_in_blocks / 5."
     positive_int32_parameter
 
 let history_mode_parameter =
@@ -479,6 +493,14 @@ let compact : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Produce a compact snapshot with a single commit for the context."
     ()
 
+let rollup_node_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"rollup-node-endpoint"
+    ~placeholder:"uri"
+    ~doc:(Format.sprintf "The address of the running rollup node.")
+    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         Lwt.return_ok (Uri.of_string s)))
+
 let string_list =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
       let list = String.split ',' s in
@@ -526,3 +548,14 @@ let apply_unsafe_patches_switch : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:
       "Apply unsafe PVM patches in the configuration or hardcoded by the node."
     ()
+
+let bail_on_disagree_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"bail-on-disagree"
+    ~doc:
+      "Make an observer rollup node bail when it sees a commitment it disagree \
+       with on L1."
+    ()
+
+let level_param next =
+  Tezos_clic.param ~name:"level" ~desc:"Level" positive_int32_parameter next

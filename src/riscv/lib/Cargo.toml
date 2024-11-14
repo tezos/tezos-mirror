@@ -1,0 +1,45 @@
+[package]
+name = "octez-riscv"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+arbitrary-int.workspace = true
+bincode.workspace = true
+derive_more.workspace = true
+ed25519-dalek.workspace = true
+enum-tag.workspace = true
+goblin.workspace = true
+hex.workspace = true
+ieee-apsqrt.workspace = true
+num_enum.workspace = true
+paste.workspace = true
+rustc_apfloat.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+strum.workspace = true
+tezos_crypto_rs.workspace = true
+tezos-smart-rollup-constants.workspace = true
+tezos-smart-rollup-utils.workspace = true
+thiserror.workspace = true
+vm-fdt.workspace = true
+
+[dependencies.ocaml]
+workspace = true
+optional = true
+
+[build-dependencies]
+ocaml-build.workspace = true
+
+[dev-dependencies]
+hex.workspace = true
+rand.workspace = true
+proptest.workspace = true
+lazy_static.workspace = true
+tempfile.workspace = true
+goldenfile.workspace = true
+
+[features]
+default = []
+ocaml-api = ["ocaml"]

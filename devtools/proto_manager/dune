@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (public_name proto-manager)
+ (package proto-manager)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  cmdliner
+  re)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)))

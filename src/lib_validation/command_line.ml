@@ -66,11 +66,11 @@ let run () =
   let main_promise = External_validator.main ?socket_dir () in
   Stdlib.exit
     (let open Lwt_syntax in
-    Lwt.Exception_filter.(set handle_all_except_runtime) ;
-    Lwt_main.run
-      (let* r = Lwt_exit.wrap_and_exit main_promise in
-       match r with
-       | Ok () -> Lwt_exit.exit_and_wait 0
-       | Error err ->
-           Format.eprintf "%a\n%!" pp_print_trace err ;
-           Lwt_exit.exit_and_wait 1))
+     Lwt.Exception_filter.(set handle_all_except_runtime) ;
+     Lwt_main.run
+       (let* r = Lwt_exit.wrap_and_exit main_promise in
+        match r with
+        | Ok () -> Lwt_exit.exit_and_wait 0
+        | Error err ->
+            Format.eprintf "%a\n%!" pp_print_trace err ;
+            Lwt_exit.exit_and_wait 1))

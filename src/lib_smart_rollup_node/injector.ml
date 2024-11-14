@@ -32,6 +32,8 @@ type state = {
   delay_increment_per_round : int64;
 }
 
+let registry = Prometheus.CollectorRegistry.create ()
+
 module Parameters :
   PARAMETERS
     with type state = state
@@ -70,6 +72,7 @@ module Parameters :
     | Refute -> 1
     | Recover -> 1
     | Execute_outbox_message -> 1
+    | Publish_dal_commitment -> 1
 
   let operation_tag : Operation.t -> Tag.t = function
     | Add_messages _ -> Add_messages
@@ -79,6 +82,7 @@ module Parameters :
     | Refute _ -> Refute
     | Recover_bond _ -> Recover
     | Execute_outbox_message _ -> Execute_outbox_message
+    | Publish_dal_commitment _ -> Publish_dal_commitment
 
   let fee_parameter {fee_parameters; _} operation =
     let operation_kind = operation_tag operation in
@@ -99,6 +103,7 @@ module Parameters :
         Some 300
     | Add_messages _ | Cement _ | Recover_bond _ | Execute_outbox_message _ ->
         None
+    | Publish_dal_commitment _ -> None
 
   let persist_operation (op : Operation.t) =
     match op with
@@ -110,13 +115,15 @@ module Parameters :
        requeued by the node automatically depending on the state of the game on
        L1 on startup. *) ->
         false
-    | Add_messages _ | Recover_bond _ | Execute_outbox_message _ -> true
+    | Add_messages _ | Recover_bond _ | Execute_outbox_message _
+    | Publish_dal_commitment _ ->
+        true
 
-  let retry_unsuccessful_operation _state (op : Operation.t) status =
+  let retry_unsuccessful_operation _state (op : Operation.t) ?reason status =
     let open Lwt_syntax in
     match status with
-    | Backtracked | Skipped | Other_branch ->
-        (* Always retry backtracked or skipped operations, or operations that
+    | Backtracked | Other_branch ->
+        (* Always retry backtracked operations, or operations that
            are on another branch because of a reorg:
 
            - Messages posted to an inbox should be re-emitted (i.e. re-queued)
@@ -130,22 +137,30 @@ module Parameters :
              maybe check if game exists on other branch as well.
         *)
         return Retry
+    | Skipped -> (
+        match (op, reason) with
+        | Cement _, Some (Operation.Cement _, _) ->
+            (* Cementations following a failed cement are bound to fail *)
+            return Forget
+        | _ -> return Retry)
     | Failed error -> (
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
            Think about which operations should be retried and when. *)
         match op with
-        | Cement _ | Publish _ ->
-            (* Cement and Publish commitments can be forgotten to free up the
+        | Cement _ | Publish _ | Execute_outbox_message _ ->
+            (* These operations can be forgotten to free up the
                injector as they are requeued by the node automatically. *)
             return Forget
         | Refute _ | Timeout _ | Add_messages _ | Recover_bond _
-        | Execute_outbox_message _ -> (
+        | Publish_dal_commitment _ -> (
             match classify_trace error with
             | Permanent | Outdated -> return Forget
             | Branch | Temporary -> return Retry))
     | Never_included ->
         (* Forget operations that are never included *)
         return Forget
+
+  let metrics_registry = registry
 end
 
 include Injector_functor.Make (Parameters)

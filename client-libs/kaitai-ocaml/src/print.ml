@@ -211,8 +211,8 @@ let rec to_yaml ~toplevel (t : ClassSpec.t) =
   mapping_flatten
     [
       (if toplevel then [("meta", metaSpec t.meta)]
-      else if id_only_meta t.meta then []
-      else [("meta", metaSpec t.meta)]);
+       else if id_only_meta t.meta then []
+       else [("meta", metaSpec t.meta)]);
       doc_spec t.doc;
       spec_if_non_empty "types" t.types types_spec;
       spec_if_non_empty "instances" t.instances instances_spec;

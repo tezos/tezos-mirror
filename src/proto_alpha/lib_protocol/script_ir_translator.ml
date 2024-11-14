@@ -1359,13 +1359,13 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
     | None ->
         return
           ( (if reachable then acc
-            else
-              match ty with
-              | Or_t _ -> acc
-              | _ -> (
-                  match first_unreachable with
-                  | None -> (Some (List.rev path), all)
-                  | Some _ -> acc)),
+             else
+               match ty with
+               | Or_t _ -> acc
+               | _ -> (
+                   match first_unreachable with
+                   | None -> (Some (List.rev path), all)
+                   | Some _ -> acc)),
             reachable )
     | Some {name; original_type_expr = _} ->
         if Entrypoint.Set.mem name all then tzfail (Duplicate_entrypoint name)
@@ -3532,7 +3532,7 @@ and parse_instr :
       Item_t
         ( vk,
           (Item_t (Option_t (vv, _, _), Item_t (Big_map_t (k, v, _), _)) as
-          stack) ) ) ->
+           stack) ) ) ->
       let*? Eq, ctxt = check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 in
       let*? Eq, ctxt = check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 in
       let*? () = check_var_annot loc annot in
@@ -5338,17 +5338,17 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
     match entrypoints.at_node with
     | None ->
         ( (if reachable then acc
-          else
-            match ty with
-            | Or_t _ -> acc
-            | _ -> (List.rev path :: unreachables, all)),
+           else
+             match ty with
+             | Or_t _ -> acc
+             | _ -> (List.rev path :: unreachables, all)),
           reachable )
     | Some {name; original_type_expr} ->
         ( (if Entrypoint.Map.mem name all then
-           (List.rev path :: unreachables, all)
-          else
-            ( unreachables,
-              Entrypoint.Map.add name (Ex_ty ty, original_type_expr) all )),
+             (List.rev path :: unreachables, all)
+           else
+             ( unreachables,
+               Entrypoint.Map.add name (Ex_ty ty, original_type_expr) all )),
           true )
   in
   let rec fold_tree :

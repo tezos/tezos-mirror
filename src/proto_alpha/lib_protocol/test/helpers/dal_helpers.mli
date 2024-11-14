@@ -26,7 +26,7 @@
 open Protocol
 
 (** Returns an object of type {!Cryptobox.t} from the given DAL paramters. *)
-val mk_cryptobox : Cryptobox.parameters -> Cryptobox.t tzresult
+val mk_cryptobox : Cryptobox.parameters -> Cryptobox.t tzresult Lwt.t
 
 (** Derive new DAL parameters from the given ones by:
     - setting the given redundancy factor ;
@@ -46,7 +46,7 @@ val content_slot_id :
 module Make (P : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
-  val cryptobox : Cryptobox.t Lazy.t
+  val cryptobox : Cryptobox.t tzresult Lwt.t Lazy.t
 end) : sig
   (** Some global constants. *)
 
@@ -67,7 +67,7 @@ end) : sig
     Dal_slot_repr.History.t option Lwt.t
 
   (** Returns the slot's polynomial from the given slot's data. *)
-  val dal_mk_polynomial_from_slot : bytes -> Cryptobox.polynomial tzresult
+  val dal_mk_polynomial_from_slot : bytes -> Cryptobox.polynomial tzresult Lwt.t
 
   (* Commits to the given polynomial. *)
   val dal_commit :
@@ -80,7 +80,7 @@ end) : sig
   val dal_mk_prove_page :
     Cryptobox.polynomial ->
     Dal_slot_repr.Page.t ->
-    Cryptobox.page_proof tzresult
+    Cryptobox.page_proof tzresult Lwt.t
 
   (** Constructs a slot whose ID is defined from the given level and given
       index, and whose data are built using the given fill function. The function
@@ -91,7 +91,7 @@ end) : sig
     ?index:Dal_slot_index_repr.t ->
     ?fill_function:(int -> char) ->
     unit ->
-    (bytes * Cryptobox.polynomial * Dal_slot_repr.Header.t) tzresult
+    (bytes * Cryptobox.polynomial * Dal_slot_repr.Header.t) tzresult Lwt.t
 
   (** Constructs a record value of type Page.id. *)
   val mk_page_id :
@@ -116,6 +116,7 @@ end) : sig
     ( (bytes * Cryptobox.page_proof) option * Dal_slot_repr.Page.t,
       error trace )
     result
+    Lwt.t
 
   (** Returns the char after [c]. Restarts from the char whose code is 0 if [c]'s
       code is 255. *)

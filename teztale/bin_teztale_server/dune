@@ -1,0 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name teztale_server_main)
+ (public_name octez-teztale-server)
+ (package octez-teztale)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  aches
+  caqti-driver-postgresql
+  caqti-driver-sqlite3
+  caqti-lwt.unix
+  octez-libs.cohttp-lwt-unix
+  ezgzip
+  safepass
+  octez-version.value
+  lib_teztale_base
+  lib_teztale_server
+  cmdliner)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (:include %{workspace_root}/static-link-flags-teztale.sexp))
+ (flags
+  (:standard)
+  -open Lib_teztale_base
+  -open Lib_teztale_server))

@@ -65,14 +65,14 @@ let test_seed_no_commitment () =
     let* s = Context.get_seed (B b) in
     let seed_bytes = Data_encoding.Binary.to_bytes_exn Seed.seed_encoding s in
     (if expected_seed <> seed_bytes then
-     let seed_pp =
-       Hex.show
-         (Hex.of_string
-            (Data_encoding.Binary.to_string_exn Seed.seed_encoding s))
-     in
-     let expected_seed_pp = Hex.show (Hex.of_bytes expected_seed) in
-     Stdlib.failwith
-       (Format.sprintf "Seed: %s\nExpected: %s\n\n" seed_pp expected_seed_pp)) ;
+       let seed_pp =
+         Hex.show
+           (Hex.of_string
+              (Data_encoding.Binary.to_string_exn Seed.seed_encoding s))
+       in
+       let expected_seed_pp = Hex.show (Hex.of_bytes expected_seed) in
+       Stdlib.failwith
+         (Format.sprintf "Seed: %s\nExpected: %s\n\n" seed_pp expected_seed_pp)) ;
     return b
   in
   let rec bake_and_check_seed b = function
@@ -148,7 +148,6 @@ let test_revelation_early_wrong_right_twice () =
   (* test that the baking reward is received *)
   let* reward_to_liquid =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      ~policy
       (B b)
       cycle_for_rewards
       pkh
@@ -214,7 +213,6 @@ let test_revelation_early_wrong_right_twice () =
   (* test that the baker gets the tip reward plus the baking reward*)
   let* tip_to_liquid =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      ~policy
       (B b)
       cycle_for_rewards
       pkh
@@ -222,7 +220,6 @@ let test_revelation_early_wrong_right_twice () =
   in
   let* baking_reward_to_liquid =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      ~policy
       (B b)
       cycle_for_rewards
       pkh
@@ -419,7 +416,6 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   (* test that the baking reward is received *)
   let* reward_to_liquid =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      ~policy
       (B b)
       cycle_for_rewards
       pkh
@@ -445,7 +441,6 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   (* test that the baker gets the tip reward plus the baking reward*)
   let* tip_to_liquid =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      ~policy
       (B b)
       cycle_for_rewards
       pkh
@@ -453,7 +448,6 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   in
   let* baking_reward_to_liquid =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      ~policy
       (B b)
       cycle_for_rewards
       pkh
@@ -543,7 +537,6 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
       let* tip_to_liquid =
         Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-          ~policy
           (B b)
           cycle_for_rewards
           pkh
@@ -551,7 +544,6 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       in
       let* baking_reward_to_liquid =
         Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-          ~policy
           (B b)
           cycle_for_rewards
           pkh

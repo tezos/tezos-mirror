@@ -11,8 +11,5 @@
   qcheck-alcotest
   lwt
   pure-splitmix
-  data-encoding)
- (js_of_ocaml)
+  octez-libs.data-encoding)
  (library_flags (:standard -linkall)))
-
-(rule (alias runtest_js) (action progn))

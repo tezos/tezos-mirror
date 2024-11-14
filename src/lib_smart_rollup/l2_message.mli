@@ -26,8 +26,12 @@
 (** Type of L2 messages.  *)
 type t
 
-(** [make message] constructs a message with content [message]. *)
-val make : string -> t
+(** [make ~unique message] constructs a message with content
+    [message]. If [unique = true] the returned value will be unique
+    (multiple identical calls to [make] will return different values)
+    because it will be given a unique id. Using [unique = false], on the
+    contrary, makes the call idempotent. *)
+val make : unique:bool -> string -> t
 
 (** [content message] returns the string content of [message], i.e.
     [content (make s) = s]. *)

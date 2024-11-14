@@ -48,6 +48,7 @@ type config = {
   dal_pages_directory : string;
   kernel_debug : bool;
   flamecharts_directory : string;
+  timings_file : string option;
 }
 
 let config ?(sender = default_sender) ?(source = default_source)
@@ -55,7 +56,7 @@ let config ?(sender = default_sender) ?(source = default_source)
     ?(preimage_directory = default_preimage_directory) ?preimage_endpoint
     ?(dal_pages_directory = default_dal_pages_directory)
     ?(kernel_debug = default_kernel_debug)
-    ?(flamecharts_directory = default_flamecharts_directory) () =
+    ?(flamecharts_directory = default_flamecharts_directory) ?timings_file () =
   {
     sender;
     source;
@@ -65,4 +66,5 @@ let config ?(sender = default_sender) ?(source = default_source)
     dal_pages_directory;
     kernel_debug;
     flamecharts_directory;
+    timings_file;
   }

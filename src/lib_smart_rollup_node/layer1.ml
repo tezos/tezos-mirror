@@ -124,10 +124,18 @@ let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
         l1_blocks_cache_size
     else Ok ()
   in
-  let*! l1 = start ~name ~reconnection_delay ?protocols cctxt in
+  let chain = cctxt#chain in
+  let*! l1 =
+    start
+      ~name
+      ~chain
+      ~reconnection_delay
+      ?protocols
+      (cctxt :> Tezos_rpc.Context.generic)
+  in
+  let cctxt = (cctxt :> Client_context.full) in
   let blocks_cache = Blocks_cache.create l1_blocks_cache_size in
   let headers_cache = Blocks_cache.create l1_blocks_cache_size in
-  let cctxt = (cctxt :> Client_context.full) in
   return {l1; cctxt; blocks_cache; headers_cache; prefetch_blocks}
 
 let create ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
@@ -140,10 +148,18 @@ let create ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
         l1_blocks_cache_size
     else Ok ()
   in
-  let l1 = create ~name ~reconnection_delay ?protocols cctxt in
+  let chain = cctxt#chain in
+  let l1 =
+    create
+      ~name
+      ~chain
+      ~reconnection_delay
+      ?protocols
+      (cctxt :> Tezos_rpc.Context.generic)
+  in
+  let cctxt = (cctxt :> Client_context.full) in
   let blocks_cache = Blocks_cache.create l1_blocks_cache_size in
   let headers_cache = Blocks_cache.create l1_blocks_cache_size in
-  let cctxt = (cctxt :> Client_context.full) in
   return {l1; cctxt; blocks_cache; headers_cache; prefetch_blocks}
 
 let shutdown {l1; _} = shutdown l1
@@ -170,6 +186,8 @@ let get_latest_head l1_ctxt =
       {hash; level; header})
     (get_latest_head l1_ctxt.l1)
 
+let get_status l1_ctxt = get_status l1_ctxt.l1
+
 let get_predecessor_opt ?max_read {l1; _} = get_predecessor_opt ?max_read l1
 
 let get_predecessor ?max_read {l1; _} = get_predecessor ?max_read l1
@@ -181,8 +199,8 @@ let get_tezos_reorg_for_new_head {l1; _} ?get_old_predecessor old_head new_head
 module Internal_for_tests = struct
   let dummy cctxt =
     {
-      l1 = Internal_for_tests.dummy cctxt;
-      cctxt = (cctxt :> Client_context.full);
+      l1 = Internal_for_tests.dummy (cctxt :> Tezos_rpc.Context.generic);
+      cctxt :> Client_context.full;
       blocks_cache = Blocks_cache.create 1;
       headers_cache = Blocks_cache.create 1;
       prefetch_blocks = 0;

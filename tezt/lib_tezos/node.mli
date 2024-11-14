@@ -99,8 +99,11 @@ type argument =
   | RPC_additional_addr of string  (** [--rpc-addr] *)
   | RPC_additional_addr_external of string  (** [--external-rpc-addr] *)
   | Max_active_rpc_connections of int  (** [--max-active-rpc-connections] *)
+  | Enable_http_cache_headers  (** [--enable-http-cache-headers] *)
   | Disable_context_pruning  (** [--disable_context-pruning] *)
   | Storage_maintenance_delay of string  (** [--storage-maintenance-delay]*)
+  | Force_history_mode_switch  (** [--force-history-mode-switch] *)
+  | Allow_yes_crypto  (** [--allow-yes-crypto] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 
@@ -109,6 +112,34 @@ type tls_config = {certificate_path : string; key_path : string}
 
 (** Tezos node states. *)
 type t
+
+(** This placeholder aims to handle the activation of the external RPC
+    process for the Tezt nodes. Indeed, the external RPC process is an
+    important feature that is not activated by default in the node and
+    thus not tested on the CI. The tests on master are thus not
+    testing the feature. To test the external RPC process anyway, a
+    scheduled pipeline is launched every week, with the feature
+    enabled, running all tests.
+    When the scheduled pipeline is launched, the TZ_SCHEDULE_KIND
+    environment variable is set to "EXTENDED_RPC_TESTS" to turn on the
+    external RPC process. Look for the
+    [ci/bin/custom_extended_test_pipeline.ml] file for more details. *)
+val enable_external_rpc_process : bool
+
+(** This placeholder aims to handle the activation of the
+    singleprocess validation for the Tezt nodes. Indeed, the
+    singleprocess validation is an alternative way of validating
+    blocks that is not activated by default in the node and thus not
+    tested by the CI. The tests on master are thus not testing the
+    feature. To test the singleprocess validation anyway, a scheduled
+    pipeline is launched every week, with the feature enabled, running
+    all tests.
+    When the scheduled pipeline is launched, the TZ_SCHEDULE_KIND
+    environment variable is set to "EXTENDED_VALIDATION_TESTS" to turn
+    on the singleprocess validation. Look for the
+    [ci/bin/singleprocess_validation_pipeline.ml] file for more
+    details. *)
+val enable_singleprocess : bool
 
 (** Create a node.
 
@@ -142,6 +173,10 @@ type t
     Default value for [allow_all_rpc] is [true].
 
     Default value for [max_active_rpc_connections] is [500].
+
+    [local_rpc_server] specify whether or not the RPC server must be
+    run locally, if true (default), or on a external process. It is
+    not allowed yet to run both server kinds at the same time.
 
     The argument list is a list of configuration options that the node
     should run with. It is passed to the first run of [octez-node config init].
@@ -239,6 +274,8 @@ val net_port : t -> int
 (** Get the network port given as [--advertised-net-port] to a node. *)
 val advertised_net_port : t -> int option
 
+val metrics_port : t -> int
+
 (** Get the RPC scheme of a node.
 
     Returns [https] if node is started with [--rpc-tls], otherwise [http] *)
@@ -255,9 +292,11 @@ val rpc_port : t -> int
 
 (** Get the node's RPC endpoint URI.
 
-    These are composed of the node's [--rpc-tls], [--rpc-addr]
-    and [--rpc-port] arguments. *)
-val rpc_endpoint : t -> string
+    These are composed of the node's [--rpc-tls], [--rpc-addr] and
+    [--rpc-port] arguments. If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument). *)
+val rpc_endpoint : ?local:bool -> t -> string
 
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
@@ -441,6 +480,7 @@ val spawn_reconstruct : t -> Process.t
     for a more precise semantic.
  *)
 val run :
+  ?env:string String_map.t ->
   ?patch_config:(JSON.t -> JSON.t) ->
   ?on_terminate:(Unix.process_status -> unit) ->
   ?event_level:Daemon.Level.default_level ->
@@ -477,6 +517,12 @@ exception
     where : string option;
   }
 
+(** Wait for synchronisation status changes
+
+More precisely, wait until a [synchronisation_status] event occurs with a status
+change listed in [statuses]. *)
+val wait_for_synchronisation : statuses:string list -> t -> unit Lwt.t
+
 (** Wait until the node is ready.
 
     More precisely, wait until a [node_is_ready] event occurs.
@@ -485,9 +531,11 @@ val wait_for_ready : t -> unit Lwt.t
 
 (** Wait for a given chain level.
 
-    More precisely, wait until a [head_increment] or [branch_switch] with a
-    [level] greater or equal to the requested level occurs. If such an event
-    already occurred, return immediately. *)
+    More precisely, wait until a [head_increment] or [branch_switch]
+    (or [store_synchronized_on_head] when the node is running with
+    [rpc_external] set to true) with a [level] greater or equal to the
+    requested level occurs. If such an event already occurred, return
+    immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
 (** Get the current known level of the node.
@@ -581,11 +629,16 @@ val memory_consumption : t -> observe_memory_consumption Lwt.t
     [~snapshot:(file, do_reconstruct)], where file is the path to the snapshot.
     If [reconstruct] is [true], then [--reconstruct] is passed to the import
     command.
- *)
+
+    The [env] argument, if specified, allows adding new environment
+    variables when executing the [run] command of the octez-node. If
+    any environment variable is already defined internally they
+    will overwrite the ones provided via [env]. *)
 val init :
   ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
+  ?env:string String_map.t ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
@@ -608,7 +661,7 @@ val init :
     port of [node]. *)
 val send_raw_data : t -> data:string -> unit Lwt.t
 
-(** [upgrade_storage node] upprades the given [node] storage. *)
+(** [upgrade_storage node] upgrades the given [node] storage. *)
 val upgrade_storage : t -> unit Lwt.t
 
 (** Run [octez-node --version] and return the node's version. *)

@@ -754,9 +754,12 @@ let commands_ro () =
                             (Tez.of_mutez_exn w)
                             Operation_result.tez_sym
                             (if
-                             List.mem ~equal:Protocol_hash.equal p known_protos
-                            then ""
-                            else "not "))
+                               List.mem
+                                 ~equal:Protocol_hash.equal
+                                 p
+                                 known_protos
+                             then ""
+                             else "not "))
                         ranks ;
                       pp_close_box ppf ())
               else cctxt#message "The proposals have already been cleared."
@@ -2603,8 +2606,8 @@ let commands_rw () =
               error
                 "There %s: %a."
                 (if Compare.List_length_with.(dups = 1) then
-                 "is a duplicate proposal"
-                else "are duplicate proposals")
+                   "is a duplicate proposal"
+                 else "are duplicate proposals")
                 Format.(
                   pp_print_list
                     ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
@@ -2631,7 +2634,7 @@ let commands_rw () =
               cctxt#message
                 "There %s with the submission:%t"
                 (if Compare.List_length_with.(!errors = 1) then "is an issue"
-                else "are issues")
+                 else "are issues")
                 Format.(
                   fun ppf ->
                     pp_print_cut ppf () ;

@@ -138,7 +138,7 @@ let handle_forge_consensus_votes worker baking_state
   let batch_branch = unsigned_consensus_votes.batch_branch in
   let task
       ({vote_consensus_content; vote_kind; delegate; dal_content = _} as
-      unsigned_consensus_vote) =
+       unsigned_consensus_vote) =
     let*! signed_consensus_vote_r =
       Baking_actions.forge_and_sign_consensus_vote
         baking_state
@@ -177,7 +177,7 @@ let handle_forge_consensus_votes worker baking_state
           unsigned_consensus_votes)
   in
   List.iter
-    (fun unsigned_preattestation ->
+    (fun (unsigned_preattestation : unsigned_consensus_vote) ->
       let queue = get_or_create_queue worker unsigned_preattestation.delegate in
       Delegate_signing_queue.push_task
         ~on_error:(fun _err -> Lwt.return_unit)

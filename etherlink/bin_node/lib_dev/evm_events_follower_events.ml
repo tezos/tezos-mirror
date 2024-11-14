@@ -33,8 +33,8 @@ module Event = struct
       ~name:"evm_events_new_event"
       ~msg:"Evm events follower: applying {event}"
       ~level:Debug
-      ~pp1:Ethereum_types.Evm_events.pp
-      ("event", Ethereum_types.Evm_events.encoding)
+      ~pp1:Evm_events.pp
+      ("event", Evm_events.encoding)
 
   let pp_int32 fmt i = Format.fprintf fmt "%ld" i
 

@@ -22,7 +22,10 @@ type time_interval =
 
 type expiration = Duration of time_interval | Never
 
-(** Represents values of the [when:] field in job rules. *)
+(** Represents values of the [when:] field in job rules.
+
+    Note: [Delayed] jobs only run if their dependencies (or subsequent
+    stages for jobs that have no [needs:]) passed. *)
 type when_ = Always | Never | On_success | Manual | Delayed of time_interval
 
 (** Represents values of the [when:] field of jobs. *)
@@ -30,6 +33,9 @@ type when_job = Always | On_success | Manual
 
 (** Represents values of the [when:] field in [workflow:] and [include:] rules. *)
 type when_workflow = Always | Never
+
+(** Represents values of the [when:] field of trigger jobs. *)
+type when_trigger_job = Always | On_success | On_failure
 
 (** Represents values of the [job:allow_failure:] field of rules. *)
 type allow_failure_job = Yes | No | With_exit_codes of int list
@@ -39,6 +45,17 @@ type allow_failure_job = Yes | No | With_exit_codes of int list
     GitLab does not enable allowing a set of exit codes in rules,
     as is possible in a job's [allow_failure] field. *)
 type allow_failure_rule = Yes | No
+
+(** Represents auto cancel configurations.
+
+    Auto-cancel can be used to auto-cancel pipelines on certain conditions.
+
+    Auto-cancel can be configured globally for the full configuration
+    (by adding it to the {!workflow}), or configured for a given
+    workflow rule {!workflow_rule}. See
+    {{:https://docs.gitlab.com/ee/ci/yaml/#workflowauto_cancelon_job_failure}
+    workflow:auto_cancel:on_job_failure} for more info. *)
+type auto_cancel = {on_new_commit : bool; on_job_failure : bool}
 
 (** Represents a job rule. *)
 type job_rule = {
@@ -55,6 +72,12 @@ type workflow_rule = {
   if_ : If.t option;
   variables : variables option;
   when_ : when_workflow;
+  auto_cancel : auto_cancel option;
+      (** Auto-cancel for this workflow rule.
+
+      See
+      {{:https://docs.gitlab.com/ee/ci/yaml/#workflowrulesauto_cancel}
+      workflow:rules:auto_cancel} for more info. *)
 }
 
 (** Represents an include rule. *)
@@ -87,9 +110,48 @@ type artifacts = {
   name : string option;
 }
 
-type default = {image : image option; interruptible : bool option}
+type failure_type =
+  | Unknown_failure
+  | Script_failure
+  | Api_failure
+  | Stuck_or_timeout_failure
+  | Runner_system_failure
+  | Runner_unsupported
+  | Stale_schedule
+  | Job_execution_timeout
+  | Archived_failure
+  | Unmet_prerequisites
+  | Scheduler_failure
+  | Data_integrity_failure
 
-type cache = {key : string; paths : string list}
+(** Retry configuration.
+
+    Retry at most [max] times (can be 0, 1, or 2).
+
+    If [when_] is non-empty, only retry for those specific error causes.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#retry}retry} in the GitLab
+    YAML keyword reference for more information. *)
+type retry = {max : int; when_ : failure_type list}
+
+type default = {
+  image : image option;
+  interruptible : bool option;
+  retry : retry option;
+}
+
+(** Policy for caches.
+
+    - A [Pull_push] cache is pulled at the start of a job's execution and pushed at its termination. This is the default.
+    - A [Push] cache is not pulled at the start of a job's execution, but is pushed at its termination,
+    - A [Pull] cache is pulled at the start of a job's execution, but is not pushed at its termination.
+
+    That is, a jobs with [Pull_push] cache produce and consume
+    caches. Jobs with [Push] caches only produce the caches. Jobs with
+    [Pull] caches only consumes them. *)
+type cache_policy = Pull_push | Push | Pull
+
+type cache = {key : string; paths : string list; policy : cache_policy}
 
 type service = {name : string}
 
@@ -163,11 +225,70 @@ type job = {
           expose the captured coverage information as a report in a
           job's artifacts
           ({{:https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportscoverage_report}ref}). *)
-  retry : int option;
+  retry : retry option;
   parallel : parallel option;
 }
 
-type workflow = {rules : workflow_rule list; name : string option}
+(** Parent-child downstream pipeline trigger.
+
+    {{:https://docs.gitlab.com/ee/ci/pipelines/downstream_pipelines.html#parent-child-pipelines}
+    Parent-child downstream pipelines} execute in the same project as
+    the parent pipeline. They inherit the global variables of the
+    parent pipeline. [trigger_include] should be a path to the
+    definition of the child-pipeline.
+
+    Be aware that the child pipeline must define a workflow that
+    enables the jobs therein. Notably, the default workflow does not
+    enable merge request pipelines, and thus the workflow for a child
+    pipeline spawned by a merge request pipeline must include
+    [workflow:] section with rules that also enables merge request
+    pipelines.
+
+    Note that except [trigger_include], the fields of a trigger job is
+    a subset of those of a normal {!job} and share the same
+    semantics. The fields supported by GitLab for trigger jobs are:
+
+    - [allow_failure].
+    - [extends].
+    - [needs], but not [needs:project].
+    - [only] and [except].
+    - [rules].
+    - [stage].
+    - [trigger].
+    - [variables].
+    - [when] (only with a value of [on_success], [on_failure], or [always]).
+    - [resource_group].
+    - [environment].
+
+    We currently only implement a subset of these, but more can be
+    added as need arises. See
+    {{:https://docs.gitlab.com/ee/ci/yaml/#trigger}CI/CD YAML syntax
+    reference} for more information. *)
+type trigger_job = {
+  name : string;
+  stage : string option;
+  when_ : when_trigger_job option;
+  rules : job_rule list option;
+  needs : need list option;
+  trigger_include : string;
+      (** Path to the child pipeline that the trigger will execute.
+
+          Translates to [trigger:include:]. *)
+}
+
+type generic_job = Job of job | Trigger_job of trigger_job
+
+(** Represents a workflow configuration.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#workflow}workflow} for more info. *)
+type workflow = {
+  rules : workflow_rule list;
+  name : string option;
+  auto_cancel : auto_cancel option;
+      (** Default auto-cancel for the configuration.
+
+      See {{:https://docs.gitlab.com/ee/ci/yaml/#workflowauto_cancelon_new_commit} workflow:auto_cancel} for more info. *)
+}
 
 type include_ = {local : string; rules : include_rule list}
 
@@ -176,7 +297,8 @@ type config_element =
   | Stages of string list  (** Corresponds to a [stages:] key. *)
   | Variables of variables  (** Corresponds to a [variables:] key. *)
   | Default of default  (** Corresponds to a [default:] key. *)
-  | Job of job  (** Corresponds to a job, identified by it's key. *)
+  | Generic_job of generic_job
+      (** Corresponds to a job, identified by it's key. *)
   | Include of include_ list  (** Corresponds to a [include:] key *)
   | Comment of string  (** Corresponds to a top-level YAML comment. *)
 

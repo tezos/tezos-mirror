@@ -473,7 +473,7 @@ val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
 (**********************************)
 
-(** A case for describing union types using {!union} ans {!case}. *)
+(** A case for describing union types using {!union} and {!val-case}. *)
 type 't case
 
 (** To be used inside a {!union}. Takes a [encoding] for a specific
@@ -602,7 +602,7 @@ exception Cannot_destruct of (Json_query.path * exn)
 (** Unexpected kind of data encountered (w/ the expectation). *)
 exception Unexpected of string * string
 
-(** Some {!union} couldn't be destructed, w/ the reasons for each {!case}. *)
+(** Some {!union} couldn't be destructed, w/ the reasons for each {!val-case}. *)
 exception No_case_matched of exn list
 
 (** Array of unexpected size encountered  (w/ the expectation). *)

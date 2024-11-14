@@ -380,7 +380,7 @@ let vest ?(expect_failure = false) ?(amount = Tez.zero) vesting_contract =
   in
   assert_updated_storage
     (if expect_failure then []
-    else Contract_storage.[increment_vested_balance; next_payout])
+     else Contract_storage.[increment_vested_balance; next_payout])
     vesting_contract
 
 let sign_transfer ?(expect_failure = false) ?data ~contract ~replay ~receiver
@@ -588,7 +588,7 @@ let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_threshold
   let* () = assert_balance contract in
   assert_updated_storage
     (if expect_failure then []
-    else Contract_storage.[update_keys key_groups overall_threshold])
+     else Contract_storage.[update_keys key_groups overall_threshold])
     contract
 
 let transfer_and_pour_happy_path =

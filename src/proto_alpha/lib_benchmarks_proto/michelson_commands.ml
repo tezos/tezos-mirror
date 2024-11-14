@@ -74,8 +74,8 @@ module Michelson_gen_cmd = struct
   let lift_opt f opt_arg state =
     match opt_arg with None -> state | Some arg -> f arg state
 
-  let handler (min_size, max_size, burn_in, seed) terms_count terms_kind
-      filename () =
+  let handler (min_size, max_size, burn_in, seed, verbose) terms_count
+      terms_kind filename () =
     let open Lwt_result_syntax in
     let default = Michelson_generation.default_generator_config in
     let min = Option.value ~default:default.target_size.min min_size in
@@ -83,6 +83,9 @@ module Michelson_gen_cmd = struct
     let burn_in_multiplier =
       Option.value ~default:default.burn_in_multiplier burn_in
     in
+    if Sys.file_exists filename then (
+      Format.eprintf "File %s already exists, exiting@." filename ;
+      exit 1) ;
     let rng_state =
       match seed with
       | None ->
@@ -114,23 +117,23 @@ module Michelson_gen_cmd = struct
         terms_count
         "Generating term"
     in
-    let terms =
-      match terms_kind with
-      | "data" ->
-          Stdlib.List.init terms_count (fun _i ->
-              progress () ;
-              Michelson_mcmc_samplers.Data
-                (Michelson_generation.make_data_sampler rng_state cfg))
-      | "code" ->
-          Stdlib.List.init terms_count (fun _i ->
-              progress () ;
-              Michelson_mcmc_samplers.Code
-                (Michelson_generation.make_code_sampler rng_state cfg))
-      | _ ->
-          Format.eprintf "Term kind must be either \"data\" or \"code\"@." ;
-          exit 1
-    in
-    Michelson_mcmc_samplers.save ~filename ~terms ;
+    for _ = 1 to terms_count do
+      progress () ;
+      let s =
+        match terms_kind with
+        | "data" ->
+            Michelson_mcmc_samplers.Data
+              (Michelson_generation.make_data_sampler ~verbose rng_state cfg)
+        | "code" ->
+            Michelson_mcmc_samplers.Code
+              (Michelson_generation.make_code_sampler ~verbose rng_state cfg)
+        | _ ->
+            Format.eprintf "Term kind must be either \"data\" or \"code\"@." ;
+            exit 1
+      in
+      Michelson_mcmc_samplers.append ~filename ~terms:[s] ;
+      Type.clear_tables ()
+    done ;
     return_unit
 
   let min_size_arg =
@@ -189,7 +192,15 @@ module Michelson_gen_cmd = struct
     in
     Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
 
-  let options = Tezos_clic.args4 min_size_arg max_size_arg burn_in_arg seed_arg
+  let verbose_arg =
+    Tezos_clic.switch
+      ~doc:"Print the generated terms in the standard output"
+      ~long:"verbose"
+      ~short:'v'
+      ()
+
+  let options =
+    Tezos_clic.args5 min_size_arg max_size_arg burn_in_arg seed_arg verbose_arg
 
   let params =
     Tezos_clic.(

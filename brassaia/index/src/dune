@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_index)
+ (public_name octez-libs.brassaia.index)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  optint
+  mtime
+  fmt
+  rusage
+  lwt
+  progress
+  cmdliner
+  repr
+  lru)
+ (preprocess (pps ppx_repr))
+ (flags
+  (:standard)
+  -w -66-68))

@@ -35,10 +35,11 @@
 open Qcheck2_helpers
 open QCheck2
 
-module Hash_Properties (Desc : sig
-  val name : string
-end)
-(X : Hacl.Hash.S) =
+module Hash_Properties
+    (Desc : sig
+      val name : string
+    end)
+    (X : Hacl.Hash.S) =
 struct
   let pp_bytes fmt d = Format.fprintf fmt "%S" (Bytes.to_string d)
 
@@ -96,13 +97,10 @@ module SHA512_Props =
     (Hacl.Hash.SHA512)
 
 let () =
-  match Sys.backend_type with
-  | Other "js_of_ocaml" -> ()
-  | Other _ | Native | Bytecode ->
-      Alcotest.run
-        ~__FILE__
-        "tezos-crypto-shaX-props"
-        [
-          ("SHA256_Props", qcheck_wrap SHA256_Props.tests);
-          ("SHA512_Props", qcheck_wrap SHA512_Props.tests);
-        ]
+  Alcotest.run
+    ~__FILE__
+    "tezos-crypto-shaX-props"
+    [
+      ("SHA256_Props", qcheck_wrap SHA256_Props.tests);
+      ("SHA512_Props", qcheck_wrap SHA512_Props.tests);
+    ]

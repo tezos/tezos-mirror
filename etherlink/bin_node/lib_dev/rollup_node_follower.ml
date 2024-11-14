@@ -5,37 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let read_from_rollup_node path level rollup_node_endpoint =
-  let open Rollup_services in
-  call_service
-    ~base:rollup_node_endpoint
-    durable_state_value
-    ((), Block_id.Level level)
-    {key = path}
-    ()
-
-let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
-  let open Lwt_result_syntax in
-  let* finalized_current_number =
-    read_from_rollup_node
-      Durable_storage_path.Block.current_number
-      finalized_level
-      rollup_node_endpoint
-  in
-  match finalized_current_number with
-  | Some bytes ->
-      let (Qty evm_block_number) = Ethereum_types.decode_number bytes in
-      let* () = Blueprints_publisher.new_l2_head evm_block_number in
-      return_unit
-  | None -> return_unit
-
-let process_new_block ~rollup_node_endpoint ~finalized_level =
+let process_new_block ~proxy ~finalized_level () =
   let open Lwt_result_syntax in
   let* () = Evm_events_follower.new_rollup_block finalized_level in
-  let* () =
-    advertize_blueprints_publisher rollup_node_endpoint finalized_level
-  in
-  Tx_pool.pop_and_inject_transactions_lazy ()
+  let* () = Blueprints_publisher.new_rollup_block finalized_level in
+  let* () = Signals_publisher.new_rollup_block ~finalized_level in
+  if proxy then Tx_pool.pop_and_inject_transactions_lazy () else return_unit
 
 type error += Connection_lost | Connection_timeout
 
@@ -47,11 +22,11 @@ type error += Connection_lost | Connection_timeout
     This is necessary for the very beginning of the rollup life, when
     the evm node is started at the same moment at the origination of
     the rollup, and so `finalized_level` is < origination level. *)
-let process_finalized_level ~oldest_rollup_node_known_l1_level ~finalized_level
-    ~rollup_node_endpoint =
+let process_finalized_level ~proxy ~oldest_rollup_node_known_l1_level
+    ~finalized_level () =
   let open Lwt_result_syntax in
   if oldest_rollup_node_known_l1_level <= finalized_level then
-    process_new_block ~finalized_level ~rollup_node_endpoint
+    process_new_block ~proxy ~finalized_level ()
   else return_unit
 
 let reconnection_delay = 5.0
@@ -197,8 +172,8 @@ let[@tailrec] rec catchup_and_next_block ~proxy ~catchup_event ~connection =
 
     get the current rollup node block with [catchup_and_next_block], process it
     with [process_finalized_level] then loop over. *)
-let[@tailrec] rec loop_on_rollup_node_stream ~catchup_event ~proxy
-    ~oldest_rollup_node_known_l1_level ~connection =
+let[@tailrec] rec loop_on_rollup_node_stream ~keep_alive ~catchup_event ~proxy
+    ~oldest_rollup_node_known_l1_level ~connection () =
   let open Lwt_result_syntax in
   let start_time = Unix.gettimeofday () in
   let* block, connection =
@@ -209,29 +184,34 @@ let[@tailrec] rec loop_on_rollup_node_stream ~catchup_event ~proxy
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
   let* () =
     process_finalized_level
+      ~proxy
       ~oldest_rollup_node_known_l1_level
-      ~rollup_node_endpoint:connection.rollup_node_endpoint
       ~finalized_level
+      ()
   in
   (loop_on_rollup_node_stream [@tailcall])
+    ~keep_alive
     ~catchup_event:false
     ~proxy
     ~oldest_rollup_node_known_l1_level
     ~connection
+    ()
 
-let start ~proxy ~rollup_node_endpoint =
+let start ~keep_alive ~proxy ~rollup_node_endpoint () =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
-  Helpers.unwrap_error_monad @@ fun () ->
+  Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* oldest_rollup_node_known_l1_level =
-    Rollup_services.oldest_known_l1_level rollup_node_endpoint
+    Rollup_services.oldest_known_l1_level ~keep_alive rollup_node_endpoint
   in
   let* connection = connect_to_stream ~rollup_node_endpoint () in
   loop_on_rollup_node_stream
-  (* when fetching first block it should try to catchup if needed *)
+    ~keep_alive
+      (* when fetching first block it should try to catchup if needed *)
     ~catchup_event:(not proxy)
     ~proxy
     ~oldest_rollup_node_known_l1_level
     ~connection
+    ()

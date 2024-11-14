@@ -49,6 +49,8 @@ module Block_store_status = struct
 
   let is_merging = function Idle _ -> false | Merging _ -> true
 
+  let get_status_value = function Idle v | Merging v -> v
+
   let create_idle_status = Idle 0
 
   let equal s1 s2 =
@@ -349,3 +351,12 @@ module Protocol_levels = struct
         Data_encoding.(list (tup2 uint8 legacy_activation_block_encoding))
   end
 end
+
+type metadata_stat = {
+  block_level : Int32.t;
+  block_metadata_size : Int64.t;
+  operation_metadata_arity : int list;
+  operation_metadata_size : Int64.t;
+  manager_operation_metadata_sizes : int list;
+  too_large_operation_metadata_count : Int64.t;
+}

@@ -32,6 +32,47 @@ let pp_int32 fmt n = Format.fprintf fmt "%ld" n
 
 let pp_int64 fmt n = Format.fprintf fmt "%Ld" n
 
+let waiting_color = Internal_event.Magenta
+
+module Commands = struct
+  include Internal_event.Simple
+
+  let section = section @ ["commands"]
+
+  let node_version_check_bypass =
+    declare_0
+      ~section
+      ~name:"node_version_check_bypass"
+      ~level:Warning
+      ~msg:"Compatibility between node version and baker version by passed"
+      ()
+
+  let node_version_check =
+    declare_4
+      ~section
+      ~name:"node_version_check"
+      ~level:Debug
+      ~msg:
+        "Checking compatibility between node version {node_version} \
+         ({node_commit}) and baker version {baker_version} ({baker_commit})"
+      ~pp1:Tezos_version.Version.pp_simple
+      ("node_version", Tezos_version.Octez_node_version.version_encoding)
+      ~pp2:
+        (Format.pp_print_option
+           Tezos_version.Octez_node_version.commit_info_pp_short)
+      ( "node_commit",
+        Data_encoding.option
+          Tezos_version.Octez_node_version.commit_info_encoding )
+      ~pp3:Tezos_version.Version.pp_simple
+      ("baker_version", Tezos_version.Octez_node_version.version_encoding)
+      ~pp4:
+        (Format.pp_print_option
+           Tezos_version.Octez_node_version.commit_info_pp_short)
+      ( "baker_commit",
+        Data_encoding.option
+          Tezos_version.Octez_node_version.commit_info_encoding )
+end
+
 module State_transitions = struct
   include Internal_event.Simple
 
@@ -501,6 +542,25 @@ module Node_rpc = struct
       ("trace", Error_monad.trace_encoding)
 end
 
+module Delegates = struct
+  include Internal_event.Simple
+
+  let section = section @ ["delegates"]
+
+  let delegates_used =
+    declare_1
+      ~section
+      ~alternative_color:Internal_event.Cyan
+      ~name:"delegates_used"
+      ~level:Notice
+      ~msg:"Baker will run with the following delegates:\n  {delegates}"
+      ~pp1:
+        (Format.pp_print_list
+           (fun fmt (delegate : Baking_state.consensus_key) ->
+             Format.fprintf fmt "%a" Baking_state.pp_consensus_key delegate))
+      ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
+end
+
 module Scheduling = struct
   include Internal_event.Simple
 
@@ -518,6 +578,7 @@ module Scheduling = struct
   let waiting_for_new_head =
     declare_0
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_for_new_head"
       ~level:Info
       ~msg:"no possible timeout, waiting for a new head to arrive..."
@@ -564,6 +625,7 @@ module Scheduling = struct
   let waiting_end_of_round =
     declare_3
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_end_of_round"
       ~level:Info
       ~msg:"waiting {timespan} until end of round {round} at {timestamp}"
@@ -577,6 +639,7 @@ module Scheduling = struct
   let waiting_delayed_end_of_round =
     declare_4
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_delayed_end_of_round"
       ~level:Info
       ~msg:
@@ -594,6 +657,7 @@ module Scheduling = struct
   let waiting_time_to_bake =
     declare_2
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_time_to_bake"
       ~level:Info
       ~msg:"waiting {timespan} until it's time to bake at {timestamp}"
@@ -640,6 +704,7 @@ module Scheduling = struct
   let waiting_to_forge_block =
     declare_2
       ~section
+      ~alternative_color:waiting_color
       ~name:"waiting_to_forge_block"
       ~level:Info
       ~msg:"waiting {timespan} until it's time to forge block at {timestamp}"
@@ -679,12 +744,23 @@ module Lib = struct
       ~level:Debug
       ~msg:"attempting to {action} proposal {proposal}"
       ("action", Baking_state.consensus_vote_kind_encoding)
-      ~pp1:
-        (fun fmt -> function
-          | Baking_state.Preattestation -> Format.fprintf fmt "preattest"
-          | Attestation -> Format.fprintf fmt "attest")
+      ~pp1:(fun fmt -> function
+        | Baking_state.Preattestation -> Format.fprintf fmt "preattest"
+        | Attestation -> Format.fprintf fmt "attest")
       ("proposal", Baking_state.proposal_encoding)
       ~pp2:Baking_state.pp_proposal
+
+  let waiting_block_timestamp =
+    declare_2
+      ~section
+      ~alternative_color:waiting_color
+      ~name:"waiting_block_timestamp"
+      ~level:Notice
+      ~msg:"Waiting {diff_time} until block timestamp {timestamp}"
+      ("timestamp", Time.Protocol.encoding)
+      ("diff_time", Time.System.Span.encoding)
+      ~pp1:Time.Protocol.pp_hum
+      ~pp2:Time.System.Span.pp_hum
 end
 
 module Actions = struct
@@ -806,6 +882,16 @@ module Actions = struct
       ("attestation_level", Data_encoding.int32)
       ("round", Round.encoding)
 
+  let warning_dal_timeout_old_round =
+    declare_0
+      ~section
+      ~name:"warning_dal_timeout_old_round"
+      ~level:Warning
+      ~msg:
+        "The DAL timeout computed was for an old round. Please report this \
+         issue."
+      ()
+
   let synchronizing_round =
     declare_1
       ~section
@@ -874,6 +960,7 @@ module Actions = struct
 
   let block_injected =
     declare_4
+      ~alternative_color:Internal_event.Blue
       ~section
       ~name:"block_injected"
       ~level:Notice
@@ -1041,6 +1128,7 @@ module Nonces = struct
 
   let revealing_nonce =
     declare_3
+      ~alternative_color:Internal_event.Cyan
       ~section
       ~name:"revealing_nonce"
       ~level:Notice
@@ -1143,17 +1231,24 @@ module Nonces = struct
       ()
 
   let ignore_failed_nonce_migration =
-    declare_1
+    declare_3
       ~section
       ~name:"ignore_failed_nonce_migration"
       ~level:Warning
       ~msg:
-        "There is not enough block history to complete the migration. Try \
-         starting from an older snapshot or providing more block history. The \
-         nonces from the following blocks will not be migrated:\n\
-         {failed} "
+        "Found orphaned nonces while migrating baking nonces to the new file \
+         format. Please review the list of associated blocks. If the block is \
+         older than the last cycle or if it was not included, the file at \
+         '{legacy_nonces_file}' and '{orphaned_nonces_file}'should be archived \
+         and then removed. If the block is in the current or last cycle, you \
+         must start from a snapshot that is old enough to boostrap those \
+         blocks to avoid losing some of your baking rewards. Blocks associated \
+         with orphaned nonces:\n\
+         {failed}"
       ~pp1:(Format.pp_print_list Block_hash.pp)
       ("failed", Data_encoding.list Block_hash.encoding)
+      ("legacy_nonces_file", Data_encoding.string)
+      ("orphaned_nonces_file", Data_encoding.string)
 
   let outdated_nonce =
     declare_1

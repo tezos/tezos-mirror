@@ -1,11 +1,20 @@
-Version 19.1
+Version 19.2
 ============
+
+General
+-------
 
 Version 19 contains a new version (V11) of the protocol environment,
 which is the set of functions that a protocol can call.
 This new version is used by the new version of :doc:`Oxford <../protocols/018_oxford>`,
 protocol proposal for the successor of Nairobi.
 This release contains the Oxford 2 protocol proposal itself, as well as its associated protocol-specific executable binaries (baker, accuser, etc).
+
+Node
+----
+
+Version 19.1
+~~~~~~~~~~~~
 
 .. _acl_fix:
 
@@ -18,8 +27,17 @@ default limit is set to 100.
 Finally, version 19.1 now shuts down the node gracefully when hitting an "unknown key" error raised by Irmin.
 This prevents the node to run indefinitely in a failing state.
 
+Version 19.2
+~~~~~~~~~~~~
+
+Version 19.2 addresses an issue in the *cemented store* for Octez nodes running full and archive history modes which can result in errors while accessing blocks.
+
+The cemented store keeps chunks of continuous cemented blocks, that is those which are no longer subject to chain reorganization and that belong to the same cycle. The storage footprint of cycles has recently increased, and this resulted in overflow errors which prevented retrieving data from these blocks.
+
+Note that this issue occurred only when retrieving data and the integrity of written data was always preserved. Updating to v19.2 ensures blocks can always be retrieved successfully from the cemented store.
+
 Rollup node
-~~~~~~~~~~~
+-----------
 
 Starting from version 19, the rollup node is *protocol-agnostic* -- This change was also backported to v18.1.
 This means that a single executable, ``octez-smart-rollup-node`` can be used with any Tezos protocols.
@@ -52,7 +70,7 @@ The keys in the Smart Rollup client use the same format as the Octez client.
 They can be imported with ``octez-client import secret key <sk_uri>``, or by merging the key files
 between the ``octez-client`` base directory and the ``smart-rollup-client-<proto>`` base directory.
 
-The Smart Rollup node now allows multiple :ref:`batcher keys <rollup_batcher>`. Setting multiple
+The Smart Rollup node now allows :ref:`multiple batcher keys <rollup_batcher_keys>`. Setting multiple
 keys for the batching purpose allows to inject multiple operations
 of the same kind per block by the rollup node.
 
@@ -60,6 +78,9 @@ Version 19 introduces a :ref:`history-mode option <rollup_history_mode>` for the
 It can be either ``archive`` or ``full``.
 The ``full`` mode integrates garbage collection that reduces the disk usage.
 By default, the rollup node runs in ``archive`` mode, without the GC.
+
+Version 19.1
+~~~~~~~~~~~~
 
 Version 19.1 fixes a critical bug that could happen on a ``full`` rollup node.
 This bug leads to data loss when chain reorganizations happen while a GC is running.
@@ -70,20 +91,25 @@ In addition, it fixes the protocol migration on the rollup node. The constants a
 
    Due to the :ref:`new default ACL <acl_fix>`, the Octez node requires allowing some specific RPCs from the rollup node if it is running on a remote machine or a different network interface. Check :ref:`the rollup node documentation <smart_rollup_node_prerequisites>` for more details on the prerequisites.
 
+Version 19.2
+~~~~~~~~~~~~
+
+Version 19.2 fixes a bug in the Smart Rollup node, where the incorrect computation of Dissections could cause honest players to lose refutation games.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v19.1
+  git checkout v19.2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v19.1`` Docker images of Octez.
+If you are using Docker instead, use the ``v19.2`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -92,6 +118,7 @@ It is now also possible to download experimental Debian and Redhat packages on t
 Changelog
 ---------
 
+- `Version 19.2 <../CHANGES.html#version-19-2>`_
 - `Version 19.1 <../CHANGES.html#version-19-1>`_
 - `Version 19.0 <../CHANGES.html#version-19-0>`_
 - `Version 19.0~rc1 <../CHANGES.html#version-19-0-rc1>`_

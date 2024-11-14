@@ -164,6 +164,34 @@ module Test = struct
 
   let make params = Cryptobox.make (get_cryptobox_parameters params)
 
+  (* Tests that [shards_from_polynomial] returns all the shards in
+     increasing order of shard index. *)
+  let test_shards_from_polynomial =
+    let open QCheck2 in
+    let open Error_monad.Result_syntax in
+    Test.make
+      ~name:"shards_from_polynomial increasing order"
+      ~print:print_parameters
+      ~count:30
+      generate_parameters
+      (fun params ->
+        Cryptobox.Internal_for_tests.init_prover_dal () ;
+        assert (ensure_validity params) ;
+        (let* t = make params in
+         let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
+         let shards = Cryptobox.shards_from_polynomial t polynomial in
+         let increasing =
+           Seq.fold_lefti
+             (fun acc i Cryptobox.{index; share = _} -> acc && i = index)
+             true
+             shards
+         in
+         let complete = Seq.length shards = params.number_of_shards in
+         return (increasing && complete))
+        |> function
+        | Ok check -> check
+        | Error _ -> false)
+
   (* Tests that with a fraction 1/redundancy_factor of the shards
      the decoding succeeds. Checks equality of polynomials. *)
   let test_erasure_code =
@@ -726,15 +754,15 @@ module Test = struct
              let* retrieved_precomputation =
                Lwt_main.run
                  (let open Error_monad.Lwt_result_syntax in
-                 let* () =
-                   Cryptobox.save_precompute_shards_proofs
-                     precomputation
-                     ~filename
-                 in
-                 Cryptobox.load_precompute_shards_proofs
-                   ~hash:(Some hash)
-                   ~filename
-                   ())
+                  let* () =
+                    Cryptobox.save_precompute_shards_proofs
+                      precomputation
+                      ~filename
+                  in
+                  Cryptobox.load_precompute_shards_proofs
+                    ~hash:(Some hash)
+                    ~filename
+                    ())
              in
              Sys.remove filename ;
              return
@@ -770,15 +798,15 @@ module Test = struct
              let* _ =
                Lwt_main.run
                  (let open Error_monad.Lwt_result_syntax in
-                 let* () =
-                   Cryptobox.save_precompute_shards_proofs
-                     precomputation
-                     ~filename:!filename
-                 in
-                 Cryptobox.load_precompute_shards_proofs
-                   ~hash:(Some dummy_hash)
-                   ~filename:!filename
-                   ())
+                  let* () =
+                    Cryptobox.save_precompute_shards_proofs
+                      precomputation
+                      ~filename:!filename
+                  in
+                  Cryptobox.load_precompute_shards_proofs
+                    ~hash:(Some dummy_hash)
+                    ~filename:!filename
+                    ())
              in
              return filename
          | _ ->
@@ -792,31 +820,30 @@ module Test = struct
             false)
 
   let find_trusted_setup_files () =
-    let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
-    in
     let find_srs_files () : (string * string) Error_monad.tzresult =
-      Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
+      Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
-    Lwt_main.run
-      (Cryptobox.Config.init_prover_dal ~find_srs_files ~srs_size_log2:5 config)
+    Lwt_main.run Cryptobox.(init_prover_dal ~find_srs_files ~srs_size_log2:5 ())
     |> function
     | Ok () -> ()
-    | Error _ -> assert false
+    | Error err ->
+        Format.eprintf "%a\n%!" Error_monad.pp_print_trace err ;
+        assert false
 
   let find_trusted_setup_files_failure () =
-    let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
-    in
     let find_srs_files () : (string * string) Error_monad.tzresult =
-      Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
+      Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
-    Lwt_main.run
-      (Cryptobox.Config.init_prover_dal ~find_srs_files ~srs_size_log2:6 config)
+    Lwt_main.run Cryptobox.(init_prover_dal ~find_srs_files ~srs_size_log2:6 ())
     |> function
     | Error [Cryptobox.Failed_to_load_trusted_setup s] ->
-        if Re.Str.(string_match (regexp "EOF") s 0) then () else assert false
-    | _ -> assert false
+        if
+          Re.Str.(string_match (regexp "EOF") s 0)
+          || Re.Str.(string_match (regexp ".*Unexpected srs size.*") s 0)
+        then ()
+        else assert false
+    | Error _ -> assert false
+    | Ok _ -> assert false
 
   let test_wrong_slot_size =
     let open QCheck2 in
@@ -1166,6 +1193,7 @@ let () =
         Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
           Test.
             [
+              test_shards_from_polynomial;
               test_erasure_code;
               test_erasure_code_with_slot_conversion;
               test_erasure_code_failure_out_of_range;

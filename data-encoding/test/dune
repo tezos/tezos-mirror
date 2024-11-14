@@ -1,11 +1,11 @@
-(tests
- (names test)
- (modes native js)
- (js_of_ocaml)
- (package data-encoding)
- (libraries data_encoding zarith zarith_stubs_js alcotest))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
-(rule
- (alias runtest_js)
- (action
-  (run node %{dep:./test.bc.js})))
+(executable
+ (name test)
+ (libraries
+  octez-libs.data-encoding
+  zarith
+  alcotest))
+
+(rule (alias runtest) (package octez-libs) (action (run %{dep:./test.exe})))

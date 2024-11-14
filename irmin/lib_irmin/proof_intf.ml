@@ -329,7 +329,8 @@ module type Proof = sig
 
   module Make
       (C : Type.S)
-      (H : Hash.S) (P : sig
+      (H : Hash.S)
+      (P : sig
         type step [@@deriving irmin]
       end)
       (M : Type.S) : sig

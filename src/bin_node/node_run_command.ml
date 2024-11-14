@@ -1,26 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -144,6 +127,7 @@ module Event = struct
   let node_is_ready =
     declare_0
       ~section
+      ~alternative_color:Internal_event.Green
       ~name:"node_is_ready"
       ~msg:"the Tezos node is now running"
       ~level:Notice
@@ -196,6 +180,32 @@ module Event = struct
       ("given_history_mode", History_mode.encoding)
       ~pp2:History_mode.pp
       ("stored_history_mode", History_mode.encoding)
+
+  let enable_http_cache_headers_for_local =
+    declare_0
+      ~section
+      ~name:"enable_http_cache_headers_for_local"
+      ~msg:"HTTP cache headers enabled for local rpc server"
+      ~level:Notice
+      ()
+
+  let accepted_conn_rpc_server =
+    declare_2
+      ~section
+      ~name:"accepted_conn_rpc_server"
+      ~msg:"[pid:{pid}] ({con}) accepted connection"
+      ~level:Debug
+      ("pid", Data_encoding.int32)
+      ("con", Data_encoding.string)
+
+  let conn_closed_rpc_server =
+    declare_2
+      ~section
+      ~name:"conn_closed_rpc_server"
+      ~msg:"[pid:{pid}] ({con}) got connection closed"
+      ~level:Debug
+      ("pid", Data_encoding.int32)
+      ("con", Data_encoding.string)
 end
 
 open Filename.Infix
@@ -390,8 +400,10 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-(* Launches an RPC server depending on the given server kind *)
-let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
+(* Launches an RPC server depending on the given server kind. [middleware] can
+   be provided to transform the callback. *)
+let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
+    addr =
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let media_types = rpc_config.media_type in
@@ -445,8 +457,23 @@ let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
   let update_metrics uri meth =
     Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)
   in
+  let callback conn req body =
+    let*! () =
+      Event.(emit accepted_conn_rpc_server)
+        (Int32.of_int (Unix.getpid ()), Cohttp.Connection.to_string (snd conn))
+    in
+    RPC_middleware.rpc_metrics_transform_callback
+      ~update_metrics
+      dir
+      callback
+      conn
+      req
+      body
+  in
   let callback =
-    RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
+    match middleware with
+    | Some middleware -> middleware callback
+    | None -> callback
   in
   let mode = extract_mode rpc_server_kind in
   Lwt.catch
@@ -456,6 +483,9 @@ let launch_rpc_server (config : Config_file.t) dir rpc_server_kind addr =
           ~host
           server
           ~callback
+          ~conn_closed:(fun (_, con) ->
+            Event.(emit__dont_wait__use_with_care conn_closed_rpc_server)
+              (Int32.of_int (Unix.getpid ()), Cohttp.Connection.to_string con))
           ~max_active_connections:config.rpc.max_active_rpc_connections
           mode
       in
@@ -482,7 +512,7 @@ type rpc_server_kind =
   | No_server
 
 (* Initializes an RPC server handled by the node main process. *)
-let init_local_rpc_server (config : Config_file.t) dir =
+let init_local_rpc_server ?middleware (config : Config_file.t) dir =
   let open Lwt_result_syntax in
   let* servers =
     List.concat_map_es
@@ -503,7 +533,12 @@ let init_local_rpc_server (config : Config_file.t) dir =
                           `No_password,
                           `Port port )
                 in
-                launch_rpc_server config dir (Local (mode, port)) addr)
+                launch_rpc_server
+                  ?middleware
+                  config
+                  dir
+                  (Local (mode, port))
+                  addr)
               addrs)
       config.rpc.listen_addrs
   in
@@ -516,8 +551,8 @@ let rpc_socket_path ~socket_dir ~id ~pid =
 (* Initializes an RPC server handled by the node process. It will be
    used by an external RPC process, identified by [id], to forward
    RPCs to the node through a Unix socket. *)
-let init_local_rpc_server_for_external_process id (config : Config_file.t) dir
-    addr =
+let init_local_rpc_server_for_external_process ?middleware id
+    (config : Config_file.t) dir addr =
   let open Lwt_result_syntax in
   let socket_dir = Tezos_base_unix.Socket.get_temporary_socket_dir () in
   let pid = Unix.getpid () in
@@ -531,11 +566,12 @@ let init_local_rpc_server_for_external_process id (config : Config_file.t) dir
         Lwt_unix.unlink comm_socket_path)
   in
   let* rpc_server =
-    launch_rpc_server config dir (Process comm_socket_path) addr
+    launch_rpc_server ?middleware config dir (Process comm_socket_path) addr
   in
   return (rpc_server, comm_socket_path)
 
-let init_external_rpc_server config node_version dir internal_events =
+let init_external_rpc_server ?middleware config node_version dir internal_events
+    =
   let open Lwt_result_syntax in
   (* Start one rpc_process for each rpc endpoint. *)
   let id = ref 0 in
@@ -555,6 +591,7 @@ let init_external_rpc_server config node_version dir internal_events =
                 in
                 let* local_rpc_server, comm_socket_path =
                   init_local_rpc_server_for_external_process
+                    ?middleware
                     id
                     config
                     dir
@@ -627,16 +664,8 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   let open Lwt_result_syntax in
   (* Start local RPC server (handled by the node main process) only
      when at least one local listen addr is given. *)
-  let commit_info =
-    ({
-       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
-       commit_date = Tezos_version_value.Current_git_info.committer_date;
-     }
-      : Tezos_version.Octez_node_version.commit_info)
-  in
   let node_version = Node.get_version node in
-
-  let dir = Node.build_rpc_directory ~node_version ~commit_info node in
+  let dir = Node.build_rpc_directory ~node_version node in
   let dir = Node_directory.build_node_directory config dir in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
@@ -645,7 +674,24 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   in
   let* local_rpc_server =
     if config.rpc.listen_addrs = [] then return No_server
-    else init_local_rpc_server config dir
+    else
+      let* middleware =
+        if config.rpc.enable_http_cache_headers then
+          let*! () = Event.(emit enable_http_cache_headers_for_local ()) in
+
+          let http_cache_headers_middleware =
+            let Http_cache_headers.
+                  {get_estimated_time_to_next_level; get_block_hash} =
+              Node.http_cache_header_tools node
+            in
+            RPC_middleware.Http_cache_headers.make
+              ~get_estimated_time_to_next_level
+              ~get_block_hash
+          in
+          return_some http_cache_headers_middleware
+        else return_none
+      in
+      init_local_rpc_server ?middleware config dir
   in
   (* Start RPC process only when at least one listen addr is given. *)
   let* rpc_server =
@@ -677,6 +723,22 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
+  let () =
+    match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
+    | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode)
+      ->
+        let max_lod =
+          match mode with
+          | "detailed" -> Profiler.Detailed
+          | "verbose" -> Profiler.Verbose
+          | _ -> Profiler.Terse
+        in
+        let profiler_maker =
+          Tezos_shell.Profiler_directory.profiler_maker config.data_dir max_lod
+        in
+        Shell_profiling.activate_all ~profiler_maker
+    | _ -> ()
+  in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
@@ -696,10 +758,6 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
-  let*? () =
-    Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal
-      config.blockchain_network.dal_config
-  in
   let*! node =
     init_node
       ?sandbox
@@ -781,7 +839,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
-    args =
+    allow_yes_crypto args =
   let open Lwt_result_syntax in
   let verbosity =
     let open Internal_event in
@@ -797,6 +855,13 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           cli_warnings := event :: !cli_warnings ;
           Lwt.return_unit)
         args
+    in
+    let* () =
+      if Tezos_crypto.Helpers.is_yes_crypto_enabled && not allow_yes_crypto then
+        failwith
+          "Yes crypto is enabled but the option '--allow-yes-crypto' was not \
+           provided."
+      else return_unit
     in
     let* () =
       match sandbox with
@@ -825,9 +890,9 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
                 "Failed to parse the provided target. A '<block_hash>,<level>' \
                  value was expected.")
     in
-    Lwt_lock_file.try_with_lock
-      ~when_locked:(fun () ->
-        failwith "Data directory is locked by another process")
+    Lwt_lock_file.with_lock
+      ~when_locked:
+        (`Fail (Exn (Failure "Data directory is locked by another process")))
       ~filename:(Data_version.lock_file config.data_dir)
     @@ fun () ->
     Lwt.catch
@@ -928,11 +993,25 @@ module Term = struct
           ~doc
           ["force-history-mode-switch"])
 
+  let allow_yes_crypto =
+    let open Cmdliner in
+    let doc =
+      Format.sprintf
+        "Allow usage of yes cryptography. This is used conjointly with the \
+         `TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING` environment variable. \
+         To actually enable yes crypto this option must be used and the \
+         environment variable must be set to `true`. If only the environment \
+         variable is set, the node will refuse to start."
+    in
+    Arg.(
+      value & flag
+      & info ~docs:Shared_arg.Manpage.misc_section ~doc ["allow-yes-crypto"])
+
   let term =
     Cmdliner.Term.(
       ret
         (const process $ sandbox $ verbosity $ target $ singleprocess
-       $ force_history_mode_switch $ Shared_arg.Term.args))
+       $ force_history_mode_switch $ allow_yes_crypto $ Shared_arg.Term.args))
 end
 
 module Manpage = struct

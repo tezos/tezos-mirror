@@ -60,7 +60,7 @@ echo "rust_toolchain_image_tag=$image_tag" > rust_toolchain_image_tag.env
 ./scripts/ci/docker_initialize.sh
 
 # Build image unless it already exists in the registry.
-if [ -z "${RUST_TOOLCHAIN_ALWAYS_REBUILD:-}" ] && docker manifest inspect "${image_name}" > /dev/null; then
+if docker manifest inspect "${image_name}" > /dev/null; then
   echo "Image ${image_name} already exists in the registry, update tag ${image_base}:${CI_COMMIT_REF_SLUG}."
   regctl image copy "${image_name}" "${image_base}:${CI_COMMIT_REF_SLUG}"
   exit 0
@@ -68,7 +68,8 @@ fi
 
 echo "Build ${image_name}"
 
-./images/create_rust_toolchain_image.sh \
+./images/create_image.sh \
+  "rust-toolchain" \
   "${image_base}" \
   "${image_tag}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \

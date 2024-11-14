@@ -52,7 +52,7 @@ val lookup_operation_in_previous_blocks :
 
     Function [retry] specifies how to behave in order to connect to
     the node. The default is the identity which correspond to simply
-    calling the RPC. As an example, the endorser tries 5 times with
+    calling the RPC. As an example, the baker tries 5 times with
     delays in between attempts when the connection fails. *)
 val wait_for_bootstrapped :
   ?retry:

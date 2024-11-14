@@ -8,27 +8,63 @@ set -e
 db_version 2.0
 
 # work directory to store temporary files associated to this package
-mkdir -p /var/lib/octez-baker
+mkdir -p /run/octez-baker
 
 case "${1}" in
 configure)
+  # if $2 is empty, then we're doing a fresh install.
+  # if $DPKG_RUNNING_VERSION" is empty a reconfigure
+  # Otherwise we're upgrading
+  if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
+    echo "Fresh installation (or reconfigure) of the Octez baker"
 
-  db_get octez-baker/liquidity-vote
-  echo "LQVOTE=${RET}" > /etc/default/octez-baker
+    db_get octez-baker/liquidity-vote
+    echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
+    echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
 
-  db_get octez-baker/baker-key
-  echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
+    db_get octez-baker/baker-key
+    echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
+    echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
 
-  db_get octez-baker/baker-active-protocol
-  echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
+    db_get octez-baker/baker-active-protocol
+    echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
 
-  db_get octez-baker/baker-next-protocol
-  if [ -z "$RET" ]; then
-    echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-next
+    db_get octez-baker/baker-next-protocol
+    if [ -n "${RET:-}" ]; then
+      echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-next
+    else
+      echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
+    fi
+    mkdir -p /var/tezos/.tezos-client
+    chown tezos:tezos /var/tezos/.tezos-client
   else
-    echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
-  fi
+    # the configure script is called with the version of the old
+    # package in case of upgrade. We display a message to the user
+    # in this case
+    case "$2" in
+    0.0*)
+      echo "Upgrading Octez baker from version $2"
+      echo "Setting defaults /etc/default/octez-baker-*"
 
+      db_get octez-baker/liquidity-vote
+      echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
+      echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
+
+      db_get octez-baker/baker-key
+      echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
+      echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
+
+      db_input high octez-baker/upgrade_note_current || true
+      #shellcheck disable=SC2119
+      db_go || true
+
+      ;;
+    *)
+      echo "Upgrading octez-baker from version $2"
+      echo "DO NOTHING"
+      ;;
+    esac
+  fi
   ;;
 *)
   echo "postinst noop"

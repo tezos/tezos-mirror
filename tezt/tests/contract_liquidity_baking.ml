@@ -30,6 +30,7 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file contract_liquility_baking.ml
    Subject:      Regression testing of liquility baking contracts
 *)
+let team = Tag.layer1
 
 (* Using the lighter hook that only scrubs the clients [--base-dir] *)
 let hooks =
@@ -185,7 +186,7 @@ let register_add_approve_transfer_remove =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test add/approve/transfer/remove liquidity"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -258,7 +259,7 @@ let register_trades =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test trades"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

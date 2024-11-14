@@ -12,11 +12,13 @@
    Subject:      Check that run code command to octez-client behaves correctly
 *)
 
+let team = Tag.layer1
+
 let test_balance_and_self_address =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code with balance and self address"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
@@ -79,7 +81,7 @@ let test_source_and_sender =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code with source and sender"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
@@ -144,7 +146,7 @@ let test_other_contracts =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code with other_contracts"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
@@ -168,7 +170,7 @@ let test_extra_big_maps =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code with extra_big_maps"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
@@ -187,7 +189,7 @@ let test_amount =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code with amount"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
@@ -204,7 +206,7 @@ let test_level =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code with level"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
@@ -219,7 +221,7 @@ let test_now =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code with now"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->
@@ -235,7 +237,7 @@ let test_long_output =
   Protocol.register_test
     ~__FILE__
     ~title:"Run code outputing a long stack"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->

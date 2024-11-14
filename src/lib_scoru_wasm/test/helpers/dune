@@ -9,7 +9,6 @@
   octez-libs.base
   octez-libs.tree-encoding
   octez-libs.base.unix
-  octez-libs.tezos-context.disk
   octez-libs.base-test-helpers
   octez-libs.test-helpers
   octez-l2-libs.scoru-wasm

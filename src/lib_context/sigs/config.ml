@@ -44,5 +44,16 @@ let equal x y =
   && x.stable_hash = y.stable_hash
   && equal_inode_child_order x.inode_child_order y.inode_child_order
 
+let pp ppf t =
+  Format.fprintf
+    ppf
+    "{entries: %d; stable_hash: %d, inode_child_order: %s}"
+    t.entries
+    t.stable_hash
+    (match t.inode_child_order with
+    | `Seeded_hash -> "seeded_hash"
+    | `Hash_bits -> "hash_bits"
+    | `Custom _ -> "custom")
+
 let v ~entries ~stable_hash ~inode_child_order =
   {entries; stable_hash; inode_child_order}

@@ -33,6 +33,8 @@
                  debug when called in various contexts. That is why these
                  tests are nice to have. *)
 
+let team = Tag.layer1
+
 (** Wait for [n] injection request events. *)
 let wait_for_n_injections n node =
   let filter json =
@@ -97,7 +99,7 @@ let test_stresstest_sources_format =
   Protocol.register_test
     ~__FILE__
     ~title:"stresstest sources format"
-    ~tags:["stresstest"; "isolated_node"; "sources"]
+    ~tags:[team; "stresstest"; "isolated_node"; "sources"]
   @@ fun protocol ->
   let n_bootstraps_to_use = 10 in
   let n_bootstraps_total = 2 * n_bootstraps_to_use
@@ -271,7 +273,7 @@ let test_stresstest_n_transfers =
   Protocol.register_test
     ~__FILE__
     ~title:"stresstest explicit transfers argument"
-    ~tags:["stresstest"; "isolated_node"; "n_transfers"]
+    ~tags:[team; "stresstest"; "isolated_node"; "n_transfers"]
   @@ fun protocol ->
   let n_transfers = 10 in
   let n_bootstraps = 2 * n_transfers in
@@ -330,7 +332,7 @@ let test_stresstest_multiple_nodes =
   Protocol.register_test
     ~__FILE__
     ~title:"stresstest multiple nodes"
-    ~tags:["stresstest"; "multiple_nodes"]
+    ~tags:[team; "stresstest"; "multiple_nodes"; Tag.flaky]
   @@ fun protocol ->
   let n_nodes = 4 in
   let n_bootstraps_per_node = 5 in

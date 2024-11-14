@@ -40,13 +40,6 @@ type prefix = Block_services.chain_prefix
 
 let path = Block_services.chain_path
 
-let checkpoint_encoding =
-  obj4
-    (req "block" (dynamic_size Block_header.encoding))
-    (req "savepoint" int32)
-    (req "caboose" int32)
-    (req "history_mode" History_mode.encoding)
-
 let block_descriptor_encoding =
   obj2 (req "block_hash" Block_hash.encoding) (req "level" int32)
 
@@ -73,17 +66,6 @@ module S = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Chain_id.encoding
       Tezos_rpc.Path.(path / "chain_id")
-
-  (* DEPRECATED: use `chains/<CHAIN_ID>/levels/{checkpoint, savepoint,
-     caboose, history_mode}` instead. *)
-  let checkpoint =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "DEPRECATED: use `../levels/{checkpoint, savepoint, caboose, \
-         history_mode}` instead. The current checkpoint for this chain."
-      ~query:Tezos_rpc.Query.empty
-      ~output:checkpoint_encoding
-      Tezos_rpc.Path.(path / "checkpoint")
 
   let is_bootstrapped =
     Tezos_rpc.Service.get_service
@@ -221,9 +203,6 @@ let chain_id ctxt =
   let f = make_call0 S.chain_id ctxt in
   fun ?(chain = `Main) () ->
     match chain with `Hash h -> Lwt.return_ok h | _ -> f chain () ()
-
-let checkpoint ctxt ?(chain = `Main) () =
-  make_call0 S.checkpoint ctxt chain () ()
 
 module Levels = struct
   let checkpoint ctxt ?(chain = `Main) () =

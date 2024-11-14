@@ -11,19 +11,18 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "octez-smart-rollup-wasm-debugger-plugin"
-  "ocaml-protoc-plugin" { >= "4.5.0" }
+  "octez-shell-libs"
+  "octez-l2-libs"
+  "octez-rust-deps"
   "caqti-lwt" { >= "2.0.1" }
   "crunch" { >= "3.3.0" }
   "re" { >= "1.10.0" }
+  "octez-smart-rollup-wasm-debugger-plugin"
   "octez-version"
   "lwt-watcher" { = "0.2" }
   "lwt-exit"
-  "caqti"
-  "caqti-driver-sqlite3" { >= "2.0.1" }
-  "octez-shell-libs"
-  "octez-l2-libs"
   "octez-smart-rollup-wasm-debugger-lib"
+  "tezos-dal-node-services"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

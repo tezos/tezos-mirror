@@ -11,8 +11,6 @@
   octez-libs.error-monad
   tezos-benchmark
   octez-libs.crypto
-  octez-libs.tezos-context
-  octez-shell-libs.shell-context
   octez-shell-libs.store
   octez-libs.micheline)
  (library_flags (:standard -linkall))

@@ -1,22 +1,57 @@
 (vendored_dirs vendors)
-(data_only_dirs _opam-repo-for-release data-encoding)
+
+(data_only_dirs _opam-repo-for-release)
+
 (env
  (_
-  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
+  (flags
+   (:standard
+    (:include custom-flags.sexp)))))
+
+; File custom-flags.sexp needs to exist, otherwise the above :include fails.
+; But we do not want to commit it to the repository, since its goal is to be different
+; for everyone. So we generate it.
+
+(rule
+ (target custom-flags.sexp)
+ (deps (universe))
+ (action
+  (with-stdout-to
+   %{target}
+   (run scripts/custom-flags.sh sexp))))
 
 ; This file is included in the link_flags stanza of binaries for which
 ; we want a static build.
 ; If the current dune profile is "static", it contains the flag
 ; telling the compiler to compile static executables.
 ; Else it contains no flags.
+
 (rule
  (target static-link-flags.sexp)
- (action (with-stdout-to %{target}
-  (system "[ '%{profile}' = 'static' ] && echo '(-ccopt -static -cclib -lusb-1.0 -cclib -ludev)' || echo '()'"))))
+ (action
+  (with-stdout-to
+   %{target}
+   (system
+    "[ '%{profile}' = 'static' ] && echo '(-ccopt -static -cclib -lusb-1.0 -cclib -ludev)' || echo '()'"))))
 
 ; This file is included in the link_flags stanza of binaries and static libraries
 ; for which we should include -ccopt "-framework Security" on macOS.
+
 (rule
  (target macos-link-flags.sexp)
- (action (with-stdout-to %{target}
-  (system "[ '%{system}' = 'macosx' ] && echo '(-ccopt \"-framework Security\")' || echo '(-ccopt \"-Wl,-allow-multiple-definition\")'"))))
+ (action
+  (with-stdout-to
+   %{target}
+   (system
+    "[ '%{system}' = 'macosx' ] && echo '(-ccopt \"-framework Security\")' || echo '()'"))))
+
+; This file is included in the link_flags stanza of teztale server binary when
+; we want a static build.
+
+(rule
+ (target static-link-flags-teztale.sexp)
+ (action
+  (with-stdout-to
+   %{target}
+   (system
+    "[ '%{profile}' = 'static' ] && echo '(-ccopt -static -cclib -lusb-1.0 -cclib -ludev -cclib -lcrypto -cclib -lssl -cclib -lpgport -cclib -lpgcommon)' || echo '()'"))))

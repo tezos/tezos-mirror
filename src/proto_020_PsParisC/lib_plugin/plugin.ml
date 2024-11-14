@@ -30,4 +30,5 @@ module View_helpers = View_helpers
 module RPC = RPC
 module Metrics = Metrics_plugin
 module Script_interpreter_logging = Script_interpreter_logging
+module Http_cache_headers = Http_cache_headers
 module Shell_helpers = Shell_helpers

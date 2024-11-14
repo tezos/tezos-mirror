@@ -4,232 +4,225 @@
 
 ### Features
 
-### Bug fixes
+#### Stable
 
-### Breaking changes
+- The kernel is able to trace calls for the `callTracer` configuration. (!14290)
+- Gas cost of XTZ withdrawals is increased to prevent abuses. (!14016)
 
-### Internal
+#### Experimental
 
-## Version d517020b58afef0e15c768ee0b5acbda1786cdd8
+##### FA Bridge
 
-### Features
+The FA Bridge complements the native bridge already available on both Mainnet
+Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 
-- Limit the size of blueprints to 128 chunks. (!12631)
-
-### Bug fixes
-
-### Breaking changes
+- Gas cost of FA withdrawals is increased to prevent abuses. (!14016)
 
 ### Internal
 
-- Improve tick model of the delayed inbox. (!12524)
-- Update tick model. (!12631)
-
-## Version 0a81ce76b3d4f57d8c5194bcb9418f9294fd2be1
-
-### Features
-
-- Delayed EVM transactions no longer pay data-availability fee. (!12401)
-- Raise minimum gas price to **1 gwei**. (!12514)
-- Set a delayed bridge for Ghostnet. (!12485)
+- Transactions root and receipts root from blocks no longer hash all
+  transactions. It now hashes new transactions and the previous hash.
+  It will allow to remove old transactions from the durable storage. (!14688)
+- Tick model is updated with regards to FA deposits and withdrawals. (!14016)
+- L1 proxy address is added as a field to the FA withdrawal event. (!14260)
+- Preliminary support of larger delayed transactions. (!14467)
+- Move block storage related functions to another file to improve the readability
+  (!14685)
+- EVM Execution no longer require an additional storage for block number to
+  block hash. Uses the existing indexing table instead. (!14704)
+- A generic storage crate was introduced so that every component of the kernel
+  benefits from the same implementation to read/write primitives. (!14735)
+- Adds a storage for account's code. Code are referenced by their code
+  hash. (!14369)
+- Enable LTO (Link Time Optimization) during compilation to reduce tick consumption
+  and improve execution speed. (!14933)
 
 ### Bug fixes
 
-- Fix `eth_getTransactionBy*`: report the gas & gasPrice as set by the sender. (!12419)
+- Fix gas cost of contract creation by fixing the implementation of init code
+  cost recording. (!14892)
+- Fix call trace reporting of error messages. (!15000)
 
-### Breaking changes
+## Version af7909023768bc4aad3120bec7bea4a64a576047
 
-- Delayed EVM transactions use a dedicated encoding tag in blueprints. (!12401)
+This kernel has been activated on Etherlink Testnet on block
+[4,899,480][af90-activation-testnet]. It requires the 3rd revision of the WASM
+PVM to work.
+
+Its storage version is 14.
+
+[af90-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x2d80703e04542bd3e465d028674e19d3888e057b764a8482ed3218cc175b55d0
+
+### Features
+
+#### Stable
+
+- Simulation now uses timestamp provided by the node. (!14186)
+
+#### Experimental
+
+##### FA Bridge
+
+The FA Bridge complements the native bridge already available on both Mainnet
+Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
+
+- FA withdrawals are applied if FA bridge feature is enabled. (!13958)
+- Add FA withdrawal execution methods and FA bridge precompile. (!13941)
+- FA bridge enabled in Ghostnet. (!14342)
+
+##### DAL Integration
+
+Tezos Data-Availibility Layer (DAL) offers an increased bandwidth compared to
+L1 blocks, without sacrificing decentralization, and with reduced costs.
+
+- The list of DAL slot indices on which the sequencer may publish DAL slots can
+  be configured at path `/evm/dal_slots`. (!13717)
+- A DAL feature flag is added to the configuration. If the path has a
+  value in `/evm/feature_flags/enable_dal`, the kernel is allowed to import
+  data from the DAL. (!13634)
+
+### Bug fixes
+
+- Simulation with parameter `from` no longer return `OutOfFunds` if the
+  value is greater than zero. (!14150)
+- Removes transactions from the delayed inbox only if they are applied
+  in a block. They were previously optimistically removed from the delayed
+  inbox, which could be an issue if an upgrade happen in the same block.
+  (!14351)
 
 ### Internal
 
-- Make parsing dependent on the kernel mode. (!12356, !12363)
-- Implements reboot scheduling for the stage one in sequencer mode. (!12400)
+- Forbids in the code module to overwrite the code storage of an
+  account. Execution forbid this. (!14317)
+- Tick model is updated with regards to FA deposits and withdrawals. (!14016)
+- Gas cost of XTZ/FA withdrawals is increased to prevent abuses. (!14016)
 
-## Version d689a9dcfa16169aa0dbce1944e920093223c671t (Security Upgrade)
+## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 
-### Bug fixes
+This kernel has been activated on Etherlink Testnet on block
+[3,825,580][4f44-activation-testnet], and on Etherlink Mainnet Beta on block
+[1,273,380][4f44-activation-mainnet].
 
-- The delayed inbox was blocked as deposit were stored in the wrong
-  storage location. The delayed inbox is flushed to unblock it.
+Its storage version is 12.
 
-## Version 79509a69d01c38eeba38d6cc7a323b4d69c58b94
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 
-### Features
-
-- Add detailed tick model for the `modexp` precompiled contract (!12278)
-- Reduce the verbosity of logs (!12372)
-- Store the root hash used for an upgrade in the durable storage (!12352)
-- Update the governance contracts to a more up-to-date deployment (!12379)
-- Support upgrade from a kernel security governance contract (!12359)
-- Rename the sequencer admin contract into sequencer governance (!12380)
-
-### Bug fixes
-
-- Ticks for gas price adjustments are counted per block, rather than per run. (!12279)
-
-### Breaking changes
-
-## Version 5cc8ce8253e0fc4fb31b0d975d20351c25d22bab (Security Upgrade)
-
-### Bug Fixes
-
-- Disable elastic fee model
-- Clean-up pending blueprints
-- Patch timestamps of blocks created by the delayed inbox flushing mechanism
-
-## Version 624a144032d6dc6431697c39eb81790bccaacff9
+[mainnet-branch]: https://gitlab.com/tezos/tezos/-/tree/etherlink-mainnet-launch
+[4f44-activation-testnet]: https://testnet-explorer.etherlink.com/block/0x54e37d7743b4a79e23640ab36fcd95cf9e54d9b95959cc6c7ed3abfaff93dc52
+[4f44-activation-mainnet]: https://explorer.etherlink.com/block/0x18027e1703da079fed2d8bea3395a7f365957194b7ed35eaba36e901217e6c6f
 
 ### Features
 
-- Add an evm event when a sequencer upgrade is seen by the
-  kernel. (!12046)
-- Da fee is sent to sequencer pool address. (!12113)
-- Gas price adjusts itself to handle congestion. (!12167)
+- Blueprints provided by the sequencer must have increasing timestamps. (!13807)
+- Blueprints provided by the sequencer are accepted by the rollup node only
+  if they are smaller than current view of the L1 timestamp plus an margin
+  error of 5 minutes. 5 minutes is the default value but can be configured by
+  the installer. (!13827)
+- FA deposits are applied if FA bridge feature is enabled (disabled on Mainnet
+  Beta and Testnet). (!13835)
+- Native token withdrawals emit event log in case of successful execution. (!14014)
+- Native token deposits emit EVM event log. (!14012)
 
 ### Bug fixes
 
-- `BLOCKHASH` opcode now returns the actual block hash instead of `0x00..0`. (!12130)
-- Withdrawals are now compatible with sequencer. (!11733)
-
-### Breaking changes
-
-- Sequencer upgrade expect an activation timestamp and an etherlink
-  pool address attached to the new public key. The new sequencer is
-  activated when the rollup sees a l1 block with a timestamp greater
-  than or equal to the activation timestamp. Blueprint in the storage
-  are deleted during the sequencer upgrade as they can be trusted
-  anymore. (!12038, !12046)
-- Calling the withdrawals precompiled contract at `0xff00..0001` now costs
-  880 gas units. (!12220)
+- Allow `eth_call` to return the contract bytecode on contract creation. (!13830)
+- Stack depth for smart contracts are temporarily limited to 256, instead of
+  the expected limit of 1024 on Shanghai. (!13850)
+- The simulation now caps the gas limit for execution at the maximum allowed
+  per transaction (30 million gas at most). (!13729)
+- `block.number` and `block.timestamp` now return respectively the current
+  number and timetamp of the processed block, instead of the last produced one.
+  (!13901)
+- Forced blueprints (in case of delayed inbox timeout) always use a timestamp
+  equal or greater than the predecessor. (!13832)
+- Withdrawal counter is now revertable. (!14389)
 
 ### Internal
 
-- Keys modified by block application are moved to `/evm/world_state`. (!12080, !12187)
-- Remove error logs from storage. (!12180)
+- Add FA deposit structure and helper methods for its parsing and formatting. (!13720)
+- Add FA deposit execution methods. (!13773)
+- Add ticket table to account for FA deposits. (!12072)
+- Refactor withdrawals handling to keep `OutboxMessage` in the `ExecutionOutcome`. (!13751)
+- Compress h256 hash when encoding. Transaction encoded with `r` or
+  `s` hash compressed were impacted. (!13654)
+- Allows a `/__evm_node` flag in the kernel to have a different logic whether
+  the kernel is run by the evm-node or the rollup node. (!13827)
+- Add FA withdrawal structure and helper methods for parsing and encoding. (!13843)
+- Rework the semantics of migrations in order to allow a network to skip frozen
+  versions. (!13895)
 
-## Version 20ab639f09a8c7c76f982383c3d9e1f831f38088
+## Version ec7c3b349624896b269e179384d0a45cf39e1145
 
-### Features
+This kernel has been deployed on Etherlink Testnet on block
+[3,244,690][ec7c3-activation]. It has not been activated on Mainnet Beta.
 
-- Implement EIP-3860. (!11831)
-- Implement EIP-2681. (!11976)
-- Flush every transactions in the delayed inbox in case one is overdue. (!11914)
-- Require a minimal number of L1 blocks to have been backed before a delayed transaction is considered overdue. (!11811)
-- Raise minimum base fee per gas to 0.05 gwei. (!12001)
-- Raise da fee to 4 mutez/byte. (!12101)
+Its storage version is 12.
 
-### Bug fixes
-
-- Fix selfdestruct behavior when target is itself. (!12081)
-- Fix the nonce of the caller on contract creation. Callee's address remains hot even if creation fails. (!11634)
-- Fix the nonce of a new created contract. (!11767)
-- Fix the encoding of the upgrade event emitted by the kernel. (!12003)
-- Gas is now charged for inner create. (!11814)
-- Add missing checks on data integrity and signature overflows for the `ecrecover` precompile contract. (!11997)
-- Exit when there's a mod overflow when calling `modexp` precompiled contract. (!12005)
-- Clear contract storage before execution on contract creation. (!12089)
-- Record call stipend even if balance is not enough for inner call. (!12070)
-
-## Version c5969505b81b52a779270b69f48b6a66c84da429
+[ec7c3-activation]: https://testnet-explorer.etherlink.com/block/0x5d16e74c2d5445df5944f79509c3e24dfe392f5f07556efe1b7c30ca477e7a28
 
 ### Features
 
-- Support forcing the execution of overdue transactions in the delayed inbox. (!11667)
-- Allow to force upgrade if no blueprints are submitted for 24h. (!11918)
+- The kernel has now the ability to trace a transaction (via
+  the EVM runtime). (!13185, !13502)
+- Incorporate the gas limit in the block hash. (!13280)
+- The block's miner and coinbase address are set to sequencer pool
+  address if it exists. (!13414)
+- Update Sequencer Pool address on Ghostnet. (!13614)
 
 ### Bug fixes
 
-- Fix external messages being added to the delayed inbox. (!11779)
-- EVM call stack is now the number of internal transaction layers. (!11719)
-- Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
-- Fix a bug where precompiled failures were considered as `Fatal`. (!11947)
-- Fix a bug where validation would succeed, for a transaction that failed to pay da-fee. (!11992)
-
-### Internals
-
-- Make the stage-1 more resilient to internals errors, to improve the robustness of the upgrade process. (!11874 !11887)
-- Nonce is now bumped before executing the transaction. (!11998)
+- Withdrawal reverts if the amount loses wei during the conversion to mutez,
+  e.g. `1000000000001` would make caller lose 1 wei. (!13928)
 
 ### Breaking changes
 
+- Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
+- Introduce new block encoding to include `baseFeePerGas` and `mixHash`.
+  New blocks would contain `baseFeePerGas` and a default `mixHash`. (!13159)
+
 ### Internal
 
-- `evm-evaluation-assessor` takes 'PREVRANDAO' in its computation. (!11907)
-- Implement warm/cold access for state access opcodes. (!11580)
-- Remove invalid blueprints. (!11607)
+- Gas price is removed from internal structure block in progress. (!13220)
+- Refactor block creation to properly add the gas limit. (!13278)
+- Gas limit is no longer optional for blocks. (!13279)
+- The kernel can limit the block production to at most one block per tezos level
+  if the file `/__at_most_one_block` exists in the storage. (!13202)
+- Stop emitting an `Info` log when running an Ethereum transaction. (!13630)
+- A FA bridge feature flag is added to the configuration. If the path has a value
+  in `/evm/feature_flags/enable_fa_bridge`, FA bridge related operations will be accepted. (!13535)
+- Uses safe increment function for deposit transaction nonce (!13712)
 
-## Version a41f30ddb8787e5ff5c461d949a9ae3f71e4eea9
+## Version b9f6c9138719220db83086f0548e49c5c4c8421f
+
+This is the kernel used to originate Etherlink Mainnet Beta.
+
+Its storage version is 11.
 
 ### Features
 
-- Implement Call stipend for inner call with transfer. (!11587)
-- Support 'modexp' precompiled contract. (!11732)
-- Support 'ecAdd', 'ecMul' and 'ecPairing' precompiled contracts. (!11746)
+- Set block gas limit to 2^50. (!13010)
 
-### Bug fixes
+### Security Upgrades
 
-- Fix minimum gas price used for charging fees: should be `base_fee_per_gas`, instead of `1 wei`. (!11509)
-- Fix an overflow bug when prepaying transactions/repaying gas. (!11545)
-- Fix a bug where creating a create a contract with not enough funds was allowed. (!11526)
-- Hands the return to the current context when the creation of a contract fails. (!11546)
-- Fix a bug where for non-existing address default hash was used rather than zero hash. (!11665)
-- Fix a bug where nonce and code shouldn't be set when SELFDESTRUCT is called
-  in initialisation code. (!11637)
-- Fix a bug where SELFDESTRUCT deletes contracts immediately rather than at the end of the transaction. (!11658)
-- `CallTooDeep` is treated as a simple error (not as fatal). (!11794)
+#### Version 4d98081699595b57512ffeff35bca320f281c806
 
-### Breaking changes
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-security-upgrades`][su-1] instead.
 
-- Prefix withdrawal precompiled contract by 'ff' to avoid any friction with upcoming Ethereum fork.
-  Withdrawal contract address is now 'ff00000000000000000000000000000000000001'. (!11556)
+[su-1]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-1
 
-### Internal
+This security upgrade addresses security vulnerabilities in the withdraw
+precompiled contract, found by Spearbit as part as their external audit of
+the Etherlink kernel. The security vulnerability was not exploited on
+Mainnet Beta before the activation of the kernel on block 853,175.
 
-## Version 9978f3a5f8bee0be78686c5c568109d2e6148f13
+- Forbid delegatecall, staticcall and callcode to the withdraw precompiled
+  contract. (!13997)
+- The withdrawal precompiled contract needs to be called with at least `10^12`
+  Wei to make sure it can be transformed to a mutez.
 
-### Features
+## Older versions
 
-- Fix contract code storage cost (!10356)
-- Fix contract creation gas cost and transaction data cost. (!10349)
-- Implementation of EIP-3541, new code starting with the 0xEF byte cannot be
-deployed. (!11225)
-- Implement EIP-684: Prevent create collision. Reject contract creation to non-empty address (!11150)
-- Smart contract starts at nonce 1 following EIP-161. (!11276)
-- Support signature of transactions pre EIP-155. (!11281)
-- Prevent collision when creating a contract at the same level it was self-
-  destructed. (!11474)
-
-### Bug fixes
-
-- Prevent fatal errors when an intermediate call/transaction runs out of gas during an execution. (!11290)
-- Completely remove fatal error promotion between intermediate call/transactions. (!11334)
-- Prevent fatal errors on transfers in connection with calls. (!11365)
-- Prevent panics when BLOCKHASH opcode is used. (!11366)
-
-### Breaking changes
-
-### Internal
-
-- Added support for multi-testing to the `evm-evaluation`. (!11223)
-- Blueprints are now stored, the Queue is simplified. New storage version (3). (!11131)
-
-## Version 32f957d52ace920916d54b9f02a2d32ee30e16b3
-
-### Features
-
-- Support precompiled contract `ecrecover`. (!10926)
-
-### Bug fixes
-
-- Fix the memory limit of the runtime, which is now of the maximum size
-  addressable considering the limits of the WASM PVM (32bits, which means `2^32`
-  bytes addressable). (!10988)
-- Nested contract creation correctly limit gas according to EIP-150. (!10352)
-
-### Breaking changes
-
-### Internal
-
-- Add a debug feature flag to the log crate for optional debug traces. (!10692)
-- Blueprints include timestamp, instead of retrieving it at block finalization. (!10822)
+For versions of the kernel pre-dating Etherlink Mainnet Beta, see
+<CHANGES_KERNEL_PREMAINNET.md>.

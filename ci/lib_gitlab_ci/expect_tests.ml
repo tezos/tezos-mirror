@@ -24,6 +24,7 @@ let%expect_test _ =
         {
           rules = [Util.workflow_rule ~if_:If.(var "CI_SETTING" == null) ()];
           name = Some "setting_not_set";
+          auto_cancel = None;
         };
     ] ;
   [%expect
@@ -35,8 +36,28 @@ let%expect_test _ =
         when: always |}] ;
   p
     [
+      Workflow
+        {
+          rules = [];
+          name = Some "Woops";
+          auto_cancel = Some {on_job_failure = true; on_new_commit = false};
+        };
+    ] ;
+  [%expect
+    {|
+    workflow:
+      name: Woops
+      rules: []
+      auto_cancel:
+        on_job_failure: all |}] ;
+  p
+    [
       Types.Default
-        {image = Some (Image "alpine-or-something"); interruptible = Some false};
+        {
+          image = Some (Image "alpine-or-something");
+          interruptible = Some false;
+          retry = None;
+        };
       Types.Stages ["first"];
       Types.Include
         [
@@ -44,12 +65,14 @@ let%expect_test _ =
           {local = "bar"; rules = [Util.include_rule ~changes:["src/**/*"] ()]};
         ];
       Variables [("k1", "v"); ("k2", "vv")];
-      Types.Job
-        (Util.job
-           ~stage:"first"
-           ~name:"jobbbbbbb"
-           ~script:["rm -rf /"; "echo it is all gone now"]
-           ());
+      Types.(
+        Generic_job
+          (Job
+             (Util.job
+                ~stage:"first"
+                ~name:"jobbbbbbb"
+                ~script:["rm -rf /"; "echo it is all gone now"]
+                ())));
     ] ;
   [%expect
     {|

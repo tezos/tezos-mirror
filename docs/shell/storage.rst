@@ -27,20 +27,21 @@ The store is initialized using a :doc:`history
 mode<../user/history_modes>` that can be either *Archive*, *Full* or
 *Rolling*.
 
-In Archive mode, the storage keeps the complete history of all the blocks, up to the genesis block. The history of each block includes the block itself, the context (ledger state) in which the block was applied, and metadata such as the changes resulting of the block application.
+In Archive mode, the storage keeps the complete history of all the blocks, up to the genesis block. The history of each block includes the block itself, the :ref:`context <def_context>` (ledger state) in which the block was applied, and :ref:`metadata <def_metadata>` such as the changes resulting of the block application.
 
 Depending on the chosen history mode, some data will be
 pruned while the chain is growing. In *Full* mode, all blocks that are
-part of the chain are kept but their associated metadata below a
-certain threshold are discarded. In *Rolling* mode, blocks under a
-certain threshold are discarded entirely. The thresholds of *Full* and *Rolling* modes may
+part of the chain are kept but their associated context and metadata below a
+certain threshold level are discarded. In *Rolling* mode, blocks under a
+certain threshold level are discarded entirely. The thresholds of *Full* and *Rolling* modes may
 be varied by specifying a number of :ref:`additional cycles to keep <History_mode_additional_cycles>`.
 
-The moments when data may be pruned are when a cycle is completed.
-When this happens, the store performs two operations.
+The moments when data may be pruned are when cycles complete.
+When this happens, the store performs three operations.
 First, the block history is linearized by trimming branches in the completed cycle.
-Secondly, the remaining blocks in the completed cycle (or just their metadata), and possibly their context (ledger state), can be pruned, according to the history mode.
-Both operations are explained next.
+Secondly, the cycle that just became un-reorganizable (with :ref:`Tenderbake <finality>`, this is the predecessor of the completed cycle) is archived, aka *cemented*. This process is called a **merge** and is performed asynchronously.
+Thirdly, blocks in the oldest cemented cycle (or just their context and metadata), can be pruned, according to the history mode.
+Trimming and pruning are further explained next.
 
 Trimming
 ********
@@ -57,22 +58,17 @@ returned represents a *cycle*.
 Pruning
 *******
 
-When the complete (hence, un-reorganizable) cycle is retrieved, it is
-archived with the *cemented cycles*. This process is
-called a **merge** and is performed asynchronously. Depending on which
-history mode is ran and on the amount of additional cycles, blocks
-and/or their associated metadata present in these cemented cycles may
+Depending on which
+history mode is ran and on the amount of additional cycles, blocks in cemented cycles
+and possibly their associated context and metadata may
 or may not be preserved. For instance, if the history mode is
-*Archive*, every block is preserved, with all its metadata. If it is
-*Full* with 5 additional cycles, all the cemented cycles will be
-present but only the 10 most recent cemented cycles will have some
-metadata kept (see details at :ref:`History_mode_additional_cycles`).
-Older metadata is pruned.
+*Archive*, every block is preserved, with its context and metadata. If it is
+*Full* with 5 additional cycles, no cemented block is pruned, but context and
+metadata will only be kept for the blocks in the 6 most recent cemented cycles
+(see details at :ref:`History_mode_additional_cycles`).
+Older contexts and metadata are pruned.
 
-Starting with Octez v15.0, the store also triggers *context pruning* when a cycle is completed, after finishing the store trimming and cementing.
-Thus, whenever pruning the metadata of a block, its context (ledger state associated to that block) is pruned as well.
-
-For the operational details of pruning, see :ref:`first_pruning`.
+*Context pruning* has been introduced with Octez v15.0, before that only metadata was pruned, see :ref:`first_pruning`.
 
 Other features
 **************

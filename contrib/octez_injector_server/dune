@@ -14,16 +14,13 @@
   octez-libs.rpc-http
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  data-encoding
-  (select void_for_linking-octez_injector_Proxford from
-   (octez_injector_Proxford -> void_for_linking-octez_injector_Proxford.empty)
-   (-> void_for_linking-octez_injector_Proxford.empty))
-  (select void_for_linking-octez_injector_PtParisB from
-   (octez_injector_PtParisB -> void_for_linking-octez_injector_PtParisB.empty)
-   (-> void_for_linking-octez_injector_PtParisB.empty))
+  octez-libs.data-encoding
   (select void_for_linking-octez_injector_PsParisC from
    (octez_injector_PsParisC -> void_for_linking-octez_injector_PsParisC.empty)
    (-> void_for_linking-octez_injector_PsParisC.empty))
+  (select void_for_linking-octez_injector_PsQuebec from
+   (octez_injector_PsQuebec -> void_for_linking-octez_injector_PsQuebec.empty)
+   (-> void_for_linking-octez_injector_PsQuebec.empty))
   (select void_for_linking-octez_injector_alpha from
    (octez_injector_alpha -> void_for_linking-octez_injector_alpha.empty)
    (-> void_for_linking-octez_injector_alpha.empty)))
@@ -45,7 +42,6 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez_injector_Proxford.empty "")
-   (write-file void_for_linking-octez_injector_PtParisB.empty "")
    (write-file void_for_linking-octez_injector_PsParisC.empty "")
+   (write-file void_for_linking-octez_injector_PsQuebec.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))

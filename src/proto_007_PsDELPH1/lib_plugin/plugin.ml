@@ -26,4 +26,6 @@
 module RPC = struct
   let rpc_services : Environment.Updater.rpc_context Tezos_rpc.Directory.t =
     Protocol.rpc_services
+
+  let get_blocks_preservation_cycles ~get_context:_ = Lwt.return_none
 end

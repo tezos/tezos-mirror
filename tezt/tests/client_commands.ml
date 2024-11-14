@@ -30,6 +30,8 @@
    Subject:      Tests for the Tezos client
 *)
 
+let team = Tag.layer1
+
 module Helpers = struct
   let originate_fail_on_false protocol client =
     let* _alias, contract =
@@ -149,14 +151,14 @@ module Simulation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simulation of successful operation"
-      ~tags:["client"; "simulation"; "success"]
+      ~tags:[team; "client"; "simulation"; "success"]
     @@ transfer ~arg:"True" ~simulation:true Process.check
 
   let successful_multiple =
     Protocol.register_test
       ~__FILE__
       ~title:"Simulation of successful operation batch"
-      ~tags:["client"; "simulation"; "success"; "multiple"; "batch"]
+      ~tags:[team; "client"; "simulation"; "success"; "multiple"; "batch"]
     @@ multiple_transfers
          ~args:["True"; "True"; "True"]
          ~simulation:true
@@ -166,7 +168,7 @@ module Simulation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simulation of failing operation"
-      ~tags:["client"; "simulation"; "failing"]
+      ~tags:[team; "client"; "simulation"; "failing"]
     @@ transfer ~arg:"False" ~simulation:true
     @@ Process.check_error ~exit_code:1 ~msg:(rex "with \"bang\"")
 
@@ -174,7 +176,7 @@ module Simulation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simulation of failing operation with force"
-      ~tags:["client"; "simulation"; "failing"; "force"]
+      ~tags:[team; "client"; "simulation"; "failing"; "force"]
     @@ transfer ~arg:"False" ~simulation:true ~force:true
     @@ fun p ->
     let* stdout = Process.check_and_read_stdout ~expect_failure:false p in
@@ -186,7 +188,8 @@ module Simulation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simulation of failing batch with force"
-      ~tags:["client"; "simulation"; "failing"; "multiple"; "batch"; "force"]
+      ~tags:
+        [team; "client"; "simulation"; "failing"; "multiple"; "batch"; "force"]
     @@ multiple_transfers
          ~args:["True"; "False"; "True"]
          ~simulation:true
@@ -205,7 +208,8 @@ module Simulation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simulation of first failing operation in batch with force"
-      ~tags:["client"; "simulation"; "failing"; "multiple"; "batch"; "force"]
+      ~tags:
+        [team; "client"; "simulation"; "failing"; "multiple"; "batch"; "force"]
     @@ multiple_transfers
          ~args:["False"; "True"; "True"; "True"; "True"; "True"]
          ~simulation:true
@@ -224,7 +228,7 @@ module Simulation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Injecting of failing operation with force"
-      ~tags:["client"; "injection"; "failing"; "force"]
+      ~tags:[team; "client"; "injection"; "failing"; "force"]
     @@ transfer ~arg:"False" ~force:true
     @@ Process.check_error
          ~exit_code:1
@@ -234,7 +238,8 @@ module Simulation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Injecting of failing operations batch with force"
-      ~tags:["client"; "injection"; "failing"; "force"; "multiple"; "batch"]
+      ~tags:
+        [team; "client"; "injection"; "failing"; "force"; "multiple"; "batch"]
     @@ multiple_transfers ~args:["True"; "False"; "True"] ~force:true
     @@ fun Runnable.{value; _} ->
     Process.check_error
@@ -260,7 +265,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Transfer to public key hash alias"
-      ~tags:["client"; "alias"; "transfer"]
+      ~tags:[team; "client"; "alias"; "transfer"]
     @@ fun protocol ->
     let* node, client = Client.init_with_protocol `Client ~protocol () in
     let* client2 = Client.init ~endpoint:(Node node) () in
@@ -297,7 +302,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Transfer from public key hash alias"
-      ~tags:["client"; "alias"; "transfer"]
+      ~tags:[team; "client"; "alias"; "transfer"]
     @@ fun protocol ->
     let* node, client = Client.init_with_protocol `Client ~protocol () in
     let* client2 = Client.init ~endpoint:(Node node) () in
@@ -352,7 +357,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Transfer from and to accounts"
-      ~tags:["client"; "transfer"; "bls"; "tz4"]
+      ~tags:[team; "client"; "transfer"; "bls"; "tz4"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     Log.info "Generating new accounts" ;
@@ -398,7 +403,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Batch transfers"
-      ~tags:["client"; "batch"; "transfer"; "bls"; "tz4"]
+      ~tags:[team; "client"; "batch"; "transfer"; "bls"; "tz4"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     Log.info "Generating new accounts" ;
@@ -472,7 +477,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Set delegate forbidden on tz4"
-      ~tags:["client"; "set_delegate"; "bls"; "tz4"]
+      ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let* () =
@@ -495,7 +500,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test transfer with too low balance"
-      ~tags:["client"; "transfer"]
+      ~tags:[team; "client"; "transfer"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     Log.info "Generating new accounts" ;
@@ -520,7 +525,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer from bootstrap5 to bootstrap1"
-      ~tags:["client"; "transfer"]
+      ~tags:[team; "client"; "transfer"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let check_balance_and_deposits ~__LOC__ (account : Account.key)
@@ -600,7 +605,7 @@ module Transfer = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Gas safety guard for transfer"
-      ~tags:["client"; "transfer"; "safety_guard"]
+      ~tags:[team; "client"; "transfer"; "safety_guard"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let Account.{public_key_hash = bootstrap1_pkh; _} = Constant.bootstrap1 in
@@ -657,7 +662,7 @@ module Dry_run = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Check consumed gas of origination dry run"
-      ~tags:["client"; "gas"; "estimation"; "dryrun"]
+      ~tags:[team; "client"; "gas"; "estimation"; "dryrun"]
     @@ fun protocol ->
     Log.info
       "This test checks that the consumed gas returned by the dry run of a \
@@ -761,7 +766,7 @@ module Signatures = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test client signatures and on chain check"
-      ~tags:["client"; "signature"; "check"; "bls"]
+      ~tags:[team; "client"; "signature"; "check"; "bls"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let* contract, _hash =
@@ -809,7 +814,7 @@ module Signatures = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test client message signatures"
-      ~tags:["client"; "signature"; "message"; "check"]
+      ~tags:[team; "client"; "signature"; "message"; "check"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
     [
@@ -850,7 +855,7 @@ module Account_activation = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test account activation"
-      ~tags:["client"; "account"; "activation"]
+      ~tags:[team; "client"; "account"; "activation"]
     @@ fun protocol ->
     let parameter_file =
       Protocol.parameter_file ~constants:Constants_test protocol

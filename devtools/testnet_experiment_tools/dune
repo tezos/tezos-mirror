@@ -12,7 +12,8 @@
   octez-libs.base.unix
   octez-libs.stdlib-unix
   octez-protocol-alpha-libs.client
-  tezos-protocol-alpha.protocol)
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.plugin)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
@@ -21,6 +22,8 @@
   -open Tezt
   -open Tezt.Base
   -open Tezos_client_base_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix)
  (modules testnet_experiment_tools format_baker_accounts))
 
@@ -35,18 +38,14 @@
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-libs.tezos-context
-  octez-protocol-018-Proxford-libs.baking
-  octez-protocol-018-Proxford-libs.client
-  octez-protocol-018-Proxford-libs.client.commands
-  tezos-protocol-018-Proxford.protocol
-  octez-protocol-019-PtParisB-libs.baking
-  octez-protocol-019-PtParisB-libs.client
-  octez-protocol-019-PtParisB-libs.client.commands
-  tezos-protocol-019-PtParisB.protocol
   octez-protocol-020-PsParisC-libs.baking
   octez-protocol-020-PsParisC-libs.client
   octez-protocol-020-PsParisC-libs.client.commands
   tezos-protocol-020-PsParisC.protocol
+  octez-protocol-021-PsQuebec-libs.baking
+  octez-protocol-021-PsQuebec-libs.client
+  octez-protocol-021-PsQuebec-libs.client.commands
+  tezos-protocol-021-PsQuebec.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.client.commands
@@ -62,12 +61,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context)
- (modules
-  sigs
-  tool_018_Proxford
-  tool_019_PtParisB
-  tool_020_PsParisC
-  tool_alpha))
+ (modules sigs tool_020_PsParisC tool_021_PsQuebec tool_alpha))
 
 (executable
  (name simulation_scenario)

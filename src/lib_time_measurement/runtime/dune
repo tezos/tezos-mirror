@@ -2,7 +2,7 @@
  (name tezos_time_measurement_runtime)
  (public_name tezos-time-measurement)
  (libraries unix
-            data-encoding
+            octez-libs.data-encoding
             octez-libs.event-logging
             lwt)
  (instrumentation.backend (ppx tezos-time-measurement.ppx))

@@ -29,6 +29,7 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file rpc_process.ml
    Subject:      Tests the resilience of the RPC process
 *)
+let team = Tag.layer1
 
 let wait_for_RPC_process_pid node =
   let filter json = JSON.(json |> as_int_opt) in
@@ -67,7 +68,7 @@ let test_kill =
   Protocol.register_test
     ~__FILE__
     ~title:"RPC process kill"
-    ~tags:["rpc"; "process"; "kill"]
+    ~tags:[team; "rpc"; "process"; "kill"]
   @@ fun protocol ->
   let node = Node.create ~rpc_external:true [] in
   let wait_RPC_process_pid = wait_for_RPC_process_pid node in
@@ -95,7 +96,7 @@ let test_forward =
   Protocol.register_test
     ~__FILE__
     ~title:"RPC process forward"
-    ~tags:["rpc"; "process"; "forward"]
+    ~tags:[team; "rpc"; "process"; "forward"]
   @@ fun protocol ->
   Log.info
     "Test whether some specific RPCs are handled directly by the RPC process \
@@ -103,7 +104,7 @@ let test_forward =
   let* node, client =
     Client.init_with_protocol
       ~rpc_external:true
-      ~event_sections_levels:[("rpc-process", `Debug)]
+      ~event_sections_levels:[("rpc.process", `Debug)]
       ~protocol
       `Client
       ()
@@ -140,7 +141,7 @@ let test_forward =
   let* () = test_rpc Handle RPC.get_config ~rpc_prefix:"/config" in
   let* () =
     test_rpc
-      Forward
+      Handle
       (RPC.get_chain_chain_id ())
       ~rpc_prefix:"/chains/main/chain_id"
   in
@@ -153,27 +154,29 @@ let test_forward =
   in
   let* () =
     test_rpc
-      Forward
+      Handle
       (RPC.get_chain_chain_id ~chain:"nonexistent" ())
       ~rpc_prefix:"/chains/nonexistent/chain_id"
       ~error:"Cannot parse chain identifier"
   in
   let* () =
     test_rpc
-      Forward
+      Forward (* Only the node deals with the mempool. *)
       (RPC.post_chain_mempool_filter ~data:(Data (Ezjsonm.from_string "{}")) ())
       ~rpc_prefix:"/chains/main/mempool/filter"
   in
   let* () =
     test_rpc
       Forward
+      (* The path is unknown by the RPC process, we try to
+         forward it to the node. *)
       RPC.nonexistent_path
       ~rpc_prefix:"/nonexistent/path"
       ~error:"No service found at this URL"
   in
-  let test_streaming_rpc ~rpc_prefix rpc =
+  let test_streaming_rpc expected_behavior ~rpc_prefix rpc =
     Log.info "Test streaming RPC: %s" rpc_prefix ;
-    let waiter = wait_for Forward ~rpc_prefix in
+    let waiter = wait_for expected_behavior ~rpc_prefix in
     let url =
       RPC_core.make_uri (Node.as_rpc_endpoint node) rpc |> Uri.to_string
     in
@@ -182,25 +185,32 @@ let test_forward =
   in
   let* () =
     test_streaming_rpc
+      Forward (* Only the node deals with the mempool. *)
       (RPC.get_chain_mempool_monitor_operations ())
       ~rpc_prefix:"/chains/main/mempool/monitor_operations"
   in
   let* () =
     test_streaming_rpc
+      Handle
       (RPC.get_monitor_heads_chain ())
       ~rpc_prefix:"/monitor/heads/main"
   in
   let* () =
     test_streaming_rpc
+      Forward
+      (* The path is unknown by the RPC process, we try to
+         forward it to the node. *)
       (RPC.get_monitor_heads_chain ~chain:"test" ())
       ~rpc_prefix:"/monitor/heads/test"
   in
   let* () =
     test_streaming_rpc
+      Forward (* FIXME/TODO: Not handled by the RPC process for now. *)
       RPC.get_monitor_validated_blocks
       ~rpc_prefix:"/monitor/validated_blocks"
   in
   test_streaming_rpc
+    Handle
     RPC.get_monitor_applied_blocks
     ~rpc_prefix:"/monitor/applied_blocks"
 
@@ -228,9 +238,9 @@ let test_local_rpc_server =
   Test.register
     ~__FILE__
     ~title:"RPC local server"
-    ~tags:["rpc"; "process"; "local_server"]
+    ~tags:[team; "rpc"; "process"; "local_server"]
   @@ fun () ->
-  let node = Node.create [] in
+  let node = Node.create ~rpc_external:false [] in
   (* Register event watchers for local RPC server before the node is running to
      ensure they will not be missed. *)
   let local_event_promise =
@@ -262,7 +272,7 @@ let test_process_rpc_server =
   Test.register
     ~__FILE__
     ~title:"RPC process server"
-    ~tags:["rpc"; "process"; "external_server"]
+    ~tags:[team; "rpc"; "process"; "external_server"]
   @@ fun () ->
   (* By default Node module start a process RPC server. *)
   let node = Node.create ~rpc_external:true [] in
@@ -297,7 +307,7 @@ let test_local_and_process_rpc_servers =
   Test.register
     ~__FILE__
     ~title:"RPC local servers and process servers"
-    ~tags:["rpc"; "process"; "local_server"; "external_server"]
+    ~tags:[team; "rpc"; "process"; "local_server"; "external_server"]
   @@ fun () ->
   (* Generate some ports for additional local RPC servers *)
   let local_rpc_ports = List.init 2 (fun _ -> Port.fresh ()) in
@@ -312,8 +322,12 @@ let test_local_and_process_rpc_servers =
           (fun port -> Node.RPC_additional_addr_external (point_of_port port))
           external_rpc_ports)
   in
-  (* Add the local RPC server created by default in Node module. *)
-  let local_rpc_ports = Node.rpc_port node :: local_rpc_ports in
+  (* Add the external RPC server created by default in Node module. *)
+  let local_rpc_ports, external_rpc_ports =
+    if Node.enable_external_rpc_process then
+      (local_rpc_ports, Node.rpc_port node :: external_rpc_ports)
+    else (Node.rpc_port node :: local_rpc_ports, external_rpc_ports)
+  in
   (* Register event watchers for both external and local RPC servers
      before the node is running to ensure they will not be missed. *)
   let local_event_promises =
@@ -350,6 +364,54 @@ let test_local_and_process_rpc_servers =
   Log.info "Checking if external RPC servers have been well started" ;
   Lwt_list.iter_p (fun p -> p) external_event_promises
 
+let wait_for_RPC_process_sync node =
+  let filter json = JSON.(json |-> "level" |> as_int_opt) in
+  Node.wait_for node "store_synchronized_on_head.v0" filter
+
+let wait_for_local_rpc_server node =
+  Node.wait_for node "starting_local_rpc_server.v0" (fun _ -> Some ())
+
+let test_sync_with_node =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"RPC is sync with node"
+    ~tags:["rpc"; "process"; "node"; "sync"]
+  @@ fun protocol ->
+  let node_arguments = Node.[Synchronisation_threshold 0] in
+  (* Default node running with the RPC_process *)
+  let* node_rpc_process =
+    Node.init ~name:"node_rpc_process" ~rpc_external:true node_arguments
+  in
+  let* () = Node.wait_for_ready node_rpc_process in
+  let node_local_rpc =
+    Node.create ~name:"node_local_rpc" ~rpc_external:false node_arguments
+  in
+  let waiter_for_local_rpc_server = wait_for_local_rpc_server node_local_rpc in
+  let* () = Node.run node_local_rpc node_arguments in
+  let* () = Node.wait_for_ready node_local_rpc in
+  (* Wait for the event that states that the local RPC server is
+     used. *)
+  let* () = waiter_for_local_rpc_server in
+  let* client = Client.init ~endpoint:(Node node_local_rpc) () in
+  let* () = Client.Admin.connect_address ~peer:node_rpc_process client in
+  let waiter_for_RPC_process_sync =
+    wait_for_RPC_process_sync node_rpc_process
+  in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
+  Log.info
+    "Wait for RPC_process sync at level 1 on the %s"
+    (Node.name node_rpc_process) ;
+  let* (_ : int) = waiter_for_RPC_process_sync in
+  Log.info "Wait for level 1 on the %s" (Node.name node_rpc_process) ;
+  (* Node.wait_for_level relies on the RPC_process synchronization
+     event.*)
+  let* (_ : int) = Node.wait_for_level node_rpc_process 1 in
+  (* Node.wait_for_level relies on the set_head/branch_switch
+     events. *)
+  let* (_ : int) = Node.wait_for_level node_local_rpc 1 in
+  unit
+
 let register ~protocols =
   test_kill protocols ;
-  test_forward protocols
+  test_forward protocols ;
+  test_sync_with_node protocols

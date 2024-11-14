@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
@@ -10,7 +10,9 @@ use crypto::hash::SmartRollupHash;
 use tezos_smart_rollup_core::{
     MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE, PREIMAGE_HASH_SIZE,
 };
-use tezos_smart_rollup_host::{metadata::RollupMetadata, Error};
+use tezos_smart_rollup_host::{
+    dal_parameters::RollupDalParameters, metadata::RollupMetadata, Error,
+};
 
 pub(crate) mod in_memory_store;
 pub(crate) mod store;
@@ -32,6 +34,7 @@ pub(crate) struct HostState {
     /// Key-value store of runtime state.
     pub store: InMemoryStore,
     pub metadata: RollupMetadata,
+    pub dal_parameters: RollupDalParameters,
     // Inbox metadata
     pub(crate) curr_level: u32,
     pub(crate) curr_input_id: usize,
@@ -44,7 +47,7 @@ impl Default for HostState {
         let raw_rollup_address: [u8; 20] =
             SmartRollupHash::from_base58_check("sr1V6huFSUBUujzubUCg9nNXqpzfG9t4XD1h")
                 .unwrap()
-                .0
+                .as_ref()
                 .try_into()
                 .unwrap();
 
@@ -52,9 +55,17 @@ impl Default for HostState {
             raw_rollup_address,
             origination_level: crate::NAIROBI_ACTIVATION_LEVEL,
         };
+
+        let dal_parameters = RollupDalParameters {
+            number_of_slots: 16,
+            attestation_lag: 8,
+            slot_size: 126944,
+            page_size: 3967,
+        };
         Self {
             store,
             metadata,
+            dal_parameters,
             curr_level: crate::NAIROBI_ACTIVATION_LEVEL,
             curr_input_id: 0,
             input: vec![],
@@ -132,6 +143,32 @@ impl HostState {
 
     pub(crate) fn get_metadata(&self) -> &RollupMetadata {
         &self.metadata
+    }
+
+    pub(crate) fn get_dal_parameters(&self) -> &RollupDalParameters {
+        &self.dal_parameters
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn set_dal_parameters(&mut self, params: RollupDalParameters) {
+        self.dal_parameters = params
+    }
+
+    pub(crate) fn get_dal_slot(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+    ) -> Option<&Vec<u8>> {
+        self.store.0.retrieve_dal_slot(published_level, slot_index)
+    }
+
+    pub(crate) fn set_dal_slot(
+        &mut self,
+        published_level: i32,
+        slot_index: u8,
+        data: Vec<u8>,
+    ) {
+        self.store.0.set_dal_slot(published_level, slot_index, data)
     }
 }
 
@@ -553,5 +590,18 @@ mod tests {
             .handle_store_read(path.as_bytes(), 0, 4)
             .unwrap();
         assert_eq!(read_back, [4, 0, 0, 0]);
+    }
+
+    #[test]
+    fn set_and_get_dal_slot() {
+        let mut state = HostState::default();
+        let data = vec![b'z'; 512];
+        let published_level = 10;
+        let slot_index = 4;
+        state.set_dal_slot(published_level, slot_index, data.clone());
+        let data_in_slot = state
+            .get_dal_slot(published_level, slot_index)
+            .expect("Slot should contain data");
+        assert_eq!(&data, data_in_slot);
     }
 }

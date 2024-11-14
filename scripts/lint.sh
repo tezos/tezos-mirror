@@ -8,14 +8,14 @@ Where <action> can be:
 
 * --update-ocamlformat: update all the \`.ocamlformat\` files and
   git-commit (requires clean repo).
+* --check-ocamlformat: check that --update-ocamlformat does nothing.
 * --format-scripts: format shell scripts inplace using shfmt
-* --check-ocamlformat: check the above does nothing.
-* --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
 * --check-scripts: shellcheck and check formatting of the .sh files
 * --check-redirects: check docs/_build/_redirects.
 * --check-coq-attributes: check the presence of coq attributes.
 * --check-rust-toolchain: check the contents of rust-toolchain files
 * --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
+* --check-jsonnet-format: checks that the jsonnet files are formatted.
 * --help: display this and return 0.
 EOF
 }
@@ -41,6 +41,11 @@ source_directories=(src docs/doc_gen tezt devtools contrib etherlink client-libs
 license_check_exclude=$(
   cat << EOF
 .*_generated.ml
+src/lib_protocol_environment/sigs/.*
+src/riscv/lib/octez_riscv_api.ml
+src/riscv/lib/octez_riscv_api.mli
+src/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
+src/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
 EOF
 )
 
@@ -68,7 +73,7 @@ update_all_dot_ocamlformats() {
     cp .ocamlformat "$ofmt"
     git add "$ofmt"
   done
-  # we don't want to reformat protocols (but alpha) because it would alter its hash
+  # we don't want to reformat protocols (but alpha and stabilised protocols) because it would alter its hash
   protocols=$(find src/ -maxdepth 1 -name "proto_*" -not -name "proto_alpha")
   for d in $protocols; do
     (cd "$d/lib_protocol" && (find ./ -maxdepth 1 -name "*.ml*" | sed 's:^./::' | LC_COLLATE=C sort > ".ocamlformat-ignore"))
@@ -180,7 +185,7 @@ check_redirects() {
 }
 
 check_rust_toolchain_files() {
-  authorized_version=("1.66.0" "1.71.1" "1.73.0")
+  authorized_version=("1.66.0" "1.73.0" "1.76.0" "1.78.0")
 
   declare -a rust_toolchain_files
   mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"
@@ -191,28 +196,6 @@ check_rust_toolchain_files() {
       exit 1
     fi
   done
-}
-
-check_gitlab_ci_yml() {
-  # Check that a rule is not defined twice, which would result in the first
-  # one being ignored. Gitlab linter doesn't warn for it.
-  find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml |
-    while read -r filename; do
-      repeated=$(grep '^[^ #-]' "$filename" |
-        sort |
-        grep -v include |
-        uniq --repeated)
-      if [ -n "$repeated" ]; then
-        echo "$filename contains repeated rules:"
-        echo "$repeated"
-        touch /tmp/repeated
-      fi
-    done
-
-  if [ -f /tmp/repeated ]; then
-    rm /tmp/repeated
-    exit 1
-  fi
 }
 
 check_licenses_git_new() {
@@ -261,6 +244,22 @@ check_licenses_git_new() {
   return $res
 }
 
+check_jsonnet_format() {
+
+  function jsonnetfmt_script() {
+    jsonnetfmt --test grafazos/src/*.jsonnet
+  }
+
+  if jsonnetfmt_script; then
+    echo "Jsonnet files correctly formatted ✅"
+  else
+    echo "Jsonnet files are not correctly formatted (or formatting failed). ❌"
+    echo "Consider running: make -C grafazos/ fmt"
+    exit 1
+  fi
+
+}
+
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
   say "provide one action (see --help)"
   exit 1
@@ -282,9 +281,6 @@ case "$action" in
   action=update_all_dot_ocamlformats
   check_clean=true
   ;;
-"--check-gitlab-ci-yml")
-  action=check_gitlab_ci_yml
-  ;;
 "--check-scripts")
   action=check_scripts
   ;;
@@ -299,6 +295,9 @@ case "$action" in
   ;;
 "--check-licenses-git-new")
   action=check_licenses_git_new
+  ;;
+"--check-jsonnet-format")
+  action=check_jsonnet_format
   ;;
 "help" | "-help" | "--help" | "-h")
   usage

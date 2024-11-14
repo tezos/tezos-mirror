@@ -25,6 +25,7 @@
 
 open Client_proto_args
 open Baking_errors
+module Events = Baking_events.Commands
 
 let pidfile_arg =
   let open Lwt_result_syntax in
@@ -39,11 +40,89 @@ let may_lock_pidfile pidfile_opt f =
   match pidfile_opt with
   | None -> f ()
   | Some pidfile ->
-      Lwt_lock_file.try_with_lock
-        ~when_locked:(fun () ->
-          failwith "Failed to create the pidfile: %s" pidfile)
+      Lwt_lock_file.with_lock
+        ~when_locked:
+          (`Fail (Exn (Failure ("Failed to create the pidfile: " ^ pidfile))))
         ~filename:pidfile
         f
+
+let check_node_version cctxt bypass allowed =
+  let open Lwt_result_syntax in
+  (* Parse and check allowed versions *)
+  let*? allowed =
+    let open Result_syntax in
+    Option.map_e
+      (fun allowed ->
+        match
+          Tezos_version_parser.version_commit (Lexing.from_string allowed)
+        with
+        | None -> tzfail (Node_version_malformatted allowed)
+        | Some x -> return x)
+      allowed
+  in
+  let is_allowed node_version
+      (node_commit_info : Tezos_version.Octez_node_version.commit_info option) =
+    match allowed with
+    | None -> false
+    | Some (v, c) -> (
+        let c =
+          Option.map
+            (fun commit_hash ->
+              Tezos_version.Octez_node_version.{commit_hash; commit_date = ""})
+            c
+        in
+        match
+          Tezos_version.Octez_node_version.partially_compare
+            v
+            c
+            node_version
+            node_commit_info
+        with
+        | None -> false
+        | Some x -> x = 0)
+  in
+  if bypass then
+    let*! () = Events.(emit node_version_check_bypass ()) in
+    return_unit
+  else
+    let baker_version = Tezos_version_value.Current_git_info.octez_version in
+    let (baker_commit_info
+          : Tezos_version.Octez_node_version.commit_info option) =
+      Some
+        {
+          commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+          commit_date = Tezos_version_value.Current_git_info.committer_date;
+        }
+    in
+    let* node_version = Version_services.version cctxt in
+    let*! () =
+      Events.(
+        emit
+          node_version_check
+          ( node_version.version,
+            node_version.commit_info,
+            baker_version,
+            baker_commit_info ))
+    in
+    if is_allowed node_version.version node_version.commit_info then return_unit
+    else
+      match
+        Tezos_version.Octez_node_version.partially_compare
+          baker_version
+          baker_commit_info
+          node_version.version
+          node_version.commit_info
+      with
+      | Some r when r <= 0 -> return_unit
+      | _ ->
+          tzfail
+            (Node_version_incompatible
+               {
+                 node_version = node_version.version;
+                 node_commit_info = node_version.commit_info;
+                 baker_version;
+                 baker_commit_info;
+               })
 
 let http_headers_env_variable =
   "TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS"
@@ -154,14 +233,15 @@ let per_block_vote_parameter =
   Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
     (let open Protocol.Alpha_context.Per_block_votes in
-    fun _ctxt -> function
-      | "on" -> return Per_block_vote_on
-      | "off" -> return Per_block_vote_off
-      | "pass" -> return Per_block_vote_pass
-      | s ->
-          failwith
-            "unexpected vote: %s, expected either \"on\", \"off\", or \"pass\"."
-            s)
+     fun _ctxt -> function
+       | "on" -> return Per_block_vote_on
+       | "off" -> return Per_block_vote_off
+       | "pass" -> return Per_block_vote_pass
+       | s ->
+           failwith
+             "unexpected vote: %s, expected either \"on\", \"off\", or \
+              \"pass\"."
+             s)
 
 let liquidity_baking_toggle_vote_arg =
   Tezos_clic.arg
@@ -196,6 +276,27 @@ let state_recorder_switch_arg =
          "If record-state flag is set, the baker saves all its internal \
           consensus state in the filesystem, otherwise just in memory."
        ())
+
+let node_version_check_bypass_arg =
+  Tezos_clic.switch
+    ~long:"node-version-check-bypass"
+    ~doc:
+      "If node-version-check-bypass flag is set, the baker will not check its \
+       compatibility with the version of the node to which it is connected."
+    ()
+
+let node_version_allowed_arg =
+  Tezos_clic.arg
+    ~long:"node-version-allowed"
+    ~placeholder:"<product>-[v]<major>.<minor>[.0]<info>[:<commit>]"
+    ~doc:
+      "When specified the baker will accept to run with a node of this \
+       version. The specified version is composed of the product, for example \
+       'octez'; the major and the minor versions that are positive integers; \
+       the info, for example '-rc', '-beta1+dev' or realese if none is \
+       provided; optionally the commit that is the hash of the last git commit \
+       or a prefix of at least 8 characters long."
+    string_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
@@ -253,6 +354,18 @@ let endpoint_arg =
     ~placeholder:"uri"
     ~doc:"endpoint of the DAL node, e.g. 'http://localhost:8933'"
     (Tezos_clic.parameter (fun _ s -> return @@ Uri.of_string s))
+
+let dal_node_timeout_percentage_arg =
+  Tezos_clic.arg
+    ~long:"dal-node-timeout-percentage"
+    ~placeholder:"percentage"
+    ~doc:
+      "percentage of the time until the end of round, which determines the \
+       timeout to wait for the DAL node to provide shards' attestation status; \
+       the default value is 10%; use with care: too small a value may mean not \
+       being able to attest DAL slots, while too big a value may mean the \
+       baker's consensus attestations may be injected late and not included"
+  @@ Client_proto_args.positive_int_parameter ()
 
 let block_count_arg =
   Tezos_clic.default_arg
@@ -582,8 +695,10 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args13
+  Tezos_clic.args16
     pidfile_arg
+    node_version_check_bypass_arg
+    node_version_allowed_arg
     minimal_fees_arg
     minimal_nanotez_per_gas_unit_arg
     minimal_nanotez_per_byte_arg
@@ -594,11 +709,14 @@ let baker_args =
     per_block_vote_file_arg
     operations_arg
     endpoint_arg
+    dal_node_timeout_percentage_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
 
 let run_baker
     ( pidfile,
+      node_version_check_bypass,
+      node_version_allowed,
       minimal_fees,
       minimal_nanotez_per_gas_unit,
       minimal_nanotez_per_byte,
@@ -609,10 +727,14 @@ let run_baker
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
+      dal_node_timeout_percentage,
       state_recorder,
       pre_emptive_forge_time ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
   may_lock_pidfile pidfile @@ fun () ->
+  let* () =
+    check_node_version cctxt node_version_check_bypass node_version_allowed
+  in
   let*! per_block_vote_file =
     if per_block_vote_file = None then
       (* If the votes file was not explicitly given, we
@@ -644,6 +766,7 @@ let run_baker
     ~votes
     ?extra_operations
     ?dal_node_endpoint
+    ?dal_node_timeout_percentage
     ?pre_emptive_forge_time
     ~force_apply
     ~chain:cctxt#chain

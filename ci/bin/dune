@@ -6,7 +6,8 @@
  (libraries
   gitlab_ci
   yaml
-  unix)
+  unix
+  tezt.core)
  (flags
   (:standard)
   -open Gitlab_ci.Base))

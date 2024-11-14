@@ -80,7 +80,7 @@ module Info = struct
     peer_id : P2p_peer_id.t;
     id_point : Id.t;
     remote_socket_port : P2p_addr.port;
-    announced_version : Network_version.t;
+    announced_version : Tezos_version.Network_version.t;
     private_node : bool;
     local_metadata : 'meta;
     remote_metadata : 'meta;
@@ -130,7 +130,7 @@ module Info = struct
          (req "peer_id" P2p_peer_id.encoding)
          (req "id_point" Id.encoding)
          (req "remote_socket_port" uint16)
-         (req "announced_version" Network_version.encoding)
+         (req "announced_version" Tezos_version.Network_version.encoding)
          (req "private" bool)
          (req "local_metadata" metadata_encoding)
          (req "remote_metadata" metadata_encoding))
@@ -159,7 +159,7 @@ module Info = struct
       peer_id
       P2p_point.Id.pp
       point
-      Network_version.pp
+      Tezos_version.Network_version.pp
       announced_version
       (if private_node then " private" else "")
       pp_meta
@@ -522,7 +522,8 @@ module Internal_for_tests = struct
           peer_id = P2p_peer_id.zero;
           id_point = Id.of_point (P2p_point.Id.of_string_exn "0.0.0.0:0");
           remote_socket_port = 0;
-          announced_version = Network_version.Internal_for_tests.mock ();
+          announced_version =
+            Tezos_version.Network_version.Internal_for_tests.mock ();
           private_node = true;
           local_metadata = default_metadata;
           remote_metadata = default_metadata;

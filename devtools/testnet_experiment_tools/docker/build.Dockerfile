@@ -1,9 +1,10 @@
-ARG BASE_IMAGE=registry.gitlab.com/tezos/opam-repository
+ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION
-ARG RUST_TOOLCHAIN_IMAGE
+ARG RUST_TOOLCHAIN_IMAGE_NAME
 ARG RUST_TOOLCHAIN_IMAGE_TAG
 
-FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as without-evm-artifacts
+# hadolint ignore=DL3006
+FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as without-evm-artifacts
 # use alpine /bin/ash and set pipefail.
 # see https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]

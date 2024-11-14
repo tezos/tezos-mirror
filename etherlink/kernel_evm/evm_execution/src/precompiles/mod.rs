@@ -11,30 +11,39 @@
 //! provided by SputnikVM, as we require the Host type and object
 //! for writing to the log.
 
-use std::{str::FromStr, vec};
+use std::vec;
 
 mod blake2;
 mod ecdsa;
+mod fa_bridge;
 mod hash;
 mod identity;
 mod modexp;
 mod withdrawal;
 mod zero_knowledge;
 
-use crate::handler::EvmHandler;
+use crate::handler::{EvmHandler, Withdrawal};
 use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use blake2::blake2f_precompile;
 use ecdsa::ecrecover_precompile;
 use evm::{Context, ExitReason, Handler, Transfer};
+use fa_bridge::fa_bridge_precompile;
 use hash::{ripemd160_precompile, sha256_precompile};
-use host::runtime::Runtime;
 use identity::identity_precompile;
 use modexp::modexp_precompile;
 use primitive_types::H160;
-use tezos_ethereum::withdrawal::Withdrawal;
+use tezos_evm_runtime::runtime::Runtime;
 use withdrawal::withdrawal_precompile;
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
+
+/// FA bridge precompile address
+pub const FA_BRIDGE_PRECOMPILE_ADDRESS: H160 = H160([
+    0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+]);
+
+// System (zero) account address, owns ticket table and withdrawal counter
+pub const SYSTEM_ACCOUNT_ADDRESS: H160 = H160::zero();
 
 /// Outcome of executing a precompiled contract. Covers both successful
 /// return, stop and revert and additionally, it covers contract execution
@@ -144,9 +153,17 @@ pub fn call_precompile_with_gas_draining<Host: Runtime>(
     }
 }
 
+// Prefixed by 'ff' to make sure we will not conflict with any
+// upcoming Ethereum upgrades.
+pub const WITHDRAWAL_ADDRESS: H160 = H160([
+    0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+]);
+
 /// Factory function for generating the precompileset that the EVM kernel uses.
-pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
-    BTreeMap::from([
+pub fn precompile_set<Host: Runtime>(
+    enable_fa_withdrawals: bool,
+) -> PrecompileBTreeMap<Host> {
+    let mut precompiles = BTreeMap::from([
         (
             H160::from_low_u64_be(1u64),
             ecrecover_precompile as PrecompileFn<Host>,
@@ -184,13 +201,19 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
             blake2f_precompile as PrecompileFn<Host>,
         ),
         (
-            // Prefixed by 'ff' to make sure we will not conflict with any
-            // upcoming Ethereum upgrades.
-            // NB: The `unwrap()` here is safe.
-            H160::from_str("ff00000000000000000000000000000000000001").unwrap(),
+            WITHDRAWAL_ADDRESS,
             withdrawal_precompile as PrecompileFn<Host>,
         ),
-    ])
+    ]);
+
+    if enable_fa_withdrawals {
+        precompiles.insert(
+            FA_BRIDGE_PRECOMPILE_ADDRESS,
+            fa_bridge_precompile as PrecompileFn<Host>,
+        );
+    }
+
+    precompiles
 }
 
 #[macro_export]
@@ -205,21 +228,17 @@ macro_rules! fail_if_too_much {
 }
 
 mod tick_model {
-    use crate::EthereumError;
-
-    pub fn ticks_of_sha256(data_size: usize) -> Result<u64, EthereumError> {
+    pub fn ticks_of_sha256(data_size: usize) -> u64 {
         let size = data_size as u64;
-        Ok(75_000 + 30_000 * (size.div_euclid(64)))
+        75_000 + 30_000 * (size.div_euclid(64))
     }
-    pub fn ticks_of_ripemd160(data_size: usize) -> Result<u64, EthereumError> {
+    pub fn ticks_of_ripemd160(data_size: usize) -> u64 {
         let size = data_size as u64;
-
-        Ok(70_000 + 20_000 * (size.div_euclid(64)))
+        70_000 + 20_000 * (size.div_euclid(64))
     }
-    pub fn ticks_of_identity(data_size: usize) -> Result<u64, EthereumError> {
+    pub fn ticks_of_identity(data_size: usize) -> u64 {
         let size = data_size as u64;
-
-        Ok(42_000 + 35 * size)
+        42_000 + 35 * size
     }
     pub fn ticks_of_withdraw() -> u64 {
         880_000
@@ -242,18 +261,21 @@ mod test_helpers {
     use crate::handler::EvmHandler;
     use crate::handler::ExecutionOutcome;
     use crate::EthereumError;
+    use crate::NATIVE_TOKEN_TICKETER_PATH;
     use evm::Config;
     use evm::Transfer;
+    use host::runtime::Runtime;
     use primitive_types::{H160, U256};
     use tezos_ethereum::block::BlockConstants;
     use tezos_ethereum::block::BlockFees;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use super::precompile_set;
     const DUMMY_ALLOCATED_TICKS: u64 = 100_000_000;
+    pub const DUMMY_TICKETER: &str = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5";
 
     pub fn set_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
         balance: U256,
@@ -278,19 +300,28 @@ mod test_helpers {
         input: &[u8],
         transfer: Option<Transfer>,
         gas_limit: Option<u64>,
+        is_static: bool,
     ) -> Result<ExecutionOutcome, EthereumError> {
         let caller = H160::from_low_u64_be(118u64);
-        let mut mock_runtime = MockHost::default();
+        let mut mock_runtime = MockKernelHost::default();
         let block_fees = BlockFees::new(
             U256::from(21000),
             U256::from(21000),
             U256::from(2_000_000_000_000u64),
         );
-        let block = BlockConstants::first_block(U256::zero(), U256::one(), block_fees);
+        let block = BlockConstants::first_block(
+            U256::zero(),
+            U256::one(),
+            block_fees,
+            u64::MAX,
+            H160::zero(),
+        );
         let mut evm_account_storage = init_evm_account_storage().unwrap();
-        let precompiles = precompile_set::<MockHost>();
+        let precompiles = precompile_set::<MockKernelHost>(false);
         let config = Config::shanghai();
         let gas_price = U256::from(21000);
+
+        set_ticketer(&mut mock_runtime, DUMMY_TICKETER);
 
         if let Some(Transfer { source, value, .. }) = transfer {
             set_balance(
@@ -315,9 +346,9 @@ mod test_helpers {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
-        let is_static = true;
         let value = transfer.map(|t| t.value);
 
         handler.call_contract(
@@ -328,5 +359,10 @@ mod test_helpers {
             gas_limit,
             is_static,
         )
+    }
+
+    fn set_ticketer(host: &mut MockKernelHost, address: &str) {
+        host.store_write(&NATIVE_TOKEN_TICKETER_PATH, address.as_bytes(), 0)
+            .unwrap();
     }
 }

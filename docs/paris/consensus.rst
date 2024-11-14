@@ -50,6 +50,7 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
+.. _tb_validator:
 .. _tb_validator_paris:
 
 Tenderbake is executed for each new block level by a "committee" whose members
@@ -79,12 +80,14 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
+.. _candidate_block:
 .. _candidate_block_paris:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
+.. _quorum:
 .. _quorum_paris:
 
 Unlike Emmy*, Tenderbake has `two types of
@@ -105,6 +108,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
+.. _finality:
 .. _finality_paris:
 
 Transaction and block finality
@@ -122,6 +126,8 @@ Consequently, to agree on a block, that is, on both the payload and the header, 
 confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
+.. _time_between_blocks: 
+
 Time between blocks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -138,50 +144,52 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
+.. _active_stake:
 .. _active_stake_paris:
 
-Validator selection: staking balance, active stake, and frozen deposits
+Validator selection: staked balance and active stake
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Validator selection is based on the stake, as in Emmy*, with the exception that
-it is based on the delegate's *active stake* instead of its *staking
-balance*. Let us first (re)define these and related concepts.
+Validator selection is based on the staked balance of a delegate, as in Emmy*.
+Let us first (re)define these and related concepts.
 
-- The *(maximal) staking balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
+- The *overall balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
   balances of all accounts that have delegated to it.
   It must be at least ``MINIMAL_STAKE`` tez, otherwise the delegate cannot be selected as a validator.
 - The *active stake* of a delegate is the amount of tez with which
-  it participates in consensus. It is at most its
-  staking balance. We explain below how it is computed.
-- The *frozen deposit* represents the delegate's skin in the game: in the case that the
-  delegate behaves badly, its frozen deposit is partly slashed (see
-  :ref:`slashing_paris`).
-  The frozen deposits are updated at the end of each cycle.  It must be at least
-  ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot be selected as a
-  validator.
+  it participates in consensus. It is at most its maximal
+  staked balance. We explain below how it is computed.
+- The *staked balance* represents the delegate's skin in the game: in
+  the case that the delegate behaves badly, its staked balance is
+  partly :ref:`slashed<slashing_paris>`. This staked balance must be
+  at least ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot
+  be selected as a validator. Note that until the :ref:`activation of
+  Adaptive Issuance and Staking<feature_activation_paris>`, the
+  staked balance is automatically updated at the end of each cycle to
+  maximize the active stake.
 - The *spendable balance* of a delegate is its full balance
-  minus the frozen deposits.
+  minus its staked balance and unstaked frozen balance.
 
 We state next the RPCs which allow to retrieve these types of balances, and also some invariants about them
 (Note that these are just invariants, not definitions; for
 instance, the frozen deposits are computed in terms of the full balance,
 not the other way around.):
 
-- ``delegated balance`` represents the total amount of tokens delegated by others to a
+- ``delegated balance`` represents the total amount of tokens delegated or staked by others to a
   given delegate; it excludes the delegate's full balance; it is obtained
   with ``../context/delegates/<pkh>/delegated_balance``
-- ``staking balance = full balance + delegated balance``; it is obtained with
+- ``overall balance = full balance + delegated balance``; it is obtained with
   ``../context/delegates/<pkh>/staking_balance``
-- ``full balance = spendable balance + frozen deposit``; it is obtained with
+- ``full balance = spendable balance + staked balance + unstaked frozen balance``; it is obtained with
   ``../context/delegates/<pkh>/full_balance``
-- ``frozen deposit`` is obtained with ``../context/delegates/<pkh>/frozen_deposits``
+- ``staked balance`` is obtained with ``../context/delegates/<pkh>/frozen_deposits``
 - ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
 
-Delegates can set an upper limit to their frozen deposits with the
+Until Adaptive Issuance, delegates can set an upper limit to their staked balance with the
 command ``octez-client set deposits limit for <delegate> to
 <deposit_limit>``, and unset this limit with the command ``octez-client
 unset deposits limit for <delegate>``. These commands are implemented
-using a new manager operation ``Set_deposits_limit``.
+using the manager operation ``Set_deposits_limit``.
 When emitting such a command in cycle ``c``, it affects the automatic deposit at
 the end of this cycle, and thus the consensus rights set for cycle ``(c + 1) +
 CONSENSUS_RIGHTS_DELAY + 1``.
@@ -203,28 +211,31 @@ before updating the delegates' :ref:`activity status<active_delegate_paris>`.
    block* or *having a preattestation or attestation included in a final
    block*.
 
-Intuitively, the active stake is set to 10 times the delegate's chosen frozen
-deposit limit, without going beyond its available staking balance,
-nor its maximum staking capacity (determined by its full balance).
-More precisely, the active stake is the minimum between:
+Intuitively, the active stake is set to 10 times the delegate's staked balance,
+without going beyond its overall balance.
+More precisely, the active stake is:
 
-- the delegate's staking balance, and
-- 10 times the delegate's *deposit cap*, i.e. ``deposit_cap * 100 / deposit_percentage``. If the delegate has not set a frozen deposit limit, ``deposit_cap`` is its full balance. Otherwise ``deposit_cap`` is the minimum between its full balance and the frozen deposit limit set by the delegate.
+- the delegate's staked balance,
+- its stakers' staked balance (up to a limit, see
+  :ref:`limit_of_staking_over_baking<staking_policy_configuration_paris>`),
+- and the liquid delegated balance + the spendable balance, up to 9 times the delegate's staked balance.
+
+Before Adaptive Issuance, each part weighs equally when computing the baking and voting rights. After Adaptive Issuance, the frozen balances (non-liquid, non-spendable) are weighed for twice as much per tez as the liquid part.
 
 Let's take some examples. Say that the full balance of a delegate is ``1000`` tez.
-Then its theoretical maximum staking balance is
-``10000`` tez. The following table lists some scenarios (assuming for
-simplicity no changes in the delegate's full and staking balances
-during the last 8 cycles).
+Then, without external staking, its theoretical maximum active stake is
+``10000`` tez. The following table lists some scenarios before Adaptive Issuance (assuming for
+simplicity no changes in the delegate's full and staked balances
+during the last 5 cycles).
 
 .. list-table::
    :widths: 20 20 20 20 20
    :header-rows: 1
 
-   * - Staking balance
+   * - Overall balance
      - Frozen deposit limit
      - Active stake
-     - Frozen deposit
+     - Staked balance
      - Spendable balance
    * - 9000
      - --
@@ -251,7 +262,7 @@ We note in passing that this new schema basically solves the main
 problem of over-delegation: a delegate will not fail anymore to bake
 and attest because of an insufficient balance to pay the
 deposit. However, a delegate can still be over-delegated, and it will be
-rewarded based on its active stake, not on its staking balance.
+rewarded based on its active stake, not on its overall balance.
 
 Economic Incentives
 ~~~~~~~~~~~~~~~~~~~
@@ -267,15 +278,11 @@ behavior. Notable changes however are as follows:
   obtain a quorum, is rewarded with a bonus.
 * Attesting rewards are shared equally among all validators. Participation above
   a minimal threshold per cycle is however required.
-* Deposits are no longer frozen and unfrozen, instead a percentage of the active
-  stake is always locked. A delegate with an empty deposit cannot bake nor
-  (pre)attest.
 * Validators are rewarded instantaneously for baking blocks and including extra attestations, and not at the end of the cycle like in Emmy*.
 * At the end of a cycle ``c``, the following actions happen:
 
-  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution,
   - the distribution of attesting rewards,
-  - the adjustment of frozen deposits.
+  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution.
 
 
 Fees
@@ -326,9 +333,9 @@ cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expe
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
-Regarding the concrete values for rewards, we first fix the total reward per
+Regarding the concrete values for rewards, before Adaptive Issuance, we first fix the total reward per
 level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
-Assuming ``blocks_per_minute = 6``, ``total_rewards`` is 13.33 tez.
+Assuming ``blocks_per_minute = 6``, ``total_rewards`` is 13.33 tez. With Adaptive Issuance, this value changes dynamically over time but for the sake of example, we will assume that the reward value stays the same as above.
 We define:
 
 - ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
@@ -341,15 +348,15 @@ where:
 - ``bonus_ratio`` to ``1 / 3``.
 
 Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 3.33`` tez,
-(maximum) ``bonus = 3.33`` tez, and ``attesting_rewards = 6.67`` tez.
+(maximum) ``bonus = 3.33`` tez, and ``attesting_reward = 6.66`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional attestations included in a block). The rewards per
-attestation slot are ``attesting_rewards / CONSENSUS_COMMITTEE_SIZE``.
+attestation slot are ``attesting_reward / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
 ``3.33 / (7000 / 3) = 0.001427`` tez and an attesting
-rewards per slot of ``6.67 / 7000 = 0.000952`` tez.
+rewards per slot of ``6.66 / 7000 = 0.000951`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
@@ -357,16 +364,18 @@ A. Also, B includes attestations with attesting power ``5251``. Then A receives
 the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
-Therefore B receives the bonus ``(5251 - 4667) * 0.001428 = 0.833952`` tez. (Note
-that B only included attestations corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
-maximum 2333 extra attestations it could have theoretically included.) Finally, consider some
-delegate C, whose active stake at some cycle is 5% of the total stake. Note that
-his expected number of validator slots for that cycle is ``5/100 * 8192 * 7000 =
-2,867,200`` slots. Assume also that the attesting power of C's attestations
-included during that cycle has been ``2,123,456`` slots. Given that this number is
-bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an attesting
-reward of ``2,867,200 * 0.000952 = 2729.5744`` tez for that cycle.
+Therefore B receives the bonus ``(5251 - 4667) * 0.001427 = 0.833368`` tez. (Note
+that B only included attestations corresponding to ``584 = 5251 - 4667`` additional validator slots, about a quarter of the
+maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
+delegate C, whose active stake at some cycle is 1% of the total stake. Note that
+his expected number of validator slots for that cycle is
+``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 24576 * 7000 = 1,720,320``
+slots. Assume also that the attesting power of C's attestations
+included during that cycle has been ``1,321,456`` slots. Given that this number is
+bigger than the minimum required (``1,720,320 * 2 / 3``), it receives an attesting
+reward of ``1,720,320 * 0.000951 = 1636.0243`` tez for that cycle.
 
+.. _slashing:
 .. _slashing_paris:
 
 Slashing
@@ -378,10 +387,12 @@ its attesting rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or it
 double (pre)attests (which means voting on two different proposals at the same
 level and round), a part of the frozen deposit is slashed. The slashed amount
-for double baking and double (pre)attesting are fixed percentage of the frozen
-deposit: ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING`` and
-``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``.
-The payload producer that includes the misbehavior evidence is rewarded a
+for double baking is a fixed percentage of the frozen deposit
+``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``. For
+double (pre)attestations, the formula is more complex, as it depends
+on the number of attestation slots that participated in the
+misbehavior; see :doc:`adaptive_slashing` for more details.
+The payload producer that includes the misbehavior evidence will be rewarded a
 seventh of the slashed amount, which corresponds to ``1 /
 (GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``.
 
@@ -392,18 +403,14 @@ The evidence for double signing at a given level can be collected by any
 :ref:`accuser<def_accuser_paris>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
-If the recorded denunciation events in the previous and current cycle lead to
-slashing over 51% of the deposits, it immediately forbids the delegate to
-participate further in the consensus, either by baking or attesting.
-At the end of the first cycle in which both the sum of slashing events of a
-delegate over the last two cycles fall under the 51% threshold and its frozen
-deposits are at least half of its consensus rights for the given cycle, the
-delegate is allowed to participate again in the next cycle.
+As soon as a delegate is denounced for any double signing, it is
+immediately :ref:`forbidden<new_forbidden_period_paris>` from both baking
+and attesting for at least 2 cycles.
 
-The actual slashing and denunciation rewarding happen at the end of the cycle in
-which the denunciation has been included.
+The actual slashing and denunciation rewarding happen at the end of
+the last cycle of the slashing period of the misbehavior.
 
-We note that selfish baking is not an issue in Tenderbake: say we are at round
+Note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
 at round ``r`` in the hope that the block at round ``r`` is not agreed upon and
 its turn comes to propose at round ``r+1``. Under the assumption that the
@@ -411,6 +418,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _cs_constants:
 .. _cs_constants_paris:
 
 Consensus related protocol parameters
@@ -428,29 +436,28 @@ Consensus related protocol parameters
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
    * - ``MINIMAL_BLOCK_DELAY``
      - 10s
+   * - ``BLOCKS_PER_CYCLE``
+     - 24576
    * - ``DELAY_INCREMENT_PER_ROUND``
      - 5s
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
-   * - ``FROZEN_DEPOSITS_PERCENTAGE``
-     - 10
    * - ``MAX_SLASHING_PERIOD``
      - 2 cycles
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
      - 5%
-   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``
-     - 50%
    * - ``BAKING_REWARD_FIXED_PORTION``
      - 3.33 tez
    * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001429 tez
+     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001427 tez
    * - ``ATTESTING_REWARD_PER_SLOT``
-     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000952 tez
+     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000951 tez
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
      - 5
 
 These are a subset of the :ref:`protocol constants <protocol_constants_paris>`.
 
+.. _shell_proto_revisit:
 .. _shell_proto_revisit_paris:
 
 Shell-protocol interaction revisited
@@ -472,6 +479,7 @@ As in Emmy*, the protocol-specific header contains the fields:
 
 There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_paris>`.
 
+.. _fitness:
 .. _fitness_paris:
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.

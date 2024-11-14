@@ -8,7 +8,6 @@ __pycache__
 **/_build
 _build_rust
 _opam
-!_opam/share/*
 _docker_build
 _snoop
 docs/api/tezos-client.html
@@ -22,7 +21,6 @@ tezos-admin-client
 tezos-baker-*
 tezos-endorser-*
 tezos-accuser-*
-tezos-proxy-server
 tezos-signer
 tezos-smart-rollup-node-*
 tezos-smart-rollup-client-*
@@ -34,12 +32,14 @@ octez-admin-client
 octez-baker-*
 octez-endorser-*
 octez-accuser-*
-octez-proxy-server
 octez-signer
 octez-smart-rollup-node*
 octez-smart-rollup-client-*
 octez-injector-server
 octogram
+octez-teztale-archiver
+octez-teztale-server
+octez-agnostic-baker
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src
@@ -139,5 +139,5 @@ terraform.rc
 *.lock.hcl
 
 # RISC-V
-/src/risc_v/risc-v-sandbox
-/src/risc_v/risc-v-dummy.elf
+/src/riscv/riscv-sandbox
+/src/riscv/riscv-dummy.elf

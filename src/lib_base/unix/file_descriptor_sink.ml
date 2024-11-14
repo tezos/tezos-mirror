@@ -81,9 +81,21 @@ module Color = struct
   let bold_len = 4
 
   module FG = struct
+    (* Error level default color *)
     let red = "\027[31m"
 
+    (* Warning level default color *)
     let yellow = "\027[33m"
+
+    (* Alternative colors *)
+
+    let green = "\027[32m"
+
+    let blue = "\027[34m"
+
+    let cyan = "\027[36m"
+
+    let magenta = "\027[35m"
   end
 end
 
@@ -351,9 +363,10 @@ end) : Internal_event.SINK with type t = t = struct
       match (Uri.get_query_param uri "level-at-least", section_prefixes) with
       | None, None -> return (`Level_at_least Internal_event.Level.default)
       | Some l, None -> (
-          match Internal_event.Level.of_string l with
+          match Internal_event.Level.of_string_exn l with
           | Some l -> return (`Level_at_least l)
-          | None -> fail_parsing uri "Wrong level: %S" l)
+          | None | (exception Internal_event.Level.Not_a_level _) ->
+              fail_parsing uri "Wrong level: %S" l)
       | base_level, Some l -> (
           try
             let sections =
@@ -365,17 +378,17 @@ end) : Internal_event.SINK with type t = t = struct
                       Some Internal_event.Level.default )
                 | [one; two] ->
                     let lvl =
-                      match String.lowercase_ascii two with
-                      | "none" -> None
-                      | s -> (
-                          match Internal_event.Level.of_string s with
-                          | Some s -> Some s
-                          | None ->
-                              Format.kasprintf
-                                Stdlib.failwith
-                                "Wrong level name: %S in argument %S"
-                                two
-                                s)
+                      match
+                        Internal_event.Level.of_string_exn
+                          (String.lowercase_ascii two)
+                      with
+                      | level -> level
+                      | exception Internal_event.Level.Not_a_level _ ->
+                          Format.kasprintf
+                            Stdlib.failwith
+                            "Wrong level name: %S in argument %S"
+                            two
+                            s
                     in
                     let section =
                       match one with
@@ -395,11 +408,11 @@ end) : Internal_event.SINK with type t = t = struct
               match base_level with
               | None -> pairs
               | Some lvl -> (
-                  match Internal_event.Level.of_string lvl with
-                  | Some l ->
+                  match Internal_event.Level.of_string_exn lvl with
+                  | level ->
                       (* establish default for all sections *)
-                      pairs @ [(Internal_event.Section.empty, Some l)]
-                  | None ->
+                      pairs @ [(Internal_event.Section.empty, level)]
+                  | exception Internal_event.Level.Not_a_level _ ->
                       Format.kasprintf
                         Stdlib.failwith
                         "Wrong level name %S in level-at-least argument"
@@ -618,6 +631,12 @@ end) : Internal_event.SINK with type t = t = struct
         | Some (_, None) -> (* exclude list *) false
         | Some (_, Some lvl) -> Internal_event.Level.compare M.level lvl >= 0)
 
+  let color = function
+    | Internal_event.Blue -> Some Color.FG.blue
+    | Internal_event.Cyan -> Some Color.FG.cyan
+    | Internal_event.Green -> Some Color.FG.green
+    | Internal_event.Magenta -> Some Color.FG.magenta
+
   let level_color = function
     | Internal_event.Warning -> Some Color.FG.yellow
     | Error | Fatal -> Some Color.FG.red
@@ -653,7 +672,9 @@ end) : Internal_event.SINK with type t = t = struct
               if colors then
                 let*! color_compatible = output_color_compatible output in
                 if color_compatible then
-                  Lwt.return (Enabled (level_color M.level))
+                  match M.alternative_color with
+                  | None -> Lwt.return (Enabled (level_color M.level))
+                  | Some c -> Lwt.return (Enabled (color c))
                 else Lwt.return Disabled
               else Lwt.return Disabled
             in

@@ -32,14 +32,6 @@
 
 module Dal = Dal_common
 
-module Helpers = struct
-  include Dal.Helpers
-
-  (* We override store slot so that it uses a DAL node in this file. *)
-  let store_slot dal_node ?with_proof slot =
-    store_slot (Either.Left dal_node) ?with_proof slot
-end
-
 module Dal_RPC = struct
   include Dal.RPC
 
@@ -63,18 +55,15 @@ let dal_parameters ~is_fake =
   let parameters =
     {number_of_shards; redundancy_factor; page_size; slot_size}
   in
-  let dal_config =
-    let use_mock_srs_for_testing = is_fake in
-    Config.{activated = true; use_mock_srs_for_testing; bootstrap_peers = []}
-  in
   let find_srs_files = Tezos_base.Dal_srs.find_trusted_setup_files in
   let check_make error_msg =
     match make parameters with
     | Ok _ -> unit
     | Error (`Fail s) -> Test.fail "%s. Reason:@.%s@." error_msg s
   in
+  let* () = check_make "The set of parameters is invalid for the verifier" in
   let* () =
-    let* res = Config.init_prover_dal ~find_srs_files dal_config in
+    let* res = init_prover_dal ~find_srs_files () in
     match res with
     | Ok () -> unit
     | Error errs ->
@@ -84,18 +73,7 @@ let dal_parameters ~is_fake =
              Tezos_error_monad.Error_monad.pp)
           errs
   in
-  let* () = check_make "The set of parameters is invalid for the verifier" in
-  let () =
-    match Config.init_verifier_dal dal_config with
-    | Ok () -> ()
-    | Error errs ->
-        Test.fail
-          "Could not init verifier. Reason:@.%a@."
-          (Tezos_error_monad.Error_monad.TzTrace.pp_print_top
-             Tezos_error_monad.Error_monad.pp)
-          errs
-  in
-  let* () = check_make "The set of parameters is invalid for the verifier." in
+  let* () = check_make "The set of parameters is invalid for the prover" in
   unit
 
 (** Start a layer 1 node on the given network, with the given data-dir and
@@ -351,10 +329,11 @@ let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
   (* Endless loop that injects slots *)
   let rec loop level =
     let slot =
-      sf "slot=%d/payload=%d" slot_index level |> Helpers.make_slot ~slot_size
+      sf "slot=%d/payload=%d" slot_index level
+      |> Dal_common.Helpers.make_slot ~slot_size
     in
     let* commitment, proof =
-      Helpers.store_slot dal_node ~with_proof:true slot
+      Dal_common.Helpers.store_slot dal_node ~slot_index slot
     in
     let* level = Node.wait_for_level l1_node (level + 1) in
     let*! () =

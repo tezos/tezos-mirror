@@ -2,6 +2,9 @@
 
 set -e
 
+script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+src_dir="$(dirname "$(dirname "$script_dir")")"
+
 ORIGIN=${ORIGIN:-origin}
 
 if [[ "$CI_MERGE_REQUEST_LABELS" =~ (^|,)ci--run-all-tezts($|,) ]]; then
@@ -15,13 +18,21 @@ abort() {
   exit 17
 }
 
-if [ -z "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
-  echo "CI_MERGE_REQUEST_DIFF_BASE_SHA is unspecified or empty, test selection is disabled."
+# shellcheck source=scripts/ci/gitlab_mr_environment.sh
+. "$src_dir"/scripts/ci/gitlab_mr_environment.sh
+
+merge_base=$("$src_dir"/scripts/ci/git_merge_base.sh "$TEZOS_CI_MR_TARGET" "$TEZOS_CI_MR_HEAD" || {
+  # Print on stderr to make visible outside command substitution
+  echo "Failed to get merge base, test selection is disabled." >&2
+  abort
+})
+if [ -z "$merge_base" ]; then
+  echo "Merge base is empty, test selection is disabled."
   abort
 fi
 
-echo "---- Fetching HEAD and $CI_MERGE_REQUEST_DIFF_BASE_SHA from $ORIGIN..."
-if ! git fetch "$ORIGIN" HEAD "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; then
+echo "---- Fetching source branch HEAD ($TEZOS_CI_MR_HEAD) and base ($merge_base) from $ORIGIN..."
+if ! git fetch "$ORIGIN" "$TEZOS_CI_MR_HEAD" "$merge_base"; then
   # Example error that was seen in a job:
   # error: RPC failed; curl 92 HTTP/2 stream 5 was not closed cleanly: INTERNAL_ERROR (err 2)
   # error: 50483 bytes of body are still expected
@@ -32,11 +43,11 @@ if ! git fetch "$ORIGIN" HEAD "$CI_MERGE_REQUEST_DIFF_BASE_SHA"; then
 fi
 
 echo "---- Diffing..."
-CHANGES="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA")"
+CHANGES="$(git diff --name-only "$merge_base" "$TEZOS_CI_MR_HEAD")"
 echo "$CHANGES"
 
 echo "---- Compiling manifest/manifest..."
-make -C manifest manifest
+make --silent -C manifest manifest
 
 echo "---- Selecting tests..."
 # "--" ensures that if a filename starts with a dash, it is not interpreted as an option.

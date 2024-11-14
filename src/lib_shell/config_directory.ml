@@ -49,9 +49,32 @@ let build_rpc_directory ~user_activated_upgrades
     ~user_activated_protocol_overrides
     ~dal_config
     Tezos_rpc.Directory.empty
-  |> register Config_services.history_mode (fun () () () ->
+  |> register
+       Config_services.History_mode_services.history_mode
+       (fun () () () ->
          let chain_store = Store.main_chain_store store in
-         return (Store.Chain.history_mode chain_store))
+         let history_mode =
+           match Store.Chain.history_mode chain_store with
+           | (Full (Some _) | Rolling (Some _) | Archive) as history_mode ->
+               history_mode
+           | Full None -> Full (Some History_mode.default_additional_cycles)
+           | Rolling None ->
+               Rolling (Some History_mode.default_additional_cycles)
+         in
+         let*! head = Store.Chain.current_head chain_store in
+         let*! protocol = Store.Block.protocol_hash_exn chain_store head in
+         let*! blocks_preservation_cycles =
+           let open Lwt_syntax in
+           match history_mode with
+           | Archive -> return_none
+           | Rolling _ | Full _ -> (
+               match Protocol_plugin.find_rpc protocol with
+               | None -> return_none
+               | Some (module RPC) ->
+                   RPC.get_blocks_preservation_cycles ~get_context:(fun () ->
+                       Store.Block.context_exn chain_store head))
+         in
+         return (history_mode, blocks_preservation_cycles))
   |> register Config_services.Logging.configure (fun () () configuration ->
          let open Lwt_result_syntax in
          let* () = Internal_event_unix.Configuration.reapply configuration in

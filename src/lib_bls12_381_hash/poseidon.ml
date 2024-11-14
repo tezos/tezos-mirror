@@ -11,7 +11,8 @@ module Stubs = struct
     ark:Bls12_381.Fr.t array ->
     mds:Bls12_381.Fr.t array array ->
     ctxt
-    = "caml_bls12_381_hash_poseidon_allocate_ctxt_stubs_bytecode" "caml_bls12_381_hash_poseidon_allocate_ctxt_stubs"
+    = "caml_bls12_381_hash_poseidon_allocate_ctxt_stubs_bytecode"
+      "caml_bls12_381_hash_poseidon_allocate_ctxt_stubs"
 
   external get_state : Bls12_381.Fr.t array -> ctxt -> unit
     = "caml_bls12_381_hash_poseidon_get_state_stubs"

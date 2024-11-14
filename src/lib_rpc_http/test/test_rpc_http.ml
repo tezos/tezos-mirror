@@ -353,16 +353,16 @@ let test_matching_with_name_resolving =
     (fun () ->
       Lwt_main.run
         (let open Lwt_syntax in
-        let* policy = resolve_domain_names_in_policy example_policy in
-        List.iter
-          (fun (ip_addr, port, expected) ->
-            check_acl_search
-              "a domain name should match an appropriate IP address"
-              policy
-              expected
-              (ip_addr, port))
-          to_test ;
-        return_unit))
+         let* policy = resolve_domain_names_in_policy example_policy in
+         List.iter
+           (fun (ip_addr, port, expected) ->
+             check_acl_search
+               "a domain name should match an appropriate IP address"
+               policy
+               expected
+               (ip_addr, port))
+           to_test ;
+         return_unit))
 
 let test_media_type_pp_parse =
   let open Tezos_rpc_http.Media_type.Command_line in

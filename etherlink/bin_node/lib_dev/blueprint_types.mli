@@ -5,8 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A chunk of a blueprint *)
+type chunk = [`External of string]
+
 (** A chunked blueprint, ready to be executed localy. *)
-type payload = [`External of string] list
+type payload = chunk list
 
 type t = {
   number : Ethereum_types.quantity;
@@ -16,8 +19,9 @@ type t = {
 
 (** Blueprint with events contains: *)
 type with_events = {
-  delayed_transactions : Ethereum_types.Delayed_transaction.t list;
+  delayed_transactions : Evm_events.Delayed_transaction.t list;
       (** The delayed transactions to apply before applying the blueprint. *)
+  kernel_upgrade : Evm_events.Upgrade.t option;
   blueprint : t;  (** The blueprint to execute. *)
 }
 

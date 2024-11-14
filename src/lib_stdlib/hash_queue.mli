@@ -32,7 +32,8 @@
 *)
 
 module Make
-    (K : Hashtbl.HashedType) (V : sig
+    (K : Hashtbl.HashedType)
+    (V : sig
       type t
     end) : sig
   (** The type of hash queues holding bindings from [K.t] to [V.t] *)
@@ -81,20 +82,20 @@ module Make
 
   (** Returns the oldest element of the queue when not empty. Returns [None]
       when empty. *)
-  val peek : t -> V.t option
+  val peek : t -> (K.t * V.t) option
 
   (** [take q] removes and returns the oldest element in queue [q], or returns
       [None] if the queue is empty. *)
-  val take : t -> V.t option
+  val take : t -> (K.t * V.t) option
 
   (** [peek_at_most q n] returns the oldest n elements of the queue [q]. If the
       queue has less than [n] elements, returns all elements of the queue. *)
-  val peek_at_most : t -> int -> V.t list
+  val peek_at_most : t -> int -> (K.t * V.t) list
 
   (** [take_at_most q n] removes and returns the oldest n elements of the queue
       [q]. If the queue has less than [n] elements, removes and returns all
       elements of the queue. *)
-  val take_at_most : t -> int -> V.t list
+  val take_at_most : t -> int -> (K.t * V.t) list
 
   (** Returns the elements from oldest to newest. *)
   val elements : t -> V.t list

@@ -80,11 +80,8 @@ let concat_completed {lv; rv; offset; _} =
 (* Errors *)
 
 module Link = Error.Make ()
-
 module Trap = Error.Make ()
-
 module Crash = Error.Make ()
-
 module Exhaustion = Error.Make ()
 
 exception Link = Link.Error
@@ -763,7 +760,7 @@ let step_instr module_reg frame label vs at e' es_rst stack :
         vs'
         [
           (if i = 0l then Plain (Block (bt, es2)) @@ at
-          else Plain (Block (bt, es1)) @@ at);
+           else Plain (Block (bt, es1)) @@ at);
         ]
   | Br x ->
       return_label_kont_with_code (Vector.empty ()) [Breaking (x.it, vs) @@ at]
@@ -777,7 +774,7 @@ let step_instr module_reg frame label vs at e' es_rst stack :
       label_kont_with_code
         vs'
         (if I32.ge_u i (Lib.List32.length xs) then [Plain (Br x) @@ at]
-        else [Plain (Br (Lib.List32.nth xs i)) @@ at])
+         else [Plain (Br (Lib.List32.nth xs i)) @@ at])
   | Return -> return_label_kont_with_code (Vector.empty ()) [Returning vs @@ at]
   | Call x ->
       let* inst = resolve_module_ref module_reg frame.inst in
@@ -793,7 +790,7 @@ let step_instr module_reg frame label vs at e' es_rst stack :
       label_kont_with_code
         vs'
         (if not check_eq then [Trapping "indirect call type mismatch" @@ at]
-        else [Invoke func @@ at])
+         else [Invoke func @@ at])
   | Drop ->
       (* _ :: vs' *)
       let+ _, vs' = vector_pop_map vs Option.some at in
@@ -900,11 +897,11 @@ let step_instr module_reg frame label vs at e' es_rst stack :
       label_kont_with_code
         vs'
         (if oob_d || oob_s then [Trapping (table_error at Table.Bounds) @@ at]
-        else if n = 0l then []
-        else if I32.le_u d s then
-          [Table_copy_meta (0l, d, s, n, x, y, true) @@ at]
-        else (* d > s *)
-          [Table_copy_meta (0l, d, s, n, x, y, false) @@ at])
+         else if n = 0l then []
+         else if I32.le_u d s then
+           [Table_copy_meta (0l, d, s, n, x, y, true) @@ at]
+         else (* d > s *)
+           [Table_copy_meta (0l, d, s, n, x, y, false) @@ at])
   | TableInit (x, y) ->
       (* Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' *)
       let* n, vs = vector_pop_map vs num_i32 at in
@@ -1084,8 +1081,8 @@ let step_instr module_reg frame label vs at e' es_rst stack :
       label_kont_with_code
         vs'
         (if oob then [Trapping (memory_error at Memory.Bounds) @@ at]
-        else if n = 0l then []
-        else [Memory_fill_meta (0l, i, k, n) @@ at])
+         else if n = 0l then []
+         else [Memory_fill_meta (0l, i, k, n) @@ at])
   | MemoryCopy ->
       (* Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' *)
       let* n, vs = vector_pop_map vs num_i32 at in
@@ -1096,10 +1093,10 @@ let step_instr module_reg frame label vs at e' es_rst stack :
       label_kont_with_code
         vs'
         (if oob_s || oob_d then [Trapping (memory_error at Memory.Bounds) @@ at]
-        else if n = 0l then []
-        else if I32.le_u d s then [Memory_copy_meta (0l, d, s, n, true) @@ at]
-        else (* d > s *)
-          [Memory_copy_meta (0l, d, s, n, false) @@ at])
+         else if n = 0l then []
+         else if I32.le_u d s then [Memory_copy_meta (0l, d, s, n, true) @@ at]
+         else (* d > s *)
+           [Memory_copy_meta (0l, d, s, n, false) @@ at])
   | MemoryInit x ->
       (* Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' *)
       let* n, vs = vector_pop_map vs num_i32 at in
@@ -1765,15 +1762,15 @@ let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
   let* t = import_type m im in
   let+ type_match = match_extern_type (extern_type_of ext) t in
   (if not type_match then
-   let module_name = im.it.module_name in
-   let item_name = im.it.item_name in
-   Link.error
-     im.at
-     ("incompatible import type for " ^ "\"" ^ module_name ^ "\" " ^ "\""
-    ^ item_name ^ "\": " ^ "expected "
-     ^ Types.string_of_extern_type t
-     ^ ", got "
-     ^ Types.string_of_extern_type (extern_type_of ext))) ;
+     let module_name = im.it.module_name in
+     let item_name = im.it.item_name in
+     Link.error
+       im.at
+       ("incompatible import type for " ^ "\"" ^ module_name ^ "\" " ^ "\""
+      ^ item_name ^ "\": " ^ "expected "
+       ^ Types.string_of_extern_type t
+       ^ ", got "
+       ^ Types.string_of_extern_type (extern_type_of ext))) ;
 
   match ext with
   | ExternFunc func -> {inst with funcs = Vector.cons func inst.funcs}

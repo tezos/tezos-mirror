@@ -39,6 +39,8 @@ type 'a process = (Process.t, 'a) t
 module Syntax = struct
   type nonrec ('a, 'b) t = ('a, 'b) t = {value : 'a; run : 'a -> 'b Lwt.t}
 
+  type ('a, 'b) runnable = ('a, 'b) t
+
   let ( let*! ) x f =
     let* res = run x in
     f res

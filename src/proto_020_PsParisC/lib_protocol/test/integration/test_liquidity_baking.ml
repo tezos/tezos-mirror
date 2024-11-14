@@ -34,7 +34,10 @@
 
 open Liquidity_baking_machine
 open Protocol
-open Test_tez
+open Tez_helpers
+
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["liquidity_baking"]
 
 let generate_init_state () =
   let open Lwt_result_syntax in
@@ -467,7 +470,7 @@ let liquidity_baking_origination_result_cpmm_balance () =
   in
   let result = get_cpmm_result origination_results in
   let balance_update = get_balance_update_in_result result in
-  let* () = Assert.equal_tez ~loc:__LOC__ balance_update (of_mutez_exn 100L) in
+  let* () = Assert.equal_tez ~loc:__LOC__ balance_update (of_mutez 100L) in
   return_unit
 
 let liquidity_baking_origination_result_lqt_address () =
@@ -508,8 +511,8 @@ let liquidity_baking_origination_result_lqt_balance () =
   ] ->
       let* () = Assert.equal_tez ~loc:__LOC__ am1 am2 in
       let* () = Assert.equal_tez ~loc:__LOC__ am3 am4 in
-      let* () = Assert.equal_tez ~loc:__LOC__ am1 (of_mutez_exn 64_250L) in
-      Assert.equal_tez ~loc:__LOC__ am3 (of_mutez_exn 494_500L)
+      let* () = Assert.equal_tez ~loc:__LOC__ am1 (of_mutez 64_250L) in
+      Assert.equal_tez ~loc:__LOC__ am3 (of_mutez 494_500L)
   | _ -> failwith "Unexpected balance updates (%s)" __LOC__
 
 (* Test that with no contract at the tzBTC address and the level low enough to indicate we're not on mainnet, three contracts are originated in stitching. *)
@@ -535,123 +538,97 @@ let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
   let num_results = List.length origination_results in
   Assert.equal_int ~loc:__LOC__ num_results 0
 
-let tests =
-  [
-    Tztest.tztest
-      "liquidity baking script hashes"
-      `Quick
-      liquidity_baking_origination;
-    Tztest.tztest
-      "liquidity baking cpmm is originated at the expected address"
-      `Quick
-      liquidity_baking_cpmm_address;
-    Tztest.tztest "Init Context" `Quick generate_init_state;
-    Tztest.tztest
-      "liquidity baking subsidy is correct"
-      `Quick
-      (liquidity_baking_subsidies 64);
-    Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting \
-       Per_block_vote_off baking one block longer"
-      `Quick
-      (liquidity_baking_toggle_100 1);
-    Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting \
-       Per_block_vote_off baking two blocks longer"
-      `Quick
-      (liquidity_baking_toggle_100 2);
-    Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting \
-       Per_block_vote_off baking 100 blocks longer"
-      `Quick
-      (liquidity_baking_toggle_100 100);
-    Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting \
-       Per_block_vote_off baking one block longer"
-      `Quick
-      (liquidity_baking_toggle_80 1);
-    Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting \
-       Per_block_vote_off baking two blocks longer"
-      `Quick
-      (liquidity_baking_toggle_80 2);
-    Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting \
-       Per_block_vote_off baking 100 blocks longer"
-      `Quick
-      (liquidity_baking_toggle_80 100);
-    Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting \
-       Per_block_vote_off baking one block longer"
-      `Quick
-      (liquidity_baking_toggle_60 1);
-    Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting \
-       Per_block_vote_off baking two blocks longer"
-      `Quick
-      (liquidity_baking_toggle_60 2);
-    Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting \
-       Per_block_vote_off baking 100 blocks longer"
-      `Quick
-      (liquidity_baking_toggle_60 100);
-    Tztest.tztest
-      "liquidity baking does not shut off with toggle vote at 50% and baking \
-       100 blocks longer than sunset level in previous protocols"
-      `Quick
-      liquidity_baking_toggle_50;
-    Tztest.tztest
-      "liquidity baking restart with 100% of bakers voting off, then pass, \
-       then on"
-      `Quick
-      (liquidity_baking_restart 2000 1);
-    Tztest.tztest
-      "liquidity baking toggle ema in block metadata is zero with no bakers \
-       voting Per_block_vote_off."
-      `Quick
-      liquidity_baking_toggle_ema_zero;
-    Tztest.tztest
-      "liquidity baking toggle ema is equal to the threshold after the subsidy \
-       has been stopped by a toggle vote"
-      `Quick
-      liquidity_baking_toggle_ema_threshold;
-    Tztest.tztest
-      "liquidity baking storage is updated"
-      `Quick
-      (liquidity_baking_storage 64);
-    Tztest.tztest
-      "liquidity baking balance updates"
-      `Quick
-      liquidity_baking_balance_update;
-    Tztest.tztest
-      "liquidity baking CPMM address in storage matches address in the \
-       origination result"
-      `Quick
-      liquidity_baking_origination_result_cpmm_address;
-    Tztest.tztest
-      "liquidity baking CPMM balance in origination result is 100 mutez"
-      `Quick
-      liquidity_baking_origination_result_cpmm_balance;
-    Tztest.tztest
-      "liquidity baking LQT contract is originated at expected address"
-      `Quick
-      liquidity_baking_origination_result_lqt_address;
-    Tztest.tztest
-      "liquidity baking LQT balance in origination result is 0 mutez"
-      `Quick
-      liquidity_baking_origination_result_lqt_balance;
-    Tztest.tztest
-      "liquidity baking originates three contracts when tzBTC does not exist \
-       and level indicates we are not on mainnet"
-      `Quick
-      liquidity_baking_origination_test_migration;
-    Tztest.tztest
-      "liquidity baking originates three contracts when tzBTC does not exist \
-       and level indicates we might be on mainnet"
-      `Quick
-      liquidity_baking_origination_no_tzBTC_mainnet_migration;
-  ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("liquidity baking", tests)]
-  |> Lwt_main.run
+  register_test ~title:"script hashes" liquidity_baking_origination ;
+  register_test
+    ~title:"cpmm is originated at the expected address"
+    liquidity_baking_cpmm_address ;
+  register_test ~title:"Init Context" generate_init_state ;
+  register_test ~title:"subsidy is correct" (liquidity_baking_subsidies 64) ;
+  register_test
+    ~title:
+      "toggle vote with 100% of bakers voting Per_block_vote_off baking one \
+       block longer"
+    (liquidity_baking_toggle_100 1) ;
+  register_test
+    ~title:
+      "toggle vote with 100% of bakers voting Per_block_vote_off baking two \
+       blocks longer"
+    (liquidity_baking_toggle_100 2) ;
+  register_test
+    ~title:
+      "toggle vote with 100% of bakers voting Per_block_vote_off baking 100 \
+       blocks longer"
+    (liquidity_baking_toggle_100 100) ;
+  register_test
+    ~title:
+      "toggle vote with 80% of bakers voting Per_block_vote_off baking one \
+       block longer"
+    (liquidity_baking_toggle_80 1) ;
+  register_test
+    ~title:
+      "toggle vote with 80% of bakers voting Per_block_vote_off baking two \
+       blocks longer"
+    (liquidity_baking_toggle_80 2) ;
+  register_test
+    ~title:
+      "toggle vote with 80% of bakers voting Per_block_vote_off baking 100 \
+       blocks longer"
+    (liquidity_baking_toggle_80 100) ;
+  register_test
+    ~title:
+      "toggle vote with 60% of bakers voting Per_block_vote_off baking one \
+       block longer"
+    (liquidity_baking_toggle_60 1) ;
+  register_test
+    ~title:
+      "toggle vote with 60% of bakers voting Per_block_vote_off baking two \
+       blocks longer"
+    (liquidity_baking_toggle_60 2) ;
+  register_test
+    ~title:
+      "toggle vote with 60% of bakers voting Per_block_vote_off baking 100 \
+       blocks longer"
+    (liquidity_baking_toggle_60 100) ;
+  register_test
+    ~title:
+      "does not shut off with toggle vote at 50% and baking 100 blocks longer \
+       than sunset level in previous protocols"
+    liquidity_baking_toggle_50 ;
+  register_test
+    ~title:"restart with 100% of bakers voting off, then pass, then on"
+    (liquidity_baking_restart 2000 1) ;
+  register_test
+    ~title:
+      "toggle ema in block metadata is zero with no bakers voting \
+       Per_block_vote_off."
+    liquidity_baking_toggle_ema_zero ;
+  register_test
+    ~title:
+      "toggle ema is equal to the threshold after the subsidy has been stopped \
+       by a toggle vote"
+    liquidity_baking_toggle_ema_threshold ;
+  register_test ~title:"storage is updated" (liquidity_baking_storage 64) ;
+  register_test ~title:"balance updates" liquidity_baking_balance_update ;
+  register_test
+    ~title:"CPMM address in storage matches address in the origination result"
+    liquidity_baking_origination_result_cpmm_address ;
+  register_test
+    ~title:"CPMM balance in origination result is 100 mutez"
+    liquidity_baking_origination_result_cpmm_balance ;
+  register_test
+    ~title:"LQT contract is originated at expected address"
+    liquidity_baking_origination_result_lqt_address ;
+  register_test
+    ~title:"LQT balance in origination result is 0 mutez"
+    liquidity_baking_origination_result_lqt_balance ;
+  register_test
+    ~title:
+      "originates three contracts when tzBTC does not exist and level \
+       indicates we are not on mainnet"
+    liquidity_baking_origination_test_migration ;
+  register_test
+    ~title:
+      "originates three contracts when tzBTC does not exist and level \
+       indicates we might be on mainnet"
+    liquidity_baking_origination_no_tzBTC_mainnet_migration

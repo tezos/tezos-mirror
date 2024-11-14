@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name lib_teztale_base)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  lwt.unix)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives))

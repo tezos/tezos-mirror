@@ -65,6 +65,19 @@ val recover_bond : Signature.Public_key_hash.t -> unit Lwt.t
 val publish_execute_whitelist_update :
   Commitment.Hash.t -> int32 -> int -> unit Lwt.t
 
+val execute_outbox_message :
+  outbox_level:int32 ->
+  message_index:int ->
+  Outbox_message.summary ->
+  unit Lwt.t
+
+val outbox_message_execution_failed :
+  outbox_level:int32 ->
+  message_index:int ->
+  Outbox_message.summary ->
+  tztrace ->
+  unit Lwt.t
+
 (** Events emmitted by the Publisher worker *)
 module Publisher : sig
   (** [request_failed view status errors] emits the event that a worker

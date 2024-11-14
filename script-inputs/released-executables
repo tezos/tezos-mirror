@@ -4,14 +4,11 @@ octez-dac-client
 octez-dac-node
 octez-dal-node
 octez-signer
-octez-proxy-server
 octez-codec
 octez-client
 octez-admin-client
 octez-node
+octez-accuser-PsQuebec
+octez-baker-PsQuebec
 octez-accuser-PsParisC
 octez-baker-PsParisC
-octez-accuser-PtParisB
-octez-baker-PtParisB
-octez-accuser-Proxford
-octez-baker-Proxford

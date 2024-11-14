@@ -14,8 +14,6 @@
  (package octez-version)
  (libraries
   octez-version.value
-  octez-libs.version
-  octez-libs.base.unix
   octez-version.print)
  (link_flags
   (:standard)
@@ -23,13 +21,12 @@
  (flags
   (:standard)
   -open Tezos_version_value
-  -open Tezos_version
   -open Octez_version_print)
  (modules octez_print_version))
 
 (executable
- (name etherlink_print_version)
- (public_name etherlink-version)
+ (name octez_evm_node_print_version)
+ (public_name octez-evm-node-version)
  (package octez-version)
  (libraries
   octez-version.value
@@ -44,4 +41,4 @@
   -open Tezos_version_value
   -open Tezos_version
   -open Octez_version_print)
- (modules etherlink_print_version))
+ (modules octez_evm_node_print_version))

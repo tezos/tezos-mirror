@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type t = {
-  counter : Z.t;
+  counter : Z.t option;
       (** Each message is given a unique counter to allow for the batcher to
           receive multiple identical messages. *)
   content : string;  (** The actual content of the message. *)
@@ -40,14 +40,16 @@ let encoding =
   conv
     (fun {counter; content} -> (counter, content))
     (fun (counter, content) -> {counter; content})
-  @@ obj2 (req "counter" z) (req "content" content_encoding)
+  @@ obj2 (opt "counter" z) (req "content" content_encoding)
 
 let make =
   let counter = ref Z.zero in
-  fun content ->
-    let m = {content; counter = !counter} in
-    counter := Z.succ !counter ;
-    m
+  fun ~unique content ->
+    if unique then (
+      let m = {content; counter = Some !counter} in
+      counter := Z.succ !counter ;
+      m)
+    else {content; counter = None}
 
 let content m = m.content
 

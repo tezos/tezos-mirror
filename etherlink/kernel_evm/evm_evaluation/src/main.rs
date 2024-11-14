@@ -340,6 +340,36 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         // Reason: chainId is tested for ethereum mainnet (1) not for etherlink (1337)
         | "chainId.json"
 
+        // Reason: we temporarily reduce stack limit to 256.
+        | "Call1024PreCalls.json"
+        | "gasPriceDiffPlaces.json"
+        | "Create2Recursive.json"
+        | "LoopCallsDepthThenRevert2.json"
+        | "Call1024BalanceTooLow.json"
+        | "CallRecursiveBomb1.json"
+        | "Delegatecall1024.json"
+        | "Call1024OOG.json"
+        | "LoopDelegateCallsDepthThenRevert.json"
+        | "static_Call1024PreCalls2.json"
+        | "CallRecursiveBombLog.json"
+        | "performanceTester.json"
+        | "LoopCallsDepthThenRevert3.json"
+        | "Callcode1024BalanceTooLow.json"
+        | "LoopCallsDepthThenRevert.json"
+        | "Callcode1024OOG.json"
+        | "CallRecursiveBomb0_OOG_atMaxCallDepth.json"
+        | "stackOverflowSWAP.json"
+        | "CallRecursiveBombPreCall.json"
+        | "Create2OnDepth1023.json"
+        | "CallRecursiveBomb2.json"
+        | "ABAcalls2.json"
+        | "diffPlaces.json"
+        | "Delegatecall1024OOG.json"
+        | "CallRecursiveBomb0.json"
+        | "baseFeeDiffPlaces.json"
+        | "Create2OnDepth1024.json"
+        | "CallRecursiveBombLog2.json"
+
         // Reason: EIP-2930 (https://eips.ethereum.org/EIPS/eip-2930) concerns optional
         // access lists and we don't intend to implement them for now
         | "addressOpcodes.json"
@@ -370,13 +400,13 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         // possibility of potential replay attacks.
         | "invalidTr.json"
 
-        // Reason: The gas price is computed with max_fee_per_gas. But max_fee_per_gas 
-        // is used when you don't know the base fee. Usually the client verifies if the 
+        // Reason: The gas price is computed with max_fee_per_gas. But max_fee_per_gas
+        // is used when you don't know the base fee. Usually the client verifies if the
         // account has enough funds to pay the max gas price (computed with max_fee_per_gas)
         // and if that isn't the case then the client directly rejects the transaction.
         // But in the kernel we know the real gas price because we have a base fee.
-        // Therefore, the test does not pass because it checks if the account has enough funds, 
-        // which it doesn't, but with the known base fee the account does have enough funds 
+        // Therefore, the test does not pass because it checks if the account has enough funds,
+        // which it doesn't, but with the known base fee the account does have enough funds
         // and the test should pass.
         // max_gas_price = max_fee_per_gas x gas_limit
         // real_gas_price = (base_fee + max_priority_fee_per_gas) x gas_limit

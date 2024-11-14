@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let name = "validator"
+
 type parameters = {
   context_root : string;
   protocol_root : string;
@@ -34,11 +36,8 @@ type parameters = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
-  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   internal_events : Tezos_base.Internal_event_config.t;
 }
-
-type never = |
 
 type _ request =
   | Apply : {
@@ -51,7 +50,7 @@ type _ request =
       predecessor_resulting_context_hash : Context_hash.t;
       operations : Block_validation.operation list list;
       max_operations_ttl : int;
-      should_precheck : bool;
+      should_validate : bool;
       simulate : bool;
     }
       -> Block_validation.result request
@@ -71,7 +70,7 @@ type _ request =
       operations : Block_validation.operation list list;
     }
       -> (Block_header.shell_header * error Preapply_result.t list) request
-  | Precheck : {
+  | Validate : {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;
@@ -94,18 +93,18 @@ type _ request =
     }
       -> unit request
   | Context_split : unit request
-  | Terminate : never request
+  | Terminate : unit request
   | Reconfigure_event_logging :
       Tezos_base_unix.Internal_event_unix.Configuration.t
       -> unit request
 
 let request_pp : type a. Format.formatter -> a request -> unit =
  fun ppf -> function
-  | Apply {block_header; chain_id; should_precheck; _} ->
+  | Apply {block_header; chain_id; should_validate; _} ->
       Format.fprintf
         ppf
         "%s %a for chain %a"
-        (if should_precheck then "precheck and apply block" else "apply block")
+        (if should_validate then "validate and apply block" else "apply block")
         Block_hash.pp_short
         (Block_header.hash block_header)
         Chain_id.pp_short
@@ -118,8 +117,8 @@ let request_pp : type a. Format.formatter -> a request -> unit =
         predecessor_hash
         Chain_id.pp_short
         chain_id
-  | Precheck {hash; _} ->
-      Format.fprintf ppf "precheck block %a" Block_hash.pp_short hash
+  | Validate {hash; _} ->
+      Format.fprintf ppf "validate block %a" Block_hash.pp_short hash
   | Commit_genesis {chain_id} ->
       Format.fprintf
         ppf
@@ -158,7 +157,6 @@ let parameters_encoding =
            user_activated_protocol_overrides;
            operation_metadata_size_limit;
            sandbox_parameters;
-           dal_config;
            internal_events;
          } ->
       ( (context_root, protocol_root, genesis, readonly, data_dir),
@@ -166,14 +164,12 @@ let parameters_encoding =
           user_activated_protocol_overrides,
           operation_metadata_size_limit,
           sandbox_parameters,
-          dal_config,
           internal_events ) ))
     (fun ( (context_root, protocol_root, genesis, readonly, data_dir),
            ( user_activated_upgrades,
              user_activated_protocol_overrides,
              operation_metadata_size_limit,
              sandbox_parameters,
-             dal_config,
              internal_events ) ) ->
       {
         context_root;
@@ -185,7 +181,6 @@ let parameters_encoding =
         user_activated_protocol_overrides;
         operation_metadata_size_limit;
         sandbox_parameters;
-        dal_config;
         internal_events;
       })
   @@ merge_objs
@@ -195,7 +190,7 @@ let parameters_encoding =
           (req "genesis" Genesis.encoding)
           (req "readonly" bool)
           (req "data_dir" string))
-       (obj6
+       (obj5
           (req "user_activated_upgrades" User_activated.upgrades_encoding)
           (req
              "user_activated_protocol_overrides"
@@ -204,7 +199,6 @@ let parameters_encoding =
              "operation_metadata_size_limit"
              Shell_limits.operation_metadata_size_limit_encoding)
           (opt "sandbox_parameters" json)
-          (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
           (req "internal_events" Tezos_base.Internal_event_config.encoding))
 
 type packed_request = Erequest : _ request -> packed_request
@@ -225,7 +219,7 @@ let case_apply tag =
        (req
           "operations"
           (list (list (dynamic_size Block_validation.operation_encoding))))
-       (req "should_precheck" bool)
+       (req "should_validate" bool)
        (req "simulate" bool))
     (function
       | Erequest
@@ -239,7 +233,7 @@ let case_apply tag =
               predecessor_resulting_context_hash;
               max_operations_ttl;
               operations;
-              should_precheck;
+              should_validate;
               simulate;
             }) ->
           Some
@@ -251,7 +245,7 @@ let case_apply tag =
               predecessor_resulting_context_hash,
               max_operations_ttl,
               operations,
-              should_precheck,
+              should_validate,
               simulate )
       | _ -> None)
     (fun ( chain_id,
@@ -262,7 +256,7 @@ let case_apply tag =
            predecessor_resulting_context_hash,
            max_operations_ttl,
            operations,
-           should_precheck,
+           should_validate,
            simulate ) ->
       Erequest
         (Apply
@@ -275,7 +269,7 @@ let case_apply tag =
              predecessor_resulting_context_hash;
              max_operations_ttl;
              operations;
-             should_precheck;
+             should_validate;
              simulate;
            }))
 
@@ -361,11 +355,11 @@ let case_preapply tag =
              operations;
            }))
 
-let case_precheck tag =
+let case_validate tag =
   let open Data_encoding in
   case
     tag
-    ~title:"precheck"
+    ~title:"validate"
     (obj7
        (req "chain_id" Chain_id.encoding)
        (req "predecessor_block_header" (dynamic_size Block_header.encoding))
@@ -378,7 +372,7 @@ let case_precheck tag =
           (list (list (dynamic_size Block_validation.operation_encoding)))))
     (function
       | Erequest
-          (Precheck
+          (Validate
             {
               chain_id;
               predecessor_block_header;
@@ -405,7 +399,7 @@ let case_precheck tag =
            hash,
            operations ) ->
       Erequest
-        (Precheck
+        (Validate
            {
              chain_id;
              predecessor_block_header;
@@ -481,7 +475,7 @@ let request_encoding =
           | Erequest (Reconfigure_event_logging c) -> Some c | _ -> None)
         (fun c -> Erequest (Reconfigure_event_logging c));
       case_preapply (Tag 5);
-      case_precheck (Tag 6);
+      case_validate (Tag 6);
       case_context_gc (Tag 7);
       case_context_split (Tag 8);
     ]
@@ -489,37 +483,13 @@ let request_encoding =
 let result_encoding : type a. a request -> a Data_encoding.t = function
   | Apply _ -> Block_validation.result_encoding
   | Preapply _ -> Block_validation.preapply_result_encoding
-  | Precheck _ -> Data_encoding.unit
+  | Validate _ -> Data_encoding.unit
   | Commit_genesis _ -> Context_hash.encoding
   | Fork_test_chain _ -> Block_header.encoding
   | Context_garbage_collection _ -> Data_encoding.unit
   | Context_split -> Data_encoding.unit
   | Reconfigure_event_logging _ -> Data_encoding.unit
-  | Terminate -> assert false
-
-let send pin encoding data =
-  let open Lwt_syntax in
-  let msg = Data_encoding.Binary.to_bytes_exn encoding data in
-  let* () = Lwt_io.write_int pin (Bytes.length msg) in
-  let* () = Lwt_io.write pin (Bytes.to_string msg) in
-  Lwt_io.flush pin
-
-let recv_result pout encoding =
-  let open Lwt_syntax in
-  let* count = Lwt_io.read_int pout in
-  let buf = Bytes.create count in
-  let* () = Lwt_io.read_into_exactly pout buf 0 count in
-  return
-    (Data_encoding.Binary.of_bytes_exn
-       (Error_monad.result_encoding encoding)
-       buf)
-
-let recv pout encoding =
-  let open Lwt_syntax in
-  let* count = Lwt_io.read_int pout in
-  let buf = Bytes.create count in
-  let* () = Lwt_io.read_into_exactly pout buf 0 count in
-  Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)
+  | Terminate -> Data_encoding.unit
 
 let socket_path_prefix = "tezos-validation-socket-"
 
@@ -527,96 +497,11 @@ let socket_path ~socket_dir ~pid =
   let filename = Format.sprintf "%s%d" socket_path_prefix pid in
   Filename.concat socket_dir filename
 
-(* To get optimized socket communication of processes on the same
-   machine, we use Unix domain sockets: ADDR_UNIX. *)
-let make_socket socket_path = Unix.ADDR_UNIX socket_path
+let internal_events {internal_events; _} = internal_events
 
-let create_socket ~canceler =
-  let open Lwt_syntax in
-  let socket = Lwt_unix.socket ~cloexec:true PF_UNIX SOCK_STREAM 0o000 in
-  Lwt_unix.set_close_on_exec socket ;
-  Lwt_canceler.on_cancel canceler (fun () ->
-      let* (_ : unit tzresult) = Lwt_utils_unix.safe_close socket in
-      return_unit) ;
-  Lwt_unix.setsockopt socket SO_REUSEADDR true ;
-  Lwt.return socket
+let reconfigure_event_logging_request config = Reconfigure_event_logging config
 
-let create_socket_listen ~canceler ~max_requests ~socket_path =
-  let open Lwt_result_syntax in
-  let*! socket = create_socket ~canceler in
-  let* () =
-    Lwt.catch
-      (fun () ->
-        let*! () = Lwt_unix.bind socket (make_socket socket_path) in
-        return_unit)
-      (function
-        | Unix.Unix_error (ENAMETOOLONG, _, _) ->
-            (* Unix.ENAMETOOLONG (Filename too long (POSIX.1-2001)) can
-               be thrown if the given directory has a too long path. *)
-            tzfail
-              Block_validator_errors.(
-                Validation_process_failed (Socket_path_too_long socket_path))
-        | Unix.Unix_error (EACCES, _, _) ->
-            (* Unix.EACCES (Permission denied (POSIX.1-2001)) can be
-               thrown when the given directory has wrong access rights.
-               Unix.EPERM (Operation not permitted (POSIX.1-2001)) should
-               not be thrown in this case. *)
-            tzfail
-              Block_validator_errors.(
-                Validation_process_failed
-                  (Socket_path_wrong_permission socket_path))
-        | exn ->
-            tzfail
-              (Block_validator_errors.Validation_process_failed
-                 (Cannot_run_external_validator (Printexc.to_string exn))))
-  in
-  Lwt_unix.listen socket max_requests ;
-  return socket
+let terminate_request = Erequest Terminate
 
-type error += Cannot_connect_to_node_socket
-
-let () =
-  register_error_kind
-    `Temporary
-    ~id:"cannot_connect_to_node_socket"
-    ~title:"Cannot connect to node socket"
-    ~description:"External validator failed to connect to the node's socket"
-    ~pp:(fun fmt () ->
-      Format.fprintf
-        fmt
-        "External validator failed to connect to the node's socket")
-    Data_encoding.unit
-    (function Cannot_connect_to_node_socket -> Some () | _ -> None)
-    (fun () -> Cannot_connect_to_node_socket)
-
-module Events = struct
-  open Internal_event.Simple
-
-  let section = ["external_validation"]
-
-  let cannot_connect_and_retry =
-    declare_0
-      ~section
-      ~level:Warning
-      ~name:"cannot_connect_and_retry"
-      ~msg:"validator cannot connect to node: retrying"
-      ()
-end
-
-let create_socket_connect ~canceler ~socket_path =
-  let open Lwt_result_syntax in
-  protect @@ fun () ->
-  let*! socket = create_socket ~canceler in
-  let await_socket_to_be_ready () =
-    let log = function
-      | [Cannot_connect_to_node_socket] ->
-          Internal_event.Simple.emit Events.cannot_connect_and_retry ()
-      | _ -> Lwt.return_unit
-    in
-    Lwt_utils_unix.retry ~log ~n:20 ~sleep:1. @@ fun () ->
-    let*! b = Lwt_unix.file_exists socket_path in
-    if b then return_unit else tzfail Cannot_connect_to_node_socket
-  in
-  let* () = await_socket_to_be_ready () in
-  let*! () = Lwt_unix.connect socket (make_socket socket_path) in
-  return socket
+let command_line_args _parameters ~socket_dir =
+  (Some "octez-validator", ["--socket-dir"; socket_dir])

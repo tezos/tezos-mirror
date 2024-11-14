@@ -22,6 +22,9 @@ version = "0.2.3"
 features = ["global"]
 optional = true
 
+[dependencies]
+cfg-if = "1.0.0"
+
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
 version = "0.2.2"
@@ -43,6 +46,11 @@ path = "../debug"
 version = "0.2.2"
 default-features = false
 
+[dependencies.tezos-smart-rollup-utils]
+path = "../utils"
+version = "0.2.2"
+optional = true
+
 [dependencies.tezos-smart-rollup-mock]
 path = "../mock"
 version = "0.2.2"
@@ -51,12 +59,32 @@ optional = true
 features = ["proto-alpha"]
 
 [features]
-default = ["std", "alloc", "dlmalloc", "panic-hook-debug", "panic-hook-abort", "panic-hook"]
+default = [
+  "std",
+  "alloc",
+  "dlmalloc",
+  "panic-hook-debug",
+  "panic-hook-abort",
+  "panic-hook",
+]
 std = ["tezos-smart-rollup-panic-hook/std", "tezos-smart-rollup-host/std"]
 alloc = []
 panic-hook = ["tezos-smart-rollup-panic-hook"]
-panic-hook-debug = ["panic-hook", "tezos-smart-rollup-panic-hook/debug", "tezos-smart-rollup-debug/default"]
+panic-hook-debug = [
+  "panic-hook",
+  "tezos-smart-rollup-panic-hook/debug",
+  "tezos-smart-rollup-debug/default",
+]
 panic-hook-abort = ["panic-hook", "tezos-smart-rollup-panic-hook/abort"]
 testing = []
-proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha", "tezos-smart-rollup-debug/proto-alpha"]
+proto-alpha = [
+  "tezos-smart-rollup-core/proto-alpha",
+  "tezos-smart-rollup-host/proto-alpha",
+  "tezos-smart-rollup-debug/proto-alpha",
+]
 experimental-host-in-memory-store = ["tezos-smart-rollup-mock"]
+native-kernel = [
+    "proto-alpha",
+    "experimental-host-in-memory-store",
+    "tezos-smart-rollup-utils",
+]

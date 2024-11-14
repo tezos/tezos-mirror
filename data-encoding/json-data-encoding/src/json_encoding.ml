@@ -377,13 +377,13 @@ struct
           | `Float v ->
               let rest, v = modf v in
               (if rest <> 0. then
-               let exn =
-                 Failure (int_name ^ " cannot have a fractional part")
-               in
-               raise (Cannot_destruct ([], exn))) ;
+                 let exn =
+                   Failure (int_name ^ " cannot have a fractional part")
+                 in
+                 raise (Cannot_destruct ([], exn))) ;
               (if v < lower_bound || v > upper_bound then
-               let exn = Failure (int_name ^ " out of range") in
-               raise (Cannot_destruct ([], exn))) ;
+                 let exn = Failure (int_name ^ " out of range") in
+                 raise (Cannot_destruct ([], exn))) ;
               of_float v
           | k -> raise (unexpected k "number"))
     | Bool -> (

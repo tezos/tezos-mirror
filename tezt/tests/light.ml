@@ -31,6 +31,8 @@
    Dependencies: tezt/tests/proxy.ml
 *)
 
+let team = Tag.layer1
+
 let init_light ~protocol =
   (* Note that this code CANNOT be in tezt/lib_tezos/client.ml
      because it uses RPC.*.get_current_level, which depends on client.ml
@@ -68,7 +70,7 @@ let test_no_endpoint () =
   Test.register
     ~__FILE__
     ~title:"mode light no endpoint"
-    ~tags:[Tag.layer1; "client"; "light"; "cli"]
+    ~tags:[team; "client"; "light"; "cli"]
     ~uses_node:false
   @@ fun () ->
   let min_agreement = 1.0 in
@@ -99,7 +101,7 @@ let test_endpoint_not_in_sources () =
   Test.register
     ~__FILE__
     ~title:"mode light endpoint not in sources"
-    ~tags:[Tag.layer1; "client"; "light"; "cli"]
+    ~tags:[team; "client"; "light"; "cli"]
   @@ fun () ->
   let min_agreement = 1.0 in
   let mk_node_endpoint rpc_port = Client.Node (Node.create ~rpc_port []) in
@@ -142,7 +144,7 @@ let test_transfer =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) transfer"
-    ~tags:[Tag.layer1; "light"; "client"; "transfer"]
+    ~tags:[team; "light"; "client"; "transfer"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   do_transfer client
@@ -151,7 +153,7 @@ let test_bake =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) bake"
-    ~tags:[Tag.layer1; "light"; "client"; "bake"]
+    ~tags:[team; "light"; "client"; "bake"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   let giver = Constant.bootstrap1.alias in
@@ -222,7 +224,7 @@ module NoUselessRpc = struct
     Protocol.register_test
       ~__FILE__
       ~title:"(Light) No useless RPC call"
-      ~tags:[Tag.layer1; "light"; "rpc"; "get"]
+      ~tags:[team; "light"; "rpc"; "get"]
     @@ fun protocol ->
     let* _, client = init_light ~protocol in
     let paths =
@@ -258,7 +260,7 @@ let test_wrong_proto =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) Wrong proto"
-    ~tags:[Tag.layer1; "light"; "proto"]
+    ~tags:[team; "light"; "proto"]
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   Proxy.wrong_proto protocol client
@@ -269,7 +271,7 @@ let test_locations =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) RPC get's location"
-    ~tags:(locations_tags alt_mode)
+    ~tags:(team :: locations_tags alt_mode)
   @@ fun protocol ->
   let* _, client = init_light ~protocol in
   check_locations alt_mode client
@@ -280,7 +282,7 @@ let test_compare_light =
   Protocol.register_test
     ~__FILE__
     ~title:"(Light) Compare RPC get"
-    ~tags:(compare_tags alt_mode)
+    ~tags:(team :: compare_tags alt_mode)
   @@ fun protocol ->
   let* node, light_client = init_light ~protocol in
   let* vanilla = Client.init ~endpoint:(Node node) () in

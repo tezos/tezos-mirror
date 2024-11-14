@@ -17,7 +17,7 @@ let error_mode_for_useless_use = ref Warn
 let error_mode_for_non_existing_use = ref Fail
 
 module Uses = struct
-  type t = {tag : string; path : string}
+  type t = {tag : string; path : string; how_to_build : string option}
 
   (* Filled by [make] and read by [lookup]. *)
   let known_paths : t String_map.t ref = ref String_map.empty
@@ -35,8 +35,8 @@ module Uses = struct
         (function None -> Some uses | Some _ as x -> x)
         !known_paths
 
-  let make ~tag ~path =
-    let uses = {tag; path} in
+  let make ?how_to_build ~tag ~path () =
+    let uses = {tag; path; how_to_build} in
     add_to_known_paths path uses ;
     uses
 
@@ -50,11 +50,14 @@ module Uses = struct
 
   let lookup path = String_map.find_opt (canonicalize_path path) !known_paths
 
-  let octez_node = make ~tag:"node" ~path:"./octez-node"
+  let octez_node = make ~tag:"node" ~path:"./octez-node" ()
 
-  let octez_client = make ~tag:"client" ~path:"./octez-client"
+  let octez_client = make ~tag:"client" ~path:"./octez-client" ()
 
-  let octez_admin_client = make ~tag:"admin_client" ~path:"./octez-admin-client"
+  let octez_admin_client =
+    make ~tag:"admin_client" ~path:"./octez-admin-client" ()
+
+  let octez_baker_alpha = make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
 
   let register_meta_test () =
     Regression.register
@@ -104,15 +107,24 @@ let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
     (match uses_that_do_not_exist with
     | [] -> ()
     | _ :: _ ->
-        let paths =
-          Fun.flip List.map uses_that_do_not_exist @@ fun uses -> uses.path
+        let error_details =
+          List.map
+            (fun Uses.{path; how_to_build; _} ->
+              sf
+                "'%s' which does not exist%s"
+                path
+                (match how_to_build with
+                | None -> ""
+                | Some how_to_build -> sf " (try '%s')" how_to_build))
+            uses_that_do_not_exist
+          |> String.concat ", "
         in
         error
           !error_mode_for_non_existing_use
-          "In %S, test %S requires %s which do(es) not exist."
+          "In %S, test %S requires %s."
           file
           title
-          (String.concat ", " (List.map (sf "'%s'") paths))) ;
+          error_details) ;
     (* Set hook so that tests can only call [Uses.path] on allowed paths. *)
     (Uses.path_handler :=
        fun uses ->

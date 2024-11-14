@@ -46,33 +46,33 @@ let test_free_neutral (start, any_cost) =
   let open Alpha_context in
   extract_qcheck_result
     (let open Result_syntax in
-    let* free_first = Gas.consume start Gas.free in
-    let* branch1 = Gas.consume free_first any_cost in
-    let* cost_first = Gas.consume start any_cost in
-    let+ branch2 = Gas.consume cost_first Gas.free in
-    let equal_consumption_from_start t1 t2 =
-      Gas.Arith.(
-        qcheck_eq
-          ~pp
-          ~eq:equal
-          (Gas.consumed ~since:start ~until:t1)
-          (Gas.consumed ~since:start ~until:t2))
-    in
-    equal_consumption_from_start branch1 branch2
-    && equal_consumption_from_start branch1 cost_first)
+     let* free_first = Gas.consume start Gas.free in
+     let* branch1 = Gas.consume free_first any_cost in
+     let* cost_first = Gas.consume start any_cost in
+     let+ branch2 = Gas.consume cost_first Gas.free in
+     let equal_consumption_from_start t1 t2 =
+       Gas.Arith.(
+         qcheck_eq
+           ~pp
+           ~eq:equal
+           (Gas.consumed ~since:start ~until:t1)
+           (Gas.consumed ~since:start ~until:t2))
+     in
+     equal_consumption_from_start branch1 branch2
+     && equal_consumption_from_start branch1 cost_first)
 
 (** Consuming [Gas.free] is equivalent to consuming nothing. *)
 let test_free_consumption start =
   let open Alpha_context in
   extract_qcheck_result
     (let open Result_syntax in
-    let+ after_empty_consumption = Gas.consume start Gas.free in
-    Gas.Arith.(
-      qcheck_eq
-        ~pp
-        ~eq:equal
-        (Gas.consumed ~since:start ~until:after_empty_consumption)
-        zero))
+     let+ after_empty_consumption = Gas.consume start Gas.free in
+     Gas.Arith.(
+       qcheck_eq
+         ~pp
+         ~eq:equal
+         (Gas.consumed ~since:start ~until:after_empty_consumption)
+         zero))
 
 (** Consuming [cost1] then [cost2] is equivalent to consuming
     [Gas.(cost1 +@ cost2)]. *)
@@ -80,26 +80,26 @@ let test_consume_commutes (start, cost1, cost2) =
   let open Alpha_context in
   extract_qcheck_result
     (let open Result_syntax in
-    let* after_cost1 = Gas.consume start cost1 in
-    let* branch1 = Gas.consume after_cost1 cost2 in
-    let+ branch2 = Gas.consume start Gas.(cost1 +@ cost2) in
-    Gas.Arith.(
-      qcheck_eq
-        ~pp
-        ~eq:equal
-        (Gas.consumed ~since:start ~until:branch1)
-        (Gas.consumed ~since:start ~until:branch2)))
+     let* after_cost1 = Gas.consume start cost1 in
+     let* branch1 = Gas.consume after_cost1 cost2 in
+     let+ branch2 = Gas.consume start Gas.(cost1 +@ cost2) in
+     Gas.Arith.(
+       qcheck_eq
+         ~pp
+         ~eq:equal
+         (Gas.consumed ~since:start ~until:branch1)
+         (Gas.consumed ~since:start ~until:branch2)))
 
 (** Arbitrary context with a gas limit of 100_000_000. *)
 let context_gen : Alpha_context.t QCheck2.Gen.t =
   QCheck2.Gen.return
     (Lwt_main.run
        (let open Lwt_result_syntax in
-       let* b, _contract = Context.init1 () in
-       let+ inc = Incremental.begin_construction b in
-       Alpha_context.Gas.set_limit
-         (Incremental.alpha_ctxt inc)
-         Alpha_context.Gas.Arith.(fp (integral_of_int_exn 100_000_000)))
+        let* b, _contract = Context.init1 () in
+        let+ inc = Incremental.begin_construction b in
+        Alpha_context.Gas.set_limit
+          (Incremental.alpha_ctxt inc)
+          Alpha_context.Gas.Arith.(fp (integral_of_int_exn 100_000_000)))
      |> function
      | Ok a -> a
      | Error _ -> assert false)

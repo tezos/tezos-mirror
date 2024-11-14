@@ -71,12 +71,10 @@
 //! [outbox queue]: OutboxQueue
 //! [default]: OUTBOX_QUEUE
 
-#[doc(inline)]
-pub use tezos_smart_rollup_encoding::outbox::*;
-
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup_core::MAX_OUTPUT_SIZE;
-use tezos_smart_rollup_encoding::michelson::Michelson;
+#[doc(inline)]
+pub use tezos_smart_rollup_encoding::outbox::*;
 use tezos_smart_rollup_host::path::{concat, Path, PathError};
 use tezos_smart_rollup_host::Error;
 use tezos_smart_rollup_host::{
@@ -140,10 +138,10 @@ impl<'a, P: Path> OutboxQueue<'a, P> {
     /// Returns the current length of the queue.
     ///
     /// [`flush_queue`]: Self::flush_queue
-    pub fn queue_message<Expr: Michelson>(
+    pub fn queue_message<Batch: AtomicBatch>(
         &self,
         host: &mut impl Runtime,
-        message: impl Into<OutboxMessage<Expr>>,
+        message: impl Into<OutboxMessageFull<Batch>>,
     ) -> Result<usize, RuntimeError> {
         let (start, len) = self.read_meta(host);
 
@@ -153,9 +151,8 @@ impl<'a, P: Path> OutboxQueue<'a, P> {
 
         let end = start.wrapping_add(len);
 
-        let message: OutboxMessage<Expr> = message.into();
+        let message = message.into();
 
-        // could remove the allocation if bin_write supported encoding into a buffer directly.
         let mut buffer = Vec::with_capacity(MAX_OUTPUT_SIZE);
         message
             .bin_write(&mut buffer)

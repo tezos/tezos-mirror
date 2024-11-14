@@ -141,6 +141,11 @@ val close : t -> unit
    lowest known cycle of the store. *)
 val cemented_blocks_files : t -> cemented_blocks_file array option
 
+(** [reload_cemented_blocks_files cemented_store] updates the cemented
+    store so the latest cemented files are available. This is
+    particularly useful for RO instances. *)
+val reload_cemented_blocks_files : t -> (unit, tztrace) result Lwt.t
+
 (** [cemented_metadata_files cemented_store] returns the {b current}
    array of cemented metadata files. The returned array is sorted in
    ascending order such that the first element of the array is the
@@ -155,6 +160,12 @@ val cemented_block_level_index : t -> Cemented_block_level_index.t
 (** [cemented_block_hash_index block_store] returns the level to hash
     index. *)
 val cemented_block_hash_index : t -> Cemented_block_hash_index.t
+
+(** [may_synchronize_indexes cemented_store] updates a RO index
+    instance to allow concurrent access to the value added by a RW
+    instance. This operation is expected to be cheap (~10us) and has
+    no effect on RW instances. *)
+val may_synchronize_indexes : t -> unit
 
 (** [load_table ~cemented_blocks_dir] reads the [cemented_blocks_dir]
     directory and instantiate the cemented blocks chunks files. *)
@@ -299,8 +310,13 @@ val check_indexes_consistency :
   t ->
   unit tzresult Lwt.t
 
-(** [get_and_upgrade_offsets fd nb_blocks] obtains the list of [nb_blocks] offsets from the 
-    beginning of the file given by file descriptor [fd] and upgrades their sizes from 32-bits to 
+(** Utility function that aims to give an overview of the shape of the
+    store's metadata. *)
+val stat_metadata_cycles :
+  t -> (string * Store_types.metadata_stat list) list tzresult Lwt.t
+
+(** [get_and_upgrade_offsets fd nb_blocks] obtains the list of [nb_blocks] offsets from the
+    beginning of the file given by file descriptor [fd] and upgrades their sizes from 32-bits to
     64-bits, adjusting their values for the following blocks in the cemented blocks file. *)
 val get_and_upgrade_offsets : Lwt_unix.file_descr -> int -> bytes Lwt.t
 

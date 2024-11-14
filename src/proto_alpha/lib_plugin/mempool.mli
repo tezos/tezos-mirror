@@ -181,6 +181,19 @@ val default_minimal_nanotez_per_gas_unit : nanotez
 (** Minimal fee over byte size ratio in {!default_config}. *)
 val default_minimal_nanotez_per_byte : nanotez
 
+(** Protocol context *)
+type ctxt
+
+(** Return the protocol context *)
+val get_context :
+  Environment.Context.t -> head:Block_header.shell_header -> ctxt tzresult Lwt.t
+
+(** Return the sources from the operation *)
+val sources_from_operation :
+  ctxt ->
+  Protocol.Alpha_context.packed_operation ->
+  Signature.public_key_hash list Lwt.t
+
 module Internal_for_tests : sig
   open Protocol.Alpha_context
 

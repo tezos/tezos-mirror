@@ -1160,12 +1160,12 @@ module Stake_storage_tests = struct
             ~loc:__LOC__
             (cement_commitment ctxt rollup commitment)
             (let open Sc_rollup_errors in
-            function
-            | Sc_rollup_disputed | Sc_rollup_parent_not_lcc
-            | Raw_context.Storage_error (Missing_key _) (* missing commitment *)
-              ->
-                true
-            | _ -> false))
+             function
+             | Sc_rollup_disputed | Sc_rollup_parent_not_lcc
+             | Raw_context.Storage_error (Missing_key _)
+             (* missing commitment *) ->
+                 true
+             | _ -> false))
     in
     let* () = cant_cement ctxt honest_commitments in
     let* () = cant_cement ctxt dishonest_commitments in

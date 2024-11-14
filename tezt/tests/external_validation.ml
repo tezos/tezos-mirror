@@ -32,9 +32,11 @@
                  failures
 *)
 
+let team = Tag.layer1
+
 let wait_for_external_validator_pid node =
   let filter json = JSON.(json |> as_int_opt) in
-  Node.wait_for node "proc_validator_started.v0" filter
+  Node.wait_for node "validator_proc_started.v0" filter
 
 (* Typical signals that could be sent. This could be enriched but the
    effects are expected to be similar.
@@ -68,7 +70,7 @@ let pp_signal ppf signal =
 
 let wait_for_external_validator_failure node =
   let filter json = JSON.(json |> as_int_opt) in
-  Node.wait_for node "proc_status.v0" filter
+  Node.wait_for node "validator_proc_status.v0" filter
 
 let kill_process ~pid ~signal =
   Log.info
@@ -94,7 +96,7 @@ let test_kill =
   Protocol.register_test
     ~__FILE__
     ~title:"external validator kill"
-    ~tags:["node"; "external"; "validator"; "kill"]
+    ~tags:[team; "node"; "external"; "validator"; "kill"]
   @@ fun protocol ->
   let node = Node.create [] in
   let wait_for_validator_pid = wait_for_external_validator_pid node in
@@ -124,4 +126,8 @@ let test_kill =
   in
   unit
 
-let register ~protocols = test_kill protocols
+let register ~protocols =
+  (* If the singleprocess was not activated through the
+     schedule_extended_validation_test pipeline, no need to run any
+     check, the test is not even registered. *)
+  if Node.enable_singleprocess then () else test_kill protocols

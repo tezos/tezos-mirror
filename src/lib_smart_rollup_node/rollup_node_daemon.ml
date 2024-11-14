@@ -27,7 +27,6 @@
 
 type state = {
   mutable plugin : (module Protocol_plugin_sig.S);
-  mutable degraded : bool;
   rpc_server : Rpc_server.t;
   configuration : Configuration.t;
   node_ctxt : Node_context.rw;
@@ -52,6 +51,7 @@ let start_workers (plugin : (module Protocol_plugin_sig.S))
   let open Lwt_result_syntax in
   let* () = Publisher.init node_ctxt in
   let* () = Batcher.init plugin node_ctxt in
+  let* () = Dal_injection_queue.init node_ctxt in
   let* () = Refutation_coordinator.init node_ctxt in
   return_unit
 
@@ -86,6 +86,7 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   in
   state.plugin <- new_plugin ;
   Reference.set state.node_ctxt.current_protocol new_protocol ;
+  Metrics.Info.set_proto_info new_protocol.hash constants ;
   let*! () =
     Daemon_event.switched_protocol
       new_protocol.hash
@@ -103,17 +104,30 @@ let maybe_split_context node_ctxt commitment_hash head_level =
   when_ commit_is_gc_candidate @@ fun () ->
   let* last = Node_context.get_last_context_split_level node_ctxt in
   let last = Option.value last ~default:node_ctxt.genesis_info.level in
-  let splitting_period =
-    Option.value
-      node_ctxt.config.gc_parameters.context_splitting_period
-      ~default:
-        (Reference.get node_ctxt.current_protocol).constants.sc_rollup
-          .challenge_window_in_blocks
-  in
-  if Int32.(to_int @@ sub head_level last) >= splitting_period then (
+  if
+    Int32.(to_int @@ sub head_level last)
+    >= Node_context.splitting_period node_ctxt
+  then (
     Context.split node_ctxt.context ;
     Node_context.save_context_split_level node_ctxt head_level)
   else return_unit
+
+(** Register outbox messages if any. *)
+let register_outbox_messages (module Plugin : Protocol_plugin_sig.S) node_ctxt
+    ctxt level =
+  let open Lwt_result_syntax in
+  let* pvm_state = Context.PVMState.get ctxt in
+  let*! outbox_messages =
+    Plugin.Pvm.get_outbox_messages node_ctxt pvm_state ~outbox_level:level
+  in
+  match outbox_messages with
+  | [] -> return_unit
+  | _ ->
+      let indexes = List.map fst outbox_messages in
+      Node_context.register_outbox_messages
+        node_ctxt
+        ~outbox_level:level
+        ~indexes
 
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
@@ -125,9 +139,15 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
   let module Plugin = (val state.plugin) in
+  let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
     Plugin.Inbox.process_head node_ctxt ~predecessor head
   in
+  let fetch_timestamp = Time.System.now () in
+  Metrics.wrap (fun () ->
+      Metrics.Inbox.set_fetch_time @@ Ptime.diff fetch_timestamp start_timestamp ;
+      Metrics.Inbox.set_messages messages ~is_internal:(fun s ->
+          String.length s > 0 && s.[0] = '\000')) ;
   let* () =
     when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
     Plugin.Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
@@ -169,6 +189,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
       Sc_rollup_block.most_recent_commitment pred.header
   in
+  let* () = register_outbox_messages state.plugin node_ctxt ctxt level in
   let header =
     Sc_rollup_block.
       {
@@ -177,7 +198,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         predecessor = predecessor.hash;
         commitment_hash;
         previous_commitment_hash;
-        context = Smart_rollup_context_hash.of_context_hash context_hash;
+        context = context_hash;
         inbox_witness;
         inbox_hash;
       }
@@ -186,11 +207,16 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
   in
   let* () =
-    Node_context.mark_finalized_level
-      node_ctxt
-      Int32.(sub head.level (of_int node_ctxt.block_finality_time))
+    assert (node_ctxt.block_finality_time = 2) ;
+    let finalized_level = Int32.pred predecessor.header.level in
+    let finalized_hash = predecessor.header.predecessor in
+    Node_context.set_finalized node_ctxt finalized_hash finalized_level
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
+  let end_timestamp = Time.System.now () in
+  Metrics.wrap (fun () ->
+      Metrics.Inbox.set_process_time @@ Ptime.diff end_timestamp fetch_timestamp ;
+      Metrics.Inbox.set_total_time @@ Ptime.diff end_timestamp start_timestamp) ;
   return l2_block
 
 let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
@@ -203,29 +229,17 @@ let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
     | Some l2_head ->
         (* Already processed *)
         return (`Already_processed l2_head)
-    | None -> (
+    | None ->
         (* New head *)
         let*! () = Daemon_event.head_processing head.hash head.level in
-        let* predecessor =
-          Node_context.get_predecessor_header_opt node_ctxt head
+        let* predecessor = Node_context.get_predecessor_header node_ctxt head in
+        let* () =
+          update_l2_chain state ~catching_up:true ~recurse_pred:true predecessor
         in
-        match predecessor with
-        | None ->
-            (* Predecessor not available on the L1, which means the block does not
-               exist in the chain. *)
-            return `Nothing
-        | Some predecessor ->
-            let* () =
-              update_l2_chain
-                state
-                ~catching_up:true
-                ~recurse_pred:true
-                predecessor
-            in
-            let* l2_head =
-              process_unseen_head state ~catching_up ~predecessor head
-            in
-            return (`New l2_head))
+        let* l2_head =
+          process_unseen_head state ~catching_up ~predecessor head
+        in
+        return (`New l2_head)
 
 and update_l2_chain ({node_ctxt; _} as state) ~catching_up
     ?(recurse_pred = false) (head : Layer1.header) =
@@ -240,6 +254,10 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
   match done_ with
   | `Nothing -> return_unit
   | `Already_processed l2_block ->
+      Metrics.wrap (fun () ->
+          Metrics.Inbox.set_fetch_time Ptime.Span.zero ;
+          Metrics.Inbox.set_process_time Ptime.Span.zero ;
+          Metrics.Inbox.set_total_time Ptime.Span.zero) ;
       if recurse_pred then
         (* We are calling update_l2_chain recursively to ensure we have handled
            the predecessor. In this case, we don't update the head or notify the
@@ -250,7 +268,6 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
-      Metrics.Inbox.set_process_time process_time ;
       let*! () =
         Daemon_event.new_head_processed head.hash head.level process_time
       in
@@ -258,8 +275,10 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       return_unit
 
 let update_l2_chain state ~catching_up head =
-  Utils.with_lockfile
-    (Node_context.processing_lockfile_path ~data_dir:state.node_ctxt.data_dir)
+  Lwt_lock_file.with_lock
+    ~when_locked:`Block
+    ~filename:
+      (Node_context.processing_lockfile_path ~data_dir:state.node_ctxt.data_dir)
   @@ fun () -> update_l2_chain state ~catching_up head
 
 let missing_data_error trace =
@@ -350,10 +369,12 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   notify_synchronization node_ctxt head.level ;
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
+  let* () = Publisher.execute_outbox () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Batcher.produce_batches () in
+  let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
   let*! () = Injector.inject ~header:head.header () in
-  state.degraded <- false ;
+  Reference.set node_ctxt.degraded false ;
   return_unit
 
 let daemonize state =
@@ -375,11 +396,15 @@ let degraded_refutation_loop state (head : Layer1.header) =
   let* () = Publisher.publish_commitments () in
   (* Continue to produce batches but ignore any error *)
   let*! (_ : unit tzresult) = Batcher.produce_batches () in
+  let*! (_ : unit tzresult) =
+    Dal_injection_queue.produce_dal_slots ~level:head.level
+  in
   let*! () = Injector.inject () in
   return_unit
 
 let refutation_loop state (head : Layer1.header) =
-  if state.degraded then degraded_refutation_loop state head
+  if Reference.get state.node_ctxt.degraded then
+    degraded_refutation_loop state head
   else simple_refutation_loop head
 
 let rec refutation_daemon ?(restart = false) state =
@@ -431,8 +456,9 @@ let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
     let operator = Node_context.get_operator node_ctxt Purpose.Operating in
     match operator with
     | None ->
-        (* this case can't happen because the bailout mode needs a operator to start*)
-        tzfail (Purpose.Missing_operator (Purpose Operating))
+        (* this case can't happen because the bailout mode needs an operator to
+           start *)
+        tzfail Purpose.(Missing_operators (Set.singleton (Purpose Operating)))
     | Some (Single operating_pkh) -> (
         let module Plugin = (val state.plugin) in
         let* last_published_commitment =
@@ -450,6 +476,36 @@ let maybe_recover_bond ({node_ctxt; configuration; _} as state) =
             (* when the operator is still stake on something *)
             return_unit)
   else return_unit
+
+let check_operator_balance state =
+  let open Lwt_result_syntax in
+  match Reference.get state.node_ctxt.lpc with
+  | Some _ ->
+      (* Operator has already published a commitment, so has staked. *)
+      return_unit
+  | None -> (
+      let publisher =
+        Purpose.find_operator Operating state.node_ctxt.config.operators
+      in
+      match publisher with
+      | None ->
+          (* Not operating the rollup, so no need to stake. *)
+          return_unit
+      | Some (Single publisher) ->
+          let (module Plugin) = state.plugin in
+          let* balance =
+            Plugin.Layer1_helpers.get_balance_mutez
+              state.node_ctxt.cctxt
+              publisher
+          in
+          if balance > 10_000_000_000L (* 10ktez *) then return_unit
+          else
+            failwith
+              "Operator %a only has %f tz but needs more than 10000 in order \
+               to stake on the rollup."
+              Signature.Public_key_hash.pp
+              publisher
+              (Int64.to_float balance /. 1_000_000.))
 
 let make_signers_for_injector operators =
   let update map (purpose, operator) =
@@ -507,13 +563,23 @@ let make_signers_for_injector operators =
          in
          let strategy =
            match operation_kinds with
-           | [Operation_kind.Add_messages] ->
-               (* For the batcher we delay of 0.5 sec to allow more
+           | [Operation_kind.Add_messages; Publish_dal_commitment]
+           | [Publish_dal_commitment; Add_messages] ->
+               (* For the batcher we delay half a block to allow more
                   operations to get in. *)
                `Delay_block 0.5
            | _ -> `Each_block
          in
          (operators, strategy, operation_kinds))
+
+let performance_metrics state =
+  let open Lwt_syntax in
+  let rec collect () =
+    let* () = Metrics.Performance.set_stats state.node_ctxt.data_dir in
+    let* () = Lwt_unix.sleep 10. in
+    collect ()
+  in
+  Metrics.wrap @@ fun () -> Lwt.dont_wait collect ignore
 
 let rec process_daemon ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
@@ -524,7 +590,7 @@ let rec process_daemon ({node_ctxt; _} as state) =
   in
   let error_to_degraded_mode e =
     let*! () = Daemon_event.error e in
-    state.degraded <- true ;
+    Reference.set node_ctxt.degraded true ;
     if node_ctxt.config.no_degraded then fatal_error_exit e
     else
       let*! () =
@@ -561,8 +627,9 @@ let rec process_daemon ({node_ctxt; _} as state) =
   protect loop ~on_error:(function
       | ( Rollup_node_errors.(
             ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-            | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup ))
-        | Purpose.(Missing_operator _ | Too_many_operators _) )
+            | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
+            | Disagree_with_cemented _ | Disagree_with_commitment _ ))
+        | Purpose.Missing_operators _ )
         :: _ as e ->
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
@@ -577,11 +644,17 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let current_protocol = Reference.get node_ctxt.current_protocol in
+  let* history_mode = Node_context.get_history_mode node_ctxt in
   Metrics.Info.init_rollup_node_info
-    ~id:configuration.sc_rollup_address
-    ~mode:configuration.mode
+    configuration
     ~genesis_level:node_ctxt.genesis_info.level
-    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind) ;
+    ~genesis_hash:node_ctxt.genesis_info.commitment_hash
+    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
+    ~history_mode ;
+  Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
+  let* first_available_level = Node_context.first_available_level node_ctxt in
+  Metrics.GC.set_oldest_available_level first_available_level ;
+  if configuration.performance_metrics then performance_metrics state ;
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->
@@ -599,6 +672,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       ~signers
       ~retention_period:configuration.injector.retention_period
       ~allowed_attempts:configuration.injector.attempts
+      ~collect_metrics:(Option.is_some state.configuration.metrics_addr)
   in
   let* () = start_workers plugin node_ctxt in
   Lwt.dont_wait
@@ -647,7 +721,6 @@ module Internal_for_tests = struct
         node_ctxt
         ~is_first_block
         ~predecessor
-        head
         messages
     in
     let* ctxt, _num_messages, num_ticks, initial_tick =
@@ -677,6 +750,7 @@ module Internal_for_tests = struct
         let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
         Sc_rollup_block.most_recent_commitment pred.header
     in
+    let* () = register_outbox_messages (module Plugin) node_ctxt ctxt level in
     let header =
       Sc_rollup_block.
         {
@@ -685,7 +759,7 @@ module Internal_for_tests = struct
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
-          context = Smart_rollup_context_hash.of_context_hash context_hash;
+          context = context_hash;
           inbox_witness;
           inbox_hash;
         }
@@ -709,7 +783,7 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
   let*? plugin = Protocol_plugins.proto_plugin_for_protocol current_protocol in
   return (current_protocol, plugin)
 
-let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
+let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   let* () =
@@ -780,6 +854,10 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       cctxt
       configuration.sc_rollup_address
   in
+  Metrics.Info.set_lcc_level_l1 lcc.level ;
+  Option.iter
+    (fun Commitment.{inbox_level = l; _} -> Metrics.Info.set_lpc_level_l1 l)
+    lpc ;
   let current_protocol =
     {
       Node_context.hash = protocol;
@@ -792,7 +870,6 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       cctxt
       ~data_dir
       ~irmin_cache_size
-      ~index_buffer_size
       ?log_kernel_debug_file
       Read_write
       l1_ctxt
@@ -813,8 +890,7 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       ~cors:configuration.cors
       dir
   in
-  let state =
-    {node_ctxt; rpc_server; configuration; plugin; degraded = false}
-  in
+  let state = {node_ctxt; rpc_server; configuration; plugin} in
+  let* () = check_operator_balance state in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
   run state

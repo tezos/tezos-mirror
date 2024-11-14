@@ -9,10 +9,10 @@ use alloc::vec::Vec;
 use bn::{FieldError, GroupError};
 use evm::{executor::stack::PrecompileFailure, ExitError, ExitReason, ExitSucceed};
 use evm::{Context, Transfer};
-use host::runtime::Runtime;
 use primitive_types::U256;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Debug;
+use tezos_evm_runtime::runtime::Runtime;
 
 /// Input length for the add operation.
 const ADD_INPUT_LEN: usize = 128;
@@ -317,12 +317,17 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // zero sum test
         let input = hex::decode(
@@ -340,12 +345,17 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // no input test
         let input = [0u8; 0];
@@ -356,12 +366,17 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // point not on curve fail
         let input = hex::decode(
@@ -373,8 +388,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(6), &input, None, Some(50_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(6),
+            &input,
+            None,
+            Some(50_000),
+            false,
+        );
         // ERR_BN128_INVALID_POINT
         assert!(result.is_err());
     }
@@ -395,12 +415,17 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // zero multiplication test
         let input = hex::decode(
@@ -417,12 +442,17 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // no input test
         let input = [0u8; 0];
@@ -433,12 +463,17 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // point not on curve fail
         let input = hex::decode(
@@ -449,8 +484,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(7), &input, None, Some(40_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(7),
+            &input,
+            None,
+            Some(40_000),
+            false,
+        );
         // ERR_BN128_INVALID_POINT
         assert!(result.is_err());
     }
@@ -478,13 +518,18 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         println!("result {:?}", result);
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // no input test
         let input = [0u8; 0];
@@ -493,12 +538,17 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(outcome.result.unwrap(), expected);
+        assert!(outcome.is_success());
+        assert_eq!(*outcome.output().unwrap(), expected);
 
         // point not on curve fail
         let input = hex::decode(
@@ -512,8 +562,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         // ERR_BN128_INVALID_A
         assert!(result.is_err());
 
@@ -527,8 +582,13 @@ mod tests {
         )
         .unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(8), &input, None, Some(260_000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(8),
+            &input,
+            None,
+            Some(260_000),
+            false,
+        );
         // ERR_BN128_INVALID_LEN
         assert!(result.is_err());
     }

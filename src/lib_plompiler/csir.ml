@@ -238,7 +238,7 @@ let table_rotate_right4_3 =
   Table.of_list
   @@ generate_lookup_table_op2 ~nb_bits (fun x y -> rotate_right ~nb_bits x y 3)
 
-module Tables = Map.Make (String)
+module Tables = Kzg.SMap
 
 let table_registry =
   let t = Tables.add "or" table_or Tables.empty in

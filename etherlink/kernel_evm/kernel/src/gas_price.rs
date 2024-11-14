@@ -5,13 +5,13 @@
 //! Adjustments of the gas price (a.k.a `base_fee_per_gas`), in response to load.
 
 use crate::block_in_progress::BlockInProgress;
-use crate::storage::read_minimum_base_fee_per_gas;
+use crate::storage::{read_minimum_base_fee_per_gas, store_base_fee_per_gas};
 
 use primitive_types::U256;
 use softfloat::F64;
 use tezos_ethereum::block::BlockFees;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::runtime::Runtime;
 
 // actual ~34M, allow some overhead for less effecient ERC20 transfers.
 const ERC20_TICKS: u64 = 40_000_000;
@@ -32,7 +32,11 @@ pub fn register_block(
         anyhow::bail!("update_gas_price on non-empty block");
     }
 
-    update_tick_backlog(host, bip.estimated_ticks_in_block, bip.timestamp)
+    update_tick_backlog(host, bip.estimated_ticks_in_block, bip.timestamp)?;
+    let base_fee_per_gas = base_fee_per_gas(host, bip.timestamp);
+    store_base_fee_per_gas(host, base_fee_per_gas)?;
+
+    Ok(())
 }
 
 /// Update the kernel-wide base fee per gas with a new value.
@@ -163,7 +167,7 @@ mod test {
     use super::*;
     use proptest::prelude::*;
     use std::collections::VecDeque;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
 
     proptest! {
         #[test]
@@ -173,7 +177,8 @@ mod test {
 
         #[test]
         fn u64_to_f64_conv(u in any::<u64>()) {
-            assert_eq!(u as f64, u64_to_f64(u).into());
+            let f: f64 = u64_to_f64(u).into();
+            assert_eq!(u as f64, f);
         }
 
         #[test]
@@ -192,14 +197,13 @@ mod test {
 
     #[test]
     fn gas_price_responds_to_load() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let timestamp = 0_i64;
         let mut block_fees = BlockFees::new(U256::zero(), U256::zero(), U256::zero());
 
         let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
             Default::default(),
-            U256::zero(),
             VecDeque::new(),
             // estimated ticks in run (ignored)
             0,

@@ -39,6 +39,11 @@ type t =
       cemented_commitment : Commitment.Hash.t;
       output_proof : string;
     }
+  | Publish_dal_commitment of {
+      slot_index : Dal.Slot_index.t;
+      commitment : Dal.Commitment.t;
+      commitment_proof : Dal.Commitment_proof.t;
+    }
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -125,6 +130,20 @@ let encoding : t Data_encoding.t =
              | _ -> None)
            (fun (rollup, cemented_commitment, output_proof) ->
              Execute_outbox_message {rollup; cemented_commitment; output_proof});
+         case
+           7
+           "publish_dal_commitment"
+           (obj3
+              (req "slot_index" Dal.Slot_index.encoding)
+              (req "commitment" Dal.Commitment.encoding)
+              (req "commitment_proof" Dal.Commitment_proof.encoding))
+           (function
+             | Publish_dal_commitment {slot_index; commitment; commitment_proof}
+               ->
+                 Some (slot_index, commitment, commitment_proof)
+             | _ -> None)
+           (fun (slot_index, commitment, commitment_proof) ->
+             Publish_dal_commitment {slot_index; commitment; commitment_proof});
        ]
 
 let pp ppf = function
@@ -182,10 +201,17 @@ let pp ppf = function
   | Recover_bond {rollup = _; staker = _} -> Format.fprintf ppf "recover"
   | Execute_outbox_message
       {rollup = _; cemented_commitment = _; output_proof = _} ->
-      Format.fprintf ppf "Execute outbox message"
+      Format.fprintf ppf "execute outbox message"
+  | Publish_dal_commitment {slot_index; commitment; commitment_proof = _} ->
+      Format.fprintf
+        ppf
+        "publishing DAL commitment %a at slot index %d@."
+        Dal.Commitment.pp
+        commitment
+        slot_index
 
 let unique = function
-  | Add_messages _ | Cement _ -> false
+  | Add_messages _ | Publish_dal_commitment _ -> false
   | Publish _ | Refute _ | Timeout _ | Recover_bond _ | Execute_outbox_message _
-    ->
+  | Cement _ ->
       true

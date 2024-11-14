@@ -30,6 +30,7 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file contract_mini_scenarios.ml
    Subject:      Test mini scenarios
 *)
+let team = Tag.layer1
 
 let test_replay client ~protocol =
   Log.info "Replay 'originate'" ;
@@ -487,7 +488,7 @@ let register ~protocols =
       Protocol.register_test
         ~__FILE__
         ~title
-        ~tags:["client"; "michelson"; "mini_scenarios"]
+        ~tags:[team; "client"; "michelson"; "mini_scenarios"]
         ~uses_node:false
         (fun protocol ->
           let* client = Client.init_mockup ~protocol () in

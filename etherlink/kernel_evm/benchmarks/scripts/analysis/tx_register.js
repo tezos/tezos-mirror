@@ -2,54 +2,78 @@
 //
 // SPDX-License-Identifier: MIT
 
-const path = require('node:path')
-module.exports = { print_analysis }
 const utils = require("./utils")
+const pdfUtils = require("./pdf_utils")
 const OUTPUT = 'register_tx_data.csv'
 const MODEL_OBJ = { intercept: 200000, coef: 880 }
 const MODEL_RECEIPT = { intercept: 200000, coef: 960 }
 const MODEL_LOGBLOOM = { intercept: 5300, coef: 85000 }
+module.exports = { print_analysis }
 
-function print_analysis(infos, dir = "analysis_result") {
 
-    function print_csv(name, columns) {
-        utils.print_csv(dir, name + OUTPUT, infos.tx_register, columns)
+function print_analysis(infos, dir = "analysis_result", doc) {
+    let context_init = {
+        doc,
+        dir
     }
+    let data = infos.tx_register
+    let outline = pdfUtils.h1("Registering transaction", doc);
 
     // transaction object
-    console.log(`[object] Current model: ${utils.print_model(MODEL_OBJ, "size")}`)
-    let obj_lr = utils.make_lr(infos.tx_register, (x) => x.tx_size, (y) => y.store_transaction_object_ticks)
-    console.log(`[object] Computed LR: ${utils.print_lr(obj_lr)} `)
-    let error_object = utils.print_summary_errors(infos.tx_register, datum => { return datum.tx_size - utils.predict_linear_model(MODEL_OBJ, datum.receipt_size) }, "[object]")
-
-    print_csv(
-        "object_",
-        ["benchmark_name", "tx_size", "store_transaction_object_ticks",]
-    )
+    pdfUtils.h2("Store transaction object", doc, outline);
+    let errors_obj = utils.print_page(data, {
+        fx: (d) => d.tx_size,
+        fy: (d) => d.store_transaction_object_ticks,
+        model: MODEL_OBJ,
+        labels: {
+            title: "Tick model for storing transaction object",
+            x: "size of tx",
+            prefix: "[object] "
+        },
+        context: {
+            csv_filepath: `object_${OUTPUT}`,
+            csv_columns: ["benchmark_name", "tx_size", "store_transaction_object_ticks",],
+            ...context_init
+        }
+    });
 
     // receipt
-    console.log(`[receipt] Current model: ${utils.print_model(MODEL_RECEIPT, "size")}`)
-    let receipt_lr = utils.make_lr(infos.tx_register, (x) => x.receipt_size, (y) => y.store_receipt_ticks)
-    console.log(`[receipt] Computed LR: ${utils.print_lr(receipt_lr)} `)
-    let error_receipt = utils.print_summary_errors(infos.tx_register, datum => { return datum.store_receipt_ticks - utils.predict_linear_model(MODEL_RECEIPT, datum.receipt_size) }, "[receipt]")
-
-    print_csv(
-        "receipt_",
-        ["benchmark_name", "receipt_size", "store_receipt_ticks"]
-    )
+    doc.addPage()
+    pdfUtils.h2("Store receipt", doc, outline);
+    let errors_receipt = utils.print_page(data, {
+        fx: (d) => d.receipt_size,
+        fy: (d) => d.store_receipt_ticks,
+        model: MODEL_RECEIPT,
+        labels: {
+            title: "Tick model for storing transaction receipt",
+            x: "size of receipt",
+            prefix: "[receipt] "
+        },
+        context: {
+            csv_filepath: `receipt_${OUTPUT}`,
+            csv_columns: ["benchmark_name", "receipt_size", "store_receipt_ticks"],
+            ...context_init
+        }
+    });
 
     // bloom
-    console.log(`[bloom] Current model: ${utils.print_model(MODEL_LOGBLOOM, "size")}`)
-    let bloom_lr = utils.make_lr(infos.tx_register, (x) => x.bloom_size, (y) => y.logs_to_bloom)
-    console.log(`[bloom] Computed LR: ${utils.print_lr(bloom_lr)} `)
-    let error_bloom = utils.print_summary_errors(infos.tx_register, datum => { return datum.logs_to_bloom - utils.predict_linear_model(MODEL_LOGBLOOM, datum.bloom_size) }, "[bloom]")
+    doc.addPage()
+    pdfUtils.h2("Log bloom", doc, outline);
+    let errors_bloom = utils.print_page(data, {
+        fx: (d) => d.bloom_size,
+        fy: (d) => d.logs_to_bloom,
+        model: MODEL_LOGBLOOM,
+        labels: {
+            title: "Tick model for log bloom",
+            x: "size of bloom",
+            prefix: "[bloom] "
+        },
+        context: {
+            csv_filepath: `bloom_${OUTPUT}`,
+            csv_columns: ["benchmark_name", "bloom_size", "logs_to_bloom"],
+            ...context_init
+        }
+    });
 
-    print_csv(
-        "bloom_",
-        ["benchmark_name", "bloom_size", "logs_to_bloom"]
-    )
-
-    let errors = error_receipt + error_object + error_bloom
-    console.log(`Total errors: ${errors}`)
-    return errors
+    return errors_obj + errors_receipt + errors_bloom;
 }

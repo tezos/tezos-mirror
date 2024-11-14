@@ -5,7 +5,7 @@ DAL support
 The support for the :doc:`DAL <../shell/dal>` within the economic protocol relies on two operations:
 
 #. ``DAL_publish_commitment``: a new manager operation, allowing anyone to publish a DAL commitment
-#. ``attestation``: the existing :ref:`consensus operation <consensus_operations>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
+#. ``attestation``: the existing :ref:`consensus operation <consensus_operations_paris>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
 
 DAL publish commitment
 ======================
@@ -57,7 +57,7 @@ Therefore, for data committed (published) at level ``L``, the slot's availabilit
 Smart rollups integration
 =========================
 
-The DAL is integrated with :doc:`smart rollups <../active/smart_rollups>` so that kernels can request pages from the DAL via the :ref:`reveal data channel <reveal_data_channel_smart_rollups>`. A smart rollup can fetch any page from the DAL node if the commitment respects some conditions:
+The DAL is integrated with :doc:`smart rollups <../active/smart_rollups>` so that kernels can request pages from the DAL via the :ref:`reveal data channel <reveal_data_channel_smart_rollups_paris>`. A smart rollup can fetch any page from the DAL node if the commitment respects some conditions:
 
 - The commitment should have been published after the rollup origination (this constraint will be leveraged so that the kernel can request any commitment in the past)
 - The commitment should not have been published in a level in the future after the level of the next commitment of the state (at most 30 levels in the future).
@@ -67,12 +67,13 @@ If the kernel requests a page that does not satisfy the mentioned conditions, th
 
 Moreover, the rollup kernel has access to the protocol constants so that the same kernel code can be used on different test networks.
 
+.. _dal_constants:
 .. _dal_constants_paris:
 
 DAL-related protocol constants
 ==============================
 
-This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants` on how to find the values for tests networks):
+This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants_paris` on how to find the values for tests networks):
 
 - ``feature_enable`` (true): Whether the DAL is available
 - ``incentives_enable`` (false): Whether baker incentives are available
@@ -81,6 +82,6 @@ This section describes the protocol constants specific to the DAL as well as the
 - ``attestation_threshold`` (66): The percentage of shards attested for a given slot to declare the slot available
 - ``blocks_per_epoch`` (1): Unused. Could be removed in the future
 - ``page_size`` (3967B, ~4KiB): The size of a page (see :ref:`dal_slots`)
-- ``slot_size`` (126944B, ~1MiB): The size of a slot (see :ref:`dal_slots`)
+- ``slot_size`` (126944B, ~128KiB): The size of a slot (see :ref:`dal_slots`)
 - ``redundancy_factor`` (8): The erasure-code factor (see :ref:`dal_slots`)
 - ``number_of_shards`` (512): The number of shards per slot (see :ref:`dal_slots`)

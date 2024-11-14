@@ -270,10 +270,11 @@ exception SamplingError of string
 
 let fail_sampling error = raise (SamplingError error)
 
-module Make (P : sig
-  val parameters : parameters
-end)
-(Crypto_samplers : Crypto_samplers.Finite_key_pool_S) : S = struct
+module Make
+    (P : sig
+      val parameters : parameters
+    end)
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) : S = struct
   module Michelson_base = Michelson_samplers_base.Make (struct
     let parameters = P.parameters.base_parameters
   end)

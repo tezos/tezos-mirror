@@ -10,20 +10,18 @@
   octez-libs.base
   octez-libs.crypto
   octez-libs.rpc
-  octez-libs.tezos-context
   octez-shell-libs.context-ops
-  octez-shell-libs.shell-context
   octez-shell-libs.shell-services
   octez-shell-libs.protocol-updater
   octez-libs.stdlib-unix
   octez-version.value)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_crypto
-  -open Tezos_context
   -open Tezos_context_ops
-  -open Tezos_shell_context
   -open Tezos_shell_services
   -open Tezos_protocol_updater
   -open Tezos_stdlib_unix))

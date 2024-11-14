@@ -803,11 +803,11 @@ module Protocol_constants_overrides = struct
              Option.is_some override_value)
     in
     (if fields_with_override <> [] then
-     cctxt#message
-       "@[<v>mockup client uses protocol overrides:@,%a@]@?"
-       (pp_print_list field_pp)
-       fields_with_override
-    else Lwt.return_unit)
+       cctxt#message
+         "@[<v>mockup client uses protocol overrides:@,%a@]@?"
+         (pp_print_list field_pp)
+         fields_with_override
+     else Lwt.return_unit)
     >>= fun () ->
     return
       ({
@@ -1310,8 +1310,8 @@ let mem_init :
   let default = parameters.initial_timestamp in
   let timestamp = Option.value ~default protocol_overrides.timestamp in
   (if not @@ Time.Protocol.equal default timestamp then
-   cctxt#message "@[<h>initial_timestamp: %a@]" Time.Protocol.pp_hum timestamp
-  else Lwt.return_unit)
+     cctxt#message "@[<h>initial_timestamp: %a@]" Time.Protocol.pp_hum timestamp
+   else Lwt.return_unit)
   >>= fun () ->
   let fitness =
     Protocol.Alpha_context.(

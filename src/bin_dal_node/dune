@@ -33,14 +33,12 @@
   octez-libs.crypto
   octez-libs.base.p2p-identity-file
   octez-shell-libs.shell-services
-  octez-internal-libs.irmin_pack
-  octez-internal-libs.irmin_pack.unix
-  octez-internal-libs.irmin
-  prometheus-app
-  prometheus
-  octez-protocol-018-Proxford-libs.dal
-  octez-protocol-019-PtParisB-libs.dal
+  octez-libs.prometheus-app
+  octez-libs.prometheus
+  octez-crawler
+  memtrace
   octez-protocol-020-PsParisC-libs.dal
+  octez-protocol-021-PsQuebec-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
@@ -68,7 +66,8 @@
   -open Tezos_p2p_services
   -open Tezos_crypto
   -open Tezos_base_p2p_identity_file
-  -open Tezos_shell_services))
+  -open Tezos_shell_services
+  -open Octez_crawler))
 
 (rule
  (action

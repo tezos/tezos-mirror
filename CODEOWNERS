@@ -15,96 +15,56 @@
 # Insert code owner declarations here!
 # ************************************
 
-/docs/                       @NicVolanschi
-/docs/protocols/alpha.rst
+/etherlink/bin_dsn_node               @jtcoolen @hantang.sun @m-kus
+/etherlink/tezt                       @jtcoolen @hantang.sun @m-kus
+/brassaia                    @mattiasdrp
 
-/src/bin_codec               @raphael-proust
-/src/bin_node                @romain.nl
-/src/bin_openapi             @romain.nl
-/src/bin_snoop               @naih
-/src/lib_base                @raphael-proust
-/src/lib_benchmark           @naih
-/src/lib_error_monad         @raphael-proust
-/src/lib_event_logging       @romain.nl
-/src/lib_lwt_result_stdlib   @raphael-proust
-/src/lib_node_config         @Killian-Delarue
-/src/lib_openapi             @romain.nl @Killian-Delarue
-/src/lib_p2p*                @julien.t @vivienpe
-/src/lib_protocol_environment   @raphael-proust
-/src/lib_shell_benchmarks    @naih
-/src/lib_stdlib              @raphael-proust
-/src/lib_stdlib_unix         @raphael-proust
-/src/lib_version             @romain.nl
-/src/proto_*/lib_benchmark   @naih
-/src/proto_*/lib_benchmarks_proto @naih
-/src/proto_*/lib_protocol/sc_rollup_proof*         @sribaroud
-/src/proto_*/lib_protocol/sc_rollup_game*          @sribaroud
-/src/proto_*/lib_protocol/sc_rollup_inbox*         @sribaroud
-/src/proto_*/lib_protocol/sc_rollup_refutation*    @sribaroud
+/irmin                    @mattiasdrp
 
-/src/lib_aplonk               @MarcBeunardeau
-/src/lib_bls12_381*           @victor-dumitrescu
-/src/lib_crypto               @victor-dumitrescu
-/src/lib_hacl                 @victor-dumitrescu
-/src/lib_mec                  @MarcBeunardeau
-/src/lib_plonk                @MarcBeunardeau
-/src/lib_polynomial           @MarcBeunardeau
-
-/src/lib_webassembly         @lthms @ole.kruger @picdc
-/src/lib_scoru_wasm          @lthms @ole.kruger @picdc
-
-/scripts                     @romain.nl
-
-/tezt/lib*                   @romain.nl
-/tezt/records                @romain.nl
-
-/manifest                    @romain.nl
-
-/.gitlab                     @romain.nl @arvidnl
-/ci                          @arvidnl
+/src/lib_context_brassaia    @mattiasdrp
+/src/lib_context             @mattiasdrp
 
 # Octez Merge Team
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
+# @abate = Pietro Abate
 # @ACoquereau = Albin Coquereau
 # @andrea.cerone = Andrea Cerone
 # @arvidnl = Arvid Jakobsson
-# @bsall = Boubacar Sall
 # @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
 # @eugenz = Eugen Zalinescu
 # @iguerNL = Mohamed Iguernlala
 # @jobjo = Joel Bjornson
+# @julien.sagot.nl = Julien Sagot
 # @julien.t = Julien Tesson
 # @Killian-Delarue = Killian Delarue
-# @linoscope = Lin Oshitani
 # @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
-# @MarcBeunardeau = Marc Beunardeau
 # @MBourgoin = Mathias Bourgoin
+# @mattiasdrp = Mattias Roux
 # @mebsout = Alain Mebsout
 # @murbard = Arthur B.
 # @naih = Nicolas Ayache
 # @NicVolanschi = Nic Volanschi
 # @ole.kruger = Ole Krüger
 # @pe.cornilleau = Pierre-Emmanuel Cornilleau
+# @phink = Paul Lafourge
 # @picdc = Pierrick Couderc
 # @rafoo_ = Raphaël Cauderlier
-# @raphael-proust = Raphaël Proust
 # @rodibozman = Rodi-Can Bozman
 # @romain.nl = Romain
 # @ryan.tan3 = Ryan Tan
 # @Saroupille = François Thiré
 # @sribaroud = Sylvain R.
 # @tomjack = Tom Jack
-# @vbotbol = vbot
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MarcBeunardeau @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
+* @abate @ACoquereau @andrea.cerone @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
@@ -112,6 +72,6 @@
 #
 # Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
 #
-/CODEOWNERS         @murbard @vbotbol @romain.nl
-/docs/CODEOWNERS    @murbard @vbotbol @romain.nl
-/.gitlab/CODEOWNERS @murbard @vbotbol @romain.nl
+/CODEOWNERS         @murbard @romain.nl @arvidnl
+/docs/CODEOWNERS    @murbard @romain.nl @arvidnl
+/.gitlab/CODEOWNERS @murbard @romain.nl @arvidnl

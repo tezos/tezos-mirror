@@ -98,16 +98,16 @@ module Encoding = struct
            dynamic_size ~kind (check_size length Variable.string))
         ~json:
           (let open Json_encoding in
-          conv
-            (fun s ->
-              if String.length s > length then invalid_arg "oversized string" ;
-              s)
-            (fun s ->
-              if String.length s > length then
-                raise
-                  (Cannot_destruct ([], Invalid_argument "oversized string")) ;
-              s)
-            (Json.string json_repr))
+           conv
+             (fun s ->
+               if String.length s > length then invalid_arg "oversized string" ;
+               s)
+             (fun s ->
+               if String.length s > length then
+                 raise
+                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
+               s)
+             (Json.string json_repr))
 
     let string length = string' Plain length
 
@@ -138,16 +138,16 @@ module Encoding = struct
            dynamic_size ~kind (check_size length Variable.bytes))
         ~json:
           (let open Json_encoding in
-          conv
-            (fun s ->
-              if Bytes.length s > length then invalid_arg "oversized string" ;
-              s)
-            (fun s ->
-              if Bytes.length s > length then
-                raise
-                  (Cannot_destruct ([], Invalid_argument "oversized string")) ;
-              s)
-            (Json.bytes json_repr))
+           conv
+             (fun s ->
+               if Bytes.length s > length then invalid_arg "oversized string" ;
+               s)
+             (fun s ->
+               if Bytes.length s > length then
+                 raise
+                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
+               s)
+             (Json.bytes json_repr))
 
     let bytes length = bytes' Hex length
 
@@ -178,17 +178,17 @@ module Encoding = struct
            dynamic_size ~kind (check_size length (Variable.bigstring ())))
         ~json:
           (let open Json_encoding in
-          conv
-            (fun s ->
-              if Bigstringaf.length s > length then
-                invalid_arg "oversized string" ;
-              Bigstringaf.to_string s)
-            (fun s ->
-              if String.length s > length then
-                raise
-                  (Cannot_destruct ([], Invalid_argument "oversized string")) ;
-              Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
-            (Json.string string_json_repr))
+           conv
+             (fun s ->
+               if Bigstringaf.length s > length then
+                 invalid_arg "oversized string" ;
+               Bigstringaf.to_string s)
+             (fun s ->
+               if String.length s > length then
+                 raise
+                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
+               Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
+             (Json.string string_json_repr))
   end
 
   type 'a lazy_state = Value of 'a | Bytes of Bytes.t | Both of Bytes.t * 'a

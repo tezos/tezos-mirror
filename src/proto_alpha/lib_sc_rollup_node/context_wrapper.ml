@@ -1,25 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -34,6 +17,8 @@ module type S = sig
 
   type tree
 
+  type mut_state
+
   val of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t
 
   val to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t
@@ -41,6 +26,10 @@ module type S = sig
   val of_node_pvmstate : Context.pvmstate -> tree
 
   val to_node_pvmstate : tree -> Context.pvmstate
+
+  val from_imm : tree -> mut_state
+
+  val to_imm : mut_state -> tree
 end
 
 (* Context *)
@@ -97,6 +86,8 @@ module Irmin = struct
 
   type tree = I.tree
 
+  type mut_state = I.mut_state
+
   let of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t =
    fun ctxt -> of_node_context I.equality_witness ctxt
 
@@ -107,4 +98,33 @@ module Irmin = struct
    fun c -> of_node_pvmstate I.equality_witness c
 
   let to_node_pvmstate : tree -> Context.pvmstate = to_node_pvmstate (module I)
+
+  let from_imm : tree -> mut_state = I.from_imm
+
+  let to_imm : mut_state -> tree = I.to_imm
+end
+
+module Riscv = struct
+  module R = Riscv_context
+
+  type repo = R.repo
+
+  type tree = R.tree
+
+  type mut_state = R.mut_state
+
+  let of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t =
+   fun ctxt -> of_node_context R.equality_witness ctxt
+
+  let to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t =
+   fun ctxt -> to_node_context (module R) ctxt
+
+  let of_node_pvmstate : Context.pvmstate -> tree =
+   fun c -> of_node_pvmstate R.equality_witness c
+
+  let to_node_pvmstate : tree -> Context.pvmstate = to_node_pvmstate (module R)
+
+  let from_imm : tree -> mut_state = R.from_imm
+
+  let to_imm : mut_state -> tree = R.to_imm
 end

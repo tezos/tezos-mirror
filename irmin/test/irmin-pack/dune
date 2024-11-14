@@ -1,0 +1,69 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name irmin_test_irmin_pack_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-libs.tezos-context.memory
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin_test_helpers
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin_tezos
+  octez-libs.test-helpers
+  octez-alcotezt
+  fpath
+  tezt)
+ (preprocess (pps octez-internal-libs.ppx_irmin.internal))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Irmin_test_helpers
+  -open Tezos_test_helpers
+  -open Octez_alcotezt
+  -open Tezt
+  -open Tezt.Base)
+ (modules
+  common
+  test
+  test_async
+  test_corrupted
+  test_dispatcher
+  test_existing_stores
+  test_flush_reload
+  test_gc
+  test_hashes
+  test_indexing_strategy
+  test_inode
+  test_lower
+  test_mapping
+  test_nearest_geq
+  test_pack
+  test_pack_version_bump
+  test_readonly
+  test_ranges
+  test_snapshot
+  test_tree
+  test_upgrade))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  irmin_test_irmin_pack_tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos_internal_irmin_tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -8,7 +8,10 @@ documentation, we will generally refer to the rollup under
 consideration as the Layer 2 on top of the Tezos blockchain,
 considered as the Layer 1.
 
-Rollups are a permissionless scaling solution for the Tezos
+Overview
+^^^^^^^^
+
+Smart rollups are a permissionless scaling solution for the Tezos
 blockchain.  Indeed, anyone can originate and operate one or more
 rollups, allowing to increase the throughput of the Tezos blockchain,
 (almost) arbitrarily.
@@ -24,6 +27,9 @@ trusted. However, a refutation mechanism allows anyone to economically
 punish someone who has published an invalid claim. Therefore, thanks
 to the refutation mechanism, a single honest participant is enough to
 guarantee that the input messages are correctly interpreted.
+
+Rollup kernel
+^^^^^^^^^^^^^
 
 In the Tezos protocol, the subsystem of smart rollups is generic with
 respect to the syntax and the semantics of the input messages. More
@@ -49,8 +55,8 @@ use case though: they are fully programmable, hence their names, smart
 optimistic rollups, as they are very close to smart contracts in terms
 of expressiveness.
 
-Overview
---------
+User roles
+^^^^^^^^^^
 
 Just like smart contracts, smart rollups are decentralized software
 components. However, contrary to smart contracts that are processed
@@ -137,6 +143,7 @@ the Layer 1 pushes one final internal message “End of
 level”. Similarly to “Start of level“, this internal message does not
 come with any payload.
 
+.. _reveal_data_channel_smart_rollups:
 .. _reveal_data_channel_smart_rollups_paris:
 
 Reveal data channel
@@ -173,7 +180,7 @@ A smart rollup is characterized by:
 - the Michelson type of the entrypoint used by Layer 1 smart contracts
 to send internal messages to it, and
 - an optional list of addresses used as a white-list of allowed
-stakers (see :ref:`private_rollups_paris`).
+committers (see :ref:`private_rollups_paris`).
 
 All these characteristics are provided when originating a new smart
 rollup.
@@ -205,7 +212,7 @@ Commitments
 ^^^^^^^^^^^
 
 Starting from the rollup origination level, levels are partitioned
-into **commitment periods** of 60 consecutive blocks.
+into **commitment periods** of a number of consecutive blocks corresponding to about 15 minutes (currently 90 blocks).
 
 A **commitment** claims that the interpretation of all inbox messages
 published during a given commitment period, and applied on the state of
@@ -228,11 +235,15 @@ is only one honest commitment. In other words, if two distinct
 commitments are published for the same commitment period, one of them
 must be wrong.
 
-Notice that, to publish a commitment, an operator must provide a
-deposit of 10,000 tez. For this reason, the operator is said to be a
-**staker**. Several users can stake on the same commitment. When a
-staker *S* publishes a new commitment based on a commitment that *S* is staking
-on, *S* does not have to provide a new deposit: the deposit also
+An operator publishing a commitment is called a **committer**.
+Notice that, in order to publish a commitment, the operator must freeze a
+deposit of 10,000 tez. For this reason, the committer is sometimes called a
+(smart rollup) *staker*. However, in order to avoid confusion with the
+:ref:`staker <new_staking_paris>` role in Tezos Layer 1's Proof-of-Stake mechanism, we prefer to use the term "committer" throughout this documentation.
+
+Several committers can publish (and thus stake on) the same commitment. When a
+committer *C* publishes a new commitment based on a commitment that *C*
+has published, *C* does not have to provide a new deposit: the deposit also
 applies to this new commitment.
 
 There is no need to synchronize between operators: if two honest
@@ -276,7 +287,7 @@ By construction, only one view of the rollup state is valid (as the
 PVM is deterministic). When two concurrent branches exist in the
 commitment tree, the cementation process is stopped at the first fork
 in the tree. To unfreeze the cementation process, a **refutation
-game** must be started between *two concurrent stakers* of these
+game** must be started between *two concurrent committers* of these
 branches. Refutation games are automatically played by rollup nodes to
 defend their stakes: honest participants are guaranteed to win these
 games. Therefore, an honest participant should not have to worry about
@@ -285,19 +296,19 @@ new commitments to be published on top of the disputed commitments.
 
 A refutation game is decomposed into two main steps: a dissection
 mechanism and a final conflict resolution phase. During the first
-phase, the two stakers exchange hashes about intermediate states of
+phase, the two committers exchange hashes about intermediate states of
 the rollups in a way that allows them to converge to the very first
 tick on which they disagree. The exact number of hashes exchanged at a
-given step is PVM-dependent. During the final phase, the stakers must
+given step is PVM-dependent. During the final phase, the committers must
 provide a proof that they correctly interpreted this conflicting tick.
 
 The Layer 1 PVM then determines whether these proofs are valid. There
-are only two possible outcomes: either one of the stakers, that we dub *S* in the sequel, has provided
-a valid proof, then *S* wins the game, and is rewarded with half of the
-opponent's deposit (the other half being burnt); or, both stakers have
+are only two possible outcomes: either one of the committers, that we dub *C* in the sequel, has provided
+a valid proof, then *C* wins the game, and is rewarded with half of the
+opponent's deposit (the other half being burnt); or, both committers have
 provided an invalid proof and they both lose their deposit. In the
 end, at most one stake will be kept in the commitment tree. When a
-commitment has no more stake on it (because all stakers have lost the
+commitment has no more stake on it (because all committers have lost the
 related refutation games), it is removed from the tree. An honest
 player *H* must therefore play as many refutation games as there are
 stakes on the commitments in conflict with *H*'s own commitment.
@@ -311,8 +322,9 @@ two players can last at most 2 weeks.
 There is no timeout for starting a refutation game after having
 published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
-concurrent stakers to avoid the rollup getting stuck.
+concurrent committers to avoid the rollup getting stuck.
 
+.. _private_rollups:
 .. _private_rollups_paris:
 
 Private rollups
@@ -321,7 +333,7 @@ Private rollups
 A **private** Smart Rollup guarantees that private data cannot be
 leaked by any means, whereas in a public rollup, one can force a
 rollup to leak part of the data by starting a refutation game. This is
-achieved by restricting the set of allowed stakers using a
+achieved by restricting the set of allowed committers using a
 *whitelist*. With that restriction, only addresses on the whitelist
 can publish commitments and therefore participate in a refutation
 game.
@@ -342,37 +354,3 @@ own access control list logic to add and remove addresses.
 Also, it is important to remember that because of the refutation
 logic, an outbox message can only be executed when the associated
 commitment has been cemented (see :doc:`../shell/smart_rollup_node`).
-
-Glossary
---------
-
-#. **PVM**: A Proof-generating Virtual Machine is a reference
-   implementation for a device on top of which a smart rollup can be
-   executed. This reference implementation is part of the Tezos
-   protocol and is the unique source of truth regarding the semantics
-   of rollups. The PVM is able to produce proofs enforcing this truth.
-   This ability is used during the final step of refutation games.
-
-#. **Inbox**: A sequence of messages from the Layer 1 to smart rollups.
-   The contents of the inbox are determined by the consensus of the
-   Tezos protocol.
-
-#. **Outbox**: A sequence of messages from a smart rollup to the Layer 1.
-   Messages are smart contract calls, potentially containing tickets.
-   These calls can be triggered only when the related commitment is
-   cemented (hence, at least two weeks after the actual execution of
-   the operation).
-
-#. **Commitment period**: A period of 60 blocks during which all inbox
-   messages must be processed by the rollup node state to compute a
-   commitment. A commitment must be published for each commitment
-   period.
-
-#. **Refutation period**: When the first commitment for a commitment period is published, a refutation
-   period of two weeks starts to allow this commitment to be challenged.
-
-#. **Staker**: An implicit account that has made a deposit on a
-   commitment.
-
-#. **Refutation game**: A process by which the Tezos protocol solves
-   a conflict between two stakers.

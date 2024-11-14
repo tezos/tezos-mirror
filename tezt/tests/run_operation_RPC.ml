@@ -35,8 +35,10 @@
                  instead of [RPC_test.ml].
 *)
 
+let team = Tag.layer1
+
 (** Tags shared by all tests in this file. *)
-let run_operation_tags = [Tag.layer1; "rpc"; "run_operation"]
+let run_operation_tags = [team; "rpc"; "run_operation"]
 
 (** Check that the RPC [response]'s code is [500] (Internal Server
     Error), and that its body has an "id" field that ends in

@@ -27,6 +27,9 @@
 
 open Node_context
 
+(** [lock ~data_dir] locks the [data_dir]. *)
+val lock : data_dir:string -> Lwt_unix.file_descr tzresult Lwt.t
+
 (** [init cctxt ~data_dir mode l1_ctxt genesis_info protocol configuration]
     initializes the rollup representation. The rollup origination level and kind
     are fetched via an RPC call to the layer1 node that [cctxt] uses for RPC
@@ -36,7 +39,6 @@ val init :
   #Client_context.full ->
   data_dir:string ->
   irmin_cache_size:int ->
-  index_buffer_size:int ->
   ?log_kernel_debug_file:string ->
   ?last_whitelist_update:Z.t * Int32.t ->
   'a Store_sigs.mode ->
@@ -63,6 +65,7 @@ module For_snapshots : sig
     ([< `Read | `Write > `Read] as 'a) Store.t ->
     'a Context.t ->
     data_dir:string ->
+    apply_unsafe_patches:bool ->
     'a t tzresult Lwt.t
 end
 

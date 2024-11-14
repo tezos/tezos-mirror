@@ -94,6 +94,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack '{'
 Error:
@@ -130,6 +131,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack 0
 Error:
@@ -209,6 +211,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack '{' --unparsing-mode Readable
 Error:
@@ -245,6 +248,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack 0 --unparsing-mode Readable
 Error:
@@ -324,6 +328,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack '{' --unparsing-mode Optimized
 Error:
@@ -360,6 +365,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack 0 --unparsing-mode Optimized
 Error:
@@ -439,6 +445,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack '{' --unparsing-mode Optimized_legacy
 Error:
@@ -475,6 +482,7 @@ Global options (must come before the command):
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
   -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs. Coloring is enabled by default.
 
 ./octez-client --mode mockup normalize stack 0 --unparsing-mode Optimized_legacy
 Error:

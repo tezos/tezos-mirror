@@ -401,7 +401,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
   else
     let fresh = Random.State.float rng 1.0 < parameters.fresh_probability in
     (if fresh then Lwt.return (generate_fresh_source state rng)
-    else sample_any_source_from_pool state rng)
+     else sample_any_source_from_pool state rng)
     >>= fun dest ->
     let amount =
       match parameters.strategy with
@@ -505,94 +505,94 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
           pcounter
   in
   (if
-   Tezos_crypto.Signature.V0.Public_key_hash.Set.mem
-     transfer.src.pkh
-     state.revealed
-  then return true
-  else (
-    (* Either the [manager_key] RPC tells us the key is already
-       revealed, or we immediately inject a reveal operation: in any
-       case the key is revealed in the end. *)
-    state.revealed <-
-      Tezos_crypto.Signature.V0.Public_key_hash.Set.add
-        transfer.src.pkh
-        state.revealed ;
-    Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
-    >>=? fun pk_opt -> return (Option.is_some pk_opt)))
+     Tezos_crypto.Signature.V0.Public_key_hash.Set.mem
+       transfer.src.pkh
+       state.revealed
+   then return true
+   else (
+     (* Either the [manager_key] RPC tells us the key is already
+        revealed, or we immediately inject a reveal operation: in any
+        case the key is revealed in the end. *)
+     state.revealed <-
+       Tezos_crypto.Signature.V0.Public_key_hash.Set.add
+         transfer.src.pkh
+         state.revealed ;
+     Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
+     >>=? fun pk_opt -> return (Option.is_some pk_opt)))
   >>=? fun already_revealed ->
   (if not already_revealed then (
-   let reveal_counter = Z.succ freshest_counter in
-   let transf_counter = Z.succ reveal_counter in
-   let reveal =
-     Manager_operation
-       {
-         source = transfer.src.pkh;
-         fee = Tez.zero;
-         counter = reveal_counter;
-         gas_limit = cost_of_manager_operation;
-         storage_limit = Z.zero;
-         operation = Reveal transfer.src.pk;
-       }
-   in
-   let manager_op =
-     manager_op_of_transfer
-       parameters
-       {transfer with counter = Some transf_counter}
-   in
-   let list = Cons (reveal, Single manager_op) in
-   Tezos_crypto.Signature.V0.Public_key_hash.Table.remove
-     state.counters
-     transfer.src.pkh ;
-   Tezos_crypto.Signature.V0.Public_key_hash.Table.add
-     state.counters
-     transfer.src.pkh
-     (branch, transf_counter) ;
-   (if !verbose then
-    cctxt#message
-      "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-      Tezos_crypto.Signature.V0.Public_key_hash.pp
-      transfer.src.pkh
-      Z.pp_print
-      reveal_counter
-      Z.pp_print
-      transf_counter
-      Tezos_crypto.Signature.V0.Public_key_hash.pp
-      transfer.dst
-   else Lwt.return_unit)
-   >>= fun () ->
-   (* NB: regardless of our best efforts to keep track of counters, injection can fail with
-      "counter in the future" if a block switch happens in between the moment we
-      get the branch and the moment we inject, and the new block does not include
-      all the operations we injected. *)
-   inject_contents cctxt chain branch transfer.src.sk list)
-  else
-    let transf_counter = Z.succ freshest_counter in
-    let manager_op =
-      manager_op_of_transfer
-        parameters
-        {transfer with counter = Some transf_counter}
-    in
-    let list = Single manager_op in
-    Tezos_crypto.Signature.V0.Public_key_hash.Table.remove
-      state.counters
-      transfer.src.pkh ;
-    Tezos_crypto.Signature.V0.Public_key_hash.Table.add
-      state.counters
-      transfer.src.pkh
-      (branch, transf_counter) ;
-    (if !verbose then
-     cctxt#message
-       "injecting transfer from %a (counter=%a) to %a"
-       Tezos_crypto.Signature.V0.Public_key_hash.pp
+     let reveal_counter = Z.succ freshest_counter in
+     let transf_counter = Z.succ reveal_counter in
+     let reveal =
+       Manager_operation
+         {
+           source = transfer.src.pkh;
+           fee = Tez.zero;
+           counter = reveal_counter;
+           gas_limit = cost_of_manager_operation;
+           storage_limit = Z.zero;
+           operation = Reveal transfer.src.pk;
+         }
+     in
+     let manager_op =
+       manager_op_of_transfer
+         parameters
+         {transfer with counter = Some transf_counter}
+     in
+     let list = Cons (reveal, Single manager_op) in
+     Tezos_crypto.Signature.V0.Public_key_hash.Table.remove
+       state.counters
+       transfer.src.pkh ;
+     Tezos_crypto.Signature.V0.Public_key_hash.Table.add
+       state.counters
        transfer.src.pkh
-       Z.pp_print
-       transf_counter
-       Tezos_crypto.Signature.V0.Public_key_hash.pp
-       transfer.dst
-    else Lwt.return_unit)
-    >>= fun () ->
-    (* See comment above. *)
-    inject_contents cctxt chain branch transfer.src.sk list)
+       (branch, transf_counter) ;
+     (if !verbose then
+        cctxt#message
+          "injecting reveal+transfer from %a (counters=%a,%a) to %a"
+          Tezos_crypto.Signature.V0.Public_key_hash.pp
+          transfer.src.pkh
+          Z.pp_print
+          reveal_counter
+          Z.pp_print
+          transf_counter
+          Tezos_crypto.Signature.V0.Public_key_hash.pp
+          transfer.dst
+      else Lwt.return_unit)
+     >>= fun () ->
+     (* NB: regardless of our best efforts to keep track of counters, injection can fail with
+        "counter in the future" if a block switch happens in between the moment we
+        get the branch and the moment we inject, and the new block does not include
+        all the operations we injected. *)
+     inject_contents cctxt chain branch transfer.src.sk list)
+   else
+     let transf_counter = Z.succ freshest_counter in
+     let manager_op =
+       manager_op_of_transfer
+         parameters
+         {transfer with counter = Some transf_counter}
+     in
+     let list = Single manager_op in
+     Tezos_crypto.Signature.V0.Public_key_hash.Table.remove
+       state.counters
+       transfer.src.pkh ;
+     Tezos_crypto.Signature.V0.Public_key_hash.Table.add
+       state.counters
+       transfer.src.pkh
+       (branch, transf_counter) ;
+     (if !verbose then
+        cctxt#message
+          "injecting transfer from %a (counter=%a) to %a"
+          Tezos_crypto.Signature.V0.Public_key_hash.pp
+          transfer.src.pkh
+          Z.pp_print
+          transf_counter
+          Tezos_crypto.Signature.V0.Public_key_hash.pp
+          transfer.dst
+      else Lwt.return_unit)
+     >>= fun () ->
+     (* See comment above. *)
+     inject_contents cctxt chain branch transfer.src.sk list)
   >>= function
   | Ok op_hash ->
       debug_msg (fun () ->
@@ -696,7 +696,7 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
        included). Note that the operations injected during the last block are \
        ignored because they should not be currently included."
       (if Int.equal injected_ops_count 0 then "N/A"
-      else Format.sprintf "%d%%" (included_ops_count * 100 / injected_ops_count))
+       else Format.sprintf "%d%%" (included_ops_count * 100 / injected_ops_count))
       injected_ops_count
       included_ops_count
     >>= fun () -> return_unit
@@ -765,10 +765,10 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       let elapsed = Time.Monotonic.Span.to_float_s (Mtime_clock.count start) in
       let remaining = dt -. elapsed in
       (if remaining <= 0.0 then
-       cctxt#warning
-         "warning: tps target could not be reached, consider using a lower \
-          value for --tps"
-      else Lwt_unix.sleep remaining)
+         cctxt#warning
+           "warning: tps target could not be reached, consider using a lower \
+            value for --tps"
+       else Lwt_unix.sleep remaining)
       >>= loop
   in
   let on_new_head : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t =
@@ -1090,11 +1090,11 @@ let generate_random_transactions =
               pool_size = List.length sources;
               shuffled_pool =
                 (if parameters.single_op_per_pkh_per_block then
-                 Some
-                   (List.shuffle
-                      ~rng
-                      (List.map (fun src_org -> src_org.source) sources))
-                else None);
+                   Some
+                     (List.shuffle
+                        ~rng
+                        (List.map (fun src_org -> src_org.source) sources))
+                 else None);
               revealed = Tezos_crypto.Signature.V0.Public_key_hash.Set.empty;
               last_block = current_head_on_start;
               last_level = Int32.to_int header_on_start.shell.level;
@@ -1131,4 +1131,12 @@ let generate_random_transactions =
 let commands = [generate_random_transactions]
 
 let commands network () =
-  match network with Some `Mainnet -> [] | Some `Testnet | None -> commands
+  (* Stresstest should not be used on mainnet. If the client is running with
+     the yes-crypto activated, operations won't be considered valid and should
+     not endanger the network nor the users funds. *)
+  match Sys.getenv_opt Tezos_crypto.Helpers.yes_crypto_environment_variable with
+  | Some _ -> commands
+  | None -> (
+      match network with
+      | Some `Mainnet -> []
+      | Some `Testnet | None -> commands)

@@ -105,7 +105,7 @@ module Make (Elt : Elt_sig) : Carray_sig with type elt = Elt.t = struct
         - ensures: [elt = p[i]] *)
     external get : elt -> t -> int -> int -> unit
       = "caml_bls12_381_polynomial_polynomial_carray_get_stubs"
-      [@@noalloc]
+    [@@noalloc]
 
     (** [set p elt i size] copies [elt] in the [i]-th element of [p],
         assuming elements of [size] bytes.
@@ -113,13 +113,13 @@ module Make (Elt : Elt_sig) : Carray_sig with type elt = Elt.t = struct
         - ensures: [elt = p[i]] *)
     external set : t -> elt -> int -> int -> unit
       = "caml_bls12_381_polynomial_polynomial_carray_set_stubs"
-      [@@noalloc]
+    [@@noalloc]
 
     (** [memset_zero p n] writes [n] bytes of zeros in [p]
         - requires: [n <= size p] *)
     external memset_zero : t -> int -> unit
       = "caml_bls12_381_polynomial_polynomial_memset_zero_stubs"
-      [@@noalloc]
+    [@@noalloc]
   end
 
   let t : t Repr.t =

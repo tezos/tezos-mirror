@@ -30,6 +30,8 @@
    Subject:      Check that run script command to octez-client behaves correctly
 *)
 
+let team = Tag.layer1
+
 (* This script checks result of some arbitrary instruction against the
    expected value. Return type and name of the instruction should be
    given by arguments [ty] and [instr] respectively.  The expected
@@ -79,7 +81,7 @@ let test_balance_and_self_address =
   Protocol.register_test
     ~__FILE__
     ~title:"Run script with balance and self address"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -158,7 +160,7 @@ let test_source_and_sender =
   Protocol.register_test
     ~__FILE__
     ~title:"Run script with source and sender"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -228,7 +230,7 @@ let test_other_contracts =
   Protocol.register_test
     ~__FILE__
     ~title:"Run script with other_contracts"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -247,7 +249,7 @@ let test_extra_big_maps =
   Protocol.register_test
     ~__FILE__
     ~title:"Run script with extra_big_maps"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     ~supports:(Protocol.From_protocol 018)
   @@ fun protocol ->

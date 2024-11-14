@@ -14,6 +14,7 @@
   octez-protocol-alpha-libs.smart-rollup
   tezos-protocol-alpha.parameters
   tezt)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -32,7 +33,6 @@
  (libraries
   src_lib_scoru_wasm_regressions_tezt_lib
   tezt)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
  (modules main))
 
 (rule
@@ -44,7 +44,7 @@
   ../test/messages/deposit.out
   ../test/messages/withdrawal.out)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

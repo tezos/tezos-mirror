@@ -1,0 +1,101 @@
+{
+  "date": "2024-06-05T12:00:00.000Z",
+  "value": [
+    {
+      "kind": "Local RPC",
+      "rpc": "Health",
+      "concurrency": "1",
+      "rps": 4049
+    },
+    {
+      "kind": "Local RPC",
+      "rpc": "Health",
+      "concurrency": "10",
+      "rps": 5637
+    },
+    {
+      "kind": "Local RPC",
+      "rpc": "Header",
+      "concurrency": "1",
+      "rps": 4054
+    },
+    {
+      "kind": "Local RPC",
+      "rpc": "Header",
+      "concurrency": "10",
+      "rps": 5992
+    },
+    {
+      "kind": "Local RPC",
+      "rpc": "Baking right",
+      "concurrency": "1",
+      "rps": 706
+    },
+    {
+      "kind": "Local RPC",
+      "rpc": "Baking right",
+      "concurrency": "10",
+      "rps": 762
+    },
+    {
+      "kind": "Local RPC",
+      "rpc": "Attestation right",
+      "concurrency": "1",
+      "rps": 91
+    },
+    {
+      "kind": "Local RPC",
+      "rpc": "Attestation right",
+      "concurrency": "10",
+      "rps": 91
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Health",
+      "concurrency": "1",
+      "rps": 4309
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Health",
+      "concurrency": "10",
+      "rps": 6899
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Header",
+      "concurrency": "1",
+      "rps": 4294
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Header",
+      "concurrency": "10",
+      "rps": 6618
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Baking right",
+      "concurrency": "1",
+      "rps": 730
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Baking right",
+      "concurrency": "10",
+      "rps": 811
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Attestation right",
+      "concurrency": "1",
+      "rps": 91
+    },
+    {
+      "kind": "External RPC",
+      "rpc": "Attestation right",
+      "concurrency": "10",
+      "rps": 91
+    }
+  ]
+}

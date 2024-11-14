@@ -23,7 +23,6 @@ After a successful compilation, you should have the following binaries:
   (see :ref:`signer`);
 - ``octez-smart-rollup-node``: executable for using and running a smart rollup node as Layer 2 (see :doc:`../shell/smart_rollup_node`);
 - ``octez-smart-rollup-wasm-debugger``: debugger for smart rollup kernels (see :doc:`../shell/smart_rollup_node`)
-- ``octez-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``octez-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``octez-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
@@ -31,8 +30,8 @@ After a successful compilation, you should have the following binaries:
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to.
 More precisely, the suffix consists of the first 8 characters of the protocol hash; except for protocol Alpha, for which the suffix is simply ``-alpha``.
-For instance, ``octez-baker-Proxford`` is the baker
-for the Oxford protocol, and ``octez-baker-alpha`` is the baker
+For instance, ``octez-baker-PtParisB`` is the baker
+for the Paris protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
@@ -284,7 +283,7 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-The behaviour of the client can be customized using various mechanisms, including command-line options, a configuration file, and environment variables. For details, refer to :doc:`../user/setup-client`.
+The behaviour of the client can be customized using various mechanisms, including command-line options, a configuration file, and environment variables. For details, refer to the :ref:`client manual <client_manual>` and :doc:`client set-up instructions <../user/setup-client>`.
 
 A Simple Wallet
 ~~~~~~~~~~~~~~~
@@ -462,12 +461,12 @@ Once your transaction is included in a block, you can retrieve it in one of the 
 
 .. _originated-accounts:
 
-Implicit Accounts and Smart Contracts
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+User Accounts and Smart Contracts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts* (see :doc:`../active/accounts` for more details).
+In Tezos there are two kinds of accounts: *user accounts* (also called implicit accounts) and *smart contracts* (also called originated accounts), see :doc:`../active/accounts` for more details.
 
-- Addresses with a *tz* prefix, like the *tz1* public key hashes used above,  represent implicit accounts. They are created with a transfer
+- Addresses with a *tz* prefix, like the *tz1* public key hashes used above, represent user accounts. They are created with a transfer
   operation to the account's public key hash.
 
 - Smart contracts have addresses starting with *KT1* and are created
@@ -481,7 +480,7 @@ Let's originate our first contract and call it *id*::
                  running ./michelson_test_scripts/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
-The initial balance is 1 tez, generously provided by implicit account
+The initial balance is 1 tez, generously provided by user account
 *alice*. The contract stores a Michelson program ``id.tz``
 (found in file :src:`michelson_test_scripts/attic/id.tz`), with
 Michelson value ``"hello"`` as initial storage (the extra quotes are
@@ -696,7 +695,7 @@ Summary
 In this tutorial, you have learned:
 
 - to start an Octez node and set up its basic configuration;
-- to use the Octez client to create implicit accounts and do transfers between them;
+- to use the Octez client to create user accounts and do transfers between them;
 - to deploy and interact with a simple predefined smart contract;
 - to distinguish between the various costs associated to transactions such as burnt tez, fees, storage costs, and gas consumption;
 - some further concepts such as transaction validation and the RPC interface;

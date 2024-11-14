@@ -15,13 +15,19 @@ use self::constants::TICKS_FOR_CRYPTO;
 /// This doesn't apply to inherited constants from the PVM, e.g. maximum
 /// number of reboots.
 pub mod constants {
-    /// Maximum number of ticks for a kernel run as set by the PVM
-    pub(crate) const MAX_TICKS: u64 = 11_000_000_000;
+
+    /// Maximum of gas allowed for a transaction.
+    /// Comes from the block limit, defined in EIP-1559 as 2 * gas target
+    pub const MAXIMUM_GAS_LIMIT: u64 = 30_000_000;
+
+    /// Maximum number of ticks for a kernel run.
+    /// Order of magnitude lower than the limit set by the PVM to provide
+    /// security margin.
+    pub(crate) const MAX_TICKS: u64 = 30_000_000_000;
 
     /// Maximum number of allowed ticks for a kernel run. We consider a safety
     /// margin and an incompressible initilisation overhead.
-    pub const MAX_ALLOWED_TICKS: u64 =
-        MAX_TICKS - SAFETY_MARGIN - INITIALISATION_OVERHEAD;
+    pub const MAX_ALLOWED_TICKS: u64 = MAX_TICKS;
 
     /// Maximum number of reboots for a level as set by the PVM.
     pub(crate) const _MAX_NUMBER_OF_REBOOTS: u32 = 1_000;
@@ -36,28 +42,8 @@ pub mod constants {
     // Overapproximation of ticks used in signature verification.
     pub const TICKS_FOR_CRYPTO: u64 = 25_000_000;
 
-    /// Overapproximation using an upper bound of the number of ticks needed to
-    /// store a queue before rebooting.
-    /// The bound is calculated using a model linear in size of encoding of the
-    /// queue, and applying to a queue of size 512kB, which correspond to a full
-    /// inbox. This value doesn't take into account the facts that the encoding
-    /// is not the same in the inbox, and that some transactions have been
-    /// executed already.
-    pub const QUEUE_STORING_UPPER_BOUND: u64 = 1_000_000_000;
-
-    /// Safety margin the kernel enforce to avoid approaching the maximum number
-    /// of ticks.
-    pub const SAFETY_MARGIN: u64 = QUEUE_STORING_UPPER_BOUND + 2_000_000_000;
-
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
-
-    /// Overapproximation of the number of ticks used in kernel initialization
-    pub const KERNEL_INITIALIZATION: u64 = 70_000_000;
-
-    /// Overapproximation of the number of ticks the kernel uses to initialise and
-    /// reload its state.
-    pub const INITIALISATION_OVERHEAD: u64 = KERNEL_INITIALIZATION;
 
     /// Overapproximation of the upper bound of the number of ticks used to
     /// finalize a block. Considers a block corresponding to an inbox full of
@@ -66,13 +52,13 @@ pub mod constants {
 
     /// The number of ticks used for storing receipt is overapproximated by
     /// an affine function of the size of the receipt
-    pub const RECEIPT_TICKS_COEF: u64 = 960;
+    pub const RECEIPT_TICKS_COEF: u64 = 1028;
     pub const RECEIPT_TICKS_INTERCEPT: u64 = 200_000;
 
     /// The number of ticks used for storing transactions is overapproximated by
     /// an affine function of the size of the transaction
     pub const TX_OBJ_TICKS_COEF: u64 = 880;
-    pub const TX_OBJ_TICKS_INTERCEPT: u64 = 200_000;
+    pub const TX_OBJ_TICKS_INTERCEPT: u64 = 900_000;
 
     /// The number of ticks used to compute the bloom filter is overapproximated
     /// by an affine function of the size of the bloom
@@ -99,25 +85,16 @@ pub mod constants {
 
     /// Number of ticks used to parse deposits
     pub const TICKS_PER_DEPOSIT_PARSING: u64 = 1_500_000;
-
-    /// Number of ticks used to read and transform a blueprint into a blpock in
-    /// progress
-    pub const TICKS_PER_BYTES_BLUEPRINT_TO_BIP: u64 = 3700;
-    pub const TICKS_BLUEPRINT_TO_BIP_INTERCEPT: u64 = 3_000_000;
-
-    /// A blueprint cannot exceed 512kB, this is the maximum size per L1 block.
-    /// This will be eventually updated with DAL and a better representation for
-    /// blueprint parsing.
-    pub const MAXIMUM_SIZE_FOR_BLUEPRINT: u64 = 512 * 1024;
 }
 
 /// Estimation of the number of ticks the kernel can safely spend in the
 /// execution of the opcodes.
 pub fn estimate_remaining_ticks_for_transaction_execution(
+    max_allowed_ticks: u64,
     ticks: u64,
     tx_data_size: u64,
 ) -> u64 {
-    constants::MAX_ALLOWED_TICKS
+    max_allowed_ticks
         .saturating_sub(TICKS_FOR_CRYPTO)
         .saturating_sub(ticks_of_transaction_overhead(tx_data_size))
         .saturating_sub(ticks)
@@ -162,7 +139,7 @@ pub fn ticks_of_valid_transaction(
         }
         // Ticks are already spent during the validation of the transaction (see
         // apply.rs).
-        Deposit(_) => resulting_ticks,
+        Deposit(_) | FaDeposit(_) => resulting_ticks,
     }
 }
 
@@ -202,15 +179,4 @@ pub fn ticks_of_register(receipt_size: u64, obj_size: u64, bloom_size: u64) -> u
 
 pub fn maximum_ticks_for_sequencer_chunk() -> u64 {
     constants::TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE
-}
-
-pub fn ticks_for_next_blueprint(length: u64) -> u64 {
-    constants::TICKS_BLUEPRINT_TO_BIP_INTERCEPT.saturating_add(
-        constants::TICKS_PER_BYTES_BLUEPRINT_TO_BIP.saturating_mul(length),
-    )
-}
-
-#[inline(always)]
-pub fn maximum_ticks_per_blueprint() -> u64 {
-    ticks_for_next_blueprint(constants::MAXIMUM_SIZE_FOR_BLUEPRINT)
 }

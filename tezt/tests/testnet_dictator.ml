@@ -31,6 +31,8 @@
                  the dictator is able to force a protocol migration.
 *)
 
+let team = Tag.layer1
+
 let bake node client =
   let* level = Node.get_level node in
   let* () =
@@ -142,6 +144,7 @@ let register_test chain_id period =
          (Voting.period_kind_to_string period))
     ~tags:
       [
+        team;
         "amendment";
         string_of_chain_id chain_id;
         Voting.period_kind_to_string period;

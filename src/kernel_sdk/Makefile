@@ -90,7 +90,7 @@ doc:
 
 .PHONY: build-deps
 build-deps:
-	@exec ../risc_v/install-rust-std-hermit.sh
+	@exec ../riscv/scripts/install-rust-std-hermit.sh
 	@rustup target add wasm32-unknown-unknown $(NATIVE_TARGET)
 
 .PHONY: build-dev-deps

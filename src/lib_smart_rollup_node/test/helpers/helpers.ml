@@ -122,7 +122,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;
-        context = Smart_rollup_context_hash.of_context_hash context_hash;
+        context = context_hash;
         inbox_witness;
         inbox_hash;
       }

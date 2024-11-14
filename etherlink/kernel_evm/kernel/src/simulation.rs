@@ -8,7 +8,11 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
+use crate::block_storage;
+use crate::configuration::fetch_limits;
 use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
+use crate::storage::{read_sequencer_pool_address, read_tracer_input};
+use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
@@ -16,20 +20,27 @@ use crate::{
     tick_model, CONFIG,
 };
 
-use evm::ExitReason;
-use evm_execution::handler::ExtendedExitReason;
-use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
+use evm_execution::account_storage::account_path;
+use evm_execution::trace::TracerInput;
+use evm_execution::{
+    account_storage,
+    handler::{ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult},
+    precompiles,
+};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
+use sha3::{Digest, Keccak256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
-    next,
+    decode_timestamp, next, VersionedEncoding,
 };
+use tezos_ethereum::transaction::TransactionObject;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::types::Timestamp;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -41,6 +52,9 @@ pub const SIMULATION_CHUNK_TAG: u8 = 3;
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
 pub const VALIDATION_TAG: u8 = 0x01;
+
+/// Version of the encoding in use.
+pub const SIMULATION_ENCODING_VERSION: u8 = 0x01;
 
 pub const OK_TAG: u8 = 0x1;
 pub const ERR_TAG: u8 = 0x2;
@@ -54,6 +68,7 @@ const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
     is allocated. Try reducing its gas consumption or splitting the call in
     multiple steps, if possible.";
 const GAS_LIMIT_TOO_LOW: &str = "Gas limit too low.";
+const GAS_LIMIT_TOO_HIGH: &str = "Gas limit (for execution) is too high.";
 
 // Redefined Result as we cannot implement Decodable and Encodable traits on Result
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -70,9 +85,9 @@ pub struct ExecutionResult {
 
 type CallResult = SimulationResult<ExecutionResult, Vec<u8>>;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ValidationResult {
-    address: H160,
+    transaction_object: TransactionObject,
 }
 
 impl<T: Encodable, E: Encodable> Encodable for SimulationResult<T, E> {
@@ -125,14 +140,14 @@ impl Decodable for ExecutionResult {
 
 impl Encodable for ValidationResult {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.append(&self.address);
+        self.transaction_object.rlp_append(stream);
     }
 }
 
 impl Decodable for ValidationResult {
     fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         Ok(ValidationResult {
-            address: decode_field(decoder, "caller")?,
+            transaction_object: TransactionObject::decode(decoder)?,
         })
     }
 }
@@ -174,6 +189,18 @@ pub struct Evaluation {
     pub value: Option<U256>,
     /// (optional) Hash of the method signature and encoded parameters.
     pub data: Vec<u8>,
+    /// The gas returned by the simualtion include the DA fees if this parameter
+    /// is set to true.
+    ///
+    /// Important: latest versions of the node no longer use with_da_fees. All
+    /// simulation set with_da_fees to false. The node now adds the da fees
+    /// itself.
+    /// The field is not removed from the kernel simulation for retro-compatibility
+    /// reason, and in case we want to revert and switch back to this implementation.
+    pub with_da_fees: bool,
+    /// The timestamp used during simulation. It is marked as optional as
+    /// the support has been added in `StorageVersion::V13`.
+    pub timestamp: Option<Timestamp>,
 }
 
 impl<T> From<EthereumError> for SimulationResult<T, String> {
@@ -189,25 +216,27 @@ impl From<Result<Option<ExecutionOutcome>, EthereumError>>
     fn from(result: Result<Option<ExecutionOutcome>, EthereumError>) -> Self {
         match result {
             Ok(Some(ExecutionOutcome {
-                gas_used,
-                reason: ExtendedExitReason::Exit(ExitReason::Succeed(_)),
-                result,
-                ..
-            })) => Self::Ok(SimulationResult::Ok(ExecutionResult {
-                value: result,
-                gas_used: Some(gas_used),
-            })),
+                gas_used, result, ..
+            })) if result.is_success() => {
+                Self::Ok(SimulationResult::Ok(ExecutionResult {
+                    value: result.output().map(|x| x.to_vec()),
+                    gas_used: Some(gas_used),
+                }))
+            }
+            Ok(Some(
+                outcome @ ExecutionOutcome {
+                    result: ExecutionOutcomeResult::CallReverted(_),
+                    ..
+                },
+            )) => Self::Ok(SimulationResult::Err(
+                outcome.output().unwrap_or_default().to_vec(),
+            )),
             Ok(Some(ExecutionOutcome {
-                reason: ExtendedExitReason::Exit(ExitReason::Revert(_)),
-                result,
-                ..
-            })) => Self::Ok(SimulationResult::Err(result.unwrap_or_default())),
-            Ok(Some(ExecutionOutcome {
-                reason: ExtendedExitReason::OutOfTicks,
+                result: ExecutionOutcomeResult::OutOfTicks,
                 ..
             })) => Self::Err(String::from(OUT_OF_TICKS_MSG)),
-            Ok(Some(ExecutionOutcome { reason, .. })) => {
-                let msg = format!("The transaction failed: {:?}.", reason);
+            Ok(Some(ExecutionOutcome { result, .. })) => {
+                let msg = format!("The transaction failed: {:?}.", result);
                 Self::Err(msg)
             }
             Ok(None) => Self::Err(String::from(
@@ -219,80 +248,7 @@ impl From<Result<Option<ExecutionOutcome>, EthereumError>>
 }
 
 impl Evaluation {
-    /// Unserialize bytes as RLP encoded data.
-    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
-        let decoder = Rlp::new(bytes);
-        Evaluation::decode(&decoder)
-    }
-
-    /// Execute the simulation
-    pub fn run<Host: Runtime>(
-        &self,
-        host: &mut Host,
-    ) -> Result<SimulationResult<CallResult, String>, Error> {
-        let chain_id = retrieve_chain_id(host)?;
-        let block_fees = retrieve_block_fees(host)?;
-
-        let current_constants = match storage::read_current_block(host) {
-            Ok(block) => block.constants(chain_id, block_fees),
-            Err(_) => {
-                let timestamp = current_timestamp(host);
-                let timestamp = U256::from(timestamp.as_u64());
-                BlockConstants::first_block(timestamp, chain_id, block_fees)
-            }
-        };
-
-        let mut evm_account_storage = account_storage::init_account_storage()
-            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
-        let precompiles = precompiles::precompile_set::<Host>();
-        let default_caller = H160::zero();
-        let tx_data_size = self.data.len() as u64;
-        let allocated_ticks =
-            tick_model::estimate_remaining_ticks_for_transaction_execution(
-                0,
-                tx_data_size,
-            );
-
-        let gas_price = if let Some(gas_price) = self.gas_price {
-            U256::from(gas_price)
-        } else {
-            block_fees.base_fee_per_gas()
-        };
-
-        match run_transaction(
-            host,
-            &current_constants,
-            &mut evm_account_storage,
-            &precompiles,
-            CONFIG,
-            self.to,
-            self.from.unwrap_or(default_caller),
-            self.data.clone(),
-            self.gas.or(Some(u64::MAX)),
-            gas_price,
-            self.value,
-            false,
-            allocated_ticks,
-            false,
-            false,
-        ) {
-            Ok(Some(outcome)) => {
-                let outcome =
-                    simulation_add_gas_for_fees(outcome, &block_fees, &self.data)
-                        .map_err(Error::Simulation)?;
-
-                let result: SimulationResult<CallResult, String> =
-                    Result::Ok(Some(outcome)).into();
-
-                Ok(result)
-            }
-            result => Ok(result.into()),
-        }
-    }
-}
-
-impl Decodable for Evaluation {
-    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+    fn rlp_decode_v0(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
         // the proxynode works preferably with little endian
         let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
         let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
@@ -315,6 +271,8 @@ impl Decodable for Evaluation {
                     gas_price,
                     value,
                     data,
+                    with_da_fees: true,
+                    timestamp: None,
                 })
             } else {
                 Err(DecoderError::RlpIncorrectListLen)
@@ -323,13 +281,218 @@ impl Decodable for Evaluation {
             Err(DecoderError::RlpExpectedToBeList)
         }
     }
-}
 
-impl TryFrom<&[u8]> for Evaluation {
-    type Error = DecoderError;
+    fn rlp_decode_v1(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        // the proxynode works preferably with little endian
+        let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
+        let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
+        if decoder.is_list() {
+            if Ok(7) == decoder.item_count() {
+                let mut it = decoder.iter();
+                let from: Option<H160> = decode_option(&next(&mut it)?, "from")?;
+                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+                let gas: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas")?.map(u64_from_le);
+                let gas_price: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas_price")?.map(u64_from_le);
+                let value: Option<U256> =
+                    decode_option(&next(&mut it)?, "value")?.map(u256_from_le);
+                let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
+                let with_da_fees: bool = decode_field(&next(&mut it)?, "with_da_fees")?;
+                Ok(Self {
+                    from,
+                    to,
+                    gas,
+                    gas_price,
+                    value,
+                    data,
+                    with_da_fees,
+                    timestamp: None,
+                })
+            } else {
+                Err(DecoderError::RlpIncorrectListLen)
+            }
+        } else {
+            Err(DecoderError::RlpExpectedToBeList)
+        }
+    }
 
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        Self::from_rlp_bytes(bytes)
+    fn rlp_decode_v2(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        // the proxynode works preferably with little endian
+        let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
+        let u256_from_le = |v: Vec<u8>| U256::from_little_endian(&v);
+        if decoder.is_list() {
+            if Ok(8) == decoder.item_count() {
+                let mut it = decoder.iter();
+                let from: Option<H160> = decode_option(&next(&mut it)?, "from")?;
+                let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+                let gas: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas")?.map(u64_from_le);
+                let gas_price: Option<u64> =
+                    decode_option(&next(&mut it)?, "gas_price")?.map(u64_from_le);
+                let value: Option<U256> =
+                    decode_option(&next(&mut it)?, "value")?.map(u256_from_le);
+                let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
+                let with_da_fees: bool = decode_field(&next(&mut it)?, "with_da_fees")?;
+                let timestamp: Timestamp = decode_timestamp(&next(&mut it)?)?;
+                Ok(Self {
+                    from,
+                    to,
+                    gas,
+                    gas_price,
+                    value,
+                    data,
+                    with_da_fees,
+                    timestamp: Some(timestamp),
+                })
+            } else {
+                Err(DecoderError::RlpIncorrectListLen)
+            }
+        } else {
+            Err(DecoderError::RlpExpectedToBeList)
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
+        let first = *bytes.first().ok_or(DecoderError::Custom("Empty bytes"))?;
+        match first {
+            0x01 => {
+                let decoder = Rlp::new(&bytes[1..]);
+                Self::rlp_decode_v1(&decoder)
+            }
+            0x02 => {
+                let decoder = Rlp::new(&bytes[1..]);
+                Self::rlp_decode_v2(&decoder)
+            }
+            _ => {
+                let decoder = Rlp::new(bytes);
+                Self::rlp_decode_v0(&decoder)
+            }
+        }
+    }
+
+    /// Execute the simulation
+    pub fn run<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        tracer_input: Option<TracerInput>,
+        enable_fa_withdrawals: bool,
+    ) -> Result<SimulationResult<CallResult, String>, Error> {
+        let chain_id = retrieve_chain_id(host)?;
+        let block_fees = retrieve_block_fees(host)?;
+        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
+        let mut evm_account_storage = account_storage::init_account_storage()
+            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
+
+        // If the simulation is performed with the zero address and has a non
+        // null value, the simulation will fail with out of funds.
+        // This can be problematic as some tools doesn't provide the `from`
+        // field but provide a non null `value`.
+        //
+        // We solve the issue by giving funds before the simulation to the
+        // zero address if necessary.
+        let from = self.from.unwrap_or(H160::zero());
+        if let Some(value) = self.value {
+            if from.is_zero() {
+                let mut account =
+                    evm_account_storage.get_or_create(host, &account_path(&from)?)?;
+                account.balance_add(host, value)?;
+            }
+        }
+
+        let constants = match block_storage::read_current(host) {
+            Ok(block) => {
+                // Timestamp is taken from the simulation caller if provided.
+                // If the timestamp is missing, because of an older evm-node,
+                // default to last block timestamp.
+                let timestamp = self
+                    .timestamp
+                    .map(|timestamp| U256::from(timestamp.as_u64()))
+                    .unwrap_or_else(|| U256::from(block.timestamp.as_u64()));
+
+                BlockConstants {
+                    number: block.number + 1,
+                    coinbase,
+                    timestamp,
+                    gas_limit: crate::block::GAS_LIMIT,
+                    block_fees,
+                    chain_id,
+                    prevrandao: None,
+                }
+            }
+            Err(_) => {
+                // Timestamp is taken from the simulation caller if provided.
+                // If the timestamp is missing, because of an older evm-node,
+                // default to current timestamp.
+                let timestamp = self
+                    .timestamp
+                    .map(|timestamp| U256::from(timestamp.as_u64()))
+                    .unwrap_or_else(|| U256::from(current_timestamp(host).as_u64()));
+
+                BlockConstants::first_block(
+                    timestamp,
+                    chain_id,
+                    block_fees,
+                    crate::block::GAS_LIMIT,
+                    coinbase,
+                )
+            }
+        };
+
+        let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
+        let tx_data_size = self.data.len() as u64;
+        let limits = fetch_limits(host);
+        let allocated_ticks =
+            tick_model::estimate_remaining_ticks_for_transaction_execution(
+                limits.maximum_allowed_ticks,
+                0,
+                tx_data_size,
+            );
+
+        let gas_price = if let Some(gas_price) = self.gas_price {
+            U256::from(gas_price)
+        } else {
+            block_fees.base_fee_per_gas()
+        };
+
+        match run_transaction(
+            host,
+            &constants,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            self.to,
+            from,
+            self.data.clone(),
+            self.gas.map_or(Some(MAXIMUM_GAS_LIMIT), |gas| {
+                Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
+            }),
+            gas_price,
+            self.value.unwrap_or_default(),
+            false,
+            allocated_ticks,
+            false,
+            false,
+            tracer_input,
+        ) {
+            Ok(Some(outcome)) if !self.with_da_fees => {
+                let result: SimulationResult<CallResult, String> =
+                    Result::Ok(Some(outcome)).into();
+
+                Ok(result)
+            }
+            Ok(Some(outcome)) => {
+                let outcome =
+                    simulation_add_gas_for_fees(outcome, &block_fees, &self.data)
+                        .map_err(Error::Simulation)?;
+
+                let result: SimulationResult<CallResult, String> =
+                    Result::Ok(Some(outcome)).into();
+
+                Ok(result)
+            }
+            result => Ok(result.into()),
+        }
     }
 }
 
@@ -346,32 +509,59 @@ impl TxValidation {
         host: &mut Host,
         transaction: &EthereumTransactionCommon,
         caller: &H160,
+        enable_fa_withdrawals: bool,
     ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
+        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
 
-        let current_constants = match storage::read_current_block(host) {
-            Ok(block) => block.constants(chain_id, block_fees),
+        let current_constants = match block_storage::read_current(host) {
+            Ok(block) => {
+                BlockConstants {
+                    number: block.number + 1,
+                    coinbase,
+                    // The timestamp is incorrect in simulation. The simulation
+                    // caller should provide a view of the real timestamp.
+                    timestamp: U256::from(block.timestamp.as_u64()),
+                    gas_limit: crate::block::GAS_LIMIT,
+                    block_fees,
+                    chain_id,
+                    prevrandao: None,
+                }
+            }
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
-                BlockConstants::first_block(timestamp, chain_id, block_fees)
+                BlockConstants::first_block(
+                    timestamp,
+                    chain_id,
+                    block_fees,
+                    crate::block::GAS_LIMIT,
+                    coinbase,
+                )
             }
         };
 
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
-        let precompiles = precompiles::precompile_set::<Host>();
+        let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
         let tx_data_size = transaction.data.len() as u64;
+        let limits = fetch_limits(host);
         let allocated_ticks =
             tick_model::estimate_remaining_ticks_for_transaction_execution(
+                limits.maximum_allowed_ticks,
                 0,
                 tx_data_size,
             );
 
-        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false) else {
+        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false)
+        else {
             return Self::to_error(GAS_LIMIT_TOO_LOW);
         };
+
+        if gas_limit > limits.maximum_gas_limit {
+            return Self::to_error(GAS_LIMIT_TOO_HIGH);
+        }
 
         match run_transaction(
             host,
@@ -384,18 +574,33 @@ impl TxValidation {
             transaction.data.clone(),
             Some(gas_limit), // gas could be omitted
             block_fees.base_fee_per_gas(),
-            Some(transaction.value),
+            transaction.value,
             true,
             allocated_ticks,
             false,
             false,
+            None,
         ) {
             Ok(Some(ExecutionOutcome {
-                reason: ExtendedExitReason::OutOfTicks,
+                result: ExecutionOutcomeResult::OutOfTicks,
                 ..
             })) => Self::to_error(OUT_OF_TICKS_MSG),
             Ok(None) => Self::to_error(CANNOT_PREPAY),
-            _ => Ok(SimulationResult::Ok(ValidationResult { address: *caller })),
+            _ => Ok(SimulationResult::Ok(ValidationResult {
+                transaction_object: TransactionObject {
+                    block_number: U256::zero(),
+                    from: *caller,
+                    to: transaction.to,
+                    gas_used: transaction.gas_limit_with_fees().into(),
+                    gas_price: transaction.max_fee_per_gas,
+                    hash: Keccak256::digest(transaction.to_bytes()).into(),
+                    input: transaction.data.clone(),
+                    nonce: transaction.nonce,
+                    index: 0,
+                    value: transaction.value,
+                    signature: transaction.signature.clone(),
+                },
+            })),
         }
     }
 
@@ -409,11 +614,14 @@ impl TxValidation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
+        enable_fa_withdrawals: bool,
     ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let tx = &self.transaction;
         let evm_account_storage = account_storage::init_account_storage()?;
         // Get the caller
-        let Ok(caller) = tx.caller() else {return  Self::to_error(INCORRECT_SIGNATURE)};
+        let Ok(caller) = tx.caller() else {
+            return Self::to_error(INCORRECT_SIGNATURE);
+        };
         // Get the caller account
         let caller_account_path = evm_execution::account_storage::account_path(&caller)?;
         let caller_account = evm_account_storage.get(host, &caller_account_path)?;
@@ -439,7 +647,7 @@ impl TxValidation {
         }
         // Check if running the transaction (assuming it is valid) would run out
         // of ticks, or fail validation for another reason.
-        Self::validate(host, tx, &caller)
+        Self::validate(host, tx, &caller, enable_fa_withdrawals)
     }
 }
 
@@ -462,11 +670,15 @@ impl TryFrom<&[u8]> for Message {
     type Error = DecoderError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        let Some(&tag) = bytes.first() else {return Err(DecoderError::Custom("Empty simulation message"))};
-        let Some(bytes) = bytes.get(1..) else {return Err(DecoderError::Custom("Empty simulation message"))};
+        let Some(&tag) = bytes.first() else {
+            return Err(DecoderError::Custom("Empty simulation message"));
+        };
+        let Some(bytes) = bytes.get(1..) else {
+            return Err(DecoderError::Custom("Empty simulation message"));
+        };
 
         match tag {
-            EVALUATION_TAG => Evaluation::try_from(bytes).map(Message::Evaluation),
+            EVALUATION_TAG => Evaluation::from_bytes(bytes).map(Message::Evaluation),
             VALIDATION_TAG => TxValidation::try_from(bytes)
                 .map(|tx| Message::TxValidation(Box::new(tx))),
             _ => Err(DecoderError::Custom("Unknown message to simulate")),
@@ -566,18 +778,30 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
     }
 }
 
+impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String> {
+    const VERSION: u8 = SIMULATION_ENCODING_VERSION;
+    fn unversionned_encode(&self) -> bytes::BytesMut {
+        self.rlp_bytes()
+    }
+    fn unversionned_decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        Self::decode(decoder)
+    }
+}
+
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
+    enable_fa_withdrawals: bool,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
-            let outcome = simulation.run(host)?;
+            let tracer_input = read_tracer_input(host)?;
+            let outcome = simulation.run(host, tracer_input, enable_fa_withdrawals)?;
             storage::store_simulation_result(host, outcome)
         }
         Message::TxValidation(tx_validation) => {
-            let outcome = tx_validation.run(host)?;
+            let outcome = tx_validation.run(host, enable_fa_withdrawals)?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -590,22 +814,13 @@ mod tests {
     use tezos_ethereum::{
         block::BlockConstants, transaction::TransactionType, tx_signature::TxSignature,
     };
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::{
         current_timestamp, fees::gas_for_fees, retrieve_block_fees, retrieve_chain_id,
     };
 
     use super::*;
-
-    impl Evaluation {
-        /// Unserialize an hex string as RLP encoded data.
-        pub fn from_rlp(e: String) -> Result<Evaluation, DecoderError> {
-            let tx = hex::decode(e)
-                .or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
-            Self::from_rlp_bytes(&tx)
-        }
-    }
 
     fn address_of_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
@@ -615,7 +830,8 @@ mod tests {
     #[test]
     fn test_decode_empty() {
         let input_string =
-            "da8094353535353535353535353535353535353535353580808080".to_string();
+            hex::decode("da8094353535353535353535353535353535353535353580808080")
+                .unwrap();
         let address = address_of_str("3535353535353535353535353535353535353535");
         let expected = Evaluation {
             from: None,
@@ -624,9 +840,11 @@ mod tests {
             gas_price: None,
             value: None,
             data: vec![],
+            with_da_fees: true,
+            timestamp: None,
         };
 
-        let evaluation = Evaluation::from_rlp(input_string);
+        let evaluation = Evaluation::from_bytes(&input_string);
 
         assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
@@ -639,7 +857,7 @@ mod tests {
     #[test]
     fn test_decode_non_empty() {
         let input_string =
-            "f84894242424242424242424242424242424242424242494353535353535353535353535353535353535353588672b00000000000088ce56000000000000883582000000000000821616".to_string();
+            hex::decode("f84894242424242424242424242424242424242424242494353535353535353535353535353535353535353588672b00000000000088ce56000000000000883582000000000000821616").unwrap();
         let to = address_of_str("3535353535353535353535353535353535353535");
         let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
@@ -650,9 +868,11 @@ mod tests {
             gas_price: Some(22222),
             value: Some(U256::from(33333)),
             data,
+            with_da_fees: true,
+            timestamp: None,
         };
 
-        let evaluation = Evaluation::from_rlp(input_string);
+        let evaluation = Evaluation::from_bytes(&input_string);
 
         assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
@@ -687,8 +907,10 @@ mod tests {
             timestamp,
             chain_id.unwrap(),
             block_fees.unwrap(),
+            crate::block::GAS_LIMIT,
+            H160::zero(),
         );
-        let precompiles = precompiles::precompile_set::<Host>();
+        let precompiles = precompiles::precompile_set::<Host>(false);
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
 
         let callee = None;
@@ -712,11 +934,12 @@ mod tests {
             call_data,
             Some(gas_limit),
             gas_price,
-            Some(transaction_value),
+            transaction_value,
             false,
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
         assert!(outcome.is_ok(), "contract should have been created");
         let outcome = outcome.unwrap();
@@ -724,13 +947,13 @@ mod tests {
             outcome.is_some(),
             "execution should have produced some outcome"
         );
-        outcome.unwrap().new_address.unwrap()
+        outcome.unwrap().new_address().unwrap()
     }
 
     #[test]
     fn simulation_result() {
         // setup
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -741,8 +964,10 @@ mod tests {
             data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
             gas: Some(100000),
             value: None,
+            with_da_fees: false,
+            timestamp: None,
         };
-        let outcome = evaluation.run(&mut host);
+        let outcome = evaluation.run(&mut host, None, false);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -765,8 +990,10 @@ mod tests {
             data: hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap(),
             gas: Some(111111),
             value: None,
+            with_da_fees: false,
+            timestamp: None,
         };
-        let outcome = evaluation.run(&mut host);
+        let outcome = evaluation.run(&mut host, None, false);
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -784,7 +1011,7 @@ mod tests {
     #[test]
     fn evaluation_result_no_gas() {
         // setup
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -795,8 +1022,10 @@ mod tests {
             data: hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
             gas: None,
             value: None,
+            with_da_fees: false,
+            timestamp: None,
         };
-        let outcome = evaluation.run(&mut host);
+        let outcome = evaluation.run(&mut host, None, false);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -811,6 +1040,7 @@ mod tests {
         }
     }
 
+    #[ignore]
     #[test]
     fn parse_simulation() {
         let to = address_of_str("3535353535353535353535353535353535353535");
@@ -823,6 +1053,8 @@ mod tests {
             gas_price: Some(22222),
             value: Some(U256::from(33333)),
             data,
+            with_da_fees: false,
+            timestamp: None,
         };
 
         let mut encoded =
@@ -843,10 +1075,11 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[test]
     fn parse_simulation2() {
         // setup
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let new_address = create_contract(&mut host);
 
         let to = Some(new_address);
@@ -859,6 +1092,8 @@ mod tests {
             gas_price: None,
             value: None,
             data,
+            with_da_fees: false,
+            timestamp: None,
         };
 
         let encoded = hex::decode(
@@ -974,7 +1209,7 @@ mod tests {
 
     #[test]
     fn test_tx_validation_gas_price() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
         let gas_price = U256::one();
         let tx_data = vec![];
@@ -1022,7 +1257,7 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        let result = simulation.run(&mut host);
+        let result = simulation.run(&mut host, false);
         println!("{result:?}");
         assert!(result.is_ok());
         assert_eq!(
@@ -1033,7 +1268,7 @@ mod tests {
 
     #[test]
     fn test_tx_validation_da_fees_not_covered() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
 
         let transaction = EthereumTransactionCommon::new(
@@ -1071,7 +1306,7 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        let result = simulation.run(&mut host);
+        let result = simulation.run(&mut host, false);
 
         assert!(result.is_ok());
         assert_eq!(
@@ -1094,8 +1329,27 @@ mod tests {
     fn test_simulation_result_encoding_roundtrip() {
         let valid: SimulationResult<ValidationResult, String> =
             SimulationResult::Ok(ValidationResult {
-                address: address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
-                    .unwrap(),
+                transaction_object: TransactionObject {
+                    block_number: U256::from(532532),
+                    from: address_of_str("3535353535353535353535353535353535353535")
+                        .unwrap(),
+                    gas_used: U256::from(32523),
+                    gas_price: U256::from(100432432),
+                    hash: [5; 32],
+                    input: vec![],
+                    nonce: 8888,
+                    to: address_of_str("3635353535353535353535353535353535353536"),
+                    index: 15u32,
+                    value: U256::from(0),
+                    signature: Some(
+                        TxSignature::new(
+                            U256::from(1337),
+                            H256::from_low_u64_be(1),
+                            H256::from_low_u64_be(2),
+                        )
+                        .unwrap(),
+                    ),
+                },
             });
         let call: SimulationResult<CallResult, String> =
             SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {

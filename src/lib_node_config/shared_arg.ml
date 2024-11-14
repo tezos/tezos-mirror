@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -70,6 +71,7 @@ type t = {
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
+  enable_http_cache_headers : bool option;
   disable_context_pruning : bool option;
   storage_maintenance_delay : Storage_maintenance.delay option;
 }
@@ -193,7 +195,8 @@ let wrap data_dir config_file network connections max_download_speed
     log_coloring history_mode synchronisation_threshold latency
     disable_config_validation allow_all_rpc media_type
     max_active_rpc_connections metrics_addr operation_metadata_size_limit
-    disable_context_pruning storage_maintenance_delay =
+    enable_http_cache_headers disable_context_pruning storage_maintenance_delay
+    =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -204,6 +207,9 @@ let wrap data_dir config_file network connections max_download_speed
   in
   let rpc_tls =
     Option.map (fun (cert, key) -> {Config_file.cert; key}) rpc_tls
+  in
+  let enable_http_cache_headers =
+    if enable_http_cache_headers then Some true else None
   in
   let disable_context_pruning =
     if disable_context_pruning then Some true else None
@@ -245,6 +251,7 @@ let wrap data_dir config_file network connections max_download_speed
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
+    enable_http_cache_headers;
     disable_context_pruning;
     storage_maintenance_delay;
   }
@@ -535,9 +542,7 @@ module Term = struct
       & info ~docs ~doc ~docv:"NUM" ["peer-table-size"])
 
   let listen_addr =
-    let doc =
-      "The TCP address and port at which this instance can be reached."
-    in
+    let doc = "The URL at which this instance can be reached." in
     Arg.(
       value
       & opt (some string) None
@@ -663,18 +668,17 @@ module Term = struct
 
   let rpc_listen_addrs =
     let doc =
-      "The TCP socket address at which this RPC server instance can be \
-       reached. Note that: as a local RPC server is handled by the node \
-       itself, calling computational intensive RPCs can affect the \
-       performances of the node."
+      "The URL at which this RPC server instance can be reached. Note that: as \
+       a local RPC server is handled by the node itself, calling computational \
+       intensive RPCs can affect the performances of the node."
     in
     Arg.(
       value & opt_all string [] & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let external_rpc_listen_addrs =
     let doc =
-      "The TCP socket address at which this external RPC server instance can \
-       be reached. Warning: this feature is unstable -- use it with care."
+      "The URL at which this external RPC server instance can be reached. \
+       Warning: this feature is unstable -- use it with care."
     in
     Arg.(
       value & opt_all string []
@@ -755,6 +759,10 @@ module Term = struct
           Config_file.default_max_active_rpc_connections
       & info ~docs ~doc ~docv:"NUM" ["max-active-rpc-connections"])
 
+  let enable_http_cache_headers =
+    let doc = "Enables HTTP cache headers in the RPC response" in
+    Arg.(value & flag & info ~docs ~doc ["enable-http-cache-headers"])
+
   let disable_context_pruning =
     let doc = "Disables the storage maintenance of the context" in
     Arg.(value & flag & info ~docs ~doc ["disable-context-pruning"])
@@ -796,7 +804,8 @@ module Term = struct
     $ log_output $ log_coloring $ history_mode $ synchronisation_threshold
     $ latency $ disable_config_validation $ allow_all_rpc $ media_type
     $ max_active_rpc_connections $ metrics_addr $ operation_metadata_size_limit
-    $ disable_context_pruning $ storage_maintenance_delay
+    $ enable_http_cache_headers $ disable_context_pruning
+    $ storage_maintenance_delay
 end
 
 let read_config_file args =
@@ -944,6 +953,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     max_active_rpc_connections;
     metrics_addr;
     operation_metadata_size_limit;
+    enable_http_cache_headers;
     disable_context_pruning;
     storage_maintenance_delay;
   } =
@@ -1103,6 +1113,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?synchronisation_threshold
     ?history_mode
     ?latency
+    ?enable_http_cache_headers
     ?disable_context_pruning
     ?storage_maintenance_delay
     cfg

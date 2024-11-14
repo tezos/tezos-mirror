@@ -35,6 +35,8 @@ open Protocol
 open Alpha_context
 open Tez_helpers
 
+let register_test = Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["token"]
+
 (** Creates a context with a single account. Returns the context and the public
     key hash of the account. *)
 let create_context () =
@@ -53,6 +55,22 @@ let nonce = Origination_nonce.Internal_for_tests.initial Operation_hash.zero
 
 let sc_rollup () = Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
 
+let check_total_supply ~loc ~before ~after change =
+  let open Lwt_result_wrap_syntax in
+  let*@ total_supply_before = Contract.get_total_supply before in
+  let*@ total_supply_after = Contract.get_total_supply after in
+  let* expected =
+    match change with
+    | `Equal -> return total_supply_before
+    | `Decrease amount ->
+        let*?@ expected = Tez.(total_supply_before -? amount) in
+        return expected
+    | `Increase amount ->
+        let*?@ expected = Tez.(total_supply_before +? amount) in
+        return expected
+  in
+  Assert.equal_tez ~loc total_supply_after expected
+
 (** Check balances for a simple transfer from [bootstrap] to new [Implicit]. *)
 let test_simple_balances () =
   let open Lwt_result_wrap_syntax in
@@ -69,6 +87,7 @@ let test_simple_balances () =
   let*@ _, bal_receiver' = Token.Internal_for_tests.balance ctxt' receiver in
   let*? add_bal_giver'_amount = bal_giver' +? amount in
   let*? add_bal_receiver_amount = bal_receiver +? amount in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () = Assert.equal_tez ~loc:__LOC__ bal_giver add_bal_giver'_amount in
   Assert.equal_tez ~loc:__LOC__ bal_receiver' add_bal_receiver_amount
 
@@ -82,9 +101,10 @@ let test_simple_balance_updates () =
   let pkh, _pk, _sk = Signature.generate_key () in
   let receiver = Contract.Implicit pkh in
   let amount = Tez.one in
-  let*@ _, bal_updates =
+  let*@ ctxt', bal_updates =
     Token.transfer ctxt (`Contract giver) (`Contract receiver) amount
   in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   Alcotest.(
     check
       bool
@@ -115,6 +135,9 @@ let test_allocated_and_deallocated ctxt receiver initial_status
   let* () = Assert.equal_bool ~loc:__LOC__ allocated initial_status in
   let amount = Tez.one in
   let*@ ctxt', _ = Token.transfer ctxt `Minted receiver_container amount in
+  let* () =
+    check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' (`Increase amount)
+  in
   let*@ ctxt', allocated =
     Token.Internal_for_tests.allocated ctxt' receiver_container
   in
@@ -122,8 +145,16 @@ let test_allocated_and_deallocated ctxt receiver initial_status
   let*@ ctxt', bal_receiver' =
     Token.Internal_for_tests.balance ctxt' receiver
   in
+  let before = ctxt' in
   let*@ ctxt', _ =
     Token.transfer ctxt' receiver_container `Burned bal_receiver'
+  in
+  let* () =
+    check_total_supply
+      ~loc:__LOC__
+      ~before
+      ~after:ctxt'
+      (`Decrease bal_receiver')
   in
   let*@ _, allocated =
     Token.Internal_for_tests.allocated ctxt' receiver_container
@@ -168,9 +199,13 @@ let test_transferring_to_receiver ctxt receiver amount expected_bupds =
   let open Lwt_result_wrap_syntax in
   (* Transferring zero must be a noop, and must not return balance updates. *)
   let*@ ctxt', bupds = Token.transfer ctxt `Minted receiver Tez.zero in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () = Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true in
   (* Test transferring a non null amount. *)
   let*@ ctxt', bupds = Token.transfer ctxt `Minted receiver amount in
+  let* () =
+    check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' (`Increase amount)
+  in
   let* () = check_receiver_balances ctxt ctxt' receiver amount in
   let expected_bupds =
     Receipt.item Minted (Debited amount) Block_application :: expected_bupds
@@ -214,7 +249,8 @@ let test_transferring_to_burned ctxt =
   let open Lwt_result_wrap_syntax in
   let amount = random_amount () in
   let minted_bupd = Receipt.item Minted (Debited amount) Block_application in
-  let*@ _, bupds = Token.transfer ctxt `Minted `Burned amount in
+  let*@ ctxt', bupds = Token.transfer ctxt `Minted `Burned amount in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () =
     Assert.equal_bool
       ~loc:__LOC__
@@ -222,7 +258,8 @@ let test_transferring_to_burned ctxt =
       = Receipt.[minted_bupd; item Burned (Credited amount) Block_application])
       true
   in
-  let*@ _, bupds = Token.transfer ctxt `Minted `Storage_fees amount in
+  let*@ ctxt', bupds = Token.transfer ctxt `Minted `Storage_fees amount in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () =
     Assert.equal_bool
       ~loc:__LOC__
@@ -231,9 +268,10 @@ let test_transferring_to_burned ctxt =
           [minted_bupd; item Storage_fees (Credited amount) Block_application])
       true
   in
-  let*@ _, bupds =
+  let*@ ctxt', bupds =
     Token.transfer ctxt `Minted `Double_signing_punishments amount
   in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () =
     Assert.equal_bool
       ~loc:__LOC__
@@ -247,9 +285,10 @@ let test_transferring_to_burned ctxt =
   in
   let pkh = Signature.Public_key_hash.zero in
   let p, r = (Random.bool (), Random.bool ()) in
-  let*@ _, bupds =
+  let*@ ctxt', bupds =
     Token.transfer ctxt `Minted (`Lost_attesting_rewards (pkh, p, r)) amount
   in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () =
     Assert.equal_bool
       ~loc:__LOC__
@@ -264,9 +303,10 @@ let test_transferring_to_burned ctxt =
           ])
       true
   in
-  let*@ _, bupds =
+  let*@ ctxt', bupds =
     Token.transfer ctxt `Minted `Sc_rollup_refutation_punishments amount
   in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   Assert.equal_bool
     ~loc:__LOC__
     (bupds
@@ -318,11 +358,13 @@ let check_giver_balances ctxt ctxt' giver amount =
 let test_transferring_from_infinite_source ctxt giver expected_bupds =
   let open Lwt_result_wrap_syntax in
   (* Transferring zero must not return balance updates. *)
-  let*@ _, bupds = Token.transfer ctxt giver `Burned Tez.zero in
+  let*@ ctxt', bupds = Token.transfer ctxt giver `Burned Tez.zero in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () = Assert.equal_bool ~loc:__LOC__ (bupds = []) true in
   (* Test transferring a non null amount. *)
   let amount = random_amount () in
-  let*@ _, bupds = Token.transfer ctxt giver `Burned amount in
+  let*@ ctxt', bupds = Token.transfer ctxt giver `Burned amount in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let expected_bupds =
     expected_bupds amount
     @ Receipt.[item Burned (Credited amount) Block_application]
@@ -355,17 +397,29 @@ let test_transferring_from_container ctxt giver amount expected_bupds =
   let* () = Assert.proto_error_with_info ~loc:__LOC__ res error_title in
   (* Transferring zero must be a noop, and must not return balance updates. *)
   let*@ ctxt', bupds = Token.transfer ctxt giver `Burned Tez.zero in
+  let* () = check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal in
   let* () = Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true in
   (* Test transferring everything. *)
+  let before = ctxt in
   let*@ ctxt, _ = Token.transfer ctxt `Minted giver amount in
+  let* () =
+    check_total_supply ~loc:__LOC__ ~before ~after:ctxt (`Increase amount)
+  in
   let*@ ctxt', bupds = Token.transfer ctxt giver `Burned amount in
+  let* () =
+    check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' (`Decrease amount)
+  in
   let* () = check_giver_balances ctxt ctxt' giver amount in
   let expected_bupds =
     expected_bupds @ Receipt.[item Burned (Credited amount) Block_application]
   in
   let* () = Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true in
   (* Test transferring a smaller amount. *)
+  let before = ctxt in
   let*@ ctxt, _ = Token.transfer ctxt `Minted giver amount in
+  let* () =
+    check_total_supply ~loc:__LOC__ ~before ~after:ctxt (`Increase amount)
+  in
   let* () =
     match giver with
     | `Frozen_bonds _ ->
@@ -491,6 +545,25 @@ let cast_to_container_type x =
   | `Block_fees as x -> Some x
   | `Frozen_bonds _ as x -> Some x
 
+let is_giver_infinite (x : [< Token.giver]) =
+  match x with
+  | `Contract _ | `Collected_commitments _ | `Frozen_deposits _
+  | `Unstaked_frozen_deposits _ | `Block_fees | `Frozen_bonds _ ->
+      false
+  | `Invoice | `Bootstrap | `Initial_commitments | `Revelation_rewards
+  | `Attesting_rewards | `Baking_rewards | `Baking_bonuses | `Minted
+  | `Liquidity_baking_subsidies | `Sc_rollup_refutation_rewards ->
+      true
+
+let is_receiver_infinite (x : [< Token.receiver]) =
+  match x with
+  | `Contract _ | `Collected_commitments _ | `Frozen_deposits _
+  | `Unstaked_frozen_deposits _ | `Block_fees | `Frozen_bonds _ ->
+      false
+  | `Storage_fees | `Double_signing_punishments | `Lost_attesting_rewards
+  | `Sc_rollup_refutation_punishments | `Burned ->
+      true
+
 (** Generates all combinations of constructors. *)
 let build_test_cases () =
   let open Lwt_result_wrap_syntax in
@@ -505,10 +578,17 @@ let build_test_cases () =
   let baker2, baker2_pk, _ = Signature.generate_key () in
   let baker2c = `Contract (Contract.Implicit baker2) in
   (* Allocate contracts for user1, user2, baker1, and baker2. *)
-  let*@ ctxt, _ = Token.transfer ctxt origin user1c (random_amount ()) in
-  let*@ ctxt, _ = Token.transfer ctxt origin user2c (random_amount ()) in
-  let*@ ctxt, _ = Token.transfer ctxt origin baker1c (random_amount ()) in
-  let*@ ctxt, _ = Token.transfer ctxt origin baker2c (random_amount ()) in
+  let allocate ctxt contract amount =
+    let*@ ctxt', _ = Token.transfer ctxt origin contract amount in
+    let* () =
+      check_total_supply ~loc:__LOC__ ~before:ctxt ~after:ctxt' `Equal
+    in
+    return ctxt'
+  in
+  let* ctxt = allocate ctxt user1c (random_amount ()) in
+  let* ctxt = allocate ctxt user2c (random_amount ()) in
+  let* ctxt = allocate ctxt baker1c (random_amount ()) in
+  let* ctxt = allocate ctxt baker2c (random_amount ()) in
   (* Configure baker1, and baker2 as delegates by self-delegation, for which
      revealing their manager key is a prerequisite. *)
   let*@ ctxt = Contract.reveal_manager_key ctxt baker1 baker1_pk in
@@ -600,10 +680,31 @@ let test_all_combinations_of_givers_and_receivers () =
         match cast_to_container_type giver with
         | None -> return ctxt
         | Some giver ->
+            let before = ctxt in
             let*@ ctxt, _ = Token.transfer ctxt `Minted giver amount in
+            let* () =
+              check_total_supply
+                ~loc:__LOC__
+                ~before
+                ~after:ctxt
+                (`Increase amount)
+            in
             return ctxt
       in
       let*@ ctxt', _ = Token.transfer ctxt giver receiver amount in
+      let total_supply_change =
+        match (is_giver_infinite giver, is_receiver_infinite receiver) with
+        | true, false -> `Increase amount
+        | false, true -> `Decrease amount
+        | false, false | true, true -> `Equal
+      in
+      let* () =
+        check_total_supply
+          ~loc:__LOC__
+          ~before:ctxt
+          ~after:ctxt'
+          total_supply_change
+      in
       check_balances ctxt ctxt' giver receiver amount)
     cases
 
@@ -661,11 +762,11 @@ let check_balances_are_consistent ctxt1 ctxt2 elt =
 (** Test that [transfer_n] is equivalent to n debits followed by n credits. *)
 let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
     (receiver : [< Token.container]) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   (* Run transfer_n. *)
-  let* ctxt1, bal_updates1 = Token.transfer_n ctxt giver receiver in
+  let*@ ctxt1, bal_updates1 = Token.transfer_n ctxt giver receiver in
   (* Debit all givers. *)
-  let* ctxt, debit_logs =
+  let*@ ctxt, debit_logs =
     List.fold_left_es
       (fun (ctxt, bal_updates) (giver, am) ->
         let* ctxt, debit_logs = Token.transfer ctxt giver `Burned am in
@@ -683,7 +784,7 @@ let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
       debit_logs
   in
   (* Credit the receiver for each giver. *)
-  let* ctxt2, credit_logs =
+  let*@ ctxt2, credit_logs =
     List.fold_left_es
       (fun (ctxt, bal_updates) (_, am) ->
         let* ctxt, credit_logs = Token.transfer ctxt `Minted receiver am in
@@ -707,19 +808,24 @@ let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
     | head :: tail -> [List.fold_left coalesce_balance_updates head tail]
   in
   assert (bal_updates1 = debit_logs @ credit_logs) ;
+  (* Check total supplies are the same in ctxt1 and ctxt2. *)
+  let*@ total_supply_1 = Contract.get_total_supply ctxt1 in
+  let*@ total_supply_2 = Contract.get_total_supply ctxt2 in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_supply_1 total_supply_2 in
   (* Check balances are the same in ctxt1 and ctxt2. *)
-  let* () =
+  let*@ () =
     List.(iter_es (check_balances_are_consistent ctxt1 ctxt2) (map fst giver))
   in
-  check_balances_are_consistent ctxt1 ctxt2 receiver
+  let*@ () = check_balances_are_consistent ctxt1 ctxt2 receiver in
+  return_unit
 
 let test_transfer_n_with_no_giver () =
-  let open Lwt_result_wrap_syntax in
+  let open Lwt_result_syntax in
   Random.init 0 ;
   let* ctxt, pkh = create_context () in
-  let*@ () = test_transfer_n ctxt [] `Block_fees in
+  let* () = test_transfer_n ctxt [] `Block_fees in
   let receiver = `Contract (Contract.Implicit pkh) in
-  let*@ () = test_transfer_n ctxt [] receiver in
+  let* () = test_transfer_n ctxt [] receiver in
   return_unit
 
 let test_transfer_n_with_several_givers () =
@@ -750,40 +856,28 @@ let test_transfer_n_with_several_givers () =
       (user4c, random_amount ());
     ]
   in
-  let*@ () = test_transfer_n ctxt givers user1c in
-  let*@ () =
+  let* () = test_transfer_n ctxt givers user1c in
+  let* () =
     test_transfer_n ctxt ((user1c, random_amount ()) :: givers) user1c
   in
   return_unit
 
-let tests =
-  Tztest.
-    [
-      tztest "transfer - balances" `Quick test_simple_balances;
-      tztest "transfer - balance updates" `Quick test_simple_balance_updates;
-      tztest "transfer - test allocated" `Quick test_allocated;
-      tztest
-        "transfer - test transfer to receiver"
-        `Quick
-        test_transferring_to_receiver;
-      tztest
-        "transfer - test transfer from giver"
-        `Quick
-        test_transferring_from_giver;
-      tztest
-        "transfer - test all (givers x receivers)"
-        `Quick
-        test_all_combinations_of_givers_and_receivers;
-      tztest
-        "transfer - test from no giver to a receiver"
-        `Quick
-        test_transfer_n_with_no_giver;
-      tztest
-        "transfer - test from n givers to a receiver"
-        `Quick
-        test_transfer_n_with_several_givers;
-    ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("token movements", tests)]
-  |> Lwt_main.run
+  register_test ~title:"transfer - balances" test_simple_balances ;
+  register_test ~title:"transfer - balance updates" test_simple_balance_updates ;
+  register_test ~title:"transfer - test allocated" test_allocated ;
+  register_test
+    ~title:"transfer - test transfer to receiver"
+    test_transferring_to_receiver ;
+  register_test
+    ~title:"transfer - test transfer from giver"
+    test_transferring_from_giver ;
+  register_test
+    ~title:"transfer - test all (givers x receivers)"
+    test_all_combinations_of_givers_and_receivers ;
+  register_test
+    ~title:"transfer - test from no giver to a receiver"
+    test_transfer_n_with_no_giver ;
+  register_test
+    ~title:"transfer - test from n givers to a receiver"
+    test_transfer_n_with_several_givers

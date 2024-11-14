@@ -31,6 +31,7 @@
                  injection of transfer operations, baking, and a couple RPCs
                  that retrieve operations.
 *)
+let team = Tag.layer1
 
 let get_request_level = function
   | "debug" -> "request_completed_debug.v0"
@@ -162,7 +163,7 @@ let test_debug_level_misc =
   Protocol.register_test
     ~__FILE__
     ~title:"event level debug"
-    ~tags:["node"; "event"]
+    ~tags:[team; "node"; "event"]
   @@ fun protocol ->
   Log.info "Step 1: Start a node with event_level:debug, activate the protocol." ;
   let* node_1 = Node.init ~event_level:`Debug [Synchronisation_threshold 0] in
@@ -230,11 +231,20 @@ let test_debug_level_misc =
   | _ -> Test.fail "RPC.operations should return a list of length 4.") ;
   unit
 
-(* Wait for an event of name "set_head.v0".
-   Note: this event has level "info", so the node needs to have event
-   level set to either "debug" or "info" for such an event to exist.
+(* Wait for an event of name "set_head.v0" when the node's RPC server
+   is local (rpc_external=false) or "store_synchronized_on_head.v0"
+   when the external RPC server is enabled (rpc_external=true).
+   Note: the "set_head.v0" event has level "info", so the node needs
+   to have event level set to either "debug" or "info" for such an
+   event to exist. Regarding "store_synchronized_on_head.v0" it
+   requires to be set to "notice" at least.
 *)
-let wait_for_set_head node = Node.wait_for node "set_head.v0" (fun _ -> Some ())
+let wait_for_set_head node =
+  let event =
+    if Node.rpc_external node then "store_synchronized_on_head.v0"
+    else "set_head.v0"
+  in
+  Node.wait_for node event (fun _ -> Some ())
 
 (* Event handler that ensures there is no "set_head.v0" event (this event has
    level "info", so should not happen for nodes of event level "notice").
@@ -311,7 +321,10 @@ let check_level_of_all_events node config_level =
      arrival requests (level debug) from node 1.
 *)
 let test_event_levels =
-  Protocol.register_test ~__FILE__ ~title:"event levels" ~tags:["node"; "event"]
+  Protocol.register_test
+    ~__FILE__
+    ~title:"event levels"
+    ~tags:[team; "node"; "event"]
   @@ fun protocol ->
   Log.info
     "Step 1: Start three nodes with respective event levels debug, info, and \

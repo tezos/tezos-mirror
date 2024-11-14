@@ -32,6 +32,8 @@
                  on the baker.
 *)
 
+let team = Tag.layer1
+
 let hooks = Tezos_regression.hooks
 
 let blocks_per_cycle = 4
@@ -90,7 +92,7 @@ let test_update_consensus_key =
   Protocol.register_test
     ~__FILE__
     ~title:"update consensus key"
-    ~tags:["consensus_key"]
+    ~tags:[team; "consensus_key"]
   @@ fun protocol ->
   let manual_staking = manual_staking protocol in
   let parameters =
@@ -100,6 +102,8 @@ let test_update_consensus_key =
       (["blocks_per_cycle"], `Int blocks_per_cycle);
       (["nonce_revelation_threshold"], `Int 2);
       (["consensus_rights_delay"], `Int consensus_rights_delay);
+      (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+      (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
     ]
   in
   let* parameter_file =
@@ -522,17 +526,17 @@ let consensus_key_typ : consensus_key Check.typ =
       (tuple2 string (list (tuple2 int string))))
 
 let get_consensus_key client (delegate : Account.key) : consensus_key Lwt.t =
-  let* delegate_json =
+  let* json =
     Client.RPC.call client
-    @@ RPC.get_chain_block_context_delegate delegate.public_key_hash
+    @@ RPC.get_chain_block_context_delegate_consensus_key
+         delegate.public_key_hash
   in
   return
     JSON.
       {
-        active_consensus_key =
-          delegate_json |-> "active_consensus_key" |> as_string;
+        active_consensus_key = json |-> "active" |-> "pkh" |> as_string;
         pending_consensus_keys =
-          delegate_json |-> "pending_consensus_keys" |> as_list
+          json |-> "pendings" |> as_list
           |> List.map (fun pending_key ->
                  ( pending_key |-> "cycle" |> as_int,
                    pending_key |-> "pkh" |> as_string ));
@@ -628,7 +632,7 @@ let register ?(regression = true) title test =
   Protocol.(if regression then register_regression_test else register_test)
     ~__FILE__
     ~title
-    ~tags:["consensus_key"]
+    ~tags:[team; "consensus_key"]
   @@ fun protocol ->
   let parameters =
     (* we update paramaters for faster testing: no need to wait
@@ -637,6 +641,8 @@ let register ?(regression = true) title test =
       (["blocks_per_cycle"], `Int blocks_per_cycle);
       (["nonce_revelation_threshold"], `Int 2);
       (["consensus_rights_delay"], `Int consensus_rights_delay);
+      (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+      (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
     ]
   in
   let* parameter_file =

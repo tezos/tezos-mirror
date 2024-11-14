@@ -15,7 +15,11 @@
   octez-libs.stdlib-unix
   octez-libs.tezos-context.encoding
   octez-libs.context.sigs
-  octez-libs.tezos-context.helpers)
+  octez-libs.tezos-context.helpers
+  octez-riscv-pvm
+  camlzip
+  tar
+  tar-unix)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

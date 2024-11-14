@@ -247,8 +247,6 @@ let dispatch_policy rpc_ctxt = function
 let get_next_baker chain_store ?(policy = By_round 0) =
   dispatch_policy chain_store policy
 
-let get_endorsing_power _chain_store _b = 0
-
 module Forge = struct
   type header = {
     baker : public_key_hash;
@@ -602,7 +600,7 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
   in
   let block_header_metadata =
     Data_encoding.Binary.to_bytes_exn
-      Main.block_header_metadata_encoding_with_legacy_attestation_name
+      Main.block_header_metadata_encoding
       block_header_metadata
   in
   let payload_hash =

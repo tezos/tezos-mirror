@@ -30,6 +30,7 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file contract_entrypoints.ml
    Subject:      Tests for the contract entrypoints
 *)
+let team = Tag.layer1
 
 let extract_new_contract client_output =
   match client_output =~* rex "New contract ?(KT1\\w{33})" with
@@ -87,7 +88,7 @@ let register_create_contract_rootname protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "test %s" contract)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (test_create_contract_rootname_originate ~contract)
        protocols
@@ -112,7 +113,7 @@ let script contract_annotation contract_type =
     {|
 parameter address;
 storage (option address);
-code { CAR; CONTRACT %s %s; 
+code { CAR; CONTRACT %s %s;
        IF_SOME { ADDRESS; SOME } { NONE address; }; NIL operation; PAIR }
 |}
     contract_annotation
@@ -306,7 +307,7 @@ let register_simple_entrypoints protocols =
   Protocol.register_test
     ~__FILE__
     ~title:"simple entrypoints"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
     (fun protocol ->
       let* client = Client.init_mockup ~protocol () in

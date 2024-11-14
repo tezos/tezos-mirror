@@ -46,6 +46,7 @@ module Denunciator = struct
 
   let double_attestation_detected =
     declare_2
+      ~alternative_color:Internal_event.Magenta
       ~section
       ~level
       ~name:"double_attestation_detected"
@@ -55,6 +56,7 @@ module Denunciator = struct
 
   let double_attestation_denounced =
     declare_2
+      ~alternative_color:Internal_event.Blue
       ~section
       ~level
       ~name:"double_attestation_denounced"
@@ -65,6 +67,7 @@ module Denunciator = struct
 
   let double_preattestation_detected =
     declare_2
+      ~alternative_color:Internal_event.Magenta
       ~section
       ~level
       ~name:"double_preattestation_detected"
@@ -74,6 +77,7 @@ module Denunciator = struct
 
   let double_preattestation_denounced =
     declare_2
+      ~alternative_color:Internal_event.Blue
       ~section
       ~level
       ~name:"double_preattestation_denounced"
@@ -132,6 +136,7 @@ module Denunciator = struct
 
   let double_baking_detected =
     declare_0
+      ~alternative_color:Internal_event.Magenta
       ~section
       ~level
       ~name:"double_baking_detected"
@@ -140,6 +145,7 @@ module Denunciator = struct
 
   let double_baking_denounced =
     declare_2
+      ~alternative_color:Internal_event.Blue
       ~section
       ~level
       ~name:"double_baking_denounced"

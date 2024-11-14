@@ -35,15 +35,6 @@ open TzPervasives
 
 exception Skip_list_test_error of string
 
-let tztest_qcheck2 ?print ?count ~name generator f =
-  let name, speed, run =
-    QCheck_alcotest.to_alcotest
-      ( QCheck2.Test.make ?print ?count ~name generator @@ fun x ->
-        f x ;
-        true )
-  in
-  Alcotest.test_case name speed run
-
 module TestNat (Parameters : sig
   val basis : int
 end) =
@@ -89,7 +80,9 @@ struct
   let show_path path = String.concat " " (List.map string_of_int path)
 
   let head list =
-    match List.hd list.cells with None -> assert false | Some h -> h
+    match List.hd list.cells with
+    | None -> Test.fail "head function called on an empty list"
+    | Some h -> h
 
   let zero = {size = 1; cells = [(0, genesis initial_value)]}
 
@@ -323,32 +316,95 @@ struct
       fmt
 end
 
-let test_skip_list_nat_check_path (basis, i, j) =
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let* i = 0 -- 100 in
+      let* j = 0 -- i in
+      return (basis, i, j))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: produce paths with `back_path` and check"
+    ~count:10
+    generator
+  @@ fun (basis, i, j) ->
   let module M = TestNat (struct
     let basis = basis
   end) in
   let back_path list start stop = M.back_path list start stop in
-  M.check_path i j back_path
+  M.check_path i j back_path ;
+  true
 
-let test_skip_list_nat_check_find (basis, i, j) =
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let* i = 0 -- 100 in
+      let* j = 0 -- i in
+      return (basis, i, j))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: find cell with `find` and `check`"
+    ~count:10
+    generator
+  @@ fun (basis, i, j) ->
   let module M = TestNat (struct
     let basis = basis
   end) in
-  M.check_find i j
+  M.check_find i j ;
+  true
 
-let test_skip_list_nat_check_invalid_find (basis, i) =
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let* i = 0 -- 100 in
+      return (basis, i))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: `find` won't produce invalid value"
+    ~count:10
+    generator
+  @@ fun (basis, i) ->
   let module M = TestNat (struct
     let basis = basis
   end) in
-  M.check_invalid_find i
+  M.check_invalid_find i ;
+  true
 
-let test_skip_list_nat_check_invalid_path (basis, i) =
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let* i = 0 -- 100 in
+      return (basis, i))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: `back_path` won't produce invalid paths"
+    ~count:10
+    generator
+  @@ fun (basis, i) ->
   let module M = TestNat (struct
     let basis = basis
   end) in
-  M.check_invalid_paths i
+  M.check_invalid_paths i ;
+  true
 
-let test_minimal_back_path () =
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"Skip list: check if the back_path is minimal"
+    ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ fun () ->
   let basis = 4 in
   let module M = TestNat (struct
     let basis = basis
@@ -380,18 +436,67 @@ let test_minimal_back_path () =
     (List.map
        (fun (start, target, expected_path) ->
          (M.back_path l start target, expected_path))
-       cases)
+       cases) ;
+  unit
+
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let* i = 0 -- 100 in
+      let* j = 0 -- i in
+      return (basis, i, j))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: produce paths with `search` and check"
+    ~count:10
+    generator
+  @@ fun (basis, i, j) ->
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  M.check_path i j (fun l i j ->
+      let target = M.content_from_index ~default:(-1) l j in
+      let start =
+        match M.deref l i with None -> assert false | Some start -> start
+      in
+      match M.search l start target with
+      | {last_cell = Found _; rev_path} ->
+          List.rev_map
+            (fun cell ->
+              let x = M.content cell in
+              (x - 10) / 2)
+            rev_path
+          |> Option.some
+      | _result -> None) ;
+  true
 
 (* This test ensures that if [j] is part of the skip list, then we can
    produce a path from [i] to [j] without knowing any cell strictly
    below [j]. *)
-let test_search_succeeds_even_if_deref_can_fail (basis, i, j) =
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let* i = pure 100 in
+      let* j = 0 -- i in
+      return (basis, i, j))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: produce a path when deref is partial"
+    ~count:100
+    generator
+  @@ fun (basis, i, j) ->
   let module M = TestNat (struct
     let basis = basis
   end) in
   (* The list is equivalent to [0;1;2;3;...;i]. *)
   let l = M.nlist' basis i in
-  match M.deref l i with
+  (match M.deref l i with
   | None -> Test.fail "Unable to deref initial cell"
   | Some start -> (
       match M.search ~lowest_known_cell:j l start j with
@@ -410,9 +515,35 @@ let test_search_succeeds_even_if_deref_can_fail (basis, i, j) =
              succeeds when [deref] is used on older cells than the
              target one when it exists. Hence, this error should not
              happen. *)
-          Test.fail "Skip_list.search returned 'Deref_returned_none'")
+          Test.fail "Skip_list.search returned 'Deref_returned_none'")) ;
+  true
 
-let test_search_non_minimal_back_path () =
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let* i = 0 -- 10 in
+      return (basis, i))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: `search` won't produce invalid paths"
+    ~count:10
+    generator
+  @@ fun (basis, i) ->
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  M.check_invalid_search_paths i ;
+  true
+
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"Skip list: `search` may not produce minimal path"
+    ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ fun () ->
   let basis = 4 in
   let module M = TestNat (struct
     let basis = basis
@@ -433,7 +564,7 @@ let test_search_non_minimal_back_path () =
   (* Since we are only checking the minimality of the path returned by
      search, we assume the other part of the [search] specification to
      be correct below (hence the [assert false]). *)
-  match M.search l start target with
+  (match M.search l start target with
   | M.{last_cell = Nearest {lower; upper = Some upper}; rev_path} -> (
       match rev_path with
       | [] ->
@@ -466,105 +597,5 @@ let test_search_non_minimal_back_path () =
                 assert false))
   | _ ->
       (* The cell does not exist in the list. *)
-      assert false
-
-let test_skip_list_nat_check_path_with_search (basis, i, j) =
-  let module M = TestNat (struct
-    let basis = basis
-  end) in
-  M.check_path i j (fun l i j ->
-      let target = M.content_from_index ~default:(-1) l j in
-      let start =
-        match M.deref l i with None -> assert false | Some start -> start
-      in
-      match M.search l start target with
-      | {last_cell = Found _; rev_path} ->
-          List.rev_map
-            (fun cell ->
-              let x = M.content cell in
-              (x - 10) / 2)
-            rev_path
-          |> Option.some
-      | _result -> None)
-
-let test_skip_list_nat_check_invalid_path_with_search (basis, i) =
-  let module M = TestNat (struct
-    let basis = basis
-  end) in
-  M.check_invalid_search_paths i
-
-let tests =
-  [
-    tztest_qcheck2
-      ~name:"Skip list: produce paths with `back_path` and check"
-      ~count:10
-      QCheck2.Gen.(
-        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
-        let* i = 0 -- 100 in
-        let* j = 0 -- i in
-        return (basis, i, j))
-      test_skip_list_nat_check_path;
-    tztest_qcheck2
-      ~name:"Skip list: find cell with `find` and `check`"
-      ~count:10
-      QCheck2.Gen.(
-        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
-        let* i = 0 -- 100 in
-        let* j = 0 -- i in
-        return (basis, i, j))
-      test_skip_list_nat_check_find;
-    tztest_qcheck2
-      ~name:"Skip list: `find` won't produce invalid value"
-      ~count:10
-      QCheck2.Gen.(
-        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
-        let* i = 0 -- 100 in
-        return (basis, i))
-      test_skip_list_nat_check_invalid_find;
-    tztest_qcheck2
-      ~name:"Skip list: `back_path` won't produce invalid paths"
-      ~count:10
-      QCheck2.Gen.(
-        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
-        let* i = 0 -- 100 in
-        return (basis, i))
-      test_skip_list_nat_check_invalid_path;
-    Alcotest.test_case
-      "Skip list: check if the back_path is minimal"
-      `Quick
-      test_minimal_back_path;
-    tztest_qcheck2
-      ~name:"Skip list: produce paths with `search` and check"
-      ~count:10
-      QCheck2.Gen.(
-        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
-        let* i = 0 -- 100 in
-        let* j = 0 -- i in
-        return (basis, i, j))
-      test_skip_list_nat_check_path_with_search;
-    tztest_qcheck2
-      ~name:"Skip list: produce a path when deref is partial"
-      ~count:100
-      QCheck2.Gen.(
-        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
-        let* i = pure 100 in
-        let* j = 0 -- i in
-        return (basis, i, j))
-      test_search_succeeds_even_if_deref_can_fail;
-    tztest_qcheck2
-      ~name:"Skip list: `search` won't produce invalid paths"
-      ~count:10
-      QCheck2.Gen.(
-        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
-        let* i = 0 -- 10 in
-        return (basis, i))
-      test_skip_list_nat_check_invalid_path_with_search;
-    (* We cheat here to avoid mixing non-pbt tests with pbt tests. *)
-    tztest_qcheck2
-      ~name:"Skip list: `search` may not produce minimal path"
-      ~count:10
-      QCheck2.Gen.unit
-      test_search_non_minimal_back_path;
-  ]
-
-let () = Alcotest.run ~__FILE__ "Skip_list" [("skip list", tests)]
+      assert false) ;
+  unit

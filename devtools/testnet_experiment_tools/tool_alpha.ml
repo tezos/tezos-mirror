@@ -30,6 +30,7 @@ open Tezos_baking_alpha
 open Tezos_protocol_alpha
 open Protocol
 open Alpha_context
+module Alpha_services = Tezos_protocol_plugin_alpha.Plugin.Alpha_services
 
 (** Sync node *)
 

@@ -7,7 +7,7 @@
     }
     ''
       . $src
-      echo -n $full_opam_repository_tag > $out
+      echo -n $opam_repository_tag > $out
     ''
   );
 in

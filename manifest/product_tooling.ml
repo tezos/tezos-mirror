@@ -12,6 +12,8 @@ open Externals
 
 include Product (struct
   let name = "tooling"
+
+  let source = ["src"; "devtools"]
 end)
 
 let _octez_tooling =
@@ -24,39 +26,9 @@ let _octez_tooling =
       [
         bisect_ppx;
         (* These next are only used in the CI, we add this dependency so that
-           it is added to tezos/opam-repository. *)
+           it is added to images/ci. *)
         ocamlformat;
       ]
-    ~npm_deps:
-      [
-        Npm.make "kaitai-struct" (Version (V.exactly "0.10.0"))
-        (* Client-libs project requires Javascript Kaitai runtime. *);
-      ]
-
-let _node_wrapper =
-  private_exe
-    "node_wrapper"
-    ~path:"src/tooling"
-    ~opam:""
-    ~deps:[unix]
-    ~modules:["node_wrapper"]
-    ~bisect_ppx:No
-
-let octez_tooling_opam_file_format =
-  private_lib
-    "opam_file_format"
-    ~opam:"tezos-tooling"
-    ~path:"src/tooling/opam-lint/opam-file-format-src"
-    ~deps:[unix]
-    ~dune:Dune.[ocamllex "opamLexer"; ocamlyacc "opamBaseParser"]
-
-let _octez_tooling_opam_lint =
-  test
-    "opam_lint"
-    ~alias:""
-    ~path:"src/tooling/opam-lint"
-    ~opam:"tezos-tooling"
-    ~deps:[octez_tooling_opam_file_format; unix]
 
 let _git_gas_diff =
   public_exe
@@ -90,3 +62,22 @@ let _benchmark_tools_purge_disk_cache =
     ~deps:[]
     ~static:false
     ~bisect_ppx:No
+
+let _benchmark_tools_occupy_memory =
+  public_exe
+    "occupy_memory"
+    ~path:"devtools/benchmarks-tools/occupy_memory"
+    ~internal_name:"occupy_memory"
+    ~opam:"tezos-tooling"
+    ~release_status:Unreleased
+    ~deps:[]
+    ~static:false
+    ~bisect_ppx:No
+
+let _octez_proto_manager =
+  public_exe
+    "proto-manager"
+    ~path:"devtools/proto_manager"
+    ~internal_name:"main"
+    ~synopsis:"Tezos protocol manager"
+    ~deps:[unix; cmdliner; re]

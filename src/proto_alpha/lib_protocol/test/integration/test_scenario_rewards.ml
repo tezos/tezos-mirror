@@ -176,6 +176,57 @@ let test_wait_rewards_with_ai_staker_variation =
   --> set_delegate "delegate" (Some "delegate")
   --> wait_n_cycles 4 --> set_baker "delegate" --> wait_n_cycles 10
 
+(** Tests reward distribution under AI for one baker and two stakers,
+    and the baker changes its limit parameter while being overstaked.
+    We expect the rewards for the stakers to change accordingly with the limit.
+*)
+let test_overstake_different_limits =
+  let set_limit l =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.of_float l;
+        edge_of_baking_over_staking = Q.zero;
+      }
+    in
+    set_delegate_params "delegate" params
+  in
+  init_constants ~reward_per_block:1_000_000_007L ()
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
+  --> set_baker "faucet"
+  --> unstake "delegate" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> check_balance_field "delegate" `Staked (Tez.of_mutez 10_000_000_000L)
+  --> set_baker "delegate"
+  (* same rights to have same block distribution *)
+  --> unstake "faucet" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> unstake "__bootstrap__" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> set_limit 5. --> wait_delegate_parameters_activation
+  --> add_account_with_funds
+        "staker1"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_delegate "staker1" (Some "delegate")
+  --> add_account_with_funds
+        "staker2"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_delegate "staker2" (Some "delegate")
+  (* Always overstaked *)
+  --> stake "staker1" (Amount (Tez.of_mutez 111_000_000_000L))
+  --> stake "staker2" (Amount (Tez.of_mutez 222_000_000_000L))
+  --> (Tag "limit = 0" --> set_limit 0.
+      |+ Tag "limit = 0.24" --> set_limit 0.24
+      |+ Tag "limit = 1" --> set_limit 1.
+      |+ Tag "limit >= 5" --> set_limit 6.)
+  (* Before activation: testing global limit (5) *)
+  --> wait_delegate_parameters_activation
+  --> wait_n_cycles 6
+  --> (Tag "limit = 0" --> set_limit 0.
+      |+ Tag "limit = 0.24" --> set_limit 0.24
+      |+ Tag "limit = 1" --> set_limit 1.
+      |+ Tag "limit >= 5" --> set_limit 6.)
+  --> wait_delegate_parameters_activation --> wait_n_cycles 6
+
 (** Tests that the activation time for AI is as expected:
     The expected delay is [consensus_rights_delay] + 1 cycles after activation. *)
 let test_ai_curve_activation_time =
@@ -294,6 +345,215 @@ let test_static_timing =
          --> check_rate_evolution q_almost_equal
          --> next_cycle --> check_rate_evolution Q.lt)
 
+let begin_test_with_rewards_checks ~init_limit =
+  let set_limit name l =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.of_float l;
+        edge_of_baking_over_staking = Q.of_float 0.5;
+      }
+    in
+    set_delegate_params name params
+  in
+  init_constants ~reward_per_block:1_000_000_000L ()
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
+  --> set_baker "delegate"
+  --> add_account_with_funds
+        "staker"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_limit "delegate" init_limit
+  --> set_limit "faucet" 4. --> wait_delegate_parameters_activation
+  --> set_delegate "staker" (Some "delegate")
+  --> snapshot_balances "before staking" ["staker"]
+  --> stake "staker" (Amount (Tez.of_mutez 111_000_000_000L))
+  --> check_snapshot_balances
+        ~f:
+          (Test_scenario_autostaking.assert_balance_evolution
+             ~loc:__LOC__
+             ~for_accounts:["staker"]
+             ~part:`staked
+             Q.gt)
+        "before staking"
+
+let check_finalize_unstake_no_change staker =
+  snapshot_balances "before finalize" [staker]
+  --> finalize_unstake staker
+  --> check_snapshot_balances "before finalize"
+
+let test_rewards_with_limit_change =
+  let set_limit name l =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.of_float l;
+        edge_of_baking_over_staking = Q.of_float 0.5;
+      }
+    in
+    set_delegate_params name params
+  in
+  begin_test_with_rewards_checks ~init_limit:5.
+  --> set_limit "delegate" 0.
+  --> wait_cycle_until `right_before_delegate_parameters_activation
+  --> snapshot_balances "old limit" ["staker"]
+  --> next_cycle
+  (* The last cycle when the staker gets rewards *)
+  --> check_snapshot_balances
+        ~f:
+          (Test_scenario_autostaking.assert_balance_evolution
+             ~loc:__LOC__
+             ~for_accounts:["staker"]
+             ~part:`staked
+             Q.gt)
+        "old limit"
+  --> snapshot_balances "limit = 0" ["staker"]
+  --> next_cycle
+  (* The staker does not get rewards *)
+  --> check_snapshot_balances "limit = 0"
+  --> Test_scenario_stake.fail_to_stake_refuse_external_staking
+        ~loc:__LOC__
+        "staker"
+        ~amount:(Amount (Tez.of_mutez 222_000_000_000L))
+  --> (Tag "unstake" --> unstake "staker" All
+       --> check_finalize_unstake_no_change "staker"
+       --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+       --> Test_scenario_stake.finalize "staker"
+      |+ Tag "change delegate"
+         --> set_delegate "staker" (Some "faucet")
+         --> check_balance_field "staker" `Staked Tez.zero
+         --> check_finalize_unstake_no_change "staker"
+         --> Test_scenario_stake
+             .fail_to_stake_with_unfinalizable_unstake_requests
+               ~loc:__LOC__
+               "staker"
+               ~amount:(Amount (Tez.of_mutez 10_000_000_000L))
+         --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+         --> assert_failure_in_check_balance_field
+               ~loc:__LOC__
+               "staker"
+               `Unstaked_finalizable
+               Tez.zero
+         --> (Tag "finalize" --> finalize_unstake "staker"
+             |+ Tag "don't finalize, stake"
+                --> stake "staker" (Amount (Tez.of_mutez 10_000_000_000L)))
+         --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+
+let test_stake_with_unfinalizable_unstake_requests =
+  begin_test_with_rewards_checks ~init_limit:5.
+  --> set_delegate "staker" (Some "faucet")
+  --> check_balance_field "staker" `Staked Tez.zero
+  --> check_finalize_unstake_no_change "staker"
+  --> Test_scenario_stake.fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:(Amount (Tez.of_mutez 10_000_000_000L))
+  --> next_cycle
+  (* Staker can stake with the old delegate with which he has
+     unfinalizable unstake requests *)
+  --> set_delegate "staker" (Some "delegate")
+  --> stake "staker" (Amount (Tez.of_mutez 50_000_000_000L))
+
+let check_overstaked_status ~loc ~expected delegate =
+  let open Lwt_result_syntax in
+  exec_unit (fun (block, state) ->
+      let dlgt = State.find_account delegate state in
+      let* info = Context.Delegate.info (B block) dlgt.pkh in
+      let* staked_balance =
+        Context.Contract.staked_balance (B block) dlgt.contract
+      in
+      let staked_balance = Option.value ~default:Tez.zero staked_balance in
+      let overstaked_limit =
+        Tez.(
+          of_q
+            ~round:`Up
+            (mul_q staked_balance dlgt.parameters.limit_of_staking_over_baking))
+      in
+      let is_overstaked = Tez.(overstaked_limit < info.total_delegated_stake) in
+      Log.debug "total_delegated_stake = %a" Tez.pp info.total_delegated_stake ;
+      Log.debug
+        "limit_of_staking_over_baking = %a"
+        Q.pp_print
+        dlgt.parameters.limit_of_staking_over_baking ;
+      Log.debug "staked_balance = %a" Tez.pp staked_balance ;
+      Log.debug
+        "The diff is %a"
+        Tez.pp
+        (if is_overstaked then
+           Tez.(info.total_delegated_stake -! overstaked_limit)
+         else Tez.(overstaked_limit -! info.total_delegated_stake)) ;
+      Assert.equal_bool ~loc is_overstaked expected)
+
+let test_overstake =
+  let set_edge pct =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.of_float pct;
+      }
+    in
+    set_delegate_params "delegate" params
+  in
+  let check_rewards ~loc ~snapshot_name name (diff : Q.t) =
+    let gt_diff (diff : Q.t) new_b old_b = Q.equal new_b (Q.add old_b diff) in
+    check_snapshot_balances
+      ~f:
+        (Test_scenario_autostaking.assert_balance_evolution
+           ~loc
+           ~for_accounts:[name]
+           ~part:`staked
+           (gt_diff diff))
+      snapshot_name
+  in
+  let next_block_with_check_rewards ~loc ~staker_diff ~delegate_diff =
+    snapshot_balances "1 block" ["staker"]
+    --> snapshot_balances "1 block-d" ["delegate"]
+    --> next_block
+    --> check_rewards ~loc ~snapshot_name:"1 block" "staker" staker_diff
+    --> check_rewards ~loc ~snapshot_name:"1 block-d" "delegate" delegate_diff
+  in
+  begin_test_with_rewards_checks ~init_limit:3.
+  --> next_block_with_check_rewards
+        ~loc:__LOC__
+        ~staker_diff:(Q.of_int32 30_516l)
+        ~delegate_diff:(Q.of_int32 141_452l)
+  --> next_block_with_check_rewards
+        ~loc:__LOC__
+        ~staker_diff:(Q.of_int32 30_516l)
+        ~delegate_diff:(Q.of_int32 141_452l)
+  --> add_account_with_funds
+        "staker2"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 600_000_000_000L))
+  --> set_delegate "staker2" (Some "delegate")
+  --> stake "staker2" (Amount (Tez.of_mutez 222_000_000_000L))
+  --> next_block_with_check_rewards
+        ~loc:__LOC__
+        ~staker_diff:
+          (Q.make (Z.of_int64 123_818_187_500_000L) (Z.of_int64 6_937_492_371L))
+          (* = 12466.3429088 *)
+        ~delegate_diff:(Q.of_int32 118_425l)
+  --> check_overstaked_status ~loc:__LOC__ ~expected:false "delegate"
+  --> stake "staker2" (Amount (Tez.of_mutez 300_000_000_000L))
+  --> check_overstaked_status ~loc:__LOC__ ~expected:true "delegate"
+  --> next_block_with_check_rewards
+        ~loc:__LOC__
+        ~staker_diff:
+          (Q.make (Z.of_int64 89_477_100_000_000L) (Z.of_int64 7_912_488_031L))
+          (* = 7898.71925 *)
+        ~delegate_diff:(Q.of_int32 107_480l)
+  --> set_edge 0.8 --> wait_delegate_parameters_activation
+  --> set_delegate "staker2" (Some "faucet")
+  --> check_overstaked_status ~loc:__LOC__ ~expected:false "delegate"
+  --> next_block_with_check_rewards
+        ~loc:__LOC__
+        ~staker_diff:(Q.of_int32 34_603l)
+        ~delegate_diff:(Q.of_int32 452_898l)
+  --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+  --> next_block_with_check_rewards
+        ~loc:__LOC__
+        ~staker_diff:(Q.of_int32 17_858l)
+        ~delegate_diff:(Q.of_int32 233_748l)
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -308,6 +568,12 @@ let tests =
          test_static_decreasing );
        ( "Test static rate updated after consensus_rights_delay",
          test_static_timing );
+       ( "Test limit parameter with overstake and rewards",
+         test_overstake_different_limits );
+       ("Test rewards with limit change", test_rewards_with_limit_change);
+       ( "Test stake with unfinalizable unstake requests",
+         test_stake_with_unfinalizable_unstake_requests );
+       ("Test overstake", test_overstake);
      ]
 
 let () =

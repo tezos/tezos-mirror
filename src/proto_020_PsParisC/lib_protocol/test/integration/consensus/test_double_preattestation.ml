@@ -152,11 +152,11 @@ end = struct
     let* bal_good = Context.Delegate.full_balance (B bgood) d1 in
     let* bal_bad = Context.Delegate.full_balance (B bbad) d1 in
     (* the diff of the two balances in normal and in denunciation cases *)
-    let diff_end_bal = Test_tez.(bal_good -! bal_bad) in
+    let diff_end_bal = Tez_helpers.(bal_good -! bal_bad) in
     (* amount lost due to denunciation *)
     let Q.{num; den} = Percentage.to_q p in
     let lost_deposit =
-      Test_tez.(frozen_deposit *! Z.to_int64 num /! Z.to_int64 den)
+      Tez_helpers.(frozen_deposit *! Z.to_int64 num /! Z.to_int64 den)
     in
     (* some of the lost deposits (depending on staking constants) will be earned by the baker *)
     let divider =
@@ -166,11 +166,11 @@ end = struct
            constants.parametric.adaptive_issuance
              .global_limit_of_staking_over_baking)
     in
-    let denun_reward = Test_tez.(lost_deposit /! divider) in
+    let denun_reward = Tez_helpers.(lost_deposit /! divider) in
     (* if the baker is the attester, he'll only loose half of the deposits *)
     let expected_attester_loss =
       if Signature.Public_key_hash.equal baker d1 then
-        Test_tez.(lost_deposit -! denun_reward)
+        Tez_helpers.(lost_deposit -! denun_reward)
       else lost_deposit
     in
     let* () =
@@ -188,7 +188,7 @@ end = struct
       if Signature.Public_key_hash.equal baker d1 then (bal_good, bal_bad)
       else (bal_bad, bal_good)
     in
-    let diff_baker = Test_tez.(high -! low) in
+    let diff_baker = Tez_helpers.(high -! low) in
     (* the baker has either earnt or lost (in case baker = d1) half of burnt
        attestation deposits *)
     let* () = Assert.equal_tez ~loc:__LOC__ denun_reward diff_baker in

@@ -1,4 +1,15 @@
-(tests
- (names test_bson_relaxation)
- (libraries json-data-encoding json-data-encoding-bson crowbar alcotest)
- (package json-data-encoding-bson))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_bson_relaxation)
+ (libraries
+  crowbar
+  alcotest
+  octez-libs.json-data-encoding
+  octez-libs.json-data-encoding-bson))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./test_bson_relaxation.exe})))

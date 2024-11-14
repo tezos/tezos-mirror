@@ -13,9 +13,8 @@ depends: [
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
-  "octez-protocol-018-Proxford-libs" { = version }
-  "octez-protocol-019-PtParisB-libs" { = version }
   "octez-protocol-020-PsParisC-libs" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
 ]
 depopts: [
   "tezos-client-genesis"
@@ -38,6 +37,8 @@ depopts: [
   "octez-protocol-015-PtLimaPt-libs"
   "octez-protocol-016-PtMumbai-libs"
   "octez-protocol-017-PtNairob-libs"
+  "octez-protocol-018-Proxford-libs"
+  "octez-protocol-019-PtParisB-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -61,6 +62,8 @@ conflicts: [
   "octez-protocol-015-PtLimaPt-libs" { != version }
   "octez-protocol-016-PtMumbai-libs" { != version }
   "octez-protocol-017-PtNairob-libs" { != version }
+  "octez-protocol-018-Proxford-libs" { != version }
+  "octez-protocol-019-PtParisB-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

@@ -10,12 +10,9 @@
   octez-libs.base
   octez-libs.version
   index
-  octez-internal-libs.irmin_pack
   octez-shell-libs.store.shared
   octez-proto-libs.protocol-environment
-  octez-libs.tezos-context
   octez-shell-libs.context-ops
-  octez-shell-libs.shell-context
   octez-shell-libs.validation
   octez-shell-libs.protocol-updater
   octez-libs.stdlib-unix
@@ -27,7 +24,9 @@
   camlzip
   tar
   tar-unix
-  prometheus)
+  octez-libs.prometheus)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_shell_services
@@ -35,7 +34,6 @@
   -open Tezos_base.TzPervasives
   -open Tezos_store_shared
   -open Tezos_protocol_environment
-  -open Tezos_context
   -open Tezos_context_ops
   -open Tezos_validation
   -open Tezos_protocol_updater

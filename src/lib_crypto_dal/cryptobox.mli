@@ -59,7 +59,10 @@ open Cryptobox_intf
     almost proportional to the length [n] of the slot encoded with the MDS
     code: we've chosen and implemented a technique to produce the proofs in
     time [O(n log n)]
-    (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}). *)
+    (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}).
+    
+    More diverse details about the formalization are provided here :
+    https://hackmd.io/36XUZUo7QqK5Ub6GvZmgOg *)
 
 (** Initial values for the parameters of the DAL cryptographic primitives.
     It used to build a value of type [t]. *)
@@ -490,11 +493,6 @@ module Internal_for_tests : sig
       verifier using default parameters designed to handle test cases. *)
   val init_verifier_dal : unit -> unit
 
-  (** This function loads in memory the default verifier SRS. The
-      difference with [init_verifier_dal] is that the latter loads a
-      SRS that should be only used for tests. *)
-  val init_verifier_dal_default : unit -> unit
-
   (** Returns a randomized valid sequence of shards using the random state
      [state] for the given parameters. *)
   val make_dummy_shards : t -> state:Random.State.t -> shard Seq.t
@@ -572,42 +570,22 @@ module Internal_for_tests : sig
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
-
-   This configuration module is currently used by each process that
-   needs to initialize DAL. Given that in the default case [init_dal]
-   may take several seconds, it would be better to call this function
-   only once. *)
+(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the DAL
+    in "prover" mode, given the function [find_srs_files] to find the SRS files,
+    and the optional log2 of the SRS size [srs_size_log2]. Note that the both
+    proving & verifying functions can be used with this setup. If this function
+    is not called only verifying functions are available. *)
+val init_prover_dal :
+  find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+  ?srs_size_log2:int ->
+  unit ->
+  unit Error_monad.tzresult Lwt.t
 
 (** node parameters for the DAL. *)
 module Config : sig
-  type t = Dal_config.t = {
-    activated : bool;
-    use_mock_srs_for_testing : bool;
-    bootstrap_peers : string list;
-  }
+  type t = Dal_config.t = {activated : bool; bootstrap_peers : string list}
 
   val encoding : t Data_encoding.t
 
   val default : t
-
-  (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the
-     DAL according to the dal configuration [config], a function to find the SRS
-     files [find_trusted_setup_files] and the optional log2 of the SRS size
-     [srs_size_log2].
-
-      When [config.use_mock_srs_for_testing = false],
-     [init_dal] loads [initialisation_parameters] from the files at the
-     paths provided by [find_trusted_setup_files ()]. It is important that
-     every time the primitives above are used, they are used with the very
-     same initialization parameters. (To ensure this property, an integrity
-     check is run.) In this case, [init_dal] can take several seconds
-     to run. *)
-  val init_verifier_dal : t -> unit Error_monad.tzresult
-
-  val init_prover_dal :
-    find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
-    ?srs_size_log2:int ->
-    t ->
-    unit Error_monad.tzresult Lwt.t
 end

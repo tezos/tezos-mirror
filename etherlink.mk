@@ -8,6 +8,11 @@ EVM_DIR=etherlink/kernel_evm
 EVM_KERNEL_PREIMAGES=_evm_installer_preimages
 EVM_UNSTRIPPED_KERNEL_PREIMAGES=_evm_unstripped_installer_preimages
 
+NATIVE_TARGET ?=
+ifneq ($(NATIVE_TARGET),)
+NATIVE_OPT := --target "$(NATIVE_TARGET)"
+endif
+
 .PHONY: all
 all: build-dev-deps check test build
 
@@ -110,3 +115,7 @@ clean:
 sequencer.wasm::
 	@${MAKE} -f etherlink.mk EVM_CONFIG=etherlink/config/sequencer.yaml evm_installer.wasm
 	@cp evm_installer.wasm sequencer.wasm
+
+octez-dsn-node:
+	@cd etherlink/bin_dsn_node; cargo build --release $(NATIVE_OPT)
+	@cp etherlink/bin_dsn_node/target/$(NATIVE_TARGET)/release/dsn-node octez-dsn-node

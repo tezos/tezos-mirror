@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Sc_rollup_helpers
+
 let evm_type =
   "or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes"
 
@@ -47,20 +49,50 @@ let mapping_position index map_position =
 
 let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
 
+let hex_256_of_int n = Printf.sprintf "%064x" n
+
 let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
   Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node
 
+let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
+  match Evm_node.mode evm_node with
+  | Sandbox _ | Sequencer _ -> Rpc.produce_block ?timestamp evm_node
+  | Threshold_encryption_sequencer {time_between_blocks; _} -> (
+      let open Rpc.Syntax in
+      let*@ current_number = Rpc.block_number evm_node in
+      let wait_blueprint =
+        if wait_on_blueprint_applied then
+          Evm_node.wait_for_blueprint_applied
+            evm_node
+            (Int32.to_int current_number + 1)
+        else unit
+      in
+      let* res =
+        (* if time_between_blocks is not Nothing, then it is unsafe
+           so make a produce_proposal request as the proposal handler might
+           be locked, in which case the threshold encryption sequencer will fail. *)
+        if time_between_blocks = Some Nothing then
+          Rpc.produce_proposal ?timestamp evm_node
+        else return @@ Ok ()
+      and* () = wait_blueprint in
+      match res with Ok () -> return (Ok 0) | Error res -> return (Error res))
+  | _ -> assert false
+
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
-  | Proxy _ ->
+  | Proxy ->
       let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
       unit
-  | Sequencer _ ->
+  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ ->
       let open Rpc.Syntax in
-      let*@ _l2_level = Rpc.produce_block evm_node in
+      let*@ _l2_level = produce_block evm_node in
       unit
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
+  | Rpc _ -> Test.fail "Cannot create a new level with a Rpc node"
+  | Threshold_encryption_observer _ ->
+      Test.fail
+        "Cannot create a new level with a Threshold encryption observer node"
 
 let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
 
@@ -111,13 +143,16 @@ let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-  unit
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  return root_hash
 
 let check_block_consistency ~left ~right ?error_msg ~block () =
   let open Rpc.Syntax in
   let block =
-    match block with `Latest -> "latest" | `Level l -> Int32.to_string l
+    match block with
+    | `Latest -> "latest"
+    | `Level l -> Int32.to_string l
+    | `Finalized -> "finalized"
   in
   let error_msg =
     Option.value
@@ -161,27 +196,52 @@ let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
   in
   Client.bake_for_and_wait ~keys:[] client
 
-let bake_until_sync ?(timeout = 30.) ~sc_rollup_node ~proxy ~sequencer ~client
-    () =
-  let open Rpc.Syntax in
-  let rec go () =
-    let*@ proxy_level_opt = Rpc.block_number_opt proxy in
+let bake_until ?__LOC__ ?(timeout_in_blocks = 20) ?(timeout = 30.) ~bake
+    ~result_f () =
+  let res = ref None in
+  let rec go counter_block =
+    let* opt = result_f () in
+    match opt with
+    | Some x ->
+        res := Some x ;
+        unit
+    | None ->
+        if counter_block > timeout_in_blocks then
+          Test.fail
+            ?__LOC__
+            "Bake until has baked more than %d blocks but the condition is \
+             still false."
+            timeout_in_blocks
+        else
+          let* _ = bake () in
+          go (counter_block + 1)
+  in
+  let* () = Lwt.pick [go 0; Lwt_unix.sleep timeout] in
+  match !res with
+  | Some x -> return x
+  | None -> Test.fail ?__LOC__ "Bake until failed with a timeout"
+
+let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
+    ~sequencer ~client () =
+  let bake () =
+    let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+    unit
+  in
+  let result_f () =
+    let open Rpc.Syntax in
+    let* proxy_level_opt = Rpc.block_number_opt proxy in
     let*@ sequencer_level = Rpc.block_number sequencer in
     match proxy_level_opt with
-    | None ->
-        let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
-        go ()
-    | Some proxy_level ->
+    | Error _ | Ok None -> Lwt.return_none
+    | Ok (Some proxy_level) ->
         if sequencer_level < proxy_level then
           Test.fail
             ~loc:__LOC__
             "rollup node has more recent block. Not supposed to happened "
-        else if sequencer_level = proxy_level then unit
-        else
-          let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
-          go ()
+        else if sequencer_level = proxy_level then return @@ Some ()
+        else Lwt.return_none
   in
-  Lwt.pick [go (); Lwt_unix.sleep timeout]
+  bake_until ?__LOC__ ?timeout_in_blocks ?timeout ~bake ~result_f ()
 
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]
@@ -207,24 +267,24 @@ let wait_for_transaction_receipt ?(count = 3) ~evm_node ~transaction_hash () =
   in
   loop count
 
-let wait_for_application ~evm_node ~sc_rollup_node ~client apply =
+let wait_for_application ~produce_block apply =
+  let open Rpc.Syntax in
   let max_iteration = 10 in
   let application_result = apply () in
   let rec loop current_iteration =
     let* () = Lwt_unix.sleep 5. in
-    let* () = next_evm_level ~evm_node ~sc_rollup_node ~client in
+    let*@ _ = produce_block () in
     if max_iteration < current_iteration then
       Test.fail
         "Baked more than %d blocks and the operation's application is still \
          pending"
         max_iteration ;
-    if Lwt.state application_result = Lwt.Sleep then loop (current_iteration + 1)
-    else unit
+    match Lwt.state application_result with
+    | Lwt.Return value -> Lwt.return value
+    | Lwt.Fail exn -> raise exn
+    | Lwt.Sleep -> loop (current_iteration + 1)
   in
-  (* Using [Lwt.both] ensures that any exception thrown in [tx_hash] will be
-     thrown by [Lwt.both] as well. *)
-  let* result, () = Lwt.both application_result (loop 0) in
-  return result
+  Lwt.pick [application_result; loop 0]
 
 let batch_n_transactions ~evm_node txs =
   let requests =
@@ -242,19 +302,173 @@ let batch_n_transactions ~evm_node txs =
   return (requests, hashes)
 
 (* sending more than ~300 tx could fail, because or curl *)
-let send_n_transactions ~sc_rollup_node ~client ~evm_node ?wait_for_blocks txs =
+let send_n_transactions ~produce_block ~evm_node ?wait_for_blocks txs =
   let* requests, hashes = batch_n_transactions ~evm_node txs in
   let first_hash = List.hd hashes in
   (* Let's wait until one of the transactions is injected into a block, and
       test this block contains the `n` transactions as expected. *)
   let* receipt =
     wait_for_application
-      ~evm_node
-      ~sc_rollup_node
-      ~client
+      ~produce_block
       (wait_for_transaction_receipt
          ?count:wait_for_blocks
          ~evm_node
          ~transaction_hash:first_hash)
   in
   return (requests, receipt, hashes)
+
+let default_bootstrap_account_balance = Wei.of_eth_int 9999
+
+let l1_timestamp client =
+  let* l1_header = Client.RPC.call client @@ RPC.get_chain_block_header () in
+  return
+    JSON.(
+      l1_header |-> "timestamp" |> as_string
+      |> Tezos_base.Time.Protocol.of_notation_exn)
+
+let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
+    ~commitment_period ~challenge_window ~evm_node ~sc_rollup_node
+    ~sc_rollup_address ~client () =
+  (* Bake enough levels to have a commitment and cement it. *)
+  let* _ =
+    repeat
+      ((commitment_period * challenge_window) + 3)
+      (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  (* Construct and execute the outbox proof. *)
+  let find_outbox level =
+    let rec aux level' =
+      if level' > level + outbox_lookup_depth then
+        Test.fail
+          "Looked for an outbox for %d levels, stopping the loop"
+          outbox_lookup_depth
+      else
+        let* outbox =
+          Sc_rollup_node.RPC.call sc_rollup_node
+          @@ Sc_rollup_rpc.get_global_block_outbox ~outbox_level:level' ()
+        in
+        if
+          JSON.is_null outbox
+          || (JSON.is_list outbox && JSON.as_list outbox = [])
+        then aux (level' + 1)
+        else return (JSON.as_list outbox |> List.length, level')
+    in
+    aux level
+  in
+  let* size, withdrawal_level = find_outbox withdrawal_level in
+  let execute_withdrawal withdrawal_level message_index =
+    let* outbox_proof =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.outbox_proof_simple
+           ~message_index
+           ~outbox_level:withdrawal_level
+           ()
+    in
+    let Sc_rollup_rpc.{proof; commitment_hash} =
+      match outbox_proof with
+      | Some r -> r
+      | None -> Test.fail "No outbox proof found for the withdrawal"
+    in
+    let*! () =
+      Client.Sc_rollup.execute_outbox_message
+        ~hooks
+        ~burn_cap:(Tez.of_int 10)
+        ~rollup:sc_rollup_address
+          (* Execute with bootstrap5 as tests in general use bootstrap1 for the
+             rollup node operators. We might break the 1M rule if we use
+             the same key. *)
+        ~src:Constant.bootstrap5.alias
+        ~commitment_hash
+        ~proof
+        client
+    in
+    let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
+    unit
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun message_index -> execute_withdrawal withdrawal_level message_index)
+      (List.init size Fun.id)
+  in
+  return withdrawal_level
+
+let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?patch_config ?(kernel = Constant.WASM.evm_kernel)
+    ?(bootstrap_accounts =
+      List.map
+        (fun account -> account.Eth_account.address)
+        (Array.to_list Eth_account.bootstrap_accounts)) () =
+  let wallet_dir = Temp.dir "wallet" in
+  let output_config = Temp.file "config.yaml" in
+  let preimages_dir = Temp.dir "wasm_2_0_0" in
+
+  let*! () =
+    Evm_node.make_kernel_installer_config
+      ?set_account_code
+      ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
+      ~output:output_config
+      ~bootstrap_accounts
+      ()
+  in
+  let* {output; _} =
+    Sc_rollup_helpers.prepare_installer_kernel
+      ~preimages_dir
+      ~config:(`Path output_config)
+      kernel
+  in
+  let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
+  let sequencer_mode =
+    Evm_node.Sandbox
+      {
+        initial_kernel = output;
+        preimage_dir = Some preimages_dir;
+        private_rpc_port = Some (Port.fresh ());
+        time_between_blocks = Some Nothing;
+        genesis_timestamp = None;
+        max_number_of_chunks = None;
+        wallet_dir = Some wallet_dir;
+        tx_pool_timeout_limit = None;
+        tx_pool_addr_limit = None;
+        tx_pool_tx_per_addr_limit = None;
+      }
+  in
+  Evm_node.init ?patch_config ~mode:sequencer_mode Uri.(empty |> to_string)
+
+(* Send the transaction but doesn't wait to be mined and does not
+   produce a block after sending the transaction. *)
+let send_transaction_to_sequencer_dont_produce_block
+    (transaction : unit -> 'a Lwt.t) sequencer =
+  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+  let transaction = transaction () in
+  let* _ = wait_for in
+  Lwt.return transaction
+
+let send_transactions_to_sequencer ~(sends : (unit -> 'a Lwt.t) list) sequencer
+    =
+  let open Rpc.Syntax in
+  let* res =
+    Lwt_list.map_s
+      (fun tx -> send_transaction_to_sequencer_dont_produce_block tx sequencer)
+      sends
+  in
+  (* Once the transactions are in the transaction pool the next block
+     will include them. *)
+  let*@ n = produce_block sequencer in
+  (* Resolve the transactions sends to make sure they were included. *)
+  let* transactions = Lwt.all res in
+  Lwt.return (n, transactions)
+
+let send_transaction_to_sequencer (transaction : unit -> 'a Lwt.t) sequencer =
+  let open Rpc.Syntax in
+  let* transaction =
+    send_transaction_to_sequencer_dont_produce_block transaction sequencer
+  in
+  (* Once the transaction us in the transaction pool the next block
+     will include it. *)
+  let*@ _ = produce_block sequencer in
+  (* Resolve the transaction sends to make sure they were included. *)
+  transaction

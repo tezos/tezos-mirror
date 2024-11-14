@@ -38,6 +38,8 @@
    These test have disabled by adding the tag [ci_disabled] due to consistent failures.
 *)
 
+let team = Team.layer1
+
 (*
 
    Helpers
@@ -276,6 +278,7 @@ let check ?(tags = []) label test ~protocol ~executors =
     ~__FILE__
     ~title:(sf "(%s) Cache: %s" (Protocol.name protocol) label)
     ~tags:(["cache"] @ tags)
+    ~team
     ~timeout:(Minutes 2000)
     ~executors
   @@ test
@@ -688,6 +691,7 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
          (Protocol.name migrate_from)
          (Protocol.name migrate_to))
     ~tags:["cache"; "simulation"; "user"; "upgrade"; Tag.ci_disabled]
+    ~team
     ~timeout:(Minutes 2000)
     ~executors
   @@ fun () ->
@@ -787,6 +791,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
          (Protocol.name migrate_from)
          (Protocol.name migrate_to))
     ~tags:["cache"; "simulation"; "auto"; "upgrade"; Tag.ci_disabled]
+    ~team
     ~timeout:(Minutes 2000)
     ~executors
   @@ fun () ->

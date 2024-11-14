@@ -71,5 +71,21 @@ val decode_result :
   item ->
   ('a, 'b) result tzresult
 
+(** [decode_value decode item] decodes an encapsulated value. *)
+val decode_value : (bytes -> 'a tzresult) -> item -> 'a tzresult
+
+(** [decode_list decode_item list_item] decodes a list using [decode_item] on 
+   each list element. *)
+val decode_list : (item -> 'a tzresult) -> item -> 'a list tzresult
+
+(** [filter_decode_list filter_decode list] decodes and filter the item in a list:
+    If [filter_decode item] is [None] then the item is filtered out, else it's 
+    decoded. Based on [List.filter_map] so slightly faster than two steps. *)
+val filter_decode_list : (item -> 'a option) -> item -> 'a list tzresult
+
+(** [decode_as_bytes item] returns the bytes of [item] if it's a value, and 
+    returns a {!Rlp_decoding_error} if it's a list. *)
+val decode_as_bytes : item -> bytes tzresult
+
 (** [pp ppf item] pretty-prints an item. *)
 val pp : Format.formatter -> item -> unit

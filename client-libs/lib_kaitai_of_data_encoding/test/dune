@@ -6,7 +6,7 @@
  (package kaitai-of-data-encoding)
  (libraries
   yaml
-  data-encoding
+  octez-libs.data-encoding
   kaitai
   kaitai-of-data-encoding)
  (inline_tests (flags -verbose) (modes native))

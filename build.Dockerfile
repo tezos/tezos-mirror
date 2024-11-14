@@ -1,9 +1,10 @@
-ARG BASE_IMAGE=registry.gitlab.com/tezos/opam-repository
+ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION
-ARG RUST_TOOLCHAIN_IMAGE
+ARG RUST_TOOLCHAIN_IMAGE_NAME
 ARG RUST_TOOLCHAIN_IMAGE_TAG
 
-FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as without-evm-artifacts
+# hadolint ignore=DL3006
+FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as without-evm-artifacts
 # use alpine /bin/ash and set pipefail.
 # see https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
@@ -23,8 +24,11 @@ COPY --chown=tezos:nogroup script-inputs/experimental-executables tezos/script-i
 COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
+COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup irmin tezos/irmin
+COPY --chown=tezos:nogroup brassaia tezos/brassaia
+COPY --chown=tezos:nogroup data-encoding tezos/data-encoding
 COPY --chown=tezos:nogroup etherlink tezos/etherlink
 COPY --chown=tezos:nogroup tezt tezos/tezt
 COPY --chown=tezos:nogroup opam tezos/opam
@@ -32,6 +36,11 @@ COPY --chown=tezos:nogroup dune tezos/dune
 COPY --chown=tezos:nogroup dune-workspace tezos/dune-workspace
 COPY --chown=tezos:nogroup dune-project tezos/dune-project
 COPY --chown=tezos:nogroup vendors tezos/vendors
+COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
+COPY --chown=tezos:nogroup cohttp tezos/cohttp
+COPY --chown=tezos:nogroup resto tezos/resto
+COPY --chown=tezos:nogroup prometheus tezos/prometheus
+COPY --chown=tezos:nogroup teztale tezos/teztale
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
 ENV GIT_VERSION=${GIT_VERSION}
@@ -42,7 +51,7 @@ RUN while read -r protocol; do \
     cp tezos/src/proto_"$(echo "$protocol" | tr - _)"/parameters/*.json tezos/parameters/"$protocol"-parameters; \
     done < tezos/script-inputs/active_protocol_versions
 
-FROM ${RUST_TOOLCHAIN_IMAGE}:${RUST_TOOLCHAIN_IMAGE_TAG} AS layer2-builder
+FROM ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} AS layer2-builder
 WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/

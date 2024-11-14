@@ -7,12 +7,10 @@
   octez-libs.micheline
   octez-libs.base
   octez-shell-libs.store
-  tezos-protocol-018-Proxford.protocol
-  octez-protocol-018-Proxford-libs.client
-  tezos-protocol-019-PtParisB.protocol
-  octez-protocol-019-PtParisB-libs.client
   tezos-protocol-020-PsParisC.protocol
   octez-protocol-020-PsParisC-libs.client
+  tezos-protocol-021-PsQuebec.protocol
+  octez-protocol-021-PsQuebec-libs.client
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))

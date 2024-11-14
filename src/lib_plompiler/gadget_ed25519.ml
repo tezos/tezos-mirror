@@ -269,7 +269,8 @@ module Ed25519 = struct
         in
         Num.range_check ~nb_bits:253 order_minus_s
         >* with_label ~label:"Ed25519.verify"
-           @@ (* h <- H (compressed (R) || compressed (pk) || msg ) *)
+           @@
+           (* h <- H (compressed (R) || compressed (pk) || msg ) *)
            let* h = compute_h msg pk r in
            (* NOTE: we do not reduce a result of compute_h modulo Curve.Scalar.order *)
            with_label ~label:"Ed25519.scalar_mul"

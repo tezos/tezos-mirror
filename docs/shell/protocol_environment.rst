@@ -76,10 +76,10 @@ protocol P2 built on environment Y fails unless X ≤ Y.
 
 Some examples of prior environment switches can be found within past protocol changelogs:
 
- - :doc:`Edo - environment V1 <../protocols/008_edo>`
- - :doc:`Hangzhou - environment V3 <../protocols/011_hangzhou>`
- - :doc:`Ithaca - environment V4 <../protocols/012_ithaca>`
- - :doc:`Jakarta - environment V5 <../protocols/013_jakarta>`
- - :doc:`Kathmandu - environment V6 <../protocols/014_kathmandu>`
+- :doc:`Edo - environment V1 <../protocols/008_edo>`
+- :doc:`Hangzhou - environment V3 <../protocols/011_hangzhou>`
+- :doc:`Ithaca - environment V4 <../protocols/012_ithaca>`
+- :doc:`Jakarta - environment V5 <../protocols/013_jakarta>`
+- :doc:`Kathmandu - environment V6 <../protocols/014_kathmandu>`
 
 For how to prepare and implement an environment switch, see :doc:`../developer/protocol_environment_upgrade`.

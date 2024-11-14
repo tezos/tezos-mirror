@@ -419,9 +419,11 @@ let group_commands commands =
 let print_group print_command ppf ({title; _}, commands) =
   Format.fprintf
     ppf
-    "@{<title>%s@}@,@{<list>%a@}"
+    "@{<title>%s@}@,@,@{<list>%a@}"
     title
-    (Format.pp_print_list print_command)
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@,")
+       print_command)
     commands
 
 type formatter_state =
@@ -740,35 +742,56 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
       (print_group (fun ppf (Ex command) ->
            print_command ?prefix:None ~highlights ppf command))
   in
+  let pp_print_global_options ppf = function
+    | Constant _ -> ()
+    | global_options ->
+        Format.fprintf
+          ppf
+          "@{<title>Global options (must come before the command)@}@,\
+           @{<commanddoc>%a@}%a"
+          print_options_detailed
+          global_options
+          (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,")
+          ()
+  in
+  let pp_print_global_options_usage ppf = function
+    | Constant _ -> ()
+    | _ -> Format.fprintf ppf " [@{<opt>global options@}]"
+  in
   Format.fprintf
     ppf
     "@{<document>@{<title>Usage@}@,\
-     @{<list>@{<command>@{<commandline>%s [@{<opt>global options@}] \
-     @{<kwd>command@} [@{<opt>command options@}]@}@}@,\
+     @{<list>@{<command>@{<commandline>%s%a @{<kwd>command@} [@{<opt>command \
+     options@}]@}@}@,\
      @{<command>@{<commandline>%s @{<opt>--help@} (for global options)@}@}@,\
-     @{<command>@{<commandline>%s [@{<opt>global options@}] @{<kwd>command@} \
-     @{<opt>--help@} (for command options)@}@}@,\
+     @{<command>@{<commandline>%s%a @{<kwd>command@} @{<opt>--help@} (for \
+     command options)@}@}@,\
      @{<command>@{<commandline>%s @{<opt>--version@} (for version \
      information)@}@}@}@,\
      @,\
      @{<title>To browse the documentation@}@,\
-     @{<list>@{<command>@{<commandline>%s [@{<opt>global options@}] \
-     @{<kwd>man@} (for a list of commands)@}@}@,\
-     @{<command>@{<commandline>%s [@{<opt>global options@}] @{<kwd>man@} \
-     @{<opt>-v 3@} (for the full manual)@}@}@}@,\
+     @{<list>@{<command>@{<commandline>%s%a @{<kwd>man@} (for a list of \
+     commands)@}@}@,\
+     @{<command>@{<commandline>%s%a @{<kwd>man@} @{<opt>-v 3@} (for the full \
+     manual)@}@}@}@,\
      @,\
-     @{<title>Global options (must come before the command)@}@,\
-     @{<commanddoc>%a@}%a%a@}@."
+     %a%a@}@."
     executable_name
-    executable_name
-    executable_name
-    executable_name
-    executable_name
-    executable_name
-    print_options_detailed
+    pp_print_global_options_usage
     global_options
-    (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,")
-    ()
+    executable_name
+    executable_name
+    pp_print_global_options_usage
+    global_options
+    executable_name
+    executable_name
+    pp_print_global_options_usage
+    global_options
+    executable_name
+    pp_print_global_options_usage
+    global_options
+    pp_print_global_options
+    global_options
     print_groups
     by_group
 
@@ -895,56 +918,58 @@ let args19 a b c d e f g h i j k l m n o p q r s =
 
 let args20 a b c d e f g h i j k l m n o p q r s t =
   map_arg
-    ~f:
-      (fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t)) ->
+    ~f:(fun
+        _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t)) ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args4 q r s t))
 
 let args21 a b c d e f g h i j k l m n o p q r s t u =
   map_arg
-    ~f:
-      (fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u)) ->
+    ~f:(fun
+        _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u)) ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args5 q r s t u))
 
 let args22 a b c d e f g h i j k l m n o p q r s t u v =
   map_arg
-    ~f:
-      (fun _
-           ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u, v))
-           ->
+    ~f:(fun
+        _
+        ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u, v))
+      ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args6 q r s t u v))
 
 let args23 a b c d e f g h i j k l m n o p q r s t u v w =
   map_arg
-    ~f:
-      (fun _
-           ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
-             (q, r, s, t, u, v, w) ) ->
+    ~f:(fun
+        _
+        ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s, t, u, v, w))
+      ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args7 q r s t u v w))
 
 let args24 a b c d e f g h i j k l m n o p q r s t u v w x =
   map_arg
-    ~f:
-      (fun _
-           ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
-             (q, r, s, t, u, v, w, x) ) ->
+    ~f:(fun
+        _
+        ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+          (q, r, s, t, u, v, w, x) )
+      ->
       Lwt_result_syntax.return
         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x))
     (args2 (args16 a b c d e f g h i j k l m n o p) (args8 q r s t u v w x))
 
 let args25 a b c d e f g h i j k l m n o p q r s t u v w x y =
   map_arg
-    ~f:
-      (fun _
-           ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
-             (q, r, s, t, u, v, w, x, y) ) ->
+    ~f:(fun
+        _
+        ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+          (q, r, s, t, u, v, w, x, y) )
+      ->
       Lwt_result_syntax.return
         ( a,
           b,
@@ -1226,7 +1251,7 @@ let search_command keyword (Command {params; _}) =
 (* Command execution *)
 let exec (type ctx)
     (Command {options = options_spec; params = spec; handler; conv; _} as
-    command) (ctx : ctx) params args_dict =
+     command) (ctx : ctx) params args_dict =
   let open Lwt_result_syntax in
   let rec exec :
       type ctx a.
@@ -1474,6 +1499,18 @@ let find_command tree initial_arguments =
           traverse nts arguments' (parameter :: acc)
     | TPrefix {stop = Some cmd; _}, [] ->
         return (cmd, empty_args_dict, initial_arguments)
+    | ( TPrefix {stop = Some (Command {options; _} as command); _},
+        (hd :: _ as remaining) )
+      when String.length hd > 0 && hd.[0] = '-' -> (
+        let* args_dict, unparsed =
+          make_args_dict_filter ~command options remaining
+        in
+        match unparsed with
+        | [] -> return (command, args_dict, initial_arguments)
+        | hd :: _ ->
+            if String.length hd > 0 && hd.[0] = '-' then
+              tzfail (Unknown_option (hd, Some command))
+            else tzfail (Extra_arguments (unparsed, command)))
     | TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _) ->
         tzfail (Unterminated_command (initial_arguments, gather_assoc prefix))
     | TPrefix {prefix; _}, hd_arg :: tl -> (

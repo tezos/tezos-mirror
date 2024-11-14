@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,21 +36,22 @@ let build_socket_redirection_ctx socket_path =
   in
   Cohttp_lwt_unix.Client.custom_ctx ~resolver ()
 
-let callback ~acl server socket_path =
+let callback ~acl server forwarder_resources socket_path =
   let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
     Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
   in
   let forwarding_endpoint = Uri.of_string socket_forwarding_uri in
   let on_forwarding req =
-    Rpc_process_event.(emit forwarding_rpc (Cohttp.Request.resource req))
+    Rpc_process_events.(emit forwarding_rpc (Cohttp.Request.resource req))
   in
   let on_locally_handled req =
-    Rpc_process_event.(emit locally_handled_rpc (Cohttp.Request.resource req))
+    Rpc_process_events.(emit locally_handled_rpc (Cohttp.Request.resource req))
   in
   let ctx = build_socket_redirection_ctx socket_path in
   RPC_middleware.proxy_server_query_forwarder
     ~acl
     ~ctx
     ~forwarder_events:{on_forwarding; on_locally_handled}
+    forwarder_resources
     forwarding_endpoint
     callback

@@ -71,7 +71,7 @@ specified by the :package-api:`Protocol
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V12``, and it is
 implemented by this protocol in the
-:package-api:`Main<tezos-protocol-019-PtParisB/Tezos_raw_protocol_019_PtParisB/Main/index.html>`
+:package-api:`Main<tezos-protocol-020-PsParisC/Tezos_raw_protocol_020_PsParisC/Main/index.html>`
 module.
 
 The rest of this document is organized as follows: we first describe
@@ -79,6 +79,7 @@ the different validation modes implemented by this Tezos economic
 protocol, and then we delve deeper into the particulars of validation
 and application for blocks and the operations supported.
 
+.. _validation_modes:
 .. _validation_modes_paris:
 
 Validation modes
@@ -93,6 +94,7 @@ specified by the protocol environment offers an entry point so that
 protocol-agnostic components, the Tezos shell for instance, are able
 to use these different modes.
 
+.. _full_application:
 .. _full_application_paris:
 
 Full Application
@@ -108,6 +110,7 @@ signature is correct, and **all** operations included in the block are
 valid; the correct amount of consensus operations have been included
 in order to satisfy the consensus' threshold, etc.
 
+.. _full_construction:
 .. _full_construction_paris:
 
 Full Construction
@@ -126,6 +129,7 @@ construction is finalized.
 
 In Octez, this mode is mainly used by the baker daemon.
 
+.. _partial_construction:
 .. _partial_construction_paris:
 
 Partial Construction
@@ -142,6 +146,7 @@ potential validity of operations (and whether they can safely included
 into a block), so that the latter can **classify** incoming
 operations, and further decide how to process them accordingly.
 
+.. _protocol_classification:
 .. _protocol_classification_paris:
 
 The protocol provides the shell with the following classification of
@@ -176,20 +181,20 @@ protocol environment:
   case of an attestation which was received *too late*, but that could
   still be used to form a consensus quorum.
 
+.. _partial_application:
 .. _partial_application_paris:
 
 Partial Application
 ~~~~~~~~~~~~~~~~~~~
 
-The ``Partial application`` mode is used for :ref:`multi-pass
-validation<multi_pass_validation>`. Its aim is to provide Tezos shell
+The ``Partial application`` mode is no longer used, but it subsists in the code. Its aim is to provide Tezos shell
 implementations with a light-weight (read "fast") block application
 mechanism, which can determine whether a block has a *chance* of being
 valid or not, in a situation when the provided context is *not a
 recent one*. That is, when the block candidate succeeds neither the
 head of the chain, nor a close ancestor.
 
-This validation mode is typically used when the node receives a
+This validation mode could be used when the node receives a
 significantly large branch -- for instance, while bootstrapping. To
 check whether this branch is plausibly valid or potentially malicious
 spam, the shell retrieves the context from the most recent common
@@ -206,6 +211,7 @@ application`` mode provides an over-approximation of the branch's
 validity, and as a result intermediate results are not committed on
 disk in order to prevent potential attacks.
 
+.. _block_validation_overview:
 .. _block_validation_overview_paris:
 
 Block Validation
@@ -253,6 +259,7 @@ course, as this is an over-approximation, this feature cannot be
 considered to provide a safe guarantee that a block will be valid: in
 particular, it does not validate all kinds of operations.
 
+.. _operation_validity:
 .. _operation_validity_paris:
 
 Operation Validation and Application
@@ -280,6 +287,7 @@ application process for each of the different validation passes.
 
    Expand validity and application for other validation classes.
 
+.. _manager_operations_validity:
 .. _manager_operations_validity_paris:
 
 Validity of Manager Operations
@@ -355,6 +363,7 @@ defined as the conjunction of the following conditions:
   solvent to pay the announced fees for all the operations in the
   batch.
 
+.. _manager_operations_application:
 .. _manager_operations_application_paris:
 
 Application of Manager Operations

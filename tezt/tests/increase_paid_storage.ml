@@ -30,11 +30,13 @@
    Subject: Tests for increasing the paid storage of a smart contract
 *)
 
+let team = Tag.layer1
+
 let test_increase_paid_storage =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"increase paid storage"
-    ~tags:["storage"; "paid_storage"; "increase_paid_storage"]
+    ~tags:[team; "storage"; "paid_storage"; "increase_paid_storage"]
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let* _alias, contract =

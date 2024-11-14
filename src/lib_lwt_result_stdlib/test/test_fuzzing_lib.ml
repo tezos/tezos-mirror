@@ -1108,8 +1108,8 @@ let gen_test_of_ty :
       let dg = gen_of_ty tyd in
       QCheck2.Test.make
         ~name
-        ~print:
-          (fun ((va, _, _, _), (vb, _, _, _), (vc, _, _, _), (vd, _, _, _)) ->
+        ~print:(fun
+            ((va, _, _, _), (vb, _, _, _), (vc, _, _, _), (vd, _, _, _)) ->
           Format.asprintf
             "(%a, %a, %a, %a)"
             (pp_of_ty tya)

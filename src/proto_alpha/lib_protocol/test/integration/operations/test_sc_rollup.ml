@@ -669,8 +669,8 @@ let execute_outbox_message_without_proof_validation block rollup
   let*@ res, alpha_ctxt =
     Sc_rollup_operations.Internal_for_tests.execute_outbox_message
       (Incremental.alpha_ctxt incr)
-      ~validate_and_decode_output_proof:
-        (fun ctxt ~cemented_commitment:_ _rollup ~output_proof:_ ->
+      ~validate_and_decode_output_proof:(fun
+          ctxt ~cemented_commitment:_ _rollup ~output_proof:_ ->
         return (outbox_message, ctxt))
       rollup
       ~cemented_commitment
@@ -983,7 +983,6 @@ let test_originating_with_invalid_types () =
     [
       "mutez";
       "big_map string nat";
-      "contract string";
       "sapling_state 2";
       "sapling_transaction 2";
       "lambda string nat";
@@ -1588,7 +1587,10 @@ let test_execute_message_override_applied_messages_slot () =
   (* Since we will create more blocks than the [max_active_outbox_levels]
      parametric constant, we initialize it with a small enough value. *)
   let* block, (baker, originator) =
-    context_init ~sc_rollup_max_active_outbox_levels:100l Context.T2
+    context_init
+      ~sc_rollup_max_active_outbox_levels:100l
+      ~commitment_period_in_blocks:50
+      Context.T2
   in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1859,6 +1861,7 @@ let test_number_of_parallel_games_bounded () =
   let* block, accounts =
     context_init
       ~sc_rollup_challenge_window_in_blocks:100
+      ~hard_gas_limit_per_block:(Gas.Arith.integral_of_int_exn 1_000_000_000)
       (Context.TList nb_accounts)
   in
   let* block, rollup = sc_originate block (Stdlib.List.hd accounts) in
@@ -2911,7 +2914,7 @@ let test_curfew () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3), rollup =
     (* sc_rollup_challenge_window_in_blocks should be at least commitment period *)
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:90 Context.T3
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:112 Context.T3
   in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
@@ -3317,7 +3320,7 @@ let test_conflict_point_on_a_branch () =
 let test_agreeing_stakers_cannot_play () =
   let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:1000 Context.T2
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1009 Context.T2
   in
   let pB_pkh = Account.pkh_of_contract_exn pB in
   (* pA stakes on a whole branch. *)
@@ -3349,7 +3352,7 @@ let test_agreeing_stakers_cannot_play () =
 let test_start_game_on_cemented_commitment () =
   let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:1000 Context.T2
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1009 Context.T2
   in
   let* constants = Context.get_constants (B block) in
   let pA_pkh = Account.pkh_of_contract_exn pA in

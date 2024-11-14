@@ -1,0 +1,64 @@
+
+./octez-evm-node debug print store schemas
+CREATE TABLE context_hashes (
+  id SERIAL PRIMARY KEY,
+  context_hash VARCHAR(52) NOT NULL
+);
+
+CREATE TABLE kernel_upgrades (
+  injected_before INT NOT NULL,
+  root_hash TEXT NOT NULL,
+  activation_timestamp INT NOT NULL,
+  applied_before INT
+);
+
+CREATE TABLE blueprints (
+  id SERIAL PRIMARY KEY,
+  payload BLOB NOT NULL,
+  timestamp DATETIME NOT NULL
+);
+
+CREATE TABLE delayed_transactions (
+  injected_before INT NOT NULL,
+  hash TEXT NOT NULL,
+  payload TEXT NOT NULL
+);
+
+CREATE TABLE "l1_l2_levels_relationships" (
+  latest_l2_level PRIMARY KEY ON CONFLICT REPLACE,
+  l1_level INT NOT NULL UNIQUE ON CONFLICT ABORT
+, finalized_l2_level INT DEFAULT 0);
+
+CREATE TABLE metadata (
+  smart_rollup_address TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX unapplied_upgrade
+ON kernel_upgrades (
+  COALESCE(applied_before, -1)
+);
+
+CREATE TABLE blocks (
+  level serial PRIMARY KEY,
+  hash VARCHAR(32) NOT NULL,
+  block BLOB NOT NULL
+);
+
+CREATE TABLE transactions (
+  block_hash VARCHAR(32) NOT NULL,
+  block_number serial NOT NULL,
+  index_ serial NOT NULL,
+  hash VARCHAR(32) PRIMARY KEY NOT NULL,
+  from_ VARCHAR(20) NOT NULL,
+  to_ VARCHAR(20),
+  receipt_fields BLOB NOT NULL,
+  object_fields BLOB NOT NULL
+);
+
+CREATE TABLE gc (
+  id INTEGER PRIMARY KEY,
+  last_gc_level INTEGER,
+  last_gc_timestamp TIMESTAMP,
+  last_split_level INTEGER,
+  last_split_timestamp TIMESTAMP
+)

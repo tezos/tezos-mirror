@@ -1,61 +1,2951 @@
-include:
-  # Stage: sanity
-  - .gitlab/ci/jobs/sanity/sanity_ci.yml
-  - .gitlab/ci/jobs/sanity/docker:hadolint-schedule_extended_test.yml
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
 
-  # Stage: build
-  - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.build_arm64-released-scheduled_extended_test.yml
-  # Check that binary packages build
-  - .gitlab/ci/jobs/build/oc.build:rpm:amd64.yml
-  - .gitlab/ci/jobs/build/oc.build:dpkg:amd64.yml
-  - .gitlab/ci/jobs/build/select_tezts.yml
+stages:
+- images
+- sanity
+- build
+- test
+- packaging
+- doc
 
-  # These jobs are necessary to run flaky tezts
-  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.build_x86_64-released-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.build_kernels-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.tezt:fetch-records-scheduled_extended_test.yml
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script: []
+  script:
+  - ./images/ci_create_ci_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
 
-  # These jobs may not have been run in before_merging pipeline
-  # because of absence of certain changes
-  - .gitlab/ci/jobs/build/ocaml-check-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/doc/documentation.yml
+oc.docker:client-libs-dependencies:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script: []
+  script:
+  - ./scripts/ci/docker_client_libs_dependencies_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: client_libs_dependencies_image_tag.env
 
-  # Stage: packaging
-  - .gitlab/ci/jobs/packaging/opam:prepare-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/packaging/opam_package.yml
+oc.docker:jsonnet:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_jsonnet_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: jsonnet_image_tag.env
 
-  # Stage: test
-  - .gitlab/ci/jobs/test/install_octez-scheduled_extended_test.yml
-  # Flaky tezts
-  - .gitlab/ci/jobs/test/tezt-flaky-schedule_extended_test.yml
-  # Slow tezts
-  - .gitlab/ci/jobs/test/tezt-slow-schedule_extended_test.yml
-  # Tests that may not have been run in before_merging pipeline
-  # because of absence of certain changes
-  - .gitlab/ci/jobs/test/kaitai_checks-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/kaitai_e2e_checks-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.misc_checks-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/misc_opam_checks-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.semgrep-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.unit-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.integration:compiler-rejections-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.script:test-gen-genesis-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.script:b58_prefix-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/tezt.yml
-  - .gitlab/ci/jobs/test/test_kernels.yml
-  - .gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml
-  - .gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml
-  - .gitlab/ci/jobs/test/test_evm_compatibility.yml
+oc.docker:rust-toolchain:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script: []
+  script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
 
-  # Stage: doc
-  - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
-  - .gitlab/ci/jobs/doc/oc.install_python.yml
+oc.docker:ci:arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp_arm64
+  dependencies: []
+  timeout: 60 minutes
+  before_script: []
+  script:
+  - ./images/ci_create_ci_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: arm64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+  retry:
+    max: 1
+    when:
+    - runner_system_failure
+
+sanity_ci:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  script:
+  - make --silent -C manifest check
+  - make --silent -C ci check
+
+docker:hadolint:
+  image: hadolint/hadolint:2.9.3-debian
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - hadolint build.Dockerfile
+  - hadolint Dockerfile
+
+oc.ocaml_fmt:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - scripts/lint.sh --check-ocamlformat
+  - dune build --profile=dev @fmt
+  variables:
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+
+oc.semgrep:
+  image: returntocorp/semgrep-agent:sha-c6cd7cf
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - echo "OCaml code linting. For information on how to reproduce locally, check out
+    scripts/semgrep/README.md"
+  - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
+
+oc.misc_checks:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - ./scripts/ci/lint_misc_check.sh
+  - scripts/check_wasm_pvm_regressions.sh check
+  - etherlink/scripts/check_evm_store_migrations.sh check
+  - ./scripts/check_rollup_node_sql_migrations.sh check
+
+check_jsonnet_fmt:
+  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:jsonnet:amd64
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - scripts/lint.sh --check-jsonnet-format
+
+check_rust_fmt:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - scripts/check-format-rust.sh
+
+documentation:rst-check:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . $HOME/.venv/bin/activate
+  script:
+  - make --silent -C docs sphinx-check
+
+oc.build_arm64-released:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    name: build-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    when: on_success
+
+oc.build_arm64-exp-dev-extra:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
+    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
+      tezt/tests/main.exe
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    name: build-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    when: on_success
+
+oc.build:static-x86_64-linux-binaries:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_static_binaries.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    paths:
+    - octez-binaries/$ARCH/*
+
+oc.build_x86_64-released:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+  artifacts:
+    name: build-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    when: on_success
+
+oc.build_x86_64-exp-dev-extra:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
+    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
+      tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  artifacts:
+    name: build-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    when: on_success
+
+wasm-runtime-check:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - src/lib_wasm_runtime/lint.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+ocaml-check:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - dune build @check --stop-on-first-error
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+
+oc.build_kernels:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: kernels-sccache
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f kernels.mk build
+  - make -f etherlink.mk evm_kernel.wasm
+  - make -C src/riscv riscv-sandbox riscv-dummy.elf
+  - make -C src/riscv/tests/ build
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    name: build-kernels-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - evm_kernel.wasm
+    - smart-rollup-installer
+    - sequenced_kernel.wasm
+    - tx_kernel.wasm
+    - tx_kernel_dal.wasm
+    - dal_echo_kernel.wasm
+    - src/riscv/riscv-sandbox
+    - src/riscv/riscv-dummy.elf
+    - src/riscv/tests/inline_asm/rv64-inline-asm-tests
+    when: on_success
+
+oc.build_dsn_node:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk octez-dsn-node
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    name: build-dsn-node-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-dsn-node
+    when: on_success
+
+oc.tezt:fetch-records:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log
+    --from last-successful-schedule-extended-test --info
+  after_script:
+  - ./scripts/ci/filter_corrupted_records.sh
+  artifacts:
+    expire_in: 4 hours
+    paths:
+    - tezt-fetch-records.log
+    - tezt/records/*.json
+    - tezt/records/*.json.broken
+    when: always
+
+build_octez_source:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/restrict_export_to_octez_source.sh
+  - ./scripts/ci/create_octez_tarball.sh octez
+  - mv octez.tar.bz2 ../
+  - cd ../
+  - tar xf octez.tar.bz2
+  - cd octez/
+  - eval $(opam env)
+  - make octez
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+oc.build:rpm:amd64:
+  image: $DISTRIBUTION
+  stage: build
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 75 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - ./scripts/ci/bin_packages_rpm_dependencies.sh
+  script:
+  - wget https://sh.rustup.rs/rustup-init.sh
+  - chmod +x rustup-init.sh
+  - ./rustup-init.sh --profile minimal --default-toolchain  $recommended_rust_version
+    -y
+  - . $HOME/.cargo/env
+  - export OPAMYES="true"
+  - opam init --bare --disable-sandboxing
+  - make build-deps
+  - eval $(opam env)
+  - make $TARGET-$GROUP
+  - DISTRO=$(echo "$DISTRIBUTION" | cut -d':' -f1)
+  - RELEASE=$(echo "$DISTRIBUTION" | cut -d':' -f2)
+  - mkdir -p packages/$DISTRO/$RELEASE
+  - mv octez-*.* packages/$DISTRO/$RELEASE/
+  variables:
+    TARGET: rpm
+    GROUP: A
+    OCTEZ_PKGMAINTAINER: nomadic-labs
+    BLST_PORTABLE: "yes"
+    ARCH: amd64
+    CARGO_HOME: /root/.cargo
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - packages/
+    when: on_success
+  retry:
+    max: 1
+    when:
+    - stuck_or_timeout_failure
+  parallel:
+    matrix:
+    - DISTRIBUTION:
+      - fedora:39
+      - rockylinux:9.3
+
+opam:prepare:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 1 minute
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  script:
+  - git init _opam-repo-for-release
+  - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
+  - git -C _opam-repo-for-release add packages
+  - git -C _opam-repo-for-release commit -m "tezos packages"
+  artifacts:
+    paths:
+    - _opam-repo-for-release/
+
+opam:all_6:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 6 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - tezos-protocol-genesis
+      - tezos-protocol-demo-noops
+      - tezos-protocol-demo-counter
+      - tezos-protocol-alpha
+      - tezos-protocol-021-PsQuebec
+      - tezos-protocol-020-PsParisC
+      - tezos-protocol-019-PtParisB
+      - tezos-dal-node-services
+      - tezos-benchmark
+      - octez-shell-libs
+      - octez-riscv-pvm
+      - octez-proto-libs
+      - octez-l2-libs
+
+opam:exec_6:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 6 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - octez-version
+      - octez-protocol-compiler
+
+opam:all_2:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 2 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - tezos-dac-node-lib
+      - octez-smart-rollup-wasm-debugger-lib
+      - octez-smart-rollup-node-lib
+      - octez-smart-rollup-node-alpha
+      - octez-smart-rollup-node-PtParisB
+      - octez-smart-rollup-node-PtNairob
+      - octez-protocol-alpha-libs
+      - octez-protocol-021-PsQuebec-libs
+      - octez-protocol-020-PsParisC-libs
+      - octez-protocol-019-PtParisB-libs
+      - octez-protocol-018-Proxford-libs
+      - octez-protocol-017-PtNairob-libs
+      - octez-protocol-016-PtMumbai-libs
+      - octez-protocol-000-Ps9mPmXa-libs
+      - octez-injector
+
+opam:all_1:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 1 minute
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - octez-smart-rollup-node-PsQuebec
+      - octez-smart-rollup-node-PsParisC
+      - octez-smart-rollup-node-Proxford
+
+opam:all_3:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 3 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - octez-protocol-015-PtLimaPt-libs
+      - octez-protocol-014-PtKathma-libs
+      - octez-protocol-013-PtJakart-libs
+      - octez-protocol-012-Psithaca-libs
+      - octez-protocol-011-PtHangz2-libs
+      - octez-protocol-010-PtGRANAD-libs
+      - octez-protocol-009-PsFLoren-libs
+      - octez-protocol-008-PtEdo2Zk-libs
+      - octez-protocol-007-PsDELPH1-libs
+      - octez-protocol-006-PsCARTHA-libs
+      - octez-protocol-005-PsBabyM1-libs
+      - octez-protocol-004-Pt24m4xi-libs
+      - octez-protocol-003-PsddFKi3-libs
+      - octez-protocol-002-PsYLVpVv-libs
+      - octez-protocol-001-PtCJ7pwo-libs
+
+opam:exec_4:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 4 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - octez-signer
+
+opam:all_4:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 4 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - tezos-protocol-005-PsBABY5H
+      - tezos-protocol-004-Pt24m4xi
+      - tezos-protocol-003-PsddFKi3
+      - tezos-protocol-002-PsYLVpVv
+      - tezos-protocol-001-PtCJ7pwo
+      - tezos-protocol-000-Ps9mPmXa
+      - tezos-dal-node-lib
+      - tezos-dac-lib
+      - tezos-dac-client-lib
+      - tezos-client-genesis
+      - tezos-client-demo-counter
+      - octez-rpc-process
+      - octez-node-config
+      - octez-crawler
+
+opam:exec_1:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 1 minute
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - octez-smart-rollup-wasm-debugger
+      - octez-smart-rollup-node
+      - octez-node
+      - octez-dal-node
+      - octez-dac-node
+      - octez-dac-client
+      - octez-codec
+      - octez-client
+      - octez-baker-PsQuebec
+      - octez-baker-PsParisC
+      - octez-accuser-PsQuebec
+      - octez-accuser-PsParisC
+
+opam:all_5:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 5 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - tezos-protocol-018-Proxford
+      - tezos-protocol-017-PtNairob
+      - tezos-protocol-016-PtMumbai
+      - tezos-protocol-015-PtLimaPt
+      - tezos-protocol-014-PtKathma
+      - tezos-protocol-013-PtJakart
+      - tezos-protocol-012-Psithaca
+      - tezos-protocol-011-PtHangz2
+      - tezos-protocol-010-PtGRANAD
+      - tezos-protocol-009-PsFLoren
+      - tezos-protocol-008-PtEdoTez
+      - tezos-protocol-008-PtEdo2Zk
+      - tezos-protocol-007-PsDELPH1
+      - tezos-protocol-006-PsCARTHA
+      - tezos-protocol-005-PsBabyM1
+
+opam:all_7:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 7 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - tezt-tezos
+      - tezos-openapi
+      - octez-smart-rollup-wasm-debugger-plugin
+      - octez-rust-deps
+      - octez-riscv-api
+      - octez-libs
+      - octez-internal-libs
+      - octez-distributed-lwt-internal
+      - octez-distributed-internal
+      - octez-alcotezt
+      - bls12-381
+
+trigger:debian_repository_full:
+  stage: test
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/debian_repository_full.yml
+
+kaitai_checks:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
+    and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
+    and commit the resulting diff.' ; false)
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    expire_in: 1 hour
+    paths:
+    - _build/default/client-libs/bin_codec_kaitai/codec.exe
+    when: on_success
+
+kaitai_e2e_checks:
+  image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:client-libs-dependencies
+  - kaitai_checks
+  dependencies:
+  - oc.docker:client-libs-dependencies
+  - kaitai_checks
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - . ./scripts/install_build_deps.js.sh
+  script:
+  - ./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files
+    2>/dev/null
+
+oc.check_lift_limits_patch:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) =
+    "src/proto_alpha/lib_protocol/main.ml" ]'
+  - git apply src/bin_tps_evaluation/lift_limits.patch
+  - dune build @src/proto_alpha/lib_protocol/check
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+oc.python_check:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - . $HOME/.venv/bin/activate
+  script:
+  - ./scripts/ci/lint_misc_python_check.sh
+
+oc.integration:compiler-rejections:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - dune build @runtest_rejections
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+oc.script:test-gen-genesis:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - cd scripts/gen-genesis
+  script:
+  - dune build gen_genesis.exe
+
+oc.script:snapshot_alpha_and_link:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/script:snapshot_alpha_and_link.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+
+oc.script:test_octez_release_versions:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - ./scripts/test_octez_release_version.sh
+
+oc.script:b58_prefix:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - . $HOME/.venv/bin/activate
+  script:
+  - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring
+    --disable=invalid-name
+  - poetry run pytest scripts/b58_prefix/test_b58_prefix.py
+
+oc.test-liquidity-baking-scripts:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - ./scripts/ci/test_liquidity_baking_scripts.sh
+
+oc:scripts:release_script_values:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - scripts/ci/test_release_values.sh
+
+test_kernels:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f kernels.mk check
+  - make -f kernels.mk test
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+test_etherlink_kernel:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk check
+  - make -f etherlink.mk test
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+test_etherlink_firehose:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C etherlink/firehose check
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+check_riscv_kernels:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C src/riscv CHECK_FEATURES= check
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+test_riscv_kernels:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - check_riscv_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C src/riscv test
+  - make -C src/riscv audit
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+test_evm_compatibility:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
+  - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
+  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/
+    -c
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+oc.unit:non-proto-x86_64:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make $MAKE_TARGETS
+  - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    MAKE_TARGETS: test-nonproto-unit
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 1 day
+    paths:
+    - test_results
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: test_results/*.xml
+    when: always
+  retry: 2
+
+oc.unit:other-x86_64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make $MAKE_TARGETS
+  - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    MAKE_TARGETS: test-other-unit
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 1 day
+    paths:
+    - test_results
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: test_results/*.xml
+    when: always
+  retry: 2
+
+oc.unit:proto-x86_64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make $MAKE_TARGETS
+  - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    MAKE_TARGETS: test-proto-unit
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 1 day
+    paths:
+    - test_results
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: test_results/*.xml
+    when: always
+  retry: 2
+
+oc.unit:non-proto-arm64:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:arm64
+  - oc.build_arm64-released
+  - oc.build_arm64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make $MAKE_TARGETS
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    MAKE_TARGETS: test-nonproto-unit test-webassembly
+    DISTRIBUTE_TESTS_TO_PARALLELS: "true"
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
+    expire_in: 1 day
+    paths:
+    - test_results
+    reports:
+      junit: test_results/*.xml
+    when: always
+  retry: 2
+  parallel: 2
+
+oc.unit:webassembly-x86_64:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 20 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - make test-webassembly
+
+oc.unit:protocol_compiles:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - dune build @runtest_compile_protocol
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+
+de.unit:x86_64:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
+de.unit:arm64:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:arm64
+  - oc.build_arm64-released
+  - oc.build_arm64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
+resto.unit:x86_64:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest resto
+
+resto.unit:arm64:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  needs:
+  - oc.docker:ci:arm64
+  - oc.build_arm64-released
+  - oc.build_arm64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest resto
+
+oc.install_opam_jammy:
+  image: ocaml/opam:ubuntu-22.04
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  allow_failure: true
+  timeout: 2 hours
+  interruptible: false
+  script:
+  - ./docs/introduction/install-opam.sh
+  variables:
+    OPAMJOBS: "4"
+
+oc.compile_sources_doc_bookworm:
+  image: ocaml/opam:debian-12
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
+  variables:
+    CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
+
+oc.compile_sources_doc_mantic:
+  image: ocaml/opam:ubuntu-23.10
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
+  variables:
+    CARGO_HOME: /home/opam/.cargo
+    CARGO_NET_OFFLINE: "false"
+
+tezt:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  timeout: 40 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+  - ./scripts/ci/merge_coverage.sh
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: ""
+    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
+      /cloud && /flaky
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "3"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 100
+
+tezt-memory-3k:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+  - ./scripts/ci/merge_coverage.sh
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -memory_3k
+    TESTS: memory_3k && /ci_disabled && /memory_4k && /time_sensitive && /slow &&
+      /cloud
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "1"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 6
+
+tezt-memory-4k:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+  - ./scripts/ci/merge_coverage.sh
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -memory_4k
+    TESTS: memory_4k && /ci_disabled && /memory_3k && /time_sensitive && /slow &&
+      /cloud
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "1"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 4
+
+tezt-time-sensitive:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+  - ./scripts/ci/merge_coverage.sh
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -time_sensitive
+    TESTS: time_sensitive && /ci_disabled && /memory_3k && /memory_4k && /slow &&
+      /cloud
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "1"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+
+tezt-slow:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -slow
+    TESTS: slow && /ci_disabled && /memory_3k && /memory_4k && /time_sensitive &&
+      /cloud && not (file = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "3"
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 20
+
+tezt-flaky:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+  - ./scripts/ci/merge_coverage.sh
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -flaky
+    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
+      /cloud && flaky
+    TEZT_RETRY: "3"
+    TEZT_PARALLEL: "1"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+
+tezt:static-binaries:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build:static-x86_64-linux-binaries
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build:static-x86_64-linux-binaries
+  - oc.tezt:fetch-records
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - mv octez-binaries/x86_64/octez-* .
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - _build/default/tezt/tests/main.exe "${TESTS}" --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 _build/default/tezt/tests/main.exe
+    "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
+    1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: ""
+    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
+      /cloud && cli && /flaky
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "3"
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+
+oc.install_python_noble:
+  image: public.ecr.aws/lts/ubuntu:24.04_stable
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
+
+oc.install_python_jammy:
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
+
+oc.install_python_bookworm:
+  image: debian:bookworm
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
+
+documentation:odoc:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C docs odoc-lite
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    expire_in: 1 hour
+    paths:
+    - docs/_build/api/odoc/
+    - docs/odoc.log
+    when: always
+
+documentation:manuals:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/documentation:manuals.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/*/octez-*.html
+    - docs/api/octez-*.txt
+    - docs/developer/metrics.csv
+    - docs/user/node-config.json
+
+documentation:docgen:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C docs -j docexes-gen
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/alpha/rpc.rst
+    - docs/shell/rpc.rst
+    - docs/user/default-acl.json
+    - docs/api/errors.rst
+    - docs/shell/p2p_api.rst
+
+documentation:build_all:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - documentation:odoc
+  - documentation:manuals
+  - documentation:docgen
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation:odoc
+  - documentation:manuals
+  - documentation:docgen
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - make -C docs -j sphinx
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/_build/
+    expose_as: Documentation - excluding old protocols
+
+documentation:linkcheck:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - documentation:manuals
+  - documentation:docgen
+  - documentation:build_all
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation:manuals
+  - documentation:docgen
+  - documentation:build_all
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - make -C docs redirectcheck
+  - make -C docs linkcheck

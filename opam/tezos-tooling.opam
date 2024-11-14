@@ -11,8 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "bisect_ppx" { >= "2.7.0" }
-  "ocamlformat" { = "0.24.1" }
-  "base-unix"
+  "ocamlformat" { = "0.26.2" }
   "num"
   "re" { >= "1.10.0" }
 ]

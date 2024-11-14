@@ -93,7 +93,10 @@ val prepare :
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | ParisB_019
+type previous_protocol =
+  | Genesis of Parameters_repr.t
+  | Alpha
+  | (* Alpha predecessor *) Quebec (* Alpha predecessor *)
 
 val prepare_first_block :
   level:int32 ->

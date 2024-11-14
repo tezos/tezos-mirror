@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori  <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,32 +26,121 @@
 
 open Ethereum_types
 
+type estimate_gas_input_v1 = {
+  call : Ethereum_types.call;
+  with_da_fees : bool;
+      (** If true, the gas returned by the simulation include the DA
+          gas units. *)
+}
+
+type estimate_gas_input_v2 = {
+  call : Ethereum_types.call;
+  with_da_fees : bool;
+      (** If true, the gas returned by the simulation includes the DA
+          gas units. *)
+  timestamp : Time.Protocol.t;  (** Timestamp used during simulation. *)
+}
+
+type estimate_gas_input =
+  | V0 of call
+  | V1 of estimate_gas_input_v1
+  | V2 of estimate_gas_input_v2
+
 (** [hex_string_to_bytes s] transforms a hex string [s] into a byte string. *)
 let hex_string_to_bytes (Hex s) = `Hex s |> Hex.to_bytes_exn
 
+let of_opt of_val = function
+  | None -> Rlp.Value Bytes.empty
+  | Some v -> of_val v
+
+let of_addr (Address s) = Rlp.Value (hex_string_to_bytes s)
+
+let of_qty (Qty z) = Rlp.Value (Z.to_bits z |> Bytes.of_string)
+
+let of_hash (Hash h) = Rlp.Value (hex_string_to_bytes h)
+
+let rlp_v0 call =
+  Rlp.List
+    [
+      of_opt of_addr call.from;
+      of_opt of_addr call.to_;
+      of_opt of_qty call.gas;
+      of_opt of_qty call.gasPrice;
+      of_opt of_qty call.value;
+      of_opt of_hash call.data;
+    ]
+
+let rlp_v1 ({call; with_da_fees} : estimate_gas_input_v1) =
+  Rlp.List
+    [
+      of_opt of_addr call.from;
+      of_opt of_addr call.to_;
+      of_opt of_qty call.gas;
+      of_opt of_qty call.gasPrice;
+      of_opt of_qty call.value;
+      of_opt of_hash call.data;
+      Ethereum_types.bool_to_rlp_bytes with_da_fees;
+    ]
+
+let rlp_v2 ({call; with_da_fees; timestamp} : estimate_gas_input_v2) =
+  Rlp.List
+    [
+      of_opt of_addr call.from;
+      of_opt of_addr call.to_;
+      of_opt of_qty call.gas;
+      of_opt of_qty call.gasPrice;
+      of_opt of_qty call.value;
+      of_opt of_hash call.data;
+      Ethereum_types.bool_to_rlp_bytes with_da_fees;
+      Value (Ethereum_types.timestamp_to_bytes timestamp);
+    ]
+
 (** Encoding used to forward the call to the kernel, to be used in simulation
-     mode only. *)
-let rlp_encode call =
-  let of_opt of_val = function
-    | None -> Rlp.Value Bytes.empty
-    | Some v -> of_val v
+    mode only. *)
+let rlp_encode input =
+  let input =
+    (* If the value is not provided, the kernel will put `None` for the transfer
+       object. It is not wanted, we want the kernel to put `Some(0)` instead. *)
+    match input with
+    | V0 call ->
+        V0
+          {
+            call with
+            value = Some (Option.value ~default:(Qty Z.zero) call.value);
+          }
+    | V1 {call; with_da_fees} ->
+        V1
+          {
+            call =
+              {
+                call with
+                value = Some (Option.value ~default:(Qty Z.zero) call.value);
+              };
+            with_da_fees;
+          }
+    | V2 {call; with_da_fees; timestamp} ->
+        V2
+          {
+            call =
+              {
+                call with
+                value = Some (Option.value ~default:(Qty Z.zero) call.value);
+              };
+            with_da_fees;
+            timestamp;
+          }
   in
-  let of_addr (Address s) = Rlp.Value (hex_string_to_bytes s) in
-  let of_qty (Qty z) = Rlp.Value (Z.to_bits z |> Bytes.of_string) in
-  let of_hash (Hash h) = Rlp.Value (hex_string_to_bytes h) in
-  let rlp_form =
-    Rlp.List
-      [
-        of_opt of_addr call.from;
-        of_opt of_addr call.to_;
-        of_opt of_qty call.gas;
-        of_opt of_qty call.gasPrice;
-        of_opt of_qty call.value;
-        of_opt of_hash call.data;
-      ]
+
+  let prefix, rlp =
+    match input with
+    | V0 call -> (None, rlp_v0 call)
+    | V1 input -> (Some '\001', rlp_v1 input)
+    | V2 input -> (Some '\002', rlp_v2 input)
   in
-  (* we aim to use [String.chunk_bytes] *)
-  Rlp.encode rlp_form
+  let payload = Rlp.encode rlp in
+  match prefix with
+  | None -> payload
+  | Some prefix -> Bytes.cat (Bytes.make 1 prefix) payload
 
 type simulation_message =
   | Start
@@ -95,7 +185,8 @@ let validation_tag = "\001"
 (** [add_tag tag bytes] prefixes bytes by the given tag *)
 let add_tag tag bytes = tag ^ Bytes.to_string bytes |> String.to_bytes
 
-let encode_message = function
+let encode_message message =
+  match message with
   | Start -> simulation_tag
   | Simple s -> simulation_tag ^ simple_tag ^ s
   | NewChunked n ->
@@ -123,7 +214,25 @@ type execution_result = {value : hash option; gas_used : quantity option}
 
 type call_result = (execution_result, hash) result
 
-type validation_result = {address : address}
+type validation_result = (transaction_object, address) Either.t
+
+let validation_result_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"Transaction object"
+        Json_only
+        transaction_object_encoding
+        (function Either.Left obj -> Some obj | _ -> None)
+        (fun obj -> Left obj);
+      case
+        ~title:"Address"
+        Json_only
+        address_encoding
+        (function Either.Right addr -> Some addr | _ -> None)
+        (fun addr -> Right addr);
+    ]
 
 type 'a simulation_result = ('a, string) result
 
@@ -201,64 +310,102 @@ module Encodings = struct
                <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
                data directory of the rollup node.")
 
-  let decode_data =
-    let open Result_syntax in
-    function
-    | Rlp.Value v -> return (decode_hash v)
-    | Rlp.List _ -> error_with "The simulation returned an ill-encoded data"
+  module type RLP_DECODING = sig
+    val decode_validation_result :
+      Rlp.item -> (transaction_object, address) Either.t tzresult
 
-  let decode_gas_used =
-    let open Result_syntax in
-    function
-    | Rlp.Value v -> return (decode_number v)
-    | Rlp.List _ -> error_with "The simulation returned an ill-encoded gas"
+    val decode_call_result :
+      Rlp.item -> (execution_result, hash) result tzresult
 
-  let decode_execution_result =
-    let open Result_syntax in
-    function
-    | Rlp.List [value; gas_used] ->
-        let* value = Rlp.decode_option decode_data value in
-        let* gas_used = Rlp.decode_option decode_gas_used gas_used in
-        return {value; gas_used}
-    | _ ->
-        error_with
-          "The simulation for eth_call/eth_estimateGas returned an ill-encoded \
-           format"
+    val simulation_result_from_rlp :
+      (Rlp.item -> 'a tzresult) ->
+      bytes ->
+      (('a, string) result, tztrace) result
+  end
 
-  let decode_call_result v =
-    let open Result_syntax in
-    let decode_revert = function
-      | Rlp.Value msg -> return (decode_hash msg)
-      | _ -> error_with "The revert message is ill-encoded"
-    in
-    Rlp.decode_result decode_execution_result decode_revert v
+  module Rlp_decoding = struct
+    module V0 = struct
+      let decode_data =
+        let open Result_syntax in
+        function
+        | Rlp.Value v -> return (decode_hash v)
+        | Rlp.List _ -> error_with "The simulation returned an ill-encoded data"
 
-  let decode_validation_result =
-    let open Result_syntax in
-    function
-    | Rlp.Value address -> return {address = decode_address address}
-    | _ -> error_with "The transaction pool returned an illformed value"
+      let decode_gas_used =
+        let open Result_syntax in
+        function
+        | Rlp.Value v -> return (decode_number_le v)
+        | Rlp.List _ -> error_with "The simulation returned an ill-encoded gas"
 
-  let simulation_result_from_rlp decode_payload bytes =
-    let open Result_syntax in
-    let decode_error_msg = function
-      | Rlp.Value msg -> return @@ Bytes.to_string msg
-      | rlp ->
-          error_with
-            "The simulation returned an unexpected error message: %a"
-            Rlp.pp
-            rlp
-    in
-    let* rlp = Rlp.decode bytes in
-    match Rlp.decode_result decode_payload decode_error_msg rlp with
-    | Ok v -> Ok v
-    | Error e ->
-        error_with
-          "The simulation returned an unexpected format: %a, with error %a"
-          Rlp.pp
-          rlp
-          pp_print_trace
-          e
+      let decode_execution_result =
+        let open Result_syntax in
+        function
+        | Rlp.List [value; gas_used] ->
+            let* value = Rlp.decode_option decode_data value in
+            let* gas_used = Rlp.decode_option decode_gas_used gas_used in
+            return {value; gas_used}
+        | _ ->
+            error_with
+              "The simulation for eth_call/eth_estimateGas returned an \
+               ill-encoded format"
+
+      let decode_call_result v =
+        let open Result_syntax in
+        let decode_revert = function
+          | Rlp.Value msg -> return (decode_hash msg)
+          | _ -> error_with "The revert message is ill-encoded"
+        in
+        Rlp.decode_result decode_execution_result decode_revert v
+
+      let decode_validation_result =
+        let open Result_syntax in
+        function
+        | Rlp.Value address -> return (Either.Right (decode_address address))
+        | rlp ->
+            error_with
+              "The simulation returned an ill-encoded validation result: %a"
+              Rlp.pp
+              rlp
+
+      let simulation_result_from_rlp decode_payload bytes =
+        let open Result_syntax in
+        let decode_error_msg = function
+          | Rlp.Value msg -> return @@ Bytes.to_string msg
+          | rlp ->
+              error_with
+                "The simulation returned an unexpected error message: %a"
+                Rlp.pp
+                rlp
+        in
+        let* rlp = Rlp.decode bytes in
+        match Rlp.decode_result decode_payload decode_error_msg rlp with
+        | Ok v -> Ok v
+        | Error e ->
+            error_with
+              "The simulation returned an unexpected format: %a, with error %a"
+              Rlp.pp
+              rlp
+              pp_print_trace
+              e
+    end
+
+    module V1 = struct
+      include V0
+
+      let decode_validation_result bytes =
+        let open Result_syntax in
+        try return (Either.Left (transaction_object_from_rlp_item None bytes))
+        with _ ->
+          error_with "The simulation returned an ill-encoded validation result"
+
+      let simulation_result_from_rlp decode_payload bytes =
+        let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
+        simulation_result_from_rlp decode_payload bytes
+    end
+
+    let select_rlp_decodings bytes : (module RLP_DECODING) =
+      match Bytes.get_uint8 bytes 0 with 1 -> (module V1) | _ -> (module V0)
+  end
 
   let eval_result =
     conv
@@ -293,30 +440,16 @@ module Encodings = struct
 end
 
 let simulation_result bytes =
+  let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
+  in
   Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
 
 let gas_estimation bytes =
-  let open Result_syntax in
-  let* result =
-    Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
+  let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
   in
-  match result with
-  | Ok (Ok {gas_used = Some (Qty gas_used); value}) ->
-      (* See EIP2200 for reference. But the tl;dr is: we cannot do the
-         opcode SSTORE if we have less than 2300 gas available, even
-         if we don't consume it. The simulated amount then gives an
-         amount of gas insufficient to execute the transaction.
-
-         The extra gas units, i.e. 2300, will be refunded.
-      *)
-      let simulated_amount = Z.(add gas_used (of_int 2300)) in
-      (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
-      let simulated_amount =
-        Z.(add simulated_amount (cdiv simulated_amount (of_int 50)))
-      in
-      return
-      @@ Ok (Ok {gas_used = Some (quantity_of_z @@ simulated_amount); value})
-  | _ -> return result
+  Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
 
 let is_tx_valid bytes =
+  let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
+  in
   Encodings.simulation_result_from_rlp Encodings.decode_validation_result bytes

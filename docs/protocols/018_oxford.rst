@@ -7,8 +7,6 @@ to Nairobi (see :ref:`naming_convention`).
 The code can be found in directory :src:`src/proto_018_Proxford` of the ``master``
 branch of Octez.
 
-.. contents::
-
 Environment Version
 -------------------
 
@@ -339,4 +337,3 @@ Internal
 
 - Register an error's encoding: ``WASM_proof_verification_failed``. It was
   previously not registered, making the error message a bit obscure. (MR :gl:`!9603`)
-

@@ -122,13 +122,13 @@ module Make_table (H : Hashtbl.HashedType) = struct
       in
       loop 0 (Weak.length bucket - 1) ;
       (if prev_len = 0 then (
-       t.table.(t.rover) <- emptybucket ;
-       t.hashes.(t.rover) <- [||])
-      else
-        let newbucket = weak_create prev_len in
-        Weak.blit bucket 0 newbucket 0 prev_len ;
-        t.table.(t.rover) <- newbucket ;
-        t.hashes.(t.rover) <- Array.sub hbucket 0 prev_len) ;
+         t.table.(t.rover) <- emptybucket ;
+         t.hashes.(t.rover) <- [||])
+       else
+         let newbucket = weak_create prev_len in
+         Weak.blit bucket 0 newbucket 0 prev_len ;
+         t.table.(t.rover) <- newbucket ;
+         t.hashes.(t.rover) <- Array.sub hbucket 0 prev_len) ;
       if len > t.limit && prev_len <= t.limit then t.oversize <- t.oversize - 1) ;
     t.rover <- (t.rover + 1) mod Array.length t.table
 

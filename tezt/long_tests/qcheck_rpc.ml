@@ -30,6 +30,8 @@
    Subject: Property testing the RPC server
 *)
 
+let team = Team.layer1
+
 (*
    {0 Description}
 
@@ -548,6 +550,7 @@ let property_test_rpc_server ~executors =
     ~__FILE__
     ~title:"property_test_rpc_server"
     ~tags:["node"; "pbt"; "fuzz"; "rpc"]
+    ~team
     ~executors
     ~timeout:(Hours 1)
     Test.test_rpc_server

@@ -4,6 +4,7 @@
   libiconv,
   pkg-config,
   darwin,
+  rust-bin,
 }: {
   pick-latest-packages = final: prev:
     prev.repository.select {
@@ -24,6 +25,10 @@
     }
     // {
       conf-pkg-config = final.lib.overrideNativeDepends prev.conf-pkg-config [pkg-config];
+
+      ocamlformat-lib = prev.ocamlformat-lib.overrideAttrs (old: {
+        propagatedBuildInputs = old.propagatedBuildInputs ++ [prev.ocp-indent];
+      });
     };
 
   darwin-overlay = final: prev: {
@@ -48,12 +53,8 @@
   };
 
   fix-rust-packages = final: prev: {
-    conf-rust-2021 = prev.conf-rust-2021.overrideAttrs (old: {
-      propagatedNativeBuildInputs =
-        (old.propagatedNativeBuildInputs or [])
-        ++
-        # Upstream conf-rust* packages don't request libiconv
-        [libiconv];
-    });
+    conf-rust = prev.lib.overrideNativeDepends prev.conf-rust [
+      (rust-bin.fromRustupToolchainFile ../rust-toolchain)
+    ];
   };
 }

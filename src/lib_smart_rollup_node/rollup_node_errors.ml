@@ -58,10 +58,15 @@ type error +=
   | Cannot_checkout_context of Block_hash.t * Smart_rollup_context_hash.t option
   | Cannot_checkout_l2_header
   | No_batcher
+  | No_dal_injector
   | No_publisher
   | Refutation_player_failed_to_start
   | No_refutation_coordinator
   | Could_not_acquire_lock of string
+  | Patch_durable_storage_on_commitment of int32
+  | Dal_message_too_big of {slot_size : int; message_size : int}
+
+type error += PVM_eval_too_many_ticks of {max_given : int64; executed : int64}
 
 type error +=
   | Could_not_open_preimage_file of String.t
@@ -73,6 +78,7 @@ type error +=
   | Invalid_genesis_state of {
       expected : Commitment.Hash.t;
       actual : Commitment.Hash.t;
+      actual_state_hash : State_hash.t;
     }
 
 type error += Operator_not_in_whitelist
@@ -95,6 +101,12 @@ type error +=
   | Unexpected_rollup of {
       rollup_address : Octez_smart_rollup.Address.t;
       saved_address : Octez_smart_rollup.Address.t;
+    }
+
+type error +=
+  | Disagree_with_commitment of {
+      our_commitment : Octez_smart_rollup.Commitment.t;
+      their_commitment : Octez_smart_rollup.Commitment.t;
     }
 
 let () =
@@ -311,25 +323,31 @@ let () =
     ~title:"Invalid genesis state"
     ~description:
       "The rollup node computed an invalid genesis state, it cannot continue."
-    ~pp:(fun ppf (expected, actual) ->
+    ~pp:(fun ppf (expected, actual, actual_state_hash) ->
       Format.fprintf
         ppf
-        "Genesis commitment computed (%a) is not equal to the rollup genesis \
-         (%a) commitment. The rollup node cannot continue. If you used the \
-         argument `--boot-sector-file` you probably provided the wrong boot \
-         sector. If not, please report the bug."
+        "Computed genesis commitment hash %a is not equal to the rollup \
+         genesis commitment hash %a which commits state hash %a. The rollup \
+         node cannot continue. If you used the argument `--boot-sector-file` \
+         you probably provided the wrong boot sector. If not, please report \
+         the bug."
         Commitment.Hash.pp
         expected
         Commitment.Hash.pp
-        actual)
+        actual
+        State_hash.pp
+        actual_state_hash)
     Data_encoding.(
-      obj2
+      obj3
         (req "expected" Commitment.Hash.encoding)
-        (req "actual" Commitment.Hash.encoding))
+        (req "actual" Commitment.Hash.encoding)
+        (req "actual_state_hash" State_hash.encoding))
     (function
-      | Invalid_genesis_state {expected; actual} -> Some (expected, actual)
+      | Invalid_genesis_state {expected; actual; actual_state_hash} ->
+          Some (expected, actual, actual_state_hash)
       | _ -> None)
-    (fun (expected, actual) -> Invalid_genesis_state {expected; actual}) ;
+    (fun (expected, actual, actual_state_hash) ->
+      Invalid_genesis_state {expected; actual; actual_state_hash}) ;
 
   register_error_kind
     ~id:"sc_rollup.node.no_batcher"
@@ -341,6 +359,17 @@ let () =
     Data_encoding.unit
     (function No_batcher -> Some () | _ -> None)
     (fun () -> No_batcher) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_dal_injector"
+    ~title:"No dal injector for this node"
+    ~description:"This node does not have a ADL injector"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This rollup node does not have DAL injector.")
+    `Permanent
+    Data_encoding.unit
+    (function No_dal_injector -> Some () | _ -> None)
+    (fun () -> No_dal_injector) ;
 
   register_error_kind
     ~id:"sc_rollup.node.no_publisher"
@@ -540,4 +569,95 @@ let () =
           Some (rollup_address, saved_address)
       | _ -> None)
     (fun (rollup_address, saved_address) ->
-      Unexpected_rollup {rollup_address; saved_address})
+      Unexpected_rollup {rollup_address; saved_address}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.disagree_with_commitment"
+    ~title:"Rollup node disagrees with commitment"
+    ~description:
+      "The rollup node disagrees with a commitment but cannot refute it."
+    ~pp:(fun ppf (our_commitment, their_commitment) ->
+      Format.fprintf
+        ppf
+        "The rollup node has computed commitment %a, but it disagrees with the \
+         commitment %a which it cannot refute."
+        Commitment.pp
+        our_commitment
+        Commitment.pp
+        their_commitment)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "our_commitment" Commitment.encoding)
+        (req "their_commitment" Commitment.encoding))
+    (function
+      | Disagree_with_commitment {our_commitment; their_commitment} ->
+          Some (our_commitment, their_commitment)
+      | _ -> None)
+    (fun (our_commitment, their_commitment) ->
+      Disagree_with_commitment {our_commitment; their_commitment}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.patch_durable_storage_on_commitment"
+    ~title:"Patch durable storage on commitment"
+    ~description:
+      "The command patch durable storage was run on a level with a commitment."
+    ~pp:(fun ppf level ->
+      Format.fprintf
+        ppf
+        "The command patch durable storage cannot be run on a level with a \
+         commitment, current level %ld has one. Please try in the next block."
+        level)
+    `Permanent
+    Data_encoding.(obj1 (req "level" int32))
+    (function
+      | Patch_durable_storage_on_commitment level -> Some level | _ -> None)
+    (fun level -> Patch_durable_storage_on_commitment level) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.dal_message_too_big"
+    ~title:"Dal message too big"
+    ~description:
+      "The DAL injection worker received a message whose length exceeds slot \
+       size."
+    ~pp:(fun ppf (slot_size, message_size) ->
+      Format.fprintf
+        ppf
+        "The DAL injection worker received a %d bytes message length, but a \
+         DAL slot size is %d bytes."
+        message_size
+        slot_size)
+    `Permanent
+    Data_encoding.(obj2 (req "slot_size" int31) (req "message_size" int31))
+    (function
+      | Dal_message_too_big {slot_size; message_size} ->
+          Some (slot_size, message_size)
+      | _ -> None)
+    (fun (slot_size, message_size) ->
+      Dal_message_too_big {slot_size; message_size}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.pvm_eval_too_many_ticks"
+    ~title:"PVM advanced too many ticks"
+    ~description:
+      "The rollup node expects the PVM to advance at most a given amount of \
+       ticks. \n\
+       NOTE: This is a potential security issue. Please email \
+       security@tezos.com to have the problem investigated."
+    ~pp:(fun ppf (maximum, executed) ->
+      Format.fprintf
+        ppf
+        "The rollup node expected the PVM to advance at most %Ld ticks, but \
+         the PVM executed %Ld ticks \n\
+         NOTE: This is a potential security issue. Please email \
+         security@tezos.com to have the problem investigated."
+        maximum
+        executed)
+    `Permanent
+    Data_encoding.(
+      obj2 (req "maximum ticks" int64) (req "executed ticks" int64))
+    (function
+      | PVM_eval_too_many_ticks {max_given; executed} ->
+          Some (max_given, executed)
+      | _ -> None)
+    (fun (max_given, executed) -> PVM_eval_too_many_ticks {max_given; executed})

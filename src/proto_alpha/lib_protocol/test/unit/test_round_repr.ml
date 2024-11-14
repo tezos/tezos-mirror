@@ -39,9 +39,19 @@ type round_test = {
   round_duration : (int * int) list;
   (* input: level offset; output: round, round offset *)
   round_and_offset : (int * (int * int)) list;
-  (* input: pred_ts, pred_round, round; output: ts *)
+  (*
+      input: pred_ts, pred_round, round; output: ts
+      Given the timestamp [pred_ts] and round [pred_round] of the block
+      from the previous level, the starting timestamp of the [round]
+      at the current level is [ts].
+  *)
   timestamp_of_round : ((int * int * int) * int) list;
-  (* input: pred_ts, pred_round, ts; output: round *)
+  (*
+       input: pred_ts, pred_round, ts; output: round
+       Given the timestamp [pred_ts] and round [pred_round] of the block
+       from the previous level, the round which starts at timestamp
+       [ts] is [round].
+  *)
   round_of_timestamp : ((int * int * int) * int) list;
 }
 
@@ -64,18 +74,37 @@ let case_3_4 =
     timestamp_of_round = [((100, 0, 6), 136); ((100, 1, 6), 137)];
     round_of_timestamp =
       [
+        ((100, 0, 103), 0);
+        ((100, 0, 105), 0);
+        ((100, 0, 106), 1);
+        ((100, 0, 109), 1);
+        ((100, 0, 110), 2);
+        ((100, 0, 114), 2);
+        ((100, 0, 115), 3);
+        ((100, 0, 120), 3);
         ((100, 0, 121), 4);
         ((100, 0, 122), 4);
         ((100, 0, 123), 4);
         ((100, 0, 124), 4);
         ((100, 0, 125), 4);
         ((100, 0, 126), 4);
+        ((100, 0, 127), 4);
+        ((100, 0, 128), 5);
+        ((100, 1, 104), 0);
+        ((100, 1, 106), 0);
+        ((100, 1, 107), 1);
+        ((100, 1, 110), 1);
+        ((100, 1, 111), 2);
+        ((100, 1, 115), 2);
+        ((100, 1, 116), 3);
         ((100, 1, 121), 3);
         ((100, 1, 122), 4);
         ((100, 1, 123), 4);
         ((100, 1, 124), 4);
         ((100, 1, 125), 4);
         ((100, 1, 126), 4);
+        ((100, 1, 128), 4);
+        ((100, 1, 129), 5);
       ];
   }
 

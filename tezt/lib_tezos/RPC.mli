@@ -60,6 +60,9 @@ type data = RPC_core.data
 (** RPC: [GET /config] *)
 val get_config : JSON.t t
 
+(** RPC: [GET /config/history_mode] *)
+val get_config_history_mode : JSON.t t
+
 (** RPC: [GET /config/network/dal] *)
 val get_config_network_dal : JSON.t t
 
@@ -475,6 +478,8 @@ val get_chain_mempool_pending_operations :
   ?refused:bool ->
   ?outdated:bool ->
   ?validation_passes:int list ->
+  ?sources:string list ->
+  ?operation_hash:string list ->
   unit ->
   JSON.t t
 
@@ -491,6 +496,7 @@ val get_chain_mempool_monitor_operations :
   ?refused:bool ->
   ?outdated:bool ->
   ?validation_passes:int list ->
+  ?sources:string list ->
   unit ->
   JSON.t t
 
@@ -941,6 +947,16 @@ val get_chain_block_context_smart_rollups_all :
 val get_chain_block_context_smart_rollups_smart_rollup_staker_games :
   ?chain:string -> ?block:string -> staker:string -> string -> unit -> JSON.t t
 
+(** RPC: [GET
+    chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/consumed_outputs/<outbox_level>] *)
+val get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs :
+  ?chain:string ->
+  ?block:string ->
+  sc_rollup:string ->
+  outbox_level:int ->
+  unit ->
+  int list t
+
 (** this type is smaller than the actual encoding and can be enhance
     on need. *)
 type smart_rollup_inbox = {
@@ -1126,6 +1142,14 @@ val get_chain_block_context_delegate_full_balance :
 val get_chain_block_context_delegate_grace_period :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC:
+    [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/min_delegated_in_current_cycle]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_min_delegated_in_current_cycle :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/participation]
 
     [chain] defaults to ["main"].
@@ -1161,6 +1185,13 @@ val get_chain_block_context_delegate_voting_info :
 val get_chain_block_context_delegate_voting_power :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/consensus_key]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_consensus_key :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/total_supply]
 
     [chain] defaults to ["main"].
@@ -1173,6 +1204,13 @@ val get_chain_block_context_total_supply :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_total_frozen_stake :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/total_frozen_stake]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_total_currently_staked :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/current_yearly_rate]

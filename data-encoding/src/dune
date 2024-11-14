@@ -1,32 +1,17 @@
-(env
- (release
-  (flags
-   (:standard -noassert))))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
 (library
  (name data_encoding)
- (public_name data-encoding)
- (js_of_ocaml)
+ (public_name octez-libs.data-encoding)
  (libraries
-  json-data-encoding
-  json-data-encoding-bson
-  zarith
-  zarith_stubs_js
   ezjsonm
-  either
-  bigstringaf)
- (preprocess
-  (pps ppx_hash)))
+  zarith
+  hex
+  octez-libs.json-data-encoding
+  octez-libs.json-data-encoding-bson
+  bigstringaf
+  ppx_hash)
+ (preprocess (pps ppx_hash)))
 
-(documentation
- (package data-encoding)
- (mld_files index tutorial))
-
-(rule
- (targets tutorial.mld)
- (deps tutorial.md)
- (mode promote)
- (action
-  (with-stdout-to
-   %{targets}
-   (run md2mld %{deps}))))
+(include dune.inc)

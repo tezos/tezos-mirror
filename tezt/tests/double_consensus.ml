@@ -30,22 +30,15 @@
    Subject:      Detect double (pre)attestation through the accuser.
 *)
 
-let use_legacy_attestation_name protocol = Protocol.number protocol < 18
+let team = Tag.layer1
 
-let get_consensus_operation_name protocol =
-  if use_legacy_attestation_name protocol then "endorsement" else "attestation"
+let double_attestation_waiter accuser =
+  Accuser.wait_for accuser (sf "double_attestation_denounced.v0") (fun _ ->
+      Some ())
 
-let double_attestation_waiter ~protocol accuser =
-  Accuser.wait_for
-    accuser
-    (sf "double_%s_denounced.v0" (get_consensus_operation_name protocol))
-    (fun _ -> Some ())
-
-let double_preattestation_waiter ~protocol accuser =
-  Accuser.wait_for
-    accuser
-    (sf "double_pre%s_denounced.v0" (get_consensus_operation_name protocol))
-    (fun _ -> Some ())
+let double_preattestation_waiter accuser =
+  Accuser.wait_for accuser (sf "double_preattestation_denounced.v0") (fun _ ->
+      Some ())
 
 let double_consensus_already_denounced_waiter accuser oph =
   Accuser.wait_for accuser "double_consensus_already_denounced.v0" (fun json ->
@@ -118,7 +111,6 @@ let double_attestation_init
 
 let double_consensus_wrong_slot
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
-  let consensus_name = consensus_name protocol in
   let* (client, accuser), (branch, level, round, slots, block_payload_hash) =
     double_attestation_init consensus_for consensus_name protocol ()
   in
@@ -126,7 +118,7 @@ let double_consensus_wrong_slot
   let op =
     mk_consensus ~slot:(List.nth slots 1) ~level ~round ~block_payload_hash
   in
-  let waiter = consensus_waiter ~protocol accuser in
+  let waiter = consensus_waiter accuser in
   let* _ =
     Operation.Consensus.inject ~branch ~signer:Constant.bootstrap1 op client
   in
@@ -150,21 +142,15 @@ let double_consensus_wrong_slot
 let attest_utils =
   ( Client.attest_for,
     (fun ~slot ~level ~round ~block_payload_hash ->
-      Operation.Consensus.attestation
-        ~use_legacy_name:true
-        ~slot
-        ~level
-        ~round
-        ~block_payload_hash
-        ()),
+      Operation.Consensus.attestation ~slot ~level ~round ~block_payload_hash ()),
     double_attestation_waiter,
-    get_consensus_operation_name )
+    "attestation" )
 
 let preattest_utils =
   ( Client.preattest_for,
-    Operation.Consensus.preattestation ~use_legacy_name:true,
+    Operation.Consensus.preattestation,
     double_preattestation_waiter,
-    fun protocol -> sf "pre%s" (get_consensus_operation_name protocol) )
+    "preattestation" )
 
 let double_attestation_wrong_slot =
   Protocol.register_test
@@ -184,7 +170,6 @@ let double_preattestation_wrong_slot =
 
 let double_consensus_wrong_block_payload_hash
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
-  let consensus_name = consensus_name protocol in
   let* (client, accuser), (branch, level, round, slots, _block_payload_hash) =
     double_attestation_init consensus_for consensus_name protocol ()
   in
@@ -196,7 +181,7 @@ let double_consensus_wrong_block_payload_hash
   let op =
     mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
   in
-  let waiter = consensus_waiter ~protocol accuser in
+  let waiter = consensus_waiter accuser in
   let* _ =
     Operation.Consensus.inject
       ~force:true
@@ -267,7 +252,6 @@ let double_preattestation_wrong_block_payload_hash =
 
 let double_consensus_wrong_branch
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
-  let consensus_name = consensus_name protocol in
   let* (client, accuser), (_branch, level, round, slots, block_payload_hash) =
     double_attestation_init consensus_for consensus_name protocol ()
   in
@@ -276,7 +260,7 @@ let double_consensus_wrong_branch
   let op =
     mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
   in
-  let waiter = consensus_waiter ~protocol accuser in
+  let waiter = consensus_waiter accuser in
   let* _ =
     Operation.Consensus.inject
       ~force:true
@@ -371,13 +355,7 @@ let operation_too_old =
     "Craft and inject an attestation 1 level in the past and wait for \
      [consensus_operation_too_old.v0] event from the accuser." ;
   let op =
-    Operation.Consensus.attestation
-      ~use_legacy_name:(use_legacy_attestation_name protocol)
-      ~slot
-      ~level
-      ~round:3
-      ~block_payload_hash
-      ()
+    Operation.Consensus.attestation ~slot ~level ~round:3 ~block_payload_hash ()
   in
   let waiter = consensus_operation_too_old_waiter accuser in
   let* _ =
@@ -450,7 +428,6 @@ let operation_too_far_in_future =
      [consensus_operation_too_far_in_future.v0] event from the accuser." ;
   let op =
     Operation.Consensus.attestation
-      ~use_legacy_name:(use_legacy_attestation_name protocol)
       ~slot:(List.hd slots)
       ~level
       ~round:0

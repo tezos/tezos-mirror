@@ -6,74 +6,20 @@ different Protocols or Octez versions. It complements the "Breaking changes"
 sections in the development changelogs by providing more context and/or less
 fragmented mentions.
 
-For each change, there may be a subsection ``deprecation`` and ``breaking
-changes``. The first subsection will explain what changes can be made during a
-deprecation phase to adapt smoothly to the new changes. The second subsection
+For each change, there may be subsections ``Deprecation`` and ``Breaking
+changes``. The former subsection will explain what changes can be made during a
+deprecation phase to adapt smoothly to the new changes. The latter subsection
 will present the changes that can not be done by the deprecation mechanism and
 that may be breaking.
+
+In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
 
 Attestations
 ------------
 
-Starting with the Oxford protocol proposal and the Octez
-``v19`` the legacy attestation name ``endorsement`` is now deprecated and
-``attestation`` should be used everywhere. Then, ``preendorsement`` is renamed
-to ``preattestation``, ``double_preendorsement_evidence`` to
-``double_preattestation_evidence``, and ``double_endorsement_evidence`` to
-``double_attestation_evidence``. The same goes for operation receipts such as
-``lost endorsing rewards``, which are renamed to ``lost attesting rewards``.
-
-To allow a smooth transition we implemented a deprecation mechanism that will
-start with Oxford and Octez ``v19`` and should end in two protocols and two
-Octez releases. We were not able to version everything so some changes, detailed
-below, are breaking.
-
-Deprecation
-~~~~~~~~~~~
-
-For the Oxford and Octez ``v19`` we introduced a new :doc:`version argument
-<../introduction/versioning>` ``?version=<n>`` for the following RPCs that can output
-``attestation`` (and legacy ``endorsement``):
-
-* ``POST /chains/<chain>/blocks/<block_id>/helpers/scripts/run_operation``
-* ``POST /chains/<chain>/blocks/<block_id>/helpers/scripts/simulate_operation``
-* ``POST /chains/<chain>/blocks/<block_id>/helpers/preapply/operations``
-* ``POST /chains/<chain>/blocks/<block_id>/helpers/parse/operations``
-* ``GET /chains/<chain>/blocks/<block_id>``
-* ``GET /chains/<chain>/blocks/<block_id>/operations``
-* ``GET /chains/<chain>/blocks/<block_id>/operations/<list_offset>``
-* ``GET /chains/<chain>/blocks/<block_id>/operations/<list_offset>/<operation_offset>``
-* ``GET /chains/<chain>/blocks/<block_id>/metadata``
-* ``GET /chains/<chain>/mempool/monitor_operations``
-* ``GET /chains/<chain>/mempool/pending_operations``
-
-See :doc:`changelog<../CHANGES>` for more details.
-
-For protocol ``O`` and version ``v19``, using the version ``0``, which is the
-default value, will still output the legacy attestation name. Version ``1``
-allows the RPCs to output ``attestation`` instead of the legacy name.
-
-For a protocol upgrade proposal to succeed Oxford, i.e. for protocol ``P``, and
-the next major release of Octez, ``v20.0``, the default value of these RPCs will be
-``1`` but the version ``0`` will still be usable.
-
-Version ``0`` and support for legacy name ("endorsement") will be removed in the
-subsequent protocol and major Octez versions -- that is, protocol upgrade
-proposal ``Q`` and Octez ``v21.0``
-
-As an exception, for the ``GET /chains/<chain>/mempool/pending_operations`` RPC,
-in protocol ``O`` and version ``v19`, due to previous versioning of this RPC,
-the legacy version is already ``1`` (currently the default) and you should use
-version ``2`` to output ``attestation``.
-
-Breaking changes
-~~~~~~~~~~~~~~~~
-
-Starting with protocol Oxford, the protocol
-parameters, storage fields and errors that were using the legacy attestation
-name now use ``attestation``. The baker and accuser will no longer use the
-legacy attestation name in their event messages and errors and will use
-``attestation`` instead.
+Support for deprecated attestation legacy name ("endorsement"), that was still
+usable with RPCs version ``0`` will be removed in the protocol proposal ``Q``
+and Octez ``v21.0``.
 
 Opam packages
 -------------
@@ -145,8 +91,59 @@ For each dependency:
 
 For instance, if your software depends on ``tezos-rpc`` which is now a sub-library of  :package-api:`octez-libs <octez-libs/index.html>` and has been renamed to ``rpc``:
 
-  - Update the opam file content to rename the ``tezos-rpc`` dependency to ``octez-libs``. If ``octez-libs`` is already present, only remove the dependency on ``tezos-rpc``.
-  - Update the dune file to rename occurences of ``tezos-rpc``, e.g. in ``libraries`` clauses of ``executable`` stanzas to ``octez-libs.rpc``.
-  - In your code, update all references to the ``Tezos_rpc`` module (e.g. ``open Tezos_rpc``) to ``Octez-libs.Rpc`` (e.g. ``open Octez-libs.Rpc``).
+- Update the opam file content to rename the ``tezos-rpc`` dependency to ``octez-libs``. If ``octez-libs`` is already present, only remove the dependency on ``tezos-rpc``.
+- Update the dune file to rename occurences of ``tezos-rpc``, e.g. in ``libraries`` clauses of ``executable`` stanzas to ``octez-libs.rpc``.
+- In your code, update all references to the ``Tezos_rpc`` module (e.g. ``open Tezos_rpc``) to ``Octez-libs.Rpc`` (e.g. ``open Octez-libs.Rpc``).
 
 The same method applies to each dependency that is now a sub-library of a new package. Check the :doc:`API <../api/api-inline>` to see the new packages.
+
+Delegates rights vs stake snapshots
+-----------------------------------
+
+The selection of the delegates' participation rights in the proof-of-stake consensus protocol is done based on their stake.
+This computation is explained in generic terms in :doc:`../active/proof_of_stake`.
+
+One detail of the rights computation has changed: which values are considered for the delegates' stake in each cycle.
+Previously, the considered values corresponded to a notion of stake snapshots, recorderd regularly by the protocol.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Since :doc:`protocol Paris <../protocols/020_paris>`, there are no more stake snapshots, so the protocol no longer relies on stake snapshots to compute the rights.
+
+Instead:
+
+- Rights originating from staked tez are computed from the value at the end of the cycle;
+- Rights originating from delegated tez are computing using the minimum value over the cycle.
+
+Timelocks: chest keys
+---------------------
+
+Timelocks were temporarily disabled by the activation of the :doc:`Lima protocol <../protocols/015_lima>`. to address a critical vulnerability.
+
+A new safer version of Timelocks was developed to address this issue, and the feature `was re-enabled <https://research-development.nomadic-labs.com/oxford-announcement.html#timelocks-are-re-enabled>`__ in the :doc:`Oxford protocol <../protocols/018_oxford>`. However, the new chest keys format could not be made backward compatible with the previous one.
+
+Fortunately, **no contracts using the legacy format of chest keys are deployed on Tezos mainnet**.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+However, this change may impact old contracts on the Ghostnet test network.
+For example, one (trivial) `chest key demo contract <https://ghostnet.tzkt.io/KT19AtusZuLVAKEXTEERNkfL7LmzuhkXwze1/code>`__ was originated a long time ago on Ghostnet and uses the legacy format for chest keys.
+
+As a consequence, `inspecting this Ghostnet contract <https://rpc.ghostnet.teztnets.com/chains/main/blocks/BMDLt6XUxEYc6W5SfCmYncafPd5tHxdipWVNvkm9hZz9PF6Ei2g/context/contracts/KT19AtusZuLVAKEXTEERNkfL7LmzuhkXwze1>`__ currently returns an error response with status 500::
+
+    Body:
+    [
+        {
+            "kind": "permanent",
+            "id": "proto.019-PtParisB.michelson_v1.ill_typed_data",
+            "expected_type": {
+                "prim": "chest_key"
+            },
+            "ill_typed_expression": {
+                "bytes": "e4c38197..."
+            }
+        },
+        ...
+    ]

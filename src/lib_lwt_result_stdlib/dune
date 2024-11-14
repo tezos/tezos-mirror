@@ -10,7 +10,6 @@
   octez-libs.lwt-result-stdlib.bare.sigs
   octez-libs.lwt-result-stdlib.bare.structs
   octez-libs.lwt-result-stdlib.traced.sigs
-  octez-libs.lwt-result-stdlib.traced.structs)
- (js_of_ocaml))
+  octez-libs.lwt-result-stdlib.traced.structs))
 
 (documentation (package octez-libs) (mld_files tezos_lwt_result_stdlib))

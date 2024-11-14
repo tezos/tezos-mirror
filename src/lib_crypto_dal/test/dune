@@ -10,7 +10,7 @@
   octez-libs.crypto-dal
   octez-libs.crypto-dal.dal-config
   octez-libs.error-monad
-  data-encoding
+  octez-libs.data-encoding
   octez-alcotezt
   qcheck-alcotest
   octez-libs.bls12-381-polynomial
@@ -41,7 +41,7 @@
  (package octez-libs)
  (deps srs_zcash_g1_5 srs_zcash_g2_5)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

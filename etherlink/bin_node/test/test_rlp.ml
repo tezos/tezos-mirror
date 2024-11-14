@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,9 +27,12 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec etherlink/bin_evm_node/test/main.exe -- --file test_rlp.ml
+    Invocation:   dune exec etherlink/bin_node/test/main.exe -- --file test_rlp.ml
     Subject:      Tests for the RLP encoder/decoder
 *)
+
+(* TODO: #7449
+   These tests need to be refactored in tezt, Alcote*t has been deprecated *)
 
 open Evm_node_lib_dev_encoding
 open Rlp

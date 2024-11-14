@@ -59,26 +59,58 @@ let () =
     (function Dal_invalid_page_for_slot page_id -> Some page_id | _ -> None)
     (fun page_id -> Dal_invalid_page_for_slot page_id)
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = [Protocol.name; "smart_rollup_node"; "dal_pages"]
+
+  let pp_content_elipsis ppf c =
+    let len = Bytes.length c in
+    if len <= 8 then Hex.pp ppf (Hex.of_bytes c)
+    else
+      let start = Bytes.sub c 0 4 in
+      let end_ = Bytes.sub c (len - 4) 4 in
+      Format.fprintf
+        ppf
+        "%a...%a"
+        Hex.pp
+        (Hex.of_bytes start)
+        Hex.pp
+        (Hex.of_bytes end_)
+
+  let page_reveal =
+    declare_5
+      ~section
+      ~name:"dal_page_reveal"
+      ~msg:
+        "Reveal page {page_index} for slot {slot_index} published at \
+         {published_level} for inbox level {inbox_level}: {content}"
+      ~level:Debug
+      ("slot_index", Data_encoding.int31)
+      ("page_index", Data_encoding.int31)
+      ("published_level", Data_encoding.int32)
+      ("inbox_level", Data_encoding.int32)
+      ("content", Data_encoding.bytes)
+      ~pp5:pp_content_elipsis
+end
+
 let store_entry_from_published_level ~dal_attestation_lag ~published_level
     node_ctxt =
   Node_context.hash_of_level node_ctxt
   @@ Int32.(
        add (of_int dal_attestation_lag) (Raw_level.to_int32 published_level))
 
+module Slot_id = struct
+  include Tezos_dal_node_services.Types.Slot_id
+
+  let equal id1 id2 = Comparable.compare id1 id2 = 0
+
+  let hash id = Hashtbl.hash id
+end
+
 (* The cache allows to not fetch pages on the DAL node more than necessary. *)
 module Pages_cache =
-  Aches_lwt.Lache.Make
-    (Aches.Rache.Transfer
-       (Aches.Rache.LRU)
-       (struct
-         include Cryptobox.Commitment
-
-         let hash commitment =
-           Data_encoding.Binary.to_string_exn
-             Cryptobox.Commitment.encoding
-             commitment
-           |> Hashtbl.hash
-       end))
+  Aches_lwt.Lache.Make (Aches.Rache.Transfer (Aches.Rache.LRU) (Slot_id))
 
 let get_slot_pages =
   let pages_cache = Pages_cache.create 16 (* 130MB *) in
@@ -100,7 +132,10 @@ let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
   in
   let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
   (* DAL must be configured for this point to be reached *)
-  get_slot_pages dal_cctxt header.commitment
+  let slot_id : Slot_id.t =
+    {slot_level = header.id.published_level; slot_index = header.id.index}
+  in
+  get_slot_pages dal_cctxt slot_id
 
 let storage_invariant_broken published_level index =
   failwith
@@ -226,7 +261,16 @@ let page_content
           download_confirmed_slot_pages node_ctxt ~published_level ~index
         in
         match List.nth_opt pages page_index with
-        | Some page -> return @@ Some page
+        | Some page ->
+            let*! () =
+              Event.(emit page_reveal)
+                ( index,
+                  page_index,
+                  Raw_level.to_int32 published_level,
+                  inbox_level,
+                  page )
+            in
+            return @@ Some page
         | None -> tzfail @@ Dal_invalid_page_for_slot page_id)
     | Some `Unconfirmed -> return_none
     | None -> storage_invariant_broken published_level index

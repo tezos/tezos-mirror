@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,15 +27,18 @@
 
 open Protocol
 open Alpha_context
+open Plugin
 
 type t = B of Block.t | I of Incremental.t
 
-let get_alpha_ctxt ?(policy = Block.By_round 0) c =
+(* Begins the construction of a block with the first available baker.
+   Fails if no baker can bake the next block. *)
+let get_alpha_ctxt c =
   let open Lwt_result_syntax in
   match c with
   | I i -> return (Incremental.alpha_ctxt i)
   | B b ->
-      let* i = Incremental.begin_construction ~policy b in
+      let* i = Incremental.begin_construction ~policy:(Block.Excluding []) b in
       return (Incremental.alpha_ctxt i)
 
 let branch = function B b -> b.hash | I i -> (Incremental.predecessor i).hash
@@ -398,6 +402,40 @@ module Vote = struct
   }
 end
 
+(** Retrieves the contract's full balance.
+
+    Calls both RPCs
+    [../<block_id>/contracts/<contract_id>/full_balance] and
+    [../<block_id>/delegates/<pkh>/own_full_balance], and checks that
+    they return the same value.
+
+    Expected to be called only when [pkh] is a delegate, although it
+    would actually work for a non-delegate [pkh] too. *)
+let get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh =
+  let open Lwt_result_syntax in
+  let* contract_full_balance =
+    Contract_services.full_balance rpc_ctxt ctxt (Implicit pkh)
+  in
+  let* delegate_own_full_balance =
+    Delegate_services.full_balance rpc_ctxt ctxt pkh
+  in
+  (* We use {!Tezt.Check.( = )} rather than {!Assert.equal_tez} to
+     raise an exception rather than return an error if the equality is
+     not satisfied, because it's a universal invariant. With
+     {!Assert.equal_tez}, tests that expect a failure for another
+     reason might succeed if they don't check the error
+     properly. Moreover, this lets us use a more specific error
+     message. *)
+  Tezt.Check.(
+    (contract_full_balance = delegate_own_full_balance)
+      ~__LOC__
+      (equalable Tez.pp Tez.equal)
+      ~error_msg:
+        "Broken RPC invariant:\n\
+         ../contracts/<contract_id>/full_balance returned %L\n\
+         ../delegates/<pkh>/own_full_balance") ;
+  return delegate_own_full_balance
+
 module Contract = struct
   let pp = Alpha_context.Contract.pp
 
@@ -424,9 +462,6 @@ module Contract = struct
 
   let unstaked_finalizable_balance ctxt contract =
     Alpha_services.Contract.unstaked_finalizable_balance rpc_ctxt ctxt contract
-
-  let full_balance ctxt contract =
-    Alpha_services.Contract.full_balance rpc_ctxt ctxt contract
 
   let staking_numerator ctxt contract =
     let open Lwt_result_syntax in
@@ -459,6 +494,16 @@ module Contract = struct
   let delegate_opt ctxt contract =
     Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
 
+  let full_balance ?(__LOC__ = __LOC__) ctxt contract =
+    let open Lwt_result_syntax in
+    let* delegate_opt = delegate_opt ctxt contract in
+    match (contract, delegate_opt) with
+    | Contract.Implicit pkh, Some pkh'
+      when Signature.Public_key_hash.equal pkh pkh' ->
+        (* Contract is a delegate. *)
+        get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh
+    | _ -> Alpha_services.Contract.full_balance rpc_ctxt ctxt contract
+
   let storage ctxt contract =
     Alpha_services.Contract.storage rpc_ctxt ctxt contract
 
@@ -479,7 +524,7 @@ module Contract = struct
 end
 
 module Delegate = struct
-  type info = Plugin.RPC.Delegates.info = {
+  type info = Delegate_services.info = {
     full_balance : Tez.t;
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
@@ -500,9 +545,12 @@ module Delegate = struct
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
 
-  let info ctxt pkh = Plugin.RPC.Delegates.info rpc_ctxt ctxt pkh
+  let grace_period ctxt pkh = Delegate_services.grace_period rpc_ctxt ctxt pkh
 
-  let full_balance ctxt pkh = Delegate_services.full_balance rpc_ctxt ctxt pkh
+  let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
+
+  let full_balance ?(__LOC__ = __LOC__) ctxt pkh =
+    get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh
 
   let current_frozen_deposits ctxt pkh =
     Delegate_services.current_frozen_deposits rpc_ctxt ctxt pkh
@@ -512,6 +560,9 @@ module Delegate = struct
 
   let staking_balance ctxt pkh =
     Delegate_services.staking_balance rpc_ctxt ctxt pkh
+
+  let unstaked_frozen_deposits ctxt pkh =
+    Delegate_services.unstaked_frozen_deposits rpc_ctxt ctxt pkh
 
   let staking_denominator ctxt pkh =
     let open Lwt_result_syntax in
@@ -531,14 +582,11 @@ module Delegate = struct
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
-  let is_forbidden ?policy ctxt pkh =
-    let open Lwt_result_syntax in
-    let* ctxt = get_alpha_ctxt ?policy ctxt in
-    return (Delegate.is_forbidden_delegate ctxt pkh)
+  let is_forbidden ctxt pkh = Delegate_services.is_forbidden rpc_ctxt ctxt pkh
 
-  let stake_for_cycle ?policy ctxt cycle pkh =
+  let stake_for_cycle ctxt cycle pkh =
     let open Lwt_result_wrap_syntax in
-    let* alpha_ctxt = get_alpha_ctxt ?policy ctxt in
+    let* alpha_ctxt = get_alpha_ctxt ctxt in
     let*@ stakes =
       Protocol.Alpha_context.Stake_distribution.Internal_for_tests
       .get_selected_distribution

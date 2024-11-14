@@ -10,6 +10,14 @@ module Event = struct
 
   let section = Events.section
 
+  let disabled =
+    declare_0
+      ~section
+      ~name:"rollup_node_follower_disabled"
+      ~msg:"Rollup node follower is disabled"
+      ~level:Notice
+      ()
+
   let started =
     declare_0
       ~section
@@ -59,6 +67,8 @@ module Event = struct
       ~level:Info
       ("duration", Data_encoding.float)
 end
+
+let disabled = Internal_event.Simple.emit Event.disabled
 
 let started = Internal_event.Simple.emit Event.started
 

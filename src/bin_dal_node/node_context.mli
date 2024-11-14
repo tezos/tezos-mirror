@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,79 +24,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A [ready_ctx] value contains globally needed informations for a running dal
-    node. It is available when both cryptobox is initialized and the plugin
-    for dal has been loaded.
-
-   A [ready_ctx] also has a field [shards_proofs_precomputation] that contains
-   the (costly) precomputation needed to get shard proofs.
-*)
-type ready_ctxt = {
-  cryptobox : Cryptobox.t;
-  proto_parameters : Dal_plugin.proto_parameters;
-  plugin : (module Dal_plugin.T);
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  plugin_proto : int;  (** Protocol level of the plugin. *)
-  last_processed_level : int32 option;
-  skip_list_cells_store : Skip_list_cells_store.t;
-  mutable ongoing_amplifications : Types.Slot_id.Set.t;
-      (** The slot identifiers of the commitments currently being
-     amplified. This set is used to prevent concurrent amplifications
-     of the same slot. *)
-}
-
-(** The status of the dal node *)
-type status = Ready of ready_ctxt | Starting
-
-(** A [t] value contains both the status and the dal node configuration. It's
-    field are available through accessors *)
+(** A [t] value contains the needed informations for a running a DAL node. Its
+    fields are available through accessors. *)
 type t
 
-(** [init config store gs_worker transport_layer cctx] creates a [t] with a
-    status set to [Starting] using the given dal node configuration [config],
-    node store [store], gossipsub worker instance [gs_worker], transport layer
-    instance [transport_layer], and tezos node client context [cctx]. *)
+(** [init] creates a [t] value based on the given arguments. *)
 val init :
   Configuration_file.t ->
-  Store.node_store ->
-  Gossipsub.Worker.t ->
-  Gossipsub.Transport_layer.t ->
-  Tezos_rpc.Context.generic ->
-  Metrics.t ->
-  t
-
-(** Raised by [set_ready] when the status is already [Ready _] *)
-exception Status_already_ready
-
-(** [set_ready ctxt dal_plugin skip_list_cells_store cryptobox proto_parameters
-    plugin_proto] updates in place the status value to [Ready], and initializes
-    the inner [ready_ctxt] value with the given parameters.
-
-    @raise Status_already_ready when the status is already [Ready _] *)
-val set_ready :
-  t ->
-  (module Dal_plugin.T) ->
-  Skip_list_cells_store.t ->
+  Profile_manager.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->
-  int ->
-  unit tzresult
+  Proto_plugins.t ->
+  Store.t ->
+  Gossipsub.Worker.t ->
+  Gossipsub.Transport_layer.t ->
+  Tezos_rpc.Context.generic ->
+  t
 
-(** Updates the plugin and the protocol level. *)
-val update_plugin_in_ready : t -> (module Dal_plugin.T) -> int -> unit
+(** Returns all the registered plugins *)
+val get_all_plugins : t -> (module Dal_plugin.T) list
 
-type error += Node_not_ready
+(** Returns the plugin to be used for the given (block) level.
+    Recall that, for a migration level L:
+    * to retrieve the metadata of the block L, one should use the plugin for the
+      old protocol;
+    * to retrieve context-related information, one should use the plugin for the
+      new protocol.
+    This function returns the plugin of [metadata.protocols.next_protocol], so it is
+    tailored for the second use case. To get the plugin for the first use-case, just
+    get the plugin for the predecessor of the target level. *)
+val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 
-(** Updates the [last_processed_level] field of the "ready context" with the given
-    info. Assumes the node's status is ready. Otherwise it returns
-    [Node_not_ready]. *)
-val update_last_processed_level : t -> level:int32 -> unit tzresult
+(** Tries to add a new plugin for the protocol with level [proto_level] to be used
+    starting with the given [block_level].
 
-(** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
-    propagates [Node_not_ready] if status is not ready yet. If called multiple
-    times, it replaces current values for [ready_ctxt] with new ones *)
-val get_ready : t -> ready_ctxt tzresult
+    It returns an error if the node is not ready, if the
+    [Chain_services.Blocks.protocols] RPC fails, or if the plugin is not
+    registered. *)
+val may_add_plugin :
+  t ->
+  Rpc_context.t ->
+  block_level:int32 ->
+  proto_level:int ->
+  unit tzresult Lwt.t
+
+(** Set the protocol plugins to the given value. *)
+val set_proto_plugins : t -> Proto_plugins.t -> unit
+
+(** Reconstruct the given slot id by calling the [reconstruct]
+    function unless a reconstruction for the given slot id is alredy
+    ongoing in which case the ongoing promise is returned instead. *)
+val may_reconstruct :
+  reconstruct:(Types.slot_id -> (bytes, Errors.other) result Lwt.t) ->
+  Types.slot_id ->
+  t ->
+  (bytes, Errors.other) result Lwt.t
 
 (** [get_profile_ctxt ctxt] returns the profile context.  *)
 val get_profile_ctxt : t -> Profile_manager.t
@@ -111,25 +95,51 @@ val set_profile_ctxt : t -> ?save:bool -> Profile_manager.t -> unit Lwt.t
 (** [get_config ctxt] returns the dal node configuration *)
 val get_config : t -> Configuration_file.t
 
-(** [get_status ctxt] returns the dal node status *)
-val get_status : t -> status
+(** [get_cryptobox ctxt] returns the DAL node's cryptobox *)
+val get_cryptobox : t -> Cryptobox.t
+
+(** [get_proto_parameters ctxt] returns the DAL node's current protocol parameters. *)
+val get_proto_parameters : t -> Dal_plugin.proto_parameters
+
+(** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
+val get_shards_proofs_precomputation :
+  t -> Cryptobox.shards_proofs_precomputation option
 
 (** [get_store ctxt] returns the dal node store. *)
-val get_store : t -> Store.node_store
+val get_store : t -> Store.t
 
 (** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
 val get_gs_worker : t -> Gossipsub.Worker.t
 
-(** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context *)
+(** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 
-(** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
+(** [get_neighbors_cctxts ctxt] returns the client contexts of the DAL node's
+    neighbors. *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
 
-(** [next_shards_level_to_gc ctxt ~current_level] returns the oldest
-    level that should have shards stored; during [current_level], shards for
-    commitments published at this level will be removed *)
-val next_shards_level_to_gc : t -> current_level:int32 -> int32
+(** [get_ongoing_amplification ctxt] returns the slot ids for which there are
+    ongoing amplifications. *)
+val get_ongoing_amplifications : t -> Types.Slot_id.Set.t
+
+(** [set_ongoing_amplification ctxt ongoing_amplifications] set the slot ids for
+    which there are ongoing amplifications. *)
+val set_ongoing_amplifications : t -> Types.Slot_id.Set.t -> unit
+
+(** [storage_period ctxt proto_parameters] returns for how many levels should
+    the node store data about attested slots. This depends on the node's profile
+    and its history mode.  *)
+val storage_period :
+  t -> Dal_plugin.proto_parameters -> [`Always | `Finite of int]
+
+(** [level_to_gc ctxt proto_parameters ~current_level] returns the oldest level
+    that should have attested data (like shards and slots, skip list cells)
+    stored; during [current_level], such data for commitments published at the
+    returned level will be removed. The returned level is non-negative. In case
+    no removal is needed (either because the node is thus configured, or the
+    current_level is not big enough), the function returns [None]. *)
+val level_to_gc :
+  t -> Dal_plugin.proto_parameters -> current_level:int32 -> int32 option
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL
@@ -139,6 +149,18 @@ val fetch_assigned_shard_indices :
   level:int32 ->
   pkh:Tezos_crypto.Signature.Public_key_hash.t ->
   int list tzresult Lwt.t
+
+(** [get_fetched_assigned_shard_indices] is a pure variant of
+    {!fetch_assigned_shard_indices} that doesn't fetch the committee from L1 if
+    not found locally. The function returns [None] if no committee is found
+    locally for the given level, or [Some shard_indexes] otherwise, where the
+    list of shards is empty if the given [pkh] is not in the committee for the
+    givel [level]. *)
+val get_fetched_assigned_shard_indices :
+  t ->
+  level:int32 ->
+  pkh:Signature.public_key_hash ->
+  Committee_cache.shard_indexes option
 
 (** [fetch_committee ctxt ~level] fetches from L1 the shard indices assigned
     to all attesters at [level].  It internally caches the DAL committee with
@@ -244,8 +266,31 @@ module P2P : sig
     val get_topics_peers :
       subscribed:bool -> t -> (Types.Topic.t * Types.Peer.t list) list
 
-    (** [get_connections t] returns the list of connections. *)
-    val get_connections : t -> (Types.Peer.t * Types.Gossipsub.connection) list
+    (** [get_slot_indexes_peers ~subscribed t] returns an association list
+        between the slot_indexes of topics of connected peers and the connected
+        peers subscribed to those topics, when [subscribed = false]. When
+        [subscribed = true], then the returned value is restricted to the topics
+        this node is subscribed to. *)
+    val get_slot_indexes_peers :
+      subscribed:bool -> t -> (Types.slot_index * Types.Peer.t list) list
+
+    (** [get_pkhs_peers ~subscribed t] returns an association list between the
+        pkhs of topics of connected peers and the connected peers subscribed to
+        those topics, when [subscribed = false]. When [subscribed = true], then
+        the returned value is restricted to the topics this node is subscribed
+        to. *)
+    val get_pkhs_peers :
+      subscribed:bool ->
+      t ->
+      (Signature.public_key_hash * Types.Peer.t list) list
+
+    (** [get_connections t] returns the list of connections. If
+        [ignore_bootstrap_topics] (false by default) is set to [true],
+        bootstrap topics will not be included in the result *)
+    val get_connections :
+      ?ignore_bootstrap_topics:bool ->
+      t ->
+      (Types.Peer.t * Types.Gossipsub.connection) list
 
     (** [get_scores t] returns the score of peers with a known score. *)
     val get_scores : t -> (Types.Peer.t * Types.Score.t) list

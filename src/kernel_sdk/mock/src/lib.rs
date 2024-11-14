@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -12,6 +12,7 @@ mod state;
 extern crate tezos_crypto_rs as crypto;
 
 use crypto::hash::ContractKt1Hash;
+use crypto::hash::HashTrait;
 use crypto::hash::HashType;
 use crypto::hash::SmartRollupHash;
 use tezos_data_encoding::enc::BinWriter;
@@ -26,6 +27,7 @@ use tezos_smart_rollup_host::metadata::RollupMetadata;
 
 use state::HostState;
 use std::cell::RefCell;
+use std::{fmt, io};
 
 const MAXIMUM_REBOOTS_PER_INPUT: i32 = 1000;
 
@@ -47,19 +49,29 @@ const NAIROBI_ACTIVATION_TIMESTAMP: i64 = 1_687_561_630;
 pub use state::InMemoryStore;
 
 /// The runtime host when _not_ running in **wasm**.
-#[derive(Debug)]
 pub struct MockHost {
     state: RefCell<HostState>,
     info: inbox::InfoPerLevel,
+    debug_log: Box<RefCell<dyn io::Write>>,
+    keep_going: bool,
+}
+
+impl fmt::Debug for MockHost {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MockHost")
+            .field("info", &self.info)
+            .field("state", &self.state)
+            .field("keep_going", &self.keep_going)
+            .finish()
+    }
 }
 
 impl Default for MockHost {
     fn default() -> Self {
-        let address = SmartRollupAddress::new(SmartRollupHash(vec![
-                0;
-                HashType::SmartRollupHash
-                    .size()
-            ]));
+        let address = SmartRollupAddress::new(
+            SmartRollupHash::try_from_bytes(&[0; HashType::SmartRollupHash.size()])
+                .unwrap(),
+        );
 
         Self::with_address(&address)
     }
@@ -100,8 +112,7 @@ impl MockHost {
     pub fn with_address(address: &SmartRollupAddress) -> Self {
         let raw_rollup_address = address
             .hash()
-            .0
-            .as_slice()
+            .as_ref()
             .try_into()
             .expect("Incorrect length for SmartRollupHash");
 
@@ -123,12 +134,19 @@ impl MockHost {
         let mut host = Self {
             state: state.into(),
             info,
+            debug_log: Box::new(RefCell::new(io::stderr())),
+            keep_going: true,
         };
 
         // Ensure inbox setup correctly
         host.bump_level();
 
         host
+    }
+
+    /// Override debug log handler.
+    pub fn set_debug_handler(&mut self, sink: impl io::Write + 'static) {
+        self.debug_log = Box::new(RefCell::new(sink));
     }
 
     /// Append an internal message to the current inbox.
@@ -234,6 +252,24 @@ impl MockHost {
         self.state.borrow().store.0.outbox_at(level).to_vec()
     }
 
+    /// Whether execution using this host should quit.
+    ///
+    /// For example, if using `host.keep_going(false)`, `should_quit` will return
+    /// `false` once the inbox is drained.
+    pub fn should_quit(&self) -> bool {
+        if self.keep_going {
+            true
+        } else {
+            let state = self.state.borrow();
+            state.curr_input_id >= state.input.len()
+        }
+    }
+
+    /// Control whether execution should quit once inbox is drained.
+    pub fn keep_going(&mut self, keep_going: bool) {
+        self.keep_going = keep_going;
+    }
+
     fn bump_level(&mut self) {
         let state = self.as_mut();
         state.curr_level += 1;
@@ -271,6 +307,22 @@ impl MockHost {
 
         self.as_mut().add_input(inbox_message);
     }
+
+    ////Set the content of the given DAL slot with the data. Adds the necessary
+    /// padding to fill the slot completely.
+    pub fn set_dal_slot(&mut self, published_level: i32, slot_index: u8, data: &[u8]) {
+        let slot_size = self.as_mut().get_dal_parameters().slot_size;
+        let mut slot = vec![0_u8; slot_size as usize];
+        assert!(
+            data.len() <= (slot_size as usize),
+            "Data of size {} cannot fit in a DAL slot of size {}",
+            data.len(),
+            slot_size
+        );
+        slot[..data.len()].as_mut().copy_from_slice(data);
+        self.as_mut()
+            .set_dal_slot(published_level, slot_index, slot);
+    }
 }
 
 fn info_for_level(level: i32) -> inbox::InfoPerLevel {
@@ -278,10 +330,10 @@ fn info_for_level(level: i32) -> inbox::InfoPerLevel {
         * NAIROBI_BLOCK_TIME
         + NAIROBI_ACTIVATION_TIMESTAMP;
 
-    let hash = crypto::blake2b::digest_256(&timestamp.to_le_bytes()).unwrap();
+    let hash = crypto::blake2b::digest_256(&timestamp.to_le_bytes());
 
     inbox::InfoPerLevel {
-        predecessor: crypto::hash::BlockHash(hash),
+        predecessor: crypto::hash::BlockHash::try_from_bytes(&hash).unwrap(),
         predecessor_timestamp: Timestamp::from(timestamp),
     }
 }

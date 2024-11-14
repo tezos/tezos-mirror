@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
@@ -31,7 +31,8 @@ impl RollupMetadata {
     /// The address of the smart rollup.
     #[cfg(feature = "crypto")]
     pub fn address(&self) -> SmartRollupHash {
-        SmartRollupHash(self.raw_rollup_address.to_vec())
+        use tezos_crypto_rs::hash::HashTrait;
+        SmartRollupHash::try_from_bytes(&self.raw_rollup_address).unwrap()
     }
 }
 

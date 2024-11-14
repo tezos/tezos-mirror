@@ -30,6 +30,8 @@
    Subject: check regressions in the duration it takes for the client to load.
 *)
 
+let team = Team.layer1
+
 let load_time = "client load time"
 
 let response_time_test = "get blocks time"
@@ -56,24 +58,28 @@ let client_load_time ~executors () =
     ~__FILE__
     ~title:load_time
     ~tags:["client"; "load"]
+    ~team
     ~timeout:(Minutes 2)
     ~uses_node:true
     ~executors
   @@ fun () ->
   let client = Client.create () in
-  Long_test.time_lwt ~repeat:20 load_time @@ fun () -> Client.version client
+  Long_test.time_and_check_regression_lwt ~repeat:20 load_time @@ fun () ->
+  Client.version client
 
 let get_blocks_response_time ~executors ~protocol =
   Long_test.register
     ~__FILE__
     ~title:response_time_test
     ~tags:["rpc"]
-    ~timeout:(Seconds 20)
+    ~team
+    ~timeout:(Minutes 3)
     ~uses_node:true
     ~executors
   @@ fun () ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
-  Long_test.time_lwt ~repeat:20 response_time_measurement @@ fun () ->
+  Long_test.time_and_check_regression_lwt ~repeat:20 response_time_measurement
+  @@ fun () ->
   let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
   unit
 

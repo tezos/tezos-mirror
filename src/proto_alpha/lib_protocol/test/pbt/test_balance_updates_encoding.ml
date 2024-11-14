@@ -173,16 +173,6 @@ let test_balance_updates encoding =
   let gen = generate_balance_updates in
   test_roundtrip ~count:2000 ~title:"Balance_updates" ~gen ~eq encoding
 
-let test_binary_balance_updates encoding1 encoding2 =
-  let gen = generate_balance_updates in
-  test_roundtrip_through_binary
-    ~count:2000
-    ~title:"Balance_updates"
-    ~gen
-    ~eq
-    encoding1
-    encoding2
-
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
@@ -192,17 +182,4 @@ let () =
       ( "roundtrip",
         qcheck_wrap [test_balance_updates Receipt_repr.balance_updates_encoding]
       );
-      ( "legacy : roundtrip",
-        qcheck_wrap
-          [
-            test_balance_updates
-              Receipt_repr.balance_updates_encoding_with_legacy_attestation_name;
-          ] );
-      ( "roundtrip 2 encodings",
-        qcheck_wrap
-          [
-            test_binary_balance_updates
-              Receipt_repr.balance_updates_encoding
-              Receipt_repr.balance_updates_encoding_with_legacy_attestation_name;
-          ] );
     ]

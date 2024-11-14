@@ -54,9 +54,7 @@ let publish_slot dal_node client source ~slot_size ~level ~slot_index =
   in
   Log.info "Publishing slot data '%s'..." slot_content ;
   let slot = Dal.Helpers.make_slot ~slot_size slot_content in
-  let* commitment, proof =
-    Dal.Helpers.store_slot (Either.Left dal_node) ~with_proof:true slot
-  in
+  let* commitment, proof = Dal.Helpers.store_slot ~slot_index dal_node slot in
   let commitment_hash =
     match Dal.Cryptobox.Commitment.of_b58check_opt commitment with
     | None -> assert false
@@ -105,20 +103,29 @@ let publish_at_levels node dal_node client ~slot_size ~last_level publisher
    of attested slot indexes) at the given level. *)
 let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
   let module Map = Map.Make (String) in
-  let* slot_headers =
-    Dal_RPC.(call dal_node @@ get_published_level_headers published_level)
-  in
-  let map =
-    List.fold_left
-      (fun acc Dal_RPC.{status; slot_index; _} ->
-        Map.update
-          status
-          (function
-            | None -> Some (1, [slot_index])
-            | Some (c, indexes) -> Some (c + 1, slot_index :: indexes))
-          acc)
-      Map.empty
-      slot_headers
+  let slot_indices = List.init number_of_slots Fun.id in
+  let* map, num_published =
+    Lwt_list.fold_left_s
+      (fun (map, acc) slot_index ->
+        let status_rpc =
+          Dal_RPC.get_level_slot_status ~slot_level:published_level ~slot_index
+        in
+        let* response = Dal_RPC.call_raw dal_node status_rpc in
+        if response.code = 404 then return (map, acc)
+        else
+          let status =
+            status_rpc.decode @@ JSON.parse ~origin:"status RPC" response.body
+          in
+          return
+            ( Map.update
+                status
+                (function
+                  | None -> Some (1, [slot_index])
+                  | Some (c, indexes) -> Some (c + 1, slot_index :: indexes))
+                map,
+              1 + acc ))
+      (Map.empty, 0)
+      slot_indices
   in
   let pp_map =
     let open Format in
@@ -169,7 +176,6 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
       proto_attestation
       pp_array
       node_attestation ;
-  let num_published = List.length slot_headers in
   let* ops =
     Node.RPC.(
       call node
@@ -188,7 +194,7 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
   Log.info
     "At published_level %d, published slots: %d, status: %a (%d attestations)"
     published_level
-    (List.length slot_headers)
+    num_published
     pp_map
     (Map.bindings map)
     (List.length attestations) ;

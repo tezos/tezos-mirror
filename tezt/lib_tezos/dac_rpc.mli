@@ -47,7 +47,7 @@ module V0 : sig
   val put_dac_member_signature :
     hex_root_hash:Hex.t ->
     dac_member_pkh:string ->
-    signature:Tezos_crypto.Aggregate_signature.t ->
+    signature:Tezos_crypto.Aggregate_signature.signature ->
     unit RPC_core.t
 
   (** [get_missing_page ~hex_root_hash] calls

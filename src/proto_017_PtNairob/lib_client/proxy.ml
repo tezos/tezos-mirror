@@ -24,18 +24,6 @@
 (*****************************************************************************)
 
 module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
-  (** Split done only when the mode is [Tezos_proxy.Proxy.server]. Getting
-      an entire big map at once is useful for dapp developers that
-      iterate a lot on big maps and that use proxy servers in their
-      internal infra. *)
-  let split_server key =
-    match key with
-    (* matches paths like:
-       big_maps/index/i/contents/tail *)
-    | "big_maps" :: "index" :: i :: "contents" :: tail ->
-        Some (["big_maps"; "index"; i; "contents"], tail)
-    | _ -> None
-
   (** Split that is always done, no matter the mode *)
   let split_always key =
     match key with
@@ -51,20 +39,11 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
     | "v1" :: tail -> Some (["v1"], tail)
     | _ -> None
 
-  let split_key (mode : Tezos_proxy.Proxy.mode)
-      (key : Tezos_protocol_environment.Proxy_context.M.key) :
+  let split_key (key : Tezos_protocol_environment.Proxy_context.M.key) :
       (Tezos_protocol_environment.Proxy_context.M.key
       * Tezos_protocol_environment.Proxy_context.M.key)
       option =
-    match split_always key with
-    | Some _ as res ->
-        res (* No need to inspect the mode, this split is always done *)
-    | None -> (
-        match mode with
-        | Client ->
-            (* There are strictly less splits in Client mode: return immediately *)
-            None
-        | Server -> split_server key)
+    split_always key
 
   let failure_is_permanent = function
     | ["pending_migration_balance_updates"]

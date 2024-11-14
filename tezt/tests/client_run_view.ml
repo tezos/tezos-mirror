@@ -30,6 +30,8 @@
    Subject:      Check that run view command to octez-client behaves correctly
 *)
 
+let team = Tag.layer1
+
 let viewable_script = ["mini_scenarios"; "viewable"]
 
 (* Initializes the client and a viewable contract with a storage of 10 *)
@@ -196,7 +198,7 @@ let register ~protocols =
       Protocol.register_test
         ~__FILE__
         ~title
-        ~tags:["client"; "michelson"; "view"]
+        ~tags:[team; "client"; "michelson"; "view"]
         ~uses_node:false
         (fun protocol -> test_function ~protocol ())
         protocols)

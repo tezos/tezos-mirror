@@ -39,7 +39,12 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type nonrec parameters = (Peer.t, Message_id.t) parameters
 
-  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+  type add_peer = {
+    direct : bool;
+    outbound : bool;
+    peer : Peer.t;
+    bootstrap : bool;
+  }
 
   type remove_peer = {peer : Peer.t}
 
@@ -124,6 +129,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Not_subscribed : [`Receive_message] output
     | Invalid_message : [`Receive_message] output
     | Unknown_validity : [`Receive_message] output
+    | Outdated : [`Receive_message] output
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_joined : [`Leave] output
@@ -156,6 +162,8 @@ module Make (C : AUTOMATON_CONFIG) :
         (** Intuitively, an outbound connection is a connection we
             initiated. But, the application layer can refine, relax or redefine
             this notion to fit its needs. *)
+    bootstrap : bool;
+        (** True if the connection is related to a bootstrap node *)
   }
 
   (** [Connections] implements a bidirectional map from peers to connections and from
@@ -182,6 +190,7 @@ module Make (C : AUTOMATON_CONFIG) :
       Peer.t ->
       direct:bool ->
       outbound:bool ->
+      bootstrap:bool ->
       t ->
       [`added of t | `already_known]
 
@@ -214,13 +223,13 @@ module Make (C : AUTOMATON_CONFIG) :
 
     let mem peer map = Peer.Map.mem peer map.peer_to_conn
 
-    let add_peer peer ~direct ~outbound map =
+    let add_peer peer ~direct ~outbound ~bootstrap map =
       if mem peer map then `already_known
       else
         let peer_to_conn =
           Peer.Map.add
             peer
-            {topics = Topic.Set.empty; direct; outbound}
+            {topics = Topic.Set.empty; direct; outbound; bootstrap}
             map.peer_to_conn
         in
         `added {map with peer_to_conn}
@@ -658,12 +667,13 @@ module Make (C : AUTOMATON_CONFIG) :
       let state = {state with fanout = Topic.Map.remove topic state.fanout} in
       (state, ())
 
-    let put_message_in_cache message_id message topic state =
+    let put_message_in_cache ~peer message_id message topic state =
       let state =
         {
           state with
           message_cache =
             Message_cache.add_message
+              ~peer
               message_id
               message
               topic
@@ -836,7 +846,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let filtered_message_ids =
         List.filter_e
           (fun message_id ->
-            match Message.valid ~message_id () with
+            match Message_id.valid message_id with
             | `Valid -> Ok (should_handle_message_id message_id)
             | `Unknown | `Outdated -> Ok false
             | `Invalid -> Error ())
@@ -1097,11 +1107,24 @@ module Make (C : AUTOMATON_CONFIG) :
    fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
 
   module Receive_message = struct
-    let check_valid sender topic message message_id =
+    let check_message_id_valid sender topic message_id =
+      let open Monad.Syntax in
+      match Message_id.valid message_id with
+      | `Valid -> unit
+      | `Unknown | `Outdated -> fail Unknown_validity
+      | `Invalid ->
+          let* () =
+            update_score sender (fun stats ->
+                Score.invalid_message_delivered stats topic)
+          in
+          fail Invalid_message
+
+    let check_message_valid sender topic message message_id =
       let open Monad.Syntax in
       match Message.valid ~message ~message_id () with
       | `Valid -> unit
-      | `Unknown | `Outdated -> fail Unknown_validity
+      | `Outdated -> fail Outdated
+      | `Unknown -> fail Unknown_validity
       | `Invalid ->
           let* () =
             update_score sender (fun stats ->
@@ -1119,18 +1142,25 @@ module Make (C : AUTOMATON_CONFIG) :
       in
       let*? () =
         let*! message_cache in
-        match Message_cache.get_first_seen_time message_id message_cache with
+        match
+          Message_cache.get_first_seen_time_and_senders message_id message_cache
+        with
         | None -> unit
-        | Some validated ->
+        | Some (validated, peers) ->
             let* () =
-              update_score sender (fun stats ->
-                  Score.duplicate_message_delivered stats topic validated)
+              if Peer.Set.mem sender peers then fun x -> (x, ())
+              else
+                update_score sender (fun stats ->
+                    Score.duplicate_message_delivered stats topic validated)
             in
             fail Already_received
       in
-      let*? () = check_valid sender topic message message_id in
+      let*? () = check_message_id_valid sender topic message_id in
+      let*? () = check_message_valid sender topic message message_id in
       let peers = Peer.Set.remove sender peers_in_mesh in
-      let* () = put_message_in_cache message_id message topic in
+      let* () =
+        put_message_in_cache ~peer:(Some sender) message_id message topic
+      in
       let* () =
         update_score sender (fun stats ->
             Score.first_message_delivered stats topic)
@@ -1153,7 +1183,9 @@ module Make (C : AUTOMATON_CONFIG) :
     let check_not_seen message_id =
       let open Monad.Syntax in
       let*! message_cache in
-      match Message_cache.get_first_seen_time message_id message_cache with
+      match
+        Message_cache.get_first_seen_time_and_senders message_id message_cache
+      with
       | None -> unit
       | Some _validated -> fail Already_published
 
@@ -1183,7 +1215,7 @@ module Make (C : AUTOMATON_CONFIG) :
     let handle topic message_id message : [`Publish_message] output Monad.t =
       let open Monad.Syntax in
       let*? () = check_not_seen message_id in
-      let* () = put_message_in_cache message_id message topic in
+      let* () = put_message_in_cache ~peer:None message_id message topic in
       let*! mesh_opt = find_mesh topic in
       let* peers =
         match mesh_opt with
@@ -1953,12 +1985,14 @@ module Make (C : AUTOMATON_CONFIG) :
   let heartbeat : [`Heartbeat] output Monad.t = Heartbeat.handle
 
   module Add_peer = struct
-    let handle ~direct ~outbound peer : [`Add_peer] output Monad.t =
+    let handle ~direct ~outbound ~bootstrap peer : [`Add_peer] output Monad.t =
       let open Monad.Syntax in
       let*! connections in
       let*! scores in
       let*! score_limits in
-      match Connections.add_peer peer ~direct ~outbound connections with
+      match
+        Connections.add_peer peer ~direct ~outbound ~bootstrap connections
+      with
       | `added connections ->
           let scores =
             Peer.Map.update
@@ -1975,7 +2009,8 @@ module Make (C : AUTOMATON_CONFIG) :
   end
 
   let add_peer : add_peer -> [`Add_peer] output Monad.t =
-   fun {direct; outbound; peer} -> Add_peer.handle ~direct ~outbound peer
+   fun {direct; outbound; peer; bootstrap} ->
+    Add_peer.handle ~direct ~outbound ~bootstrap peer
 
   module Remove_peer = struct
     let handle peer : [`Remove_peer] output Monad.t =
@@ -2164,15 +2199,16 @@ module Make (C : AUTOMATON_CONFIG) :
 
   (* Helpers. *)
 
-  let pp_add_peer fmtr ({direct; outbound; peer} : add_peer) =
+  let pp_add_peer fmtr ({direct; outbound; peer; bootstrap} : add_peer) =
     let open Format in
     fprintf
       fmtr
-      "{ direct=%b; outbound=%b; peer=%a }"
+      "{ direct=%b; outbound=%b; peer=%a; bootstrap=%b }"
       direct
       outbound
       Peer.pp
       peer
+      bootstrap
 
   let pp_remove_peer fmtr ({peer} : remove_peer) =
     let open Format in
@@ -2354,6 +2390,7 @@ module Make (C : AUTOMATON_CONFIG) :
           to_publish
     | Already_published -> fprintf fmtr "Already_published"
     | Invalid_message -> fprintf fmtr "Invalid_message"
+    | Outdated -> fprintf fmtr "Outdated_message"
     | Unknown_validity -> fprintf fmtr "Unknown_validity"
     | Route_message {to_route} ->
         fprintf
@@ -2423,6 +2460,7 @@ module Make (C : AUTOMATON_CONFIG) :
       topics : Topic.Set.t;
       direct : bool;
       outbound : bool;
+      bootstrap : bool;
     }
 
     type nonrec fanout_peers = fanout_peers = {
@@ -2543,7 +2581,7 @@ module Make (C : AUTOMATON_CONFIG) :
         List.concat
           [
             (if Topic.Set.is_empty c.topics then []
-            else [Fmt.field "topics" (fun c -> c.topics) pp_topic_set]);
+             else [Fmt.field "topics" (fun c -> c.topics) pp_topic_set]);
             [Fmt.field "direct" (fun c -> c.direct) Fmt.bool];
             [Fmt.field "outbound" (fun c -> c.outbound) Fmt.bool];
           ]

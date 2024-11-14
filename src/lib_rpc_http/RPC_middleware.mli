@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,6 +37,13 @@ type forwarder_events = {
           (without any forwarding). *)
 }
 
+type forwarder_resources
+
+val init_forwarder : unit -> forwarder_resources
+
+val forwarding_conn_closed :
+  forwarder_resources -> 'a * Cohttp.Connection.t -> unit
+
 (** A Resto middleware that transforms any callback to an other that rewrites
     queries that the proxy server cannot handle and forwards them to the full
     node at the given [Uri.t]. If [acl] parameter is provided, the forwarding
@@ -44,6 +52,7 @@ val proxy_server_query_forwarder :
   ?acl:RPC_server.Acl.t ->
   ?ctx:Cohttp_lwt_unix.Net.ctx ->
   ?forwarder_events:forwarder_events ->
+  forwarder_resources ->
   Uri.t ->
   RPC_server.callback ->
   RPC_server.callback
@@ -59,3 +68,17 @@ val rpc_metrics_transform_callback :
   unit Tezos_rpc.Directory.t ->
   RPC_server.callback ->
   RPC_server.callback
+
+(** A Resto middleware that adds Http cache headers to responses of any block 
+    query. These headers can be used by Caches to invalidate responses. The 
+    supported headers are:
+    * `max-age`: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#response_directives
+    * `if-none-match`: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-None-Match
+*)
+module Http_cache_headers : sig
+  val make :
+    get_estimated_time_to_next_level:(unit -> Ptime.span option Lwt.t) ->
+    get_block_hash:(string -> Block_hash.t option Lwt.t) ->
+    RPC_server.callback ->
+    RPC_server.callback
+end

@@ -42,10 +42,15 @@ module Get_delegates = struct
   module Signature = struct
     include Tezos_crypto.Signature.V1
     module To_latest = Tezos_crypto.Signature.Of_V1
+    module Of_latest = Tezos_crypto.Signature.Of_V_latest
   end
 
   module Contract = struct
     open Alpha_context.Contract
+
+    let get_manager_key context public_key_hash =
+      Alpha_context.Contract.get_manager_key context public_key_hash
+      |> Lwt.map Environment.wrap_tzresult
 
     let fold context ~init ~f =
       let open Lwt_syntax in

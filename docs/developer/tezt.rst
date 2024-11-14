@@ -238,7 +238,7 @@ Here is a minimal example::
       (* your test here *)
       unit
 
-Then, declare those files in ``manifest/main.ml``::
+Then, declare those files in ``manifest/``, for instance in :src:`manifest/product_octez.ml`::
 
     let _octez_base_tezts =
       tezt

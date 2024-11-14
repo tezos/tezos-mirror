@@ -26,7 +26,12 @@
 
 type 'a known = Unknown | Known of 'a
 
-type purpose = Operating | Batching | Cementing | Recovering
+type purpose =
+  | Operating
+  | Batching
+  | Cementing
+  | Recovering
+  | Executing_outbox
 
 type operation_kind =
   | Publish
@@ -106,6 +111,8 @@ type argument =
   | Rollup of string
   | Pre_images_endpoint of string
   | Apply_unsafe_patches
+  | Injector_retention_period of int
+  | Acl_allow_all
 
 let make_argument = function
   | Data_dir dir -> ["--data-dir"; dir]
@@ -126,6 +133,9 @@ let make_argument = function
   | Rollup addr -> ["--rollup"; addr]
   | Pre_images_endpoint addr -> ["--pre-images-endpoint"; addr]
   | Apply_unsafe_patches -> ["--apply-unsafe-patches"]
+  | Injector_retention_period nb_block ->
+      ["--injector-retention-period"; string_of_int nb_block]
+  | Acl_allow_all -> ["--acl-override"; "allow-all"]
 
 let is_redundant = function
   | Data_dir _, Data_dir _
@@ -144,7 +154,9 @@ let is_redundant = function
   | Mode _, Mode _
   | Rollup _, Rollup _
   | Pre_images_endpoint _, Pre_images_endpoint _
-  | Apply_unsafe_patches, Apply_unsafe_patches ->
+  | Apply_unsafe_patches, Apply_unsafe_patches
+  | Injector_retention_period _, Injector_retention_period _
+  | Acl_allow_all, Acl_allow_all ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Metrics_addr _, _
@@ -164,7 +176,9 @@ let is_redundant = function
   | Mode _, _
   | Rollup _, _
   | Pre_images_endpoint _, _
-  | Apply_unsafe_patches, _ ->
+  | Apply_unsafe_patches, _
+  | Injector_retention_period _, _
+  | Acl_allow_all, _ ->
       false
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
@@ -189,7 +203,7 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     base_dir : string;
-    operators : (purpose * string) list;
+    mutable operators : (purpose * string) list;
     default_operator : string option;
     metrics_addr : string option;
     metrics_port : int;
@@ -280,8 +294,14 @@ let metrics node =
       node.persistent_state.metrics_addr,
     node.persistent_state.metrics_port )
 
-let endpoint sc_node =
-  Printf.sprintf "http://%s:%d" (rpc_host sc_node) (rpc_port sc_node)
+let rpc_endpoint ?(local = false) node =
+  let host =
+    if local then Constant.default_host
+    else Runner.address node.persistent_state.runner
+  in
+  Printf.sprintf "http://%s:%d" host (rpc_port node)
+
+let endpoint node = rpc_endpoint node
 
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
@@ -292,6 +312,7 @@ let string_of_purpose = function
   | Batching -> "batching"
   | Cementing -> "cementing"
   | Recovering -> "recovering"
+  | Executing_outbox -> "executing_outbox"
 
 (* Extracts operators from node state, handling custom mode, and
    formats them as "purpose:operator". Includes default operator if present. *)
@@ -302,13 +323,16 @@ let operators_params rollup_node =
     (Option.to_list rollup_node.persistent_state.default_operator)
     rollup_node.persistent_state.operators
 
-let make_command_arguments ?password_file node =
-  [
-    "--endpoint";
-    Client.string_of_endpoint ~hostname:true node.persistent_state.endpoint;
-    "--base-dir";
-    base_dir node;
-  ]
+let make_command_arguments ?endpoint ?password_file node =
+  let endpoint =
+    Option.value
+      ~default:
+        (Client.string_of_endpoint
+           ~hostname:true
+           node.persistent_state.endpoint)
+      endpoint
+  in
+  ["--endpoint"; endpoint; "--base-dir"; base_dir node]
   @ Cli_arg.optional_arg "password-filename" Fun.id password_file
 
 let spawn_command sc_node args =
@@ -322,11 +346,21 @@ let spawn_command sc_node args =
 
 let runlike_argument rollup_node =
   let rollup_node_state = rollup_node.persistent_state in
+  let metrics_arg =
+    let metrics_addr, metrics_port = metrics rollup_node in
+    match rollup_node.persistent_state.runner with
+    | None -> metrics_addr ^ ":" ^ string_of_int metrics_port
+    | Some _ -> "0.0.0.0:" ^ string_of_int metrics_port
+  in
+  let rpc_host =
+    match rollup_node.persistent_state.runner with
+    | None -> rpc_host rollup_node
+    | Some _ -> Unix.(string_of_inet_addr inet_addr_any)
+  in
   [
     Data_dir (data_dir rollup_node);
-    (let metrics_addr, metrics_port = metrics rollup_node in
-     Metrics_addr (metrics_addr ^ ":" ^ string_of_int metrics_port));
-    Rpc_addr (rpc_host rollup_node);
+    Metrics_addr metrics_arg;
+    Rpc_addr rpc_host;
     Rpc_port (rpc_port rollup_node);
     History_mode rollup_node_state.history_mode;
     Gc_frequency rollup_node_state.gc_frequency;
@@ -334,6 +368,7 @@ let runlike_argument rollup_node =
   @ optional_arg (fun s -> Loser_mode s) rollup_node_state.loser_mode
   @ optional_switch No_degraded (not rollup_node_state.allow_degraded)
   @ optional_arg (fun n -> Dal_node n) rollup_node_state.dal_node
+  @ optional_arg (fun _ -> Acl_allow_all) rollup_node_state.runner
 
 let node_args rollup_node rollup_address =
   let mode = string_of_mode rollup_node.persistent_state.mode in
@@ -368,6 +403,40 @@ module Config_file = struct
 
   let update sc_node update = read sc_node |> update |> write sc_node
 end
+
+type unsafe_pvm_patch = Increase_max_nb_ticks of int
+
+let patch_config_unsafe_pvm_patches pvm_patches =
+  JSON.put
+    ( "unsafe-pvm-patches",
+      JSON.annotate ~origin:"sc_rollup_node.unsafe_pvm_patches"
+      @@ `A
+           [
+             `O
+               (List.map
+                  (function
+                    | Increase_max_nb_ticks i ->
+                        ("increase_max_nb_tick", `String (string_of_int i)))
+                  pvm_patches);
+           ] )
+
+let patch_config_execute_outbox =
+  JSON.put
+    ( "execute-outbox-messages-filter",
+      JSON.annotate ~origin:"sc_rollup_node.execute_outbox"
+      @@ `A
+           [
+             `O
+               [
+                 ( "transaction",
+                   `O
+                     [
+                       ("destination", `String "any");
+                       ("entrypoint", `String "any");
+                     ] );
+               ]
+             (* execute all outbox messages transactions *);
+           ] )
 
 let trigger_ready sc_node value =
   let pending = sc_node.persistent_state.pending_ready in
@@ -448,6 +517,24 @@ let wait_for_level ?timeout sc_node level =
         "smart_rollup_node_daemon_new_head_processed.v0"
         ~where:("level >= " ^ string_of_int level)
         promise
+
+let wait_for ?where ?(timeout = 60.) daemon name filter =
+  let w =
+    let* res = wait_for ?where daemon name filter in
+    return (`Ok res)
+  in
+  let t =
+    let* () = Lwt_unix.sleep timeout in
+    return `Timeout
+  in
+  let* res = Lwt.pick [w; t] in
+  match res with
+  | `Ok res -> return res
+  | `Timeout ->
+      Test.fail
+        "Timeout wile waiting %fs for smart rollup node event %s"
+        timeout
+        name
 
 let unsafe_wait_sync ?timeout sc_node =
   let* node_level =
@@ -552,16 +639,19 @@ let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
     mode
     (Node node)
 
-let do_runlike_command ?event_level ?event_sections_levels ?password_file node
-    arguments =
+let do_runlike_command ?env ?endpoint ?event_level ?event_sections_levels
+    ?password_file node arguments =
   if node.status <> Not_running then
     Test.fail "Smart contract rollup node %s is already running" node.name ;
   let on_terminate _status =
     trigger_ready node None ;
     unit
   in
-  let arguments = make_command_arguments ?password_file node @ arguments in
+  let arguments =
+    make_command_arguments ?password_file ?endpoint node @ arguments
+  in
   run
+    ?env
     ?runner:node.persistent_state.runner
     ?event_level
     ?event_sections_levels
@@ -570,7 +660,7 @@ let do_runlike_command ?event_level ?event_sections_levels ?password_file node
     arguments
     ~on_terminate
 
-let run ?(legacy = false) ?(restart = false) ?mode ?event_level
+let run ?env ?endpoint ?(legacy = false) ?(restart = false) ?mode ?event_level
     ?event_sections_levels ?(wait_ready = true) ?password_file node
     rollup_address extra_arguments =
   let* () = if restart then terminate node else return () in
@@ -589,6 +679,8 @@ let run ?(legacy = false) ?(restart = false) ?mode ?event_level
   in
   let* () =
     do_runlike_command
+      ?env
+      ?endpoint
       ?event_level
       ?event_sections_levels
       ?password_file
@@ -608,6 +700,9 @@ let change_node_mode sc_rollup_node mode =
     persistent_state = {sc_rollup_node.persistent_state with mode};
   }
 
+let change_operators sc_rollup_node operators =
+  sc_rollup_node.persistent_state.operators <- operators
+
 let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
   let cmd =
     [
@@ -624,6 +719,27 @@ let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
   in
   let process = spawn_command sc_rollup_node cmd in
   Process.check process
+
+let patch_durable_storage sc_rollup_node ~key ~value =
+  match sc_rollup_node.status with
+  | Not_running ->
+      let cmd =
+        [
+          "patch";
+          "durable";
+          "storage";
+          "at";
+          key;
+          "with";
+          value;
+          "--data-dir";
+          sc_rollup_node.persistent_state.data_dir;
+          "--force";
+        ]
+      in
+      let process = spawn_command sc_rollup_node cmd in
+      Process.check process
+  | Running _ -> Test.fail "Cannot patch the state of a running node"
 
 let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
     sc_rollup_node dir =
@@ -649,7 +765,8 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
   in
   Runnable.{value = process; run = parse}
 
-let import_snapshot ?(force = false) sc_rollup_node ~snapshot_file =
+let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
+    sc_rollup_node ~snapshot_file =
   let process =
     spawn_command
       sc_rollup_node
@@ -660,6 +777,7 @@ let import_snapshot ?(force = false) sc_rollup_node ~snapshot_file =
          "--data-dir";
          data_dir sc_rollup_node;
        ]
+      @ (if apply_unsafe_patches then make_argument Apply_unsafe_patches else [])
       @ Cli_arg.optional_switch "force" force)
   in
   Runnable.{value = process; run = Process.check}
@@ -682,12 +800,13 @@ module RPC = struct
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?extra_headers
         (as_rpc_endpoint node)
         rpc
 

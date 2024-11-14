@@ -135,7 +135,6 @@ extern "C" {
     /// `payload_len` is the same as the one used by the Tezos protocol.
     ///
     /// Returns the size of the data loaded in memory.
-    #[cfg(feature = "proto-alpha")]
     pub fn reveal(
         payload_addr: *const u8,
         payload_len: usize,
@@ -324,7 +323,6 @@ pub unsafe trait SmartRollupCore {
     /// - `payload_len` must be the length of the slice.
     /// - `destination_addr `must point to a mutable slice of bytes with
     ///   `capacity >= max_bytes`.
-    #[cfg(feature = "proto-alpha")]
     unsafe fn reveal(
         &self,
         payload_addr: *const u8,
@@ -346,80 +344,36 @@ pub struct ReadInputMessageInfo {
 #[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
 mod riscv64_hermit {
     extern crate std;
+
     use crate::smart_rollup_core::ReadInputMessageInfo;
     use std::{
         io::{self, Write},
         slice::from_raw_parts,
     };
-    use tezos_smart_rollup_constants::riscv::{
-        SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
-        SBI_TEZOS_META_ORIGINATION_LEVEL,
+    use tezos_smart_rollup_constants::{
+        core::{
+            GENERIC_INVALID_ACCESS, MEMORY_INVALID_ACCESS, METADATA_LENGTH,
+            ORIGINATION_LEVEL_LENGTH, ROLLUP_ADDRESS_LENGTH,
+        },
+        riscv::{
+            SbiError, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL,
+        },
     };
 
-    /// Information about the next inbox level
-    struct MessageInfo {
-        /// Level of the inbox that contains the new message
-        level: i32,
+    /// Check the SBI return value for errors.
+    fn check_sbi_result(result: isize) -> Result<usize, i32> {
+        match SbiError::from_result(result) {
+            None => Ok(result as usize),
 
-        /// ID within that inbox level
-        id: i32,
+            // The SBI call was not supported. This is a fatal error.
+            Some(SbiError::NotSupported) => panic!("SBI call not supported"),
 
-        /// Number of bytes in the message
-        length: u64,
-    }
+            // Indicates a bad address or memory access.
+            Some(SbiError::InvalidAddress) => Err(MEMORY_INVALID_ACCESS),
 
-    /// Select the next available inbox message.
-    #[inline(always)]
-    unsafe fn sbi_tezos_inbox_next(buffer: *mut u8, max_len: u64) -> MessageInfo {
-        let level: i32;
-        let id: i32;
-        let length: u64;
-
-        core::arch::asm!(
-            "ecall",
-            in("a0") buffer,
-            in("a1") max_len,
-            in("a7") SBI_FIRMWARE_TEZOS, // Extension ID for Tezos
-            in("a6") SBI_TEZOS_INBOX_NEXT, // Function ID for `sbi_tezos_inbox_next`
-            lateout("a0") level,
-            lateout("a1") id,
-            lateout("a2") length
-        );
-
-        MessageInfo { level, id, length }
-    }
-
-    /// Retrieve this rollup's origination level.
-    #[inline(always)]
-    unsafe fn sbi_tezos_meta_origination_level() -> u64 {
-        let level: u64;
-
-        core::arch::asm!(
-            "ecall",
-            in("a7") SBI_FIRMWARE_TEZOS,
-            in("a6") SBI_TEZOS_META_ORIGINATION_LEVEL,
-            lateout("a0") level
-        );
-
-        level
-    }
-
-    /// Retrieve the address of this rollup and return it via `buffer`. Returns
-    /// the number of bytes written to `buffer`.
-    #[inline(always)]
-    unsafe fn sbi_tezos_meta_address(buffer: *mut u8, max_len: u64) -> u64 {
-        let result: u64;
-
-        core::arch::asm!(
-            "ecall",
-            in("a0") buffer,
-            in("a1") max_len,
-            in("a7") SBI_FIRMWARE_TEZOS,
-            in("a6") SBI_TEZOS_META_ADDRESS,
-            lateout("a0") result
-        );
-
-        result
+            // Uncategorised error.
+            Some(_) => Err(GENERIC_INVALID_ACCESS),
+        }
     }
 
     pub unsafe fn read_input(
@@ -427,17 +381,27 @@ mod riscv64_hermit {
         dst: *mut u8,
         max_bytes: usize,
     ) -> i32 {
-        let info = sbi_tezos_inbox_next(dst, max_bytes as u64);
+        let message_info = &mut *message_info;
+        let result: isize;
 
-        // Length of 0 means nothing is available.
-        if info.length == 0 {
-            return 0i32;
+        // SBI call
+        //   extension = SBI_FIRMWARE_TEZOS
+        //   function = SBI_TEZOS_INBOX_NEXT
+        core::arch::asm!(
+            "ecall",
+            in("a0") dst,
+            in("a1") max_bytes,
+            in("a2") &mut message_info.level,
+            in("a3") &mut message_info.id,
+            in("a6") SBI_TEZOS_INBOX_NEXT,
+            in("a7") SBI_FIRMWARE_TEZOS,
+            lateout("a0") result,
+        );
+
+        match check_sbi_result(result) {
+            Ok(result) => result as i32,
+            Err(err) => err,
         }
-
-        (*message_info).level = info.level;
-        (*message_info).id = info.id;
-
-        info.length as i32
     }
 
     pub unsafe fn write_output(_src: *const u8, _num_bytes: usize) -> i32 {
@@ -514,7 +478,6 @@ mod riscv64_hermit {
         unimplemented!()
     }
 
-    #[cfg(feature = "proto-alpha")]
     pub unsafe fn reveal(
         _payload_addr: *const u8,
         _payload_len: usize,
@@ -529,17 +492,49 @@ mod riscv64_hermit {
     }
 
     pub unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
-        // Fill in the address part of the buffer.
-        let offset = sbi_tezos_meta_address(buffer, max_bytes as u64) as usize;
+        let mut sbi_buffer = [0u8; METADATA_LENGTH];
+        let origin_level = {
+            let result: isize;
 
-        // Fill the remaining part of the buffer with the origination level.
-        let orig_level = (sbi_tezos_meta_origination_level() as u32).to_le_bytes();
-        assert!(max_bytes - offset >= orig_level.len());
-        buffer
-            .add(offset)
-            .copy_from(orig_level.as_ptr(), orig_level.len());
+            // SBI call
+            //   extension = SBI_FIRMWARE_TEZOS
+            //   function = SBI_TEZOS_METADATA_REVEAL
+            core::arch::asm!(
+                "ecall",
+                in("a0") sbi_buffer.as_mut_ptr(),
+                in("a6") SBI_TEZOS_METADATA_REVEAL,
+                in("a7") SBI_FIRMWARE_TEZOS,
+                lateout("a0") result,
+            );
 
-        (offset + orig_level.len()) as i32
+            match check_sbi_result(result) {
+                Err(err) => return err,
+                Ok(result) => result,
+            }
+        };
+
+        match ORIGINATION_LEVEL_LENGTH {
+            4 => {
+                sbi_buffer[ROLLUP_ADDRESS_LENGTH
+                    ..(ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH)]
+                    .copy_from_slice(&(origin_level as i32).to_be_bytes());
+            }
+
+            8 => {
+                sbi_buffer[ROLLUP_ADDRESS_LENGTH
+                    ..(ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH)]
+                    .copy_from_slice(&(origin_level as i64).to_be_bytes());
+            }
+
+            _ => {
+                panic!("Unknown origination level type length {ORIGINATION_LEVEL_LENGTH}")
+            }
+        }
+
+        let written = max_bytes.min(sbi_buffer.len());
+        buffer.copy_from(sbi_buffer.as_mut_ptr(), written);
+
+        written as i32
     }
 }
 

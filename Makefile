@@ -1,5 +1,5 @@
 PACKAGES_SUBPROJECT:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
-PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find opam -name \*.opam -print)))
+PACKAGES:=$(patsubst %.opam,%,$(notdir $(wildcard opam/*.opam)))
 
 define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
@@ -13,17 +13,6 @@ endif
 
 include scripts/version.sh
 
-DOCKER_IMAGE_NAME := tezos
-DOCKER_IMAGE_VERSION := latest
-DOCKER_BUILD_IMAGE_NAME := $(DOCKER_IMAGE_NAME)_build
-DOCKER_BUILD_IMAGE_VERSION := latest
-DOCKER_BARE_IMAGE_NAME := $(DOCKER_IMAGE_NAME)-bare
-DOCKER_BARE_IMAGE_VERSION := latest
-DOCKER_DEBUG_IMAGE_NAME := $(DOCKER_IMAGE_NAME)-debug
-DOCKER_DEBUG_IMAGE_VERSION := latest
-DOCKER_DEPS_IMAGE_NAME := registry.gitlab.com/tezos/opam-repository
-DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
-DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
 PROFILE?=dev
@@ -41,8 +30,11 @@ DEV_EXECUTABLES := $(shell cat script-inputs/dev-executables)
 
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
-#Define octez only executables by excluding the EVM-node.
-OCTEZ_ONLY_EXECUTABLES := $(filter-out octez-evm-node,${ALL_EXECUTABLES})
+#Define octez only executables by excluding the EVM-node and teztale tools.
+OCTEZ_ONLY_EXECUTABLES := $(filter-out octez-evm-node octez-teztale-archiver octez-teztale-server,${ALL_EXECUTABLES})
+
+#Define octez layer1 only executables by excluding the EVM-node and teztale tools.
+OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out octez-evm-node octez-teztale-archiver octez-teztale-server octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dac-client octez-dac-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
 
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
@@ -52,8 +44,8 @@ BUILD_EXTRA ?=
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
-ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
-$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
+ifeq ($(filter ${opam_version_major}.%,${current_opam_version}),)
+$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version_major}.*))
 endif
 endif
 
@@ -110,6 +102,14 @@ release:
 octez:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_EXECUTABLES)"
 
+.PHONY: octez-layer1
+octez-layer1:
+	@$(MAKE) build OCTEZ_EXECUTABLES?="$(OCTEZ_ONLY_LAYER1_EXECUTABLES)"
+
+.PHONY: teztale
+teztale:
+	@$(MAKE) build OCTEZ_EXECUTABLES?="octez-teztale-archiver octez-teztale-server"
+
 .PHONY: experimental-release
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
@@ -133,21 +133,29 @@ build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
 .PHONY: $(ALL_EXECUTABLES)
-$(ALL_EXECUTABLES):
+$(ALL_EXECUTABLES): check-slim-mode check-custom-flags
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
+# If slim mode is active, kaitai updates should fail, as some protocol encoding
+# will be missing.
+# This check is disabled if file scripts/slim-mode.sh is not available,
+# which may be the case in Docker images or tarballs for instance.
+.PHONY: kaitai-fail-slim-mode
+kaitai-fail-slim-mode:
+	@if [ -f scripts/slim-mode.sh ]; then scripts/slim-mode.sh fail; fi || (echo "Cannot check kaitai struct files, slim mode is active."; exit 1)
+
 .PHONY: kaitai-struct-files-update
-kaitai-struct-files-update:
+kaitai-struct-files-update: kaitai-fail-slim-mode
 	@dune exe client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files
 
 .PHONY: kaitai-struct-files
-kaitai-struct-files:
+kaitai-struct-files: kaitai-fail-slim-mode
 	@$(MAKE) kaitai-struct-files-update
 	@$(MAKE) -C client-libs/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
-check-kaitai-struct-files:
+check-kaitai-struct-files: kaitai-fail-slim-mode
 	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
 	@dune build client-libs/bin_codec_kaitai/codec.exe
 	@rm client-libs/kaitai-struct-files/files/*.ksy
@@ -156,10 +164,24 @@ check-kaitai-struct-files:
 	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files with `make kaitai-struct-files-update`."; exit 1)
 
 .PHONY: validate-kaitai-struct-files
-validate-kaitai-struct-files:
+validate-kaitai-struct-files: kaitai-fail-slim-mode
 	@$(MAKE) check-kaitai-struct-files
 	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files 2>/dev/null || \
 	 (echo "To see the full log run: \"./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input\""; exit 1)
+
+# If slim mode is active, print a message before building anything.
+# This check is disabled if file scripts/slim-mode.sh is not available,
+# which may be the case in Docker images or tarballs for instance.
+.PHONY: check-slim-mode
+check-slim-mode:
+	@if [ -f scripts/slim-mode.sh ]; then scripts/slim-mode.sh check; fi
+
+# If custom flags are active, print a message before building anything.
+# This check is disabled if file scripts/custom-flags.sh is not available,
+# which may be the case in Docker images or tarballs for instance.
+.PHONY: check-custom-flags
+check-custom-flags:
+	@if [ -f scripts/custom-flags.sh ]; then scripts/custom-flags.sh check; fi
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
@@ -177,6 +199,7 @@ clean-old-names:
 	@rm -f tezos-codec
 	@rm -f tezos-protocol-compiler
 	@rm -f tezos-proxy-server
+	@rm -f octez-proxy-server
 	@rm -f tezos-baker-012-Psithaca
 	@rm -f tezos-accuser-012-Psithaca
 	@rm -f tezos-baker-013-PtJakart
@@ -209,7 +232,7 @@ clean-old-names:
 # See comment of clean-old-names for an explanation regarding why we do not try
 # to generate the symbolic links from *_EXECUTABLES.
 .PHONY: build
-build: clean-old-names
+build: check-slim-mode check-custom-flags clean-old-names
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
@@ -222,10 +245,6 @@ endif
 		@copy-parameters
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
-	@cd $(OCTEZ_BIN_DIR)/; \
-		ln -s octez-smart-rollup-node octez-smart-rollup-node-PtNairob; \
-		ln -s octez-smart-rollup-node octez-smart-rollup-node-Proxford; \
-		ln -s octez-smart-rollup-node octez-smart-rollup-node-alpha
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
@@ -317,12 +336,6 @@ test-unit: test-nonproto-unit test-proto-unit test-other-unit
 test-unit-alpha:
 	@dune build --profile=$(PROFILE) @src/proto_alpha/lib_protocol/runtest
 
-# TODO: https://gitlab.com/tezos/tezos/-/issues/5377
-# Running the runtest_js targets intermittently hangs.
-.PHONY: test-js
-test-js:
-	@dune build --error-reporting=twice @runtest_js
-
 .PHONY: build-tezt
 build-tezt:
 	@dune build tezt
@@ -383,7 +396,7 @@ lint-opam-dune:
 # the repo if you add "internal" dependencies to octez-distributed-internal)
 .PHONY: lint-tests-pkg
 lint-tests-pkg:
-	@(dune build -p octez-distributed-internal @runtest @runtest_js) || \
+	@(dune build -p octez-distributed-internal @runtest) || \
 	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
 
 
@@ -393,7 +406,7 @@ EXCLUDE_TEST_DIRS := $(addprefix --exclude-file ,$(addsuffix /,${TEST_DIRS}))
 .PHONY: test
 test: test-code
 
-.PHONY: check-linting check-python-linting check-ocaml-linting
+.PHONY: check-linting check-python-linting check-ocaml-linting check-opam-linting
 
 check-linting:
 	@scripts/lint.sh --check-scripts
@@ -410,6 +423,9 @@ check-python-typecheck:
 check-ocaml-linting:
 	@./scripts/semgrep/lint-all-ocaml-sources.sh
 
+check-opam-linting:
+	@find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +
+
 .PHONY: fmt fmt-ocaml fmt-python
 fmt: fmt-ocaml fmt-python fmt-shell
 
@@ -422,14 +438,23 @@ fmt-ocaml:
 fmt-python:
 	@$(MAKE) -C docs fmt
 
-.PHONY: dpkg
-dpkg:	all
-	@./scripts/dpkg/make_dpkg.sh
+.PHONY: dpkg-A
+dpkg-A:	all
+	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
 
-.PHONY: rpm
-rpm:	all
+.PHONY: dpkg-B
+dpkg-B:	all
+	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/B
+
+.PHONY: dpkg
+dpkg:	all dpkg-A dpkg-B
+
+.PHONY: rpm-A
+rpm-A: all
 	@./scripts/rpm/make_rpm.sh
 
+.PHONY: rpm
+rpm: all rpm-A
 
 .PHONY: build-deps
 build-deps:
@@ -467,49 +492,24 @@ build-unreleased: all
 
 .PHONY: docker-image-build
 docker-image-build:
-	@docker build \
-		-t $(DOCKER_BUILD_IMAGE_NAME):$(DOCKER_BUILD_IMAGE_VERSION) \
-		-f build.Dockerfile \
-		--build-arg BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
-		--build-arg BASE_IMAGE_VERSION=$(DOCKER_DEPS_IMAGE_VERSION) \
-		.
+	# Setting '--variants ""' creates only the build image.
+	@./scripts/create_docker_image.sh --variants ""
 
 .PHONY: docker-image-debug
 docker-image-debug:
-	docker build \
-		-t $(DOCKER_DEBUG_IMAGE_NAME):$(DOCKER_DEBUG_IMAGE_VERSION) \
-		--build-arg BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
-		--build-arg BASE_IMAGE_VERSION=$(DOCKER_DEPS_MINIMAL_IMAGE_VERSION) \
-		--build-arg BUILD_IMAGE=$(DOCKER_BUILD_IMAGE_NAME) \
-		--build-arg BUILD_IMAGE_VERSION=$(DOCKER_BUILD_IMAGE_VERSION) \
-		--target=debug \
-		.
+	@./scripts/create_docker_image.sh --variants "debug"
 
 .PHONY: docker-image-bare
 docker-image-bare:
-	@docker build \
-		-t $(DOCKER_BARE_IMAGE_NAME):$(DOCKER_BARE_IMAGE_VERSION) \
-		--build-arg=BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
-		--build-arg=BASE_IMAGE_VERSION=$(DOCKER_DEPS_MINIMAL_IMAGE_VERSION) \
-		--build-arg=BASE_IMAGE_VERSION_NON_MIN=$(DOCKER_DEPS_IMAGE_VERSION) \
-		--build-arg BUILD_IMAGE=$(DOCKER_BUILD_IMAGE_NAME) \
-		--build-arg BUILD_IMAGE_VERSION=$(DOCKER_BUILD_IMAGE_VERSION) \
-		--target=bare \
-		.
+	@./scripts/create_docker_image.sh --variants "bare"
 
 .PHONY: docker-image-minimal
 docker-image-minimal:
-	@docker build \
-		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_VERSION) \
-		--build-arg=BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
-		--build-arg=BASE_IMAGE_VERSION=$(DOCKER_DEPS_MINIMAL_IMAGE_VERSION) \
-		--build-arg=BASE_IMAGE_VERSION_NON_MIN=$(DOCKER_DEPS_IMAGE_VERSION) \
-		--build-arg BUILD_IMAGE=$(DOCKER_BUILD_IMAGE_NAME) \
-		--build-arg BUILD_IMAGE_VERSION=$(DOCKER_BUILD_IMAGE_VERSION) \
-		.
+	@./scripts/create_docker_image.sh --variants "minimal"
 
 .PHONY: docker-image
-docker-image: docker-image-build docker-image-debug docker-image-bare docker-image-minimal
+docker-image:
+	@./scripts/create_docker_image.sh
 
 .PHONY: install
 install:
@@ -547,7 +547,7 @@ clean: coverage-clean clean-old-names dpkg-clean rpm-clean
 build-kernels-deps:
 	$(MAKE) -f kernels.mk build-deps
 	$(MAKE) -f etherlink.mk build-deps
-	$(MAKE) -C src/risc_v build-deps
+	$(MAKE) -C src/riscv build-deps
 
 .PHONY: build-kernels-dev-deps
 build-kernels-dev-deps:
@@ -558,22 +558,28 @@ build-kernels-dev-deps:
 build-kernels:
 	$(MAKE) -f kernels.mk build
 	$(MAKE) -f etherlink.mk build
-	$(MAKE) -C src/risc_v build
+	$(MAKE) -C src/riscv build
 
 .PHONY: check-kernels
 check-kernels:
 	$(MAKE) -f kernels.mk check
 	$(MAKE) -f etherlink.mk check
-	$(MAKE) -C src/risc_v check
+	$(MAKE) -C src/riscv check
 
 .PHONY: test-kernels
 test-kernels:
 	$(MAKE) -f kernels.mk test
 	$(MAKE) -f etherlink.mk test
-	$(MAKE) -C src/risc_v test
+	$(MAKE) -C src/riscv test
 
 .PHONY: clean-kernels
 clean-kernels:
 	$(MAKE) -f kernels.mk clean
 	$(MAKE) -f etherlink.mk clean
-	$(MAKE) -C src/risc_v clean
+	$(MAKE) -C src/riscv clean
+
+.PHONY: wasm_runtime_gen_files
+wasm_runtime_gen_files::
+	@cd src/lib_wasm_runtime; cargo build 2> /dev/null
+
+octez-evm-node: wasm_runtime_gen_files

@@ -123,20 +123,18 @@ module Term = struct
       & opt (some endpoint_arg) None
       & info ~docs ~doc ~docv:"URI" ["endpoint"])
 
-  let operator_profile_printer fmt = function
-    | Types.Attester pkh ->
-        Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
-    | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
-    | Observer {slot_index} -> Format.fprintf fmt "%d" slot_index
+  let attester_profile_printer = Signature.Public_key_hash.pp
+
+  let observer_producer_profile_printer = Format.pp_print_int
 
   let attester_profile_arg =
     let open Cmdliner in
     let decoder string =
       match Signature.Public_key_hash.of_b58check_opt string with
       | None -> Error (`Msg "Unrecognized profile")
-      | Some pkh -> Types.Attester pkh |> Result.ok
+      | Some pkh -> Ok pkh
     in
-    Arg.conv (decoder, operator_profile_printer)
+    Arg.conv (decoder, attester_profile_printer)
 
   let producer_profile_arg =
     let open Cmdliner in
@@ -151,9 +149,9 @@ module Term = struct
       match int_of_string_opt string with
       | None -> error ()
       | Some i when i < 0 -> error ()
-      | Some slot_index -> Types.Producer {slot_index} |> Result.ok
+      | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, operator_profile_printer)
+    Arg.conv (decoder, observer_producer_profile_printer)
 
   let observer_profile_arg =
     let open Cmdliner in
@@ -168,9 +166,9 @@ module Term = struct
       match int_of_string_opt string with
       | None -> error ()
       | Some i when i < 0 -> error ()
-      | Some slot_index -> Types.Observer {slot_index} |> Result.ok
+      | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, operator_profile_printer)
+    Arg.conv (decoder, observer_producer_profile_printer)
 
   let attester_profile =
     let open Cmdliner in
@@ -180,7 +178,7 @@ module Term = struct
     Arg.(
       value
       & opt (list attester_profile_arg) []
-      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"])
+      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"; "attester"])
 
   let producer_profile =
     let open Cmdliner in
@@ -188,15 +186,23 @@ module Term = struct
     Arg.(
       value
       & opt (list producer_profile_arg) []
-      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["producer-profiles"])
+      & info
+          ~docs
+          ~doc
+          ~docv:"INDEX1,INDEX2,..."
+          ["producer-profiles"; "producer"; "operator"])
 
   let observer_profile =
     let open Cmdliner in
     let doc = "The Octez DAL node observer profiles for given slot indexes." in
     Arg.(
       value
-      & opt (list observer_profile_arg) []
-      & info ~docs ~doc ~docv:"INDEX1,INDEX2,..." ["observer-profiles"])
+      & opt (some' (list observer_profile_arg)) None
+      & info
+          ~docs
+          ~doc
+          ~docv:"INDEX1,INDEX2,..."
+          ["observer-profiles"; "observer"])
 
   let bootstrap_profile =
     let open Cmdliner in
@@ -204,7 +210,7 @@ module Term = struct
       "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
        cannot also be an attester or a slot producer"
     in
-    Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"])
+    Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"; "bootstrap"])
 
   let peers =
     let open Cmdliner in
@@ -224,7 +230,7 @@ module Term = struct
       "The TCP address and optionally the port of the node's metrics server. \
        The default address is 0.0.0.0. The default port is 11733."
     in
-    let default_port = Configuration_file.default.metrics_addr |> snd in
+    let default_port = Configuration_file.default_metrics_port in
     Arg.(
       value
       & opt (some (p2p_point_arg ~default_port)) None
@@ -263,13 +269,51 @@ module Term = struct
       & opt (some history_mode_arg) None
       & info ~docs ~doc ["history-mode"])
 
+  let service_name_env =
+    let open Cmdliner in
+    Cmd.Env.info
+      ~docs:"Opentelemetry"
+      ~doc:"Enable to provide an opentelemetry service name"
+      "OTEL_SERVICE_NAME"
+
+  let service_name =
+    let open Cmdliner in
+    let doc =
+      "A name that can be used to identify this node. This name can appear in \
+       observability data such as traces."
+    in
+    let service_name_arg = Arg.string in
+    Arg.(
+      value
+      & opt (some service_name_arg) None
+      & info ~docs ~doc ~env:service_name_env ["service-name"])
+
+  let service_namespace_env =
+    let open Cmdliner in
+    Cmd.Env.info
+      ~docs:"Opentelemetry"
+      ~doc:"Enable to provide an opentelemetry service namespace"
+      "OTEL_SERVICE_NAMESPACE"
+
+  let service_namespace =
+    let open Cmdliner in
+    let doc =
+      "A namespace associated with the node. This namespace can appear in \
+       observability data such as traces."
+    in
+    let service_namespace_arg = Arg.string in
+    Arg.(
+      value
+      & opt (some service_namespace_arg) None
+      & info ~docs ~doc ~env:service_namespace_env ["service-namespace"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode))
+       $ history_mode $ service_name $ service_namespace))
 end
 
 module Run = struct
@@ -336,10 +380,12 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  profiles : Types.profiles option;
+  profile : Profile_manager.t option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
   history_mode : Configuration_file.history_mode option;
+  service_name : string option;
+  service_namespace : string option;
 }
 
 type t = Run | Config_init
@@ -347,8 +393,8 @@ type t = Run | Config_init
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode =
-    let run profiles =
+      history_mode service_name service_namespace =
+    let run profile =
       run
         subcommand
         {
@@ -358,20 +404,31 @@ let make ~run =
           listen_addr;
           public_addr;
           endpoint;
-          profiles;
+          profile;
           metrics_addr;
           peers;
           history_mode;
+          service_name;
+          service_namespace;
         }
     in
-    match (bootstrap_flag, attesters @ producers @ observers) with
-    | false, [] -> run None
-    | true, [] -> run @@ Some Types.Bootstrap
-    | false, operator_profiles -> run @@ Some (Operator operator_profiles)
-    | true, _ :: _ ->
+    let profile = Operator_profile.make ~attesters ~producers ?observers () in
+    match (bootstrap_flag, observers, profile) with
+    | false, None, profiles when Operator_profile.is_empty profiles -> run None
+    | false, Some _, profiles when Operator_profile.is_empty profiles ->
+        (* The user only mentioned '--observer' without any slot and
+           without any other profile. It will be assigned to random
+           slots. *)
+        run (Some Profile_manager.random_observer)
+    | false, _, _ -> run @@ Some (Profile_manager.operator profile)
+    | true, None, profiles when Operator_profile.is_empty profiles ->
+        run @@ Some Profile_manager.bootstrap
+    | true, _, _ ->
         `Error
           ( false,
-            "A bootstrap node cannot also be an attester or a slot producer." )
+            "a bootstrap node (option '--bootstrap') cannot be an attester \
+             (option '--attester'), an operator (option '--operator') nor an \
+             observer (option '--observer')" )
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =

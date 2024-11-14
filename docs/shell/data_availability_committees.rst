@@ -34,8 +34,8 @@ Tools
 -----
 The DAC infrastructure is implemented by two executables: ``octez-dac-node`` and ``octez-dac-client``.
 
- * ``octez-dac-node`` is used for setting up a new DAC Committee or track an existing one.
- * ``octez-dac-client`` is used for sending payloads to the DAC infrastructure for storage and for retrieving certificates signed by the DAC Members.
+* ``octez-dac-node`` is used for setting up a new DAC Committee or track an existing one.
+* ``octez-dac-client`` is used for sending payloads to the DAC infrastructure for storage and for retrieving certificates signed by the DAC Members.
 
 There is support for DAC in the Rust `Smart Rollup Kernel SDK <https://crates.io/crates/tezos-smart-rollup>`_ for revealing the underlying data of a DAC Certificate and verifying DAC Member signatures.
 
@@ -45,10 +45,10 @@ The DAC Certificate is a key artifact in the DAC workflow.
 It represents the commitment of DAC Members to provide the underlying data upon request and is used to verify data integrity and signature validity.
 It is composed of 4 attributes:
 
-   * **Version** - The version of the DAC Certificate schema.
-   * **Root hash** - The Merkle tree root hash of the payload.
-   * **Aggregate signature** - The aggregate of the DAC Member signatures as proof of their commitment to provide the data.
-   * **Witnesses** - A bitset to indicate which DAC Members' signatures are included in the aggregate signature.
+* **Version** - The version of the DAC Certificate schema.
+* **Root hash** - The Merkle tree root hash of the payload.
+* **Aggregate signature** - The aggregate of the DAC Member signatures as proof of their commitment to provide the data.
+* **Witnesses** - A bitset to indicate which DAC Members' signatures are included in the aggregate signature.
 
 Workflow Overview
 ^^^^^^^^^^^^^^^^^
@@ -109,9 +109,9 @@ This can be done with the following command:
 
 where
 
-   * ``$COORDINATOR_RPC_ADDR`` - RPC address of the coordinator node in the format ``{host}:{port}``. eg. ``104.16.227.108:443``
-   * ``$PAYLOAD`` - Hex-encoded payload that DAC Members will store.
-   * ``$THRESHOLD`` - Minimum number of DAC Members that must commit to provide the data before the command returns.
+* ``$COORDINATOR_RPC_ADDR`` - RPC address of the coordinator node in the format ``{host}:{port}``. eg. ``104.16.227.108:443``
+* ``$PAYLOAD`` - Hex-encoded payload that DAC Members will store.
+* ``$THRESHOLD`` - Minimum number of DAC Members that must commit to provide the data before the command returns.
 
 Upon executing the command, the client will wait until the threshold number of signatures on the certificate is reached before returning the certificate as a hex-encoded string.
 This certificate must be posted to the global rollup inbox (see :ref:`Sending external inbox message <sending_external_inbox_message>`) which will eventually be processed by the kernel.
@@ -146,9 +146,9 @@ A Coordinator node can be further configured with the following command:
 
 where
 
-   * ``$BLS_PUBLIC_KEYS`` - Space separated list of BLS12-381 public keys of the committee members. Note that the order of keys will ultimately affect the Certificate's hash and should be respected among all parties in the DAC network. eg. ``BLpk1yH... BLpk1wV...``
-   * ``$DATA_DIR`` - Optional directory containing the persisted store of the DAC node instance. It is advised to give different values in case multiple DAC nodes run on the same host. Defaults to ``~/.octez-dac-node``.
-   * ``$REVEAL_DATA_DIR`` - Directory where pages are stored. It is advised to provide different values in case multiple DAC nodes run on the same host.
+* ``$BLS_PUBLIC_KEYS`` - Space separated list of BLS12-381 public keys of the committee members. Note that the order of keys will ultimately affect the Certificate's hash and should be respected among all parties in the DAC network. eg. ``BLpk1yH... BLpk1wV...``
+* ``$DATA_DIR`` - Optional directory containing the persisted store of the DAC node instance. It is advised to give different values in case multiple DAC nodes run on the same host. Defaults to ``~/.octez-dac-node``.
+* ``$REVEAL_DATA_DIR`` - Directory where pages are stored. It is advised to provide different values in case multiple DAC nodes run on the same host.
 
 Once configured, the Coordinator can be run with:
 
@@ -159,8 +159,8 @@ Once configured, the Coordinator can be run with:
 
 where
 
-   * ``$NODE_ENDPOINT`` - Endpoint of the Tezos node to connect to. All inter-connected DAC nodes should be connected to Tezos nodes running the same Protocol.
-   * ``$DATA_DIR`` - Same value as ``$DATA_DIR`` above.
+* ``$NODE_ENDPOINT`` - Endpoint of the Tezos node to connect to. All inter-connected DAC nodes should be connected to Tezos nodes running the same Protocol.
+* ``$DATA_DIR`` - Same value as ``$DATA_DIR`` above.
 
 
 Running a Committee Member
@@ -185,10 +185,10 @@ Then a Committee Member node can be configured with the following command:
 
 where:
 
-   * ``$COORDINATOR_RPC_ADDR`` - RPC address of the coordinator node, in the format ``{host}:{port}``. eg. ``127.0.0.1:10832``
-   * ``$TZ4_ADDRESS`` - ``tz4`` address of the account of the committee member. eg. ``tz4KWwWMTZJLX5CKxAifUAy1WS3HdEKsk8Ys``
-   * ``$DATA_DIR`` - Optional directory containing the persisted store of the DAC node instance. It is advised to give different values in case multiple DAC nodes run on the same host. Defaults to ``~/.octez-dac-node``.
-   * ``$REVEAL_DATA_DIR`` - Directory where pages are stored. It is advised to provide different values in case multiple DAC nodes run on the same host.
+* ``$COORDINATOR_RPC_ADDR`` - RPC address of the coordinator node, in the format ``{host}:{port}``. eg. ``127.0.0.1:10832``
+* ``$TZ4_ADDRESS`` - ``tz4`` address of the account of the committee member. eg. ``tz4KWwWMTZJLX5CKxAifUAy1WS3HdEKsk8Ys``
+* ``$DATA_DIR`` - Optional directory containing the persisted store of the DAC node instance. It is advised to give different values in case multiple DAC nodes run on the same host. Defaults to ``~/.octez-dac-node``.
+* ``$REVEAL_DATA_DIR`` - Directory where pages are stored. It is advised to provide different values in case multiple DAC nodes run on the same host.
 
 Once configured, the Committee Member can be run with:
 
@@ -199,8 +199,8 @@ Once configured, the Committee Member can be run with:
 
 where
 
-   * ``$NODE_ENDPOINT`` - Endpoint of the Tezos node to connect to. All inter-connected DAC nodes should be connected to Tezos nodes running the same Protocol.
-   * ``$DATA_DIR`` - Same value as ``$DATA_DIR`` above.
+* ``$NODE_ENDPOINT`` - Endpoint of the Tezos node to connect to. All inter-connected DAC nodes should be connected to Tezos nodes running the same Protocol.
+* ``$DATA_DIR`` - Same value as ``$DATA_DIR`` above.
 
 
 Integrate DAC with a Smart Rollup node
@@ -225,12 +225,12 @@ An Observer node can be configured with the following command:
 
 where
 
-   * ``$COORDINATOR_RPC_ADDR`` - RPC address of the coordinator node in the format ``{host}:{port}``. eg. ``127.0.0.1:10832``
-   * ``$COMMITTEE_MEMBER_RPC_ADDRESSES`` - Space separated list of the RPC addresses of the committee member nodes in the format ``{host1}:{port1} {host2}:{port2} ...``. eg. ``104.16.227.108:443 172.64.155.164:443``
-   * ``$DATA_DIR`` - Optional directory containing the persisted store of the DAC node instance. It is advised to give different values in case multiple DAC nodes run on the same host. Defaults to ``~/.octez-dac-node``.
-   * ``$REVEAL_DATA_DIR`` - Directory where pages are stored. It is advised to provide different values in case multiple DAC nodes run on the same host.
-   * ``$RPC_ADDR`` - Host that the DAC node listens on. Defaults to ``127.0.0.1``.
-   * ``$RPC_PORT`` - Port the DAC node listens on. Defaults to ``10832``.
+* ``$COORDINATOR_RPC_ADDR`` - RPC address of the coordinator node in the format ``{host}:{port}``. eg. ``127.0.0.1:10832``
+* ``$COMMITTEE_MEMBER_RPC_ADDRESSES`` - Space separated list of the RPC addresses of the committee member nodes in the format ``{host1}:{port1} {host2}:{port2} ...``. eg. ``104.16.227.108:443 172.64.155.164:443``
+* ``$DATA_DIR`` - Optional directory containing the persisted store of the DAC node instance. It is advised to give different values in case multiple DAC nodes run on the same host. Defaults to ``~/.octez-dac-node``.
+* ``$REVEAL_DATA_DIR`` - Directory where pages are stored. It is advised to provide different values in case multiple DAC nodes run on the same host.
+* ``$RPC_ADDR`` - Host that the DAC node listens on. Defaults to ``127.0.0.1``.
+* ``$RPC_PORT`` - Port the DAC node listens on. Defaults to ``10832``.
 
 Once configured, the Observer can be run with:
 
@@ -241,8 +241,8 @@ Once configured, the Observer can be run with:
 
 where
 
-   * ``$NODE_ENDPOINT`` - Endpoint of the Tezos node to connect to. All inter-connected DAC nodes should be connected to Tezos nodes running the same Protocol.
-   * ``$DATA_DIR`` - Same value as ``$DATA_DIR`` above.
+* ``$NODE_ENDPOINT`` - Endpoint of the Tezos node to connect to. All inter-connected DAC nodes should be connected to Tezos nodes running the same Protocol.
+* ``$DATA_DIR`` - Same value as ``$DATA_DIR`` above.
 
 Fetching missing pages from the Observer
 """"""""""""""""""""""""""""""""""""""""
@@ -256,4 +256,4 @@ The rollup node can be configured to fetch missing pages from an Observer node b
 
 where
 
-   * ``$OBSERVER_RPC_ADDR`` -  RPC address of the Observer node in the format ``{host}:{port}``. eg. ``127.0.0.1:10832``
+* ``$OBSERVER_RPC_ADDR`` -  RPC address of the Observer node in the format ``{host}:{port}``. eg. ``127.0.0.1:10832``

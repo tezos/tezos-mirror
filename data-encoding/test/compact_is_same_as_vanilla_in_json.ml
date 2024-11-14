@@ -152,11 +152,11 @@ module Commons = struct
     List.concat_map
       (fun (Test (((vanilla, _) as e), vs)) ->
         (if Data_encoding__Encoding.is_nullable vanilla then []
-        else
-          [
-            Test (option e, Seq.return None);
-            Test (option e, Seq.map Option.some vs);
-          ])
+         else
+           [
+             Test (option e, Seq.return None);
+             Test (option e, Seq.map Option.some vs);
+           ])
         @ [
             Test (tup1 e, vs);
             Test (obj1 "lol" e, vs);

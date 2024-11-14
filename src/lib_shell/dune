@@ -8,16 +8,14 @@
  (libraries
   lwt-watcher
   lwt-canceler
-  prometheus
+  octez-libs.prometheus
   octez-libs.base
   octez-libs.base.unix
   octez-libs.rpc
-  octez-libs.tezos-context
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-proto-libs.protocol-environment
   octez-shell-libs.context-ops
-  octez-shell-libs.shell-context
   octez-shell-libs.p2p
   octez-libs.stdlib-unix
   octez-shell-libs.shell-services
@@ -30,18 +28,17 @@
   octez-libs.crypto-dal.dal-config
   lwt-exit)
  (inline_tests (flags -verbose) (modes native))
- (preprocess (pps ppx_expect))
+ (preprocess (pps ppx_expect octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base
   -open Tezos_base_unix
-  -open Tezos_context
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_protocol_environment
   -open Tezos_context_ops
-  -open Tezos_shell_context
   -open Tezos_p2p
   -open Tezos_stdlib_unix
   -open Tezos_shell_services

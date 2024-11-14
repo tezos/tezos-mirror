@@ -30,11 +30,13 @@
    Subject:      Test transfers
 *)
 
+let team = Tag.layer1
+
 let test_zero_transfer_to_implicit_contract =
   Protocol.register_test
     ~__FILE__
     ~title:"Test Zero Transfer to Implicit Contract"
-    ~tags:["client"; "transfer"]
+    ~tags:[team; "client"; "transfer"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -56,7 +58,7 @@ let test_zero_transfer_to_nonexistent_contract =
   Protocol.register_test
     ~__FILE__
     ~title:"Test Zero Transfer to Nonexistent Contract"
-    ~tags:["client"; "transfer"]
+    ~tags:[team; "client"; "transfer"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -75,7 +77,7 @@ let test_encrypted_source_stop_loop_password =
   Protocol.register_test
     ~__FILE__
     ~title:"Test invalid inputs when transferring from encrypted source account"
-    ~tags:["client"; "transfer"; "stop"; "loop"; "password"]
+    ~tags:[team; "client"; "transfer"; "stop"; "loop"; "password"]
     ~uses_node:false
   @@ fun protocol ->
   Log.info "Import an encrypted account with some tez" ;

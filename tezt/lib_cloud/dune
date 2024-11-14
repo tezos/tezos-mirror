@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_tezos_tezt_cloud)
+ (public_name tezt-tezos.tezt-cloud)
+ (libraries
+  tezt
+  tezt-tezos.tezt-performance-regression
+  octez-libs.data-encoding)
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos_tezt_performance_regression))

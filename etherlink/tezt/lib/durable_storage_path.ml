@@ -43,6 +43,8 @@ let kernel rst = sf "/kernel%s" rst
 
 let kernel_root_hash = evm "/kernel_root_hash"
 
+let indexes = world_state "/indexes"
+
 let eth_accounts = world_state "/eth_accounts"
 
 let eth_account addr = sf "%s/%s" eth_accounts (normalize addr)
@@ -84,6 +86,18 @@ let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
 let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"
 
 let reveal_config = "/__tmp/reveal_config"
+
+let enable_fa_bridge = evm "/feature_flags/enable_fa_bridge"
+
+module Ticket_table = struct
+  let ticket_table =
+    sf
+      "%s/ticket_table"
+      (eth_account "0x0000000000000000000000000000000000000000")
+
+  let balance ~ticket_hash ~account =
+    String.concat "/" [ticket_table; ticket_hash; account]
+end
 
 module Ghostnet = struct
   let eth_accounts = evm "/eth_accounts"

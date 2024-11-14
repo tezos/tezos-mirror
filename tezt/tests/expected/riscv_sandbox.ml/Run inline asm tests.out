@@ -1,0 +1,2 @@
+
+./src/riscv/riscv-sandbox run --input src/riscv/tests/inline_asm/rv64-inline-asm-tests --max-steps 9223372036854775807 --posix-exit-mode machine

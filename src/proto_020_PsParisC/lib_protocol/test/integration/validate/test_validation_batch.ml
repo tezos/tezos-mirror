@@ -11,32 +11,24 @@
     Invocation: dune exec src/proto_020_PsParisC/lib_protocol/test/integration/validate/main.exe \
                   -- --file test_validation_batch.ml
     Subject:    Validation of batched manager operation.
+
+                There may be overlap with
+                [lib_protocol/test/integration/operations/test_combined_operations.ml].
 *)
 
 open Protocol
 open Alpha_context
 open Manager_operation_helpers
+open Error_helpers
+
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["validation"; "batch"]
+
+let make_test = make_test ~register_test
+
+let make_test_batched = make_test_batched ~register_test
 
 (** {2 Tests on operation batches} *)
-
-(** Revelation should not occur elsewhere than in first position
-   in a batch.*)
-let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
-  let open Lwt_result_syntax in
-  let expect_failure errs =
-    match errs with
-    | [
-     Environment.Ecoproto_error
-       Validate_errors.Manager.Incorrect_reveal_position;
-    ] ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
-  validate_ko_diagnostic infos op expect_failure
 
 let batch_in_the_middle infos kind1 kind2 =
   let open Lwt_result_syntax in
@@ -82,25 +74,8 @@ let batch_in_the_middle infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [operation1; reveal; operation2]
   in
-  batch_reveal_in_the_middle_diagnostic infos [batch]
-
-(** A batch of manager operation contains at most one Revelation.*)
-let batch_two_reveals_diagnostic (infos : infos) op =
-  let open Lwt_result_syntax in
-  let expected_failure errs =
-    match errs with
-    | [
-     Environment.Ecoproto_error
-       Validate_errors.Manager.Incorrect_reveal_position;
-    ] ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
-  validate_ko_diagnostic infos op expected_failure
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
+  validate_ko_diagnostic infos [batch] expect_failure
 
 let batch_two_reveals infos kind =
   let open Lwt_result_syntax in
@@ -146,23 +121,8 @@ let batch_two_reveals infos kind =
       (Context.B infos.ctxt.block)
       [reveal; reveal1; operation]
   in
-  batch_two_reveals_diagnostic infos [batch]
-
-(** Every manager operation in a batch concerns the same source.*)
-let batch_two_sources_diagnostic (infos : infos) op =
-  let open Lwt_result_syntax in
-  let expect_failure errs =
-    match errs with
-    | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_sources]
-      ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
-  validate_ko_diagnostic infos op expect_failure
+  let expect_failure = expect_incorrect_reveal_position ~loc:__LOC__ in
+  validate_ko_diagnostic infos [batch] expect_failure
 
 let batch_two_sources infos kind1 kind2 =
   let open Lwt_result_syntax in
@@ -178,10 +138,10 @@ let batch_two_sources infos kind1 kind2 =
       }
       infos
   in
+  let source2 =
+    match infos.accounts.del with None -> assert false | Some s -> s
+  in
   let infos =
-    let source2 =
-      match infos.accounts.del with None -> assert false | Some s -> s
-    in
     {infos with accounts = {infos.accounts with sources = [source2]}}
   in
   let* operation2 =
@@ -196,7 +156,13 @@ let batch_two_sources infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [operation1; operation2]
   in
-  batch_two_sources_diagnostic infos [batch]
+  let expect_failure =
+    Error_helpers.expect_inconsistent_sources
+      ~loc:__LOC__
+      ~first_source:source
+      ~source:(contract_of source2)
+  in
+  validate_ko_diagnostic infos [batch] expect_failure
 
 (** Counters in a batch should be a sequence from the successor of
    the stored counter associated to source in the initial context. *)
@@ -270,34 +236,54 @@ let batch_incons_counters infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [reveal; op1; op2]
   in
-  let expect_failure errs =
-    match errs with
-    | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_counters]
-      ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
   let* i = Incremental.begin_construction infos.ctxt.block in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_same
+  let test_inconsistent_counters ~__LOC__ ~before_wrong_counter ~wrong_counter
+      op =
+    let expect_failure =
+      (* Remember that [select_op] actually builds an operation
+         using the successor of the counter argument. *)
+      Error_helpers.expect_inconsistent_counters
+        ~loc:__LOC__
+        ~source
+        ~previous_counter:(Manager_counter.succ before_wrong_counter)
+        ~counter:(Manager_counter.succ wrong_counter)
+    in
+    let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
+    return_unit
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_in_the_future
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter
+      ~wrong_counter:counter
+      batch_same
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_missing_one
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter0
+      ~wrong_counter:counter2
+      batch_in_the_future
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_inverse
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter
+      ~wrong_counter:counter3
+      batch_missing_one
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_in_the_past
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter0
+      ~wrong_counter:counter2
+      batch_inverse
   in
-  return_unit
+  test_inconsistent_counters
+    ~__LOC__
+    ~before_wrong_counter:counter0
+    ~wrong_counter:counter0
+    batch_in_the_past
 
 (** A batch that consumes all the balance for fees can only face the total
    consumption at the end of the batch. *)
@@ -367,7 +353,7 @@ let batch_empty_at_end infos kind1 kind2 =
   let source = contract_of (get_source infos) in
   let* counter = Context.Contract.counter (B infos.ctxt.block) source in
   let* init_bal = Context.Contract.balance (B infos.ctxt.block) source in
-  let half_init_bal = Test_tez.(init_bal /! 2L) in
+  let half_init_bal = Tez_helpers.(init_bal /! 2L) in
   let* reveal =
     mk_reveal
       {(operation_req_default K_Reveal) with counter = Some counter}
@@ -546,70 +532,44 @@ let batch_exceeding_block_gas ~mempool_mode infos kind1 kind2 =
   in
   return_unit
 
-let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects
-    info_builder =
-  let open Lwt_result_syntax in
-  Tztest.tztest name `Quick (fun () ->
-      let* infos = info_builder () in
-      List.iter_es
-        (fun kind1 ->
-          let k1s = kind_to_string kind1 in
-          List.iter_es
-            (fun kind2 ->
-              Format.fprintf
-                fmt
-                "%s: [%s ; %s]@."
-                name
-                k1s
-                (kind_to_string kind2) ;
-              test infos kind1 kind2)
-            subjects)
-        subjects)
-
-let tests =
-  let open Lwt_result_syntax in
+let () =
   let mk_default () = default_init_ctxt () in
   let mk_high_gas_limit () =
     init_ctxt {ctxt_req_default with hard_gas_limit_per_block = Some gb_limit}
   in
   let revealed = revealed_subjects in
-  [
-    ( Tztest.tztest "batch reveal and transaction" `Quick @@ fun () ->
-      let* infos = mk_default () in
-      batch_reveal_transaction infos );
-  ]
-  @ List.map
-      (fun (name, f, subjects, info_builder) ->
-        make_tztest name f subjects info_builder)
-      [("batch two reveals", batch_two_reveals, revealed, mk_default)]
-  @ List.map
-      (fun (name, f, subjects, info_builder) ->
-        make_tztest_batched name f subjects info_builder)
-      [
-        ("reveal in the middle", batch_in_the_middle, revealed, mk_default);
-        ("batch two sources", batch_two_sources, revealed, mk_default);
-        ("batch incons. counters", batch_incons_counters, revealed, mk_default);
-        ( "empty balance in middle of batch",
-          batch_emptying_balance_in_the_middle,
-          revealed,
-          mk_default );
-        ( "empty balance at end of batch",
-          batch_empty_at_end,
-          revealed,
-          mk_default );
-        ( "too much gas consumption",
-          batch_exceeding_block_gas ~mempool_mode:false,
-          revealed,
-          mk_high_gas_limit );
-        ( "too much gas consumption (mempool)",
-          batch_exceeding_block_gas ~mempool_mode:true,
-          revealed,
-          mk_high_gas_limit );
-      ]
-
-let () =
-  Alcotest_lwt.run
-    ~__FILE__
-    Protocol.name
-    [("batched managers validation", tests)]
-  |> Lwt_main.run
+  let () =
+    register_test ~title:"batch reveal and transaction" @@ fun () ->
+    let* infos = default_init_ctxt () in
+    let infos =
+      match infos with
+      | Error errs -> Tezt.Test.fail "Error: %a" Error_monad.pp_print_trace errs
+      | Ok infos -> infos
+    in
+    batch_reveal_transaction infos
+  in
+  List.iter
+    (fun (name, f, subjects, info_builder) ->
+      make_test name f subjects info_builder)
+    [("batch two reveals", batch_two_reveals, revealed, mk_default)] ;
+  List.iter
+    (fun (name, f, subjects, info_builder) ->
+      make_test_batched name f subjects info_builder)
+    [
+      ("reveal in the middle", batch_in_the_middle, revealed, mk_default);
+      ("batch two sources", batch_two_sources, revealed, mk_default);
+      ("batch incons. counters", batch_incons_counters, revealed, mk_default);
+      ( "empty balance in middle of batch",
+        batch_emptying_balance_in_the_middle,
+        revealed,
+        mk_default );
+      ("empty balance at end of batch", batch_empty_at_end, revealed, mk_default);
+      ( "too much gas consumption",
+        batch_exceeding_block_gas ~mempool_mode:false,
+        revealed,
+        mk_high_gas_limit );
+      ( "too much gas consumption (mempool)",
+        batch_exceeding_block_gas ~mempool_mode:true,
+        revealed,
+        mk_high_gas_limit );
+    ]

@@ -1,9 +1,11 @@
-
 ## /!\ /!\ Update .dockerignore accordingly /!\ /!\
 
 .DS_Store
 __pycache__
 *.pyc
+
+# temporary files created during snapshotting
+*.old
 
 **/_build
 /_build_rust
@@ -32,8 +34,6 @@ __pycache__
 /octez-endorser-*
 /tezos-accuser-*
 /octez-accuser-*
-/tezos-proxy-server
-/octez-proxy-server
 /tezos-signer
 /octez-signer
 /tezos-sandbox
@@ -56,12 +56,16 @@ __pycache__
 /octez-dac-*
 /octez-binaries
 /octez-injector-server
+/octez-dsn-node
 /octogram
 /simulation-scenario
 /safety-checker
+/octez-teztale-archiver
+/octez-teztale-server
+/octez-agnostic-baker
 
-/src/risc_v/risc-v-sandbox
-/src/risc_v/risc-v-dummy.elf
+/src/riscv/riscv-sandbox*
+/src/riscv/riscv-dummy.elf
 
 /src/proto_*/parameters/*-parameters.json
 
@@ -154,3 +158,21 @@ terraform.rc
 
 # Terraform lock files
 *.lock.hcl
+
+# Direnv
+.direnv
+
+# Emacs
+.dir-locals.el
+
+# /src/dune is present in slim mode, absent otherwise.
+# Slim mode is a choice and, as such, must not be committed.
+/src/dune
+
+# /script-inputs/custom_dune_flags contains a local choice and must not be committed.
+/script-inputs/custom_dune_flags
+
+etherlink/scripts/docker-compose/mainnet-docker-compose/.etherlink-mainnet-data/
+
+# Etherlink benchmarks
+node_modules/

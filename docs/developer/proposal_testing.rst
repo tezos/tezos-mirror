@@ -147,11 +147,9 @@ Preparing the migration comprises the following steps:
    snapshot the Alpha protocol,
 3. set ``user-activated upgrade`` that will trigger the migration at a given
    level,
-4. patch the shell to obtain a ``yes-node`` that can fake baker signatures, if we
-   wish to import the context from Mainnet,
-5. compile the project,
-6. import a context from Mainnet, if so wished, and
-7. create a ``yes-wallet`` that stores fake baker signatures, if we wish to import
+4. compile the project,
+5. import a context from Mainnet, if so wished, and
+6. create a ``yes-wallet`` that stores fake baker signatures, if we wish to import
    the context from Mainnet.
 
 
@@ -187,7 +185,7 @@ In our example we will use a snapshot file
 ``~/snapshot-mainnet.rolling``
 which was taken at level ``1617344``.
 
-The next subsections explain each of the individual steps 1--7.
+The next subsections explain each of the individual steps 1--6.
 
 
 1. Snapshot the Alpha Protocol
@@ -309,30 +307,13 @@ As before, if we had opted for not snapshotting the Alpha protocol, we could pas
 the path ``src/proto_alpha`` as the parameter of the command above.
 
 If we are testing the migration on an empty context on the sandbox, then we
-should proceed directly to Section `5. Compile the project`_. Otherwise, the next
+should proceed directly to Section `4. Compile the project`_. Otherwise, the next
 two subsections detail how to produce credentials that will allow us to make the
 chain that we imported from Mainnet progress.
 
 
-4. Patch the Shell to Obtain a Yes-Node
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If we would start a node imported from Mainnet, how could we bake new blocks and
-make the chain progress? We do not know the private keys of existing bakers in
-Mainnet!
-
-In order to produce credentials to make the chain imported from Mainnet
-progress, we modify the code to produce a yes-node that forges and verifies
-fake signatures. This can be achieved with a small patch to
-``src/lib_crypto/signature.ml`` that replaces each signature with a
-concatenation of a public key and a message, such that this fake signature is
-still unique for each key and message. This patch is encoded as the git diff
-contained in the file ``scripts/yes-node.patch``. We can apply this patch by
-invoking::
-
-  $ ./scripts/patch-yes_node.sh
-
-5. Compile the Project
+4. Compile the Project
 ~~~~~~~~~~~~~~~~~~~~~~
 
 At this point we have to compile the Alpha protocol (or the snapshot Alpha
@@ -343,7 +324,7 @@ project under the ``src`` folder by invoking::
   $ make
 
 
-6. Import a Context From Mainnet
+5. Import a Context From Mainnet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we wish to test the migration in a realistic scenario, we need to import a
@@ -379,7 +360,7 @@ Importing the context from a snapshot file is optional and should be performed
 only if we want to test the migration on a realistic context from
 Mainnet. Otherwise the migration will run on the sandbox.
 
-7. Create a Yes-Wallet
+6. Create a Yes-Wallet
 ~~~~~~~~~~~~~~~~~~~~~~
 
 We also need to create a yes-wallet, which is a special wallet where secret
@@ -416,7 +397,7 @@ therefore some commands like ``octez-client bake for`` will execute
 faster) and its keys will represent more than the 2/3rds of the
 attesting power for any given level.
 
-Batch Steps 1--7 Above
+Batch Steps 1--6 Above
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The script ``scripts/prepare_migration_test.sh`` batches steps 1--7 above.
@@ -543,12 +524,21 @@ environment variable ``test_directory`` to the path of the test folder, such
 that we can run the node in the test folder later. Then it copies the contents
 of the original context folder into the test folder.
 
+
+
+In order to produce credentials to make the chain imported from Mainnet
+progress, we need our node to forge and verify fake signatures. This can be
+achieved with the use of the ``TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING``
+evironment variable that replaces each signature with a concatenation of a
+public key and a message, such that this fake signature is still unique for each
+key and message.
+
 Now, we can run the ``octez-node`` command by specifying the test folder
 ``$test_directory`` as the data directory. We will also specify the RPC address
 ``localhost``, such that the RPCs will be available at the url
 ``localhost:8732``. In our example, by invoking the following::
 
-  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 We will now trigger the migration by baking blocks until the level reaches the
 one specified when setting the user-activated upgrades. The blocks can be baked
@@ -556,14 +546,14 @@ with the yes-wallet created in step 5 above, and with any of the accounts
 ``foundation1`` to ``foundation8``. In our example, we can bake one block by
 running the following command::
 
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
    a specific account to bake for. Any of ``foundation[1-8]`` accounts can be
    used to do it.
 
-   ``$ octez-client bake for foundation1 --minimal-timestamp``
+   ``$ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y  octez-client bake for foundation1 --minimal-timestamp``
 
    If the chosen account ``foundation1`` ceases to have the priority to bake, we
    can switch to any of the remaining accounts ``foundation2`` to
@@ -588,12 +578,12 @@ copy the context of the original folder into the test folder. In our example::
 
 Now we run the node in the test folder by invoking::
 
-  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And finally, we bake the numbers of blocks specified by the user-activated
 upgrade, with the command::
 
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 
 Wrap up the Migration Procedure
@@ -702,7 +692,6 @@ invoking the following eight commands)::
   $ ./scripts/snapshot_alpha.sh d_012
   $ ./scripts/link_protocol.sh src/proto_012_*
   $ ./scripts/user_activated_upgrade.sh src/proto_012_* 1617344
-  $ ./scripts/patch-yes_node.sh
   $ make
   $ ./octez-node snapshot import ~/mainnet.rolling --data-dir /tmp/octez-node-mainnet
   $ ./octez-node identity generate --data-dir /tmp/octez-node-mainnet
@@ -714,13 +703,13 @@ Copy original folder into test folder::
 
 Run the node`::
 
-  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 Bake three blocks::
 
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
@@ -732,7 +721,7 @@ You should see the ``STITCHING!`` message!
 To test again, kill the node::
 
   $ fg
-  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost
+  TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost
   ^C
 
 Clean up by removing test folder and copying original folder into fresh
@@ -744,13 +733,13 @@ test folder, and by removing files ``/tmp/yes-wallet/wallet_lock`` and
 
 Run the node::
 
-  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And bake three blocks::
 
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING=Y ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
 

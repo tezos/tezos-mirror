@@ -178,6 +178,14 @@ let generate_seed_nonce_hash config delegate level =
     return_some seed_nonce
   else return_none
 
+let round_of_shell_header shell_header =
+  let open Result_syntax in
+  let* fitness =
+    Environment.wrap_tzresult
+    @@ Fitness.from_raw shell_header.Tezos_base.Block_header.fitness
+  in
+  return (Fitness.round fitness)
+
 let sign_block_header global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
@@ -192,7 +200,7 @@ let sign_block_header global_state proposer unsigned_block_header =
       (shell, contents)
   in
   let level = shell.level in
-  let*? round = Baking_state.round_of_shell_header shell in
+  let*? round = round_of_shell_header shell in
   let open Baking_highwatermarks in
   let* result =
     cctxt#with_lock (fun () ->
@@ -290,7 +298,9 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   in
   let*! () =
     Events.(
-      emit forging_block (Int32.succ predecessor.shell.level, round, delegate))
+      emit
+        forging_block
+        (Int32.succ predecessor.shell.level, round, delegate, force_apply))
   in
   let* injection_level =
     Plugin.RPC.current_level
@@ -419,21 +429,28 @@ let may_get_dal_content state consensus_vote =
   in
   let compute_dal_rpc_timeout state =
     (* We set the timeout to a certain percent of the remaining time till the
-       end of the round. *)
-    let default = 0.2 in
+       end of the round. In the corner case (for instance, not having an end of
+       round time), we pick some small default value. *)
+    let corner_case_default = 0.2 in
     match compute_next_round_time state with
-    | None -> (* corner case; we pick some small default value *) default
+    | None -> Lwt.return corner_case_default
     | Some (timestamp, _next_round) -> (
         let ts = Time.System.of_protocol_opt timestamp in
         match ts with
-        | None -> default
+        | None -> Lwt.return corner_case_default
         | Some ts ->
             let now = Time.System.now () in
             let diff = Ptime.diff ts now |> Ptime.Span.to_float_s in
             if diff < 0. then
-              (* We could output a warning, as this should not happen. *)
-              default
-            else diff *. 0.1)
+              let*! () = Events.(emit warning_dal_timeout_old_round) () in
+              Lwt.return corner_case_default
+            else
+              let factor =
+                float_of_int
+                  state.global_state.config.dal_node_timeout_percentage
+                /. 100.
+              in
+              Lwt.return (diff *. factor))
   in
   only_if_dal_feature_enabled
     state
@@ -443,7 +460,9 @@ let may_get_dal_content state consensus_vote =
       let lag = state.global_state.constants.parametric.dal.attestation_lag in
       if Int32.sub attested_level (Int32.of_int lag) < 1l then return_none
       else
-        let timeout = compute_dal_rpc_timeout state in
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7459
+           Rather then getting this now, do it at the start of the level. *)
+        let*! timeout = compute_dal_rpc_timeout state in
         let*! result =
           Lwt.pick
             [
@@ -552,7 +571,8 @@ let authorized_consensus_votes global_state
         (* Record all consensus votes new highwatermarks as one batch *)
         let delegates =
           List.map
-            (fun {delegate = ck, _; _} -> ck.public_key_hash)
+            (fun ({delegate = ck, _; _} : unsigned_consensus_vote) ->
+              ck.public_key_hash)
             authorized_votes
         in
         let record_all_consensus_vote =
@@ -639,7 +659,7 @@ let sign_consensus_votes (global_state : global_state)
   let* signed_consensus_votes =
     List.filter_map_es
       (fun ({delegate; vote_kind; vote_consensus_content; _} as
-           unsigned_consensus_vote) ->
+            unsigned_consensus_vote) ->
         let*! () = Events.(emit signing_consensus_vote (vote_kind, delegate)) in
         let*! signed_consensus_vote_r =
           forge_and_sign_consensus_vote
@@ -845,7 +865,7 @@ let start_waiting_for_attestation_quorum state =
     ~get_slot_voting_power
     candidate
 
-let compute_round proposal round_durations =
+let compute_round (proposal : proposal) round_durations =
   let open Protocol in
   let open Baking_state in
   let timestamp = Time.System.now () |> Time.System.to_protocol in

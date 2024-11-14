@@ -15,11 +15,11 @@ let test = contract.interface.encodeFunctionData("test", []);
 
 
 let txs = [];
-txs.push(utils.transfer(faucet, player1, 100000000))
-let create = utils.create(player1, 0, create_data)
+txs.push(utils.transfer(faucet, player1, 100000000000))
+let create = utils.create(player1, 0, create_data, {gasLimit: 1000000000})
 txs.push(create.tx)
 
-txs.push(utils.send(player1, create.addr, 0, test))
+txs.push(utils.send(player1, create.addr, 0, test, {gasLimit: 1000000000}))
 
 let mode = utils.bench_args(process.argv);
 

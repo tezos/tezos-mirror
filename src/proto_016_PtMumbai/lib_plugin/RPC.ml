@@ -3625,3 +3625,5 @@ let levels_in_current_cycle ctxt ?(offset = 0l) block =
 let rpc_services =
   register () ;
   RPC_directory.merge rpc_services !Registration.patched_services
+
+let get_blocks_preservation_cycles ~get_context:_ = Lwt.return_none

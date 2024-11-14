@@ -11,6 +11,50 @@ let namespace = "dal"
 module Node_metrics = struct
   let subsystem = "node"
 
+  let number_of_reconstructions_started =
+    let name = "amplification_reconstructions_started_count" in
+    Prometheus.Counter.v
+      ~help:"Number of reconstructions started for observer's amplification"
+      ~namespace
+      ~subsystem
+      name
+
+  let number_of_reconstructions_done =
+    let name = "amplification_reconstructions_done_count" in
+    Prometheus.Counter.v
+      ~help:"Number of reconstructions finished for observer's amplification"
+      ~namespace
+      ~subsystem
+      name
+
+  let number_of_reconstructions_aborted =
+    let name = "amplification_reconstructions_aborted_count" in
+    Prometheus.Counter.v
+      ~help:
+        "Number of reconstructions aborted for observer's amplification, \
+         because observer received all the shards during its random delay"
+      ~namespace
+      ~subsystem
+      name
+
+  let amplification_queue_length =
+    let name = "amplification_queue_length" in
+    Prometheus.Gauge.v
+      ~help:"Length of enqueued reconstruction tasks"
+      ~namespace
+      ~subsystem
+      name
+
+  let amplification_complete_duration =
+    let name = "amplification_complete_duration_seconds" in
+    Prometheus.DefaultHistogram.v
+      ~help:
+        "Total duration between the reception of a shard and the publication \
+         after a reconstruction"
+      ~namespace
+      ~subsystem
+      name
+
   let number_of_stored_shards =
     let name = "number_of_stored_shards" in
     Prometheus.Counter.v
@@ -30,9 +74,9 @@ module Node_metrics = struct
       name
 
   let slots_waiting_for_attestation =
-    let name = "slots_waiting_for_attestaion" in
+    let name = "slots_waiting_for_attestation" in
     Prometheus.Gauge.v_label
-      ~label_name:"slot_waiting_for_attestaion"
+      ~label_name:"slot_index"
       ~help:
         "The slot at index <i> is waiting for attestation (value is 1) or not \
          (value is 0)"
@@ -43,7 +87,7 @@ module Node_metrics = struct
   let slots_attested =
     let name = "slots_attested" in
     Prometheus.Gauge.v_label
-      ~label_name:"slot_attested"
+      ~label_name:"slot_index"
       ~help:"The slot at index <i> is attested (value is 1) or not (value is 0)"
       ~namespace
       ~subsystem
@@ -80,6 +124,26 @@ module Node_metrics = struct
       ~namespace
       ~subsystem
       name
+
+  let kvs_shards_opened_files =
+    let name = "kvs_shards_opened_files" in
+    Prometheus.Gauge.v
+      ~help:
+        "The size of the table containing opened files by the key-value store \
+         for shards"
+      ~namespace
+      ~subsystem
+      name
+
+  let kvs_shards_ongoing_actions =
+    let name = "kvs_shards_ongoing_actions" in
+    Prometheus.Gauge.v
+      ~help:
+        "The number of ongoing actions (at most 1 per file) associated with \
+         the key-value store for shards"
+      ~namespace
+      ~subsystem
+      name
 end
 
 module GS = struct
@@ -103,7 +167,7 @@ module GS = struct
     in
     (info, collect)
 
-  let labeled_metric ~help ~name ~label_name collectors =
+  let labeled_metric ~help ~name ~label_names collectors =
     let info =
       {
         Prometheus.MetricInfo.name =
@@ -111,7 +175,7 @@ module GS = struct
             (String.concat "_" [namespace; subsystem; name]);
         help;
         metric_type = Gauge;
-        label_names = [Prometheus.LabelName.v label_name];
+        label_names = List.map Prometheus.LabelName.v label_names;
       }
     in
     (info, collectors)
@@ -137,7 +201,10 @@ module GS = struct
       ref Prometheus.LabelSetMap.empty
 
     let topic_as_label Types.Topic.{pkh; slot_index} =
-      Format.asprintf "topic-%a-%d" Signature.Public_key_hash.pp pkh slot_index
+      [
+        string_of_int slot_index;
+        Format.asprintf "%a" Signature.Public_key_hash.pp pkh;
+      ]
 
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
 
@@ -147,7 +214,7 @@ module GS = struct
       W.GS.Topic.Map.fold
         (fun topic peers accu ->
           Prometheus.LabelSetMap.add
-            [topic_as_label topic]
+            (topic_as_label topic)
             [
               W.GS.Peer.Set.cardinal peers
               |> float |> Prometheus.Sample_set.sample;
@@ -222,8 +289,17 @@ module GS = struct
   let count_received_invalid_messages =
     metric
       ~name:"count_received_invalid_messages"
-      ~help:"Count the number of receivedvalid application messages by the node"
+      ~help:
+        "Count the number of received invalid application messages by the node"
       (fun () -> Int64.to_float !Stats.gs_stats.count_recv_invalid_app_messages)
+
+  let count_received_outdated_messages =
+    metric
+      ~name:"count_received_outdated_messages"
+      ~help:
+        "Count the number of received outdated application messages by the node"
+      (fun () ->
+        Int64.to_float !Stats.gs_stats.count_recv_outdated_app_messages)
 
   let count_received_unknown_validity_messages =
     metric
@@ -320,14 +396,14 @@ module GS = struct
     labeled_metric
       ~name:"count_peers_per_topic"
       ~help:"The number of peers the node is connected to per topic in the mesh"
-      ~label_name:"count_peers_per_topic"
+      ~label_names:["slot_index"; "pkh"]
       (fun () -> !Stats.count_peers_per_topic)
 
   let scores_of_peers =
     labeled_metric
       ~name:"scores_of_peers"
       ~help:"The score of peers connected to the node"
-      ~label_name:"scores_of_peers"
+      ~label_names:["peer"]
       (fun () -> !Stats.scores_of_peers)
 
   let metrics =
@@ -339,6 +415,7 @@ module GS = struct
       count_received_valid_messages;
       count_received_invalid_messages;
       count_received_unknown_validity_messages;
+      count_received_outdated_messages;
       count_received_grafts;
       count_received_prunes;
       count_received_ihaves;
@@ -359,6 +436,23 @@ module GS = struct
 
   let () = List.iter add_metric metrics
 end
+
+let reconstruction_started () =
+  Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_started
+
+let reconstruction_done () =
+  Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_done
+
+let update_amplification_complete_duration duration =
+  Prometheus.DefaultHistogram.observe
+    Node_metrics.amplification_complete_duration
+    duration
+
+let update_amplification_queue_length n =
+  Int.to_float n |> Prometheus.Gauge.set Node_metrics.amplification_queue_length
+
+let reconstruction_aborted () =
+  Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_aborted
 
 let shard_stored () =
   Prometheus.Counter.inc_one Node_metrics.number_of_stored_shards
@@ -390,6 +484,12 @@ let layer1_block_finalized_round ~block_round =
 
 let update_shards_verification_time f =
   Prometheus.DefaultHistogram.observe Node_metrics.verify_shard_time f
+
+let update_kvs_shards_metrics ~opened_files ~ongoing_actions =
+  Prometheus.Gauge.set
+    Node_metrics.kvs_shards_ongoing_actions
+    (float ongoing_actions) ;
+  Prometheus.Gauge.set Node_metrics.kvs_shards_opened_files (float opened_files)
 
 let sample_time ~sampling_frequency ~to_sample ~metric_updater =
   if sampling_frequency > 0 && Random.int sampling_frequency <> 0 then

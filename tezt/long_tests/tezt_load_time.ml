@@ -30,6 +30,8 @@
    Subject: check regressions in the duration it takes for the main tezt test suite to load.
 *)
 
+let team = Team.infrastructure
+
 let tezt_load_time = "tezt load time"
 
 let grafana_panels : Grafana.panel list =
@@ -48,13 +50,14 @@ let test_tezt_tests_suite_load_time ~executors () =
     ~title:tezt_load_time
     ~tags:["client"; "load"]
     ~timeout:(Minutes 100)
-    ~uses_node:true
-    ~uses_admin_client:true
-    ~uses_client:true
+    ~uses_node:false
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~team
     ~executors
   @@ fun () ->
   let* () = Process.run "dune" ["build"; "tezt/tests/main.exe"] in
-  Long_test.time_lwt ~repeat:5 tezt_load_time @@ fun () ->
+  Long_test.time_and_check_regression_lwt ~repeat:5 tezt_load_time @@ fun () ->
   let* () =
     (* [--list] will ensure that we register all tests, and so get a
        reasonable estimation of start up time. [--only 1] is passed to

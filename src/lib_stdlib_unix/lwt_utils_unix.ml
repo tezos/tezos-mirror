@@ -325,9 +325,9 @@ module Json = struct
             return (Ezjsonm.from_string str :> Data_encoding.json)))
 end
 
-let with_tempdir name f =
+let with_tempdir ?temp_dir name f =
   let open Lwt_syntax in
-  let base_dir = Filename.temp_file name "" in
+  let base_dir = Filename.temp_file ?temp_dir name "" in
   let* () = Lwt_unix.unlink base_dir in
   let* () = Lwt_unix.mkdir base_dir 0o700 in
   Lwt.finalize (fun () -> f base_dir) (fun () -> remove_dir base_dir)

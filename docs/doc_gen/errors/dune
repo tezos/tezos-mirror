@@ -6,7 +6,7 @@
  (libraries
   octez-libs.base
   octez-libs.error-monad
-  data-encoding
+  octez-libs.data-encoding
   octez-protocol-alpha-libs.client)
  (link_flags
   (:standard)

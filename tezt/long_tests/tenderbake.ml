@@ -30,6 +30,8 @@
    Subject: Checking performance for Tenderbake bakers
 *)
 
+let team = Team.layer1
+
 module Time = Tezos_base.Time.System
 
 let lwt_ignore p =
@@ -198,7 +200,10 @@ module Sandbox = struct
 
   let handles (st : state) = Base.range 0 (Array.length st.daemons - 1)
 
-  let add_baker_to_node (st : state) (h : handle) =
+  (* [add_baker_to_node ?run_baker st h] associates a baker to a
+     node. [run_baker] allows not to run the baker automatically, and
+     thus, one need to run it afterward. *)
+  let add_baker_to_node ?(run_baker = true) (st : state) (h : handle) =
     match Array.get st.daemons h with
     | exception Invalid_argument _ ->
         raise (Invalid_argument (sf "add_baker_to_node: invalid handle %d" h))
@@ -210,7 +215,7 @@ module Sandbox = struct
         let* client = Client.init ~endpoint:(Client.Node node) () in
         let delegates = [get_delegate st] in
         let baker = Baker.create ~protocol node client ~delegates in
-        let* () = Baker.run baker in
+        let* () = if run_baker then Baker.run baker else Lwt.return_unit in
         st.daemons.(h) <- (node, Some baker, Some client) ;
         return (client, baker)
 
@@ -235,9 +240,9 @@ module Sandbox = struct
     st.daemons <- Array.append st.daemons [|(node, None, None)|] ;
     return (handle, node)
 
-  let add_node_with_baker (st : state) =
+  let add_node_with_baker ?(run_baker = true) (st : state) =
     let* handle, node = add_node st in
-    let* client, baker = add_baker_to_node st handle in
+    let* client, baker = add_baker_to_node ~run_baker st handle in
     Log.info "Creating baker #%d (%s)" handle (Baker.name baker) ;
     return (handle, node, client, baker)
 
@@ -311,6 +316,7 @@ module Rounds = struct
       ~__FILE__
       ~title:test
       ~tags:["tenderbake"; "basic"]
+      ~team
       ~uses:[Protocol.baker protocol]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
@@ -328,19 +334,24 @@ module Rounds = struct
     let sandbox =
       Sandbox.make (Inf.cycle (Array.to_list Account.Bootstrap.keys))
     in
-    let* _, _, activator_client, _ = Sandbox.add_node_with_baker sandbox in
+    let* _, _, activator_client, _ =
+      Sandbox.add_node_with_baker ~run_baker:false sandbox
+    in
     let* () =
       Base.repeat (nodes_num - 1) @@ fun () ->
-      let* _ = Sandbox.add_node_with_baker sandbox in
+      let* _ = Sandbox.add_node_with_baker ~run_baker:false sandbox in
       unit
     in
     let nodes = Sandbox.nodes sandbox in
+    (* Run all the bakers when the nodes are ready. *)
+    let bakers = Sandbox.bakers sandbox in
 
     (* Topology does not really matter here, as long as there is a path from any
        node to another one; let's use a ring. *)
     Log.info "Setting up nodes in ring topology" ;
     Cluster.ring nodes ;
     let* () = Cluster.start ~wait_connections:true nodes in
+    let* () = Lwt_list.iter_p Baker.run bakers in
 
     let* parameter_file =
       write_parameter_file
@@ -462,6 +473,7 @@ module Long_dynamic_bake = struct
       ~__FILE__
       ~title:(test topology)
       ~tags:["tenderbake"; "dynamic"; string_of_topology topology]
+      ~team
       ~uses:[Protocol.baker protocol]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
@@ -485,15 +497,16 @@ module Long_dynamic_bake = struct
     in
     (* One client to activate the protocol later on *)
     let* _, node_hd, activator_client, _ =
-      Sandbox.add_node_with_baker sandbox
+      Sandbox.add_node_with_baker ~run_baker:false sandbox
     in
     let* () =
       Base.repeat (num_nodes - 2) @@ fun () ->
-      lwt_ignore @@ Sandbox.add_node_with_baker sandbox
+      lwt_ignore @@ Sandbox.add_node_with_baker ~run_baker:false sandbox
     in
     (* Add a node without a baker *)
     let* dead_baker_handle, _ = Sandbox.add_node sandbox in
     let nodes = Sandbox.nodes sandbox in
+    let bakers = Sandbox.bakers sandbox in
 
     Log.info
       "Setting up node %s topology: %s"
@@ -503,6 +516,9 @@ module Long_dynamic_bake = struct
 
     Log.info "Starting nodes" ;
     let* () = Cluster.start ~wait_connections:true nodes in
+
+    Log.info "Starting bakers" ;
+    let* () = Lwt_list.iter_p Baker.run bakers in
 
     Log.info "Activating protocol" ;
     let* () =

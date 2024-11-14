@@ -7,11 +7,11 @@ use crate::fail_if_too_much;
 use crate::precompiles::{tick_model, PrecompileOutcome};
 use crate::{handler::EvmHandler, EthereumError};
 use evm::{Context, ExitReason, ExitSucceed, Transfer};
-use host::runtime::Runtime;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Debug;
+use tezos_evm_runtime::runtime::Runtime;
 
 // Implementation of 0x03 precompiled (sha256)
 pub fn sha256_precompile<Host: Runtime>(
@@ -23,7 +23,7 @@ pub fn sha256_precompile<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Debug, "Calling sha2-256 precompile");
     let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_sha256(input.len())?, handler);
+        fail_if_too_much!(tick_model::ticks_of_sha256(input.len()), handler);
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;
@@ -62,7 +62,7 @@ pub fn ripemd160_precompile<Host: Runtime>(
         "Calling ripemd-160 precompile"
     );
     let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len())?, handler);
+        fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len()), handler);
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;
@@ -92,11 +92,12 @@ pub fn ripemd160_precompile<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use evm::{ExitReason, ExitSucceed};
+    use evm::ExitSucceed;
     use primitive_types::H160;
 
     use crate::{
-        handler::ExecutionOutcome, precompiles::test_helpers::execute_precompiled,
+        handler::{ExecutionOutcome, ExecutionResult},
+        precompiles::test_helpers::execute_precompiled,
     };
 
     #[test]
@@ -104,7 +105,7 @@ mod tests {
         // act
         let input: &[u8] = &[0xFF];
         let address = H160::from_low_u64_be(2u64);
-        let result = execute_precompiled(address, input, None, Some(22000));
+        let result = execute_precompiled(address, input, None, Some(22000), true);
 
         // assert
         let expected_hash = hex::decode(
@@ -118,11 +119,8 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            new_address: None,
             logs: vec![],
-            result: Some(expected_hash),
+            result: ExecutionResult::CallSucceeded(ExitSucceed::Returned, expected_hash),
             withdrawals: vec![],
             estimated_ticks_used: 75_000,
         };
@@ -135,7 +133,7 @@ mod tests {
         // act
         let input: &[u8] = &[0xFF];
         let address = H160::from_low_u64_be(3u64);
-        let result = execute_precompiled(address, input, None, Some(22000));
+        let result = execute_precompiled(address, input, None, Some(22000), true);
 
         // assert
         let expected_hash = hex::decode(
@@ -149,11 +147,8 @@ mod tests {
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
-            is_success: true,
-            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
-            new_address: None,
             logs: vec![],
-            result: Some(expected_hash),
+            result: ExecutionResult::CallSucceeded(ExitSucceed::Returned, expected_hash),
             withdrawals: vec![],
             estimated_ticks_used: 70_000,
         };

@@ -32,13 +32,19 @@ let project_job_artifact ~project ~job_id ~artifact_path =
        job_id
        artifact_path)
 
-let curl_params ?(fail_on_http_errors = true) ?output_path ?(location = false)
-    uri =
+let curl_params ?(progress_meter = false) ?(fail_on_http_errors = true)
+    ?output_path ?(location = false) uri =
   (if fail_on_http_errors then ["--fail"] else [])
   @ (match output_path with
     | Some output_path -> ["--output"; output_path]
     | None -> [])
   @ (if location then ["--location"] else [])
+  @ (if
+       progress_meter
+       || Sys.getenv_opt "MY_CURL_VERSION_IS"
+          |> Option.value ~default:"" = "very_very_old"
+     then []
+     else ["--no-progress-meter"])
   @ [Uri.to_string uri]
 
 let get ?fail_on_http_errors uri =

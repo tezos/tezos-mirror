@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +28,7 @@
 open Store_sigs
 open Context_sigs
 module Context_encoding = Tezos_context_encoding.Context_binary
+module Event = Layer2_store_events
 
 (* We shadow [Tezos_context_encoding] to prevent accidentally using
    [Tezos_context_encoding.Context] instead of
@@ -48,6 +50,8 @@ type repo = IStore.Repo.t
 
 type tree = IStore.tree
 
+type mut_state = tree ref
+
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
 type 'a index = ('a, repo) Context_sigs.index
@@ -64,7 +68,7 @@ type ro = [`Read] t
 
 type commit = IStore.commit
 
-type hash = Context_hash.t
+type hash = IStore.Hash.t
 
 type path = string list
 
@@ -92,11 +96,15 @@ let impl_name = "Irmin"
 let equality_witness : (repo, tree) Context_sigs.equality_witness =
   (Context_sigs.Equality_witness.make (), Context_sigs.Equality_witness.make ())
 
-let hash_to_istore_hash h =
-  Context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
+let from_imm imm_state = ref imm_state
 
-let istore_hash_to_hash h =
-  IStore.Hash.to_raw_string h |> Context_hash.of_string_exn
+let to_imm mut_state = !mut_state
+
+let context_hash_of_hash h =
+  IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn
+
+let hash_of_context_hash h =
+  Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
 let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
  fun ~cache_size mode path ->
@@ -127,11 +135,11 @@ let raw_commit ?(message = "") index tree =
 let commit ?message ctxt =
   let open Lwt_syntax in
   let+ commit = raw_commit ?message ctxt.index ctxt.tree in
-  IStore.Commit.hash commit |> istore_hash_to_hash
+  IStore.Commit.hash commit
 
 let checkout index key =
   let open Lwt_syntax in
-  let* o = IStore.Commit.of_hash index.repo (hash_to_istore_hash key) in
+  let* o = IStore.Commit.of_hash index.repo key in
   match o with
   | None -> return_none
   | Some commit ->
@@ -156,10 +164,14 @@ let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
     (hash : hash) =
   let open Lwt_syntax in
   let repo = index.repo in
-  let istore_hash = hash_to_istore_hash hash in
-  let* commit_opt = IStore.Commit.of_hash index.repo istore_hash in
+  let context_hash = context_hash_of_hash hash in
+  let* commit_opt = IStore.Commit.of_hash index.repo hash in
   match commit_opt with
-  | None -> Fmt.failwith "%a: unknown context hash" Context_hash.pp hash
+  | None ->
+      Fmt.failwith
+        "%a: unknown context hash"
+        Smart_rollup_context_hash.pp
+        context_hash
   | Some commit -> (
       let finished = function
         | Ok (stats : Irmin_pack_unix.Stats.Latest_gc.stats) ->
@@ -180,7 +192,7 @@ let gc index ?(callback : unit -> unit Lwt.t = fun () -> Lwt.return ())
       match launch_result with
       | Error (`Msg err) -> Event.context_gc_launch_failure err
       | Ok false -> Event.context_gc_already_launched ()
-      | Ok true -> Event.starting_context_gc hash)
+      | Ok true -> Event.starting_context_gc context_hash)
 
 let wait_gc_completion index =
   let open Lwt_syntax in
@@ -193,19 +205,19 @@ let wait_gc_completion index =
 
 let is_gc_finished index = IStore.Gc.is_finished index.repo
 
+let cancel_gc index = IStore.Gc.cancel index.repo
+
 let index context = context.index
 
-let export_snapshot {path = _; repo} context_hash ~path =
+let export_snapshot {path = _; repo} hash ~path =
   let open Lwt_result_syntax in
-  let*! commit_opt =
-    IStore.Commit.of_hash repo (hash_to_istore_hash context_hash)
-  in
+  let*! commit_opt = IStore.Commit.of_hash repo hash in
   match commit_opt with
   | None ->
       failwith
         "Cannot export context snapshot: unknown context hash %a"
-        Context_hash.pp
-        context_hash
+        Smart_rollup_context_hash.pp
+        (context_hash_of_hash hash)
   | Some commit ->
       let h = IStore.Commit.key commit in
       let*! () = IStore.create_one_commit_store repo h path in
@@ -305,6 +317,8 @@ let load ~cache_size mode path =
   let open Lwt_result_syntax in
   let*! index = load ~cache_size mode path in
   return index
+
+let reload (index : ro_index) = IStore.reload index.repo
 
 module Internal_for_tests = struct
   let get_a_tree key =

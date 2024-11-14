@@ -7,9 +7,8 @@
  (libraries
   tezt.core
   octez-libs.error-monad
-  data-encoding
+  octez-libs.data-encoding
   octez-alcotezt)
- (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -22,7 +21,6 @@
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
- (modes native)
  (libraries
   src_lib_error_monad_test_tezt_lib
   tezt)
@@ -35,31 +33,8 @@
  (alias runtest)
  (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)
  (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
-
-(executable
- (name main_js)
- (instrumentation (backend bisect_ppx --bisect-sigterm))
- (modes js)
- (libraries
-  src_lib_error_monad_test_tezt_lib
-  tezt.js)
- (js_of_ocaml)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
- (modules main_js))
-
-(rule
- (alias runtest_js)
- (package octez-libs)
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run node %{dep:./main_js.bc.js})))
-
-(rule
- (targets main_js.ml)
- (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

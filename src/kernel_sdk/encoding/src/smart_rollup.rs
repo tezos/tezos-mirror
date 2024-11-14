@@ -55,6 +55,11 @@ impl SmartRollupAddress {
     pub fn hash(&self) -> &SmartRollupHash {
         &self.hash
     }
+
+    /// Returns internal `hash`
+    pub fn into_hash(self) -> SmartRollupHash {
+        self.hash
+    }
 }
 
 #[cfg(test)]

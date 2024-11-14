@@ -540,8 +540,8 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   let sk = Signature.Of_V0.secret_key sk in
   Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
   (if encrypted then
-   Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
-  else Lwt.return @@ Tezos_signer_backends.Unencrypted.make_sk sk)
+     Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
+   else Lwt.return @@ Tezos_signer_backends.Unencrypted.make_sk sk)
   >>=? fun sk_uri ->
   Client_keys_v0.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
   >>=? fun () ->
@@ -602,7 +602,7 @@ let get_ballots_info (cctxt : #full) ~chain ~block =
 let get_period_info ?(successor = false) (cctxt : #full) ~chain ~block =
   let cb = (chain, block) in
   (if successor then Alpha_services.Voting.successor_period
-  else Alpha_services.Voting.current_period)
+   else Alpha_services.Voting.current_period)
     cctxt
     cb
   >>=? fun voting_period ->

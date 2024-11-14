@@ -24,10 +24,20 @@ for peers on port ``19731`` and listening for RPC on port ``18731``.
     ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
 
 This node will store its data in a temporary directory
-``/tmp/octez-node.xxxxxxxx`` which will be removed when the node is
-stopped.
-The option ``--connections`` is just to remove the spurious “Too few
-connections” warnings by lowering the number of expected connection.
+``/tmp/octez-node.xxxxxxxx`` which will be removed when the node is stopped.
+
+The option ``--connections`` specifies the ideal number of peers the node tries
+to connect to. Lowering the number of expected connections removes the spurious
+“Too few connections” warnings. Set it to ``1`` for our two-nodes network (and
+you would set it to ``0`` for a single-node network).
+
+More informations can be found in the :package-api:`api page of the octez node
+config <octez-node-config/Octez_node_config/Shared_arg/index.html#type-t>`: or
+by simply calling
+
+::
+
+   ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1 --help
 
 To launch the second node, run the following command in another terminal, and
 it will listen on port ``19739`` and ``18739``:
@@ -135,3 +145,20 @@ can use the ``DATA_DIR`` environment variable.
 
 You can even provide a custom ``identity.json`` and ``config.json`` to the
 sandboxed node by placing them in the data directory.
+
+Baking multiple blocks
+~~~~~~~~~~~~~~~~~~~~~~
+
+To bake multiple blocks in a single command the ``-n <number_of_blocks>`` option can be used like
+
+::
+
+   $ octez-client bake for --minimal-timestamp -n 1_000
+
+Once the current timestamp is caught up, blocks are produced every second or every ``minimal_block_delay`` set in the parameters file. To speed up the process the protocol can be activated in the past with
+
+::
+
+   $ octez-activate-alpha --timestamp "2024-01-01T00:00:00Z"
+
+This increases the number of blocks needed to reach the current timestamp and speeds up the blocks production.

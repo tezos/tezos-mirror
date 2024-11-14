@@ -1,23 +1,40 @@
 let
-  opam-nix-integration = import (
-    fetchTarball {
-      url = "https://github.com/vapourismo/opam-nix-integration/archive/646431dec7cd75fb79101be4e6ce3ef07896d972.tar.gz";
-      sha256 = "0k4p0sdikvd8066x17xarvspqhcgnhm9mij4xvs058sqm1797sl1";
-    }
-  );
-
-  pkgsSrc = fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/cd07839e2e61f8b7c467f20a896c3f9e63a04918.tar.gz";
-    sha256 = "1xr250f9z72v560pkvi25iwclnysjn8h9mw8cdnjl4izq0milmzi";
+  default-opam-nix-integration-src = fetchTarball {
+    url = "https://github.com/vapourismo/opam-nix-integration/archive/0f98236c75cdb436be7669ccaa249264456baa37.tar.gz";
+    sha256 = "0m9v7s8zgkr280f7l8qy12dnjmi7pf0mza16b5xral9fsqi9j1sa";
   };
 
-  pkgs = import pkgsSrc {
-    overlays = [opam-nix-integration.overlay];
+  default-rust-overlay-src = fetchTarball {
+    url = "https://github.com/oxalica/rust-overlay/archive/38c2f156fca1868c8be7195ddac150522752f6ab.tar.gz";
+    sha256 = "0dsalgdr99k02zzym3j2ql9awlxgavzafsm1frp4pf45ci6awf4n";
   };
 
-  riscv64Pkgs = import pkgsSrc {
-    crossSystem.config = "riscv64-unknown-linux-gnu";
+  default-pkgs-src = fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/refs/tags/24.05.tar.gz";
+    sha256 = "1lr1h35prqkd1mkmzriwlpvxcb34kmhc9dnr48gkm8hh089hifmx";
   };
-in {
-  inherit opam-nix-integration pkgs riscv64Pkgs;
-}
+in
+  {
+    opam-nix-integration-src ? default-opam-nix-integration-src,
+    pkgs-src ? default-pkgs-src,
+    rust-overlay-src ? default-rust-overlay-src,
+  }: let
+    opam-nix-integration = import opam-nix-integration-src;
+
+    rust-overlay = import rust-overlay-src;
+
+    pkgs = import pkgs-src {
+      overlays = [
+        opam-nix-integration.overlay
+        rust-overlay
+      ];
+    };
+
+    riscv64Pkgs = import pkgs-src {
+      crossSystem.config = "riscv64-unknown-linux-gnu";
+    };
+
+    opam-repository = pkgs.callPackage ./opam-repo.nix {};
+  in {
+    inherit pkgs riscv64Pkgs opam-repository;
+  }

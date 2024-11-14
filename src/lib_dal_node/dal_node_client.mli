@@ -23,32 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto_dal
-
 (** Instance of [Tezos_client_base.Client_context] that only handles IOs and
     RPCs. Can be used for keys and RPCs related commands. *)
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
+type cctxt
 
-(** Instance of [cctxt] for linux systems. Relies on
-    [Tezos_rpc_http_client_unix]. *)
-class unix_cctxt :
-  rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config -> cctxt
+val call :
+  cctxt ->
+  ([< Resto.meth], unit, 'a, 'b, 'c, 'd) Tezos_rpc__.RPC_service.t ->
+  'a ->
+  'b ->
+  'c ->
+  'd Tezos_error_monad.Error_monad.tzresult Lwt.t
 
 (** [make_unix_context endpoint] generates a cctxt with the provided
     [endpoint]. *)
 val make_unix_cctxt : Uri.t -> cctxt
 
-val get_slot : #cctxt -> Cryptobox.Commitment.t -> Cryptobox.slot tzresult Lwt.t
-
-(** [get_slot_pages cctxt header ] fetches from the dal node the pages
-    of the slot with header [header]. *)
+(** [get_slot_pages cctxt slot_id] fetches from the dal node the pages
+    of the slot with id [slot_id]. *)
 val get_slot_pages :
-  #cctxt -> Cryptobox.Commitment.t -> bytes list tzresult Lwt.t
+  cctxt -> Tezos_dal_node_services.Types.slot_id -> bytes list tzresult Lwt.t
 
-(** [get_page_proof cctxt page_index slot_data] computes and returns the proof
-    of the page whose index and slot are given. *)
-val get_page_proof :
-  #cctxt -> int -> bytes -> Cryptobox.page_proof tzresult Lwt.t
+(** [get_slot_page_proof cctxt slot_id page_index] computes and
+    returns the proof of the page whose index and slot are given. *)
+val get_slot_page_proof :
+  cctxt ->
+  Tezos_dal_node_services.Types.slot_id ->
+  int ->
+  Cryptobox.page_proof tzresult Lwt.t
+
+(** [post_slot cctxt slot_data] posts the given data as a slot to the DAL node,
+    and returns the corresponding commitment hash alongside its proof. *)
+val post_slot :
+  cctxt ->
+  ?slot_index:Tezos_dal_node_services.Types.slot_index ->
+  string ->
+  (Cryptobox.commitment * Cryptobox.commitment_proof) tzresult Lwt.t

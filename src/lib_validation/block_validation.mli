@@ -146,9 +146,9 @@ type apply_environment = {
     2. [P.apply]
     3. [P.finalize_block]
 
-    [should_precheck] when set (default), triggers the block prechecking before
-    applying it, see [precheck]. If it is set to [false] the given block must
-    have been prechecked.
+    [should_validate] when set (default), triggers the block validation before
+    applying it, see [validate]. If it is set to [false] the given block must
+    have been validated.
 
     If [simulate] is true, the context resulting from the application
     is not committed to disk using `Context.commit`, only the commit
@@ -156,14 +156,14 @@ type apply_environment = {
 val apply :
   ?simulate:bool ->
   ?cached_result:apply_result * Tezos_protocol_environment.Context.t ->
-  ?should_precheck:bool ->
+  ?should_validate:bool ->
   apply_environment ->
   cache:Tezos_protocol_environment.Context.source_of_cache ->
   Block_header.t ->
   operation list list ->
   apply_result tzresult Lwt.t
 
-(** [precheck chain_id ~predecessor_block_header
+(** [validate chain_id ~predecessor_block_header
     ~predecessor_block_hash ~predecessor_context
     ~predecessor_resulting_context_hash ~cache header ops] gets the
     protocol [P] of the context of the predecessor block and calls
@@ -171,7 +171,7 @@ val apply :
    1. [P.begin_validate]
    2. [P.validate_operation]
    3. [P.finalize_validation] *)
-val precheck :
+val validate :
   chain_id:Chain_id.t ->
   predecessor_block_header:Block_header.t ->
   predecessor_block_hash:Block_hash.t ->
@@ -206,7 +206,7 @@ val preapply :
   Lwt.t
 
 (** Hypothesis: we assume that the given block has already been
-                validated -- E.g. by calling [precheck]. *)
+                validated -- E.g. by calling [validate]. *)
 val recompute_metadata :
   chain_id:Chain_id.t ->
   predecessor_block_header:Block_header.t ->

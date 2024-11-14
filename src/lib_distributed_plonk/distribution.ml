@@ -24,9 +24,7 @@
 (*****************************************************************************)
 
 open Distribution_helpers
-
 module DP = DP_Pack ()
-
 module Runner = Master_runner.Make (DP.D)
 module MP = DP.MP
 

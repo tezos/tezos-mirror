@@ -1,6 +1,8 @@
 src/bin_snoop/bash-completion.sh
-src/bin_client/bash-completion.sh
 src/bin_client/octez-init-sandboxed-client.sh
 src/lib_bls12_381/libblst/build.sh
 src/lib_bls12_381/libblst/build/refresh.sh
 scripts/pkg-common/install_opam.sh
+src/rust_deps/wasmer-3.3.0/tests/wast/spec/update-testsuite.sh
+src/rust_deps/wasmer-3.3.0/.github/cross-linux-riscv64/install_docker.sh
+src/rust_deps/wasmer-3.3.0/.github/cross-linux-riscv64/install_deb.sh

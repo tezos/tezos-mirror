@@ -502,9 +502,9 @@ let commands () =
       @@ stop)
       (fun () bytes cctxt ->
         (if Bytes.get bytes 0 != '\005' then
-         failwith
-           "Not a piece of packed Michelson data (must start with `0x05`)"
-        else return_unit)
+           failwith
+             "Not a piece of packed Michelson data (must start with `0x05`)"
+         else return_unit)
         >>=? fun () ->
         (* Remove first byte *)
         let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in

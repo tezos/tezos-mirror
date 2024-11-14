@@ -1,6 +1,7 @@
 octez-dac-node
 octez-dac-client
 octez-dal-node
-octez-smart-rollup-node-alpha
 octez-accuser-alpha
 octez-baker-alpha
+octez-dac-node
+octez-dac-client

@@ -64,7 +64,7 @@ val create_from_endpoint :
   ?listen_addr:string ->
   ?public_addr:string ->
   ?metrics_addr:string ->
-  l1_node_endpoint:Client.endpoint ->
+  l1_node_endpoint:Endpoint.t ->
   unit ->
   t
 
@@ -78,14 +78,18 @@ val rpc_host : t -> string
 val rpc_port : t -> int
 
 (** Return the endpoint of the DAL node's RPC server, i.e.,
-    http://rpc_host:rpc_port. *)
-val rpc_endpoint : t -> string
+    http://rpc_host:rpc_port. If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument). *)
+val rpc_endpoint : ?local:bool -> t -> string
 
 (** Get the node's point pair "address:port" given as [--net-addr] to a dal node. *)
 val listen_addr : t -> string
 
 (** Get the node's metrics server point pair "address:port" given as [--metrics-addr] to a dal node. *)
 val metrics_addr : t -> string
+
+val metrics_port : t -> int
 
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
@@ -164,7 +168,7 @@ module Config_file : sig
 end
 
 (** Read the peer id from the node's identity file. *)
-val read_identity : t -> string
+val read_identity : t -> string Lwt.t
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
@@ -175,8 +179,23 @@ val as_rpc_endpoint : t -> Endpoint.t
     ["new_connection.v0"] events. *)
 val wait_for_connections : t -> int -> unit Lwt.t
 
+(** Wait until the node is ready.
+
+    More precisely, wait until a [dal_node_is_ready] event occurs. If such an
+    event already occurred, return immediately. *)
+val wait_for_ready : t -> unit Lwt.t
+
 (** Wait for a node to receive a disconnection for some peer_id.
 
     [wait_for_disconnection node peer_id] waits until [node] receives a
     ["disconnected.v0"] event from the given peer id. *)
 val wait_for_disconnection : t -> peer_id:string -> unit Lwt.t
+
+val runner : t -> Runner.t option
+
+val point_str : t -> string
+
+(** Load and return the current value of the last finalized level processed by
+    the crawler and stored in store/last_processed_level KVS file. The function
+    returns [None] in case of error (e.g. file not found, file locked, ...). *)
+val load_last_finalized_processed_level : t -> int option Lwt.t

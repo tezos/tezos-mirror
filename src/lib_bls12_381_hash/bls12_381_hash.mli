@@ -89,11 +89,11 @@ module Permutation : sig
         the library.
     *)
       val create : int -> int -> Bls12_381.Fr.t array array -> t
-        [@@deprecated
-          "It is highly recommended to follow the recommandation in the paper \
-           for the choice of security parameters. Please open an issue if you \
-           need support for other instances than the default parameters \
-           provided by the library."]
+      [@@deprecated
+        "It is highly recommended to follow the recommandation in the paper \
+         for the choice of security parameters. Please open an issue if you \
+         need support for other instances than the default parameters provided \
+         by the library."]
 
       (** Exponent for the substitution box. For BLS12-381, it is [5] *)
       val alpha : Bls12_381.Fr.t

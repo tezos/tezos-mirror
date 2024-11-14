@@ -10,7 +10,9 @@
   octez-libs.tezt-wrapper
   tezt-tezos
   tezt_etherlink
+  octez-evm-node-libs.evm_node_lib_dev_encoding
   tezos-protocol-alpha.protocol)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -22,7 +24,7 @@
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_etherlink)
- (modules evm_rollup evm_sequencer))
+ (modules evm_rollup evm_sequencer validate dal_sequencer eth_call))
 
 (executable
  (name main)
@@ -30,7 +32,6 @@
  (libraries
   etherlink_tezt_tests_tezt_lib
   tezt)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
@@ -45,7 +46,7 @@
   (glob_files ../../config/*)
   (glob_files_rec ../../kernel_evm/*))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

@@ -25,6 +25,19 @@
 
 open Error_monad
 
+type error +=
+  | Missing_stored_kvs_data of {filepath : string; index : int}
+  | Wrong_encoded_value_size of {
+      file : string;
+      index : int;
+      expected : int;
+      got : int;
+    }
+  | Closed of {action : string}
+  | Corrupted_data of {action : string; filepath : string; index : int}
+  | Encoding_failed of {filepath : string; index : int}
+  | Decoding_failed of {filepath : string; index : int}
+
 (** {1 Key-value store}
 
     This module defines a simple key-value store. The design is
@@ -194,3 +207,30 @@ val count_values :
   ('file, 'key, 'value) file_layout ->
   'file ->
   int tzresult Lwt.t
+
+module View : sig
+  (** Returns the number of files currently opened by the key value
+      store. Do note this number is an upper bound on the number of
+      file descriptors opened. This number should always be lower than [lru_size].     
+  *)
+  val opened_files : ('file, 'key, 'value) t -> int
+
+  (** Returns the number of ongoing actions happening on different
+    files. This number should always be lower than [lru_size]. *)
+  val ongoing_actions : ('file, 'key, 'value) t -> int
+end
+
+module Internal_for_tests : sig
+  (** Same as {!init} above, except that the user can specify a prefix for the
+      lock file (default is lockfile_prefix = "internal_for_tests") to avoid issues
+      if the store is already locked by another process, such as:
+
+      IO error in lockf(): Resource temporarily unavailable)
+  *)
+  val init :
+    ?lockfile_prefix:string ->
+    lru_size:int ->
+    root_dir:string ->
+    unit ->
+    ('file, 'key, 'value) t tzresult Lwt.t
+end

@@ -50,3 +50,6 @@ val process : Layer1.head -> unit tzresult Lwt.t
 
 (** Shutdown the refutation coordinator. *)
 val shutdown : unit -> unit Lwt.t
+
+(** Returns the status of the publisher worker. *)
+val worker_status : unit -> [`Running | `Not_running | `Crashed of exn]

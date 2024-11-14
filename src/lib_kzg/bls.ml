@@ -1,8 +1,12 @@
+(* This file gathers useful modules, types and functions used in KZG schemes.
+   It also enriches some modules of Bls12_381 & Bls12_381_polynomial *)
+
 module Poly = Polynomial
 module Pairing = Bls12_381.Pairing
 module Srs = Srs
 module Evals = Evaluations
 
+(* The scalar field of BLS12-381 / scalar field for G1 & G2 *)
 module Scalar = struct
   include Bls12_381.Fr
 
@@ -26,12 +30,16 @@ module Scalar = struct
   let encoding = conv to_bytes of_bytes_exn (Fixed.bytes size_in_bytes)
 end
 
+(* [Scalar_map] is used in KZG as a data structure of polynomial commitment’s
+   answers *)
 module Scalar_map = Map.Make (Scalar)
 
+(* This functor adds some encoding functions for G1 and G2, used in KZG schemes *)
 module G (G : Bls12_381.CURVE) (Srs : Srs_sig with type elt = G.t) = struct
   module Srs = Srs
   include G
 
+  (* Types Repr.t are used in the PlonK ecosystem *)
   let t : t Repr.t =
     Repr.(
       map
@@ -82,12 +90,15 @@ let to_encoding repr =
   in
   data_encoding_of_repr repr
 
+(* [Domain] is used for polynomial operations in evaluation form, FFT and IFFT *)
 module Domain = struct
   include Domain
 
   let encoding = to_encoding Domain.t
 end
 
+(* [G1_carray] is used for optimizing FFT & Pippenger with G1. [encoding] is
+   used in Kate Amortized to expose preprocessing *)
 module G1_carray = struct
   include G1_carray
 

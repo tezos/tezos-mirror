@@ -130,11 +130,11 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
     Protocol.write_parameter_file
       ~base:(Either.right (protocol, Some protocol_constants))
       (if lift_protocol_limits then
-       [
-         (["hard_gas_limit_per_block"], `String_of_int 2147483647);
-         (["hard_gas_limit_per_operation"], `String_of_int 2147483647);
-       ]
-      else [])
+         [
+           (["hard_gas_limit_per_block"], `String_of_int 2147483647);
+           (["hard_gas_limit_per_operation"], `String_of_int 2147483647);
+         ]
+       else [])
   in
   (* It is important to use a good estimate of max possible TPS that is
      theoretically achievable. If we send operations with lower TPS than
@@ -293,9 +293,11 @@ let register () =
   Long_test.register
     ~__FILE__
     ~title:Dashboard.Test.benchmark_tps
+    ~team:Tag.layer1
     ~tags:[Dashboard.Test.benchmark_tps]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]
+    ~uses:[Tezt_wrapper.Uses.octez_baker_alpha]
     (fun () ->
       let lift_protocol_limits =
         Cli.get_bool ~default:false "lift-protocol-limits"

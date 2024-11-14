@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_sqlite)
+ (public_name octez-l2-libs.sqlite)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.error-monad
+  caqti
+  caqti-lwt
+  caqti-lwt.unix
+  caqti-driver-sqlite3)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_error_monad.Error_monad))

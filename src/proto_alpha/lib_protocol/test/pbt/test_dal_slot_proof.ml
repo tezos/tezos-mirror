@@ -46,8 +46,7 @@ struct
 
     let cryptobox =
       Lazy.from_fun @@ fun () ->
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
+      Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end
 
   open Dal_helpers.Make (ARG)
@@ -72,7 +71,7 @@ struct
       - every element in the list of levels represents the slots of a single level.
       - each slot of a given level is not confirmed iff the boolean is true. *)
   let populate_slots_history (levels_data : levels) =
-    let open Result_wrap_syntax in
+    let open Lwt_result_wrap_syntax in
     (* Make and insert a slot. *)
     let slot_data =
       Bytes.init
@@ -80,8 +79,8 @@ struct
         (fun _i -> 'x')
     in
     let* polynomial = dal_mk_polynomial_from_slot slot_data in
-    let cryptobox = Lazy.force ARG.cryptobox in
-    let* commitment = dal_commit cryptobox polynomial in
+    let* cryptobox = Lazy.force ARG.cryptobox in
+    let*? commitment = dal_commit cryptobox polynomial in
     (* Insert the slots of a level. *)
     let add_slots (cell, cache, slots_info) (level, slots_data) =
       let curr_level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
@@ -105,7 +104,7 @@ struct
           (fun (slot, skip_slot) -> if skip_slot then None else Some slot)
           slots_headers
       in
-      let*@ cell, cache =
+      let*?@ cell, cache =
         Dal_slot_repr.History.add_confirmed_slot_headers
           ~number_of_slots:Parameters.dal_parameters.number_of_slots
           cell
@@ -124,13 +123,13 @@ struct
     in
 
     (* Insert the slots of all the levels. *)
-    let add_levels = List.fold_left_e add_slots in
+    let add_levels = List.fold_left_es add_slots in
     add_levels (genesis_history, genesis_history_cache, []) levels_data
 
   (** This function returns the (correct) information of a page to
       prove that it is confirmed, or None if the page's slot is skipped. *)
   let request_confirmed_page (poly, slot, skip_slot) =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     if skip_slot then
       (* We cannot check that a page of an unconfirmed slot is confirmed. *)
       return_none
@@ -144,7 +143,7 @@ struct
       field to simulate a non confirmed slot (as for even levels, no slot is
       confirmed. See {!populate_slots_history}). *)
   let request_unconfirmed_page (poly, slot, skip_slot) =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let open Dal_slot_repr.Header in
     if skip_slot then
       let level = slot.id.published_level in
@@ -162,7 +161,7 @@ struct
     let open Lwt_result_syntax in
     List.iter_es
       (fun item ->
-        let*? mk_test = page_to_request item in
+        let* mk_test = page_to_request item in
         match mk_test with
         | None -> return_unit
         | Some (page_info, page_id) ->
@@ -178,7 +177,7 @@ struct
   (** Making some confirmation pages tests for slots that are confirmed. *)
   let test_confirmed_pages (levels_data : levels) =
     let open Lwt_result_syntax in
-    let*? last_cell, last_cache, slots_info =
+    let* last_cell, last_cache, slots_info =
       populate_slots_history levels_data
     in
     helper_check_pbt_pages
@@ -192,7 +191,7 @@ struct
   (** Making some unconfirmation pages tests for slots that are confirmed. *)
   let test_unconfirmed_pages (levels_data : levels) =
     let open Lwt_result_syntax in
-    let*? last_cell, last_cache, slots_info =
+    let* last_cell, last_cache, slots_info =
       populate_slots_history levels_data
     in
     helper_check_pbt_pages

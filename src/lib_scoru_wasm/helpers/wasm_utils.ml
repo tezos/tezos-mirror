@@ -138,14 +138,15 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
     Stdlib.failwith "reveals are not available out of the box in tests"
 
   let eval_until_stuck ?(wasm_entrypoint = Constants.wasm_entrypoint)
-      ?(reveal_builtins = reveal_builtins) ?write_debug ?(max_steps = 20000L)
-      tree =
+      ?(reveal_builtins = reveal_builtins) ?hooks ?write_debug
+      ?(max_steps = 20000L) tree =
     let open Lwt.Syntax in
     let rec go counter tree =
       let* tree, _ =
         Wasm.compute_step_many
           ~wasm_entrypoint
           ~reveal_builtins
+          ?hooks
           ?write_debug
           ~max_steps
           tree
@@ -163,7 +164,7 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
      stop at a Snapshot or an input request, and never start another
      `kernel_run`. *)
   let rec eval_to_snapshot ?(wasm_entrypoint = Constants.wasm_entrypoint)
-      ?(reveal_builtins = reveal_builtins) ?write_debug
+      ?(reveal_builtins = reveal_builtins) ?hooks ?write_debug
       ?(max_steps = Int64.max_int) tree =
     let open Lwt_syntax in
     let eval tree =
@@ -171,6 +172,7 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
         Wasm.compute_step_many
           ~wasm_entrypoint
           ~reveal_builtins
+          ?hooks
           ?write_debug
           ~stop_at_snapshot:true
           ~max_steps
@@ -197,15 +199,12 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
     - return tree if input is required
     - or run compute_step_many to reach a point where input is required *)
   let eval_until_input_requested ?(wasm_entrypoint = Constants.wasm_entrypoint)
-      ?(reveal_builtins = Some reveal_builtins) ?write_debug ?after_fast_exec
+      ?(reveal_builtins = Some reveal_builtins) ?hooks ?write_debug
       ?(fast_exec = false) ?(max_steps = Int64.max_int) tree =
     let open Lwt_syntax in
     let run =
-      if fast_exec then
-        Wasm_fast.Internal_for_tests.compute_step_many_with_hooks
-          ~wasm_entrypoint
-          ?after_fast_exec
-      else Wasm.compute_step_many ~wasm_entrypoint
+      if fast_exec then Wasm_fast.compute_step_many ~wasm_entrypoint ?hooks
+      else Wasm.compute_step_many ~wasm_entrypoint ?hooks
     in
     let* info = Wasm.get_info tree in
     match info.input_request with
@@ -349,7 +348,7 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
   let eval_to_result ?(wasm_entrypoint = Constants.wasm_entrypoint) ?write_debug
-      ?reveal_builtins tree =
+      ?reveal_builtins ?hooks tree =
     let open Lwt_syntax in
     let should_compute pvm_state =
       let+ input_request_val = Wasm_vm.get_info pvm_state in
@@ -378,6 +377,7 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
       ~wasm_entrypoint
       ?write_debug
       ?reveal_builtins
+      ?hooks
       ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
       should_compute
       tree

@@ -1,0 +1,101 @@
+{ parameter
+    (or (nat %deposit)
+        (or (pair %mint (pair %content nat (option bytes)) (nat %amount))
+            (or (pair %withdraw (address %receiver) (ticket %ticket (pair nat (option bytes))))
+                (or (ticket %default (pair nat (option bytes)))
+                    (pair %set
+                       (address %target)
+                       (or %entrypoint
+                          (unit %default)
+                          (or (address %routerWithdraw) (bytes %rollupDeposit)))
+                       (mutez %xtz_amount)))))) ;
+  storage
+    (pair (pair %internal_call
+             (address %target)
+             (or %entrypoint
+                (unit %default)
+                (or (address %routerWithdraw) (bytes %rollupDeposit)))
+             (mutez %xtz_amount))
+          (big_map %metadata string bytes)) ;
+  code { LAMBDA
+           (pair (ticket (pair nat (option bytes))) address (or unit (or address bytes)) mutez)
+           operation
+           { UNPAIR ;
+             SWAP ;
+             UNPAIR 3 ;
+             SWAP ;
+             IF_LEFT
+               { DROP ;
+                 CONTRACT (ticket (pair nat (option bytes))) ;
+                 IF_NONE { PUSH string "FAILED_TO_GET_TKT_ENTRYPOINT" ; FAILWITH } {} ;
+                 SWAP ;
+                 DIG 2 ;
+                 TRANSFER_TOKENS }
+               { IF_LEFT
+                   { SWAP ;
+                     CONTRACT %withdraw
+                       (pair (address %receiver) (ticket %ticket (pair nat (option bytes)))) ;
+                     IF_NONE { PUSH string "ROUTER_ENTRYPOINT_NOT_FOUND" ; FAILWITH } {} ;
+                     DIG 2 ;
+                     DIG 3 ;
+                     DIG 3 ;
+                     PAIR ;
+                     TRANSFER_TOKENS }
+                   { DIG 3 ;
+                     SWAP ;
+                     PAIR ;
+                     LEFT bytes ;
+                     LEFT bytes ;
+                     SWAP ;
+                     CONTRACT
+                       (or (or (pair %deposit (bytes %routing_info) (ticket %ticket (pair nat (option bytes))))
+                               (bytes %b))
+                           (bytes %c)) ;
+                     IF_NONE { PUSH string "ROLLUP_DEPOSIT_NOT_FOUND" ; FAILWITH } {} ;
+                     DUG 2 ;
+                     TRANSFER_TOKENS } } } ;
+         SWAP ;
+         UNPAIR ;
+         IF_LEFT
+           { DIG 2 ; DROP 2 ; NIL operation }
+           { IF_LEFT
+               { UNPAIR ;
+                 TICKET ;
+                 IF_NONE { PUSH string "TKT_CREATION_FAILED" ; FAILWITH } {} ;
+                 DUP 2 ;
+                 NIL operation ;
+                 DIG 3 ;
+                 CAR ;
+                 DIG 3 ;
+                 PAIR ;
+                 DIG 3 ;
+                 SWAP ;
+                 EXEC ;
+                 CONS }
+               { IF_LEFT
+                   { UNPAIR ;
+                     DUP 3 ;
+                     NIL operation ;
+                     DIG 4 ;
+                     CAR ;
+                     DIG 3 ;
+                     UPDATE 1 ;
+                     DIG 3 ;
+                     PAIR ;
+                     DIG 3 ;
+                     SWAP ;
+                     EXEC ;
+                     CONS }
+                   { IF_LEFT
+                       { DUP 2 ;
+                         NIL operation ;
+                         DIG 3 ;
+                         CAR ;
+                         DIG 3 ;
+                         PAIR ;
+                         DIG 3 ;
+                         SWAP ;
+                         EXEC ;
+                         CONS }
+                       { DIG 2 ; DROP ; UPDATE 1 ; NIL operation } } } } ;
+         PAIR } }

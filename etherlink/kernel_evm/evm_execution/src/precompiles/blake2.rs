@@ -12,9 +12,9 @@ use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use alloc::borrow::Cow;
 use evm::{executor::stack::PrecompileFailure, ExitError};
 use evm::{Context, ExitReason, ExitSucceed, Transfer};
-use host::runtime::Runtime;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::{Debug, Info};
+use tezos_evm_runtime::runtime::Runtime;
 
 /// The precomputed values for BLAKE2b [from the spec](https://tools.ietf.org/html/rfc7693#section-2.7)
 /// There are 10 16-byte arrays - one for each round
@@ -218,8 +218,13 @@ mod tests {
         let input = [0; 0];
 
         // act
-        let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(9),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         // assert
         // expected outcome is Err
@@ -236,8 +241,13 @@ mod tests {
             0000000000000000000000000000000000000000000000000300000000000000000000000000000002"
         ).unwrap();
 
-        let result =
-            execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(9),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         assert!(result.is_err());
     }
@@ -294,17 +304,22 @@ mod tests {
     fn test_blake2f_input_spec() {
         for test in BLAKE2F_TESTS.iter() {
             let input = hex::decode(test.input).unwrap();
-            let result =
-                execute_precompiled(H160::from_low_u64_be(9), &input, None, Some(25000));
+            let result = execute_precompiled(
+                H160::from_low_u64_be(9),
+                &input,
+                None,
+                Some(25000),
+                true,
+            );
 
             assert!(result.is_ok());
             let outcome = result.unwrap();
             println!("{}", outcome.gas_used);
-            assert!(outcome.is_success);
+            assert!(outcome.is_success());
 
             let expected = hex::decode(test.expected).unwrap();
 
-            assert_eq!(Some(expected), outcome.result);
+            assert_eq!(Some(expected.as_slice()), outcome.output());
         }
     }
 }

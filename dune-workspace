@@ -1,16 +1,9 @@
 (lang dune 3.7)
 
 (env
- (dev
-  (flags (:standard -w @1..72-4-40..42-44-45-48-60-67-69-70))
-  (js_of_ocaml (runtest_alias runtest_js)))
- (release
-  (js_of_ocaml (runtest_alias runtest_js))
-  (ocamlopt_flags (:standard -O3)))
- (static
-  (js_of_ocaml (runtest_alias runtest_js))
-  (ocamlopt_flags (:standard -O3)))
- (_ (js_of_ocaml (runtest_alias runtest_js))))
+ (dev (flags (:standard -w @1..72-4-40..42-44-45-48-60-67-69-70)))
+ (release (ocamlopt_flags (:standard -O3)))
+ (static (ocamlopt_flags (:standard -O3))))
 
 (context (default (paths (ORIGINAL_PATH :standard))))
 

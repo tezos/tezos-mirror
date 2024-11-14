@@ -227,6 +227,12 @@ module Files : sig
   val count_values : 'value t -> ('key, 'value) layout -> int tzresult Lwt.t
 
   val remove : 'value t -> ('key, 'value) layout -> unit tzresult Lwt.t
+
+  module View : sig
+    val opened_files : 'value t -> int
+
+    val ongoing_actions : 'value t -> int
+  end
 end = struct
   module LRU = Ringo.LRU_Collection
 
@@ -345,6 +351,12 @@ end = struct
 
      The store ensures that actions performed on a given file are done
      sequentially. *)
+
+  module View = struct
+    let opened_files {files; _} = Table.length files
+
+    let ongoing_actions {last_actions; _} = Table.length last_actions
+  end
 
   let init ~lru_size =
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/6774
@@ -509,9 +521,7 @@ end = struct
   let remove_with_opened_file files lru filepath opened_file =
     let open Lwt_syntax in
     let* () = close_opened_file opened_file in
-    (* It may happen that the node was already evicted by a concurrent
-       action. Hence [LRU.remove] can fail. *)
-    (try LRU.remove lru opened_file.lru_node with _ -> ()) ;
+    LRU.remove lru opened_file.lru_node ;
     Table.remove files filepath ;
     Lwt_unix.unlink filepath
 
@@ -546,9 +556,13 @@ end = struct
       | None -> on_file_closed ~on_file_opened
       | Some opened_file -> on_file_opened opened_file
 
-    let close_file files last_actions filepath =
+    let close_file files lru last_actions filepath =
       let on_file_closed ~on_file_opened:_ = Lwt.return_unit in
-      let on_file_opened opened_file = close_opened_file opened_file in
+      let on_file_opened opened_file =
+        let open Lwt_syntax in
+        let+ () = close_opened_file opened_file in
+        LRU.remove lru opened_file.lru_node
+      in
       generic_action files last_actions filepath ~on_file_closed ~on_file_opened
 
     let read ~on_file_closed files last_actions layout key =
@@ -613,7 +627,7 @@ end = struct
       generic_action files last_actions filepath ~on_file_closed ~on_file_opened
   end
 
-  let close_file files last_actions filepath =
+  let close_file files lru last_actions filepath =
     (* Since this function does not aim to be exposed, we do not check
        whether the store is closed. This would actually be a mistake
        since it is used while the store is closing.
@@ -630,7 +644,7 @@ end = struct
     (* [p] is a promise that triggers the action of closing the
        file. It is important to not wait on it so that we can update
        the store's last_actions atomically to ensure invariant (A). *)
-    let p = Action.close_file files last_actions filepath in
+    let p = Action.close_file files lru last_actions filepath in
 
     Table.replace files filepath (Closing p) ;
     Table.replace last_actions filepath (Close p) ;
@@ -663,26 +677,43 @@ end = struct
       closed := true ;
       let* () =
         Table.iter_s
-          (fun filename _ -> close_file files last_actions filename)
+          (fun filename _ -> close_file files lru last_actions filename)
           files
       in
       LRU.clear lru ;
       return_unit)
 
   (* This function returns the lru node added and a promise for
-     closing the file evicted by the LRU. *)
+     closing the file evicted by the LRU.
+
+     This is probably the most touchy part of the KVS stores. Many
+     issues/problems come from this piece of code. So be careful when
+     modifying it, and be sure that your modifications can be caught
+     by the PBT test. *)
   let add_lru files last_actions lru filename =
     let open Lwt_syntax in
-    let lru_node, remove = LRU.add_and_return_erased lru filename in
-    match remove with
-    | None -> return lru_node
-    | Some filepath ->
+    let rec loop () =
+      if LRU.capacity lru = LRU.length lru then
+        let node = LRU.oldest_element lru |> Stdlib.Option.get in
+        let filepath = LRU.data node in
         (* We want to ensure that the number of file descriptors opened
            is bounded by the size of the LRU. This is why we wait first
            for the eviction promise to be fulfilled that will close the
            file evicted. *)
-        let* () = close_file files last_actions filepath in
-        return lru_node
+        let* () = close_file files lru last_actions filepath in
+        (* We call recursively to be sure that when trying to add the
+           node again, no node will be evicted. This strategy may
+           create in theory some starvation since while doing this
+           other nodes may have been added to the KVS, and
+           consequently, we may have to wait closing more files. In
+           practice, it should not be an issue: The starvation can
+           happen only if the store is busy all the time. *)
+        (loop [@ocaml.tailcall]) ()
+      else
+        let lru_node = LRU.add lru filename in
+        Lwt.return lru_node
+    in
+    loop ()
 
   (* This function aims to be used when the file already exists on the
      file system. *)
@@ -772,7 +803,16 @@ end = struct
       in
       let p = Action.read ~on_file_closed files last_actions layout key in
       Table.replace last_actions layout.filepath (Read p) ;
-      let+ _file, value = p in
+      let+ file, value = p in
+      (match file with
+      | None -> (
+          match Table.find_opt last_actions layout.filepath with
+          | Some (Read p) -> (
+              match Lwt.state p with
+              | Lwt.Return _ -> Table.remove last_actions layout.filepath
+              | _ -> ())
+          | _ -> ())
+      | Some _ -> ()) ;
       value
 
   (* Very similar to [read] action except we only look at the bitset
@@ -796,7 +836,16 @@ end = struct
         Action.value_exists ~on_file_closed files last_actions layout key
       in
       Table.replace last_actions layout.filepath (Value_exists p) ;
-      let+ _, exists = p in
+      let+ file, exists = p in
+      (match file with
+      | None -> (
+          match Table.find_opt last_actions layout.filepath with
+          | Some (Read p) -> (
+              match Lwt.state p with
+              | Lwt.Return _ -> Table.remove last_actions layout.filepath
+              | _ -> ())
+          | _ -> ())
+      | Some _ -> ()) ;
       exists
 
   (* Very similar to [value_exists] action except we look at the
@@ -818,7 +867,16 @@ end = struct
       in
       let p = Action.count_values ~on_file_closed files last_actions layout in
       Table.replace last_actions layout.filepath (Count_values p) ;
-      let+ _, count = p in
+      let+ file, count = p in
+      (match file with
+      | None -> (
+          match Table.find_opt last_actions layout.filepath with
+          | Some (Count_values p) -> (
+              match Lwt.state p with
+              | Lwt.Return _ -> Table.remove last_actions layout.filepath
+              | _ -> ())
+          | _ -> ())
+      | Some _ -> ()) ;
       count
 
   let write ?(override = false) {files; last_actions; lru; closed} layout key
@@ -870,7 +928,7 @@ end = struct
       let* () = p in
       (* See [close_file] for an explanation of the lines below. *)
       (match Table.find_opt last_actions layout.filepath with
-      | Some (Close p) -> (
+      | Some (Close p) | Some (Remove p) -> (
           match Lwt.state p with
           | Lwt.Return _ -> Table.remove last_actions layout.filepath
           | _ -> ())
@@ -1067,3 +1125,20 @@ let values_exist t file_layout seq =
 let remove_file {files; root_dir; _} file_layout file =
   let layout = file_layout ~root_dir file in
   Files.remove files layout
+
+module View = struct
+  let opened_files {files; _} = Files.View.opened_files files
+
+  let ongoing_actions {files; _} = Files.View.ongoing_actions files
+end
+
+module Internal_for_tests = struct
+  let init ?(lockfile_prefix = "internal_for_tests") ~lru_size ~root_dir () =
+    let open Lwt_result_syntax in
+    let*! () =
+      if not (Sys.file_exists root_dir) then Lwt_utils_unix.create_dir root_dir
+      else Lwt.return_unit
+    in
+    with_lockfile_lock (Format.sprintf "%s/.%s.lock" root_dir lockfile_prefix)
+    @@ fun fd -> return {files = Files.init ~lru_size; root_dir; lockfile = fd}
+end

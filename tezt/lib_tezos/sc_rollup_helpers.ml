@@ -75,17 +75,16 @@ module Installer_kernel_config = struct
   type t = instr list
 
   let instr_to_yaml = function
-    | Move {from; to_} -> sf {|  - move:
-      from: %s
-      to: %s
-|} from to_
-    | Reveal {hash; to_} -> sf {|  - reveal: %s
+    | Move {from; to_} -> sf {|- move:
+    from: %s
     to: %s
+|} from to_
+    | Reveal {hash; to_} -> sf {|- reveal: %s
+  to: %s
 |} hash to_
-    | Set {value; to_} ->
-        sf {|  - set:
-      value: %s
-      to: %s
+    | Set {value; to_} -> sf {|- set:
+    value: %s
+    to: %s
 |} value to_
 
   let to_yaml t =
@@ -128,8 +127,8 @@ type installer_result = {
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel_with_arbitrary_file ?runner ~preimages_dir ?config
-    installee =
+let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
+    ?runner ?(boot_sector = `Content) ~preimages_dir ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
   let installer =
@@ -157,17 +156,24 @@ let prepare_installer_kernel_with_arbitrary_file ?runner ~preimages_dir ?config
                   ""
                   (List.map Installer_kernel_config.instr_to_yaml config)
               in
-              Base.write_file setup_file ~contents:(base_config ^ new_contents) ;
+              let contents = base_config ^ new_contents in
+              Log.info "installer config:\n%s" contents ;
+              Base.write_file setup_file ~contents ;
               setup_file
         in
         ["--setup-file"; setup_file]
     | None -> []
   in
-  let process =
+  let* process =
+    let smart_rollup_installer_path =
+      match smart_rollup_installer_path with
+      | None -> project_root // Uses.path Constant.smart_rollup_installer
+      | Some path -> path
+    in
     Process.spawn
       ?runner
       ~name:installer
-      (project_root // Uses.path Constant.smart_rollup_installer)
+      smart_rollup_installer_path
       ([
          "get-reveal-installer";
          "--upgrade-to";
@@ -179,6 +185,7 @@ let prepare_installer_kernel_with_arbitrary_file ?runner ~preimages_dir ?config
          "--display-root-hash";
        ]
       @ setup_file_args)
+    |> Lwt.return
   in
   let+ installer_output =
     Runnable.run
@@ -189,7 +196,14 @@ let prepare_installer_kernel_with_arbitrary_file ?runner ~preimages_dir ?config
     | Some root_hash -> root_hash
     | None -> Test.fail "Failed to parse the root hash"
   in
-  {output; boot_sector = read_file output; root_hash}
+  {
+    output;
+    boot_sector =
+      (match boot_sector with
+      | `Content -> read_file output
+      | `Filename -> output);
+    root_hash;
+  }
 
 let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
   prepare_installer_kernel_with_arbitrary_file
@@ -232,8 +246,8 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
         "delay_increment_per_round"
         (Option.map string_of_int minimal_block_delay)
     @ (if Protocol.number protocol >= 018 then
-       make_bool_parameter "smart_rollup_private_enable" whitelist_enable
-      else [])
+         make_bool_parameter "smart_rollup_private_enable" whitelist_enable
+       else [])
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
     @
     if riscv_pvm_enable then [(["smart_rollup_riscv_pvm_enable"], `Bool true)]
@@ -293,7 +307,9 @@ let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?allow_degraded tezos_node tezos_client =
   let* sc_rollup =
     match sc_rollup with
-    | Some sc_rollup -> return sc_rollup
+    | Some sc_rollup ->
+        let* () = Client.bake_for_and_wait tezos_client in
+        return sc_rollup
     | None ->
         originate_sc_rollup
           ?hooks
@@ -321,6 +337,7 @@ let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
 let originate_forward_smart_contract ?(src = Constant.bootstrap1.alias) client
     protocol =
   (* Originate forwarder contract to send internal messages to rollup *)
+  Log.info "Originate forward contract" ;
   let* alias, contract_id =
     Client.originate_contract_at
       ~amount:Tez.zero
@@ -1193,3 +1210,35 @@ let json_of_output_tx_batch txs =
         `String
           (match parameters_ty with Some _ -> "typed" | None -> "untyped") );
     ]
+
+let serve_files ?(on_request = fun _ -> ()) ~name ~port ~root f =
+  let server =
+    Cohttp_lwt_unix.Server.make () ~callback:(fun _conn request _body ->
+        match request.meth with
+        | `GET ->
+            let fname =
+              Cohttp.Path.resolve_local_file
+                ~docroot:root
+                ~uri:(Cohttp.Request.uri request)
+            in
+            Log.debug ~prefix:name "Request file %s@." fname ;
+            on_request fname ;
+            Cohttp_lwt_unix.Server.respond_file ~fname ()
+        | _ ->
+            Cohttp_lwt_unix.Server.respond_error
+              ~status:`Method_not_allowed
+              ~body:"Static file server only answers GET"
+              ())
+  in
+  let stop, stopper = Lwt.task () in
+  let serve =
+    Cohttp_lwt_unix.Server.create ~stop ~mode:(`TCP (`Port port)) server
+  in
+  let stopper () =
+    Log.debug ~prefix:name "Stopping" ;
+    Lwt.wakeup_later stopper () ;
+    serve
+  in
+  Lwt.finalize f stopper
+
+let ticks_per_snapshot = 50_000_000_000_000

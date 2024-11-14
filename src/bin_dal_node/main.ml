@@ -33,20 +33,22 @@ let merge
         public_addr;
         endpoint;
         metrics_addr;
-        profiles;
+        profile;
         peers;
         history_mode;
+        service_name;
+        service_namespace;
       } configuration =
-  let profiles =
-    match profiles with
-    | None -> configuration.Configuration_file.profiles
+  let profile =
+    match profile with
+    | None -> configuration.Configuration_file.profile
     | Some from_cli ->
         (* Note that the profile from the CLI is prioritized over
            the profile provided in the config file. *)
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
            Improve profile configuration UX for when we have conflicting CLI and config file. *)
-        Types.merge_profiles
-          ~lower_prio:configuration.profiles
+        Profile_manager.merge_profiles
+          ~lower_prio:configuration.profile
           ~higher_prio:from_cli
   in
   {
@@ -57,10 +59,14 @@ let merge
     public_addr = Option.value ~default:configuration.public_addr public_addr;
     expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
     endpoint = Option.value ~default:configuration.endpoint endpoint;
-    profiles;
-    metrics_addr = Option.value ~default:configuration.metrics_addr metrics_addr;
+    profile;
+    (* metrics are disabled unless a metrics_addr option is specified *)
+    metrics_addr;
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;
+    service_name = Option.either service_name configuration.service_name;
+    service_namespace =
+      Option.either service_namespace configuration.service_namespace;
   }
 
 let wrap_with_error main_promise =
@@ -84,12 +90,16 @@ let run subcommand cli_options =
       in
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
-      @@ Daemon.run ~data_dir (merge cli_options)
+      @@ Daemon.run ~data_dir ~configuration_override:(merge cli_options)
   | Config_init ->
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
 
 let _ =
+  (* Memtrace can be activated via the environment variable MEMTRACE
+     whose value is the file collecting the trace. The trace can then
+     be observed with [memtrace-viewer]. *)
+  Memtrace.trace_if_requested () ;
   let commands = Cli.make ~run in
   exit @@ Cmdliner.Cmd.eval commands

@@ -24,9 +24,19 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_runtime::runtime::Runtime;
 
 use std::mem::size_of;
+
+/// /!\
+///     If you update these constants, you need to update the evm-node as well.
+///     The node uses the constants to compute the DA fees without calling the
+///     kernel, therefore they need to be synchronised.
+///
+///     If you happen to change the constants, it is recommended to write them
+///     to the storage instead. If they're written in the storage, we don't need
+///     need to default to a duplicated constant.
+/// /!\
 
 /// Minimum base fee per gas, set to 1 Gwei.
 pub const MINIMUM_BASE_FEE_PER_GAS: u64 = 10_u64.pow(9);
@@ -82,12 +92,23 @@ impl TransactionContent {
             Self::EthereumDelayed(_) => {
                 FeeUpdates::for_delayed_tx(block_fees, execution_gas_used)
             }
+            Self::FaDeposit(_) => FeeUpdates::for_fa_deposit(execution_gas_used),
         }
     }
 }
 
 impl FeeUpdates {
     fn for_deposit(gas_used: U256) -> Self {
+        Self {
+            overall_gas_used: gas_used,
+            overall_gas_price: U256::zero(),
+            burn_amount: U256::zero(),
+            charge_user_amount: U256::zero(),
+            compensate_sequencer_amount: U256::zero(),
+        }
+    }
+
+    fn for_fa_deposit(gas_used: U256) -> Self {
         Self {
             overall_gas_used: gas_used,
             overall_gas_price: U256::zero(),
@@ -287,13 +308,10 @@ fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EthereumError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use evm::{ExitReason, ExitSucceed};
-    use evm_execution::{
-        account_storage::{account_path, EthereumAccountStorage},
-        handler::ExtendedExitReason,
-    };
+    use evm::ExitSucceed;
+    use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use proptest::prelude::*;
 
@@ -344,7 +362,7 @@ mod tests {
     #[test]
     fn apply_updates_balances_no_sequencer() {
         // Arrange
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
 
@@ -381,7 +399,7 @@ mod tests {
     #[test]
     fn apply_updates_balances_with_sequencer() {
         // Arrange
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let sequencer_address =
             address_from_str("0123456789ABCDEF0123456789ABCDEF01234567");
 
@@ -438,7 +456,7 @@ mod tests {
     #[test]
     fn apply_fails_user_charge_too_large() {
         // Arrange
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
 
@@ -492,7 +510,7 @@ mod tests {
     }
 
     fn get_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: H160,
     ) -> U256 {
@@ -503,7 +521,7 @@ mod tests {
     }
 
     fn set_balance(
-        host: &mut MockHost,
+        host: &mut MockKernelHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: H160,
         balance: U256,
@@ -519,11 +537,11 @@ mod tests {
     fn mock_execution_outcome(gas_used: u64) -> ExecutionOutcome {
         ExecutionOutcome {
             gas_used,
-            is_success: true,
-            reason: ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
-            new_address: None,
             logs: Vec::new(),
-            result: None,
+            result: evm_execution::handler::ExecutionResult::CallSucceeded(
+                ExitSucceed::Stopped,
+                vec![],
+            ),
             withdrawals: Vec::new(),
             estimated_ticks_used: 1,
         }

@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-// usage: node opcodes.js <opcodes_dump.json>
+// usage: node opcodes.js
 
 const fs = require('fs');
 const process = require("process");
 const csv = require("csv-stringify/sync");
+let { parse } = require('csv-parse/sync')
 
 function sumArray(arr) {
     return arr.reduce((acc, curr) => acc + curr, 0);
@@ -138,12 +139,24 @@ function compute_opcodes_analysis_results(result) {
 function merge_all_benchmark_opcodes(results) {
     let opcodes = {};
 
-    for (const [_benchmark_name, benchmark_opcodes] of Object.entries(results)) {
-        for (const opcode in benchmark_opcodes) {
+    for (const benchmark_filename of results) {
+        let opcodes_file = fs.readFileSync(benchmark_filename);
+        const lines = parse(opcodes_file, {
+            delimiter: ",",
+            columns: false,
+        });
+        for  (const line of lines) {
+            let opcode = line[0];
+            let results = {
+                ticks: parseInt(line[1]),
+                gas: parseInt(line[2]),
+                step_result: parseInt(line[3])
+            };
+
             if (opcodes[opcode] == undefined) {
-                opcodes[opcode] = benchmark_opcodes[opcode]
+                opcodes[opcode] = [results]
             } else {
-                opcodes[opcode] = opcodes[opcode].concat(benchmark_opcodes[opcode])
+                opcodes[opcode].push(results)
             }
         }
     }

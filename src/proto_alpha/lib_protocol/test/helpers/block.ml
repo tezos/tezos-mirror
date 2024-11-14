@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,6 +40,17 @@ type t = {
 }
 
 type block = t
+
+let get_alpha_ctxt b =
+  let open Lwt_result_wrap_syntax in
+  let*@ ctxt, _migration_balance_updates, _migration_operation_results =
+    prepare
+      b.context
+      ~level:b.header.shell.level
+      ~predecessor_timestamp:b.header.shell.timestamp
+      ~timestamp:b.header.shell.timestamp
+  in
+  return ctxt
 
 let rpc_context block =
   {
@@ -121,9 +133,26 @@ let get_next_baker_by_account pkh block =
       round,
       WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
 
+(* Returns the first baker able to bake that is not in the list of excluded keys. *)
 let get_next_baker_excluding excludes block =
   let open Lwt_result_wrap_syntax in
   let* bakers = Plugin.RPC.Baking_rights.get rpc_ctxt block in
+  let* baker_opt =
+    List.find_es
+      (fun {Plugin.RPC.Baking_rights.consensus_key; delegate; _} ->
+        let* info = Delegate_services.info rpc_ctxt block delegate in
+        let* forbidden =
+          Delegate_services.is_forbidden rpc_ctxt block delegate
+        in
+        return
+        @@ ((not info.deactivated) && (not forbidden)
+           && not
+                (List.mem
+                   ~equal:Signature.Public_key_hash.equal
+                   consensus_key
+                   excludes)))
+      bakers
+  in
   let {
     Plugin.RPC.Baking_rights.delegate = pkh;
     consensus_key;
@@ -131,15 +160,7 @@ let get_next_baker_excluding excludes block =
     round;
     _;
   } =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find
-         (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
-           not
-             (List.mem
-                ~equal:Signature.Public_key_hash.equal
-                consensus_key
-                excludes))
-         bakers
+    WithExceptions.Option.get ~loc:__LOC__ baker_opt
   in
   let*?@ round = Round.to_int round in
   return
@@ -622,7 +643,11 @@ let prepare_initial_context_params ?consensus_committee_size
       ~default:constants.consensus_rights_delay
       consensus_rights_delay
   in
-
+  let cache_sampler_state_cycles =
+    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+  and cache_stake_distribution_cycles =
+    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+  in
   let constants =
     {
       constants with
@@ -647,6 +672,8 @@ let prepare_initial_context_params ?consensus_committee_size
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
       consensus_rights_delay;
+      cache_sampler_state_cycles;
+      cache_stake_distribution_cycles;
     }
   in
   let* () = check_constants_consistency constants in
@@ -868,17 +895,17 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
       List.fold_left_es
         (fun (vstate, contents_result) op ->
           (if check_size then
-           let operation_size =
-             Data_encoding.Binary.length Operation.encoding op
-           in
-           if operation_size > Constants_repr.max_operation_data_length then
-             raise
-               (invalid_arg
-                  (Format.sprintf
-                     "The operation size is %d, it exceeds the constant \
-                      maximum size %d"
-                     operation_size
-                     Constants_repr.max_operation_data_length))) ;
+             let operation_size =
+               Data_encoding.Binary.length Operation.encoding op
+             in
+             if operation_size > Constants_repr.max_operation_data_length then
+               raise
+                 (invalid_arg
+                    (Format.sprintf
+                       "The operation size is %d, it exceeds the constant \
+                        maximum size %d"
+                       operation_size
+                       Constants_repr.max_operation_data_length))) ;
           let* state, result = validate_and_apply_operation vstate op in
           if allow_manager_failures then
             return (state, result :: contents_result)
@@ -1241,16 +1268,35 @@ let current_cycle_of_level ~blocks_per_cycle ~current_level =
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
   current_cycle
 
+let current_level b = b.header.shell.level
+
 let current_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in
   let current_level = b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
 
-let last_block_of_cycle b =
-  let blocks_per_cycle = b.constants.blocks_per_cycle in
-  let current_level = b.header.shell.level in
-  let mod_plus_one = Int32.(rem (succ current_level) blocks_per_cycle) in
+let first_level_of_cycle (constants : Constants.Parametric.t) ~level =
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  Int32.(equal (rem level blocks_per_cycle) zero)
+
+let first_block_of_cycle b =
+  first_level_of_cycle b.constants ~level:b.header.shell.level
+
+let last_but_one_level_of_cycle (constants : Constants.Parametric.t) ~level =
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  let mod_plus_two = Int32.(rem (succ (succ level)) blocks_per_cycle) in
+  Int32.(equal mod_plus_two zero)
+
+let last_but_one_block_of_cycle b =
+  last_but_one_level_of_cycle b.constants ~level:b.header.shell.level
+
+let last_level_of_cycle (constants : Constants.Parametric.t) ~level =
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  let mod_plus_one = Int32.(rem (succ level) blocks_per_cycle) in
   Int32.(equal mod_plus_one zero)
+
+let last_block_of_cycle b =
+  last_level_of_cycle b.constants ~level:b.header.shell.level
 
 let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   let open Lwt_result_syntax in

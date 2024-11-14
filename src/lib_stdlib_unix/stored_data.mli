@@ -44,7 +44,7 @@ type 'a eq := 'a -> 'a -> bool
 type 'a t
 
 (** This error is returned when the requested data is not found. *)
-type error += Missing_stored_data of string
+type error += Cannot_load_stored_data of string * string
 
 (** [make_file ?(json=false) ~filepath encoding] represents a file
     located at [filepath]. The content of this value is encoded using

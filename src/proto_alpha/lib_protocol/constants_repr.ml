@@ -340,6 +340,31 @@ let check_constants constants =
          "The number of maximum stored cemented commitments must be strictly \
           positive")
   in
+  let* () =
+    error_unless
+      Compare.Int.(
+        constants.cache_stake_distribution_cycles
+        = constants.consensus_rights_delay + max_slashing_period + 1)
+      (Invalid_protocol_constants
+         (Format.sprintf
+            "We should have cache_stake_distribution_cycles (%d) = \
+             consensus_rights_delay (%d) + max_slashing_period (%d) + 1."
+            constants.cache_stake_distribution_cycles
+            constants.consensus_rights_delay
+            max_slashing_period))
+  in
+  let* () =
+    error_unless
+      Compare.Int.(
+        constants.cache_sampler_state_cycles
+        = constants.cache_stake_distribution_cycles)
+      (Invalid_protocol_constants
+         (Format.sprintf
+            "The number cached cycles for the sampler state (%d) and for the \
+             stake distribution (%d) should currently be the same."
+            constants.cache_sampler_state_cycles
+            constants.cache_stake_distribution_cycles))
+  in
   Result.return_unit
 
 module Generated = struct
@@ -370,13 +395,13 @@ module Generated = struct
           baking_reward_fixed_portion_weight =
             (* 1/4 or 1/2 *)
             (if Compare.Int.(bonus_committee_size <= 0) then
-             (* a fortiori, consensus_committee_size < 4 *)
-             reward_parts_half
-            else reward_parts_quarter);
+               (* a fortiori, consensus_committee_size < 4 *)
+               reward_parts_half
+             else reward_parts_quarter);
           baking_reward_bonus_weight =
             (* 1/4 or 0 *)
             (if Compare.Int.(bonus_committee_size <= 0) then 0
-            else reward_parts_quarter);
+             else reward_parts_quarter);
           attesting_reward_weight = reward_parts_half;
           (* 1/2 *)
           (* All block (baking + attesting)rewards sum to 1 ( *256*80 ) *)

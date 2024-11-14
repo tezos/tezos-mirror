@@ -30,9 +30,9 @@ module Parameters = struct
     rpc_port : int;
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
-    public_addr : string;
+    public_addr : string option;
     metrics_addr : string;
-    l1_node_endpoint : Client.endpoint;
+    l1_node_endpoint : Endpoint.t;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
   }
@@ -68,14 +68,24 @@ let rpc_host dal_node = dal_node.persistent_state.rpc_host
 
 let rpc_port dal_node = dal_node.persistent_state.rpc_port
 
-let rpc_endpoint dal_node =
-  Printf.sprintf "http://%s:%d" (rpc_host dal_node) (rpc_port dal_node)
+let rpc_endpoint ?(local = false) node =
+  let host =
+    if local then Constant.default_host
+    else Runner.address node.persistent_state.runner
+  in
+  Printf.sprintf "http://%s:%d" host (rpc_port node)
 
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
 
 let public_addr dal_node = dal_node.persistent_state.public_addr
 
 let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
+
+let metrics_port dal_node =
+  try
+    dal_node.persistent_state.metrics_addr |> String.split_on_char ':'
+    |> Fun.flip List.nth 1 |> int_of_string
+  with _ -> 11733
 
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
@@ -100,30 +110,31 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
        Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
        Some "--net-addr";
        Some (listen_addr dal_node);
-       Some "--public-addr";
-       Some (public_addr dal_node);
        Some "--metrics-addr";
        Some (metrics_addr dal_node);
        Some "--expected-pow";
        Some (string_of_float expected_pow);
      ]
+  @ (match public_addr dal_node with
+    | None -> []
+    | Some addr -> [Some "--public-addr"; Some addr])
   @ (if peers = [] then [None]
-    else [Some "--peers"; Some (String.concat "," peers)])
+     else [Some "--peers"; Some (String.concat "," peers)])
   @ (if attester_profiles = [] then [None]
-    else
-      [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
+     else
+       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
   @ (if observer_profiles = [] then [None]
-    else
-      [
-        Some "--observer-profiles";
-        Some (String.concat "," (List.map string_of_int observer_profiles));
-      ])
+     else
+       [
+         Some "--observer-profiles";
+         Some (String.concat "," (List.map string_of_int observer_profiles));
+       ])
   @ (if producer_profiles = [] then [None]
-    else
-      [
-        Some "--producer-profiles";
-        Some (String.concat "," (List.map string_of_int producer_profiles));
-      ])
+     else
+       [
+         Some "--producer-profiles";
+         Some (String.concat "," (List.map string_of_int producer_profiles));
+       ])
   @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
   @
   match history_mode with
@@ -159,7 +170,16 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
 
 let read_identity dal_node =
   let filename = sf "%s/identity.json" @@ data_dir dal_node in
-  JSON.(parse_file filename |-> "peer_id" |> as_string)
+  match dal_node.persistent_state.runner with
+  | None -> Lwt.return JSON.(parse_file filename |-> "peer_id" |> as_string)
+  | Some runner ->
+      let* content =
+        Process.spawn ~runner "cat" [filename] |> Process.check_and_read_stdout
+      in
+      JSON.(
+        parse ~origin:"Dal_node.read_identity" content
+        |-> "peer_id" |> as_string)
+      |> Lwt.return
 
 let check_event ?timeout ?where dal_node name promise =
   let* result =
@@ -233,9 +253,6 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
     | Some addr -> addr
   in
-  let public_addr =
-    match public_addr with None -> listen_addr | Some addr -> addr
-  in
   let metrics_addr =
     match metrics_addr with
     | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
@@ -279,25 +296,29 @@ let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?listen_addr
     ?public_addr
     ?metrics_addr
-    ~l1_node_endpoint:(Client.Node node)
+    ~l1_node_endpoint:(Node.as_rpc_endpoint node)
     ()
 
 let make_arguments node =
-  let l1_endpoint =
-    Client.as_foreign_endpoint node.persistent_state.l1_node_endpoint
+  let rpc_host =
+    match node.persistent_state.runner with
+    | Some _ -> Unix.(string_of_inet_addr inet_addr_any)
+    | None -> rpc_host node
   in
   [
     "--endpoint";
-    Endpoint.as_string l1_endpoint;
+    Endpoint.as_string node.persistent_state.l1_node_endpoint;
     "--rpc-addr";
-    Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
+    Format.asprintf "%s:%d" rpc_host (rpc_port node);
     "--net-addr";
     listen_addr node;
-    "--public-addr";
-    public_addr node;
     "--metrics-addr";
     metrics_addr node;
   ]
+  @
+  match public_addr node with
+  | None -> []
+  | Some addr -> ["--public-addr"; addr]
 
 let do_runlike_command ?env ?(event_level = `Debug) node arguments =
   if node.status <> Not_running then
@@ -337,3 +358,44 @@ let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
   Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+
+let runner (t : t) = t.persistent_state.runner
+
+let point node =
+  let address = Runner.address node.persistent_state.runner in
+  let net_port =
+    String.split_on_char ':' node.persistent_state.listen_addr
+    |> Fun.flip List.nth 1
+  in
+  (address, net_port)
+
+let point_str node =
+  let addr, port = point node in
+  addr ^ ":" ^ port
+
+let load_last_finalized_processed_level dal_node =
+  let open Tezos_stdlib_unix in
+  let aux () =
+    let open Lwt_result.Syntax in
+    let open Lwt_result in
+    let last_processed_level_filename = "last_processed_level" in
+    let root_dir = sf "%s/store" (data_dir dal_node) in
+    let* kvs =
+      Key_value_store.Internal_for_tests.init ~lru_size:1 ~root_dir ()
+    in
+    let file_layout ~root_dir () =
+      let filepath = Filename.concat root_dir last_processed_level_filename in
+      Key_value_store.layout
+        ~encoding:Data_encoding.int32
+        ~filepath
+        ~eq:Stdlib.( = )
+        ~index_of:(fun () -> 0)
+        ~number_of_keys_per_file:1
+        ()
+    in
+    let* value_res = Key_value_store.read_value kvs file_layout () () in
+    let* () = Key_value_store.close kvs in
+    Int32.to_int value_res |> return
+  in
+  let* v_res = aux () in
+  match v_res with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none

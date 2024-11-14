@@ -514,7 +514,8 @@ module Benchmark (L : LIB) = struct
           let x_g = of_pair generator |> fst in
           let* diff = Num.add x_pk ~qr:S.mone x_g in
           Num.assert_nonzero diff
-          >* (* Building signature message *)
+          >*
+          (* Building signature message *)
           let* compressed =
             monadic_compress
               [

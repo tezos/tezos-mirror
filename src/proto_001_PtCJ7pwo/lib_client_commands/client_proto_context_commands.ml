@@ -67,7 +67,7 @@ let commands () =
         Shell_services.Blocks.Header.shell_header cctxt ~block:cctxt#block ()
         >>=? fun {timestamp = v; _} ->
         (if seconds then cctxt#message "%Ld" (Time.Protocol.to_seconds v)
-        else cctxt#message "%s" (Time.Protocol.to_notation v))
+         else cctxt#message "%s" (Time.Protocol.to_notation v))
         >>= fun () -> return_unit);
     command
       ~group

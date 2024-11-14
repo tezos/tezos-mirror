@@ -184,7 +184,7 @@ let test_ema_decreases_off_bound () =
         1_000_000l)
     ema_range
 
-(* Test that 120961 On votes are needed to move from 0% to 50%. *)
+(* Test that 151201 On votes are needed to move from 0% to 50%. *)
 let test_ema_many_on () =
   let open Lwt_result_syntax in
   let open Per_block_votes_repr in
@@ -201,10 +201,10 @@ let test_ema_many_on () =
     ~loc:__LOC__
     1_000_000_000l
     (compute_new_ema_n
-       (Stdlib.List.init 120961 (fun _ -> Per_block_vote_on))
+       (Stdlib.List.init 151201 (fun _ -> Per_block_vote_on))
        initial_ema)
 
-(* Test that 120961 Off votes are needed to move from 100% to 50%. *)
+(* Test that 151201 Off votes are needed to move from 100% to 50%. *)
 let test_ema_many_off () =
   let open Lwt_result_syntax in
   let open Per_block_votes_repr in
@@ -220,7 +220,7 @@ let test_ema_many_off () =
   Assert.leq_int32
     ~loc:__LOC__
     (compute_new_ema_n
-       (Stdlib.List.init 120961 (fun _ -> Per_block_vote_off))
+       (Stdlib.List.init 151201 (fun _ -> Per_block_vote_off))
        initial_ema)
     1_000_000_000l
 
@@ -233,7 +233,7 @@ let test_ema_many_many_on () =
     Assert.leq_int32
       ~loc:__LOC__
       (compute_new_ema_n
-         (Stdlib.List.init 187258 (fun _ -> Per_block_vote_on))
+         (Stdlib.List.init 351122 (fun _ -> Per_block_vote_on))
          initial_ema)
       1_600_000_000l
   in
@@ -241,7 +241,7 @@ let test_ema_many_many_on () =
     ~loc:__LOC__
     1_600_000_000l
     (compute_new_ema_n
-       (Stdlib.List.init 280894 (fun _ -> Per_block_vote_on))
+       (Stdlib.List.init 351123 (fun _ -> Per_block_vote_on))
        initial_ema)
 
 (* Test that the EMA update function is symmetric:
@@ -288,15 +288,15 @@ let tests =
       `Quick
       test_ema_decreases_off_bound;
     Tztest.tztest
-      "EMA goes from 0% to 50% in 120961 On votes"
+      "EMA goes from 0% to 50% in 151201 On votes"
       `Quick
       test_ema_many_on;
     Tztest.tztest
-      "EMA goes from 100% to 50% in 120961 Off votes"
+      "EMA goes from 100% to 50% in 151201 Off votes"
       `Quick
       test_ema_many_off;
     Tztest.tztest
-      "EMA goes from 0% to 80% in 280894 On votes"
+      "EMA goes from 0% to 80% in 351117 On votes"
       `Quick
       test_ema_many_many_on;
     Tztest.tztest

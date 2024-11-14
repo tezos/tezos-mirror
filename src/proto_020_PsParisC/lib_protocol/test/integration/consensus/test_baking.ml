@@ -118,7 +118,7 @@ let test_voting_power_cache () =
     assert_voting_power ~loc:__LOC__ initial_voting_power_at_genesis genesis
   in
   let rewards_after_one_voting_period =
-    Test_tez.(baking_reward *! Int64.pred (blocks_per_voting_periods 1))
+    Tez_helpers.(baking_reward *! Int64.pred (blocks_per_voting_periods 1))
   in
   let expected_delta_voting_power_after_one_voting_period =
     Tez.to_mutez rewards_after_one_voting_period
@@ -138,7 +138,7 @@ let test_voting_power_cache () =
       block
   in
   let rewards_after_two_voting_periods =
-    Test_tez.(baking_reward *! Int64.pred (blocks_per_voting_periods 2))
+    Tez_helpers.(baking_reward *! Int64.pred (blocks_per_voting_periods 2))
   in
   let expected_delta_voting_power_after_two_voting_periods =
     Tez.to_mutez rewards_after_two_voting_periods
@@ -167,7 +167,7 @@ let test_basic_baking_reward () =
     Context.Delegate.current_frozen_deposits (B b) baker_pkh
   in
   let* br = Context.get_baking_reward_fixed_portion (B b) in
-  let open Test_tez in
+  let open Tez_helpers in
   let expected_initial_balance = bal +! frozen_deposit -! br in
   Assert.equal_tez
     ~loc:__LOC__
@@ -249,7 +249,7 @@ let test_rewards_block_and_payload_producer () =
      block producer, in our case, [baker_b2]. [baker_b2] gets the baking reward
      plus the fee for the transaction [tx]. *)
   let expected_balance =
-    let open Test_tez in
+    let open Tez_helpers in
     Account.default_initial_balance -! frozen_deposit +! baking_reward
     +! bonus_reward +! reward_for_b1 +! fee
   in
@@ -291,7 +291,7 @@ let test_rewards_block_and_payload_producer () =
     else Tez.zero
   in
   let expected_balance =
-    let open Test_tez in
+    let open Tez_helpers in
     Account.default_initial_balance +! baking_reward -! frozen_deposit
     +! reward_for_b1 +! fee
   in
@@ -309,7 +309,7 @@ let test_rewards_block_and_payload_producer () =
     else Tez.zero
   in
   let expected_balance' =
-    let open Test_tez in
+    let open Tez_helpers in
     Account.default_initial_balance +! bonus_reward +! reward_for_b1'
     -! frozen_deposits'
   in
@@ -349,7 +349,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
       Context.Delegate.current_frozen_deposits (B b1) pkh1
     in
     let expected_bal =
-      Test_tez.(
+      Tez_helpers.(
         Tez.of_mutez_exn initial_bal1
         +! baking_reward_fixed_portion -! frozen_deposit)
     in

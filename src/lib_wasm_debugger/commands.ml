@@ -371,17 +371,30 @@ let fetch_preimage_from_remote endpoint hash_hex =
       in
       raise Not_found
 
-let reveal_preimage_builtin config retries hash =
-  let hex = Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.to_hex hash in
-  let fetch_from_remote =
-    Option.map fetch_preimage_from_remote config.Config.preimage_endpoint
+let reveal_preimage_builtin ?preimages_endpoint ~preimages retries hash =
+  let open Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash in
+  if hash = well_known_reveal_hash then Lwt.return well_known_reveal_preimage
+  else
+    let hex = to_hex hash in
+    let fetch_from_remote =
+      Option.map fetch_preimage_from_remote preimages_endpoint
+    in
+    read_data
+      ~kind:"Preimage"
+      ~directory:preimages
+      ~filename:hex
+      ?fetch_from_remote
+      retries
+
+let reveal_preimage ?preimages_endpoint ~preimages retries (`Hex hex_hash) =
+  let hash =
+    Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.of_hex hex_hash
   in
-  read_data
-    ~kind:"Preimage"
-    ~directory:config.Config.preimage_directory
-    ~filename:hex
-    ?fetch_from_remote
-    retries
+  match hash with
+  | Some hash ->
+      reveal_preimage_builtin ?preimages_endpoint ~preimages retries hash
+  | None ->
+      Stdlib.failwith (Format.asprintf "invalid preimages hash %s" hex_hash)
 
 let request_dal_page config retries published_level slot_index page_index =
   let open Tezos_protocol_alpha.Protocol in
@@ -405,7 +418,12 @@ let reveals config request =
   let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
   let num_retries = 3 in
   match Wasm_2_0_0PVM.decode_reveal request with
-  | Reveal_raw_data hash -> reveal_preimage_builtin config num_retries hash
+  | Reveal_raw_data hash ->
+      reveal_preimage_builtin
+        ?preimages_endpoint:config.Config.preimage_endpoint
+        ~preimages:config.Config.preimage_directory
+        num_retries
+        hash
   | Reveal_metadata -> Lwt.return (build_metadata config)
   | Reveal_dal_parameters ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6547
@@ -417,9 +435,18 @@ let reveals config request =
       request_dal_page config num_retries published_level index page_index
 
 let write_debug_default config =
-  if config.Config.kernel_debug then
-    Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_fmt.printf "%s%!" msg)
-  else Tezos_scoru_wasm.Builtins.Noop
+  match config.Config.timings_file with
+  | None when config.Config.kernel_debug ->
+      Tezos_scoru_wasm.Builtins.Printer (Lwt_io.printf "%s%!")
+  | None -> Tezos_scoru_wasm.Builtins.Noop
+  | Some timings_file ->
+      let console = Timing_buffer.create () in
+      let out = open_out timings_file in
+      Gc.finalise (Timing_buffer.flush_buffer console) out ;
+      Tezos_scoru_wasm.Builtins.Printer
+        (fun msg ->
+          Timing_buffer.add_message console out msg ;
+          Lwt.return_unit)
 
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   module Prof = Profiling.Make (Wasm_utils)
@@ -427,13 +454,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [compute_step tree] is a wrapper around [Wasm_pvm.compute_step] that also
      returns the number of ticks elapsed (whi is always 1). *)
-  let compute_step config tree =
+  let compute_step ~write_debug tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let+ tree =
           Wasm.compute_step_with_debug
             ~wasm_entrypoint:Constants.wasm_entrypoint
-            ~write_debug:(write_debug_default config)
+            ~write_debug
             tree
         in
         (tree, 1L))
@@ -441,24 +468,22 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
-  let eval_to_result config tree =
+  let eval_to_result ?write_debug config tree =
     trap_exn (fun () ->
-        eval_to_result
-          ~write_debug:(write_debug_default config)
-          ~reveal_builtins:(reveals config)
-          tree)
+        eval_to_result ?write_debug ~reveal_builtins:(reveals config) tree)
 
   (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
      starts a new one if already at snapshot point). *)
-  let eval_kernel_run ~wasm_entrypoint config tree =
+  let eval_kernel_run ?hooks ?write_debug ~wasm_entrypoint config tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree, _ =
           Wasm_fast.compute_step_many
+            ?hooks
             ~wasm_entrypoint
             ~reveal_builtins:(reveals config)
-            ~write_debug:(write_debug_default config)
+            ?write_debug
             ~stop_at_snapshot:true
             ~max_steps:Int64.max_int
             tree
@@ -469,19 +494,18 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         ))
 
   (* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
-  let eval_until_input_requested ?write_debug ~wasm_entrypoint config tree =
+  let eval_until_input_requested ?hooks ?write_debug ~wasm_entrypoint config
+      tree =
     let open Lwt_syntax in
-    let write_debug =
-      Option.value ~default:(write_debug_default config) write_debug
-    in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree =
           eval_until_input_requested
+            ?hooks
             ~wasm_entrypoint
             ~fast_exec:true
             ~reveal_builtins:(Some (reveals config))
-            ~write_debug
+            ?write_debug
             ~max_steps:Int64.max_int
             tree
         in
@@ -586,13 +610,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (* [load_inputs_gen inboxes level tree] reads the next inbox from [inboxes], set the
      messages at [level] in the [tree], and returns the remaining inbox, the next
      level and the tree. *)
-  let load_inputs_gen inboxes level tree =
+  let load_inputs_gen ?migrate_to inboxes level tree =
     let open Lwt_result_syntax in
     match Seq.uncons inboxes with
     | Some (inputs, inboxes) ->
         let* tree =
           trap_exn (fun () ->
               set_full_input_step_gen
+                ?migrate_to
                 set_raw_message_input_step
                 inputs
                 level
@@ -603,43 +628,55 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let*! () = Lwt_fmt.printf "No more inputs at level %ld\n%!" level in
         return (tree, inboxes, level)
 
-  let load_inputs inboxes level tree =
+  let load_inputs ?migrate_to inboxes level tree =
     let open Lwt_result_syntax in
     let*! status = check_input_request tree in
     match status with
-    | Ok () -> load_inputs_gen inboxes level tree
+    | Ok () -> load_inputs_gen ?migrate_to inboxes level tree
     | Error msg ->
         Format.printf "%s\n%!" msg ;
         return (tree, inboxes, level)
 
   (* Eval dispatcher. *)
-  let eval ?write_debug ~wasm_entrypoint level inboxes config step tree =
+  let eval ?hooks ?migrate_to ~write_debug ~wasm_entrypoint level inboxes config
+      step tree =
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
       let* tree, count = f in
       return (tree, count, inboxes, level)
     in
     match step with
-    | Tick -> return' (compute_step config tree)
-    | Result -> return' (eval_to_result config tree)
-    | Kernel_run -> return' (eval_kernel_run ~wasm_entrypoint config tree)
+    | Tick -> return' (compute_step ~write_debug tree)
+    | Result -> return' (eval_to_result ~write_debug config tree)
+    | Kernel_run ->
+        return'
+          (eval_kernel_run ?hooks ~write_debug ~wasm_entrypoint config tree)
     | Inbox -> (
         let*! status = check_input_request tree in
         match status with
         | Ok () ->
-            let* tree, inboxes, level = load_inputs inboxes level tree in
+            let* tree, inboxes, level =
+              load_inputs ?migrate_to inboxes level tree
+            in
             let* tree, ticks =
               eval_until_input_requested
-                ?write_debug
+                ?hooks
+                ~write_debug
                 ~wasm_entrypoint
                 config
                 tree
             in
             return (tree, ticks, inboxes, level)
         | Error _ ->
-            return' (eval_until_input_requested ~wasm_entrypoint config tree))
+            return'
+              (eval_until_input_requested
+                 ?hooks
+                 ~write_debug
+                 ~wasm_entrypoint
+                 config
+                 tree))
 
-  let profile ~collapse ~with_time ~no_reboot level inboxes config
+  let profile ?migrate_to ~collapse ~with_time ~no_reboot level inboxes config
       function_symbols tree =
     let open Lwt_result_syntax in
     let*! pvm_state =
@@ -657,7 +694,9 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
     match status with
     | Ok () when is_profilable ->
-        let* tree, inboxes, level = load_inputs inboxes level tree in
+        let* tree, inboxes, level =
+          load_inputs ?migrate_to inboxes level tree
+        in
         let* tree =
           eval_and_profile
             ~collapse
@@ -713,10 +752,10 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [step level inboxes config kind tree] evals according to the step kind and
      prints the number of ticks elapsed and the new status. *)
-  let step ~wasm_entrypoint level inboxes config kind tree =
+  let step ~write_debug ~wasm_entrypoint level inboxes config kind tree =
     let open Lwt_result_syntax in
     let* tree, ticks, inboxes, level =
-      eval ~wasm_entrypoint level inboxes config kind tree
+      eval ~write_debug ~wasm_entrypoint level inboxes config kind tree
     in
     let*! () = Lwt_fmt.printf "Evaluation took %Ld ticks so far\n" ticks in
     let*! () = show_status tree in
@@ -964,7 +1003,13 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         | Reveal_raw_data hash, None ->
             Lwt.catch
               (fun () ->
-                let* preimage = reveal_preimage_builtin config 1 hash in
+                let* preimage =
+                  reveal_preimage_builtin
+                    ?preimages_endpoint:config.Config.preimage_endpoint
+                    ~preimages:config.Config.preimage_directory
+                    1
+                    hash
+                in
                 Wasm.reveal_step (String.to_bytes preimage) tree)
               (fun _ -> return tree)
         | _ ->
@@ -1016,7 +1061,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [handle_command command tree inboxes level] dispatches the commands to their
      actual implementation. *)
-  let handle_command c config tree inboxes level =
+  let handle_command ~write_debug c config tree inboxes level =
     let open Lwt_result_syntax in
     let command = parse_commands c in
     let return ?(tree = tree) ?(inboxes = inboxes) () =
@@ -1041,6 +1086,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           return ()
       | Step kind ->
           step
+            ~write_debug
             ~wasm_entrypoint:Constants.wasm_entrypoint
             level
             inboxes

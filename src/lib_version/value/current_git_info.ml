@@ -52,4 +52,4 @@ let committer_date =
 
 let octez_version = Generated_git_info.git_describe_octez
 
-let etherlink_version = Generated_git_info.git_describe_etherlink
+let octez_evm_node_version = Generated_git_info.git_describe_octez_evm_node

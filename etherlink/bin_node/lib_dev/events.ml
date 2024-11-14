@@ -119,6 +119,14 @@ let event_retrying_connect =
     ("endpoint", Data_encoding.string)
     ("delay", Data_encoding.float)
 
+let event_deprecation_note =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"deprecation_note"
+    ~msg:"{msg}"
+    ~level:Warning
+    ("msg", Data_encoding.string)
+
 type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
@@ -153,9 +161,66 @@ let event_kernel_log_application_fatal = event_kernel_log Application Fatal
 
 let event_kernel_log_simulation_fatal = event_kernel_log Simulation Fatal
 
+let patched_state =
+  Internal_event.Simple.declare_2
+    ~level:Warning
+    ~section
+    ~name:"patched_state"
+    ~msg:"Key {key} successfully patched, starting from level {level}"
+    ("key", Data_encoding.string)
+    ("level", Ethereum_types.quantity_encoding)
+
+let preload_kernel =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~name:"preloaded_kernel"
+    ~msg:"Kernel {version} successfully preloaded"
+    ("version", Data_encoding.string)
+
+let predownload_kernel =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~name:"predownload_kernel"
+    ~msg:"Kernel {version} successfully predownloaded"
+    ("version", Data_encoding.string)
+
+let sandbox_started =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~name:"sandbox_started"
+    ~msg:"Starting sandbox mode at level {level}"
+    ("level", Data_encoding.z)
+
+let cannot_fetch_time_between_blocks =
+  Internal_event.Simple.declare_2
+    ~level:Error
+    ~section
+    ~name:"cannot_fetch_time_between_blocks"
+    ~msg:
+      "Could not fetch the maximum time between blocks from remote EVM \
+       endpoint, default to {tbb}: {trace}"
+    ~pp1:Configuration.pp_time_between_blocks
+    ~pp2:Error_monad.pp_print_trace
+    ("tbb", Configuration.time_between_blocks_encoding)
+    ("trace", Error_monad.trace_encoding)
+
+let invalid_node_da_fees =
+  Internal_event.Simple.declare_2
+    ~level:Fatal
+    ~section
+    ~name:"node_da_fees"
+    ~msg:
+      "Internal: node gives {node_da_fees} DA fees, whereas kernel gives \
+       {kernel_da_fees}"
+    ("node_da_fees", Data_encoding.z)
+    ("kernel_da_fees", Data_encoding.z)
+
 let received_upgrade payload = emit received_upgrade payload
 
-let pending_upgrade (upgrade : Ethereum_types.Upgrade.t) =
+let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
   emit pending_upgrade (upgrade.hash, upgrade.timestamp)
 
 let applied_upgrade root_hash Ethereum_types.(Qty level) =
@@ -193,3 +258,19 @@ let event_kernel_log ~level ~kind ~msg =
 
 let retrying_connect ~endpoint ~delay =
   emit event_retrying_connect (Uri.to_string endpoint, delay)
+
+let preload_kernel commit = emit preload_kernel commit
+
+let patched_state key level = emit patched_state (key, level)
+
+let predownload_kernel root_hash = emit predownload_kernel (Hex.show root_hash)
+
+let sandbox_started level = emit sandbox_started level
+
+let cannot_fetch_time_between_blocks fallback trace =
+  emit cannot_fetch_time_between_blocks (fallback, trace)
+
+let invalid_node_da_fees ~node_da_fees ~kernel_da_fees =
+  emit invalid_node_da_fees (node_da_fees, kernel_da_fees)
+
+let deprecation_note msg = emit event_deprecation_note msg

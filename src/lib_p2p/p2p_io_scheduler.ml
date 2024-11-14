@@ -490,13 +490,13 @@ let reset_quota st =
   in
   let nb_conn = P2p_fd.Table.length st.connected in
   (if nb_conn > 0 then
-   let fair_read_quota = current_inflow / nb_conn
-   and fair_write_quota = current_outflow / nb_conn in
-   P2p_fd.Table.iter
-     (fun _id conn ->
-       conn.read_conn.quota <- min conn.read_conn.quota 0 + fair_read_quota ;
-       conn.write_conn.quota <- min conn.write_conn.quota 0 + fair_write_quota)
-     st.connected) ;
+     let fair_read_quota = current_inflow / nb_conn
+     and fair_write_quota = current_outflow / nb_conn in
+     P2p_fd.Table.iter
+       (fun _id conn ->
+         conn.read_conn.quota <- min conn.read_conn.quota 0 + fair_read_quota ;
+         conn.write_conn.quota <- min conn.write_conn.quota 0 + fair_write_quota)
+       st.connected) ;
   ReadScheduler.update_quota st.read_scheduler ;
   WriteScheduler.update_quota st.write_scheduler
 

@@ -35,6 +35,7 @@ sent to the CPMM contract is 0.83 tez per block.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
+.. _toggle:
 .. _toggle_paris:
 
 Toggle vote

@@ -31,12 +31,13 @@
    Subject:      Test forging a block with a timestamp in the future and verify
                  that it is rejected if it is more than 5 seconds in the future.
 *)
+let team = Tag.layer1
 
 let test_forge_block () : unit =
   Test.register
     ~__FILE__
     ~title:"Test forge block"
-    ~tags:["protocol"; "sandbox"]
+    ~tags:[team; "protocol"; "sandbox"]
   @@ fun () ->
   let protocol_hash = Protocol.demo_counter_hash in
   Log.info "Test setup network" ;

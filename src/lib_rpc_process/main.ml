@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -59,6 +60,16 @@ let () =
     (function Missing_socket_dir -> Some () | _ -> None)
     (fun () -> Missing_socket_dir)
 
+let rpc_metrics =
+  Prometheus.Summary.v_labels
+    ~label_names:["endpoint"; "method"]
+    ~help:"External RPC endpoint call counts and sum of execution times."
+    ~namespace:Tezos_version.Octez_node_version.namespace
+    ~subsystem:"external_rpc_process"
+    "calls"
+
+module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
+
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =
   List.map String.lowercase_ascii headers
@@ -66,8 +77,8 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (params : Parameters.t) (addr, port) =
-  let open Config_file in
+let launch_rpc_server dynamic_store (params : Parameters.t) (addr, port)
+    head_watcher applied_blocks_watcher =
   let open Lwt_result_syntax in
   let media_types = params.config.rpc.media_type in
   let*! acl_policy =
@@ -86,7 +97,7 @@ let launch_rpc_server (params : Parameters.t) (addr, port) =
     |> Option.value_f ~default:(fun () -> default addr)
   in
   let*! () =
-    Rpc_process_event.(emit starting_rpc_server)
+    Rpc_process_events.(emit starting_rpc_server)
       (host, port, params.config.rpc.tls <> None, RPC_server.Acl.policy_type acl)
   in
   let cors_headers =
@@ -101,7 +112,14 @@ let launch_rpc_server (params : Parameters.t) (addr, port) =
         allowed_headers = cors_headers;
       }
   in
-  let dir = Directory.build_rpc_directory params.node_version params.config in
+  let dir =
+    Directory.build_rpc_directory
+      params.node_version
+      params.config
+      dynamic_store
+      ~head_watcher
+      ~applied_blocks_watcher
+  in
   let server =
     RPC_server.init_server
       ~cors
@@ -109,8 +127,46 @@ let launch_rpc_server (params : Parameters.t) (addr, port) =
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
+  let forwarder_resources = RPC_middleware.init_forwarder () in
+  let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
+    let path = Cohttp.Request.uri req |> Uri.path in
+    if path = "/metrics" then
+      let*! response = Metrics_server.callback conn req body in
+      Lwt.return (`Response response)
+    else
+      Forward_handler.callback
+        ~acl
+        server
+        forwarder_resources
+        params.rpc_comm_socket_path
+        conn
+        req
+        body
+  in
+  let conn_closed = RPC_middleware.forwarding_conn_closed forwarder_resources in
+  let update_metrics uri meth callback =
+    Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time) callback
+  in
   let callback =
-    Forward_handler.callback ~acl server params.rpc_comm_socket_path
+    RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
+  in
+  let* callback =
+    if params.config.rpc.enable_http_cache_headers then
+      let Http_cache_headers.{get_estimated_time_to_next_level; get_block_hash}
+          =
+        Http_cache_headers.make_tools (fun () ->
+            let store_opt = !dynamic_store in
+            Option.map Store.main_chain_store store_opt)
+      in
+      let*! () =
+        Rpc_process_events.(emit enable_http_cache_headers_for_external ())
+      in
+      return
+        (RPC_middleware.Http_cache_headers.make
+           ~get_estimated_time_to_next_level
+           ~get_block_hash
+           callback)
+    else return callback
   in
   Lwt.catch
     (fun () ->
@@ -118,6 +174,7 @@ let launch_rpc_server (params : Parameters.t) (addr, port) =
         RPC_server.launch
           ~host
           server
+          ~conn_closed
           ~callback
           ~max_active_connections:params.config.rpc.max_active_rpc_connections
           mode
@@ -131,7 +188,7 @@ let launch_rpc_server (params : Parameters.t) (addr, port) =
           tzfail (RPC_Process_Port_already_in_use [(addr, port)])
       | exn -> fail_with_exn exn)
 
-let init_rpc parameters =
+let init_rpc dynamic_store parameters head_watcher applied_blocks_watcher =
   let open Lwt_result_syntax in
   let* server =
     let* p2p_point =
@@ -146,7 +203,13 @@ let init_rpc parameters =
           assert false
     in
     match p2p_point with
-    | [point] -> launch_rpc_server parameters point
+    | [point] ->
+        launch_rpc_server
+          dynamic_store
+          parameters
+          point
+          head_watcher
+          applied_blocks_watcher
     | _ ->
         (* Same as above: only one p2p_point is expected here. *)
         assert false
@@ -190,11 +253,30 @@ let run socket_dir =
       ~config:parameters.Parameters.internal_events
       ()
   in
-  let* () = init_rpc parameters in
-  (* Send the params ack as synchronization barrier for the init_rpc
+  (* Updater needs to be initialized to be able to read the protocol
+     sources from the store when a protocol is injected and
+     compiled. *)
+  Updater.init (Data_version.protocol_dir parameters.config.data_dir) ;
+  let head_watcher = Lwt_watcher.create_input () in
+  let dynamic_store : Store.t option ref = ref None in
+  let applied_blocks_watcher = ref Directory.Empty in
+  let* daemon =
+    Head_daemon.init
+      dynamic_store
+      parameters
+      head_watcher
+      applied_blocks_watcher
+  in
+  let (_ccid : Lwt_exit.clean_up_callback_id) =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        Head_daemon.Daemon.shutdown daemon)
+  in
+  let* () =
+    init_rpc dynamic_store parameters head_watcher applied_blocks_watcher
+  in
+  (* Send the config ack as synchronisation barrier for the init_rpc
      phase. *)
   let* () = Socket.send init_socket_fd Data_encoding.unit () in
-  let*! () = Lwt_unix.close init_socket_fd in
   Lwt_utils.never_ending ()
 
 let process socket_dir =

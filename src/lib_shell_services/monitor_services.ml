@@ -171,14 +171,6 @@ module S = struct
       ~output:Protocol_hash.encoding
       Tezos_rpc.Path.(path / "protocols")
 
-  (* DEPRECATED: use [version] from "version_services" instead. *)
-  let commit_hash =
-    Tezos_rpc.Service.get_service
-      ~description:"DEPRECATED: use `version` instead."
-      ~query:Tezos_rpc.Query.empty
-      ~output:string
-      Tezos_rpc.Path.(path / "commit_hash")
-
   let active_chains =
     Tezos_rpc.Service.get_service
       ~description:
@@ -239,7 +231,5 @@ let heads ctxt ?(protocols = []) ?(next_protocols = []) chain =
     ()
 
 let protocols ctxt = make_streamed_call S.protocols ctxt () () ()
-
-let commit_hash ctxt = make_call S.commit_hash ctxt () () ()
 
 let active_chains ctxt = make_streamed_call S.active_chains ctxt () () ()

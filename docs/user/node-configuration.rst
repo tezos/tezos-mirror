@@ -185,11 +185,11 @@ modifying the file.
    Rules are always searched from the beginning of the list to the end and
    the first matching address is returned. Therefore if one wants to put one
    rule on a specific port on a given host and another rule for all other ports
-   on the same host, then more specific rules should always be written *first*
+   on the same host, then more specific rules should always be written *first*.
    Otherwise they'll be shadowed by the more general rule.
 
 Examples
-~~~~~~~~
+""""""""
 
 ::
 
@@ -247,7 +247,7 @@ in order to accommodate each specific setup.
 .. _default_acl:
 
 Default ACL for RPC
--------------------
+"""""""""""""""""""
 
 The default ACL for RPC depends on the listening address that the node is using.
 
@@ -261,8 +261,8 @@ If the listening address is a network address, then a more restrictive policy
 applies. Its main purpose is to protect nodes from attacks. These attacks can
 take two main forms:
 
-  - spamming the node with costly requests (denial of service attack)
-  - breaking the node by forcing it to perform a risky operation
+- spamming the node with costly requests (denial of service attack)
+- breaking the node by forcing it to perform a risky operation
 
 Thus all costly or risky endpoints are blocked by default. This can be
 relaxed or tightened by modifying the configuration file. It's
@@ -278,6 +278,30 @@ actually listening on):
 
 .. literalinclude:: default-acl.json
    :language: json
+
+HTTP Caching Headers
+~~~~~~~~~~~~~~~~~~~~
+
+It is possible to enable http caching headers in the RPC responses with the
+``--enable-http-cache-headers`` option. This feature is disabled by default.
+
+When enabled, the RPC server will support `max-age <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#response_directives>`_ 
+header. The header ``Cache-control: public, max-age: <duration>`` will be included in the response headers of head related 
+queries (``/chains/main/blocks/head*``) for responses that are cacheable. This also works on paths 
+that are relative to ``head`` such as ``head-n`` and ``head~n``. The response is cacheable throughout the ``<duration>``
+of the head block's consensus round where ``<duration>`` is the remaining time until the :ref:`estimated end time<time_between_blocks>`
+of the consensus round. If a response should not be cached, the RPC server will not include any cache control headers. 
+
+The RPC server will also support the conditional request header `If-None-Match <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-None-Match>`_
+and include the ``ETag`` field in every head related query. The value of the ``ETag`` will be set to the block hash that the query 
+is related to. If the client sends a request with ``If-None-Match: <comma-separated list of ETag values>`` header and the block hash
+is included in the list of etag values, the RPC server will respond with a ``304 Not Modified`` status code with an empty body.
+
+This feature is useful when running the RPC server behind a reverse proxy that supports automatic
+content caching (eg. `NGINX's proxy_cache setting <https://blog.nginx.org/blog/nginx-caching-guide>`_). Beware that 
+enabling this feature adds a non-negligible performance overhead (up to 10-15% slower) to every head related query 
+as the RPC server needs to perform additional checks and calculations. Consequently, it is advised to enable thie feature 
+only when operating the RPC server behind appropriate caching infrastructure.
 
 .. _configure_p2p:
 

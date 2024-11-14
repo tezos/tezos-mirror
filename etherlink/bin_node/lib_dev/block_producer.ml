@@ -108,18 +108,6 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let get_hashes ~transactions ~delayed_transactions =
-  let open Result_syntax in
-  let hashes =
-    List.map
-      (fun transaction ->
-        let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-        Ethereum_types.(
-          Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
-      transactions
-  in
-  return (delayed_transactions @ hashes)
-
 let take_delayed_transactions maximum_number_of_chunks =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
@@ -138,6 +126,104 @@ let take_delayed_transactions maximum_number_of_chunks =
   in
   return (delayed_transactions, remaining_cumulative_size)
 
+let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
+    ~smart_rollup_address ~transactions_and_objects ~delayed_hashes head_info =
+  let open Lwt_result_syntax in
+  let transactions, tx_hashes =
+    List.to_seq transactions_and_objects
+    |> Seq.map (fun (raw, (obj : Ethereum_types.transaction_object)) ->
+           (raw, obj.hash))
+    |> Seq.split
+    |> fun (l, r) -> (List.of_seq l, List.of_seq r)
+  in
+  Misc.with_timing
+    (Blueprint_events.blueprint_production
+       head_info.Evm_context.next_blueprint_number)
+  @@ fun () ->
+  let* blueprint_chunks =
+    Misc.with_timing
+      (Blueprint_events.blueprint_proposal
+         head_info.Evm_context.next_blueprint_number)
+    @@ fun () ->
+    Sequencer_blueprint.prepare
+      ~sequencer_key
+      ~cctxt
+      ~timestamp
+      ~transactions
+      ~delayed_transactions:delayed_hashes
+      ~parent_hash:head_info.current_block_hash
+      ~number:head_info.next_blueprint_number
+  in
+  let blueprint_payload =
+    Sequencer_blueprint.create_inbox_payload
+      ~smart_rollup_address
+      ~chunks:blueprint_chunks
+  in
+  (* Resolve the content of delayed transactions. *)
+  let* delayed_transactions =
+    List.map_es
+      (fun delayed_hash ->
+        Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash)
+      delayed_hashes
+  in
+  let* () =
+    Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
+  in
+  let (Qty number) = head_info.next_blueprint_number in
+  let* () =
+    Blueprints_publisher.publish
+      number
+      (Blueprints_publisher_types.Request.Blueprint
+         {chunks = blueprint_chunks; inbox_payload = blueprint_payload})
+  in
+  let*! () =
+    List.iter_p
+      (fun hash -> Block_producer_events.transaction_selected ~hash)
+      (tx_hashes @ delayed_hashes)
+  in
+  return_unit
+
+(** Produces a block if we find at least one valid transaction in the transaction
+    pool or if [force] is true. *)
+let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
+    ~timestamp ~delayed_hashes ~remaining_cumulative_size head_info =
+  let open Lwt_result_syntax in
+  let* transactions_and_objects =
+    (* Low key optimization to avoid even checking the txpool if there is not
+       enough space for the smallest transaction. *)
+    if remaining_cumulative_size <= minimum_ethereum_transaction_size then
+      return []
+    else
+      Tx_pool.pop_transactions
+        ~maximum_cumulative_size:remaining_cumulative_size
+  in
+  let n = List.length transactions_and_objects + List.length delayed_hashes in
+  if force || n > 0 then
+    let* () =
+      produce_block_with_transactions
+        ~sequencer_key
+        ~cctxt
+        ~timestamp
+        ~smart_rollup_address
+        ~transactions_and_objects
+        ~delayed_hashes
+        head_info
+    in
+    let* () = Tx_pool.clear_popped_transactions () in
+    return n
+  else return 0
+
+let head_info_and_delayed_transactions maximum_number_of_chunks =
+  let open Lwt_result_syntax in
+  (* We need to first fetch the delayed transactions then requests the head info.
+     If the order is swapped, we might face a race condition where the delayed
+     transactions are fetched from state more recent than head info. *)
+  let* delayed_hashes, remaining_cumulative_size =
+    take_delayed_transactions maximum_number_of_chunks
+  in
+  let*! head_info = Evm_context.head_info () in
+  return (head_info, delayed_hashes, remaining_cumulative_size)
+
 let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     ~maximum_number_of_chunks =
   let open Lwt_result_syntax in
@@ -146,51 +232,37 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     let*! () = Block_producer_events.production_locked () in
     return 0
   else
-    let* delayed_transactions, remaining_cumulative_size =
-      take_delayed_transactions maximum_number_of_chunks
+    let* head_info, delayed_hashes, remaining_cumulative_size =
+      head_info_and_delayed_transactions maximum_number_of_chunks
     in
-    let* transactions =
-      (* Low key optimization to avoid even checking the txpool if there is not
-         enough space for the smallest transaction. *)
-      if remaining_cumulative_size <= minimum_ethereum_transaction_size then
-        return []
-      else
-        Tx_pool.pop_transactions
-          ~maximum_cumulative_size:remaining_cumulative_size
+    let is_going_to_upgrade =
+      match head_info.pending_upgrade with
+      | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
+          timestamp >= upgrade_timestamp
+      | None -> false
     in
-    let n = List.length transactions + List.length delayed_transactions in
-    if force || n > 0 then
-      let*! head_info = Evm_context.head_info () in
-      Helpers.with_timing
-        (Blueprint_events.blueprint_production head_info.next_blueprint_number)
-      @@ fun () ->
-      let*? hashes = get_hashes ~transactions ~delayed_transactions in
-      let* blueprint =
-        Helpers.with_timing
-          (Blueprint_events.blueprint_proposal head_info.next_blueprint_number)
-        @@ fun () ->
-        Sequencer_blueprint.create
+    if is_going_to_upgrade then
+      let* () =
+        produce_block_with_transactions
           ~sequencer_key
           ~cctxt
           ~timestamp
           ~smart_rollup_address
-          ~transactions
-          ~delayed_transactions
-          ~parent_hash:head_info.current_block_hash
-          ~number:head_info.next_blueprint_number
+          ~transactions_and_objects:[]
+          ~delayed_hashes:[]
+          head_info
       in
-      let* () =
-        Evm_context.apply_blueprint timestamp blueprint delayed_transactions
-      in
-      let (Qty number) = head_info.next_blueprint_number in
-      let* () = Blueprints_publisher.publish number blueprint in
-      let*! () =
-        List.iter_p
-          (fun hash -> Block_producer_events.transaction_selected ~hash)
-          hashes
-      in
-      return n
-    else return 0
+      return 0
+    else
+      produce_block_if_needed
+        ~cctxt
+        ~sequencer_key
+        ~timestamp
+        ~smart_rollup_address
+        ~force
+        ~delayed_hashes
+        ~remaining_cumulative_size
+        head_info
 
 module Handlers = struct
   type self = worker

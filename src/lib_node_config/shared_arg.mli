@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -86,6 +87,9 @@ type t = {
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
       (** maximum operation metadata size allowed to be stored on disk *)
+  enable_http_cache_headers : bool option;
+      (** Adds Cache-control header directives to RPC responses for queries
+          that are relative to the head block. *)
   disable_context_pruning : bool option;
   storage_maintenance_delay : Storage_maintenance.delay option;
 }

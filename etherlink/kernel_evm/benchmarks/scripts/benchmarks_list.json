@@ -11,7 +11,12 @@
     "benchmarks/scenarios/solidity_by_example/bench_abi_decode.js",
     "benchmarks/scenarios/solidity_by_example/bench_abi_encode.js",
     "benchmarks/scenarios/solidity_by_example/bench_array.js",
-    "benchmarks/scenarios/solidity_by_example/bench_assembly_error.js",
+    {
+        "script": "benchmarks/scenarios/solidity_by_example/bench_assembly_error.js",
+        "expect_false": [
+            3
+        ]
+    },
     "benchmarks/scenarios/solidity_by_example/bench_assembly_loop.js",
     "benchmarks/scenarios/solidity_by_example/bench_assembly_variable.js",
     "benchmarks/scenarios/solidity_by_example/bench_bitwise_op.js",
@@ -35,7 +40,12 @@
     "benchmarks/scenarios/solidity_by_example/bench_bytecode_contract.js",
     "benchmarks/scenarios/solidity_by_example/bench_create2.js",
     "benchmarks/scenarios/solidity_by_example/bench_minimal_proxy.js",
-    "benchmarks/scenarios/solidity_by_example/bench_upgradeable_proxy.js",
+    {
+        "script": "benchmarks/scenarios/solidity_by_example/bench_upgradeable_proxy.js",
+        "expect_false": [
+            9
+        ]
+    },
     "benchmarks/scenarios/solidity_by_example/bench_binary_exponentiation.js",
     "benchmarks/bench_erc1155.js",
     "benchmarks/bench_selfdestruct.js",
@@ -48,6 +58,10 @@
     "benchmarks/bench_ecmul.js",
     "benchmarks/bench_ecpairing.js",
     "benchmarks/bench_modexp.js",
+    "benchmarks/bench_imbricated_calls.js",
+    "benchmarks/bench_imbricated_revert.js",
+    "benchmarks/bench_rec_call.js",
+    "benchmarks/bench_revert_computation.js",
     "benchmarks/bench_linear_transfers.js --count 0",
     "benchmarks/bench_linear_transfers.js --count 5",
     "benchmarks/bench_linear_transfers.js --count 10",
@@ -55,6 +69,13 @@
     "benchmarks/bench_linear_transfers.js --count 20",
     "benchmarks/bench_linear_transfers.js --count 25",
     "benchmarks/bench_linear_transfers.js --count 30",
+    "benchmarks/bench_linear_transfers.js --count 0 --delayed",
+    "benchmarks/bench_linear_transfers.js --count 5 --delayed",
+    "benchmarks/bench_linear_transfers.js --count 10 --delayed",
+    "benchmarks/bench_linear_transfers.js --count 15 --delayed",
+    "benchmarks/bench_linear_transfers.js --count 20 --delayed",
+    "benchmarks/bench_linear_transfers.js --count 25 --delayed",
+    "benchmarks/bench_linear_transfers.js --count 30 --delayed",
     "benchmarks/bench_linear_erc20.js --count 0",
     "benchmarks/bench_linear_erc20.js --count 5",
     "benchmarks/bench_linear_erc20.js --count 10",
@@ -71,6 +92,8 @@
     "benchmarks/bench_loop_progressive.js",
     "benchmarks/bench_loop_expensive.js",
     "benchmarks/bench_deposit.js",
+    "benchmarks/bench_fa_deposit.js",
+    "benchmarks/bench_fa_withdrawal.js",
     "benchmarks/scenarios/audit/bench_create.js",
     "benchmarks/scenarios/audit/bench_linear_big_contract.js --count 1",
     "benchmarks/scenarios/audit/bench_linear_big_contract_shortened.js --count 1",

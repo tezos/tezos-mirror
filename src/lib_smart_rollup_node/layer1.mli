@@ -110,6 +110,9 @@ val wait_first : t -> header Lwt.t
     independently of how they were processed by the current process. *)
 val get_latest_head : t -> header option
 
+(** [get_status t] returns the connection status to the L1 node. *)
+val get_status : t -> [`Connected | `Disconnected | `Reconnecting]
+
 val get_predecessor_opt :
   ?max_read:int ->
   t ->

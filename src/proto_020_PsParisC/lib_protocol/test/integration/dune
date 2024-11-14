@@ -7,31 +7,36 @@
  (libraries
   tezt.core
   tezt
-  octez-libs.tezos-context
-  octez-alcotezt
   octez-libs.base
   octez-protocol-020-PsParisC-libs.client
   tezos-protocol-020-PsParisC.protocol
   tezos-protocol-020-PsParisC.parameters
   octez-protocol-020-PsParisC-libs.test-helpers
-  octez-libs.base-test-helpers)
+  octez-libs.base-test-helpers
+  octez-protocol-020-PsParisC-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
-  -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_client_020_PsParisC
   -open Tezos_protocol_020_PsParisC
   -open Tezos_protocol_020_PsParisC_parameters
   -open Tezos_020_PsParisC_test_helpers
-  -open Tezos_base_test_helpers)
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_020_PsParisC)
  (modules
   test_constants
   test_frozen_bonds
   test_adaptive_issuance_launch
-  test_adaptive_issuance_roundtrip
+  test_scenario_base
+  test_scenario_stake
+  test_scenario_rewards
+  test_scenario_autostaking
+  test_scenario_slashing
+  test_scenario_slashing_stakers
+  test_scenario_deactivation
   test_liquidity_baking
   test_storage_functions
   test_storage
@@ -53,7 +58,7 @@
  (package tezos-protocol-020-PsParisC-tests)
  (deps (glob_files wasm_kernel/*.wasm))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

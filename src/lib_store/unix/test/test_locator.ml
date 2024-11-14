@@ -184,8 +184,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
             {
               pred_header.shell with
               predecessor =
-                (if lvl = 1 then genesis_hash
-                else Block_header.hash pred_header);
+                (if lvl = 1 then genesis_hash else Block_header.hash pred_header);
               level = Int32.of_int lvl;
               proto_level;
             };

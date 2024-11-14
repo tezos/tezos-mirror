@@ -30,11 +30,13 @@
    Subject:      .
 *)
 
+let team = Tag.layer1
+
 let test_metadata_consistency ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:"metadata consistency"
-    ~tags:["rpc"; "metadata"; "migration"]
+    ~tags:[team; "rpc"; "metadata"; "migration"]
   @@ fun () ->
   let migration_level = 3 in
   let* node =

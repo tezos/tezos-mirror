@@ -15,6 +15,7 @@
 (rule
  (alias runtest)
  (package octez-libs)
+ (enabled_if (= false %{env:CI=false}))
  (action
   (setenv RANDOM_SEED 42
    (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))

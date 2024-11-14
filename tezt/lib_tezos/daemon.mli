@@ -25,10 +25,10 @@
 
 (** Parameters of the [Daemon.Make] functor. *)
 module type PARAMETERS = sig
-  (** Data to store whether a daemon is running or not. *)
+  (** User-defined read-only data stored when the daemon is created. *)
   type persistent_state
 
-  (** Data to store when a daemon is running. *)
+  (** User-defined read-only data set when the daemon is run and unset when the daemon terminates. *)
   type session_state
 
   (** Basis for the default value for the [?name] argument of [create].

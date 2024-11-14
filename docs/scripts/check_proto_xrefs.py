@@ -96,7 +96,7 @@ for file in glob.glob(f"{directory}/*.rst"):
         # warn on :ref:`Section Heading`:
         if not (m := re.fullmatch(sphinx_id_pat, label)):
             print(
-                f"{file}: :ref:`{ref}`: rewrite as ref to a label",
+                f"{file}: :ref:{repr(ref)}: rewrite as ref to a label",
                 file=sys.stderr,
             )
             continue
@@ -109,7 +109,7 @@ for file in glob.glob(f"{directory}/*.rst"):
             continue
         print(
             (
-                f"{file}: :ref:`{ref}`: label {label} should be"
+                f"{file}: :ref:{repr(ref)}: label {label} should be"
                 f"versioned as {label}_{proto}"
             ),
             file=sys.stderr,

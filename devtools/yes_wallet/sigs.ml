@@ -59,6 +59,21 @@ module type PROTOCOL = sig
 
       val signature : signature -> Tezos_crypto.Signature.V_latest.signature
     end
+
+    module Of_latest : sig
+      val public_key_hash :
+        Tezos_crypto.Signature.V_latest.public_key_hash ->
+        public_key_hash option
+
+      val public_key :
+        Tezos_crypto.Signature.V_latest.public_key -> public_key option
+
+      val secret_key :
+        Tezos_crypto.Signature.V_latest.secret_key -> secret_key option
+
+      val signature :
+        Tezos_crypto.Signature.V_latest.signature -> signature option
+    end
   end
 
   module Commitment : sig
@@ -73,6 +88,11 @@ module type PROTOCOL = sig
   end
 
   module Contract : sig
+    val get_manager_key :
+      context ->
+      Signature.public_key_hash ->
+      Signature.public_key tzresult Lwt.t
+
     val fold : context -> init:'a -> f:('a -> contract -> 'a Lwt.t) -> 'a Lwt.t
 
     val balance : context -> contract -> Tez.t tzresult Lwt.t

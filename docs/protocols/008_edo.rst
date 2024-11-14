@@ -28,8 +28,6 @@ The main novelties in the Edo protocol are:
 - An extended `Voting procedure`_ with a 5th period, ensuring smoother
   protocol upgrades
 
-.. contents:: Here is the complete list of changes:
-
 Environment V1
 --------------
 

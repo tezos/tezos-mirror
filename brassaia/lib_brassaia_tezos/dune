@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_tezos)
+ (public_name octez-libs.brassaia_tezos)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  fmt
+  zarith
+  digestif
+  octez-libs.brassaia
+  octez-libs.brassaia_pack
+  octez-libs.brassaia_pack.unix)
+ (preprocess (pps octez-libs.ppx_brassaia.internal)))

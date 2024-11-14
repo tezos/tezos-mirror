@@ -186,14 +186,6 @@ let block_info_encoding =
        (req "quorum" (list (dynamic_size Operation.encoding)))
        (req "payload" Operation_pool.payload_encoding))
 
-let round_of_shell_header shell_header =
-  let open Result_syntax in
-  let* fitness =
-    Environment.wrap_tzresult
-    @@ Fitness.from_raw shell_header.Tezos_base.Block_header.fitness
-  in
-  return (Fitness.round fitness)
-
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
 type delegate_slot = {
@@ -473,24 +465,50 @@ let () =
     (function Mismatch_signed_consensus_vote_in_batch -> Some () | _ -> None)
     (fun () -> Mismatch_signed_consensus_vote_in_batch)
 
+type error += Unauthorised_dal_content_in_preattestation
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Baking_state.unauthorised_dal_content_in_preattestation"
+    ~title:"Unauthorised dal content in preattestation"
+    ~description:"Unauthorised dal content in preattestation."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "There are batched consensus votes which are not of the same kind or \
+         do not have the same consensus content as the rest.")
+    Data_encoding.unit
+    (function
+      | Unauthorised_dal_content_in_preattestation -> Some () | _ -> None)
+    (fun () -> Unauthorised_dal_content_in_preattestation)
+
 let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
     ~batch_branch signed_consensus_votes =
   let open Result_syntax in
   let* () =
     List.iter_e
       (fun {unsigned_consensus_vote; signed_operation = _} ->
-        error_when
-          (unsigned_consensus_vote.vote_kind <> batch_kind
-          || Raw_level.(
-               unsigned_consensus_vote.vote_consensus_content.level
-               <> batch_content.level)
-          || Round.(
-               unsigned_consensus_vote.vote_consensus_content.round
-               <> batch_content.round)
-          || Block_payload_hash.(
-               unsigned_consensus_vote.vote_consensus_content.block_payload_hash
-               <> batch_content.block_payload_hash))
-          Mismatch_signed_consensus_vote_in_batch)
+        let* () =
+          error_when
+            (unsigned_consensus_vote.vote_kind <> batch_kind
+            || Raw_level.(
+                 unsigned_consensus_vote.vote_consensus_content.level
+                 <> batch_content.level)
+            || Round.(
+                 unsigned_consensus_vote.vote_consensus_content.round
+                 <> batch_content.round)
+            || Block_payload_hash.(
+                 unsigned_consensus_vote.vote_consensus_content
+                   .block_payload_hash <> batch_content.block_payload_hash))
+            Mismatch_signed_consensus_vote_in_batch
+        in
+        match batch_kind with
+        | Preattestation ->
+            error_when
+              (Option.is_some unsigned_consensus_vote.dal_content)
+              Unauthorised_dal_content_in_preattestation
+        | Attestation -> return_unit)
       signed_consensus_votes
   in
   return {batch_kind; batch_content; batch_branch; signed_consensus_votes}

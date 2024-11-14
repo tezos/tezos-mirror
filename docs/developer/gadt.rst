@@ -10,9 +10,9 @@ play in the design.
 
 For an explanation of the GADT concept itself, try one of the links below:
 
-  - `Algebraic Data Types`_ (introduction to OCaml composite types)
-  - `Generalized Algebraic Data Types`_ (OCaml manual)
-  - `A simple expression evaluator`_ (example)
+- `Algebraic Data Types`_ (introduction to OCaml composite types)
+- `Generalized Algebraic Data Types`_ (OCaml manual)
+- `A simple expression evaluator`_ (example)
 
 
 Ensuring type safety of the Michelson interpreter

@@ -10,7 +10,6 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
   "octez-node-config" { = version }
@@ -33,6 +32,7 @@ depopts: [
   "octez-protocol-018-Proxford-libs"
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
+  "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -52,6 +52,7 @@ conflicts: [
   "octez-protocol-018-Proxford-libs" { != version }
   "octez-protocol-019-PtParisB-libs" { != version }
   "octez-protocol-020-PsParisC-libs" { != version }
+  "octez-protocol-021-PsQuebec-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

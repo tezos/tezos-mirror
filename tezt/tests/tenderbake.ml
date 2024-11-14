@@ -30,6 +30,8 @@
    Subject:      Basic test for Tenderbake and related newly added API components
 *)
 
+let team = Tag.layer1
+
 (* ------------------------------------------------------------------------- *)
 (* Typedefs *)
 
@@ -81,7 +83,7 @@ let test_bake_two =
   Protocol.register_test
     ~__FILE__
     ~title:"Tenderbake transfer - baking 2"
-    ~tags:["baking"; "tenderbake"]
+    ~tags:[team; "baking"; "tenderbake"]
   @@ fun protocol ->
   let* _proto_hash, endpoint, client, _node = init protocol in
   let end_idx = List.length bootstrap_accounts in
@@ -112,7 +114,7 @@ let test_low_level_commands =
   Protocol.register_test
     ~__FILE__
     ~title:"Tenderbake low level commands"
-    ~tags:["propose"; "attest"; "preattest"; "tenderbake"; "low_level"]
+    ~tags:[team; "propose"; "attest"; "preattest"; "tenderbake"; "low_level"]
   @@ fun protocol ->
   let* _proto_hash, endpoint, client, _node = init protocol in
   Log.info "Doing a propose -> preattest -> attest cycle" ;
@@ -188,7 +190,15 @@ let test_manual_bake =
     ~__FILE__
     ~title:"Tenderbake manual bake"
     ~tags:
-      ["propose"; "attest"; "preattest"; "tenderbake"; "low_level"; "manual"]
+      [
+        team;
+        "propose";
+        "attest";
+        "preattest";
+        "tenderbake";
+        "low_level";
+        "manual";
+      ]
   @@ fun protocol ->
   let* _proto_hash, _endpoint, client, node =
     init
@@ -332,7 +342,15 @@ let test_manual_bake_null_threshold =
     ~__FILE__
     ~title:"Tenderbake manual bake null threshold"
     ~tags:
-      ["propose"; "attest"; "preattest"; "tenderbake"; "low_level"; "manual"]
+      [
+        team;
+        "propose";
+        "attest";
+        "preattest";
+        "tenderbake";
+        "low_level";
+        "manual";
+      ]
   @@ fun protocol ->
   let* _proto_hash, _endpoint, client, node =
     init
@@ -411,7 +429,15 @@ let test_repropose =
     ~__FILE__
     ~title:"Tenderbake low level repropose"
     ~tags:
-      ["propose"; "attest"; "preattest"; "tenderbake"; "low_level"; "repropose"]
+      [
+        team;
+        "propose";
+        "attest";
+        "preattest";
+        "tenderbake";
+        "low_level";
+        "repropose";
+      ]
   @@ fun protocol ->
   let* _proto_hash, endpoint, client, _node = init protocol in
   Log.info "Doing a propose -> preattest -> attest cycle" ;

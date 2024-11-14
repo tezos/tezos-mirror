@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -134,7 +135,7 @@ let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
       Node.RPC.(call node @@ get_chain_block_header ~block ())
     in
     (* Expects failure, as the metadata must not be stored. *)
-    let* {body; code} =
+    let* {body; code; headers = _} =
       Node.RPC.(call_json node @@ get_chain_block_metadata ~block ())
     in
     (* In the client, attempting to retrieve missing metadata outputs:
@@ -276,7 +277,7 @@ let test_export_import_snapshots =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot export and import"
-    ~tags:["storage"; "snapshot"; "export"; "import"; Tag.memory_4k; Tag.layer1]
+    ~tags:[team; "storage"; "snapshot"; "export"; "import"; Tag.memory_4k]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -349,7 +350,7 @@ let test_drag_after_rolling_import =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot drag after rolling import"
-    ~tags:["storage"; "snapshot"; "drag"; "rolling"; "import"; Tag.layer1]
+    ~tags:[team; "storage"; "snapshot"; "drag"; "rolling"; "import"]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -481,6 +482,18 @@ let test_drag_after_rolling_import =
         in
         (checkpoint, savepoint, caboose)
   in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7251
+     Restarting fresh_node to make sure that the store invariant
+     (savepoint/checkpoint/…) are well synchronized. Indeed, these
+     invariant are synchronized with the RPC-process in a best effort
+     way and as the RPC-process synchronization can be faster than a
+     store merge, it can return an unexpected value (the value before
+     the last expected update). *)
+  let* () =
+    let* () = Node.terminate fresh_node in
+    let* () = Node.run fresh_node node_arguments in
+    Node.wait_for_ready fresh_node
+  in
   let* () =
     check_consistency_after_import
       fresh_node
@@ -510,7 +523,7 @@ let test_info_command =
   Protocol.register_test
     ~__FILE__
     ~title:(Format.asprintf "storage snapshot info command")
-    ~tags:["storage"; "snapshot"; "info"; "command"; Tag.layer1]
+    ~tags:[team; "storage"; "snapshot"; "info"; "command"]
   @@ fun protocol ->
   let* node = Node.init ~name:"node" node_arguments in
   let* client = Client.init ~endpoint:(Node node) () in

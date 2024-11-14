@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -69,17 +70,38 @@ type injector = {
 type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
 
 type gc_parameters = {
-  frequency_in_blocks : int32;  (** Frequency at which the GC is triggered. *)
+  frequency_in_blocks : int32 option;
+      (** Frequency at which the GC is triggered. *)
   context_splitting_period : int option;
       (** Number of blocks before splitting the context. *)
 }
 
-type history_mode =
+type history_mode = Store.State.history_mode =
   | Archive
       (** The whole history of the rollup (starting at its genesis) is kept *)
   | Full
       (** Only the history necessary to play refutation games is kept
           (i.e. after the LCC only) *)
+
+(** Filter on destination of outbox message transactions. *)
+type outbox_destination_filter =
+  | Any_destination  (** Accept any destination.  *)
+  | Destination_among of string list
+      (** Accept destination which match the given list (in base58-check). *)
+
+(** Filter on entrypoints of outbox message transactions. *)
+type outbox_entrypoint_filter =
+  | Any_entrypoint  (** Accept any entrypoint. *)
+  | Entrypoint_among of string list  (** Accept entrypoints which are listed. *)
+
+(** Filter on outbox messages executed by the rollup node automatically. *)
+type outbox_message_filter =
+  | Transaction of {
+      destination : outbox_destination_filter;
+      entrypoint : outbox_entrypoint_filter;
+    }
+      (** Accept transactions which match the filter on their destination and
+          entrypoint. *)
 
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -89,6 +111,7 @@ type t = {
   rpc_port : int;
   acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
   metrics_addr : string option;
+  performance_metrics : bool;
   reconnection_delay : float;
   fee_parameters : fee_parameters;
   mode : mode;
@@ -99,6 +122,7 @@ type t = {
     Decide whether we want to handle connections to multiple
     Dal nodes for different slot indexes.
   *)
+  execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
@@ -119,6 +143,7 @@ type t = {
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
+  bail_on_disagree : bool;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -190,6 +215,9 @@ val default_gc_parameters : gc_parameters
     ({!Full}).  *)
 val default_history_mode : history_mode
 
+(** Default filter for executing outbox messages is only whitelist updates.  *)
+val default_execute_outbox_filter : outbox_message_filter list
+
 val history_mode_encoding : history_mode Data_encoding.t
 
 (** [max_injector_retention_period] is the maximum allowed value for
@@ -223,9 +251,9 @@ val operation_kinds_of_mode : mode -> Operation_kind.t list
     be injected based on the configuration settings. *)
 val can_inject : mode -> Operation_kind.t -> bool
 
-(** [purpose_matches_mode mode purpose] returns true if and only if the given [mode]
-    supports the given [purpose]. *)
-val purpose_matches_mode : mode -> 'kind Purpose.t -> bool
+(** [purposes_matches_mode mode purposes] returns true if and only if the given
+    [mode] supports the given [purposes]. *)
+val purposes_matches_mode : mode -> 'kind Purpose.t list -> bool
 
 (** Number of levels the refutation player waits until trying to play
     for a game state it already played before. *)
@@ -265,6 +293,7 @@ module Cli : sig
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
+    enable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->
@@ -290,7 +319,8 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
-    t tzresult
+    bail_on_disagree:bool ->
+    t tzresult Lwt.t
 
   val create_or_read_config :
     data_dir:string ->
@@ -298,6 +328,7 @@ module Cli : sig
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
+    enable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->
@@ -323,5 +354,6 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
+    bail_on_disagree:bool ->
     t tzresult Lwt.t
 end

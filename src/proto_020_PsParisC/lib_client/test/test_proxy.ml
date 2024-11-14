@@ -28,10 +28,8 @@
     Component:    Client
     Invocation:   dune exec src/proto_020_PsParisC/lib_client/test/main.exe \
                   -- --file test_proxy.ml
-    Subject:      Test of --mode proxy and tezos-proxy-server heuristic
+    Subject:      Test of --mode proxy heuristic
 *)
-
-let proxy_mode_gen = QCheck2.Gen.oneofl Tezos_proxy.Proxy.[Client; Server]
 
 let key_gen =
   (* Segments taken from the implementation of split_key in src/proto_alpha/lib_client/proxy.ml *)
@@ -66,11 +64,9 @@ let test_split_key =
     let pp_sep fmt () = Format.fprintf fmt "/" in
     Format.pp_print_list ~pp_sep Format.pp_print_string
   in
-  QCheck2.Test.make
-    ~name:"[fst (split_key s)] is a prefix of [s]"
-    QCheck2.Gen.(pair proxy_mode_gen key_gen)
-  @@ fun (mode, key) ->
-  match Proxy.ProtoRpc.split_key mode key with
+  QCheck2.Test.make ~name:"[fst (split_key s)] is a prefix of [s]" key_gen
+  @@ fun key ->
+  match Proxy.ProtoRpc.split_key key with
   | None -> true
   | Some (shorter, _) ->
       if is_prefix shorter key then true

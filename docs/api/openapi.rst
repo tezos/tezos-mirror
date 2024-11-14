@@ -13,7 +13,8 @@ Octez Node
 
 The REST API served by the Octez node on the RPC port is described by the union of several OpenAPI specifications:
 
-- ``rpc-openapi(-rc).json``, containing the protocol-independent (or "shell") RPCs
+- ``rpc-openapi(-rc).json``, containing the protocol-independent (or "shell") RPCs in the last (candidate) release
+- ``rpc-openapi-dev.json``, containing the protocol-independent (or "shell") RPCs in the current development version (branch ``master``)
 - For each protocol in use:
 
   + ``$PROTOCOL-openapi.json`` (served under the prefix: ``/chains/<chain-id>/blocks/<block-id>``)
@@ -51,22 +52,50 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- :src:`docs/api/rpc-openapi.json` (version 20.3)
+- :src:`docs/api/rpc-openapi-rc.json` (version 21.0~rc1)
+- :src:`docs/api/rpc-openapi-dev.json` (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Oxford RPCs
+Paris RPCs
 -----------
 
-The OpenAPI specifications for RPCs which are specific to the Oxford (``Proxford``)
+The OpenAPI specifications for RPCs which are specific to the ParisC (``PtParisC``)
 protocol can be found at:
 
-- `oxford-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
+- :src:`docs/api/paris-openapi.json` (version 20.3)
 
 The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Oxford protocol can be found at:
+and specific to the Paris protocol can be found at:
 
-- `oxford-mempool-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
+- :src:`docs/api/paris-mempool-openapi.json` (version 20.3)
+
+Qena RPCs
+-----------
+
+The OpenAPI specifications for RPCs which are specific to the Qena (``PtQenaB1``)
+protocol proposal can be found at:
+
+- :src:`docs/api/qena-openapi.json` (version 21.0~rc1)
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Qena protocol proposal can be found at:
+
+- :src:`docs/api/qena-mempool-openapi.json` (version 21.0~rc1)
+
+Alpha RPCs
+----------
+
+The OpenAPI specifications for RPCs which are specific to the Alpha
+protocol can be found at:
+
+- :src:`docs/api/alpha-openapi.json` (version master)
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Alpha protocol can be found at:
+
+- :src:`docs/api/alpha-mempool-openapi.json` (version master)
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
@@ -78,26 +107,56 @@ seen in the field ``.info.version`` within each file.)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Oxford RPCs
+Paris RPCs
+----------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
+(``PtParisB``) protocol can be found at:
+
+- :src:`docs/api/paris-smart-rollup-node-openapi.json` (version 20.3)
+
+Qena RPCs
 -----------
 
-The OpenAPI specifications for the RPCs of the smart rollup node for the Oxford
-(``Proxford``) protocol can be found at:
+The OpenAPI specifications for the RPCs of the smart rollup node for the Qena
+(``PtQenaB1``) protocol proposal can be found at:
 
-- `oxford-smart-rollup-node-openapi.json (version 19.1)
-  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
+- :src:`docs/api/qena-smart-rollup-node-openapi.json` (version 21.0~rc1)
+
+Alpha RPCs
+----------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Alpha
+protocol can be found at:
+
+- :src:`docs/api/alpha-smart-rollup-node-openapi.json` (version master)
+
+DAL Node
+~~~~~~~~
+
+The DAL node also provides RPCs.
+Their OpenAPI specification can be found at:
+
+- :src:`docs/api/dal-node-openapi.json` (version 20.3)
+- :src:`docs/api/dal-node-openapi-rc.json` (version 21.0~rc1)
+- :src:`docs/api/dal-node-openapi-dev.json` (version master)
 
 .. _openapi_generate:
 
 How to Generate
 ~~~~~~~~~~~~~~~
 
-To generate the above files, run the ``src/bin_openapi/generate.sh`` script
+To generate the ``*-dev.json`` and ``alpha-*.json`` files above from the current sources in your Octez repository, run the ``src/bin_openapi/generate.sh`` script
 from the root of the Octez repository.
-It will start a sandbox node, activate the protocol,
+Note that the generation script requires the Octez executables to be built, so you have to first run ``make`` from the repository root.
+
+You may instead run this script via ``make -C docs openapi``, which will run the generation script and check if the files above are up-to-date with respect to their versions under Git (modulo the ``version`` fields inside).
+If there are any other differences, you may want to create an MR to update these JSON files under ``docs/api/``.
+
+The generation script will start a sandbox node, activate the protocol,
 get the RPC specifications from this node and convert them to OpenAPI specifications.
 
-To generate the OpenAPI specification for the RPCs provided by a specific protocol,
+To generate the OpenAPI specification for the RPCs provided by a specific protocol instead of Alpha,
 update the following variables in :src:`src/bin_openapi/generate.sh`:
 
 ```sh

@@ -70,9 +70,9 @@ let assert_return x = assert_ok (Lwt_main.run x)
 let ctxt =
   assert_return
     (let open Lwt_result_syntax in
-    let* b, _cs = Context.init3 () in
-    let* v = Incremental.begin_construction b in
-    return (Incremental.alpha_ctxt v))
+     let* b, _cs = Context.init3 () in
+     let* v = Incremental.begin_construction b in
+     return (Incremental.alpha_ctxt v))
 
 let ex_data_sampler : ex_data Tezos_benchmark.Base_samplers.sampler =
  fun random_state ->
@@ -91,8 +91,8 @@ let ex_data_sampler : ex_data Tezos_benchmark.Base_samplers.sampler =
     | `TContract (* Forbidden in storage *)
     | `TSapling_transaction (* Not yet supported *)
     | `TSapling_transaction_deprecated (* Not yet supported *)
-    | `TSapling_state (* Not yet supported *)
-    | `TLambda (* Not yet supported *) ->
+    | `TSapling_state (* Not yet supported *) | `TLambda (* Not yet supported *)
+      ->
         true
   in
   let (Ex_ty ty) =

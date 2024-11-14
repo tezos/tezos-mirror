@@ -1,0 +1,27 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_context_brassaia_disk)
+ (public_name octez-libs.tezos-context-brassaia.disk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  bigstringaf
+  fmt
+  octez-libs.brassaia
+  octez-libs.brassaia_pack
+  octez-libs.brassaia_pack.unix
+  logs.fmt
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
+  octez-libs.context.sigs
+  octez-libs.tezos-context-brassaia.helpers
+  octez-libs.tezos-context-brassaia.encoding
+  octez-libs.tezos-context-brassaia.memory)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib
+  -open Tezos_context_brassaia_memory))

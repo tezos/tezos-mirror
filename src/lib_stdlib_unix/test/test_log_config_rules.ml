@@ -38,7 +38,7 @@ let test_case rules expected =
   let rules = rules |> parse_rules in
   Check.(
     (expected = rules)
-      (list (tuple2 string level_typ))
+      (list (tuple2 string (option level_typ)))
       ~error_msg:"Expected %L, got %R"
       ~__LOC__)
 
@@ -64,16 +64,16 @@ let () =
   let open Internal_event in
   test_case
     "toto -> notice; foo -> debug; bar -> error;"
-    [("toto", Notice); ("foo", Debug); ("bar", Error)] ;
-  test_case "toto*titi -> notice" [("toto*titi", Notice)] ;
-  test_case_error "toto" Incorrect_log_rules_not_a_level ;
-  test_case_error "toto -> titi" Incorrect_log_rules_not_a_level ;
-  test_case "debug; titi -> Warning" [("", Debug); ("titi", Warning)] ;
+    [("toto", Some Notice); ("foo", Some Debug); ("bar", Some Error)] ;
+  test_case "toto*titi -> notice" [("toto*titi", Some Notice)] ;
+  test_case_error "toto" (Incorrect_log_rules_not_a_level "toto") ;
+  test_case_error "toto -> titi" (Incorrect_log_rules_not_a_level "titi") ;
+  test_case "debug; titi -> Warning" [("", Some Debug); ("titi", Some Warning)] ;
   test_case "" [] ;
-  test_case "   toto   ->  notice  " [("toto", Notice)] ;
+  test_case "   toto   ->  notice  " [("toto", Some Notice)] ;
   test_case_error "toto -> tata -> error" Incorrect_log_rules_syntax ;
-  test_case "info" [("", Info)] ;
-  test_case "*->info" [("", Info)] ;
+  test_case "info" [("", Some Info)] ;
+  test_case "*->info" [("", Some Info)] ;
   test_case_error "notice ->" Incorrect_log_rules_missing_level ;
   test_case_error "-> info" Incorrect_log_rules_missing_pattern ;
   test_case_error "  -> info" Incorrect_log_rules_missing_pattern ;

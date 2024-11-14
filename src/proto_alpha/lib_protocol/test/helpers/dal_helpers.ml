@@ -46,11 +46,15 @@ let () =
     (function Test_failure e -> Some e | _ -> None)
     (fun e -> Test_failure e)
 
-let dal_prover_srs = lazy (Cryptobox.Internal_for_tests.init_prover_dal ())
+let dal_prover_srs =
+  lazy
+    (Cryptobox.init_prover_dal
+       ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+       ())
 
 let mk_cryptobox dal_params =
-  let open Result_syntax in
-  let () = Lazy.force dal_prover_srs in
+  let open Lwt_result_syntax in
+  let* () = Lazy.force dal_prover_srs in
   match Cryptobox.make dal_params with
   | Ok dal -> return dal
   | Error (`Fail s) -> fail [Test_failure s]
@@ -70,7 +74,7 @@ let content_slot_id = function
 module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
-  val cryptobox : Cryptobox.t Lazy.t
+  val cryptobox : Cryptobox.t tzresult Lwt.t Lazy.t
 end) =
 struct
   (* Some global constants. *)
@@ -93,8 +97,8 @@ struct
     Hist.History_cache.(Map.find h (view cache)) |> Lwt.return
 
   let dal_mk_polynomial_from_slot slot_data =
-    let open Result_syntax in
-    let cryptobox = Lazy.force cryptobox in
+    let open Lwt_result_syntax in
+    let* cryptobox = Lazy.force cryptobox in
     match Cryptobox.polynomial_from_slot cryptobox slot_data with
     | Ok p -> return p
     | Error (`Slot_wrong_size s) ->
@@ -110,28 +114,28 @@ struct
     | Ok cm -> return cm
     | Error
         ((`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
-        as commit_error) ->
+         as commit_error) ->
         fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
 
   let dal_mk_prove_page polynomial page_id =
-    let open Result_syntax in
-    let cryptobox = Lazy.force cryptobox in
+    let open Lwt_result_syntax in
+    let* cryptobox = Lazy.force cryptobox in
     match Cryptobox.prove_page cryptobox polynomial page_id.P.page_index with
     | Ok p -> return p
     | Error `Page_index_out_of_range ->
         fail [Test_failure "compute_proof_segment: Page_index_out_of_range"]
     | Error
         ((`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
-        as commit_error) ->
+         as commit_error) ->
         fail [Test_failure (Cryptobox.string_of_commit_error commit_error)]
 
   let mk_slot ?(level = level_one) ?(index = Slot_index.zero)
       ?(fill_function = fun _i -> 'x') () =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let slot_data = Bytes.init params.slot_size fill_function in
     let* polynomial = dal_mk_polynomial_from_slot slot_data in
-    let cryptobox = Lazy.force cryptobox in
-    let* commitment = dal_commit cryptobox polynomial in
+    let* cryptobox = Lazy.force cryptobox in
+    let*? commitment = dal_commit cryptobox polynomial in
     return
       ( slot_data,
         polynomial,
@@ -145,7 +149,7 @@ struct
   let mk_page_info ?(default_char = 'x') ?level ?slot_index
       ?(page_index = P.Index.zero) ?(custom_data = None) (slot : S.Header.t)
       polynomial =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let level =
       match level with None -> slot.id.published_level | Some level -> level
     in

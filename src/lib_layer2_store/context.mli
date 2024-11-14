@@ -67,7 +67,9 @@ val equiv :
   'c Equality_witness.t * 'd Equality_witness.t ->
   ('a, 'c) Equality_witness.eq option * ('b, 'd) Equality_witness.eq option
 
-type hash = Context_hash.t
+module Hash = Smart_rollup_context_hash
+
+type hash = Hash.t
 
 (** [load cache_size path] initializes from disk a context from
     [path]. [cache_size] allows to change size of the Context Backend
@@ -105,6 +107,10 @@ val commit : ?message:string -> [`Read | `Write] t -> hash Lwt.t
 (** [is_gc_finished index] returns true if a GC is finished (or idle) and false
     if a GC is running for [index]. *)
 val is_gc_finished : [`Read | `Write] t -> bool
+
+(** [cancel_gc index] stops the Irmin GC if it is currently running for
+    [index]. It returns [true] if a GC was canceled. *)
+val cancel_gc : [`Read | `Write] t -> bool
 
 (** [split ctxt] creates a new suffix file, also called "chunk", into the context's
     file hierarchy. This split function is expected to be called after
@@ -152,6 +158,10 @@ module PVMState : sig
 
   (** [find context] returns the PVM state stored in the [context], if any. *)
   val find : 'a t -> value option Lwt.t
+
+  (** [get context] is the same as {!find} but fails if there is no PVM state
+      stored in the context. *)
+  val get : 'a t -> value tzresult Lwt.t
 
   (** [lookup state path] returns the data stored for the path [path] in the PVM
       state [state].  *)

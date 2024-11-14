@@ -11,6 +11,7 @@ The following pages provide an overview of the DAL and cover its different aspec
 
    dal_overview
    dal_node
+   dal_run
    dal_bakers
 
 See also:

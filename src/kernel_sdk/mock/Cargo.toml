@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -15,8 +15,8 @@ categories = ["development-tools", "development-tools::testing"]
 
 [dependencies]
 hex = "0.4"
-tezos_crypto_rs = { version = "=0.5.2", default-features = false }
-tezos_data_encoding = "=0.5.2"
+tezos_crypto_rs.workspace = true
+tezos_data_encoding.workspace = true
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
@@ -38,5 +38,7 @@ version = "0.2.2"
 features = ["default"]
 
 [features]
-proto-nairobi = ["tezos-smart-rollup-core/proto-nairobi", "tezos-smart-rollup-host/proto-nairobi"]
-proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha"]
+proto-alpha = [
+  "tezos-smart-rollup-core/proto-alpha",
+  "tezos-smart-rollup-host/proto-alpha",
+]

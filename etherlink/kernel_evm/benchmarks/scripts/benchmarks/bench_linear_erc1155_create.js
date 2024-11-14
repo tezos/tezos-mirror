@@ -28,7 +28,7 @@ let gasLimit = 3_000_000;
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000000));
 for (let i = 0; i < nb_iter; i++) {
-let create = utils.create(player1, 0, create_data);
+let create = utils.create(player1, 0, create_data, {gasLimit: 1000000000});
 txs.push(create.tx);
 }
 utils.print_bench([txs], mode);

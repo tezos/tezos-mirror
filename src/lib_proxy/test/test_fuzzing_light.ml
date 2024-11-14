@@ -128,7 +128,7 @@ module Consensus = struct
     let printer = mock_printer () in
     let input : Tezos_proxy.Light_consensus.input =
       {
-        printer = (printer :> Tezos_client_base.Client_context.printer);
+        printer :> Tezos_client_base.Client_context.printer;
         min_agreement;
         chain;
         block;

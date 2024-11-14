@@ -30,13 +30,15 @@
    Subject:      Call smart contract views to catch performance regressions.
 *)
 
+let team = Tag.layer1
+
 let hooks = Tezos_regression.hooks
 
 let test_regression =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Run views"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -155,7 +157,7 @@ let test_all_view_runs protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "Test view runtimes - %s - %s" contract init)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (fun protocol -> test_run_view ~contract ~init ~expected protocol)
        protocols
@@ -164,7 +166,7 @@ let test_create_contract =
   Protocol.register_test
     ~__FILE__
     ~title:"Create contract with view"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -226,7 +228,7 @@ let test_view_step_constant =
   Protocol.register_test
     ~__FILE__
     ~title:"Step constants in view"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -315,7 +317,7 @@ let test_self_after_view_suite protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "self after view - %s" contract)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (test_consts_after_view ~contract ~expected:`Contract)
        protocols
@@ -330,7 +332,7 @@ let test_self_address_after_view_suite protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "self address after view - %s" contract)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (test_consts_after_view ~contract ~expected:`Contract)
        protocols
@@ -343,7 +345,7 @@ let test_sender_after_view_suite protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "sender after view - %s" contract)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (test_consts_after_view ~contract ~expected:`Sender)
        protocols
@@ -394,7 +396,7 @@ let test_balance_after_view_suite protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "balance after view - %s" contract)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (test_balance_after_view ~contract)
        protocols
@@ -440,7 +442,7 @@ let test_amount_after_view_suite protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "amount after view - %s" contract)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (test_amount_after_view ~contract)
        protocols
@@ -449,7 +451,7 @@ let test_recursive_view =
   Protocol.register_test
     ~__FILE__
     ~title:"Recursive view"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -528,7 +530,7 @@ let test_typecheck_suite protocols =
      Protocol.register_test
        ~__FILE__
        ~title:(sf "Typecheck view - %s" contract)
-       ~tags:["client"; "michelson"]
+       ~tags:[team; "client"; "michelson"]
        ~uses_node:false
        (test_typecheck ~contract ~error)
        protocols

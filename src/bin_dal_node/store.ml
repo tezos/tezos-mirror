@@ -23,75 +23,133 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
-   use another storage solution that irmin as we don't need backtracking *)
+module Version = struct
+  type t = int
 
-module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
-include StoreMaker.Make (Irmin.Contents.String)
+  let make v = v
 
-let shard_store_dir = "shard_store"
+  let equal = Int.equal
 
-let info message =
-  let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
-  Info.v ~author:"DAL Node" ~message date
+  let pp = Format.pp_print_int
 
-let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
+  let encoding =
+    let open Data_encoding in
+    obj1 (req "version" int31)
 
-let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
+  let version_file_name = "version.json"
 
-module Value_size_hooks = struct
-  (* The [value_size] required by [Tezos_key_value_store.directory] is known when
-     the daemon loads a protocol, after the store is activated. We use the closure
-     [value_size_fun] to perform delayed protocol-specific parameter passing.
+  let version_file_path ~base_dir = Filename.concat base_dir version_file_name
 
-     Note that this mechanism is not sufficient to make the key-value store
-     robust to dynamic changes in [value_size]. For instance, there could be
-     concurrent writes for protocol P-1 and protocol P, if they define
-     distinct [value_size] this will make it so that [P-1] uses the [value_size]
-     of [P].
+  (* Version history:
+     - 0: came with octez release v20; used Irmin for storing slots
+     - 1: removed Irmin dependency; added slot and status stores; changed layout of shard
+       store by indexing on slot ids instead of commitments *)
+  let current_version = 1
 
-     A potential solution would have a function [Cryptobox.share_encoding : t -> share encoding]
-     with the property that the produced encodings are of [`Fixed] class.
-     The [Key_value_store.t] type could be parameterized by an extra type parameter
-     corresponding to some dynamic state (corresponding to the cryptobox in our
-     use case), passed explicitly to the [write] and [read] functions.
+  type error += Could_not_read_data_dir_version of string
 
-     Correcting this is left to future work.
+  type error += Could_not_write_version_file of string
 
-     TODO: https://gitlab.com/tezos/tezos/-/issues/6034 *)
+  type error += Invalid_data_dir_version of {actual : t; expected : t}
 
-  (* We used the [share_size] callback to pass the share size to the store
-     in a delayed fashion, when the protocol becomes known to the daemon. *)
-  let share_size_ref = ref None
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.store.could_not_read_data_dir_version"
+      ~title:"Could not read data directory version file"
+      ~description:"Data directory version file is absent or invalid."
+      Data_encoding.(obj1 (req "version_path" string))
+      ~pp:(fun ppf path ->
+        Format.fprintf
+          ppf
+          "Tried to read version file at '%s', but the file could not be found \
+           or parsed."
+          path)
+      (function Could_not_read_data_dir_version path -> Some path | _ -> None)
+      (fun path -> Could_not_read_data_dir_version path) ;
+    register_error_kind
+      `Permanent
+      ~id:"dal.store.could_not_write_version_file"
+      ~title:"Could not write version file"
+      ~description:"Version file cannot be written."
+      Data_encoding.(obj1 (req "file_path" string))
+      ~pp:(fun ppf file_path ->
+        Format.fprintf
+          ppf
+          "Tried to write version file at '%s', but the file could not be \
+           written."
+          file_path)
+      (function
+        | Could_not_write_version_file file_path -> Some file_path | _ -> None)
+      (fun file_path -> Could_not_write_version_file file_path) ;
+    register_error_kind
+      `Permanent
+      ~id:"dal.store.invalid_version"
+      ~title:"Invalid store version"
+      ~description:"The store's version was not the one that was expected"
+      ~pp:(fun ppf (actual, expected) ->
+        Format.fprintf
+          ppf
+          "Invalid store version '%a' (expected '%a'). Your store is %s"
+          pp
+          actual
+          pp
+          expected
+          (if actual < expected then
+             "incompatible and cannot be automatically upgraded."
+           else "too recent for this version of the DAL node's store."))
+      Data_encoding.(
+        obj2 (req "actual_version" encoding) (req "expected_version" encoding))
+      (function
+        | Invalid_data_dir_version {actual; expected} -> Some (actual, expected)
+        | _ -> None)
+      (fun (actual, expected) -> Invalid_data_dir_version {actual; expected})
 
-  let set_share_size size =
-    match !share_size_ref with
-    | None -> share_size_ref := Some size
-    | Some previous_size ->
-        if Int.equal size previous_size then ()
-        else
-          Stdlib.failwith
-            "Store.set_share_size: new share size incompatible with current \
-             store"
+  let read_version_file ~file_path =
+    let open Lwt_result_syntax in
+    let* json =
+      trace
+        (Could_not_read_data_dir_version file_path)
+        (Lwt_utils_unix.Json.read_file file_path)
+    in
+    Lwt.catch
+      (fun () -> Data_encoding.Json.destruct encoding json |> return)
+      (fun _ -> tzfail (Could_not_read_data_dir_version file_path))
 
-  let share_size () =
-    match !share_size_ref with None -> assert false | Some size -> size
+  let write_version_file ~base_dir =
+    let version_file = version_file_path ~base_dir in
+    Lwt_utils_unix.Json.write_file
+      version_file
+      (Data_encoding.Json.construct encoding current_version)
+    |> trace (Could_not_write_version_file version_file)
+end
+
+module KVS = Key_value_store
+
+module Stores_dirs = struct
+  let shard = "shard_store"
+
+  let slot = "slot_store"
+
+  let status = "status_store"
+
+  let skip_list_cells = "skip_list_store"
 end
 
 module Shards = struct
-  module KVS = Key_value_store
+  type nonrec t = (Types.slot_id, int, Cryptobox.share) KVS.t
 
-  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) KVS.t
-
-  let file_layout ~root_dir commitment =
+  let file_layout ~root_dir (slot_id : Types.slot_id) =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
 
        Make Key-Value store layout resilient to crypto parameters change.  Also,
        putting a value not far from the real number of shards allows saving disk
        storage. *)
     let number_of_shards = 4096 in
-    let commitment_string = Cryptobox.Commitment.to_b58check commitment in
-    let filepath = Filename.concat root_dir commitment_string in
+    let slot_id_string =
+      Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+    in
+    let filepath = Filename.concat root_dir slot_id_string in
     Key_value_store.layout
       ~encoded_value_size:(Value_size_hooks.share_size ())
       ~encoding:Cryptobox.share_encoding
@@ -101,29 +159,43 @@ module Shards = struct
       ~number_of_keys_per_file:number_of_shards
       ()
 
+  let with_metrics store f =
+    let open Lwt_result_syntax in
+    let* r = f () in
+    let opened_files = KVS.View.opened_files store in
+    let ongoing_actions = KVS.View.ongoing_actions store in
+    Dal_metrics.update_kvs_shards_metrics ~opened_files ~ongoing_actions ;
+    return r
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
-  let are_shards_available store commitment shard_indexes =
-    List.for_all_es
-      (KVS.value_exists store file_layout commitment)
-      shard_indexes
+  let are_shards_available store slot_id shard_indexes =
+    List.for_all_es (KVS.value_exists store file_layout slot_id) shard_indexes
 
-  let save_and_notify shards_store commitment shards =
+  let write_all shards_store slot_id shards =
     let open Lwt_result_syntax in
-    let shards =
-      Seq.map
-        (fun {Cryptobox.index; share} -> (commitment, index, share))
-        shards
-    in
     let* () =
-      KVS.write_values shards_store file_layout shards
+      with_metrics shards_store @@ fun () ->
+      Seq.ES.iter
+        (fun {Cryptobox.index; share} ->
+          let* exists =
+            KVS.value_exists shards_store file_layout slot_id index
+          in
+          if exists then return_unit
+          else
+            let* () =
+              KVS.write_value shards_store file_layout slot_id index share
+            in
+            let () = Dal_metrics.shard_stored () in
+            let*! () =
+              Event.(
+                emit
+                  stored_slot_shard
+                  (slot_id.slot_level, slot_id.slot_index, index))
+            in
+            return_unit)
+        shards
       |> Errors.other_lwt_result
-    in
-    let*! () =
-      List.of_seq shards
-      |> Lwt_list.iter_s (fun (_commitment, index, _share) ->
-             Dal_metrics.shard_stored () ;
-             Event.(emit stored_slot_shard (commitment, index)))
     in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
 
@@ -131,553 +203,454 @@ module Shards = struct
     *)
     return_unit
 
-  let read_all shards_store commitment ~number_of_shards =
+  let read_all shards_store slot_id ~number_of_shards =
     Seq.ints 0
     |> Seq.take_while (fun x -> x < number_of_shards)
-    |> Seq.map (fun shard_index -> (commitment, shard_index))
+    |> Seq.map (fun shard_index -> (slot_id, shard_index))
     |> KVS.read_values shards_store file_layout
 
-  let read_value store commitment shard_id =
-    KVS.read_value store file_layout commitment shard_id
+  let read store slot_id shard_id =
+    let open Lwt_result_syntax in
+    let*! res =
+      with_metrics store @@ fun () ->
+      KVS.read_value store file_layout slot_id shard_id
+    in
+    match res with
+    | Ok share -> return {Cryptobox.share; index = shard_id}
+    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
+    | Error err ->
+        let data_kind = Types.Store.Shard in
+        fail @@ Errors.decoding_failed data_kind err
 
-  let read_values store keys = KVS.read_values store file_layout keys
+  let count_values store slot_id =
+    with_metrics store @@ fun () -> KVS.count_values store file_layout slot_id
 
-  let count_values store commitment =
-    KVS.count_values store file_layout commitment
-
-  let remove store commitment = KVS.remove_file store file_layout commitment
+  let remove store slot_id =
+    let open Lwt_result_syntax in
+    let* () =
+      with_metrics store @@ fun () -> KVS.remove_file store file_layout slot_id
+    in
+    return_unit
 
   let init node_store_dir shard_store_dir =
     let root_dir = Filename.concat node_store_dir shard_store_dir in
     KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
 end
 
-module Shard_proofs_cache =
-  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-    (struct
-      type t = Cryptobox.Commitment.t
+module Slots = struct
+  type t = (Types.slot_id * int, unit, bytes) KVS.t
 
-      let equal = Cryptobox.Commitment.equal
+  let file_layout ~root_dir ((slot_id : Types.slot_id), slot_size) =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
 
-      let hash = Hashtbl.hash
-    end)
+       Make Key-Value store layout resilient to crypto parameters change. *)
+    let number_of_slots = 1 in
+    let slot_id_string =
+      Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+    in
+    let filename = Format.sprintf "%s_%d" slot_id_string slot_size in
+    let filepath = Filename.concat root_dir filename in
+    Key_value_store.layout
+      ~encoding:(Data_encoding.Fixed.bytes slot_size)
+      ~filepath
+      ~eq:Stdlib.( = )
+      ~index_of:(fun () -> 0)
+      ~number_of_keys_per_file:number_of_slots
+      ()
+
+  let init node_store_dir slot_store_dir =
+    let root_dir = Filename.concat node_store_dir slot_store_dir in
+    KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
+
+  let add_slot t ~slot_size slot (slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let* () =
+      KVS.write_value ~override:true t file_layout (slot_id, slot_size) () slot
+      |> Errors.other_lwt_result
+    in
+    let*! () =
+      Event.(emit stored_slot_content (slot_id.slot_level, slot_id.slot_index))
+    in
+    return_unit
+
+  let find_slot t ~slot_size slot_id =
+    let open Lwt_result_syntax in
+    let*! res = KVS.read_value t file_layout (slot_id, slot_size) () in
+    match res with
+    | Ok slot -> return slot
+    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
+    | Error err ->
+        let data_kind = Types.Store.Slot in
+        fail @@ Errors.decoding_failed data_kind err
+
+  let remove_slot t ~slot_size slot_id =
+    KVS.remove_file t file_layout (slot_id, slot_size)
+end
+
+module Slot_id_cache = struct
+  module Levels =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = Types.level
+
+        let equal = Int32.equal
+
+        let hash = Hashtbl.hash
+      end)
+
+  type t = Cryptobox.Commitment.t option array Levels.t
+
+  let create ~capacity = Levels.create capacity
+
+  let add ~number_of_slots t slot_header =
+    let Dal_plugin.{slot_index; commitment; published_level} = slot_header in
+    match Levels.find_opt t published_level with
+    | None ->
+        let table = Array.make number_of_slots None in
+        Array.set table slot_index (Some commitment) ;
+        Levels.replace t published_level table
+    | Some table -> Array.set table slot_index (Some commitment)
+
+  let find_opt =
+    let get_opt a i =
+      let len = Array.length a in
+      if i < 0 || i >= len then None else Array.get a i
+    in
+    fun t Types.Slot_id.{slot_level; slot_index} ->
+      Levels.find_opt t slot_level
+      |> Option.filter_map (Fun.flip get_opt slot_index)
+end
+
+module Statuses = struct
+  type t = (int32, int, Types.header_status) KVS.t
+
+  let file_layout ~root_dir slot_level =
+    (* The number of entries per file is the number of slots. We put
+       here the max value (4096) because we don't have a cryptobox
+       at hand to get the number_of_slots parameter. *)
+    let number_of_keys_per_file = 4096 in
+    let level_string = Format.asprintf "%ld" slot_level in
+    let filepath = Filename.concat root_dir level_string in
+    Key_value_store.layout
+      ~encoding:Types.header_status_encoding
+      ~filepath
+      ~eq:Stdlib.( = )
+      ~index_of:Fun.id
+      ~number_of_keys_per_file
+      ()
+
+  let init node_store_dir status_store_dir =
+    let root_dir = Filename.concat node_store_dir status_store_dir in
+    KVS.init ~lru_size:Constants.status_store_lru_size ~root_dir
+
+  let add_status t status (slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let* () =
+      KVS.write_value
+        ~override:true
+        t
+        file_layout
+        slot_id.slot_level
+        slot_id.slot_index
+        status
+      |> Errors.other_lwt_result
+    in
+    let*! () =
+      Event.(
+        emit stored_slot_status (slot_id.slot_level, slot_id.slot_index, status))
+    in
+    return_unit
+
+  let find_status t (slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let*! res =
+      KVS.read_value t file_layout slot_id.slot_level slot_id.slot_index
+    in
+    match res with
+    | Ok slot -> return slot
+    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
+    | Error err ->
+        let data_kind = Types.Store.Header_status in
+        fail @@ Errors.decoding_failed data_kind err
+
+  let update_slot_headers_attestation ~published_level ~number_of_slots t
+      attested =
+    let open Lwt_result_syntax in
+    List.iter_es
+      (fun slot_index ->
+        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
+        if attested slot_index then (
+          Dal_metrics.slot_attested ~set:true slot_index ;
+          add_status t `Attested index |> Errors.to_tzresult)
+        else
+          let* old_data_opt =
+            find_status t index |> Errors.to_option_tzresult
+          in
+          Dal_metrics.slot_attested ~set:false slot_index ;
+          if Option.is_some old_data_opt then
+            add_status t `Unattested index |> Errors.to_tzresult
+          else
+            (* There is no header that has been included in a block
+               and selected for this index. So, the slot cannot be
+               attested or unattested. *)
+            return_unit)
+      (0 -- (number_of_slots - 1))
+
+  let update_selected_slot_headers_statuses ~block_level ~attestation_lag
+      ~number_of_slots attested t =
+    let published_level = Int32.(sub block_level (of_int attestation_lag)) in
+    update_slot_headers_attestation ~published_level ~number_of_slots t attested
+
+  let get_slot_status ~slot_id t = find_status t slot_id
+
+  let remove_level_status ~level t = KVS.remove_file t file_layout level
+end
+
+module Skip_list_cells = Skip_list_cells_store
+
+module Commitment_indexed_cache =
+  (* The commitment-indexed cache is where slots, shards, and
+     shard proofs are kept before being associated to some slot id. The
+     policy is not LRU to avoid prioritizing slots when they are accessed
+     from the cache to be stored and published on the DAL network. *)
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = Cryptobox.Commitment.t
+
+        let equal = Cryptobox.Commitment.equal
+
+        let hash = Hashtbl.hash
+      end)
+
+module Last_processed_level = Single_value_store.Make (struct
+  type t = int32
+
+  let name = "last_processed_level"
+
+  let encoding = Data_encoding.int32
+end)
+
+module First_seen_level = Single_value_store.Make (struct
+  type t = int32
+
+  let name = "first_seen_level"
+
+  let encoding = Data_encoding.int32
+end)
 
 (** Store context *)
-type node_store = {
-  store : t;
-  shard_store : Shards.t;
-  in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
+type t = {
+  slot_header_statuses : Statuses.t;
+  shards : Shards.t;
+  slots : Slots.t;
+  skip_list_cells : Skip_list_cells.t;
+  cache :
+    (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
+    Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
+  finalized_commitments : Slot_id_cache.t;
+  last_processed_level : Last_processed_level.t;
+  first_seen_level : First_seen_level.t;
 }
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
-
-   handle with_proof flag -> store proofs on disk? *)
-let save_shard_proofs node_store commitment shard_proofs =
-  Shard_proofs_cache.replace
-    node_store.in_memory_shard_proofs
+let cache_entry node_store commitment slot shares shard_proofs =
+  Commitment_indexed_cache.replace
+    node_store.cache
     commitment
-    shard_proofs
+    (slot, shares, shard_proofs)
+
+let upgrade_from_v0_to_v1 ~base_dir =
+  let open Lwt_syntax in
+  let ( // ) = Filename.Infix.( // ) in
+  let rec move_directory_contents src dst =
+    let stream = Lwt_unix.files_of_directory src in
+    Lwt_stream.iter_s
+      (fun name ->
+        Lwt.catch
+          (fun () ->
+            match name with
+            | "." | ".." -> Lwt.return_unit
+            | file_name -> (
+                let src_path = src // file_name in
+                let dst_path = dst // file_name in
+                let* stats = Lwt_unix.lstat src_path in
+                match stats.st_kind with
+                | Unix.S_REG | S_LNK -> Lwt_unix.rename src_path dst_path
+                | S_DIR ->
+                    let* () = Lwt_unix.mkdir dst_path stats.st_perm in
+                    let* () = move_directory_contents src_path dst_path in
+                    Lwt_utils_unix.remove_dir src_path
+                | _ -> Lwt.return_unit))
+          (fun exn ->
+            let src_path = src // name in
+            let dst_path = dst // name in
+            let* () =
+              Event.(
+                emit
+                  store_upgrade_error_moving_directory
+                  (src_path, dst_path, Printexc.to_string exn))
+            in
+            Lwt.return_unit))
+      stream
+  in
+  let move_and_rename old_path new_path =
+    let* () =
+      Lwt.catch
+        (fun () -> Lwt_unix.mkdir new_path 0o700)
+        (fun exn ->
+          let* () =
+            Event.(
+              emit
+                store_upgrade_error_creating_directory
+                (new_path, Printexc.to_string exn))
+          in
+          Lwt.return ())
+    in
+    let* () = move_directory_contents old_path new_path in
+    Lwt_utils_unix.remove_dir old_path
+  in
+  (* Remove the Irmin store, that is, delete the "index" directory and all files
+     that start with "store". *)
+  let stream = Lwt_unix.files_of_directory base_dir in
+  let irmin_prefix = "store" in
+  let* () =
+    Lwt_stream.iter_p
+      (fun name ->
+        let path = Filename.Infix.(base_dir // name) in
+        if String.equal name "index" then
+          (* that's Irmin related *)
+          Lwt_utils_unix.remove_dir path
+        else if String.starts_with ~prefix:irmin_prefix name then
+          Lwt_unix.unlink path
+        else if String.equal name "shard_store" then
+          (* The V0 shard store uses a different layout. We just delete it, for
+             simplicity. *)
+          Lwt_utils_unix.remove_dir path
+        else if String.equal name "skip_list" then
+          (* The skip list store is not handled by this module, but we treat this
+             case here, for simplicity *)
+          let new_path = Filename.Infix.(base_dir // "skip_list_store") in
+          move_and_rename path new_path
+        else Lwt.return ())
+      stream
+  in
+  Event.(emit store_upgraded (Version.make 0, Version.make 1))
+
+(* Returns [upgradable old_version new_version] returns an upgrade function if
+   the store is upgradable from [old_version] to [new_version]. Otherwise it
+   returns [None]. *)
+let upgradable old_version new_version :
+    (base_dir:string -> unit tzresult Lwt.t) option =
+  let open Lwt_result_syntax in
+  match (old_version, new_version) with
+  | 0, 1 ->
+      Some
+        (fun ~base_dir ->
+          let*! () = upgrade_from_v0_to_v1 ~base_dir in
+          return_unit)
+  | _ -> None
+
+(* Checks the version of the store with the respect to the current
+   version. Returns [None] if the store does not need an upgrade and [Some
+   upgrade] if the store is upgradable, where [upgrade] is a function that can
+   be used to upgrade the store. It returns an error if the version is
+   incompatible with the current one. *)
+let check_version_and_may_upgrade base_dir =
+  let open Lwt_result_syntax in
+  let file_path = Version.version_file_path ~base_dir in
+  let*! exists = Lwt_unix.file_exists file_path in
+  let* version =
+    if exists then Version.read_version_file ~file_path
+    else
+      (* In the absence of a version file, we use an heuristic to determine the
+         version. *)
+      let*! exists = Lwt_unix.file_exists (Filename.concat base_dir "index") in
+      return @@ if exists then Version.make 0 else Version.make 1
+  in
+  if Version.(equal version current_version) then return_unit
+  else
+    match upgradable version Version.current_version with
+    | Some upgrade ->
+        let* () = upgrade ~base_dir in
+        Version.write_version_file ~base_dir
+    | None ->
+        tzfail
+          (Version.Invalid_data_dir_version
+             {actual = version; expected = Version.current_version})
+
+let init_skip_list_cells_store base_dir =
+  (* We support at most 64 back-pointers, each of which takes 32 bytes.
+     The cells content itself takes less than 64 bytes. *)
+  let padded_encoded_cell_size = 64 * (32 + 1) in
+  (* A pointer hash is 32 bytes length, but because of the double
+     encoding in Dal_proto_types and then in skip_list_cells_store, we
+     have an extra 4 bytes for encoding the size. *)
+  let encoded_hash_size = 32 + 4 in
+  Skip_list_cells_store.init
+    ~node_store_dir:base_dir
+    ~skip_list_store_dir:Stores_dirs.skip_list_cells
+    ~padded_encoded_cell_size
+    ~encoded_hash_size
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
 let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
-  let*! repo = Repo.v (Irmin_pack.config base_dir) in
-  let*! store = main repo in
-  let* shard_store = Shards.init base_dir shard_store_dir in
+  let* () = check_version_and_may_upgrade base_dir in
+  let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
+  let* shards = Shards.init base_dir Stores_dirs.shard in
+  let* slots = Slots.init base_dir Stores_dirs.slot in
+  let* skip_list_cells = init_skip_list_cells_store base_dir in
+  let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
+  let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
-      shard_store;
-      store;
-      in_memory_shard_proofs =
-        Shard_proofs_cache.create Constants.shards_proofs_cache_size;
+      shards;
+      slots;
+      slot_header_statuses;
+      skip_list_cells;
+      cache = Commitment_indexed_cache.create Constants.cache_size;
+      finalized_commitments =
+        Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
+      last_processed_level;
+      first_seen_level;
     }
 
-let trace_decoding_error ~data_kind ~tztrace_of_error r =
-  let open Result_syntax in
-  match r with
-  | Ok r -> return r
-  | Error err ->
-      let tztrace = tztrace_of_error err in
-      fail @@ `Decoding_failed (data_kind, tztrace)
-
-let tztrace_of_read_error read_err =
-  [Exn (Data_encoding.Binary.Read_error read_err)]
-
-let encode_commitment = Cryptobox.Commitment.to_b58check
-
-let decode_commitment v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Commitment
-    ~tztrace_of_error:(fun tztrace -> tztrace)
-  @@ Cryptobox.Commitment.of_b58check v
-
-let encode_header_status =
-  Data_encoding.Binary.to_string_exn Types.header_status_encoding
-
-let decode_header_status v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Header_status
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Types.header_status_encoding v
-
-let decode_slot_id v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Slot_id
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Types.slot_id_encoding v
-
-let encode_slot slot_size =
-  Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
-
-let decode_slot slot_size v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Slot
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
-
-   DAL/Node: Replace Irmin storage for paths
-*)
-module Legacy = struct
-  module Path : sig
-    type t = string list
-
-    val to_string : ?prefix:string -> t -> string
-
-    module Commitment : sig
-      val slot : Cryptobox.commitment -> slot_size:int -> Path.t
-
-      val headers : Cryptobox.commitment -> Path.t
-
-      val header : Cryptobox.commitment -> Types.slot_id -> Path.t
-    end
-
-    module Level : sig
-      (**
-         Part of the storage for slots' headers where paths are indexed by slots
-         indices.
-
-         "Accepted" path(s) are used to store information about slots headers
-         that are either [`Waiting_attesattion], [`Attested], or [`Unattested].
-
-         "Others" path(s) are used to store information of slots headers when
-         their statuses are [`Not_selected] or [`Unseen_or_not_finalized]. *)
-
-      val slots_indices : Types.level -> Path.t
-
-      val accepted_header_commitment : Types.slot_id -> Path.t
-
-      val accepted_header_status : Types.slot_id -> Path.t
-
-      val others : Types.slot_id -> Path.t
-
-      val other_header_status : Types.slot_id -> Cryptobox.commitment -> Path.t
-    end
-  end = struct
-    type t = string list
-
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4457
-       Avoid the wasteful [List.append]s. *)
-    let ( / ) path suffix = path @ [suffix]
-
-    let to_string ?prefix p =
-      let s = String.concat "/" p in
-      Option.fold ~none:s ~some:(fun pr -> pr ^ s) prefix
-
-    module Commitment = struct
-      let root = ["commitments"]
-
-      let slot commitment ~slot_size =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / Int.to_string slot_size / "slot"
-
-      let headers commitment =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / "headers"
-
-      let header commitment index =
-        let open Types in
-        let prefix = headers commitment in
-        prefix / Data_encoding.Binary.to_string_exn slot_id_encoding index
-    end
-
-    module Level = struct
-      let root = ["levels"]
-
-      let slots_indices slot_level = root / Int32.to_string slot_level
-
-      let headers index =
-        let open Types.Slot_id in
-        slots_indices index.slot_level / Int.to_string index.slot_index
-
-      let accepted_header index =
-        let prefix = headers index in
-        prefix / "accepted"
-
-      let accepted_header_commitment index =
-        let prefix = accepted_header index in
-        prefix / "commitment"
-
-      let accepted_header_status index =
-        let prefix = accepted_header index in
-        prefix / "status"
-
-      let others index =
-        let prefix = headers index in
-        prefix / "others"
-
-      let other_header_status index commitment =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        others index / commitment_repr / "status"
-    end
-  end
-
-  let add_slot_by_commitment node_store cryptobox slot commitment =
-    let open Lwt_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    let encoded_slot = encode_slot slot_size slot in
-    let* () = set ~msg:"Slot stored" node_store.store path encoded_slot in
-    let* () = Event.(emit stored_slot_content commitment) in
-    return_unit
-
-  let associate_slot_id_with_commitment node_store commitment slot_id =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
-       Improve the implementation of this handler.
-    *)
-    let open Lwt_syntax in
-    let store = node_store.store in
-    let header_path = Path.Commitment.header commitment slot_id in
-    let levels_path = Path.Level.other_header_status slot_id commitment in
-    let* known_levels = mem store levels_path in
-    let* known_header = mem store header_path in
-    (* An invariant that should hold for the storage. *)
-    assert (known_levels = known_header) ;
-    if known_levels then return_unit
-    else
-      (* The path allows to reconstruct the data. *)
-      let* () =
-        set
-          ~msg:
-            (Path.to_string
-               ~prefix:"associate_slot_id_with_commitment:"
-               header_path)
-          store
-          header_path
-          ""
-      in
-      set
-        ~msg:
-          (Path.to_string
-             ~prefix:"associate_slot_id_with_commitment:"
-             levels_path)
-        store
-        levels_path
-        (encode_header_status `Unseen_or_not_finalized)
-
-  let exists_slot_by_commitment node_store cryptobox commitment =
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    mem node_store.store path
-
-  let find_slot_by_commitment node_store cryptobox commitment =
-    let open Lwt_result_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    let*! res_opt = find node_store.store path in
-    Option.fold
-      ~none:(return None)
-      ~some:(fun v ->
-        let*? dec = decode_slot slot_size v in
-        return @@ Some dec)
-      res_opt
-
-  let add_slot_headers ~number_of_slots ~block_level slot_headers node_store =
-    let module SI = Set.Make (Int) in
-    let open Lwt_result_syntax in
-    let slots_store = node_store.store in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
-       Handle reorgs. *)
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
-             https://gitlab.com/tezos/tezos/-/issues/4528
-       Handle statuses evolution. *)
-    let* waiting =
-      List.fold_left_es
-        (fun waiting (slot_header, status) ->
-          let Dal_plugin.{slot_index; commitment; published_level} =
-            slot_header
-          in
-          (* This invariant should hold. *)
-          assert (Int32.equal published_level block_level) ;
-          let index =
-            Types.Slot_id.{slot_level = published_level; slot_index}
-          in
-          let header_path = Path.Commitment.header commitment index in
-          let*! () =
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
-              slots_store
-              header_path
-              ""
-          in
-          let others_path = Path.Level.other_header_status index commitment in
-          match status with
-          | Dal_plugin.Succeeded ->
-              let commitment_path =
-                Path.Level.accepted_header_commitment index
-              in
-              let status_path = Path.Level.accepted_header_status index in
-              let data = encode_commitment commitment in
-              (* Before adding the item in accepted path, we should remove it from
-                 others path, as it may appear there with an
-                 Unseen_or_not_finalized status. *)
-              let*! () =
-                remove
-                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                  slots_store
-                  others_path
-              in
-              let*! () =
-                set
-                  ~msg:
-                    (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
-                  slots_store
-                  commitment_path
-                  data
-              in
-              let*! () =
-                set
-                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
-                  slots_store
-                  status_path
-                  (encode_header_status `Waiting_attestation)
-              in
-              return (SI.add slot_index waiting)
-          | Dal_plugin.Failed ->
-              let*! () =
-                set
-                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                  slots_store
-                  others_path
-                  (encode_header_status `Not_selected)
-              in
-              return waiting)
-        SI.empty
-        slot_headers
-    in
-    List.iter
-      (fun i ->
-        Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
-      (0 -- (number_of_slots - 1)) ;
-    return_unit
-
-  let update_slot_headers_attestation ~published_level ~number_of_slots store
-      attested =
-    let open Lwt_syntax in
-    let module S = Set.Make (Int) in
-    let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
-    let attested_str = encode_header_status `Attested in
-    let unattested_str = encode_header_status `Unattested in
-    List.iter_s
-      (fun slot_index ->
+let add_slot_headers ~number_of_slots ~block_level slot_headers t =
+  let module SI = Set.Make (Int) in
+  let open Lwt_result_syntax in
+  let slot_header_statuses = t.slot_header_statuses in
+  let* waiting =
+    List.fold_left_es
+      (fun waiting (slot_header, status) ->
+        let Dal_plugin.{slot_index; commitment = _; published_level} =
+          slot_header
+        in
+        (* This invariant should hold. *)
+        assert (Int32.equal published_level block_level) ;
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
-        let status_path = Path.Level.accepted_header_status index in
-        let msg =
-          Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
-        in
-        if S.mem slot_index attested then (
-          Dal_metrics.slot_attested ~set:true slot_index ;
-          set ~msg store status_path attested_str)
-        else
-          let* old_data_opt = find store status_path in
-          Dal_metrics.slot_attested ~set:false slot_index ;
-          if Option.is_some old_data_opt then
-            set ~msg store status_path unattested_str
-          else
-            (* There is no header that has been included in a block and selected
-               for  this index. So, the slot cannot be attested or
-               unattested. *)
-            return_unit)
-      (0 -- (number_of_slots - 1))
-
-  let update_selected_slot_headers_statuses ~block_level ~attestation_lag
-      ~number_of_slots attested node_store =
-    let store = node_store.store in
-    let published_level = Int32.(sub block_level (of_int attestation_lag)) in
-    update_slot_headers_attestation
-      ~published_level
-      ~number_of_slots
-      store
-      attested
-
-  let get_commitment_by_published_level_and_index ~level ~slot_index node_store
-      =
-    let open Lwt_result_syntax in
-    let index = Types.Slot_id.{slot_level = level; slot_index} in
-    let*! commitment_str_opt =
-      find node_store.store @@ Path.Level.accepted_header_commitment index
-    in
-    Option.fold
-      ~none:(fail `Not_found)
-      ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
-      commitment_str_opt
-
-  (** Filter the given list of indices according to the values of the given slot
-      level and index. *)
-  let filter_indexes =
-    let keep_field v = function None -> true | Some f -> f = v in
-    fun ?slot_level ?slot_index indexes ->
-      let open Result_syntax in
-      let* indexes =
-        List.map_e (fun (slot_id, _) -> decode_slot_id slot_id) indexes
-      in
-      List.filter
-        (fun {Types.Slot_id.slot_level = l; slot_index = i} ->
-          keep_field l slot_level && keep_field i slot_index)
-        indexes
-      |> return
-
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
-     header. *)
-  let get_accepted_headers ~skip_commitment slot_ids store accu =
-    let open Lwt_result_syntax in
-    List.fold_left_es
-      (fun acc slot_id ->
-        let commitment_path = Path.Level.accepted_header_commitment slot_id in
-        let*! commitment_opt = find store commitment_path in
-        match commitment_opt with
-        | None -> return acc
-        | Some read_commitment -> (
-            let*? decision = skip_commitment read_commitment in
-            match decision with
-            | `Skip -> return acc
-            | `Keep commitment -> (
-                let status_path = Path.Level.accepted_header_status slot_id in
-                let*! status_opt = find store status_path in
-                match status_opt with
-                | None -> return acc
-                | Some status_str ->
-                    let*? status = decode_header_status status_str in
-                    return
-                    @@ {
-                         Types.slot_id;
-                         commitment;
-                         status = (status :> Types.header_status);
-                       }
-                       :: acc)))
-      accu
-      slot_ids
-
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
-     header. *)
-  let get_accepted_headers_of_commitment commitment slot_ids store accu =
-    let encoded_commitment = encode_commitment commitment in
-    let skip_commitment read_commitment =
-      Result_syntax.return
-        (if String.equal read_commitment encoded_commitment then
-         `Keep commitment
-        else `Skip)
-    in
-    get_accepted_headers ~skip_commitment slot_ids store accu
-
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
-     header. *)
-  let get_other_headers_of_identified_commitment commitment slot_id store acc =
-    let open Lwt_result_syntax in
-    let*! status_opt =
-      find store @@ Path.Level.other_header_status slot_id commitment
-    in
-    match status_opt with
-    | None -> return acc
-    | Some status_str ->
-        let*? status = decode_header_status status_str in
-        return @@ ({Types.slot_id; commitment; status} :: acc)
-
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
-     header. *)
-  let get_other_headers_of_commitment commitment slot_ids store accu =
-    List.fold_left_es
-      (fun acc slot_id ->
-        get_other_headers_of_identified_commitment commitment slot_id store acc)
-      accu
-      slot_ids
-
-  let get_commitment_headers commitment ?slot_level ?slot_index node_store =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
-       Improve the implementation of this handler.
-    *)
-    let open Lwt_result_syntax in
-    let store = node_store.store in
-    (* Get the list of known slot identifiers for [commitment]. *)
-    let*! indexes = list store @@ Path.Commitment.headers commitment in
-    (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
-    let*? slot_ids = filter_indexes ?slot_level ?slot_index indexes in
-    let* accu = get_other_headers_of_commitment commitment slot_ids store [] in
-    get_accepted_headers_of_commitment commitment slot_ids store accu
-
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
-     header. *)
-  let get_other_headers slot_ids store accu =
-    let open Lwt_result_syntax in
-    List.fold_left_es
-      (fun acc slot_id ->
-        let*! commitments_with_statuses =
-          list store @@ Path.Level.others slot_id
-        in
-        List.fold_left_es
-          (fun acc (encoded_commitment, _status_tree) ->
-            let*? commitment = decode_commitment encoded_commitment in
-            get_other_headers_of_identified_commitment
-              commitment
-              slot_id
-              store
-              acc)
-          acc
-          commitments_with_statuses)
-      accu
-      slot_ids
-
-  let get_published_level_headers ~published_level ?header_status node_store =
-    let open Lwt_result_syntax in
-    let store = node_store.store in
-    (* Get the list of slots indices from the given level. *)
-    let*! slots_indices =
-      list store @@ Path.Level.slots_indices published_level
-    in
-    (* Build the list of slot IDs. *)
-    let slot_ids =
-      List.rev_map
-        (fun (index, _tree) ->
-          {
-            Types.Slot_id.slot_level = published_level;
-            slot_index = int_of_string index;
-          })
-        slots_indices
-    in
-    let* accu = get_other_headers slot_ids store [] in
-    let* accu =
-      let skip_commitment c =
-        let open Result_syntax in
-        let* commit = decode_commitment c in
-        return @@ `Keep commit
-      in
-      get_accepted_headers ~skip_commitment slot_ids store accu
-    in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4541
-       Enable the same filtering for GET /commitments/<commitment>/headers
-       (function get_commitment_headers above). Push this filtering into the result
-       construction? *)
-    return
-    @@
-    match header_status with
-    | None -> accu
-    | Some hs ->
-        List.filter_map
-          (fun header -> if header.Types.status = hs then Some header else None)
-          accu
-end
+        match status with
+        | Dal_plugin.Succeeded ->
+            let* () =
+              Statuses.add_status
+                slot_header_statuses
+                `Waiting_attestation
+                index
+              |> Errors.to_tzresult
+            in
+            Slot_id_cache.add
+              ~number_of_slots
+              t.finalized_commitments
+              slot_header ;
+            return (SI.add slot_index waiting)
+        | Dal_plugin.Failed -> return waiting)
+      SI.empty
+      slot_headers
+  in
+  List.iter
+    (fun i ->
+      Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
+    (0 -- (number_of_slots - 1)) ;
+  return_unit

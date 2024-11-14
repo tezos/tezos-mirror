@@ -13,6 +13,7 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 pub(crate) struct Store {
     pub(crate) durable: Rc<Node>,
     preimages: HashMap<[u8; PREIMAGE_HASH_SIZE], Vec<u8>>,
+    dal_slots: HashMap<(i32, u8), Vec<u8>>,
     outbox: HashMap<u32, Vec<Vec<u8>>>,
     inbox: HashMap<u32, Vec<Vec<u8>>>,
 }
@@ -186,6 +187,18 @@ impl Store {
             .get(hash)
             .expect("Cannot retrieve preimage")
             .as_ref()
+    }
+
+    pub fn retrieve_dal_slot(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+    ) -> Option<&Vec<u8>> {
+        self.dal_slots.get(&(published_level, slot_index))
+    }
+
+    pub fn set_dal_slot(&mut self, published_level: i32, slot_index: u8, data: Vec<u8>) {
+        self.dal_slots.insert((published_level, slot_index), data);
     }
 }
 

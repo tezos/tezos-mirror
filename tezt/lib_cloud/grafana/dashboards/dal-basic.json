@@ -1,0 +1,2135 @@
+{
+   "__inputs": [ ],
+   "__requires": [ ],
+   "annotations": {
+      "list": [ ]
+   },
+   "editable": true,
+   "gnetId": null,
+   "graphTooltip": 0,
+   "hideControls": false,
+   "id": null,
+   "links": [ ],
+   "panels": [
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 24,
+            "x": 0,
+            "y": 1
+         },
+         "id": 2,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "DAL node's core stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": {
+            "Finalized L1 blocks": "green",
+            "Seen L1 heads": "blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 1
+         },
+         "id": 3,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_node_new_layer1_head{app=\"$node_instance\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 1,
+               "legendFormat": "Seen L1 heads",
+               "refId": "A"
+            },
+            {
+               "expr": "dal_node_layer1_block_finalized{app=\"$node_instance\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 1,
+               "legendFormat": "Finalized L1 blocks",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Layer 1 heads & finalized blocks seen by the DAL node",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Finalized L1 blocks' rounds": "green",
+            "Seen L1 heads' rounds": "blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 1
+         },
+         "id": 4,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_node_new_layer1_head_round{app=\"$node_instance\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 1,
+               "legendFormat": "Seen L1 heads' rounds",
+               "refId": "A"
+            },
+            {
+               "expr": "dal_node_layer1_block_finalized_round{app=\"$node_instance\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 1,
+               "legendFormat": "Finalized L1 blocks' rounds",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Rounds of layer 1 heads & finalized blocks seen by the DAL node",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Stored shards": "blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 1
+         },
+         "id": 5,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "deriv(dal_node_number_of_stored_shards{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Stored shards",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "The shards stored by this node (1-minute interval)",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Number of attested slots": "green",
+            "Number of slots waiting for attestation": "yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 9
+         },
+         "id": 6,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "sum(dal_node_slots_waiting_for_attestaion{app=\"$node_instance\", slot_index=~\"$slot_index\"})",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Number of slots waiting for attestation",
+               "refId": "A"
+            },
+            {
+               "expr": "sum(dal_node_slots_attested{app=\"$node_instance\", slot_index=~\"$slot_index\"})",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Number of attested slots",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Number of slots waiting for attesatation and of attested slots",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 9
+         },
+         "id": 7,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_node_slots_waiting_for_attestaion{app=\"$node_instance\", slot_index=~\"$slot_index\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Slot index: {{ slot_index }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Indexes of slots waiting for attestation",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 9
+         },
+         "id": 8,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_node_slots_attested{app=\"$node_instance\", slot_index=~\"$slot_index\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Slot index: {{ slot_index }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Indexes of attested slots",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 24,
+            "x": 0,
+            "y": 17
+         },
+         "id": 9,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "Gossipsub worker's stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 17
+         },
+         "id": 10,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_gs_scores_of_peers{app=\"$node_instance\", peer=\"$peer\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "{{ peer }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Score of the peers connected to this node",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 17
+         },
+         "id": 11,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_gs_count_peers_per_topic{app=\"$node_instance\", slot_index=~\"$slot_index\", pkh=\"$pkh\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Topic: {{ slot_index }}, {{ pkh }}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Number of peers in the mesh for each subscribed topic",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Node's topics": "blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 25
+         },
+         "id": 12,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_gs_count_topics{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Node's topics",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "The number of topics the node is subscribed to",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "All connections": "green",
+            "Bootstrap connections": "yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 25
+         },
+         "id": 13,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_gs_count_connections{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "All connections",
+               "refId": "A"
+            },
+            {
+               "expr": "dal_gs_count_bootstrap_connections{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Bootstrap connections",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "The number of (bootstrap) connections",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Application output stream": "yellow",
+            "Input stream": "green",
+            "P2P output stream": "blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 25
+         },
+         "id": 14,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "dal_gs_input_events_stream_length{app=\"$node_instance\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Input stream",
+               "refId": "A"
+            },
+            {
+               "expr": "dal_gs_p2p_output_stream_length{app=\"$node_instance\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "P2P output stream",
+               "refId": "B"
+            },
+            {
+               "expr": "dal_gs_app_output_stream_length{app=\"$node_instance\"}",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Application output stream",
+               "refId": "C"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "The size of different worker streams",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Received & invalid": "red",
+            "Received & unchecked validity": "orange",
+            "Received & valid": "green",
+            "Sent": "blue"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 33
+         },
+         "id": 15,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "deriv(dal_gs_count_received_valid_messages{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Received & valid",
+               "refId": "A"
+            },
+            {
+               "expr": "deriv(dal_gs_count_received_invalid_messages{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Received & invalid",
+               "refId": "B"
+            },
+            {
+               "expr": "deriv(dal_gs_count_received_unknown_validity_messages{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Received & unchecked validity",
+               "refId": "C"
+            },
+            {
+               "expr": "deriv(dal_gs_count_sent_messages{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Sent",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Average sent & received app messages (1-minute interval)",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Graft": "blue",
+            "IHave": "purple",
+            "IWant": "magenta",
+            "Prune": "yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 33
+         },
+         "id": 16,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "deriv(dal_gs_count_sent_grafts{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Graft",
+               "refId": "A"
+            },
+            {
+               "expr": "deriv(dal_gs_count_sent_prunes{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Prune",
+               "refId": "B"
+            },
+            {
+               "expr": "deriv(dal_gs_count_sent_ihaves{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "IHave",
+               "refId": "C"
+            },
+            {
+               "expr": "deriv(dal_gs_count_sent_iwants{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "IWant",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Average sent control & metadata messages (1-minute interval)",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Graft": "blue",
+            "IHave": "purple",
+            "IWant": "magenta",
+            "Prune": "yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 33
+         },
+         "id": 17,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "deriv(dal_gs_count_received_grafts{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Graft",
+               "refId": "A"
+            },
+            {
+               "expr": "deriv(dal_gs_count_received_prunes{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "Prune",
+               "refId": "B"
+            },
+            {
+               "expr": "deriv(dal_gs_count_received_ihaves{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "IHave",
+               "refId": "C"
+            },
+            {
+               "expr": "deriv(dal_gs_count_received_iwants{app=\"$node_instance\"}[1m])",
+               "format": "time_series",
+               "interval": "3s",
+               "intervalFactor": 2,
+               "legendFormat": "IWant",
+               "refId": "D"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Average received control & metadata messages (1-minute interval)",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 0,
+            "w": 24,
+            "x": 0,
+            "y": 41
+         },
+         "id": 18,
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "title": "P2P stats",
+         "titleSize": "h6",
+         "type": "row"
+      },
+      {
+         "aliasColors": {
+            "Received data (KB)": "blue",
+            "Sent data (KB)": "green"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 41
+         },
+         "id": 19,
+         "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": false
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "deriv(octez_p2p_io_scheduler_total_recv{app=\"$node_instance\"}[1m]) / 1000",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Received data (KB)",
+               "refId": "A"
+            },
+            {
+               "expr": "deriv(octez_p2p_io_scheduler_total_sent{app=\"$node_instance\"}[1m]) / 1000",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Sent data (KB)",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "Average data exchange (1-minute interval)",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Incoming connections": "light-green",
+            "Outgoing connections": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 41
+         },
+         "id": 20,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_p2p_connections_outgoing{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Outgoing connections",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_p2p_connections_incoming{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Incoming connections",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "P2P total connections",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Disconnected peers": "light-yellow",
+            "Running peers": "light-green",
+            "Waiting to reconnect": "light-red"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 49
+         },
+         "id": 21,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_p2p_peers_disconnected{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Disconnected peers",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_p2p_peers_running{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Running peers",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_p2p_points_greylisted{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Waiting to reconnect",
+               "refId": "C"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "P2P peers connections",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": {
+            "Disconnected points": "light-red",
+            "Running points": "light-green",
+            "Trusted points": "light-yellow"
+         },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "fill": 1,
+         "fillGradient": 0,
+         "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 49
+         },
+         "id": 22,
+         "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": true,
+            "rightSide": false,
+            "show": true,
+            "sideWidth": null,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 1,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "expr": "octez_p2p_points_disconnected{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Disconnected points",
+               "refId": "A"
+            },
+            {
+               "expr": "octez_p2p_points_running{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Running points",
+               "refId": "B"
+            },
+            {
+               "expr": "octez_p2p_points_trusted{app=\"$node_instance\"}",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "Trusted points",
+               "refId": "C"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "P2P points connections",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "none",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "id": 23,
+         "type": "row",
+         "title": "Amplification",
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 132
+         },
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "titleSize": "h6"
+      },
+      {
+         "id": 24,
+         "type": "timeseries",
+         "title": "Total number of reconstructions",
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 132
+         },
+         "datasource": "Prometheus",
+         "targets": [
+            {
+               "refId": "This is a query",
+               "expr": "dal_node_amplification_reconstructions_done_count{app=\"$node_instance\"}",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Reconstructions done",
+               "format": "time_series",
+               "exemplar": false
+            },
+            {
+               "refId": "B",
+               "expr": "dal_node_amplification_reconstructions_aborted_count{app=\"$node_instance\"}",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions aborted"
+            },
+            {
+               "refId": "C",
+               "expr": "dal_node_amplification_reconstructions_started_count{app=\"$node_instance\"}",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions started"
+            }
+         ],
+         "options": {
+            "tooltip": {
+               "mode": "single",
+               "sort": "none"
+            },
+            "legend": {
+               "showLegend": true,
+               "displayMode": "list",
+               "placement": "bottom",
+               "calcs": []
+            }
+         }
+      },
+      {
+         "id": 25,
+         "type": "timeseries",
+         "title": "Average number of reconstructions (1-minute interval)",
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 132
+         },
+         "datasource": "Prometheus",
+         "targets": [
+            {
+               "refId": "This is a query",
+               "expr": "rate(dal_node_amplification_reconstructions_done_count{app=\"$node_instance\"}[1m]) * 60",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Reconstructions done",
+               "format": "time_series",
+               "exemplar": false
+            },
+            {
+               "refId": "B",
+               "expr": "rate(dal_node_amplification_reconstructions_aborted_count{app=\"$node_instance\"}[1m] ) * 60",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions aborted"
+            },
+            {
+               "refId": "C",
+               "expr": "rate(dal_node_amplification_reconstructions_started_count{app=\"$node_instance\"}[1m]) * 60",
+               "range": true,
+               "instant": false,
+               "hide": false,
+               "legendFormat": "Reconstructions started"
+            }
+         ],
+         "options": {
+            "tooltip": {
+               "mode": "single",
+               "sort": "none"
+            },
+            "legend": {
+               "showLegend": true,
+               "displayMode": "list",
+               "placement": "bottom",
+               "calcs": []
+            }
+         }
+      },
+      {
+         "id": 27,
+         "type": "timeseries",
+         "title": "Amplification queue length (octez-dal-node main process)",
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "targets": [
+           {
+             "disableTextWrap": false,
+             "editorMode": "builder",
+             "expr": "dal_node_amplification_queue_length{app=\"$node_instance\"}",
+             "fullMetaSearch": false,
+             "includeNullMetadata": false,
+             "instant": false,
+             "legendFormat": "Number of reconstructions queued",
+             "range": true,
+             "refId": "A"
+           }
+         ],
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 140
+         }
+      },
+      {
+         "id": 28,
+         "type": "timeseries",
+         "title": "Reconstruction duration",
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": "Prometheus",
+         "targets": [
+           {
+             "disableTextWrap": false,
+             "expr": "rate(dal_node_amplification_complete_duration_seconds_sum{app=\"$node_instance\"}[$__rate_interval]) / rate(dal_node_amplification_complete_duration_seconds_count{app=\"$node_instance\"}[$__rate_interval])",
+             "fullMetaSearch": false,
+             "includeNullMetadata": false,
+             "instant": false,
+             "legendFormat": "Average amplification time (ipc, proof and publication)",
+             "range": true,
+             "refId": "A"
+           }
+         ],
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "drawStyle": "points",
+                  "lineInterpolation": "linear"
+               }
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 140
+         }
+      }
+   ],
+   "refresh": "",
+   "rows": [ ],
+   "schemaVersion": 18,
+   "style": "dark",
+   "tags": [
+      "tezos",
+      "octez",
+      "dal"
+   ],
+   "templating": {
+      "list": [
+         {
+            "allValue": null,
+            "current": { },
+            "datasource": "Prometheus",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Node instance",
+            "multi": false,
+            "name": "node_instance",
+            "options": [ ],
+            "query": "label_values(dal_node_new_layer1_head,app)",
+            "refresh": 1,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         },
+         {
+            "allValue": ".*",
+            "current": {
+                "text": "0",
+                "value": "0"
+ },
+            "datasource": "Prometheus",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Slot index",
+            "multi": true,
+            "name": "slot_index",
+            "options": [ ],
+            "query": "label_values(dal_gs_count_peers_per_topic, slot_index)",
+            "refresh": 1,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         },
+         {
+            "allValue": null,
+            "current": { },
+            "datasource": "Prometheus",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Pkh",
+            "multi": false,
+            "name": "pkh",
+            "options": [ ],
+            "query": "label_values(dal_gs_count_peers_per_topic, pkh)",
+            "refresh": 1,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         },
+         {
+            "allValue": null,
+            "current": { },
+            "datasource": "Prometheus",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Peer",
+            "multi": false,
+            "name": "peer",
+            "options": [ ],
+            "query": "label_values(dal_gs_scores_of_peers, peer)",
+            "refresh": 1,
+            "regex": "",
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tags": [ ],
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+         }
+      ]
+   },
+   "time": {
+      "from": "now-3h",
+      "to": "now"
+   },
+   "timepicker": {
+      "refresh_intervals": [
+         "5s",
+         "10s",
+         "30s",
+         "1m",
+         "5m",
+         "15m",
+         "30m",
+         "1h",
+         "2h",
+         "1d"
+      ],
+      "time_options": [
+         "5m",
+         "15m",
+         "1h",
+         "6h",
+         "12h",
+         "24h",
+         "2d",
+         "7d",
+         "30d"
+      ]
+   },
+   "timezone": "browser",
+   "title": "Octez DAL Node Dashboard",
+   "version": 0
+}

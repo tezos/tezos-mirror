@@ -7,8 +7,6 @@
 
 open Log_helpers
 
-exception Test_failed
-
 (** A scenario is a succession of actions. We define a branching path as a way to create multiple tests
     from the same point. This allows easy compositionality of behaviors with minimal code sharing.
     The [Tag] allows to give meaningful identifiers to the branches. It is good practice to tag each
@@ -89,8 +87,8 @@ let unfolded_to_test :
         match r with
         | Ok () -> return_unit
         | Error e ->
-            Log.error "%a@." Error_monad.pp_print_trace e ;
-            raise Test_failed )
+            let m = Format.asprintf "%a@." Error_monad.pp_print_trace e in
+            Stdlib.failwith m )
 
 let register_test ~__FILE__ ~tags ((title, is_slow, test) : test_closure) : unit
     =

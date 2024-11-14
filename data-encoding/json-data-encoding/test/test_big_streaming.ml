@@ -63,17 +63,10 @@ let test1 len =
   assert (List.of_seq direct_seq = List.of_seq indirect_seq) ;
   Printf.printf "Success for big-value streaming (%d)\n%!" len
 
-let is_jsoo =
-  match Sys.backend_type with
-  | Other "js_of_ocaml" -> true
-  | Native | Bytecode | Other _ -> false
-
 let () =
   test1 0 ;
   test1 16 ;
   test1 63 ;
   test1 514 ;
   test1 1001 ;
-  (* This test running with js_of_ocaml consumes too much memory for
-     the CI *)
-  if not is_jsoo then test1 4321
+  test1 4321

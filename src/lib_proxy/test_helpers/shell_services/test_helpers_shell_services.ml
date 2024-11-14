@@ -96,9 +96,9 @@ let merkle_proof_gen =
           (Store.index store)
           kinded_key
           (let open Lwt_syntax in
-          fun t ->
-            let* _ = Store.Tree.find t path in
-            return (t, ()))
+           fun t ->
+             let* _ = Store.Tree.find t path in
+             return (t, ()))
         |> Lwt_main.run
       in
       return (proof, tree, path)

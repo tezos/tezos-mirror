@@ -5,15 +5,21 @@ OUTPUT=$(pwd)/output
 IMAGE_NAME=evm-benchmark
 CONTAINER_NAME=evm-benchmark
 FORCE=false
+INTERACTIVE=false
 
 # usage and help
 function usage() {
-  echo "Usage: $(basename "$0") [-h] [-o OUTPUT_DIRECTORY] [-i IMAGE_NAME] [-n CONTAINER_NAME] -- args" 1>&2
+  echo "Usage: $(basename "$0") [-h] [-o OUTPUT_DIRECTORY] [-i IMAGE_NAME] \
+[-n CONTAINER_NAME] -- [ARGS_PARALLEL] -- [ARGS_BENCHMARK]" 1>&2
 }
 function print_help {
   # display help
   usage
-  echo "Launches the evm-benchmark docker image. [args] are passed on to the benchmark script." 1>&2
+  echo 1>&2
+  echo "Launches the evm-benchmark docker image. Additional arguments \
+[ARGS_PARALLEL] are passed on the parallel execution script (eg nb of jobs), \
+and [ARGS_BENCHMARK] are passed on to the benchmark script. \
+If no additionnal arguments are provided, the default from the Dockerfile apply." 1>&2
   echo 1>&2
   echo "options:" 1>&2
   echo "-o      specify output directory (default ./$(basename "$OUTPUT"))" 1>&2
@@ -21,11 +27,15 @@ function print_help {
   echo "-n      specify container name (default $CONTAINER_NAME)" 1>&2
   echo "-f      force deletion of container even if running" 1>&2
   echo "-h      this help" 1>&2
+  echo "-d      launch image in interactive mode (eg for debugging)" 1>&2
 }
 
 # parse options and flags
-while getopts "hfi:n:o:" options; do
+while getopts "dhfi:n:o:" options; do
   case "${options}" in
+  d)
+    INTERACTIVE=true
+    ;;
   i)
     IMAGE_NAME=${OPTARG}
     ;;
@@ -74,4 +84,9 @@ fi
 
 echo "Launching new container:"
 # TODO: fix log-driver issue on benchmark server
-docker run --log-driver none --name "$CONTAINER_NAME" -d --mount type=bind,src="$OUTPUT",target=/home/tezos/output "$IMAGE_NAME" "$*"
+if ! $INTERACTIVE; then
+  docker run --log-driver none --name "$CONTAINER_NAME" -d --mount type=bind,src="$OUTPUT",target=/home/tezos/output "$IMAGE_NAME" "$@"
+else
+  echo "Launching in interactive mode"
+  docker run --log-driver none --name "$CONTAINER_NAME" -it --mount type=bind,src="$OUTPUT",target=/home/tezos/output "$IMAGE_NAME" debug
+fi

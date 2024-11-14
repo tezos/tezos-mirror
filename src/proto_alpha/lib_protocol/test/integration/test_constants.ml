@@ -34,17 +34,23 @@
 
 open Tez_helpers
 
-let test_sc_rollup_constants_consistency () =
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["constants"]
+
+let () =
+  register_test ~title:"sc_rollup constants consistency" @@ fun () ->
   let open Protocol.Alpha_context in
   let to_string c =
     Data_encoding.Json.(
       to_string ~minify:true
       @@ construct Constants.Parametric.Internal_for_tests.sc_rollup_encoding c)
   in
+  let open Lwt_result_syntax in
   (* We do not necessarily need to update this value when the block time
      changes. The goal is to witness the consistency of the “symbolic”
      computations in [Default_parameters] and [Raw_context].. *)
   let block_time = 10 in
+  let quarter_more x = Int32.(div (mul 5l x) 4l) in
   let sc_rollup =
     Default_parameters.Internal_for_tests.make_sc_rollup_parameter
       ~dal_attested_slots_validity_lag:241_920
@@ -52,24 +58,51 @@ let test_sc_rollup_constants_consistency () =
       ~dal_activation_level:Raw_level.root
       block_time
   in
+  (* Check no update *)
   let sc_rollup' =
-    Constants.Parametric.update_sc_rollup_parameter sc_rollup ~block_time
+    Constants.Parametric.Internal_for_tests.update_sc_rollup_parameter
+      Fun.id
+      sc_rollup
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      (fun s1 s2 -> String.equal (to_string s1) (to_string s2))
+      "sc_rollup_parameter update"
+      (fun fmt sc_rollup -> Format.pp_print_string fmt @@ to_string sc_rollup)
+      sc_rollup
+      sc_rollup'
+  in
+  (* Check with update *)
+  let sc_rollup_expected_constants =
+    Default_parameters.Internal_for_tests.make_sc_rollup_parameter
+      ~dal_attested_slots_validity_lag:241_920
+        (* 4 weeks with a 10 secs block time. *)
+      ~dal_activation_level:Raw_level.root
+      8
+  in
+  let sc_rollup_updated_constants =
+    Constants.Parametric.Internal_for_tests.update_sc_rollup_parameter
+      quarter_more
+      sc_rollup
   in
   Assert.equal
     ~loc:__LOC__
     (fun s1 s2 -> String.equal (to_string s1) (to_string s2))
     "sc_rollup_parameter update"
     (fun fmt sc_rollup -> Format.pp_print_string fmt @@ to_string sc_rollup)
-    sc_rollup
-    sc_rollup'
+    sc_rollup_expected_constants
+    sc_rollup_updated_constants
 
-let test_constants_consistency () =
+let () =
+  register_test ~title:"constants consistency" @@ fun () ->
   let open Default_parameters in
   List.iter_es
     Block.check_constants_consistency
     [constants_mainnet; constants_sandbox; constants_test]
 
-let test_max_operations_ttl () =
+let () =
+  register_test ~title:"max_operations_ttl" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let open Protocol in
   (* We check the rationale that the value for [max_operations_time_to_live] is the following:
@@ -94,7 +127,9 @@ let test_max_operations_ttl () =
 
     Otherwise committers would be forced to commit at an artificially slow rate, affecting
     the throughput of the rollup. *)
-let test_sc_rollup_challenge_window_lt_max_lookahead () =
+let () =
+  register_test ~title:"sc rollup challenge window less than max lookahead"
+  @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   let max_lookahead = constants.sc_rollup.max_lookahead_in_blocks in
   let challenge_window =
@@ -111,7 +146,9 @@ let test_sc_rollup_challenge_window_lt_max_lookahead () =
    Otherwise storage could be overallocated - since backtracking is not allowed, a staker
    can allocated at most [d] nodes (where [d] is the tree depth) - the maximum storage cost
    of these commitments must be at most the size of the staker's deposit. *)
-let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
+let () =
+  register_test ~title:"sc rollup max commitment storage cost less than deposit"
+  @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   let open Protocol in
   let cost_per_byte_mutez =
@@ -150,7 +187,8 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
    correctly scaled with respect to each other - see
    {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}
 *)
-let test_sc_rollup_max_commitment_storage_size () =
+let () =
+  register_test ~title:"sc rollup commitment storage size correct" @@ fun () ->
   let open Lwt_result_syntax in
   let open Protocol in
   let* number_of_ticks =
@@ -208,7 +246,11 @@ let test_sc_rollup_max_commitment_storage_size () =
 
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)
-let liquidity_baking_subsidy_param () =
+let () =
+  register_test
+    ~title:
+      "liquidity_baking_subsidy parameter is 1/16th of total baking rewards"
+  @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let constants = Default_parameters.constants_mainnet in
   let get_reward =
@@ -242,34 +284,3 @@ let liquidity_baking_subsidy_param () =
   let*? diff = liquidity_baking_subsidy -? expected_subsidy in
   let max_diff = 1000 (* mutez *) in
   Assert.leq_int ~loc:__LOC__ (Int64.to_int (to_mutez diff)) max_diff
-
-let tests =
-  [
-    Tztest.tztest
-      "sc_rollup constants consistency"
-      `Quick
-      test_sc_rollup_constants_consistency;
-    Tztest.tztest "constants consistency" `Quick test_constants_consistency;
-    Tztest.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
-    Tztest.tztest
-      "sc rollup challenge window less than max lookahead"
-      `Quick
-      test_sc_rollup_challenge_window_lt_max_lookahead;
-    Tztest.tztest
-      "sc rollup max commitment storage cost less than deposit"
-      `Quick
-      test_sc_rollup_max_commitment_storage_cost_lt_deposit;
-    Tztest.tztest
-      "sc rollup commitment storage size correct"
-      `Quick
-      test_sc_rollup_max_commitment_storage_size;
-    Tztest.tztest
-      "test liquidity_baking_subsidy parameter is 1/16th of total baking \
-       rewards"
-      `Quick
-      liquidity_baking_subsidy_param;
-  ]
-
-let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("test constants", tests)]
-  |> Lwt_main.run

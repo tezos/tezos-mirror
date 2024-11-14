@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_index_unix)
+ (public_name octez-libs.brassaia.index.unix)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  optint
+  mtime
+  rusage
+  lwt
+  lwt.unix
+  index
+  semaphore-compat)
+ (flags
+  (:standard)
+  -w -66-68)
+ (foreign_stubs (language c) (names pread pwrite)))

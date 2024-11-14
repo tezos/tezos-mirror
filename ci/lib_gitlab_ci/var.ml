@@ -9,8 +9,6 @@ open Base
 
 type t = string
 
-let encode = Fun.id
-
 let make variable_name =
   (* See
      {{:https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/pipeline/expression/lexeme/variable.rb#L9}string.rb}}
@@ -23,4 +21,8 @@ let make variable_name =
   then
     raise
       (Invalid_argument (sf "[Var.t] invalid variable name '%s'" variable_name)) ;
-  "$" ^ variable_name
+  variable_name
+
+let name = Fun.id
+
+let encode variable = "$" ^ variable

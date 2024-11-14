@@ -43,19 +43,19 @@ let pp_tokens fmt tokens =
       fmt
       "@[%s@]"
       (let open Micheline_parser in
-      match token_value with
-      | String s -> Format.sprintf "String %S" s
-      | Bytes s -> Format.sprintf "Bytes %S" s
-      | Int s -> Format.sprintf "Int %S" s
-      | Ident s -> Format.sprintf "Ident %S" s
-      | Annot s -> Format.sprintf "Annot %S" s
-      | Comment s -> Format.sprintf "Comment %S" s
-      | Eol_comment s -> Format.sprintf "Eol_comment %S" s
-      | Semi -> Format.sprintf "Semi"
-      | Open_paren -> Format.sprintf "Open_paren"
-      | Close_paren -> Format.sprintf "Close_paren"
-      | Open_brace -> Format.sprintf "Open_brace"
-      | Close_brace -> Format.sprintf "Close_brace")
+       match token_value with
+       | String s -> Format.sprintf "String %S" s
+       | Bytes s -> Format.sprintf "Bytes %S" s
+       | Int s -> Format.sprintf "Int %S" s
+       | Ident s -> Format.sprintf "Ident %S" s
+       | Annot s -> Format.sprintf "Annot %S" s
+       | Comment s -> Format.sprintf "Comment %S" s
+       | Eol_comment s -> Format.sprintf "Eol_comment %S" s
+       | Semi -> Format.sprintf "Semi"
+       | Open_paren -> Format.sprintf "Open_paren"
+       | Close_paren -> Format.sprintf "Close_paren"
+       | Open_brace -> Format.sprintf "Open_brace"
+       | Close_brace -> Format.sprintf "Close_brace")
   in
   Format.fprintf
     fmt

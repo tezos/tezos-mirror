@@ -3,10 +3,7 @@ Copyright (c) 2016-2022 Jane Street Group, LLC <opensource@janestreet.com>
 Copyright (c) 2022-2022 Nomadic Labs <contact@nomadic-labs.com>
 *)
 
-let tc_limit =
-  match Sys.backend_type with
-  | Other "js_of_ocaml" -> 50
-  | Other _ | Native | Bytecode -> 1000
+let tc_limit = 1000
 
 let append_tc l1 l2 = List.rev_append (List.rev l1) l2
 
@@ -21,7 +18,7 @@ let rec append_count l1 l2 ~count =
       x1 :: x2 :: x3 :: x4 :: x5
       ::
       (if count > tc_limit then append_tc l1' l2
-      else append_count l1' l2 ~count:(count + 1))
+       else append_count l1' l2 ~count:(count + 1))
 
 let append l1 l2 = match l2 with [] -> l1 | _ -> append_count l1 l2 ~count:0
 
@@ -79,7 +76,7 @@ let rec map_count ~f l ~count =
       f1 :: f2 :: f3 :: f4 :: f5
       ::
       (if count > tc_limit then map_tc ~f tl
-      else map_count ~f tl ~count:(count + 1))
+       else map_count ~f tl ~count:(count + 1))
 
 let mapi_direct xs ~f = List.mapi f xs
 
@@ -135,7 +132,7 @@ let rec mapi_count ~f l ~count i =
       f1 :: f2 :: f3 :: f4 :: f5
       ::
       (if count > tc_limit then mapi_tc ~f tl (i + 5)
-      else mapi_count ~f tl ~count:(count + 1) (i + 5))
+       else mapi_count ~f tl ~count:(count + 1) (i + 5))
 
 let map f l = map_count ~f l ~count:0
 

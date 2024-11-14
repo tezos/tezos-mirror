@@ -4,13 +4,23 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::block_storage;
 use crate::error::Error;
-use crate::error::UpgradeProcessError::Fallback;
+use crate::error::StorageError;
+use crate::error::UpgradeProcessError;
+use crate::storage::ENABLE_FA_BRIDGE;
 use crate::storage::{
-    read_chain_id, read_storage_version, store_storage_version, STORAGE_VERSION,
+    read_chain_id, read_storage_version, store_storage_version, StorageVersion,
 };
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
+use primitive_types::U256;
+use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::storage::path::RefPath;
+use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::runtime::RuntimeError;
 
+#[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
     None,
     InProgress,
@@ -20,9 +30,14 @@ pub enum MigrationStatus {
 // /!\ the following functions are migratin helpers, do not remove them /!\
 
 #[allow(dead_code)]
-fn is_etherlink_ghostnet(host: &impl Runtime) -> anyhow::Result<bool> {
-    let chain_id = read_chain_id(host)?;
-    Ok(chain_id == 128123.into())
+fn is_etherlink_ghostnet(host: &impl Runtime) -> Result<bool, Error> {
+    match read_chain_id(host) {
+        Ok(chain_id) => Ok(chain_id == 128123.into()),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Ok(false)
+        }
+        Err(err) => Err(err),
+    }
 }
 
 #[allow(dead_code)]
@@ -34,13 +49,90 @@ fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeErro
     }
 }
 
+fn migrate_to<Host: Runtime>(
+    host: &mut Host,
+    version: StorageVersion,
+) -> anyhow::Result<MigrationStatus> {
+    log!(host, Info, "Migrating to {:?}", version);
+    match version {
+        StorageVersion::V11 => anyhow::bail!(Error::UpgradeError(
+            UpgradeProcessError::InternalUpgrade("V11 has no predecessor"),
+        )),
+        StorageVersion::V12 => {
+            let legacy_ticketer_path = RefPath::assert_from(b"/evm/ticketer");
+            if host.store_has(&legacy_ticketer_path)?.is_some() {
+                host.store_move(&legacy_ticketer_path, &NATIVE_TOKEN_TICKETER_PATH)?;
+            }
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V13 => Ok(MigrationStatus::Done),
+        StorageVersion::V14 => {
+            if is_etherlink_ghostnet(host)? {
+                host.store_write_all(&ENABLE_FA_BRIDGE, &[1u8])?;
+                Ok(MigrationStatus::Done)
+            } else {
+                // Not applicable for other networks
+                Ok(MigrationStatus::None)
+            }
+        }
+        StorageVersion::V15 => {
+            // Starting version 15, the entrypoint `populate_delayed_inbox`
+            // is available.
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V16 => {
+            // Allow path not found in case the migration is performed
+            // on a context with no blocks or no transactions.
+            allow_path_not_found(host.store_delete(&RefPath::assert_from(
+                b"/evm/world_state/indexes/accounts",
+            )))?;
+            allow_path_not_found(host.store_delete(&RefPath::assert_from(
+                b"/evm/world_state/indexes/transactions",
+            )))?;
+            // Starting version 16, the `callTracer` configuration is available
+            // for tracing.
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V17 => {
+            // Starting version 17 the kernel no longer needs all transactions
+            // in its storage to produce the receipts and transactions root.
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V18 => {
+            // Blocks were indexed twice in the storage.
+            // [/evm/world_state/indexes/blocks] is the mapping of all block
+            // numbers to hashes.
+            // [/evm/world_state/blocks/<number>/hash] is the mapgping of the
+            // last 256 blocks to hashes
+            //
+            // We need only the former.
+
+            let current_number = block_storage::read_current_number(host)?;
+            let to_clean = U256::min(
+                current_number + 1,
+                evm_execution::storage::blocks::BLOCKS_STORED.into(),
+            );
+            for i in 0..to_clean.as_usize() {
+                let number = current_number - i;
+                let path: Vec<u8> =
+                    format!("/evm/world_state/blocks/{}/hash", number).into();
+                let owned_path = OwnedPath::try_from(path)?;
+                host.store_delete(&owned_path)?;
+            }
+            Ok(MigrationStatus::Done)
+        }
+    }
+}
+
 // The workflow for migration is the following:
 //
-// - bump `storage::STORAGE_VERSION` by one
-// - fill the scope inside the conditional in `storage_migration` with all the
-//   needed migration functions
+// - add a new variant to `storage::StorageVersion`, update `STORAGE_VERSION`
+//   accordingly.
+// - update `migrate_to` pattern matching  with all the needed migration functions
 // - compile the kernel and run all the E2E migration tests to make sure all the
 //   data is still available from the EVM proxy-node.
+// - upgrade the failed_migration.wasm kernel, see tests/ressources/README.md
 //
 // /!\
 //     If the migration takes more than 999 reboots, we will lose the inbox
@@ -53,19 +145,28 @@ fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeErro
 // /!\
 //
 fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> {
-    let current_version = read_storage_version(host)?;
-    if STORAGE_VERSION == current_version + 1 {
-        // MIGRATION CODE - START
-        // MIGRATION CODE - END
-        store_storage_version(host, STORAGE_VERSION)?;
-        return Ok(MigrationStatus::Done);
+    match read_storage_version(host)?.next() {
+        Some(next_version) => {
+            let status = migrate_to(host, next_version)?;
+
+            // Record the migration was applied. Even if the migration for `next_version` returns
+            // `None`, we consider it done. A good use case for `None` is for instance for a
+            // migration that does not apply to the current network.
+            if status != MigrationStatus::InProgress {
+                store_storage_version(host, next_version)?;
+                // `InProgress` so that we reboot and try apply the next migration, if any.
+                return Ok(MigrationStatus::InProgress);
+            }
+
+            Ok(status)
+        }
+        None => Ok(MigrationStatus::None),
     }
-    Ok(MigrationStatus::None)
 }
 
 pub fn storage_migration<Host: Runtime>(
     host: &mut Host,
 ) -> Result<MigrationStatus, Error> {
     let migration_result = migration(host);
-    migration_result.map_err(|_| Error::UpgradeError(Fallback))
+    migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))
 }

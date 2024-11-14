@@ -1,60 +1,114 @@
 [
   {
-    "file": "tezt/tests/storage_snapshots.ml",
-    "title": "Nairobi: storage snapshot export and import",
+    "file": "tezt/tests/p2p.ml",
+    "title": "p2p-swap-disable",
     "tags": [
-      "admin_client",
-      "client",
-      "export",
-      "import",
       "layer1",
       "memory_4k",
-      "nairobi",
       "node",
-      "snapshot",
-      "storage"
+      "p2p",
+      "swap"
     ],
     "successful_runs": {
-      "total_time": "53146105",
+      "total_time": "23655317",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/storage_snapshots.ml",
-    "title": "Oxford: storage snapshot export and import",
-    "tags": [
-      "admin_client",
-      "client",
-      "export",
-      "import",
-      "layer1",
-      "memory_4k",
-      "node",
-      "oxford",
-      "snapshot",
-      "storage"
-    ],
-    "successful_runs": {
-      "total_time": "54044748",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Alpha: bootstrap: many nodes bootstrap",
+    "title": "Alpha: storage snapshot export and import",
     "tags": [
       "admin_client",
       "alpha",
-      "baker_alpha",
-      "bootstrap",
       "client",
+      "export",
+      "import",
+      "layer1",
       "memory_4k",
       "node",
-      "synchronisation_threshold",
-      "threshold"
+      "snapshot",
+      "storage"
     ],
     "successful_runs": {
-      "total_time": "39398760",
+      "total_time": "68065684",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL L1 integration (Use all available slots)",
+    "tags": [
+      "regression",
+      "admin_client",
+      "client",
+      "dal",
+      "memory_4k",
+      "node",
+      "parisc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "33876367",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (observer triggers amplification (without lost shards))",
+    "tags": [
+      "admin_client",
+      "amplification",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_4k",
+      "node",
+      "parisc",
+      "simple",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "20833431",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisb: Testing DAL node (garbage collection of shards for producer and attester)",
+    "tags": [
+      "admin_client",
+      "attester",
+      "client",
+      "dal",
+      "dal_node",
+      "gc",
+      "memory_4k",
+      "node",
+      "parisb",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "39780050",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (garbage collection of shards for all profiles)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "gc",
+      "memory_4k",
+      "multi",
+      "node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "57582993",
       "count": "1"
     }
   }

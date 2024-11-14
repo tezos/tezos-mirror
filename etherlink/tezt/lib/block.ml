@@ -45,9 +45,11 @@ type t = {
   size : int32;
   gasLimit : int64;
   gasUsed : int64;
-  timestamp : int32;
+  timestamp : Tezos_base.Time.Protocol.t;
   transactions : transactions;
   uncles : string list;
+  baseFeePerGas : int64;
+  prevRandao : string;
 }
 
 let parse_transactions json =
@@ -73,6 +75,11 @@ let of_json json =
     let res = json |-> field in
     if JSON.is_null res then json |-> alternative else res
   in
+
+  let ( ||-> ) json (field, default, decoder) =
+    let res = json |-> field in
+    if JSON.is_null res then default else res |> decoder
+  in
   {
     number = json |-> "number" |> as_int32;
     hash = json |-> "hash" |> as_string;
@@ -91,7 +98,14 @@ let of_json json =
     size = json |-> "size" |> as_int32;
     gasLimit = json |-> "gasLimit" |> as_int64;
     gasUsed = json |-> "gasUsed" |> as_int64;
-    timestamp = json |-> "timestamp" |> as_int32;
+    timestamp =
+      json |-> "timestamp" |> as_int64 |> Tezos_base.Time.Protocol.of_seconds;
     transactions = json |-> "transactions" |> parse_transactions;
     uncles = json |-> "uncles" |> as_list |> List.map as_string;
+    baseFeePerGas = json ||-> ("baseFeePerGas", 1000000000L, as_int64);
+    prevRandao =
+      (let res = json |?-> ("mixHash", "prevRandao") in
+       if JSON.is_null res then
+         "0x0000000000000000000000000000000000000000000000000000000000000000"
+       else res |> as_string);
   }

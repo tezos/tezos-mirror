@@ -8,6 +8,15 @@
 (** A GitLab CI job annotated with Octez-specific meta-data. *)
 type tezos_job
 
+(** The name of a {!tezos_job} as given to [~name] of {!job}.
+
+    This returns the stem of the job name. Parallel jobs produce
+    multiple job instances ([JOB N/M] for a {!Vector}-parallel job and
+    [JOB: [foo, bar, ...]] for {!Matrix}-parallel jobs) -- the stem of such
+    jobs is [JOB]. For non-parallel jobs, the argument given to
+    [~name] and the stem is equivalent. *)
+val name_of_tezos_job : tezos_job -> string
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)
@@ -30,6 +39,11 @@ val check_files :
 
 (** Run-time configuration and command-line processing. *)
 module Cli : sig
+  (** Action the binary should perform. *)
+  type action =
+    | Write  (** Write the CI configuration *)
+    | List_pipelines  (** List registered pipelines. *)
+
   (** Type of the command-line configuration for the generator binary. *)
   type config = {
     mutable verbose : bool;
@@ -38,6 +52,7 @@ module Cli : sig
         (** Enable the emission of source information in generated configuration. *)
     mutable remove_extra_files : bool;
         (** Remove files that are neither generated nor excluded. *)
+    mutable action : action;  (** Action to perform *)
   }
 
   (** Populate  {!config} from command-line arguments.
@@ -59,72 +74,147 @@ module Stage : sig
 
       Fails if a stage of the same name has already been registered. *)
   val register : string -> t
-
-  (** Name of a stage *)
-  val name : t -> string
-
-  (** Returns the list of registered stages, in order of registration, as a list of strings.
-
-      This is appropriate to use with the [Stages] constructor of
-      {!Gitlab_ci.Types.config_element} generating a [stages:]
-      element. *)
-  val to_string_list : unit -> string list
 end
 
 (** A facility for registering pipelines. *)
 module Pipeline : sig
   (** Register a pipeline.
 
-      [register ?variables name rule] will register a pipeline [name]
+      [register ~description ?variables name rule] will register a pipeline [name]
       that runs when [rule] is true.
 
       If [variables] is set, then these variables will be added to the
       [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
+      Similarly, an [auto_cancel] clause can be specified.
 
-      If [jobs] is not set, then the pipeline is a legacy, hand-written
-      .yml file, expected to be defined in
-      [.gitlab/ci/pipelines/NAME.yml]. If [jobs] is set, then the those
-      jobs will be generated to the same file when {!write} is
-      called. In both cases, this file will be included from the
-      top-level [.gitlab-ci.yml]. *)
+      The [description] is printed in {!list_pipelines}.
+
+      The [jobs] of the pipeline are generated to the file
+      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
-    ?jobs:tezos_job list ->
+    ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+    description:string ->
+    jobs:tezos_job list ->
     string ->
     Gitlab_ci.If.t ->
     unit
 
-  (** Splits the set of registered pipelines into workflow rules and includes.
+  (** A child pipeline.
 
-      The result of this function is used in the top-level
-      [.gitlab-ci.yml] to filter pipelines (using [workflow:] rules)
-      and to include the select pipeline (using [include:]). *)
-  val workflow_includes :
-    unit -> Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list
+      See {!register_child} and {!trigger_job} for more information. *)
+  type child_pipeline
 
-  (** Writes the set of non-legacy registered pipelines.
+  (** Register a child pipeline.
+
+      [register_child name] will register a child pipeline called [name].
+
+      The [jobs] of the pipeline are generated to the file
+      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. See
+      {!register} for info on [auto_cancel].
+
+      The [description] is printed in {!list_pipelines}.
+
+      Child pipelines cannot be launched without a trigger job that is
+      included in a regular pipeline (see {!trigger_job}). *)
+  val register_child :
+    ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+    description:string ->
+    jobs:tezos_job list ->
+    string ->
+    child_pipeline
+
+  (** Writes the set of registered pipelines.
+
+      A top-level configuration is generated to [filename]. It
+      contains a [workflow:] section that enables pipeline execution
+      for each registered, non-child pipeline and an [include:]
+      section that includes the set of jobs for the given pipeline. If
+      specified, [default:] and [variables:] sections are also written
+      to the top-level configuration. The [stages:] section
+      automatically contains all the stages registered with
+      {!Stage.register} that are used in the given pipeline.
+
+      A [dummy_job] is written to the top-level configuration. This
+      job is never enabled, but it works around a GitLab CI issue that
+      occurs when the top-level configuration contains no visible
+      jobs.
+
+      Then, each registered pipeline is written to
+      [.gitlab/ci/pipelines/NAME.yml].
 
       The string {!header} will be prepended to each written file. *)
-  val write : unit -> unit
+  val write :
+    ?default:Gitlab_ci.Types.default ->
+    ?variables:Gitlab_ci.Types.variables ->
+    filename:string ->
+    unit ->
+    unit
+
+  (** Pretty prints the set of registered pipelines. *)
+  val list_pipelines : unit -> unit
 end
 
 (** A facility for registering images for [image:] keywords.
 
-    During the transition from hand-written [.gitlab-ci.yml] to
-    CI-in-OCaml, we write a set of templates corresponding to the
-    registered images, to make them available for hand-written jobs. *)
+    Images can be registered in two manners:
+     - {i External} images are built outside the [tezos/tezos] CI and are
+       registered with their path (e.g. [alpine:3.18]).
+
+     - {i Internal} images are built in the pipeline they are
+       used. They are registered an [image_path] and an
+       [image_builder]. The [script:] of an [image_builder]
+       must build the image and push it to [image_path].
+
+    Pipelines with jobs using internal images automatically include
+    corresponding image builder jobs with appropriate dependencies. *)
 module Image : sig
-  (** Represents an image *)
-  type t = Gitlab_ci.Types.image
+  (** A registered Docker image in which a job can execute. *)
+  type t
 
-  (** Register an image of the given [name] and [image_path]. *)
-  val register : name:string -> image_path:string -> t
+  (** Register an external image of the given [image_path]. *)
+  val mk_external : image_path:string -> t
 
-  (** The name of an image *)
-  val name : t -> string
+  (** Register internal image for [image_path] built by [image_builder_amd64].
 
-  (** Returns the set of registered images as [name, image] tuples. *)
-  val all : unit -> (string * t) list
+      Optionally, a builder for an arm64 version of the image can be
+      registered by supplying [image_builder_arm64]. If
+      [image_builder_arm64] is supplied, then it must have a distinct
+      name from [image_builder_amd64].
+
+      Note: the name of the image builder(s) must uniquely identify the
+      job definition. If two image builders with the same name but
+      differing job definitions (as per polymorphic comparison of the
+      underlying {!Gitlab_ci.Types.job}) are registered, then this
+      function throws a run-time error. *)
+  val mk_internal :
+    ?image_builder_arm64:tezos_job ->
+    image_builder_amd64:tezos_job ->
+    image_path:string ->
+    unit ->
+    t
+end
+
+(** Changesets are used to specify [changes:] clauses in rules.
+
+    Note: Operations over changesets do not preserve order nor
+    duplicates. Ordering and duplicates in [changes:] clauses have no
+    semantic impact. *)
+module Changeset : sig
+  (** A changeset. *)
+  type t
+
+  (** Create a changeset from a list of strings. *)
+  val make : string list -> t
+
+  (** Encode a changeset as a alphabetically sorted list of strings. *)
+  val encode : t -> string list
+
+  (** Combine two changesets. *)
+  val union : t -> t -> t
+
+  (** Operator for {!union}. *)
+  val ( @ ) : t -> t -> t
 end
 
 (** Represents architectures. *)
@@ -135,6 +225,33 @@ val arch_to_string : arch -> string
 
 (** Alternative string representation of architectures ([Amd64] is ["amd64"]) *)
 val arch_to_string_alt : arch -> string
+
+(** The list of available runner tags. *)
+type tag =
+  | Gcp  (** GCP prod AMD64 runner, general purpose. *)
+  | Gcp_arm64  (** GCP prod ARM64 runner, general purpose. *)
+  | Gcp_dev  (** GCP dev AMD64 runner, general purpose. *)
+  | Gcp_dev_arm64  (** GCP dev ARM64 runner, general purpose. *)
+  | Gcp_tezt
+      (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
+  | Gcp_tezt_dev
+      (** GCP dev AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
+  | Aws_specific
+      (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
+  | Dynamic
+      (** The runner is dynamically set through the CI variable {!dynamic_tag_var}. *)
+
+(** The variable to set enabling dynamic runner selection.
+
+    To dynamically set the runner of a job through a CI/CD variable,
+    assign to this variable using [variables:] or [parallel:matrix:]. *)
+val dynamic_tag_var : Gitlab_ci.Var.t
+
+(** The architecture of the runner associated to a tag if statically known. *)
+val arch_of_tag : tag -> arch option
+
+(** The string representation of a tag. *)
+val string_of_tag : tag -> string
 
 (** A job dependency.
 
@@ -152,7 +269,7 @@ type dependency =
   | Optional of tezos_job
   | Artifacts of tezos_job
 
-(** Job dependencies.
+(** Job dependency sets.
 
     - A [Staged artifact_deps] job implements the default GitLab CI behavior of
       running once all jobs in the previous stage have terminated. Artifacts are
@@ -166,6 +283,10 @@ type dependency =
     imposed limit of 50 [needs:] per job. *)
 type dependencies = Staged of tezos_job list | Dependent of dependency list
 
+(** Add the artifacts of [tezos_job] to a [dependencies] set. *)
+val dependencies_add_artifact_dependency :
+  dependencies -> tezos_job -> dependencies
+
 (** Values for the [GIT_STRATEGY] variable.
 
     This can be used to specify whether a job should [Fetch] or [Clone]
@@ -177,7 +298,7 @@ type git_strategy =
   | Fetch  (** Translates to [fetch]. *)
   | Clone  (** Translates to [clone]. *)
   | No_strategy
-      (** Translates to [].
+      (** Translates to [none].
 
           Renamed to avoid clashes with {!Option.None}. *)
 
@@ -193,19 +314,26 @@ val enc_git_strategy : git_strategy -> string
 
     - Translates each {!dependency} to [needs:] and [dependencies:]
     keywords as detailed in the documentation of {!dependency}.
-    - Adds [tags:] based on [arch] and [tags]:
+    - Adds [tag:] based on [arch] and [tag]:
 
-      - If only [arch] is set to [Amd64] (resp. [Arm64]) then the tag
-        ["gcp"] (resp ["gcp_arm64"]) is set.
-      - If only [tags] is set, then it is passed as is to the job's [tags:]
-        field.
-      - Setting both [arch] and [tags] throws an error.
-      - Omitting both [arch] and [tags] is equivalent to setting
-        [~arch:Amd64] and omitting [tags].
+      - If only [tag] is set, then it is passed as is to the job's [tags:]
+        field. The runners of the tezos/tezos CI all use singleton tags,
+        hence we only allow one tag per job.
+      - Setting both [arch] and [tag] throws an error.
+      - Omitting both [arch] and [tag] is equivalent to setting
+        [~tag:Gcp] or, equivalently, omitting tag and setting
+        [~arch:Amd64].
 
-    - Throws a run-time error if both [rules] and [when_] are passed. A
-     [when_] field can always be represented by [rules] instead, so use
-     the latter for more complex conditions. *)
+    - [image_dependencies] is a list of internal !{Image.t}s that this
+      job uses indirectly, i.e. not in it's [image:] field. For
+      instance, this can be used by a job that builds a Docker image
+      with an internal image as input.  A run-time error will be thrown
+      if this list includes an external image.
+
+    - If the [image] used is {!Internal} and [tag] is set to
+    {!Dynamic} then a run-time error is generated as the required
+    architecture for the internal image cannot be statically
+    deduced. *)
 val job :
   ?arch:arch ->
   ?after_script:string list ->
@@ -215,15 +343,15 @@ val job :
   ?cache:Gitlab_ci.Types.cache list ->
   ?interruptible:bool ->
   ?dependencies:dependencies ->
+  ?image_dependencies:Image.t list ->
   ?services:Gitlab_ci.Types.service list ->
   ?variables:Gitlab_ci.Types.variables ->
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?timeout:Gitlab_ci.Types.time_interval ->
-  ?tags:string list ->
+  ?tag:tag ->
   ?git_strategy:git_strategy ->
-  ?when_:Gitlab_ci.Types.when_job ->
   ?coverage:string ->
-  ?retry:int ->
+  ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
   __POS__:string * int * int * int ->
   image:Image.t ->
@@ -232,40 +360,20 @@ val job :
   string list ->
   tezos_job
 
-(** Generates a job to an external file.
+(** Define a trigger job for a child pipeline.
 
-    This function is meant to be used in the transition to CI-in-OCaml.
-    It writes {!header} and the given job to the destination path
-    [.gitlab/ci/jobs/DIRECTORY/NAME(-FILENAME_SUFFIX).yml].
-    Directory defaults to the stage name if not set.
-
-    This allows migrating all the jobs of a given pipeline, and
-    including the generated definition of those jobs in other
-    pipelines where it appears.
-
-    Raises [Failure] if [.gitlab/ci/jobs/DIRECTORY] is not an existing
-    directory. Also [Failure] if destination path has already been
-    used to write another job.
-
-    The returned job is the same as the input, for ease of chaining. *)
-val job_external :
-  ?directory:string -> ?filename_suffix:string -> tezos_job -> tezos_job
-
-(** Generates a set of jobs to the same external file.
-
-    This function is meant to be used in the transition to CI-in-OCaml.
-    It writes {!header} and the given jobs to the file
-    [.gitlab/ci/jobs/PATH].
-
-    The use case is the same as [job_external] but for cases where it
-    is impractical to split a set of jobs into one file per job
-    (e.g. opam package test jobs).
-
-    The returned set of jobs is the same as the input, for ease of
-    chaining. *)
-val jobs_external : path:string -> tezos_job list -> tezos_job list
+    The trigger job will be named [trigger:CHILD_PIPELINE_NAME]. *)
+val trigger_job :
+  ?dependencies:dependencies ->
+  ?rules:Gitlab_ci.Types.job_rule list ->
+  __POS__:string * int * int * int ->
+  stage:Stage.t ->
+  Pipeline.child_pipeline ->
+  tezos_job
 
 (** Adds artifacts to a job without overriding, if possible, existing artifacts.
+
+    Throws error when applied to {!trigger_job}s.
 
     - If the job already has an artifact with [old_name] and [name] is given, then
       [name] is used.
@@ -295,7 +403,34 @@ val add_artifacts :
 
 (** Append the variables [variables] to the variables of [job].
 
+    Throws error when applied to {!trigger_job}s.
+
     Raises [Failure] if any of the [variables] is already defined for
     [job], unless [allow_overwrite] is true (default is [false]). *)
 val append_variables :
   ?allow_overwrite:bool -> Gitlab_ci.Types.variables -> tezos_job -> tezos_job
+
+(** Append to the [script:] section of a job.
+
+    Throws error when applied to {!trigger_job}s. *)
+val append_script : string list -> tezos_job -> tezos_job
+
+(** Append to the [cache:] section of a job.
+
+    Throws error when applied to {!trigger_job}s. *)
+val append_cache : Gitlab_ci.Types.cache -> tezos_job -> tezos_job
+
+(** Append to the [before_script:] section of a job.
+
+    Throws error when applied to {!trigger_job}s. *)
+val append_before_script : string list -> tezos_job -> tezos_job
+
+(** Append to the [after_script:] section of a job.
+
+    Throws error when applied to {!trigger_job}s. *)
+val append_after_script : string list -> tezos_job -> tezos_job
+
+(** Override the [interruptible:] flag of a job.
+
+    Has no effect on {!trigger_job}s. *)
+val with_interruptible : bool -> tezos_job -> tezos_job

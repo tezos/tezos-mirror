@@ -10,9 +10,8 @@
   octez-libs.crypto
   octez-libs.error-monad
   zarith
-  zarith_stubs_js
   octez-libs.hacl
-  data-encoding
+  octez-libs.data-encoding
   octez-alcotezt
   lwt.unix
   qcheck-alcotest
@@ -42,7 +41,7 @@
  (alias runtest)
  (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

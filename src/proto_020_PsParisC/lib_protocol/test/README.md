@@ -24,7 +24,7 @@ create a new sub-folder corresponding to the theme of the test.
 To run all the tests, run:
 
 ```
-dune runtest src/proto_alpha/lib_protocol/
+dune runtest src/proto_020_PsParisC/lib_protocol/
 ```
 
 To run an individual test file, consult its `Invocation` header.

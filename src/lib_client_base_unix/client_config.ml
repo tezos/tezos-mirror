@@ -37,6 +37,7 @@ type cli_args = {
   log_requests : bool;
   better_errors : bool;
   client_mode : client_mode;
+  log_coloring : bool option;
 }
 
 and client_mode = [`Mode_client | `Mode_light | `Mode_mockup | `Mode_proxy]
@@ -58,6 +59,8 @@ type error += Suppressed_arg of {args : string list; by : string}
 type error += Invalid_chain_argument of string
 
 type error += Invalid_block_argument of string
+
+type error += Invalid_log_coloring_argument of string
 
 type error += Invalid_protocol_argument of string
 
@@ -101,8 +104,8 @@ let () =
       Format.fprintf
         ppf
         (if List.compare_length_with args 1 = 0 then
-         "Option %s is in conflict with %s"
-        else "Options %s are in conflict with %s")
+           "Option %s is in conflict with %s"
+         else "Options %s are in conflict with %s")
         (String.concat " and " args)
         by)
     Data_encoding.(obj2 (req "suppressed" (list string)) (req "by" string))
@@ -138,6 +141,15 @@ let () =
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_protocol_argument s -> Some s | _ -> None)
     (fun s -> Invalid_protocol_argument s) ;
+  register_error_kind
+    `Branch
+    ~id:"badLogColoringArgument"
+    ~title:"Bad Log Coloring Argument"
+    ~description:"Log coloring argument could not be parsed"
+    ~pp:(fun ppf s -> Format.fprintf ppf "Value %s is not a boolean." s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_log_coloring_argument s -> Some s | _ -> None)
+    (fun s -> Invalid_log_coloring_argument s) ;
   register_error_kind
     `Branch
     ~id:"invalidPortArgument"
@@ -333,9 +345,18 @@ let default_cli_args =
     log_requests = false;
     better_errors = false;
     client_mode = `Mode_client;
+    log_coloring = Some true;
   }
 
 let string_parameter () = Tezos_clic.parameter (fun _ x -> Lwt.return_ok x)
+
+let bool_parameter () =
+  Tezos_clic.parameter (fun _ bool ->
+      let open Lwt_result_syntax in
+      match bool with
+      | "true" -> return true
+      | "false" -> return false
+      | _ -> tzfail (Invalid_log_coloring_argument bool))
 
 let media_type_parameter () :
     (Media_type.Command_line.t, #Client_context.full) Tezos_clic.parameter =
@@ -519,6 +540,15 @@ let better_errors () =
        or if you don't know the input accepted by the RPC. It may happen that \
        the RPC calls take more time however."
     ()
+
+let log_coloring () =
+  Tezos_clic.arg
+    ~long:"log-coloring"
+    ~placeholder:"true|false"
+    ~doc:
+      "Enable or disable light coloring in default stdout logs. Coloring is \
+       enabled by default."
+    (bool_parameter ())
 
 (* Command-line args which can be set in config file as well *)
 let addr_confdesc = "-A/--addr ('node_addr' in config file)"
@@ -876,7 +906,7 @@ let commands config_file cfg (client_mode : client_mode)
   ]
 
 let global_options () =
-  Tezos_clic.args19
+  Tezos_clic.args20
     (base_dir_arg ())
     (no_base_dir_warnings_switch ())
     (config_file_arg ())
@@ -896,6 +926,7 @@ let global_options () =
     (remote_signer_arg ())
     (password_filename_arg ())
     (client_mode_arg ())
+    (log_coloring ())
 
 type parsed_config_args = {
   parsed_config_file : Cfg_file.t option;
@@ -1069,7 +1100,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
            sources,
            remote_signer,
            password_filename,
-           client_mode ),
+           client_mode,
+           log_coloring ),
          remaining ) =
     Tezos_clic.parse_global_options (global_options ()) ctx argv
   in
@@ -1229,6 +1261,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       password_filename;
       protocol;
       client_mode;
+      log_coloring;
     }
   in
   return
@@ -1261,6 +1294,7 @@ type t =
   * Uri.t option
   * string option
   * client_mode
+  * bool option
 
 module type Remote_params = sig
   val authenticate :

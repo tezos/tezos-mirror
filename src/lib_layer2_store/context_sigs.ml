@@ -78,6 +78,8 @@ module type S = sig
 
   type repo
 
+  type hash
+
   type nonrec 'a index = ('a, repo) index
 
   val impl_name : string
@@ -85,8 +87,6 @@ module type S = sig
   val equality_witness : (repo, tree) equality_witness
 
   type nonrec 'a t = ('a, repo, tree) t
-
-  type hash = Context_hash.t
 
   (** [load cache_size path] initializes from disk a context from
     [path]. [cache_size] allows to change size of the Context Backend
@@ -120,6 +120,10 @@ module type S = sig
     if a GC is running for [index]. *)
   val is_gc_finished : [> `Write] index -> bool
 
+  (** [cancel_gc index] stops the Irmin GC if it is currently running for
+      [index]. It returns [true] if a GC was canceled. *)
+  val cancel_gc : [> `Write] index -> bool
+
   (** [split ctxt] splits the current context in order to chunk the file if the
       backend supports it. This split function is expected to be called after
       committing a commit that will be a future candidate for a GC target.  *)
@@ -138,6 +142,10 @@ module type S = sig
       corresponding to [context_hash], if found in [index], into the given
       folder path. *)
   val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
+
+  val context_hash_of_hash : hash -> Smart_rollup_context_hash.t
+
+  val hash_of_context_hash : Smart_rollup_context_hash.t -> hash
 
   (** State of the PVM that this rollup node deals with *)
   module PVMState : sig

@@ -50,8 +50,139 @@ let monitor_received_block
   in
   Tezos_rpc.Answer.return_stream {next; shutdown}
 
-let build_rpc_directory ~(commit_info : Octez_node_version.commit_info)
-    validator mainchain_validator =
+let monitor_head
+    ~(head_watcher :
+       (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper)
+    (store : Store.t ref) chain q =
+  let open Lwt_syntax in
+  let* chain_store = Chain_directory.get_chain_store_exn !store chain in
+  let block_stream, stopper = head_watcher in
+  let* head = Store.Chain.current_head chain_store in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  let within_protocols header =
+    let find_protocol protocol_level =
+      (* Here, we need to resolve the given store ref to make sure
+         that we are accessing the latest store value. *)
+      let* updated_chain_store =
+        Chain_directory.get_chain_store_exn !store chain
+      in
+      let+ p = Store.Chain.find_protocol updated_chain_store ~protocol_level in
+      WithExceptions.Option.to_exn
+        ~none:
+          (Failure (Format.sprintf "Cannot find protocol %d" protocol_level))
+        p
+    in
+    let next_protocol (header : Block_header.t) =
+      find_protocol header.shell.proto_level
+    in
+    let current_protocol (header : Block_header.t) =
+      let* pred = Store.Block.read_block chain_store header.shell.predecessor in
+      match pred with
+      | Error e ->
+          Format.kasprintf
+            Stdlib.failwith
+            "Cannot find current protocol because missing predecessor: %a"
+            pp_print_trace
+            e
+      | Ok pred_block ->
+          let pred_header = Store.Block.header pred_block in
+          find_protocol pred_header.shell.proto_level
+    in
+    let within protocols get_protocol header =
+      match protocols with
+      | [] -> return_true
+      | _ ->
+          let+ p = get_protocol header in
+          List.exists (Protocol_hash.equal p) protocols
+    in
+    let* ok_next = within q#next_protocols next_protocol header in
+    let* ok_current = within q#protocols current_protocol header in
+    return (ok_current && ok_next)
+  in
+  let stream =
+    Lwt_stream.filter_map_s
+      (fun (hash, header) ->
+        let* within_protocols = within_protocols header in
+        if within_protocols then Lwt.return_some (hash, header)
+        else Lwt.return_none)
+      block_stream
+  in
+  let* first_block_is_within_protocols =
+    within_protocols (Store.Block.header head)
+  in
+  let first_call =
+    (* Skip the first block if this is false *)
+    ref first_block_is_within_protocols
+  in
+  let next () =
+    if !first_call then (
+      first_call := false ;
+      Lwt.return_some (Store.Block.hash head, Store.Block.header head))
+    else Lwt_stream.get stream
+  in
+  Tezos_rpc.Answer.return_stream {next; shutdown}
+
+let applied_blocks
+    ~(applied_blocks_watcher :
+       (Store.chain_store * Store.Block.t) Lwt_stream.t * Lwt_watcher.stopper) q
+    =
+  let open Lwt_syntax in
+  let block_stream, stopper = applied_blocks_watcher in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  let in_chains (chain_store, _block) =
+    match q#chains with
+    | [] -> Lwt.return_true
+    | chains ->
+        let that_chain_id = Store.Chain.chain_id chain_store in
+        List.exists_p
+          (fun chain ->
+            let store = Store.Chain.global_store chain_store in
+            let+ o = Chain_directory.get_chain_id_opt store chain in
+            match o with
+            | None -> false
+            | Some this_chain_id -> Chain_id.equal this_chain_id that_chain_id)
+          chains
+  in
+  let in_protocols (chain_store, block) =
+    match q#protocols with
+    | [] -> Lwt.return_true
+    | protocols -> (
+        let* o = Store.Block.read_predecessor_opt chain_store block in
+        match o with
+        | None -> Lwt.return_false (* won't happen *)
+        | Some pred ->
+            let* context = Store.Block.context_exn chain_store pred in
+            let* protocol = Context_ops.get_protocol context in
+            Lwt.return (List.exists (Protocol_hash.equal protocol) protocols))
+  in
+  let in_next_protocols (chain_store, block) =
+    match q#next_protocols with
+    | [] -> Lwt.return_true
+    | protocols ->
+        let* context = Store.Block.context_exn chain_store block in
+        let* next_protocol = Context_ops.get_protocol context in
+        Lwt.return (List.exists (Protocol_hash.equal next_protocol) protocols)
+  in
+  let stream =
+    Lwt_stream.filter_map_s
+      (fun ((chain_store, block) as elt) ->
+        let* in_chains = in_chains elt in
+        let* in_next_protocols = in_next_protocols elt in
+        let* in_protocols = in_protocols elt in
+        if in_chains && in_protocols && in_next_protocols then
+          let chain_id = Store.Chain.chain_id chain_store in
+          Lwt.return_some
+            ( chain_id,
+              Store.Block.hash block,
+              Store.Block.header block,
+              Store.Block.operations block )
+        else Lwt.return_none)
+      block_stream
+  in
+  let next () = Lwt_stream.get stream in
+  Tezos_rpc.Answer.return_stream {next; shutdown}
+
+let build_rpc_directory validator mainchain_validator =
   let open Lwt_syntax in
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in
@@ -90,62 +221,9 @@ let build_rpc_directory ~(commit_info : Octez_node_version.commit_info)
       let shutdown () = Lwt_watcher.shutdown stopper in
       Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.applied_blocks (fun q () ->
-      let block_stream, stopper = Store.global_block_watcher store in
-      let shutdown () = Lwt_watcher.shutdown stopper in
-      let in_chains (chain_store, _block) =
-        match q#chains with
-        | [] -> Lwt.return_true
-        | chains ->
-            let that_chain_id = Store.Chain.chain_id chain_store in
-            List.exists_p
-              (fun chain ->
-                let+ o = Chain_directory.get_chain_id_opt store chain in
-                match o with
-                | None -> false
-                | Some this_chain_id ->
-                    Chain_id.equal this_chain_id that_chain_id)
-              chains
-      in
-      let in_protocols (chain_store, block) =
-        match q#protocols with
-        | [] -> Lwt.return_true
-        | protocols -> (
-            let* o = Store.Block.read_predecessor_opt chain_store block in
-            match o with
-            | None -> Lwt.return_false (* won't happen *)
-            | Some pred ->
-                let* context = Store.Block.context_exn chain_store pred in
-                let* protocol = Context_ops.get_protocol context in
-                Lwt.return
-                  (List.exists (Protocol_hash.equal protocol) protocols))
-      in
-      let in_next_protocols (chain_store, block) =
-        match q#next_protocols with
-        | [] -> Lwt.return_true
-        | protocols ->
-            let* context = Store.Block.context_exn chain_store block in
-            let* next_protocol = Context_ops.get_protocol context in
-            Lwt.return
-              (List.exists (Protocol_hash.equal next_protocol) protocols)
-      in
-      let stream =
-        Lwt_stream.filter_map_s
-          (fun ((chain_store, block) as elt) ->
-            let* in_chains = in_chains elt in
-            let* in_next_protocols = in_next_protocols elt in
-            let* in_protocols = in_protocols elt in
-            if in_chains && in_protocols && in_next_protocols then
-              let chain_id = Store.Chain.chain_id chain_store in
-              Lwt.return_some
-                ( chain_id,
-                  Store.Block.hash block,
-                  Store.Block.header block,
-                  Store.Block.operations block )
-            else Lwt.return_none)
-          block_stream
-      in
-      let next () = Lwt_stream.get stream in
-      Tezos_rpc.Answer.return_stream {next; shutdown}) ;
+      applied_blocks
+        ~applied_blocks_watcher:(Store.global_block_watcher store)
+        q) ;
   gen_register0 Monitor_services.S.validated_blocks (fun q () ->
       let* chains =
         match q#chains with
@@ -224,85 +302,20 @@ let build_rpc_directory ~(commit_info : Octez_node_version.commit_info)
           in
           monitor_received_block ~received_watcher ()) ;
   gen_register1 Monitor_services.S.heads (fun chain q () ->
+      let open Lwt_syntax in
+      let* chain_store = Chain_directory.get_chain_store_exn store chain in
       (* TODO: when `chain = `Test`, should we reset then stream when
          the `testnet` change, or dias we currently do ?? *)
-      let* chain_store = Chain_directory.get_chain_store_exn store chain in
       match Validator.get validator (Store.Chain.chain_id chain_store) with
       | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
-          let block_stream, stopper =
-            Chain_validator.new_head_watcher chain_validator
-          in
-          let* head = Store.Chain.current_head chain_store in
-          let shutdown () = Lwt_watcher.shutdown stopper in
-          let within_protocols header =
-            let find_protocol protocol_level =
-              let+ p = Store.Chain.find_protocol chain_store ~protocol_level in
-              WithExceptions.Option.to_exn
-                ~none:
-                  (Failure
-                     (Format.sprintf "Cannot find protocol %d" protocol_level))
-                p
-            in
-            let next_protocol (header : Block_header.t) =
-              find_protocol header.shell.proto_level
-            in
-            let current_protocol (header : Block_header.t) =
-              let* pred =
-                Store.Block.read_block chain_store header.shell.predecessor
-              in
-              match pred with
-              | Error e ->
-                  Format.kasprintf
-                    Stdlib.failwith
-                    "Cannot find current protocol because missing predecessor: \
-                     %a"
-                    pp_print_trace
-                    e
-              | Ok pred_block ->
-                  let pred_header = Store.Block.header pred_block in
-                  find_protocol pred_header.shell.proto_level
-            in
-            let within protocols get_protocol header =
-              match protocols with
-              | [] -> return_true
-              | _ ->
-                  let+ p = get_protocol header in
-                  List.exists (Protocol_hash.equal p) protocols
-            in
-            let* ok_next = within q#next_protocols next_protocol header in
-            let* ok_current = within q#protocols current_protocol header in
-            return (ok_current && ok_next)
-          in
-          let stream =
-            Lwt_stream.filter_map_s
-              (fun (hash, header) ->
-                let* within_protocols = within_protocols header in
-                if within_protocols then Lwt.return_some (hash, header)
-                else Lwt.return_none)
-              block_stream
-          in
-          let* first_block_is_within_protocols =
-            within_protocols (Store.Block.header head)
-          in
-          let first_call =
-            (* Skip the first block if this is false *)
-            ref first_block_is_within_protocols
-          in
-          let next () =
-            if !first_call then (
-              first_call := false ;
-              Lwt.return_some (Store.Block.hash head, Store.Block.header head))
-            else Lwt_stream.get stream
-          in
-          Tezos_rpc.Answer.return_stream {next; shutdown}) ;
+          let head_watcher = Chain_validator.new_head_watcher chain_validator in
+          monitor_head ~head_watcher (ref store) chain q) ;
   gen_register0 Monitor_services.S.protocols (fun () () ->
       let stream, stopper = Store.Protocol.protocol_watcher store in
       let shutdown () = Lwt_watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in
       Tezos_rpc.Answer.return_stream {next; shutdown}) ;
-  gen_register0 Monitor_services.S.commit_hash (fun () () ->
-      Tezos_rpc.Answer.return commit_info.commit_hash) ;
   gen_register0 Monitor_services.S.active_chains (fun () () ->
       let stream, stopper = Validator.chains_watcher validator in
       let shutdown () = Lwt_watcher.shutdown stopper in

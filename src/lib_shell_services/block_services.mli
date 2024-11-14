@@ -26,7 +26,7 @@
 
 module Proof = Tezos_context_sigs.Context.Proof_types
 
-type version = Version_0 | Version_1 | Version_2
+type version = Version_1 | Version_2
 
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
@@ -101,9 +101,6 @@ module type PROTO = sig
 
   type block_header_metadata
 
-  val block_header_metadata_encoding_with_legacy_attestation_name :
-    block_header_metadata Data_encoding.t
-
   val block_header_metadata_encoding : block_header_metadata Data_encoding.t
 
   type operation_data
@@ -117,18 +114,9 @@ module type PROTO = sig
 
   val operation_data_encoding : operation_data Data_encoding.t
 
-  val operation_data_encoding_with_legacy_attestation_name :
-    operation_data Data_encoding.t
-
   val operation_receipt_encoding : operation_receipt Data_encoding.t
 
-  val operation_receipt_encoding_with_legacy_attestation_name :
-    operation_receipt Data_encoding.t
-
   val operation_data_and_receipt_encoding :
-    (operation_data * operation_receipt) Data_encoding.t
-
-  val operation_data_and_receipt_encoding_with_legacy_attestation_name :
     (operation_data * operation_receipt) Data_encoding.t
 end
 
@@ -425,7 +413,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     - Default [branch_refused] is [true].
     - Default [refused] is [true].
     - Default [outdated] is [true].
-    - Default [validation_passes] is [[]] *)
+    - Default [validation_passes] is [[]]
+    - Default [sources] is [[]]
+    - Default [operation_hash] is [[]]*)
     val pending_operations :
       #simple ->
       ?chain:chain ->
@@ -436,6 +426,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?refused:bool ->
       ?outdated:bool ->
       ?validation_passes:int list ->
+      ?sources:string list ->
+      ?operation_hash:string list ->
       unit ->
       t tzresult Lwt.t
 
@@ -471,6 +463,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?refused:bool ->
       ?outdated:bool ->
       ?validation_passes:int list ->
+      ?sources:string list ->
       unit ->
       (((Operation_hash.t * Next_proto.operation) * error trace option) list
        Lwt_stream.t
@@ -743,8 +736,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     end
 
     module Mempool : sig
-      val encoding : Mempool.t Data_encoding.t
-
       (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
       val pending_operations :
         ('a, 'b) Tezos_rpc.Path.t ->
@@ -757,7 +748,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; branch_refused : bool
           ; refused : bool
           ; outdated : bool
-          ; validation_passes : int list >,
+          ; validation_passes : int list
+          ; sources : string list
+          ; operation_hash : string list >,
           unit,
           version * Mempool.t )
         Tezos_rpc.Service.t
@@ -789,7 +782,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; branch_refused : bool
           ; refused : bool
           ; outdated : bool
-          ; validation_passes : int list >,
+          ; validation_passes : int list
+          ; sources : string list >,
           unit,
           version
           * ((Operation_hash.t * Next_proto.operation) * error trace option)

@@ -46,6 +46,8 @@
    This is to check that injected protocols are propagated to other nodes
    after the migration. *)
 
+let team = Tag.layer1
+
 (* Protocol to inject when testing injection. *)
 let test_proto_dir = "src/bin_client/test/proto_test_injection"
 
@@ -57,7 +59,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 12
+    "expected_env_version": 13
 }
 |}
 
@@ -263,9 +265,9 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          (Protocol.tag from_protocol)
          (target_protocol_tag to_protocol)
          (if loser_protocols = [] then "none"
-         else String.concat ", " (List.map Protocol.tag loser_protocols)))
+          else String.concat ", " (List.map Protocol.tag loser_protocols)))
     ~tags:
-      ("amendment"
+      (team :: "amendment"
        :: ("from_" ^ Protocol.tag from_protocol)
        :: ("to_" ^ target_protocol_tag to_protocol)
        :: List.map (fun p -> "loser_" ^ Protocol.tag p) loser_protocols
@@ -273,6 +275,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
           (match to_protocol with
           | Known _ | Demo -> "known"
           | Injected_test -> "injected");
+          "singleprocess";
         ])
   @@ fun () ->
   (* Prepare protocol parameters such that voting periods are shorter
@@ -869,6 +872,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
          (Protocol.tag to_protocol))
     ~tags:
       [
+        team;
         "amendment";
         "protocol_override";
         "baker";

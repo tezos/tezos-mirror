@@ -30,6 +30,8 @@
    Subject:      Checks if a protocol activation is well handled in the store
 *)
 
+let team = Tag.layer1
+
 let check_protocol_activation ~migrate_from ~migrate_to ~block client =
   let* migration_block =
     Client.RPC.call client @@ RPC.get_chain_block_metadata ~block ()
@@ -74,7 +76,7 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:"protocol activation"
-    ~tags:["protocol"; "protocol_table"; "update"]
+    ~tags:[team; "protocol"; "protocol_table"; "update"]
   @@ fun () ->
   let migration_level =
     (* NOTE: Migration to Tenderbake is only supported after the first
@@ -181,7 +183,7 @@ let test_branch_switch ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:"protocol table"
-    ~tags:["protocol"; "protocol_table"; "branch"]
+    ~tags:[team; "protocol"; "protocol_table"; "branch"]
   @@ fun () ->
   let migration_level = 2 in
   let uau =

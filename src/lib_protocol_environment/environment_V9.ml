@@ -143,20 +143,21 @@ module type T = sig
        and type application_state = P.application_state
 
   class ['chain, 'block] proto_rpc_context :
-    Tezos_rpc.Context.t
-    -> (unit, (unit * 'chain) * 'block) RPC_path.t
-    -> ['chain * 'block] RPC_context.simple
+    Tezos_rpc.Context.t ->
+    (unit, (unit * 'chain) * 'block) RPC_path.t ->
+    ['chain * 'block] RPC_context.simple
 
   class ['block] proto_rpc_context_of_directory :
-    ('block -> RPC_context.t)
-    -> RPC_context.t RPC_directory.t
-    -> ['block] RPC_context.simple
+    ('block -> RPC_context.t) ->
+    RPC_context.t RPC_directory.t ->
+    ['block] RPC_context.simple
 end
 
-module Make (Param : sig
-  val name : string
-end)
-() =
+module Make
+    (Param : sig
+      val name : string
+    end)
+    () =
 struct
   (* The protocol V9 only supports 64-bits architectures. We ensure this the
      hard way with a dynamic check. *)
@@ -176,6 +177,7 @@ struct
   module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
   module Pervasives = Stdlib
+  module Profiler = Environment_profiler
 
   module Logging = struct
     type level = Internal_event.level =
@@ -306,7 +308,26 @@ struct
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1
   module P256 = Tezos_crypto.Signature.P256
   module Bls = Tezos_crypto.Signature.Bls
-  module Signature = Tezos_crypto.Signature.V1
+
+  module Signature = struct
+    include Tezos_crypto.Signature.V1
+
+    let check ?watermark pk s bytes =
+      (check
+         ?watermark
+         pk
+         s
+         bytes
+       [@profiler.span_f
+         [
+           (match (pk : public_key) with
+           | Ed25519 _ -> "check_signature_ed25519"
+           | Secp256k1 _ -> "check_signature_secp256k1"
+           | P256 _ -> "check_signature_p256"
+           | Bls _ -> "check_signature_bls");
+         ]])
+  end
+
   module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
 
@@ -911,70 +932,69 @@ struct
   module RPC_context = struct
     type t = rpc_context
 
-    class type ['pr] simple =
-      object
-        method call_proto_service0 :
-          'm 'q 'i 'o.
-          ( ([< Tezos_rpc.Service.meth] as 'm),
-            t,
-            t,
-            'q,
-            'i,
-            'o )
-          Tezos_rpc.Service.t ->
-          'pr ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
+    class type ['pr] simple = object
+      method call_proto_service0 :
+        'm 'q 'i 'o.
+        ( ([< Tezos_rpc.Service.meth] as 'm),
+          t,
+          t,
+          'q,
+          'i,
+          'o )
+        Tezos_rpc.Service.t ->
+        'pr ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
 
-        method call_proto_service1 :
-          'm 'a 'q 'i 'o.
-          ( ([< Tezos_rpc.Service.meth] as 'm),
-            t,
-            t * 'a,
-            'q,
-            'i,
-            'o )
-          Tezos_rpc.Service.t ->
-          'pr ->
-          'a ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
+      method call_proto_service1 :
+        'm 'a 'q 'i 'o.
+        ( ([< Tezos_rpc.Service.meth] as 'm),
+          t,
+          t * 'a,
+          'q,
+          'i,
+          'o )
+        Tezos_rpc.Service.t ->
+        'pr ->
+        'a ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
 
-        method call_proto_service2 :
-          'm 'a 'b 'q 'i 'o.
-          ( ([< Tezos_rpc.Service.meth] as 'm),
-            t,
-            (t * 'a) * 'b,
-            'q,
-            'i,
-            'o )
-          Tezos_rpc.Service.t ->
-          'pr ->
-          'a ->
-          'b ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
+      method call_proto_service2 :
+        'm 'a 'b 'q 'i 'o.
+        ( ([< Tezos_rpc.Service.meth] as 'm),
+          t,
+          (t * 'a) * 'b,
+          'q,
+          'i,
+          'o )
+        Tezos_rpc.Service.t ->
+        'pr ->
+        'a ->
+        'b ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
 
-        method call_proto_service3 :
-          'm 'a 'b 'c 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
-            t,
-            ((t * 'a) * 'b) * 'c,
-            'q,
-            'i,
-            'o )
-          RPC_service.t ->
-          'pr ->
-          'a ->
-          'b ->
-          'c ->
-          'q ->
-          'i ->
-          'o Error_monad.shell_tzresult Lwt.t
-      end
+      method call_proto_service3 :
+        'm 'a 'b 'c 'q 'i 'o.
+        ( ([< RPC_service.meth] as 'm),
+          t,
+          ((t * 'a) * 'b) * 'c,
+          'q,
+          'i,
+          'o )
+        RPC_service.t ->
+        'pr ->
+        'a ->
+        'b ->
+        'c ->
+        'q ->
+        'i ->
+        'o Error_monad.shell_tzresult Lwt.t
+    end
 
     let make_call0 s (ctxt : _ simple) = ctxt#call_proto_service0 s
 
@@ -1191,18 +1211,6 @@ struct
 
     include P
 
-    let block_header_metadata_encoding_with_legacy_attestation_name =
-      block_header_metadata_encoding
-
-    let operation_data_encoding_with_legacy_attestation_name =
-      operation_data_encoding
-
-    let operation_receipt_encoding_with_legacy_attestation_name =
-      operation_receipt_encoding
-
-    let operation_data_and_receipt_encoding_with_legacy_attestation_name =
-      operation_data_and_receipt_encoding
-
     let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
       let open Lwt_result_syntax in
@@ -1218,33 +1226,40 @@ struct
       in
       let*? f = wrap_tzresult r in
       return (fun x ->
-          let*! r = f x in
-          Lwt.return (wrap_tzresult r))
+          (let*! r = f x in
+           Lwt.return (wrap_tzresult r))
+          [@profiler.record_s
+            Format.asprintf "load_key(%s)" (Context.Cache.identifier_of_key x)])
 
     (** Ensure that the cache is correctly loaded in memory
         before running any operations. *)
     let load_predecessor_cache predecessor_context chain_id mode
         (predecessor_header : Block_header.shell_header) cache =
       let open Lwt_result_syntax in
-      let predecessor_hash, timestamp =
-        match mode with
-        | Application block_header | Partial_validation block_header ->
-            (block_header.shell.predecessor, block_header.shell.timestamp)
-        | Construction {predecessor_hash; timestamp; _}
-        | Partial_construction {predecessor_hash; timestamp} ->
-            (predecessor_hash, timestamp)
-      in
-      let* value_of_key =
-        value_of_key
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp:predecessor_header.timestamp
-          ~predecessor_level:predecessor_header.level
-          ~predecessor_fitness:predecessor_header.fitness
-          ~predecessor:predecessor_hash
-          ~timestamp
-      in
-      Context.load_cache predecessor_hash predecessor_context cache value_of_key
+      (let predecessor_hash, timestamp =
+         match mode with
+         | Application block_header | Partial_validation block_header ->
+             (block_header.shell.predecessor, block_header.shell.timestamp)
+         | Construction {predecessor_hash; timestamp; _}
+         | Partial_construction {predecessor_hash; timestamp} ->
+             (predecessor_hash, timestamp)
+       in
+       let* value_of_key =
+         value_of_key
+           ~chain_id
+           ~predecessor_context
+           ~predecessor_timestamp:predecessor_header.timestamp
+           ~predecessor_level:predecessor_header.level
+           ~predecessor_fitness:predecessor_header.fitness
+           ~predecessor:predecessor_hash
+           ~timestamp
+       in
+       Context.load_cache
+         predecessor_hash
+         predecessor_context
+         cache
+         value_of_key)
+      [@profiler.record_s "load_predecessor_cache"]
 
     let begin_validation ctxt chain_id mode ~predecessor ~cache =
       let open Lwt_result_syntax in

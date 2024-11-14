@@ -2782,6 +2782,13 @@ module Sc_rollup = struct
           Data_encoding.(
             option Sc_rollup.Whitelist.last_whitelist_update_encoding)
         RPC_path.(path_sc_rollup / "last_whitelist_update")
+
+    let consumed_outputs =
+      RPC_service.get_service
+        ~description:"Return the known consumed outputs of a smart rollup."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(list int31)
+        RPC_path.(path_sc_rollup / "consumed_outputs" /: Raw_level.rpc_arg)
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2810,6 +2817,38 @@ module Sc_rollup = struct
           in
           return_some last_whitelist_update
         else return_none)
+
+  let register_consumed_outputs () =
+    let open Lwt_result_syntax in
+    Registration.register2 ~chunked:true S.consumed_outputs
+    @@ fun ctxt address outbox_level () () ->
+    let raw_ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+    let bitset_to_list field =
+      let[@tailrec] rec to_list pos acc field =
+        if Z.equal Z.zero field then acc
+        else
+          let acc = if Z.testbit field 0 then pos :: acc else acc in
+          to_list (pos + 1) acc (Z.shift_right field 1)
+      in
+      to_list 0 [] field
+    in
+    let max_active_levels =
+      Constants_storage.sc_rollup_max_active_outbox_levels raw_ctxt
+    in
+    let level_i = Raw_level.to_int32 outbox_level in
+    let level_index = Int32.rem level_i max_active_levels in
+    let* _ctxt, lvl_bitset_opt =
+      Storage.Sc_rollup.Applied_outbox_messages.find
+        (raw_ctxt, address)
+        level_index
+    in
+    match lvl_bitset_opt with
+    | None -> return []
+    | Some (found_level, bitset) ->
+        if Raw_level_repr.to_int32 found_level = level_i then
+          let indices = bitset_to_list (Bitset.to_z bitset) in
+          return indices
+        else return []
 
   let register_kind () =
     let open Lwt_result_syntax in
@@ -3007,6 +3046,7 @@ module Sc_rollup = struct
     register_inbox () ;
     register_whitelist () ;
     register_last_whitelist_update () ;
+    register_consumed_outputs () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
@@ -3818,7 +3858,7 @@ module Attestation_rights = struct
          (req "first_slot" Slot.encoding)
          (req
             (if use_legacy_attestation_name then "endorsing_power"
-            else "attestation_power")
+             else "attestation_power")
             uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 
@@ -4269,3 +4309,5 @@ let levels_in_current_cycle ctxt ?(offset = 0l) block =
 let rpc_services =
   register () ;
   RPC_directory.merge rpc_services !Registration.patched_services
+
+let get_blocks_preservation_cycles ~get_context:_ = Lwt.return_none

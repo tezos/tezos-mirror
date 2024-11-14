@@ -29,30 +29,18 @@ module KVS = Key_value_store
 let ( // ) = Filename.concat
 
 module Cells = struct
+  type file = Dal_proto_types.Skip_list_hash.t
+
+  type key = unit
+
+  type value = Dal_proto_types.Skip_list_cell.t
+
   type t = {
-    (* Since the size of Skip list cells is increasing over time, we define
-       here a max size we support. Any cell that fits in less than this value
-       when encoded in bytes is padded, because the Key-Value store doesn't
-       handle data with a non-fixed size. *)
-    padded_encoded_cell_size : int;
+    file_layout : (file, key, value) KVS.file_layout;
     (* The Key-Value store. We store one cell per file, hence the unit as a
        second type argument. *)
-    store :
-      ( Dal_proto_types.Skip_list_hash.t,
-        unit,
-        Dal_proto_types.Skip_list_cell.t )
-      KVS.t;
+    store : (file, key, value) KVS.t;
   }
-
-  let init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size =
-    let open Lwt_result_syntax in
-    (* We store the cells under /cells sub-directory. *)
-    let root_dir = node_store_dir // skip_list_store_dir // "cells" in
-    (* The size of the LRU is fixed to 2, as we don't need to frequently access
-       files: it's "write once & forget", and possibility read the value in case
-       of refutation. *)
-    let+ store = KVS.init ~lru_size:2 ~root_dir in
-    {store; padded_encoded_cell_size}
 
   let fixed_size_cells_encoding_with_padding ~padded_encoded_cell_size =
     let open Data_encoding in
@@ -95,58 +83,65 @@ module Cells = struct
          (req "size" length_prefix_encoding)
          (req "value_with_padding" value_encoding))
 
-  let file_layout padded_encoded_cell_size ~root_dir hash =
-    let hash_string =
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Dal_proto_types.Skip_list_hash.encoding
-          hash
-      in
-      (* We use base64 encoding for the names of files, since we don't have
-         access to function [to_b58check] here. *)
-      Bytes.to_string bytes |> Base64.(encode_exn ~alphabet:uri_safe_alphabet)
-    in
-    let filepath = root_dir // hash_string in
+  (* Since the size of Skip list cells is increasing over time, we define
+     here a max size we support. Any cell that fits in less than this value
+     when encoded in bytes is padded, because the Key-Value store doesn't
+     handle data with a non-fixed size. *)
+  let file_layout padded_encoded_cell_size =
     let encoding =
       fixed_size_cells_encoding_with_padding ~padded_encoded_cell_size
     in
-    Key_value_store.layout
-      ~encoding (* encoding has a fixed size here *)
-      ~filepath
-      ~eq:Dal_proto_types.Skip_list_cell.equal
-      ~index_of:(fun () -> 0)
-      ~number_of_keys_per_file:1
-      ()
+    fun ~root_dir hash ->
+      let hash_string =
+        let bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Dal_proto_types.Skip_list_hash.encoding
+            hash
+        in
+        (* We use base64 encoding for the names of files, since we don't have
+           access to function [to_b58check] here. *)
+        Bytes.to_string bytes |> Base64.(encode_exn ~alphabet:uri_safe_alphabet)
+      in
+      let filepath = root_dir // hash_string in
+      Key_value_store.layout
+        ~encoding (* encoding has a fixed size here *)
+        ~filepath
+        ~eq:Dal_proto_types.Skip_list_cell.equal
+        ~index_of:(fun () -> 0)
+        ~number_of_keys_per_file:1
+        ()
 
-  let write_values {store; padded_encoded_cell_size} values =
-    KVS.write_values
-      ~override:true
-      store
-      (file_layout padded_encoded_cell_size)
-      values
+  let init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size =
+    let open Lwt_result_syntax in
+    (* We store the cells under /cells sub-directory. *)
+    let root_dir = node_store_dir // skip_list_store_dir // "cells" in
+    (* The size of the LRU is fixed to 2, as we don't need to frequently access
+       files: it's "write once & forget", and possibility read the value in case
+       of refutation. *)
+    let+ store = KVS.init ~lru_size:2 ~root_dir in
+    {store; file_layout = file_layout padded_encoded_cell_size}
 
-  let read_value {store; padded_encoded_cell_size} hash =
-    KVS.read_value store (file_layout padded_encoded_cell_size) hash ()
+  let write_values {store; file_layout} values =
+    KVS.write_values ~override:true store file_layout values
 
-  let remove_file {store; padded_encoded_cell_size} hash =
-    KVS.remove_file store (file_layout padded_encoded_cell_size) hash
+  let read_value {store; file_layout} hash =
+    KVS.read_value store file_layout hash ()
+
+  let remove_file {store; file_layout} hash =
+    KVS.remove_file store file_layout hash
 end
 
 module Hashes = struct
-  type t = {
-    encoded_hash_size : int;
-    (* For the Key-Value store of hashes, we store [number_of_slots] hashes per
-       file, and a file is identified by the corresponding attested level. *)
-    store : (int32, int, Dal_proto_types.Skip_list_hash.t) KVS.t;
-    number_of_slots : int;
-  }
+  type file = int32 (* a level *)
 
-  let init ~node_store_dir ~skip_list_store_dir ~encoded_hash_size
-      ~number_of_slots =
-    let open Lwt_result_syntax in
-    let root_dir = node_store_dir // skip_list_store_dir // "hashes" in
-    let+ store = KVS.init ~lru_size:2 ~root_dir in
-    {store; encoded_hash_size; number_of_slots}
+  type key = int (* a slot index *)
+
+  type value = Dal_proto_types.Skip_list_hash.t
+
+  type t = {
+    store : (file, key, value) KVS.t;
+    file_layout : (file, key, value) KVS.file_layout;
+  }
 
   let fixed_size_hash_encoding ~encoded_hash_size =
     let open Data_encoding in
@@ -157,38 +152,36 @@ module Hashes = struct
          Dal_proto_types.Skip_list_hash.encoding)
       (obj1 (req "hash" (Fixed.bytes encoded_hash_size)))
 
-  let file_layout encoded_hash_size ~root_dir attested_level ~number_of_slots =
-    let attested_level_string = Int32.to_string attested_level in
-    let filepath = root_dir // attested_level_string in
+  (* For the Key-Value store of hashes, we store [number_of_slots] hashes per
+     file, and a file is identified by the corresponding attested level. *)
+  let file_layout encoded_hash_size =
     let encoding = fixed_size_hash_encoding ~encoded_hash_size in
-    Key_value_store.layout
-      ~encoding
-      ~filepath
-      ~eq:Dal_proto_types.Skip_list_hash.equal
-      ~index_of:Fun.id
-      ~number_of_keys_per_file:number_of_slots
-      ()
+    fun ~root_dir attested_level ->
+      let attested_level_string = Int32.to_string attested_level in
+      let filepath = root_dir // attested_level_string in
+      Key_value_store.layout
+        ~encoding
+        ~filepath
+        ~eq:Dal_proto_types.Skip_list_hash.equal
+        ~index_of:Fun.id
+        ~number_of_keys_per_file:(Value_size_hooks.number_of_slots ())
+        ()
 
-  let write_values {store; encoded_hash_size; number_of_slots} values =
-    KVS.write_values
-      ~override:true
-      store
-      (file_layout encoded_hash_size ~number_of_slots)
-      values
+  let init ~node_store_dir ~skip_list_store_dir ~encoded_hash_size =
+    let open Lwt_result_syntax in
+    let root_dir = node_store_dir // skip_list_store_dir // "hashes" in
+    let+ store = KVS.init ~lru_size:2 ~root_dir in
+    let file_layout = file_layout encoded_hash_size in
+    {store; file_layout}
 
-  let read_value {store; encoded_hash_size; number_of_slots} attested_level key
-      =
-    KVS.read_value
-      store
-      (file_layout encoded_hash_size ~number_of_slots)
-      attested_level
-      key
+  let write_values {store; file_layout; _} values =
+    KVS.write_values ~override:true store file_layout values
 
-  let remove_file {store; encoded_hash_size; number_of_slots} attested_level =
-    KVS.remove_file
-      store
-      (file_layout encoded_hash_size ~number_of_slots)
-      attested_level
+  let read_value {store; file_layout; _} attested_level key =
+    KVS.read_value store file_layout attested_level key
+
+  let remove_file {store; file_layout; _} attested_level =
+    KVS.remove_file store file_layout attested_level
 end
 
 (* The main (exposed) content of the module. *)
@@ -196,30 +189,26 @@ end
 type t = {cells_store : Cells.t; hashes_store : Hashes.t}
 
 let init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size
-    ~encoded_hash_size ~number_of_slots =
+    ~encoded_hash_size =
   let open Lwt_result_syntax in
   let* cells_store =
     Cells.init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size
   in
   let* hashes_store =
-    Hashes.init
-      ~node_store_dir
-      ~skip_list_store_dir
-      ~encoded_hash_size
-      ~number_of_slots
+    Hashes.init ~node_store_dir ~skip_list_store_dir ~encoded_hash_size
   in
   return {cells_store; hashes_store}
 
 let insert {cells_store; hashes_store} ~attested_level items =
   let open Lwt_result_syntax in
-  let values, hashes =
+  let cells, hashes =
     List.to_seq items
     |> Seq.zip (Seq.ints 0)
-    |> Seq.map (fun (index, (hash, value)) ->
-           ((hash, (), value), (attested_level, index, hash)))
+    |> Seq.map (fun (index, (hash, cell)) ->
+           ((hash, (), cell), (attested_level, index, hash)))
     |> Seq.split
   in
-  let* () = Cells.(write_values cells_store values) in
+  let* () = Cells.(write_values cells_store cells) in
   let* () = Hashes.write_values hashes_store hashes in
   return_unit
 
@@ -228,6 +217,7 @@ let find {cells_store; hashes_store = _} hash =
 
 let remove {cells_store; hashes_store} ~attested_level =
   let open Lwt_result_syntax in
+  let number_of_slots = Value_size_hooks.number_of_slots () in
   let* () =
     List.iter_es
       (fun idx ->
@@ -235,6 +225,6 @@ let remove {cells_store; hashes_store} ~attested_level =
         match hash with
         | Error _ -> return_unit
         | Ok hash -> Cells.remove_file cells_store hash)
-      (0 -- (hashes_store.number_of_slots - 1))
+      (0 -- (number_of_slots - 1))
   in
   Hashes.remove_file hashes_store attested_level

@@ -56,12 +56,17 @@ val find_message : L2_message.id -> L2_message.t option tzresult
     message that were added first to the queue are at the end of list. *)
 val get_queue : unit -> (L2_message.id * L2_message.t) list tzresult
 
-(** [register_messages messages] registers new L2 [messages] in the
-    queue of the batcher for future injection on L1. In this case,
-    when the application fails, the messages are not queued.  *)
-val register_messages : string list -> L2_message.id list tzresult Lwt.t
+(** [register_messages ~drop_duplicate messages] registers new L2
+    [messages] in the queue of the batcher for future injection on
+    L1. If [drop_duplicate = false] then it injects the message even
+    if it was already injected in a previous l1 operations. *)
+val register_messages :
+  drop_duplicate:bool -> string list -> L2_message.id list tzresult Lwt.t
 
 (** The status of a message in the batcher. Returns [None] if the message is not
     known by the batcher (the batcher only keeps the batched status of the last
     500000 messages). *)
 val message_status : L2_message.id -> (status * string) option tzresult
+
+(** Returns the status of the publisher worker  *)
+val worker_status : unit -> [`Running | `Not_running | `Crashed of exn]

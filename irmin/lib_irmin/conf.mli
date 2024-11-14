@@ -30,6 +30,9 @@ module Spec : sig
   type t
   (** A configuration spec is used to group keys by backend *)
 
+  val clear_all : unit -> unit
+  (** [clear_all t] clear the hash table containing the specs *)
+
   val v : string -> t
   (** [v name] is a new configuration specification named [name] *)
 

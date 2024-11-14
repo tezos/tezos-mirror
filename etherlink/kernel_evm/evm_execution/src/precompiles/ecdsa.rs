@@ -8,13 +8,13 @@ use crate::precompiles::tick_model;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use evm::{Context, Transfer};
 use evm::{ExitReason, ExitSucceed};
-use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use sha2::Digest;
 use sha3::Keccak256;
 use std::cmp::min;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::{Debug, Info};
+use tezos_evm_runtime::runtime::Runtime;
 
 macro_rules! unwrap_ecrecover {
     ($expr : expr) => {
@@ -157,32 +157,42 @@ mod tests {
     fn test_ecrecover_invalid_empty() {
         // act
         let input: [u8; 0] = [0; 0];
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         // assert
         // expected outcome is OK and empty output
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(Some(vec![]), outcome.result);
+        assert!(outcome.is_success());
+        assert_eq!(Some(&[] as &[u8]), outcome.output());
     }
 
     #[test]
     fn test_ecrecover_invalid_zero() {
         // act
         let input: [u8; 128] = [0; 128];
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(25000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(25000),
+            true,
+        );
 
         // assert
         // expected outcome is OK but empty output
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
-        assert_eq!(Some(vec![]), outcome.result);
+        assert!(outcome.is_success());
+        assert_eq!(Some(&[] as &[u8]), outcome.output());
     }
 
     #[test]
@@ -249,18 +259,23 @@ mod tests {
         expected_output.append(&mut expected_address);
 
         // act
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(35000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(35000),
+            true,
+        );
 
         // assert
         // expected outcome is OK and address over 32 bytes
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(
             hex::encode(expected_output),
-            hex::encode(outcome.result.unwrap())
+            hex::encode(outcome.output().unwrap())
         );
     }
 
@@ -275,11 +290,12 @@ mod tests {
             &corrupted_input,
             None,
             Some(35000),
+            true,
         );
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.result.unwrap().is_empty());
+        assert!(outcome.output().unwrap().is_empty());
     }
 
     #[test]
@@ -293,11 +309,12 @@ mod tests {
             &input_overflow,
             None,
             Some(35000),
+            true,
         );
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.result.unwrap().is_empty());
+        assert!(outcome.output().unwrap().is_empty());
     }
 
     #[test]
@@ -311,18 +328,23 @@ mod tests {
         expected_output.append(&mut expected_address);
 
         // act
-        let result =
-            execute_precompiled(H160::from_low_u64_be(1), &input, None, Some(35000));
+        let result = execute_precompiled(
+            H160::from_low_u64_be(1),
+            &input,
+            None,
+            Some(35000),
+            true,
+        );
 
         // assert
         // expected outcome is OK and address over 32 bytes
 
         assert!(result.is_ok());
         let outcome = result.unwrap();
-        assert!(outcome.is_success);
+        assert!(outcome.is_success());
         assert_eq!(
             hex::encode(expected_output),
-            hex::encode(outcome.result.unwrap())
+            hex::encode(outcome.output().unwrap())
         );
     }
 }

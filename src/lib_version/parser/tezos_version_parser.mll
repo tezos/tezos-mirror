@@ -27,11 +27,11 @@
     | RC_dev of int
     | Release [@@deriving show]
 
-  type product = Octez | Etherlink
+  type product = Octez | Octez_evm_node
 
   let pp_product ppf = function
   | Octez -> Format.fprintf ppf "Octez"
-  | Etherlink -> Format.fprintf ppf "Etherlink"
+  | Octez_evm_node -> Format.fprintf ppf "Octez_evm_node"
 
   type t = {
     product: product;
@@ -42,15 +42,17 @@
   let int s = int_of_string_opt s |> Option.value ~default: 0
 
   let default = { product = Octez; major = 0 ; minor = 0 ; additional_info = Dev }
+
 }
 
 let num = ['0'-'9']+
+let hexa = ['0'-'9' 'A'-'F' 'a'-'f']+
 
 rule version_tag = parse
-  | ("octez" | "etherlink" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+  | ("octez" | "octez-evm-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
       {
         let product = match product with 
-          | "etherlink" -> Etherlink
+          | "octez-evm-node" -> Octez_evm_node
           | "octez" -> Octez
           | _ -> (* this case cannot happen, see pattern above *)  
                  assert false
@@ -77,3 +79,61 @@ and extra = parse
       { Release }
   | _
       { Dev }
+
+and version_commit = parse 
+  | ("octez" | "octez-evm-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+      {
+        let product = match product with 
+          | "octez-evm-node" -> Octez_evm_node
+          | "octez" -> Octez
+          | _ -> (* this case cannot happen, see pattern above *)  
+                 assert false
+        in
+        let extra = extra_noeof lexbuf in
+        match extra with
+        | None -> None
+        | Some additional_info ->
+          (let commit = commit lexbuf in
+          match commit with
+          | Some commit ->
+            Some (
+              {
+                product;
+                major = int major;
+                minor = int minor;
+                additional_info;
+              },
+            commit)
+          | _ -> None)
+      }
+  | _ | eof
+      { None }
+
+(* This rule is similar to rule extra, but can be followed by a commit hash *)
+and extra_noeof = parse
+  | "-rc" (num as rc) (eof | ':')
+      { Some (RC (int rc)) }
+  | "-rc" (num as rc) "+dev" (eof | ':')
+      { Some (RC_dev (int rc)) }
+  | "-beta" (num as beta) (eof | ':')
+      { Some (Beta (int beta)) }
+  | "-beta" (num as beta) "+dev" (eof | ':')
+      { Some (Beta_dev (int beta)) }
+  | "+dev" (eof | ':')
+      { Some Dev }
+  | (eof | ':')
+      { Some Release }
+  | _
+      { None }
+
+and commit = parse
+  | (hexa as hash) eof
+      { let l = String.length hash in
+        if l >= 8 && l <= 40
+        then Some (Some (String.lowercase_ascii hash))
+        else None
+      }
+  | eof
+      { Some None }
+  | _
+      { None }

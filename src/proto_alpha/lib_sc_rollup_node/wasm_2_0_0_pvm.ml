@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -130,7 +130,9 @@ end
 module Durable_state =
   Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
 
-type unsafe_patch = Increase_max_nb_ticks of int64
+type unsafe_patch =
+  | Increase_max_nb_ticks of int64
+  | Patch_durable_storage of {key : string; value : string}
 
 module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
   module PVM =
@@ -164,18 +166,26 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
       match p with
       | Increase_max_nb_ticks max_nb_ticks ->
           Ok (Increase_max_nb_ticks max_nb_ticks)
+      | Patch_durable_storage {key; value} ->
+          Ok (Patch_durable_storage {key; value})
 
-    let apply state (Increase_max_nb_ticks max_nb_ticks) =
+    let apply state unsafe_patch =
       let open Lwt_syntax in
-      let* registered_max_nb_ticks = Backend.Unsafe.get_max_nb_ticks state in
-      let max_nb_ticks = Z.of_int64 max_nb_ticks in
-      if Z.Compare.(max_nb_ticks < registered_max_nb_ticks) then
-        Format.ksprintf
-          invalid_arg
-          "Decreasing tick limit of WASM PVM from %s to %s is not allowed"
-          (Z.to_string registered_max_nb_ticks)
-          (Z.to_string max_nb_ticks) ;
-      Backend.Unsafe.set_max_nb_ticks max_nb_ticks state
+      match unsafe_patch with
+      | Increase_max_nb_ticks max_nb_ticks ->
+          let* registered_max_nb_ticks =
+            Backend.Unsafe.get_max_nb_ticks state
+          in
+          let max_nb_ticks = Z.of_int64 max_nb_ticks in
+          if Z.Compare.(max_nb_ticks < registered_max_nb_ticks) then
+            Format.ksprintf
+              invalid_arg
+              "Decreasing tick limit of WASM PVM from %s to %s is not allowed"
+              (Z.to_string registered_max_nb_ticks)
+              (Z.to_string max_nb_ticks) ;
+          Backend.Unsafe.set_max_nb_ticks max_nb_ticks state
+      | Patch_durable_storage {key; value} ->
+          Backend.Unsafe.durable_set ~key ~value state
   end
 
   let string_of_status : status -> string = function
@@ -197,6 +207,54 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~write_debug
+      ?hooks:None
+
+  (** WASM PVM Mutable API works by holding a reference to an immutable state 
+      and wrapping all immutable functionality around the reference *)
+  module Mutable_state :
+    Pvm_sig.MUTABLE_STATE_S
+      with type hash = hash
+       and type t = Ctxt_wrapper.mut_state = struct
+    type t = tree ref
+
+    type hash = Sc_rollup.State_hash.t
+
+    let get_tick state = get_tick !state
+
+    let state_hash state = state_hash !state
+
+    let is_input_state ~is_reveal_enabled state =
+      is_input_state ~is_reveal_enabled !state
+
+    let set_input input state =
+      let open Lwt_syntax in
+      let* imm_state = set_input input !state in
+      state := imm_state ;
+      return_unit
+
+    let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled
+        ?stop_at_snapshot ~max_steps mut_state =
+      let open Lwt_syntax in
+      let* imm_state, steps =
+        eval_many
+          ~reveal_builtins
+          ~write_debug
+          ~is_reveal_enabled
+          ?stop_at_snapshot
+          ~max_steps
+          !mut_state
+      in
+      mut_state := imm_state ;
+      return steps
+
+    module Internal_for_tests = struct
+      let insert_failure state =
+        let open Lwt_syntax in
+        let* imm_state = Internal_for_tests.insert_failure !state in
+        state := imm_state ;
+        return_unit
+    end
+  end
 end
 
 include Impl

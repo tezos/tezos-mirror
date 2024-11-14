@@ -11,7 +11,6 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-protocol-019-PtParisB-libs.client
-  octez-protocol-019-PtParisB-libs.dal
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
   tezos-protocol-019-PtParisB.protocol
@@ -23,7 +22,6 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  octez-protocol-019-PtParisB-libs.dac
   tezos-dac-lib
   tezos-dac-client-lib
   octez-shell-libs.shell-services
@@ -34,7 +32,7 @@
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tree-encoding
-  data-encoding
+  octez-libs.data-encoding
   octez-internal-libs.irmin_pack
   octez-internal-libs.irmin_pack.unix
   octez-internal-libs.irmin
@@ -55,13 +53,11 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_019_PtParisB
-  -open Tezos_dal_019_PtParisB
   -open Tezos_protocol_019_PtParisB
   -open Tezos_protocol_plugin_019_PtParisB
   -open Tezos_protocol_019_PtParisB_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_019_PtParisB
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
   -open Tezos_shell_services

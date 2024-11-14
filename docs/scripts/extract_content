@@ -1,0 +1,38 @@
+#!/usr/bin/awk -f
+
+# Extract the main content from an HTML file compiled from RST by Sphinx,
+# dropping the left menu and the navigation header and footer.
+# The result is a standalone HTML page that can be published on any website.
+
+# Drop some items from the document header (extracted later)
+
+/<link rel=".*"/ { next; }
+
+/<script .*><\/script>/ { next; }
+
+# Extract the document structure (document + header + body)
+
+/<!DOCTYPE html>/, /<body class="wy-body-for-nav">/ {print; next;}
+
+/<\/body>/ { print; next; }
+
+/<\/html>/ { print; next; }
+
+# Drop the navigation header from the main content (extracted later)
+/<div role="navigation"/, /<\/div>/ { next; }
+
+# Extract the main content
+/<div class="rst-content">/, /<footer>/ {
+  if ($0 !~ /<footer>/) {
+    gsub("¶"," ");
+    gsub("class=\"reference internal\" href=\"#", "class=\"reference local\" href=\"#");
+    gsub("class=\"reference internal\" href=\"", "class=\"reference external\" href=\"https://tezos.gitlab.io/active/");
+    print;
+  }
+}
+
+# Replace the navigation footer by end of the main content
+/<footer>/, /<\/footer>/ {
+  if ($0 ~ /<\/footer>/) { print "</div>"; }
+  next;
+}

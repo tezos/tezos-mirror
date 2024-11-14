@@ -63,6 +63,25 @@ let injector_operation_to_manager :
       Manager
         (Sc_rollup_execute_outbox_message
            {rollup; cemented_commitment; output_proof})
+  | Publish_dal_commitment {slot_index; commitment; commitment_proof} ->
+      let open Sc_rollup_proto_types.Dal in
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7319
+
+         commitment and commitment_proof should be versionned in
+         Sc_rollup_proto_types.Dal *)
+
+      (* Below we use number_of_slots = slot_index + 1, because we don't have
+         access to number_of_slots parameters.  We could add it to
+         [Publish_dal_commitment], but then, we'll not be able to set it
+         correctly in function {!injector_operation_of_manager} below. *)
+      let number_of_slots = slot_index + 1 in
+      Manager
+        (Dal_publish_commitment
+           {
+             slot_index = Slot_index.of_octez ~number_of_slots slot_index;
+             commitment;
+             commitment_proof;
+           })
 
 let injector_operation_of_manager :
     type kind.
@@ -95,6 +114,15 @@ let injector_operation_of_manager :
         Sc_rollup_proto_types.Commitment_hash.to_octez cemented_commitment
       in
       Some (Execute_outbox_message {rollup; cemented_commitment; output_proof})
+  | Dal_publish_commitment {slot_index; commitment; commitment_proof} ->
+      Some
+        (Publish_dal_commitment
+           {
+             slot_index =
+               Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index;
+             commitment;
+             commitment_proof;
+           })
   | _ -> None
 
 module Proto_client = struct
@@ -420,6 +448,14 @@ module Proto_client = struct
           (to_string mempool_default)
       else Ok ()
     in
+    (* Copied from removed ParisB’s mempool module *)
+    let default_minimal_fees =
+      match Tez.of_mutez 100L with None -> assert false | Some t -> t
+    in
+    (* Copied from removed ParisB’s mempool module *)
+    let default_minimal_nanotez_per_gas_unit = Q.of_int 100 in
+    (* Copied from removed ParisB’s mempool module *)
+    let default_minimal_nanotez_per_byte = Q.of_int 1000 in
     let check purpose
         {
           minimal_fees;
@@ -436,8 +472,7 @@ module Proto_client = struct
           "minimal_fees"
           Int64.compare
           Int64.to_string
-          (Protocol.Alpha_context.Tez.to_mutez
-             Plugin.Mempool.default_minimal_fees)
+          (Protocol.Alpha_context.Tez.to_mutez default_minimal_fees)
           minimal_fees.mutez
       and+ () =
         check_value
@@ -445,7 +480,7 @@ module Proto_client = struct
           "minimal_nanotez_per_byte"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_byte
+          default_minimal_nanotez_per_byte
           minimal_nanotez_per_byte
       and+ () =
         check_value
@@ -453,7 +488,7 @@ module Proto_client = struct
           "minimal_nanotez_per_gas_unit"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+          default_minimal_nanotez_per_gas_unit
           minimal_nanotez_per_gas_unit
       in
       ()

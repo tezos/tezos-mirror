@@ -17,6 +17,11 @@ open Protocol
 open Alpha_context
 open Manager_operation_helpers
 
+let register_test =
+  Tezt_helpers.register_test_es
+    ~__FILE__
+    ~file_tags:["validation"; "manager_operation"]
+
 (** {2 Negative tests assert the case where validate must fail} *)
 
 (** Validate fails if the gas limit is too low.
@@ -540,7 +545,7 @@ let test_feature_flags infos kind =
     let* (_ : infos) = validate_diagnostic infos [op] in
     return_unit
 
-let tests =
+let () =
   let mk_default () = default_init_ctxt () in
   let mk_reveal () =
     init_ctxt {ctxt_req_default with reveal_accounts = false}
@@ -571,9 +576,9 @@ let tests =
   let gas_consum = gas_consumer_in_validate_subjects in
   let not_gas_consum = not_gas_consumer_in_validate_subjects in
   let revealed = revealed_subjects in
-  List.map
+  List.iter
     (fun (name, f, subjects, info_builder) ->
-      make_tztest name f subjects info_builder)
+      make_test ~register_test name f subjects info_builder)
     [
       (* Expected validation failure *)
       ("gas limit too low", test_low_gas_limit, gas_consum, mk_default);
@@ -610,10 +615,3 @@ let tests =
         mk_flags disabled_scoru_arith );
       ("zkru disabled", test_feature_flags, all, mk_flags disabled_zkru);
     ]
-
-let () =
-  Alcotest_lwt.run
-    ~__FILE__
-    Protocol.name
-    [("single manager validation", tests)]
-  |> Lwt_main.run

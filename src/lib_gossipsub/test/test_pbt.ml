@@ -216,7 +216,7 @@ module Test_message_cache = struct
       assert (gossip_slots <= history_slots) ;
       {ticks = 0; cache = M.empty; history_slots; gossip_slots}
 
-    let add_message message_id message topic t =
+    let add_message ~peer:_ message_id message topic t =
       {
         t with
         cache =
@@ -305,14 +305,29 @@ module Test_message_cache = struct
     return (String.of_seq (List.to_seq chars))
 
   type action =
-    | Add_message of {message_id : int; message : string; topic : string}
+    | Add_message of {
+        peer : int option;
+        message_id : int;
+        message : string;
+        topic : string;
+      }
     | Get_message_for_peer of {peer : int; message_id : int}
     | Get_message_ids_to_gossip of {topic : string}
     | Shift
 
+  let pp_peer fmt = function
+    | None -> Format.fprintf fmt "self"
+    | Some x -> Format.fprintf fmt "%d" x
+
   let pp_action fmt = function
-    | Add_message {message_id; message = _; topic} ->
-        Format.fprintf fmt "ADD_MESSAGE {id:%d;topic:%s}" message_id topic
+    | Add_message {peer; message_id; message = _; topic} ->
+        Format.fprintf
+          fmt
+          "ADD_MESSAGE {peer:%a;id:%d;topic:%s}"
+          pp_peer
+          peer
+          message_id
+          topic
     | Get_message_for_peer {peer = _; message_id} ->
         Format.fprintf fmt "GET_MESSAGE {id:%d}" message_id
     | Get_message_ids_to_gossip {topic} ->
@@ -321,10 +336,17 @@ module Test_message_cache = struct
 
   let add_message =
     let open QCheck2.Gen in
+    let* peer =
+      QCheck2.Gen.bind QCheck2.Gen.bool (function
+          | true ->
+              let* peer in
+              return (Some peer)
+          | false -> return None)
+    in
     let* message_id in
     let* message in
     let* topic in
-    return (Add_message {message_id; message; topic})
+    return (Add_message {peer; message_id; message; topic})
 
   let get_message_for_peer =
     let open QCheck2.Gen in
@@ -352,9 +374,9 @@ module Test_message_cache = struct
     let remaining_steps = List.length actions in
     match actions with
     | [] -> None
-    | Add_message {message_id; message; topic} :: actions ->
-        let left = L.add_message message_id message topic left in
-        let right = R.add_message message_id message topic right in
+    | Add_message {peer; message_id; message; topic} :: actions ->
+        let left = L.add_message ~peer message_id message topic left in
+        let right = R.add_message ~peer message_id message topic right in
         run (left, right) actions
     | Get_message_for_peer {peer; message_id} :: actions -> (
         let left_result = L.get_message_for_peer peer message_id left in
@@ -566,9 +588,14 @@ module Test_connections = struct
               | Gossipsub_pbt_generators.Input i ->
                   let conns =
                     match i with
-                    | Add_peer {peer; direct; outbound} -> (
+                    | Add_peer {peer; direct; outbound; bootstrap = false} -> (
                         match
-                          Connections.add_peer peer ~direct ~outbound conns
+                          Connections.add_peer
+                            peer
+                            ~direct
+                            ~outbound
+                            ~bootstrap:false
+                            conns
                         with
                         | `added conns -> conns
                         | `already_known -> conns)

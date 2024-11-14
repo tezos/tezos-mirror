@@ -10,6 +10,20 @@
 - Fix the incomplete inbox on the first level of using `MockHost::default()`.
 - Add support for new michelson `Ticket` constructor.
 - Add michelson `nat`.
+- Removes deprecated `proto-nairobi` feature flag.
+- Stabilise `OutboxMessage::WhitelistUpdate`.
+- Add `tezos-smart-rollup-utils`, for tooling that interacts with non-kernel related standards in the Smart Rollup ecosystem.
+- Add `tezos_smart_rollup_utils::inbox` module, constructing inboxes for testing, and manipulating `inbox.json` files.
+- Add `tezos_smart_rollup::entrypoint` module for kernel entrypoint configuration & macros.
+- Add `entrypoint::main` procedural macro to mark the kernel entrypoint function.
+- Add `extra` feature flag, for functionalility not-expected to be used by kernels directly.
+- Remove the `proto-alpha` flag restriction on DAL host functions.
+- Refactor `OutboxMessage` to `OutboxMessageFull` enabling different atomic batch backends that implement `AtomicBatch` trait.
+- Add `AtomicBatch2` ... `AtomicBatch5` structs implementing `AtomicBatch` and constructed from tuples
+  of `OutboxMessageTransaction` with potentially different parameter types.
+- Add `--keep-going` option to native cli, to control whether the kernel should exit once the inbox has been drained.
+- Implement the generic `reveal` host function in the `MockHost`, this allows in particular to use the DAL host functions in the mockup.
+- Bump `tezos_crypto_rs`/`tezos_data_encoding` to `0.6.0` release.
 
 ### Installer client/kernel
 

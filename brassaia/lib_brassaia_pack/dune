@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_pack)
+ (public_name octez-libs.brassaia_pack)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.event-logging
+  octez-libs.data-encoding
+  fmt
+  octez-libs.brassaia
+  octez-libs.brassaia.data
+  logs
+  lwt
+  optint)
+ (preprocess (pps octez-libs.ppx_brassaia.internal))
+ (flags
+  (:standard)
+  -w -66
+  -open Tezos_event_logging))

@@ -7,8 +7,6 @@ to Lima (see :ref:`naming_convention`).
 The code can be found in directory :src:`src/proto_016_PtMumbai` of the ``master``
 branch of Tezos.
 
-.. contents::
-
 New Environment Version (V8)
 ----------------------------
 

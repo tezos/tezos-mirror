@@ -33,7 +33,9 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
+
+let register_test = Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["token"]
 
 (** Creates a context with a single account. Returns the context and the public
     key hash of the account. *)
@@ -756,34 +758,22 @@ let test_transfer_n_with_several_givers () =
   in
   return_unit
 
-let tests =
-  Tztest.
-    [
-      tztest "transfer - balances" `Quick test_simple_balances;
-      tztest "transfer - balance updates" `Quick test_simple_balance_updates;
-      tztest "transfer - test allocated" `Quick test_allocated;
-      tztest
-        "transfer - test transfer to receiver"
-        `Quick
-        test_transferring_to_receiver;
-      tztest
-        "transfer - test transfer from giver"
-        `Quick
-        test_transferring_from_giver;
-      tztest
-        "transfer - test all (givers x receivers)"
-        `Quick
-        test_all_combinations_of_givers_and_receivers;
-      tztest
-        "transfer - test from no giver to a receiver"
-        `Quick
-        test_transfer_n_with_no_giver;
-      tztest
-        "transfer - test from n givers to a receiver"
-        `Quick
-        test_transfer_n_with_several_givers;
-    ]
-
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("token movements", tests)]
-  |> Lwt_main.run
+  register_test ~title:"transfer - balances" test_simple_balances ;
+  register_test ~title:"transfer - balance updates" test_simple_balance_updates ;
+  register_test ~title:"transfer - test allocated" test_allocated ;
+  register_test
+    ~title:"transfer - test transfer to receiver"
+    test_transferring_to_receiver ;
+  register_test
+    ~title:"transfer - test transfer from giver"
+    test_transferring_from_giver ;
+  register_test
+    ~title:"transfer - test all (givers x receivers)"
+    test_all_combinations_of_givers_and_receivers ;
+  register_test
+    ~title:"transfer - test from no giver to a receiver"
+    test_transfer_n_with_no_giver ;
+  register_test
+    ~title:"transfer - test from n givers to a receiver"
+    test_transfer_n_with_several_givers

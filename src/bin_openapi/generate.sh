@@ -1,12 +1,13 @@
 #!/bin/sh
 
-# This script launches a sandbox node, activates Granada, gets the RPC descriptions
+# This script launches a sandbox node, activates protocol $protocol_name, gets the RPC descriptions
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
-# When the python tests framework becomes a standalone library, this script
-# should be removed and replaced by a python script calling the test's core
+# This script should be replaced by a Tezt script calling the test's core
 # logic.
+
+set -e
 
 # Ensure we are running from the root directory of the Tezos repository.
 cd "$(dirname "$0")"/../.. || exit
@@ -18,9 +19,9 @@ smart_rollup_node=./octez-smart-rollup-node
 dal_node=./octez-dal-node
 
 # Protocol configuration.
-protocol_hash=PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ
-protocol_parameters=src/proto_019_PtParisB/parameters/sandbox-parameters.json
-protocol_name=paris
+protocol_hash=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+protocol_parameters=src/proto_alpha/parameters/sandbox-parameters.json
+protocol_name=alpha
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -33,18 +34,20 @@ dal_rpc_port=10732
 tmp=openapi-tmp
 data_dir=$tmp/octez-sandbox
 client_dir=$tmp/octez-client
-dal_node_data_dir=$tmp/dal-node
+dal_node_data_dir=$tmp/octez-dal-node
 api_json=$tmp/rpc-api.json
 proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 dal_api_json=$tmp/dal-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi-rc.json
-proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
-mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
-smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
-dal_node_openapi_json=docs/api/dal-node-openapi-rc.json
+openapi_json=docs/api/rpc-openapi-dev.json
+proto_openapi_json=docs/api/$protocol_name-openapi.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
+smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi.json
+dal_node_openapi_json=docs/api/dal-node-openapi-dev.json
+
+rm -rf "$tmp"
 
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)
@@ -54,24 +57,19 @@ $tezos_node config init --data-dir $data_dir \
   --network sandbox \
   --expected-pow 0 \
   --rpc-addr localhost:$rpc_port \
-  --no-bootstrap-peer \
-  --synchronisation-threshold 0
+  --synchronisation-threshold 0 \
+  --connections 0
 $tezos_node identity generate --data-dir $data_dir
-$tezos_node run --data-dir $data_dir --connections 0 &
+$tezos_node run --data-dir $data_dir --connections 0 --synchronisation-threshold 0 &
 node_pid="$!"
 
 # Wait for the node to be ready (sorry for the hackish way...)
-sleep 1
+sleep 3
 
 # Activate the protocol.
 mkdir $client_dir
-$tezos_client --base-dir $client_dir import secret key activator $activator_secret_key
-$tezos_client --base-dir $client_dir activate protocol $protocol_hash \
-  with fitness 1 \
-  and key activator \
-  and parameters $protocol_parameters \
-  --timestamp "$(TZ='AAA+1' date +%FT%TZ)"
-
+$tezos_client --base-dir $client_dir --endpoint http://localhost:$rpc_port --block genesis activate protocol \
+  $protocol_hash with fitness 1 and key $activator_secret_key and parameters $protocol_parameters
 # Wait a bit again...
 sleep 1
 
@@ -79,7 +77,6 @@ sleep 1
 mkdir $dal_node_data_dir
 $dal_node config init --data-dir $dal_node_data_dir \
   --endpoint "http://localhost:$rpc_port" --expected-pow 0
-$dal_node identity generate --data-dir $dal_node_data_dir
 $dal_node run --data-dir $dal_node_data_dir &
 dal_node_pid="$!"
 

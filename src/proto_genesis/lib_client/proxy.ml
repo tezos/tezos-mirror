@@ -29,7 +29,7 @@ let msg : string =
    empty."
 
 module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
-  let split_key _ _ = None
+  let split_key _ = None
 
   let failure_is_permanent _ = false
 

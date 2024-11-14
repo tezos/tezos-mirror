@@ -39,6 +39,9 @@ val delayed_inbox : path
 (** [kernel_root_hash] is the path to the current kernel root hash. *)
 val kernel_root_hash : path
 
+(** [indexes] is the directory with all indexes category. *)
+val indexes : path
+
 (** [eth_accounts] is the path to ethereum accounts. *)
 val eth_accounts : path
 
@@ -100,6 +103,15 @@ val delayed_inbox_min_levels : path
 
 (** [reveal_config] is the path to the storage configuration. *)
 val reveal_config : path
+
+(** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
+val enable_fa_bridge : path
+
+module Ticket_table : sig
+  (** [balance ~ticket_hash ~account] returns the path where the balance of
+      [account] of ticket [ticket_hash] is. *)
+  val balance : ticket_hash:path -> account:path -> path
+end
 
 module Ghostnet : sig
   val eth_accounts : path

@@ -7,7 +7,8 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  filter_event : Ethereum_types.Evm_events.t -> bool;
+  filter_event : Evm_events.t -> bool;
+  keep_alive : bool;
 }
 
 module StringSet = Set.Make (String)
@@ -63,23 +64,24 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let read_from_rollup_node path level rollup_node_endpoint =
+let read_from_rollup_node ~keep_alive path level rollup_node_endpoint =
   let open Rollup_services in
   call_service
+    ~keep_alive
     ~base:rollup_node_endpoint
     durable_state_value
     ((), Block_id.Level level)
     {key = path}
     ()
 
-let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
-    event_index =
+let fetch_event ({rollup_node_endpoint; keep_alive; _} : Types.state)
+    rollup_block_lvl event_index =
   let open Lwt_result_syntax in
   let path = Durable_storage_path.Evm_events.nth_event event_index in
   let* bytes_opt =
-    read_from_rollup_node path rollup_block_lvl rollup_node_endpoint
+    read_from_rollup_node ~keep_alive path rollup_block_lvl rollup_node_endpoint
   in
-  let event_opt = Option.bind bytes_opt Ethereum_types.Evm_events.of_bytes in
+  let event_opt = Option.bind bytes_opt Evm_events.of_bytes in
   let*! () =
     if Option.is_none event_opt then
       Evm_events_follower_events.unreadable_event (event_index, rollup_block_lvl)
@@ -87,7 +89,8 @@ let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
   in
   return event_opt
 
-let on_new_head ({rollup_node_endpoint; filter_event} as state : Types.state)
+let on_new_head
+    ({rollup_node_endpoint; keep_alive; filter_event} as state : Types.state)
     rollup_block_lvl =
   let open Lwt_result_syntax in
   let* last_known_l1_block = Evm_context.last_known_l1_level () in
@@ -109,6 +112,7 @@ let on_new_head ({rollup_node_endpoint; filter_event} as state : Types.state)
   | `Process -> (
       let* nb_of_events_bytes =
         read_from_rollup_node
+          ~keep_alive
           Durable_storage_path.Evm_events.length
           rollup_block_lvl
           rollup_node_endpoint
@@ -117,7 +121,7 @@ let on_new_head ({rollup_node_endpoint; filter_event} as state : Types.state)
       | None -> Evm_context.new_last_known_l1_level rollup_block_lvl
       | Some nb_of_events_bytes ->
           let (Qty nb_of_events) =
-            Ethereum_types.decode_number nb_of_events_bytes
+            Ethereum_types.decode_number_le nb_of_events_bytes
           in
           let nb_of_events = Z.to_int nb_of_events in
           let* events =

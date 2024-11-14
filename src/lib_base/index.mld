@@ -7,6 +7,10 @@ It contains the following libraries:
 - {{!module-Aplonk}Aplonk}
 - {{!module-Bls12_381_hash}Bls12_381_hash}
 - {{!module-Bls12_381_signature}Bls12_381_signature}
+- {{!module-Brassaia}Brassaia}
+- {{!module-Brassaia_pack}Brassaia_pack}
+- {{!module-Brassaia_test_helpers}Brassaia_test_helpers}
+- {{!module-Brassaia_tezos}Brassaia_tezos}
 - {{!module-Distributed_plonk}Distributed_plonk}
 - {{!module-Epoxy_tx}Epoxy_tx}
 - {{!module-Kzg}Kzg}: Toolbox for KZG polynomial commitment
@@ -16,10 +20,14 @@ It contains the following libraries:
 - {{!module-Plompiler}Plompiler}
 - {{!module-Plonk}Plonk}: Plonk zero-knowledge proving system
 - {{!module-Polynomial}Polynomial}: Polynomials over finite fields
+- {{!module-Ppx_brassaia}Ppx_brassaia}
+- {{!module-Ppx_profiler}Ppx_profiler}
+- {{!module-Qcheck_tezt}Qcheck_tezt}: Wrapper to register QCheck tests as Tezt tests
 - {{!module-Tezos_base}Tezos_base}: Meta-package and pervasive type definitions for Tezos
 - {{!module-Tezos_base_test_helpers}Tezos_base_test_helpers}: Octez base test helpers
 - {{!module-Tezos_clic}Tezos_clic}
 - {{!module-Tezos_context}Tezos_context}: On-disk context abstraction for [octez-node]
+- {{!module-Tezos_context_brassaia}Tezos_context_brassaia}: On-disk context abstraction for [octez-node] (brassaia)
 - {{!module-Tezos_crypto}Tezos_crypto}: Library with all the cryptographic primitives used by Tezos
 - {{!module-Tezos_crypto_dal}Tezos_crypto_dal}: DAL cryptographic primitives
 - {{!module-Tezos_error_monad}Tezos_error_monad}: Error monad
@@ -47,3 +55,7 @@ It contains the following libraries:
 - {{!module-Tezos_version}Tezos_version}: Version information generated from Git
 - {{!page-tezos_workers}Tezos_workers}: Worker library
 - {{!module-Tezt_wrapper}Tezt_wrapper}
+- {{!module-Cohttp}Cohttp}
+- {{!module-Data_encoding}Data_encoding}
+- {{!module-Prometheus}Prometheus}
+- {{!module-Resto}Resto}

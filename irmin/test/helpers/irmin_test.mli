@@ -62,6 +62,7 @@ val checks : 'a Irmin.Type.t -> string -> 'a list -> 'a list -> unit
 
 module Store : sig
   val run :
+    __FILE__:string ->
     string ->
     ?slow:bool ->
     ?random_seed:int ->

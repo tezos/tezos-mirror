@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_riscv_api)
+ (public_name octez-riscv-api)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-rust-deps)
+ (flags
+  (:standard)
+  -w -9-27-66)
+ (modules octez_riscv_api))
+
+(copy_files ../../riscv/lib/octez_riscv_api.*)

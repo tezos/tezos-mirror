@@ -2,13 +2,38 @@
 Blocks and Operations
 =====================
 
-The content of a Tezos block is made up of operations, which implement
+The content of a Tezos block is made up of a block header and a payload consisting of a list of operations.
+
+This page first describes the protocol-specific part of the block header, and then explains what operations are.
+For the protocol-independent part of the block header, see :ref:`shell_header`.
+
+.. _proto_block_header_alpha:
+
+Protocol-specific block header
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:ref:`Recall<shell_proto_interact_alpha>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
+Namely, these two notions are the protocol-specific header and the :ref:`fitness <fitness_alpha>`.
+
+As in Emmy*, the protocol-specific header contains the fields:
+
+- ``signature``: a digital signature of the shell and protocol headers (excluding the signature itself)
+- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_alpha>`, used to generate entropy on the chain
+- ``proof_of_work_nonce``: a nonce used to pass a low-difficulty proof-of-work for the block, as a spam prevention measure
+- ``liquidity_baking_toggle_vote``: :ref:`a vote<toggle_alpha>` to continue the Liquidity Baking Subsidy, stop it, or abstain.
+
+There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_alpha>`.
+
+Operations
+~~~~~~~~~~
+
+Operations implement
 and reify different functionalities provided by a Tezos economic
 protocol: from reaching consensus on the state of the Tezos
 blockchain, to performing smart contract calls and transactions. Each
 Tezos economic protocol can specify different kinds of operations.
 
-This entry describes the operations supported by :doc:`the economic
+This page only describes the operations supported by :doc:`the economic
 protocol <./protocol>` that implement *enabled* features -- that is,
 those available to end-users on Tezos Mainnet. The complete list of
 operations, including those corresponding to features in development
@@ -200,7 +225,7 @@ handled with dedicated manager operations.
   according to their specific semantics.
 - The ``Smart_rollup_publish`` operation is used to regularly declare
   what is the new state of a given smart rollup in a so-called
-  “commitment”. To publish commitments, an implicit account has to
+  “commitment”. To publish commitments, a user account has to
   own at least ꜩ 10,000, which are frozen as long as at least one of
   their commitments is disputable.
 - The ``Smart_rollup_cement`` operation is used to cement a
@@ -208,9 +233,9 @@ handled with dedicated manager operations.
   published for long enough, and there is no concurrent commitment for
   the same state update. Once a commitment is cemented, it cannot be
   disputed anymore.
-- The ``Smart_rollup_recover_bond`` operation is used by an implicit
+- The ``Smart_rollup_recover_bond`` operation is used by a user
   account to unfreeze their ꜩ 10,000. This operation only succeeds if
-  and only if all the commitments published by the implicit account
+  and only if all the commitments published by the user account
   have been cemented.
 - The ``Smart_rollup_refute`` operation is used to start or pursue a
   dispute. A dispute is resolved on the Tezos blockchain through a

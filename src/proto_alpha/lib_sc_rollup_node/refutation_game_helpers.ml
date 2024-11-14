@@ -97,8 +97,14 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
                 let dal_cctxt =
                   WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt
                 in
-                Dal_node_client.get_page_proof dal_cctxt page_index
-                @@ Bytes.concat Bytes.empty pages
+                let Dal.Slot.Header.{published_level; index} = slot_id in
+                Dal_node_client.get_slot_page_proof
+                  dal_cctxt
+                  {
+                    slot_level = published_level |> Raw_level.to_int32;
+                    slot_index = index |> Alpha_context.Dal.Slot_index.to_int;
+                  }
+                  page_index
               in
               return_some (content, page_proof)
           | None ->
@@ -223,7 +229,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
              ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
         @@
         let open Lwt_result_syntax in
-        let* messages = Messages.get node_ctxt witness in
+        let* messages = Node_context.get_messages node_ctxt witness in
         let*? hist = Inbox.payloads_history_of_all_messages messages in
         return hist
     end
@@ -307,8 +313,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
   in
   return proof
 
-let make_dissection plugin (node_ctxt : _ Node_context.t) ~start_state
-    ~start_chunk ~our_stop_chunk ~default_number_of_sections
+let make_dissection plugin (node_ctxt : _ Node_context.t) state_cache
+    ~start_state ~start_chunk ~our_stop_chunk ~default_number_of_sections
     ~commitment_period_tick_offset ~last_level =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
@@ -316,6 +322,7 @@ let make_dissection plugin (node_ctxt : _ Node_context.t) ~start_state
     Interpreter.state_of_tick
       plugin
       node_ctxt
+      state_cache
       ?start_state
       ~tick:(Z.add (Sc_rollup.Tick.to_z tick) commitment_period_tick_offset)
       last_level

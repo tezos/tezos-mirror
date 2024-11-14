@@ -9,7 +9,6 @@
   octez-libs.base
   octez-libs.tree-encoding
   octez-libs.base.unix
-  octez-libs.tezos-context.disk
   octez-libs.base-test-helpers
   octez-libs.test-helpers
   octez-l2-libs.scoru-wasm
@@ -18,6 +17,7 @@
   octez-l2-libs.scoru-wasm-helpers
   octez-l2-libs.scoru_wasm_test_helpers
   octez-l2-libs.webassembly-interpreter-extra)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -48,7 +48,8 @@
   test_wasm_encoding
   test_wasm_pvm_encodings
   test_wasm_pvm
-  test_wasm_vm))
+  test_wasm_vm
+  test_crypto))
 
 (executable
  (name main)
@@ -56,14 +57,13 @@
  (libraries
   src_lib_scoru_wasm_test_tezt_lib
   tezt)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
  (modules main))
 
 (rule
  (alias runtest)
  (package octez-l2-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

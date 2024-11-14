@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
@@ -25,6 +25,7 @@ pub(crate) mod fake_hash;
 
 use crypto::hash::{ContractTz1Hash, HashTrait, HashType, SmartRollupHash};
 use inbox::DepositFromInternalPayloadError;
+use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
 use tezos_smart_rollup_encoding::michelson::ticket::{StringTicket, Ticket};
@@ -61,6 +62,7 @@ impl TryFrom<MichelsonPair<MichelsonString, StringTicket>> for InboxDeposit {
 }
 
 /// Entrypoint of the *transactions* kernel.
+#[cfg_attr(feature = "tx-kernel", entrypoint::main)]
 pub fn transactions_run<Host>(host: &mut Host)
 where
     Host: Runtime,
@@ -229,7 +231,7 @@ fn filter_inbox_message<'a, Host: Runtime>(
             destination,
             ..
         })) => {
-            if rollup_address.0 != destination.hash().0 {
+            if rollup_address != destination.hash() {
                 #[cfg(feature = "debug")]
                 debug_msg!(
                     host,
@@ -309,13 +311,6 @@ enum CachedTransactionError {
 const MAX_ENVELOPE_CONTENT_SIZE: usize =
     MAX_INPUT_MESSAGE_SIZE - HashType::SmartRollupHash.size() - 2;
 
-/// Define the `kernel_run` for the transactions kernel.
-#[cfg(feature = "tx-kernel")]
-pub mod tx_kernel {
-    use tezos_smart_rollup_entrypoint::kernel_entry;
-    kernel_entry!(crate::transactions_run);
-}
-
 #[cfg(test)]
 mod test {
     use tezos_smart_rollup_encoding::{
@@ -341,7 +336,7 @@ mod test {
         let mut mock_runtime = MockHost::default();
 
         let destination =
-            ContractTz1Hash::from_b58check("tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K").unwrap();
+            ContractTz1Hash::from_b58check("tz1XdRrrqrMfsFKA8iuw53xHzug9ipr6MuHq").unwrap();
 
         let ticket_creator =
             Contract::from_b58check("KT1JW6PwhfaEJu6U3ENsxUeja48AdtqSoekd").unwrap();
@@ -379,7 +374,7 @@ mod test {
         let mut mock_runtime = MockHost::default();
 
         // setup message
-        let receiver = gen_ed25519_keys().0.pk_hash().unwrap();
+        let receiver = gen_ed25519_keys().0.pk_hash();
         let originator = Contract::Originated(
             ContractKt1Hash::from_b58check("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq").unwrap(),
         );

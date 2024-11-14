@@ -30,9 +30,10 @@
 
    - Doesn't add padding (KVS with values of variable size)
 
-   - Doesn't encode to intermediate structures (those of strcuture). Maybe have a
-     per-protocol store in this case, and move most of the store creating and
-     updating to the proto plugin to avoid existential type variables issues.
+   - Doesn't encode to intermediate structures (like
+     [Dal_proto_types.Skip_list_cell]). Maybe have a per-protocol store in this
+     case, and move most of the store creating and updating to the proto plugin
+     to avoid existential type variables issues.
 *)
 (**
    This module instantiates the key value store to provide facilities for
@@ -54,24 +55,22 @@
 type t
 
 (** [init ~node_store_dir ~skip_list_store_dir ~padded_encoded_cell_size
-    ~encoded_hash_size ~number_of_slots] returns a new skip lists store under
+    ~encoded_hash_size] returns a new skip lists store under
     the path [node_store_dir/skip_list_store_dir]. The
     [padded_encoded_cell_size] parameter specifies the extended size of cells
     once encoded and stored as bytes in the key-value store. The
     [encoded_hash_size] parameter indicates the size of hashes once encoded as
-    fixed-size bytes. The provided [number_of_slots] is used to know the number
-    of expected cells (hashes) per attested level. *)
+    fixed-size bytes. *)
 val init :
   node_store_dir:string ->
   skip_list_store_dir:string ->
   padded_encoded_cell_size:int ->
   encoded_hash_size:int ->
-  number_of_slots:int ->
   t tzresult Lwt.t
 
 (** [insert store ~attested_level values] inserts the given list of [values]
     associated to the given [attested_level] in the [store]. Any existing value
-    is overriden. *)
+    is overridden. *)
 val insert :
   t ->
   attested_level:int32 ->

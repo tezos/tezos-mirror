@@ -268,3 +268,14 @@ let get_commitment cctxt rollup_address commitment_hash =
       commitment_hash
   in
   Sc_rollup_proto_types.Commitment.to_octez commitment
+
+let get_balance_mutez cctxt ?block pkh =
+  let open Lwt_result_syntax in
+  let block = match block with Some b -> `Hash (b, 0) | None -> `Head 0 in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
+  let+ balance =
+    Protocol.Contract_services.balance cctxt (cctxt#chain, block) (Implicit pkh)
+  in
+  Protocol.Alpha_context.Tez.to_mutez balance

@@ -33,12 +33,12 @@ module type RPC_DIRECTORY = sig
     (unit * Rollup_node_services.Arg.block_id) Tezos_rpc.Directory.t
 end
 
-(** Protocol specific functions to track endorsed DAL slots of L1 blocks. *)
+(** Protocol specific functions to track attested DAL slots of L1 blocks. *)
 module type DAL_SLOTS_TRACKER = sig
   (** [process_head node_ctxt head] performs the following operations for a
       given protocol:
       {ul
-        {li it reads the endorsements for headers published attestation_lag
+        {li it reads the attestations for headers published attestation_lag
         levels preceding [head] from the block metadata, determines which
         ones the rollup node will download, and stores the results in
         [Store.Dal_confirmed_slots].}
@@ -92,14 +92,12 @@ module type INBOX = sig
 
   module Internal_for_tests : sig
     (** Only for tests. [process_messages node_ctxt ~is_first_block ~predecessor
-        head messages] reconstructs the inbox on disk for the [messages] as if
-        they appeared in [head]. See {!val:process_head} for the return
-        values. *)
+        messages] reconstructs the inbox on disk for the [messages]. See
+        {!val:process_head} for the return values. *)
     val process_messages :
       Node_context.rw ->
       is_first_block:bool ->
       predecessor:Layer1.header ->
-      Layer1.header ->
       string list ->
       (Octez_smart_rollup.Inbox.Hash.t
       * Octez_smart_rollup.Inbox.t
@@ -180,6 +178,13 @@ module type LAYER1_HELPERS = sig
     Address.t ->
     Commitment.Hash.t ->
     Commitment.t tzresult Lwt.t
+
+  (** Retrieve the balance in mutez for a given public key hash. *)
+  val get_balance_mutez :
+    #Client_context.full ->
+    ?block:Block_hash.t ->
+    Signature.public_key_hash ->
+    int64 tzresult Lwt.t
 end
 
 (** Protocol specific functions for processing L1 blocks. *)
@@ -213,7 +218,7 @@ module type REFUTATION_GAME_HELPERS = sig
   val generate_proof :
     Node_context.rw -> Game.t -> Context.pvmstate -> string tzresult Lwt.t
 
-  (** [make_dissection plugin node_ctxt ~start_state ~start_chunk
+  (** [make_dissection plugin node_ctxt cache ~start_state ~start_chunk
       ~our_stop_chunk ~default_number_of_sections ~commitment_period_tick_offset
       ~last_level] computes a dissection from between [start_chunk] and
       [our_stop_chunk] at level [last_level]. [commitment_period_tick_offset] is
@@ -222,6 +227,7 @@ module type REFUTATION_GAME_HELPERS = sig
   val make_dissection :
     (module PARTIAL) ->
     Node_context.rw ->
+    Pvm_plugin_sig.state_cache ->
     start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->

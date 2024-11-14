@@ -25,10 +25,6 @@
 
 (** This module provides different services related to DAL slots. *)
 
-(* We cannot include a raw mli file. But this will be removed once full
-   migration is done. *)
-include module type of Services_legacy
-
 open Tezos_crypto_dal
 
 type 'rpc service =
@@ -42,13 +38,13 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
-(** Add the given slot in the node if not already present. The corresponding
-    commitment is returned. See {!val:
-    Slot_manager.add_commitment} for more details. *)
-val post_commitment :
-  < meth : [`POST]
-  ; input : Cryptobox.slot
-  ; output : Cryptobox.commitment
+(* This RPC aims to be used by a user to check whether its DAL node
+   behaves as expected. It does not aim to provide a clear diagnostic,
+   this is left to another RPC (not implemented yet). *)
+val health :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.Health.t
   ; prefix : unit
   ; params : unit
   ; query : unit >
@@ -64,7 +60,7 @@ val post_slot :
   ; output : Cryptobox.commitment * Cryptobox.commitment_proof
   ; prefix : unit
   ; params : unit
-  ; query : < padding : char > >
+  ; query : < padding : char ; slot_index : Types.slot_index option > >
   service
 
 (** Associate a commitment to a level and a slot index. See {!val:
@@ -78,52 +74,40 @@ val patch_commitment :
   ; query : unit >
   service
 
-(** Retrieve the content of the slot associated with the given commitment. *)
-val get_commitment_slot :
+(** Retrieve the content of the slot associated with the given slot id. *)
+val get_slot_content :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.slot
   ; prefix : unit
-  ; params : unit * Cryptobox.commitment
+  ; params : (unit * Types.level) * Types.slot_index
   ; query : unit >
   service
 
-(** Compute the proof associated to a commitment. *)
-val get_commitment_proof :
+(** Returns the pages of the slot identified by the given slot id. *)
+val get_slot_pages :
   < meth : [`GET]
   ; input : unit
-  ; output : Cryptobox.commitment_proof
+  ; output : Tezos_crypto_dal.Cryptobox.page list
   ; prefix : unit
-  ; params : unit * Cryptobox.commitment
+  ; params : (unit * Types.level) * Types.slot_index
   ; query : unit >
   service
 
 (** Compute the proof associated to the page whose index is given of the given
     slot. *)
-val get_page_proof :
-  < input : Cryptobox.slot
-  ; meth : [`POST]
+val get_slot_page_proof :
+  < meth : [`GET]
+  ; input : unit
   ; output : Cryptobox.page_proof
-  ; params : unit * Types.page_index
   ; prefix : unit
-  ; query : unit >
-  service
-
-(** Compute and save the shards of the slot associated to the given
-    commitment. If the input's flag is true, the proofs associated with the
-    computed shards are also computed and stored in memory. *)
-val put_commitment_shards :
-  < meth : [`PUT]
-  ; input : Types.with_proof
-  ; output : unit
-  ; prefix : unit
-  ; params : unit * Cryptobox.commitment
+  ; params : ((unit * Types.level) * Types.slot_index) * Types.page_index
   ; query : unit >
   service
 
 (** Return the accepted commitment associated to the given slot index and
     published at the given level, if any. *)
-val get_commitment_by_published_level_and_index :
+val get_slot_commitment :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.commitment
@@ -132,24 +116,14 @@ val get_commitment_by_published_level_and_index :
   ; query : unit >
   service
 
-(** Return the known headers for the slot whose commitment is given. *)
-val get_commitment_headers :
+(** Return the status for the given slot. *)
+val get_slot_status :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.slot_header list
+  ; output : Types.header_status
   ; prefix : unit
-  ; params : unit * Cryptobox.commitment
-  ; query : Types.level option * Types.slot_index option >
-  service
-
-(** Return the known slot headers for the given published level. *)
-val get_published_level_headers :
-  < meth : [`GET]
-  ; input : unit
-  ; output : Types.slot_header list
-  ; prefix : unit
-  ; params : unit * Types.level
-  ; query : Types.header_status option >
+  ; params : (unit * Types.level) * Types.slot_index
+  ; query : unit >
   service
 
 (** Update the list of profiles tracked by the DAL node.
@@ -157,7 +131,7 @@ val get_published_level_headers :
     is incompatible with other profiles. *)
 val patch_profiles :
   < meth : [`PATCH]
-  ; input : Types.operator_profiles
+  ; input : Operator_profile.t
   ; output : unit
   ; prefix : unit
   ; params : unit
@@ -168,7 +142,7 @@ val patch_profiles :
 val get_profiles :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.profiles
+  ; output : Types.profile
   ; prefix : unit
   ; params : unit
   ; query : unit >
@@ -198,12 +172,12 @@ val get_attestable_slots :
   service
 
 (** Return the shard associated to the given index. *)
-val get_shard :
+val get_slot_shard :
   < meth : [`GET]
   ; input : unit
   ; output : Tezos_crypto_dal.Cryptobox.shard
   ; prefix : unit
-  ; params : (unit * Tezos_crypto_dal.Cryptobox.commitment) * int
+  ; params : ((unit * Types.level) * Types.slot_index) * int
   ; query : unit >
   service
 
@@ -227,43 +201,34 @@ module P2P : sig
     ; query : < timeout : Ptime.Span.t option > >
     service
 
-  val delete_disconnect_point :
-    < meth : [`DELETE]
-    ; input : unit
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * P2p_point.Id.t
-    ; query : < wait : bool > >
-    service
-
-  val delete_disconnect_peer :
-    < meth : [`DELETE]
-    ; input : unit
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * P2p_peer.Id.t
-    ; query : < wait : bool > >
-    service
-
-  val get_points :
-    < meth : [`GET]
-    ; input : unit
-    ; output : P2p_point.Id.t list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
-  val get_points_info :
-    < meth : [`GET]
-    ; input : unit
-    ; output : (P2p_point.Id.t * P2p_point.Info.t) list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
   module Points : sig
+    val delete_disconnect_point :
+      < meth : [`DELETE]
+      ; input : unit
+      ; output : unit
+      ; prefix : unit
+      ; params : unit * P2p_point.Id.t
+      ; query : < wait : bool > >
+      service
+
+    val get_points :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_point.Id.t list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
+    val get_points_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (P2p_point.Id.t * P2p_point.Info.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
     val get_point_info :
       < meth : [`GET]
       ; input : unit
@@ -274,25 +239,34 @@ module P2P : sig
       service
   end
 
-  val get_peers :
-    < meth : [`GET]
-    ; input : unit
-    ; output : P2p_peer.Id.t list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
-  val get_peers_info :
-    < meth : [`GET]
-    ; input : unit
-    ; output : (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list
-    ; prefix : unit
-    ; params : unit
-    ; query : < connected : bool > >
-    service
-
   module Peers : sig
+    val delete_disconnect_peer :
+      < meth : [`DELETE]
+      ; input : unit
+      ; output : unit
+      ; prefix : unit
+      ; params : unit * P2p_peer.Id.t
+      ; query : < wait : bool > >
+      service
+
+    val get_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : P2p_peer.Id.t list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
+    val get_peers_info :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < connected : bool > >
+      service
+
     val get_peer_info :
       < meth : [`GET]
       ; input : unit
@@ -326,6 +300,24 @@ module P2P : sig
       < meth : [`GET]
       ; input : unit
       ; output : (Types.Topic.t * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < subscribed : bool > >
+      service
+
+    val get_slot_indexes_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.slot_index * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : < subscribed : bool > >
+      service
+
+    val get_pkhs_peers :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Signature.public_key_hash * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
       ; query : < subscribed : bool > >

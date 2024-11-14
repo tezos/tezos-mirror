@@ -24,7 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {address : string; private_key : string; public_key : string}
+type t = {address : string; private_key : string}
 
 (** Bootstrap accounts in the EVM Kernel *)
 val bootstrap_accounts : t array
+
+(** [lots_of_address] is 100 addresses to use for test, correspond to
+    tx's sender in
+    tezt/tests/evm_kernel_inputs/100-inputs-for-proxy *)
+val lots_of_address : string list

@@ -94,8 +94,8 @@ let parse_nameassoc bytes start =
     else
       let uchar = String.get_utf_8_uchar string index in
       (if Uchar.utf_decode_is_valid uchar then
-       let u = Uchar.utf_decode_uchar uchar in
-       if Uchar.is_char u then Buffer.add_char buffer (Uchar.to_char u)) ;
+         let u = Uchar.utf_decode_uchar uchar in
+         if Uchar.is_char u then Buffer.add_char buffer (Uchar.to_char u)) ;
       decode string (index + Uchar.utf_decode_length uchar)
   in
   let index = decode bytes start_index in

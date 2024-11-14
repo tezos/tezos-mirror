@@ -30,6 +30,8 @@
    Subject:      Checks the migration of protocol alpha
 *)
 
+let team = Tag.layer1
+
 let connect (client_1, node_1) (client_2, node_2) =
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
@@ -118,7 +120,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   let* () =
     repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
   in
-  (* Ensure that the block before migration *)
+  (* Ensure that the block before migration is consistent *)
   Log.info "Checking migration block consistency" ;
   let* () =
     block_check
@@ -157,7 +159,7 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
     Test.register
       ~__FILE__
       ~title:(Printf.sprintf "protocol migration at level %d" migration_level)
-      ~tags:["protocol"; "migration"; "sandbox"]
+      ~tags:[team; "protocol"; "migration"; "sandbox"]
     @@ fun () ->
     let* _client, _node =
       perform_protocol_migration
@@ -171,6 +173,128 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
     in
     unit
   done
+
+(** Tests that weeklynet parameters are consistent when migrating to Alpha
+    - This test starts from the predecessor of protocol alpha (supposedly the
+      last snapshotted protocol) and will migrate to alpha.
+    - It starts by using
+      "tezt/tests/weeklynet_configs/last_snapshotted_protocol.json" parameters
+      that should reflect those used for weeklynet.
+    - It will then wait for 4 levels to migrate to alpha and check migration.
+    - Parameters are checked after migration to ensure they are still
+      consistent.
+
+    In case of errors:
+    - Errors during initial protocol activation imply inconsistency between the
+      last snapshotted protocol and the configuration file.
+    - Errors during migration imply that the stitching might not be consistent
+      with the current parameters.
+
+    When snapshotting a protocol, this test may fail because stitching to alpha
+    is not yet implemented. You should temporarily patch this test to migrate
+    from Alpha-2 to Alpha-1 and make sure to reactivate the migration from
+    Alpha-1 to Alpha in the first MR introducing stitching to new alpha.
+*)
+let test_weeklynet_migration_parameters =
+  let migrate_from =
+    match Protocol.previous_protocol Protocol.Alpha with
+    | None -> Test.fail "No previous protocol for Alpha"
+    | Some p -> p
+  in
+  let base_path = "tezt" // "tests" // "weeklynet_configs" in
+  let last_snapshotted_protocol_parameters_path =
+    base_path // "last_snapshotted_protocol.json"
+  in
+
+  let migration_level = 4 in
+
+  let perform_migration ~migrate_to ~parameter_file =
+    let keys =
+      List.map (fun b -> b.Account.alias) (Array.to_list Account.Bootstrap.keys)
+    in
+    Log.info "Node starting" ;
+    let* client, node =
+      user_migratable_node_init ~migration_level ~migrate_to ()
+    in
+    Log.info "Node %s initialized" (Node.name node) ;
+    let activate_protocol =
+      Client.spawn_activate_protocol
+        ~protocol:migrate_from
+        client
+        ~parameter_file
+    in
+    let* activation_result = Process.wait activate_protocol in
+    let () =
+      match activation_result with
+      | Unix.WEXITED 0 -> ()
+      | _ ->
+          Test.fail
+            "Failed to activate protocol %s, inconsistent parameter file in %s"
+            (Protocol.hash migrate_from)
+            last_snapshotted_protocol_parameters_path
+    in
+    Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
+    (* Bake until migration *)
+    let* () =
+      repeat (migration_level - 2) (fun () ->
+          Client.bake_for_and_wait ~keys client)
+    in
+
+    (* Migrate *)
+    let bake_migration = Client.spawn_bake_for ~keys client in
+    let* migration_result = Process.wait bake_migration in
+    let () =
+      match migration_result with
+      | Unix.WEXITED n when n = 0 -> ()
+      | _ ->
+          Test.fail
+            "Failed to migrate to protocol %s"
+            (Protocol.hash migrate_to)
+    in
+    Log.info "Checking migration block consistency" ;
+    let* () =
+      block_check
+        ~expected_block_type:`Migration
+        client
+        ~migrate_from
+        ~migrate_to
+        ~level:migration_level
+    in
+    let* () = Client.bake_for_and_wait ~keys client in
+
+    (* Ensure that we migrated *)
+    Log.info "Checking migration block consistency" ;
+    let* () =
+      block_check
+        ~expected_block_type:`Non_migration
+        client
+        ~migrate_from
+        ~migrate_to
+        ~level:(migration_level + 1)
+    in
+    (* Test that we can still bake after migration *)
+    let* () = Client.bake_for_and_wait ~keys client in
+    return (client, node)
+  in
+
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"weeklynet regression test"
+    ~tags:[team; "protocol"; "migration"; "sandbox"; "weeklynet"]
+    ~supports:Protocol.(From_protocol (number Alpha))
+  @@ fun migrate_to ->
+  let* client, __POS_OF__node =
+    perform_migration
+      ~parameter_file:last_snapshotted_protocol_parameters_path
+      ~migrate_to
+  in
+
+  let* _parametric =
+    Client.RPC.call ~hooks:Tezos_regression.hooks client
+    @@ RPC.get_chain_block_context_constants_parametric ()
+  in
+
+  unit
 
 (** Test migration from [migrate_from] to [migrate_to].
 
@@ -194,7 +318,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:(Printf.sprintf "protocol migration with snapshots")
-    ~tags:["protocol"; "migration"; "sandbox"; "snapshot"]
+    ~tags:[team; "protocol"; "migration"; "sandbox"; "snapshot"]
   @@ fun () ->
   let* client0, node0 =
     perform_protocol_migration
@@ -434,6 +558,7 @@ let test_migration_with_bakers ?(migration_level = 4)
          (Protocol.tag migrate_to))
     ~tags:
       [
+        team;
         "protocol";
         "migration";
         "baker";
@@ -532,6 +657,7 @@ let test_forked_migration_manual ?(migration_level = 4)
     ~__FILE__
     ~tags:
       [
+        team;
         "protocol";
         "migration";
         "baker";
@@ -734,6 +860,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
     ~__FILE__
     ~tags:
       [
+        team;
         "protocol";
         "migration";
         "baker";
@@ -930,35 +1057,281 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   in
   check_blocks ~level_from ~level_to
 
-let check_baking_rights client nb_cycles_to_check ?nb_cycles_is_valid () =
-  let check_baking_rights_rpc ~expect_failure ~cycle () =
-    let*? process =
-      Client.RPC.spawn client
-      @@ RPC.get_chain_block_helper_baking_rights ~cycle ()
+let test_migration_min_delegated_in_cycle =
+  (* Paris -> Quebec *)
+  let _migrate_from = Protocol.ParisC in
+  let migrate_to = Protocol.Quebec in
+
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"protocol migration for min_delegated_in_cycle"
+    ~tags:[team; "protocol"; "migration"; "min_delegated_in_cycle"]
+  @@ fun migrate_from ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      [(["adaptive_issuance_force_activation"], `Bool true)]
+  in
+  let parameters = JSON.parse_file parameter_file in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let migration_level = 2 * blocks_per_cycle in
+  Log.info
+    ~color:Log.Color.FG.green
+    "blocks_per_cycle=%d, migration_level=%d"
+    blocks_per_cycle
+    migration_level ;
+
+  Log.info ~color:Log.Color.FG.green "Start node and client." ;
+  let* client, _node =
+    user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  Log.info
+    ~color:Log.Color.FG.green
+    "Activate protocol %s."
+    (Protocol.name migrate_from) ;
+  let* () =
+    Client.activate_protocol ~parameter_file ~protocol:migrate_from client
+  in
+
+  let staking_balance_raw ?block pkh =
+    let* raw_json =
+      Client.RPC.call ~hooks:Tezos_regression.hooks client
+      @@ RPC.get_chain_block_context_raw_json
+           ?block
+           ~path:["staking_balance"; pkh]
+           ()
     in
-    let* () = Process.check ~expect_failure process in
     Log.info
-      "Checked the baking rights for cycle = %s (expect_failure = %s)"
-      (Int.to_string cycle)
-      (Bool.to_string expect_failure) ;
+      ~color:Log.Color.FG.gray
+      "Staking balance = %s"
+      (JSON.encode raw_json) ;
     unit
   in
 
-  let* level =
-    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+  let min_delegated_in_current_cycle_rpc ?block pkh =
+    let* raw_json =
+      Client.RPC.call ~hooks:Tezos_regression.hooks client
+      @@ RPC.get_chain_block_context_delegate_min_delegated_in_current_cycle
+           ?block
+           pkh
+    in
+    Log.info
+      ~color:Log.Color.FG.gray
+      "min_delegated_in_current_cycle_rpc = %s"
+      (JSON.encode raw_json) ;
+    unit
   in
-  let nb_cycles_is_valid =
-    match nb_cycles_is_valid with Some x -> x | None -> nb_cycles_to_check
+
+  let staking_balance ?block ~(delegate : Account.key) () =
+    Log.info ~color:Log.Color.FG.blue "for %s:" delegate.alias ;
+    let pkh = delegate.public_key_hash in
+    let* () = staking_balance_raw ?block pkh in
+    let* () = min_delegated_in_current_cycle_rpc ?block pkh in
+    unit
   in
-  Lwt_list.iter_s
-    (fun cycle ->
-      let expect_failure = cycle > level.cycle + nb_cycles_is_valid in
-      check_baking_rights_rpc ~expect_failure ~cycle ())
-    (range level.cycle (level.cycle + nb_cycles_to_check))
+
+  let create_account ~alias ~amount =
+    let* account = Client.gen_and_show_keys ~alias client in
+    Log.info ~color:Log.Color.FG.green "%s: %s" alias account.public_key_hash ;
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount
+        ~giver:Constant.bootstrap2.alias
+        ~receiver:account.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    return account
+  in
+
+  let transfer ~amount ~giver ~receiver =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Transfer %s tez from %s to %s."
+      (Tez.to_string amount)
+      giver
+      receiver ;
+    let* () =
+      Client.transfer ~burn_cap:Tez.one ~amount ~giver ~receiver client
+    in
+    let* () = Client.bake_for_and_wait client in
+    unit
+  in
+
+  let set_delegate ~src ~(delegate : Account.key) =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Set delegate for %s to %s."
+      src
+      delegate.alias ;
+    let*! () = Client.set_delegate ~src ~delegate:delegate.alias client in
+    let* () = Client.bake_for_and_wait client in
+    let* () = staking_balance ~delegate () in
+    unit
+  in
+
+  let register_delegate ~(delegate : Account.key) =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Register %s as a delegate."
+      delegate.alias ;
+    let* _delegate = Client.register_delegate ~delegate:delegate.alias client in
+    let* () = Client.bake_for_and_wait client in
+    let* () = staking_balance ~delegate () in
+    unit
+  in
+
+  let check_current_cycle ~cycle =
+    let* current_level =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
+    Log.info
+      ~color:Log.Color.FG.blue
+      "Current level = %d and cycle = %d."
+      current_level.level
+      current_level.cycle ;
+    Check.((current_level.cycle = cycle) ~__LOC__ int)
+      ~error_msg:"Expected cycle=%R, got %L" ;
+    unit
+  in
+
+  let check_current_level ~level =
+    let* current_level =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
+    Log.info
+      ~color:Log.Color.FG.blue
+      "Current level = %d and cycle = %d."
+      current_level.level
+      current_level.cycle ;
+    Check.((current_level.level = level) ~__LOC__ int)
+      ~error_msg:"Expected level=%R, got %L" ;
+    unit
+  in
+
+  let* baker = create_account ~alias:"baker" ~amount:(Tez.of_int 12_000) in
+  let* () = register_delegate ~delegate:baker in
+
+  let* delegator =
+    create_account ~alias:"delegator" ~amount:(Tez.of_int 12_000)
+  in
+  let* () = set_delegate ~src:delegator.alias ~delegate:baker in
+
+  let* other_account =
+    create_account ~alias:"other_account" ~amount:(Tez.of_int 12_000)
+  in
+
+  Log.info ~color:Log.Color.FG.green "Bake until a new cycle." ;
+  let* () =
+    Client.bake_until_level ~target_level:(blocks_per_cycle + 1) client
+  in
+  let* () = check_current_cycle ~cycle:1 in
+  let* () = staking_balance ~delegate:baker () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:baker.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:other_account.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+
+  let* () = set_delegate ~src:other_account.alias ~delegate:other_account in
+
+  Log.info ~color:Log.Color.FG.green "Bake until right before the migration." ;
+  let* () = Client.bake_until_level ~target_level:migration_level client in
+  let* () = check_current_level ~level:migration_level in
+
+  Log.info ~color:Log.Color.FG.green "Checking migration block consistency." ;
+  let* () =
+    block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
+  in
+  let* () = Client.bake_for_and_wait client in
+  Log.info ~color:Log.Color.FG.green "Checking migration block consistency." ;
+  let* () =
+    block_check
+      ~expected_block_type:`Non_migration
+      client
+      ~migrate_from
+      ~migrate_to
+  in
+
+  Log.info
+    ~color:Log.Color.FG.green
+    "First block of %s."
+    (Protocol.name migrate_to) ;
+  let* () = check_current_cycle ~cycle:2 in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  Log.info ~color:Log.Color.FG.green "Bake a few blocks after the migration." ;
+  let* () =
+    repeat blocks_per_cycle (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () = check_current_cycle ~cycle:3 in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:baker.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:other_account.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  Log.info ~color:Log.Color.FG.green "Bake a few blocks until a new cycle." ;
+  let* () =
+    repeat blocks_per_cycle (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () = check_current_cycle ~cycle:4 in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:baker.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  let* () =
+    transfer
+      ~amount:(Tez.of_int 500)
+      ~giver:delegator.alias
+      ~receiver:other_account.alias
+  in
+  let* () = staking_balance ~delegate:baker () in
+  let* () = staking_balance ~delegate:other_account () in
+
+  unit
 
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
-  test_migration_with_snapshots ~migrate_from ~migrate_to
+  test_migration_with_snapshots ~migrate_from ~migrate_to ;
+  test_weeklynet_migration_parameters Protocol.all ;
+  test_migration_min_delegated_in_cycle [Protocol.ParisC]

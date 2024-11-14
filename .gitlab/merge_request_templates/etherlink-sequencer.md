@@ -1,6 +1,18 @@
 <!-- Etherlink sequencer merge request template. -->
 
-# Context
+
+# What
+
+<!-- Explain what your MR does without going into details. -->
+
+# Why
+
+<!-- Explain the motivation for your work. -->
+
+# How
+
+<!-- Explain how your MR achieves what it says it does and why it is a good way. -->
+<!-- Discuss possible side-effects and other solutions you have considered. -->
 
 # Manually testing the MR
 

@@ -34,6 +34,8 @@
 
    Add more fine-grained measurements (e.g. time to verify shard) *)
 
+let team = Team.tezos2
+
 module Dal = Dal_common
 
 module Dal_RPC = struct
@@ -96,7 +98,6 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
   let config : Dal.Cryptobox.Config.t =
     {
       activated = true;
-      use_mock_srs_for_testing = true;
       bootstrap_peers =
         (match dal_bootstrap_peer with
         | None -> []
@@ -128,20 +129,11 @@ let start_dal_node l1_node ?(producer_profiles = []) ?(attester_profiles = [])
 let store_slot_to_dal_node ~slot_size dal_node =
   let slot = Dal.Helpers.make_slot "someslot" ~slot_size in
   (* Post a commitment of the slot. *)
-  let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
-  (* Compute and save the shards of the slot. *)
-  let* () =
-    Dal_RPC.(call dal_node @@ put_commitment_shards ~with_proof:true commitment)
-  in
+  let* commitment, proof = Dal_RPC.(call dal_node @@ post_slot slot) in
   let commitment_hash =
     match Dal.Cryptobox.Commitment.of_b58check_opt commitment with
     | None -> Test.fail ~__LOC__ "Decoding commitment failed."
     | Some hash -> hash
-  in
-  (* Compute the proof for the commitment. *)
-  let* proof =
-    let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
-    Dal.Commitment.proof_of_string proof |> return
   in
   return (commitment_hash, proof)
 
@@ -190,7 +182,8 @@ let test_produce_and_propagate_shards ~executors ~protocol =
   let timeout = Long_test.Seconds (repeat * 10 * expected_running_time) in
   Long_test.register
     ~__FILE__
-    ~title:"DAL node produce and propagate shards"
+    ~title:measurement
+    ~team
     ~tags:["dal"]
     ~uses:[Constant.octez_dal_node]
     ~executors
@@ -222,6 +215,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
       ()
   in
   let* dal_node2 = start_dal_node node2 ~producer_profiles:[slot_index] () in
+  let client1 = Client.with_dal_node client1 ~dal_node:dal_node2 in
   let*! () = Client.reveal ~src:Constant.bootstrap2.alias client2 in
   let* () = Client.bake_for_and_wait client1 in
   Log.info
@@ -242,7 +236,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
         ~slot_index
         ~source:Constant.bootstrap2
         ~commitment_hash
-        ~proof
+        ~proof:(Dal.Commitment.proof_of_string proof)
         client2
     in
     Log.info
@@ -260,12 +254,8 @@ let test_produce_and_propagate_shards ~executors ~protocol =
             "Expected validated operations in mempool to be %L, got %R.") ;
       unit
     in
-    let dal_node_endpoint = Dal.Helpers.endpoint dal_node2 in
     Log.info "Bake one block to include the op, and two blocks to finalize it." ;
-    let* () =
-      Base.repeat 3 (fun () ->
-          Client.bake_for_and_wait client1 ~dal_node_endpoint)
-    in
+    let* () = Base.repeat 3 (fun () -> Client.bake_for_and_wait client1) in
     Log.info
       "Wait until node1 downloads [dal_parameters.cryptobox.number_of_shards] \
        shards. (i.e. the published slot is attestable by node1.)" ;
@@ -284,7 +274,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     Log.info "Bake several blocks to surpass the attestation lag." ;
     let* () =
       Base.repeat (dal_parameters.attestation_lag - 2) (fun () ->
-          Client.bake_for_and_wait client1 ~dal_node_endpoint)
+          Client.bake_for_and_wait client1)
     in
     Log.info "Assert that the attestation was indeed posted." ;
     let* {dal_attestation; _} =

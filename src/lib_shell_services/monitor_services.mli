@@ -88,8 +88,6 @@ val heads :
 val protocols :
   #streamed -> (Protocol_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
 
-val commit_hash : #simple -> string tzresult Lwt.t
-
 val active_chains :
   #streamed -> (chain_status list Lwt_stream.t * stopper) tzresult Lwt.t
 
@@ -157,8 +155,6 @@ module S : sig
 
   val protocols :
     ([`GET], unit, unit, unit, unit, Protocol_hash.t) Tezos_rpc.Service.t
-
-  val commit_hash : ([`GET], unit, unit, unit, unit, string) Tezos_rpc.Service.t
 
   val active_chains :
     ([`GET], unit, unit, unit, unit, chain_status list) Tezos_rpc.Service.t

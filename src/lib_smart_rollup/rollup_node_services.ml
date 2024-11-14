@@ -86,9 +86,10 @@ type message_status =
     }
 
 type gc_info = {
-  last_gc_level : int32;
   first_available_level : int32;
+  last_gc_started_at : int32 option;
   last_context_split_level : int32 option;
+  last_successful_gc_target : int32 option;
 }
 
 type sync_result =
@@ -98,6 +99,19 @@ type sync_result =
       l1_head_level : int32;
       percentage_done : float;
     }
+
+type l1_health = {
+  connection : [`Connected | `Disconnected | `Reconnecting];
+  blocks_late : int32;
+  last_seen_head : (Block_hash.t * int32 * Time.Protocol.t) option;
+}
+
+type health = {
+  healthy : bool;
+  degraded : bool;
+  l1 : l1_health;
+  active_workers : (string * [`Running | `Crashed of exn]) list;
+}
 
 type version = {
   version : string;
@@ -125,6 +139,64 @@ module Encodings = struct
          (req "store_version" string)
          (req "context_version" string)
 
+  let l1_health =
+    conv
+      (fun {connection; blocks_late; last_seen_head} ->
+        (connection, blocks_late, last_seen_head))
+      (fun (connection, blocks_late, last_seen_head) ->
+        {connection; blocks_late; last_seen_head})
+    @@ obj3
+         (req
+            "connection"
+            (string_enum
+               [
+                 ("connected", `Connected);
+                 ("reconnecting", `Reconnecting);
+                 ("disconnected", `Disconnected);
+               ]))
+         (req "blocks_late" int32)
+         (opt
+            "last_seen_head"
+            (obj3
+               (req "hash" Block_hash.encoding)
+               (req "level" int32)
+               (req "timestamp" Time.Protocol.encoding)))
+
+  let exn =
+    def "exception" ~description:"Exception"
+    @@ conv Printexc.to_string (fun s -> Failure s) string
+
+  let health =
+    conv
+      (fun {healthy; degraded; l1; active_workers} ->
+        (healthy, degraded, l1, active_workers))
+      (fun (healthy, degraded, l1, active_workers) ->
+        {healthy; degraded; l1; active_workers})
+    @@ obj4
+         (req "healthy" bool)
+         (req "degraded" bool)
+         (req "l1" l1_health)
+         (req
+            "active_workers"
+            (list
+               (tup2
+                  string
+                  (union
+                     [
+                       case
+                         (Tag 0)
+                         ~title:"running"
+                         (constant "running")
+                         (function `Running -> Some () | _ -> None)
+                         (fun () -> `Running);
+                       case
+                         (Tag 1)
+                         ~title:"crashed"
+                         (obj1 (req "crashed" exn))
+                         (function `Crashed e -> Some e | _ -> None)
+                         (fun e -> `Crashed e);
+                     ]))))
+
   let commitment_with_hash =
     obj2
       (req "commitment" Commitment.encoding)
@@ -136,6 +208,16 @@ module Encodings = struct
       (req "hash" Commitment.Hash.encoding)
       (opt "first_published_at_level" int32)
       (opt "published_at_level" int32)
+
+  let outbox =
+    obj2
+      (req "outbox_level" int32)
+      (req
+         "messages"
+         (list
+            (obj2
+               (req "message_index" int31)
+               (opt "message" Outbox_message.summary_encoding))))
 
   let queued_message =
     obj2 (req "id" L2_message.Id.encoding) (req "message" L2_message.encoding)
@@ -212,8 +294,7 @@ module Encodings = struct
                     finalized,
                     cemented )
             | _ -> None)
-          (fun ((), op, (oph, op_index, l1_block, l1_level), finalized, cemented)
-               ->
+          (fun ((), op, (oph, op_index, l1_block, l1_level), finalized, cemented) ->
             Included
               {op; oph; op_index; l1_block; l1_level; finalized; cemented});
         case
@@ -292,14 +373,48 @@ module Encodings = struct
 
   let gc_info : gc_info Data_encoding.t =
     conv
-      (fun {last_gc_level; first_available_level; last_context_split_level} ->
-        (last_gc_level, first_available_level, last_context_split_level))
-      (fun (last_gc_level, first_available_level, last_context_split_level) ->
-        {last_gc_level; first_available_level; last_context_split_level})
-    @@ obj3
-         (req "last_gc_level" int32)
-         (req "first_available_level" int32)
-         (opt "last_context_split_level" int32)
+      (fun {
+             first_available_level;
+             last_gc_started_at;
+             last_context_split_level;
+             last_successful_gc_target;
+           } ->
+        ( first_available_level,
+          last_gc_started_at,
+          last_context_split_level,
+          last_successful_gc_target ))
+      (fun ( first_available_level,
+             last_gc_started_at,
+             last_context_split_level,
+             last_successful_gc_target ) ->
+        {
+          first_available_level;
+          last_gc_started_at;
+          last_context_split_level;
+          last_successful_gc_target;
+        })
+    @@ obj4
+         (req
+            "first_available_level"
+            int32
+            ~description:
+              "First level where data is guaranteed to be available in the \
+               rollup node.")
+         (opt
+            "last_gc_level"
+            int32
+            ~description:"The level at which the last GC was triggered.")
+         (opt
+            "last_context_split_level"
+            int32
+            ~description:
+              "The level at which the context was split for the last time. \
+               Commits before this level are in other chunks.")
+         (opt
+            "last_successful_gc_target"
+            int32
+            ~description:
+              "The level which was the target of the last successful GC.")
 
   let ocaml_gc_stat_encoding =
     let open Gc in
@@ -475,7 +590,9 @@ module Encodings = struct
          (obj1
             (dft
                "errors"
-               (obj2 (req "count" int31) (opt "last" trace_encoding))
+               (obj2
+                  (req "count" int31)
+                  (opt "last" Tezos_rpc.Service.error_encoding))
                (0, None)))
 
   let injector_queues =
@@ -665,6 +782,20 @@ module Local = struct
         (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "commitments" /: Arg.commitment_hash)
 
+  let outbox_pending_executable =
+    Tezos_rpc.Service.get_service
+      ~description:"Pending outbox messages which can be executed"
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.list Encodings.outbox)
+      (path / "outbox" / "pending" / "executable")
+
+  let outbox_pending_unexecutable =
+    Tezos_rpc.Service.get_service
+      ~description:"Pending outbox messages which cannot yet be executed"
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.list Encodings.outbox)
+      (path / "outbox" / "pending" / "unexecutable")
+
   let gc_info =
     Tezos_rpc.Service.get_service
       ~description:"Information about garbage collection"
@@ -673,9 +804,15 @@ module Local = struct
       (path / "gc_info")
 
   let injection =
+    let query_drop_duplicate : bool Tezos_rpc.Query.t =
+      let open Tezos_rpc.Query in
+      query Fun.id
+      |+ field "drop_duplicate" Tezos_rpc.Arg.bool false Fun.id
+      |> seal
+    in
     Tezos_rpc.Service.post_service
       ~description:"Inject messages in the batcher's queue"
-      ~query:Tezos_rpc.Query.empty
+      ~query:query_drop_duplicate
       ~input:
         Data_encoding.(
           def
@@ -704,6 +841,64 @@ module Local = struct
       ~output:Encodings.message_status_output
       (path / "batcher" / "queue" /: Arg.l2_message_id)
 
+  let dal_batcher_injection =
+    Tezos_rpc.Service.post_service
+      ~description:
+        "Inject the given messages in the DAL queue, even in case of duplicates"
+      ~query:Tezos_rpc.Query.empty
+      ~input:
+        Data_encoding.(
+          def
+            "messages"
+            ~description:"Messages to inject"
+            (list (string' Plain)))
+      ~output:Data_encoding.unit
+      (path / "dal" / "batcher" / "injection")
+
+  let injector_operation_status =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Retrieve the status of the injected operation using its injector ID."
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.message_status
+      (path / "injector" / "operation"
+     /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "status")
+
+  let dal_injected_operations_statuses =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Retrieve the statuses of all known operations injected via DAL."
+      ~query:Tezos_rpc.Query.empty
+      ~output:
+        Data_encoding.(
+          list
+            (obj2
+               (req "id" Tezos_crypto.Hashed.Injector_operations_hash.encoding)
+               (req "status" Encodings.message_status)))
+      (path / "dal" / "injected" / "operations" / "statuses")
+
+  let forget_dal_injection_id =
+    Tezos_rpc.Service.post_service
+      ~description:"Forget information about the injection whose id is given"
+      ~query:Tezos_rpc.Query.empty
+      ~input:Data_encoding.unit
+      ~output:Data_encoding.unit
+      (path / "dal" / "injection"
+     /: Tezos_crypto.Hashed.Injector_operations_hash.rpc_arg / "forget")
+
+  let dal_slot_indices =
+    let input_encoding = Data_encoding.(obj1 (req "indices" (list uint8))) in
+    Tezos_rpc.Service.post_service
+      ~description:
+        "Provide the (new) list of slot indices to use to the rollup node's \
+         DAL injector"
+      ~query:Tezos_rpc.Query.empty
+      ~input:
+        Data_encoding.(
+          def "slot_indices" ~description:"Slot indices to set" input_encoding)
+      ~output:Data_encoding.unit
+      (path / "dal" / "slot" / "indices")
+
   let synchronized =
     Tezos_rpc.Service.get_service
       ~description:
@@ -723,12 +918,19 @@ module Root = struct
     let prefix = root
   end)
 
-  let health =
+  let ping =
     Tezos_rpc.Service.get_service
       ~description:
         "Returns an empty response if the rollup node can answer requests"
       ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.unit
+      (path / "ping")
+
+  let health =
+    Tezos_rpc.Service.get_service
+      ~description:"Returns health status information for the rollup node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.health
       (path / "health")
 
   let version =
@@ -789,4 +991,11 @@ module Admin = struct
       ~query:Query.operation_tag_query
       ~output:Data_encoding.unit
       (path / "injector" / "queues")
+
+  let cancel_gc =
+    Tezos_rpc.Service.get_service
+      ~description:"Cancel any ongoing GC"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.bool
+      (path / "cancel_gc")
 end

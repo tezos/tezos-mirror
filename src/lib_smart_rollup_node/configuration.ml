@@ -4,6 +4,7 @@
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,11 +47,25 @@ type injector = {retention_period : int; attempts : int; injection_ttl : int}
 type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
 
 type gc_parameters = {
-  frequency_in_blocks : int32;
+  frequency_in_blocks : int32 option;
   context_splitting_period : int option;
 }
 
-type history_mode = Archive | Full
+type history_mode = Store.State.history_mode = Archive | Full
+
+type outbox_destination_filter =
+  | Any_destination
+  | Destination_among of string list
+
+type outbox_entrypoint_filter =
+  | Any_entrypoint
+  | Entrypoint_among of string list
+
+type outbox_message_filter =
+  | Transaction of {
+      destination : outbox_destination_filter;
+      entrypoint : outbox_entrypoint_filter;
+    }
 
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -60,12 +75,14 @@ type t = {
   rpc_port : int;
   acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
   metrics_addr : string option;
+  performance_metrics : bool;
   reconnection_delay : float;
   fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   apply_unsafe_patches : bool;
   unsafe_pvm_patches : Pvm_patches.unsafe_patch list;
+  execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
@@ -84,6 +101,7 @@ type t = {
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
+  bail_on_disagree : bool;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -162,6 +180,7 @@ let default_fee : Operation_kind.t -> Injector_common.tez = function
          lose the 10k deposit or we can get the reward). *)
       tez 5
   | Execute_outbox_message -> tez 1
+  | Publish_dal_commitment -> tez 1
 
 let default_burn : Operation_kind.t -> Injector_common.tez = function
   | Publish ->
@@ -175,6 +194,7 @@ let default_burn : Operation_kind.t -> Injector_common.tez = function
       (* A refutation move can store data, e.g. opening a game. *)
       tez 1
   | Execute_outbox_message -> tez 1
+  | Publish_dal_commitment -> tez 1
 
 (* Copied from src/proto_alpha/lib_plugin/mempool.ml *)
 let default_fee_parameter operation_kind =
@@ -226,16 +246,11 @@ let default_l1_rpc_timeout = 60. (* seconds *)
 let default_loop_retry_delay = 10. (* seconds *)
 
 let default_gc_parameters =
-  {
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6415
-     * Refine the default GC frequency parameter *)
-    frequency_in_blocks = 100l;
-    context_splitting_period = None;
-  }
+  {frequency_in_blocks = None; context_splitting_period = None}
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6576
-   Set to Full after initial evaluation on testnets. *)
-let default_history_mode = Archive
+let default_history_mode = Full
+
+let default_execute_outbox_filter = []
 
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
@@ -338,8 +353,7 @@ let batcher_encoding =
            max_batch_size;
          } ->
       (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size))
-    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size)
-         ->
+    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size) ->
       let open Result_syntax in
       let error_when c s = if c then Error s else return_unit in
       let* () =
@@ -397,9 +411,7 @@ let gc_parameters_encoding : gc_parameters Data_encoding.t =
       (frequency_in_blocks, context_splitting_period))
     (fun (frequency_in_blocks, context_splitting_period) ->
       {frequency_in_blocks; context_splitting_period})
-  @@ obj2
-       (dft "frequency" int32 default_gc_parameters.frequency_in_blocks)
-       (opt "context_splitting_period" int31)
+  @@ obj2 (opt "frequency" int32) (opt "context_splitting_period" int31)
 
 let history_mode_encoding : history_mode Data_encoding.t =
   Data_encoding.string_enum [("archive", Archive); ("full", Full)]
@@ -415,6 +427,72 @@ let cors_encoding : Resto_cohttp.Cors.t Data_encoding.t =
   @@ obj2
        (req "allowed_headers" (list string))
        (req "allowed_origins" (list string))
+
+let outbox_destination_filter_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"any_destination"
+        ~description:"Accept any destination."
+        (Tag 0)
+        (constant "any")
+        (function Any_destination -> Some () | _ -> None)
+        (fun () -> Any_destination);
+      case
+        ~title:"destination_among"
+        ~description:
+          "Accept destination that matches the given list (in base58-check)."
+        (Tag 1)
+        (list string)
+        (function Destination_among l -> Some l | _ -> None)
+        (fun l -> Destination_among l);
+    ]
+
+let outbox_entrypoint_filter_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"any_entrypoint"
+        ~description:"Accept any entrypoint."
+        (Tag 0)
+        (constant "any")
+        (function Any_entrypoint -> Some () | _ -> None)
+        (fun () -> Any_entrypoint);
+      case
+        ~title:"entrypoint_among"
+        ~description:"Accept entrypoint of the given list."
+        (Tag 1)
+        (list string)
+        (function Entrypoint_among l -> Some l | _ -> None)
+        (fun l -> Entrypoint_among l);
+    ]
+
+let outbox_messages_filter_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"transaction_filter"
+        ~description:
+          "Accept transactions which match the filter on their destination and \
+           entrypoint."
+        (Tag 0)
+        (obj1
+           (req
+              "transaction"
+              (obj2
+                 (req "destination" outbox_destination_filter_encoding)
+                 (req "entrypoint" outbox_entrypoint_filter_encoding))))
+        (function
+          | Transaction {destination; entrypoint} ->
+              Some (destination, entrypoint))
+        (fun (destination, entrypoint) -> Transaction {destination; entrypoint});
+    ]
+
+let execute_outbox_messages_filter_encoding =
+  Data_encoding.list outbox_messages_filter_encoding
 
 let encoding default_display : t Data_encoding.t =
   let open Data_encoding in
@@ -434,11 +512,13 @@ let encoding default_display : t Data_encoding.t =
            rpc_port;
            acl;
            metrics_addr;
+           performance_metrics;
            reconnection_delay;
            fee_parameters;
            mode;
            loser_mode;
            apply_unsafe_patches = _;
+           execute_outbox_messages_filter;
            unsafe_pvm_patches;
            dal_node_endpoint;
            dac_observer_endpoint;
@@ -458,6 +538,7 @@ let encoding default_display : t Data_encoding.t =
            gc_parameters;
            history_mode;
            cors;
+           bail_on_disagree;
          } ->
       ( ( ( sc_rollup_address,
             boot_sector_file,
@@ -466,11 +547,13 @@ let encoding default_display : t Data_encoding.t =
             rpc_port,
             acl ),
           ( metrics_addr,
+            performance_metrics,
             reconnection_delay,
             fee_parameters,
             mode,
             loser_mode,
-            unsafe_pvm_patches ) ),
+            unsafe_pvm_patches,
+            execute_outbox_messages_filter ) ),
         ( ( dal_node_endpoint,
             dac_observer_endpoint,
             dac_timeout,
@@ -488,7 +571,8 @@ let encoding default_display : t Data_encoding.t =
             no_degraded,
             gc_parameters,
             history_mode,
-            cors ) ) ))
+            cors,
+            bail_on_disagree ) ) ))
     (fun ( ( ( sc_rollup_address,
                boot_sector_file,
                operators,
@@ -496,11 +580,13 @@ let encoding default_display : t Data_encoding.t =
                rpc_port,
                acl ),
              ( metrics_addr,
+               performance_metrics,
                reconnection_delay,
                fee_parameters,
                mode,
                loser_mode,
-               unsafe_pvm_patches ) ),
+               unsafe_pvm_patches,
+               execute_outbox_messages_filter ) ),
            ( ( dal_node_endpoint,
                dac_observer_endpoint,
                dac_timeout,
@@ -518,7 +604,8 @@ let encoding default_display : t Data_encoding.t =
                no_degraded,
                gc_parameters,
                history_mode,
-               cors ) ) ) ->
+               cors,
+               bail_on_disagree ) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -527,6 +614,7 @@ let encoding default_display : t Data_encoding.t =
         rpc_port;
         acl;
         metrics_addr;
+        performance_metrics;
         reconnection_delay;
         fee_parameters;
         mode;
@@ -536,6 +624,7 @@ let encoding default_display : t Data_encoding.t =
              line. *)
           false;
         unsafe_pvm_patches;
+        execute_outbox_messages_filter;
         dal_node_endpoint;
         dac_observer_endpoint;
         dac_timeout;
@@ -554,6 +643,7 @@ let encoding default_display : t Data_encoding.t =
         gc_parameters;
         history_mode;
         cors;
+        bail_on_disagree;
       })
     (merge_objs
        (merge_objs
@@ -563,12 +653,13 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Smart rollup address"
                 Tezos_crypto.Hashed.Smart_rollup_address.encoding)
              (opt "boot-sector" ~description:"Boot sector" string)
-             (req
+             (dft
                 "smart-rollup-node-operator"
                 ~description:
                   "Operators that sign operations of the smart rollup, by \
                    purpose"
-                Purpose.operators_encoding)
+                Purpose.operators_encoding
+                Purpose.no_operators)
              (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
              (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
              (dft
@@ -576,8 +667,9 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Access control list"
                 Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
                 default_acl))
-          (obj6
+          (obj8
              (opt "metrics-addr" ~description:"Metrics address" string)
+             (dft "performance-metrics" bool false)
              (dft
                 "reconnection_delay"
                 ~description:
@@ -608,7 +700,15 @@ let encoding default_display : t Data_encoding.t =
                   "Unsafe patches to apply to the PVM. For tests only, don't \
                    set this value in production."
                 (list Pvm_patches.unsafe_patch_encoding)
-                [])))
+                [])
+             (dft
+                "execute-outbox-messages-filter"
+                ~description:
+                  "A filter to select which outbox messages the rollup will \
+                   execute automatically (must be in maintenance or operator \
+                   mode)."
+                execute_outbox_messages_filter_encoding
+                default_execute_outbox_filter)))
        (merge_objs
           (obj9
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
@@ -620,19 +720,20 @@ let encoding default_display : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj9
+          (obj10
              (dft "l1_rpc_timeout" Data_encoding.float default_l1_rpc_timeout)
              (dft
                 "loop_retry_delay"
                 Data_encoding.float
                 default_loop_retry_delay)
-             (opt "index_buffer_size" int31)
+             (opt "index_buffer_size" int31 ~description:"Deprecated")
              (opt "irmin_cache_size" int31)
              (dft "log-kernel-debug" Data_encoding.bool false)
              (dft "no-degraded" Data_encoding.bool false)
              (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
              (opt "history-mode" history_mode_encoding)
-             (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
+             (dft "cors" cors_encoding Resto_cohttp.Cors.default)
+             (dft "bail-on-disagree" bool false))))
 
 let encoding_no_default = encoding `Show
 
@@ -672,8 +773,11 @@ let can_inject mode (op_kind : Operation_kind.t) =
   let allowed_operations = operation_kinds_of_mode mode in
   List.mem ~equal:Stdlib.( = ) op_kind allowed_operations
 
-let purpose_matches_mode (type k) mode (purpose : k Purpose.t) =
-  List.mem ~equal:Stdlib.( = ) (Purpose.Purpose purpose) (purposes_of_mode mode)
+let purposes_matches_mode (type k) mode (purposes : k Purpose.t list) =
+  List.exists
+    (fun p ->
+      List.mem ~equal:Stdlib.( = ) (Purpose.Purpose p) (purposes_of_mode mode))
+    purposes
 
 let refutation_player_buffer_levels = 5
 
@@ -740,104 +844,103 @@ module Cli = struct
       operators
 
   let configuration_from_args ~rpc_addr ~rpc_port ~acl_override ~metrics_addr
-      ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
-      ~dac_timeout ~pre_images_endpoint ~injector_retention_period
-      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
-      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches =
-    let open Result_syntax in
-    let* purposed_operator, default_operator =
-      get_purposed_and_default_operators operators
-    in
-    let* operators =
-      Purpose.make_operator
-        ?default_operator
-        ~needed_purposes:(purposes_of_mode mode)
-        purposed_operator
-    in
-    let rpc_addr = Option.value ~default:default_rpc_addr rpc_addr in
-    let rpc_port = Option.value ~default:default_rpc_port rpc_port in
-    let acl = override_acl ~rpc_addr ~rpc_port default_acl acl_override in
-    let+ () = check_custom_mode mode in
-    {
-      sc_rollup_address;
-      boot_sector_file;
-      operators;
-      rpc_addr;
-      rpc_port;
-      acl;
-      reconnection_delay =
-        Option.value ~default:default_reconnection_delay reconnection_delay;
-      dal_node_endpoint;
-      dac_observer_endpoint;
-      dac_timeout;
-      pre_images_endpoint;
-      metrics_addr;
-      fee_parameters = Operation_kind.Map.empty;
-      mode;
-      loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
-      apply_unsafe_patches;
-      unsafe_pvm_patches = [];
-      batcher = default_batcher;
-      injector =
-        {
-          retention_period =
-            Option.value
-              ~default:default_injector.retention_period
-              injector_retention_period;
-          attempts =
-            Option.value ~default:default_injector.attempts injector_attempts;
-          injection_ttl =
-            Option.value ~default:default_injector.injection_ttl injection_ttl;
-        };
-      l1_blocks_cache_size = default_l1_blocks_cache_size;
-      l2_blocks_cache_size = default_l2_blocks_cache_size;
-      prefetch_blocks = None;
-      l1_rpc_timeout = default_l1_rpc_timeout;
-      loop_retry_delay = default_loop_retry_delay;
-      index_buffer_size;
-      irmin_cache_size;
-      log_kernel_debug;
-      no_degraded;
-      gc_parameters =
-        {
-          frequency_in_blocks =
-            Option.value
-              ~default:default_gc_parameters.frequency_in_blocks
-              gc_frequency;
-          context_splitting_period = None;
-        };
-      history_mode;
-      cors =
-        Resto_cohttp.Cors.
-          {
-            allowed_headers =
-              Option.value ~default:default.allowed_headers allowed_headers;
-            allowed_origins =
-              Option.value ~default:default.allowed_origins allowed_origins;
-          };
-    }
-
-  let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
-      ~acl_override ~metrics_addr ~loser_mode ~reconnection_delay
+      ~enable_performance_metrics ~loser_mode ~reconnection_delay
       ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
       ~pre_images_endpoint ~injector_retention_period ~injector_attempts
       ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches =
-    let open Result_syntax in
-    let mode = Option.value ~default:configuration.mode mode in
-    let* () = check_custom_mode mode in
-    let* purposed_operator, default_operator =
+      ~apply_unsafe_patches ~bail_on_disagree =
+    let open Lwt_result_syntax in
+    let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
     in
     let* operators =
-      Purpose.replace_operator
+      Purpose.make_operators
         ?default_operator
         ~needed_purposes:(purposes_of_mode mode)
-        purposed_operator
+        purposed_operators
+    in
+    let rpc_addr = Option.value ~default:default_rpc_addr rpc_addr in
+    let rpc_port = Option.value ~default:default_rpc_port rpc_port in
+    let acl = override_acl ~rpc_addr ~rpc_port default_acl acl_override in
+    let*? () = check_custom_mode mode in
+    return
+      {
+        sc_rollup_address;
+        boot_sector_file;
+        operators;
+        rpc_addr;
+        rpc_port;
+        acl;
+        reconnection_delay =
+          Option.value ~default:default_reconnection_delay reconnection_delay;
+        dal_node_endpoint;
+        dac_observer_endpoint;
+        dac_timeout;
+        pre_images_endpoint;
+        metrics_addr;
+        performance_metrics = enable_performance_metrics;
+        fee_parameters = Operation_kind.Map.empty;
+        mode;
+        loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
+        apply_unsafe_patches;
+        unsafe_pvm_patches = [];
+        execute_outbox_messages_filter = default_execute_outbox_filter;
+        batcher = default_batcher;
+        injector =
+          {
+            retention_period =
+              Option.value
+                ~default:default_injector.retention_period
+                injector_retention_period;
+            attempts =
+              Option.value ~default:default_injector.attempts injector_attempts;
+            injection_ttl =
+              Option.value ~default:default_injector.injection_ttl injection_ttl;
+          };
+        l1_blocks_cache_size = default_l1_blocks_cache_size;
+        l2_blocks_cache_size = default_l2_blocks_cache_size;
+        prefetch_blocks = None;
+        l1_rpc_timeout = default_l1_rpc_timeout;
+        loop_retry_delay = default_loop_retry_delay;
+        index_buffer_size;
+        irmin_cache_size;
+        log_kernel_debug;
+        no_degraded;
+        gc_parameters =
+          {frequency_in_blocks = gc_frequency; context_splitting_period = None};
+        history_mode;
+        cors =
+          Resto_cohttp.Cors.
+            {
+              allowed_headers =
+                Option.value ~default:default.allowed_headers allowed_headers;
+              allowed_origins =
+                Option.value ~default:default.allowed_origins allowed_origins;
+            };
+        bail_on_disagree;
+      }
+
+  let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
+      ~acl_override ~metrics_addr ~enable_performance_metrics ~loser_mode
+      ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
+      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
+      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches ~bail_on_disagree =
+    let open Lwt_result_syntax in
+    let mode = Option.value ~default:configuration.mode mode in
+    let*? () = check_custom_mode mode in
+    let*? purposed_operators, default_operator =
+      get_purposed_and_default_operators operators
+    in
+    let* operators =
+      Purpose.replace_operators
+        ?default_operator
+        ~needed_purposes:(purposes_of_mode mode)
+        purposed_operators
         configuration.operators
     in
     let rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr in
@@ -884,6 +987,8 @@ module Cli = struct
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
         apply_unsafe_patches;
         metrics_addr = Option.either metrics_addr configuration.metrics_addr;
+        performance_metrics =
+          enable_performance_metrics || configuration.performance_metrics;
         index_buffer_size =
           Option.either index_buffer_size configuration.index_buffer_size;
         irmin_cache_size =
@@ -893,9 +998,9 @@ module Cli = struct
         gc_parameters =
           {
             frequency_in_blocks =
-              Option.value
-                ~default:configuration.gc_parameters.frequency_in_blocks
-                gc_frequency;
+              Option.either
+                gc_frequency
+                configuration.gc_parameters.frequency_in_blocks;
             context_splitting_period =
               configuration.gc_parameters.context_splitting_period;
           };
@@ -912,15 +1017,17 @@ module Cli = struct
                   ~default:configuration.cors.allowed_origins
                   allowed_origins;
             };
+        bail_on_disagree = bail_on_disagree || configuration.bail_on_disagree;
       }
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
-      ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
-      ~dac_observer_endpoint ~dac_timeout ~pre_images_endpoint
-      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches =
+      ~metrics_addr ~enable_performance_metrics ~loser_mode ~reconnection_delay
+      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
+      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
+      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches ~bail_on_disagree =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -940,13 +1047,14 @@ module Cli = struct
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
       let* configuration = load ~data_dir in
-      let*? configuration =
+      let* configuration =
         patch_configuration_from_args
           configuration
           ~rpc_addr
           ~rpc_port
           ~acl_override
           ~metrics_addr
+          ~enable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -969,6 +1077,7 @@ module Cli = struct
           ~allowed_origins
           ~allowed_headers
           ~apply_unsafe_patches
+          ~bail_on_disagree
       in
       return configuration
     else
@@ -991,12 +1100,13 @@ module Cli = struct
                  "Argument --rollup is required when configuration file is not \
                   present.")
       in
-      let*? config =
+      let* config =
         configuration_from_args
           ~rpc_addr
           ~rpc_port
           ~acl_override
           ~metrics_addr
+          ~enable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -1019,6 +1129,7 @@ module Cli = struct
           ~allowed_headers
           ~allowed_origins
           ~apply_unsafe_patches
+          ~bail_on_disagree
       in
       return config
 end

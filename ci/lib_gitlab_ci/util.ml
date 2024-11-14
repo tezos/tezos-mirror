@@ -7,7 +7,8 @@
 
 open Types
 
-let default ?image ?interruptible () : default = {image; interruptible}
+let default ?image ?interruptible ?retry () : default =
+  {image; interruptible; retry}
 
 let job_rule ?changes ?if_ ?variables ?(when_ : when_ = On_success)
     ?allow_failure () : job_rule =
@@ -23,9 +24,9 @@ let job_rule ?changes ?if_ ?variables ?(when_ : when_ = On_success)
   in
   {changes; if_; variables; when_; allow_failure}
 
-let workflow_rule ?changes ?if_ ?variables ?(when_ : when_workflow = Always) ()
-    : workflow_rule =
-  {changes; if_; variables; when_}
+let workflow_rule ?changes ?if_ ?variables ?(when_ : when_workflow = Always)
+    ?auto_cancel () : workflow_rule =
+  {changes; if_; variables; when_; auto_cancel}
 
 let include_rule ?changes ?if_ ?(when_ : when_workflow = Always) () :
     include_rule =
@@ -58,6 +59,9 @@ let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?image
     parallel;
   }
 
+let trigger_job ?needs ?rules ?stage ?when_ ~name trigger_include =
+  {name; needs; rules; stage; when_; trigger_include}
+
 let artifacts ?expire_in ?reports ?when_ ?expose_as ?name paths =
   (match (reports, paths) with
   | Some {dotenv = None; junit = None; coverage_report = None}, [] ->
@@ -81,3 +85,5 @@ let reports ?dotenv ?junit ?coverage_report () =
         "Attempted to register a empty [reports] -- this doesn't make any sense"
   | _ -> ()) ;
   {dotenv; junit; coverage_report}
+
+let cache ?(policy = Pull_push) ~key paths = {key; paths; policy}

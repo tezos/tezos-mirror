@@ -33,6 +33,7 @@ detail into the validation and application process for
 :ref:`blocks<block_validation_overview_paris>` and their
 :ref:`operations<operation_validity_paris>`.
 
+.. _shell_proto_interact:
 .. _shell_proto_interact_paris:
 
 Shell-protocol interaction
@@ -75,6 +76,7 @@ interface for quite different use cases, as follows:
   block, typically used in the :doc:`validator <../shell/validation>`
   to precheck a block, avoiding to further consider invalid blocks.
 
+.. _block_contents:
 .. _block_contents_paris:
 
 Blocks, Operations and their Validation
@@ -101,6 +103,7 @@ safely included in the Tezos blockchain -- and *application* --
 that is, how the effects of operations and blocks are taken into
 account -- for this economic protocol.
 
+.. _protocol_constants:
 .. _protocol_constants_paris:
 
 Protocol constants
@@ -123,10 +126,10 @@ The *list* of protocol constants can be found in the OCaml APIs:
 
 - fixed protocol constants are defined in the module
   :package-api:`Constants_repr
-  <tezos-protocol-019-PtParisB/Tezos_raw_protocol_019_PtParisB/Constants_repr/index.html>`
+  <tezos-protocol-020-PsParisC/Tezos_raw_protocol_020_PsParisC/Constants_repr/index.html>`
 - parametric constants are defined in the module
   :package-api:`Constants_parametric_repr
-  <tezos-protocol-019-PtParisB/Tezos_raw_protocol_019_PtParisB/Constants_parametric_repr/index.html>`
+  <tezos-protocol-020-PsParisC/Tezos_raw_protocol_020_PsParisC/Constants_parametric_repr/index.html>`
 
 The *values* of protocol constants in any given protocol can be found using specific RPC calls:
 

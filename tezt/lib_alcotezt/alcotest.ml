@@ -173,6 +173,16 @@ let result (type a e) (ok : a testable) (error : e testable) :
     let equal = Result.equal ~ok:Ok.equal ~error:Error.equal
   end)
 
+let reject (type a) =
+  let module M = struct
+    type t = a
+
+    let pp fmt _ = Format.fprintf fmt "Alcotest.reject"
+
+    let equal _ _ = false
+  end in
+  (module M : TESTABLE with type t = M.t)
+
 let pp_list ?(left = "[") ?(right = "]") pp_item fmt list =
   Format.pp_print_string fmt left ;
   if list <> [] then (

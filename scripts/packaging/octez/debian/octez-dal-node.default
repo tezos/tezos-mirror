@@ -1,0 +1,4 @@
+# Defaults for the Octez DAL node
+
+# runtime options associated to the command `run`
+# RUNTIME_OPTS=

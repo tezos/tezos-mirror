@@ -10,11 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
+  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "octez-libs" {with-test}
-  "octez-alcotezt" {with-test}
   "octez-protocol-020-PsParisC-libs" {with-test}
   "tezos-protocol-020-PsParisC" {with-test}
+  "octez-alcotezt" {with-test}
   "tezos-benchmark" {with-test}
   "tezos-benchmark-020-PsParisC" {with-test}
   "tezos-benchmark-type-inference-020-PsParisC" {with-test}

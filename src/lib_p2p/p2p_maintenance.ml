@@ -299,9 +299,9 @@ let rec worker_loop ~rng ~motive t =
       return Events.Last_maintenance)
     else (
       (if not t.config.private_mode then
-       match t.debug_config with
-       | Some {trigger_swap = false; _} -> ()
-       | _ -> send_swap_request t) ;
+         match t.debug_config with
+         | Some {trigger_swap = false; _} -> ()
+         | _ -> send_swap_request t) ;
       protect ~canceler:t.canceler (fun () ->
           let timer_promise =
             let idle_time = t.config.maintenance_idle_time in

@@ -1,25 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2018 Dynamic Ledger Solutions <contact@tezos.com> *)
+(* SPDX-FileCopyrightText: 2021-2024 Nomadic Labs <contact@nomadic-labs.com> *)
+(* SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>.             *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -27,15 +11,28 @@
 
 open Error_monad
 
-(** [try_with_lock ?close_on_exec ?unlink_on_exit ~when_locked
-    ~filename f] tries to take a lock on file [filename] and calls [f]
-    if the lock was successfully taken. If the lock was previously
-    taken, [when_locked] is called instead and [f] is ignored.
+(** [lock ~when_locked ~filename] acquires a lock on the file [path] and returns
+    the opened file descriptor (for unlocking). If there is already a lock on
+    [path], this function call is blocking until the previous lock is
+    released. If there is already a lock on [filename], the call will block if
+    [when_locked] is [`Block], and will fail if [when_locke = `Fail e]. *)
+val lock :
+  when_locked:[`Block | `Fail of error] ->
+  filename:string ->
+  Lwt_unix.file_descr tzresult Lwt.t
 
-    This function may fail with an I/O exception wrapped in the error
-    monad if something unexpected happened. *)
-val try_with_lock :
-  when_locked:(unit -> 'a tzresult Lwt.t) ->
+(** [unlock fd] releases the lock on the opened file descriptor [fd]. If there
+    is no lock or if it is already released, this function does nothing. *)
+val unlock : Lwt_unix.file_descr -> unit Lwt.t
+
+(** [with_lock ~when_locked ~filename f] tries to take a lock on file [filename]
+    and calls [f] if the lock was successfully taken. If there is already a lock
+    on [filename], the call to [f] is blocked until the previous lock is
+    released if [when_lock] is [`Block], and will fail with [e] if [when_lock =
+    `Fail e] instead. This function may fail with an I/O exception wrapped in
+    the error monad if something unexpected happened. *)
+val with_lock :
+  when_locked:[`Block | `Fail of error] ->
   filename:string ->
   (unit -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t

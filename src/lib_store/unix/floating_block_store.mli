@@ -90,6 +90,12 @@ val kind : t -> floating_kind
     [floating_store]. *)
 val mem : t -> Block_hash.t -> bool Lwt.t
 
+(** [may_sync floating_store] updates a RO index instance to allow
+    concurrent access to the value added by a RW instance. This
+    operation is expected to be cheap (~10us) and has no effect on RW
+    instances. *)
+val may_sync : t -> unit
+
 (** [find_info floating_store block_hash] reads from the index the
     info of [block_hash] if the block is stored in [floating_store],
     returns [None] otherwise. *)

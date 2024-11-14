@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2021-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -59,8 +41,11 @@ type argument =
   | RPC_additional_addr of string
   | RPC_additional_addr_external of string
   | Max_active_rpc_connections of int
+  | Enable_http_cache_headers
   | Disable_context_pruning
   | Storage_maintenance_delay of string
+  | Force_history_mode_switch
+  | Allow_yes_crypto
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -94,8 +79,11 @@ let make_argument = function
   | RPC_additional_addr_external addr -> ["--external-rpc-addr"; addr]
   | Max_active_rpc_connections n ->
       ["--max-active-rpc-connections"; string_of_int n]
+  | Enable_http_cache_headers -> ["--enable-http-cache-headers"]
   | Disable_context_pruning -> ["--disable-context-pruning"]
   | Storage_maintenance_delay x -> ["--storage-maintenance-delay"; x]
+  | Force_history_mode_switch -> ["--force-history-mode-switch"]
+  | Allow_yes_crypto -> ["--allow-yes-crypto"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -119,8 +107,11 @@ let is_redundant = function
   | Metadata_size_limit _, Metadata_size_limit _
   | Version, Version
   | Max_active_rpc_connections _, Max_active_rpc_connections _
+  | Enable_http_cache_headers, Enable_http_cache_headers
   | Disable_context_pruning, Disable_context_pruning
-  | Storage_maintenance_delay _, Storage_maintenance_delay _ ->
+  | Storage_maintenance_delay _, Storage_maintenance_delay _
+  | Force_history_mode_switch, Force_history_mode_switch
+  | Allow_yes_crypto, Allow_yes_crypto ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Peer peer1, Peer peer2 -> peer1 = peer2
@@ -146,8 +137,11 @@ let is_redundant = function
   | RPC_additional_addr_external _, _
   | Version, _
   | Max_active_rpc_connections _, _
+  | Enable_http_cache_headers, _
   | Disable_context_pruning, _
-  | Storage_maintenance_delay _, _ ->
+  | Storage_maintenance_delay _, _
+  | Force_history_mode_switch, _
+  | Allow_yes_crypto, _ ->
       false
 
 (* Some arguments should not be written in the config file by [Node.init]
@@ -229,8 +223,14 @@ let rpc_host node = node.persistent_state.rpc_host
 
 let rpc_port node = node.persistent_state.rpc_port
 
-let rpc_endpoint node =
-  sf "%s://%s:%d" (rpc_scheme node) (rpc_host node) (rpc_port node)
+let rpc_endpoint ?(local = false) node =
+  let host =
+    if local then Constant.default_host
+    else Runner.address node.persistent_state.runner
+  in
+  sf "%s://%s:%d" (rpc_scheme node) host (rpc_port node)
+
+let metrics_port node = node.persistent_state.metrics_port
 
 let data_dir node = node.persistent_state.data_dir
 
@@ -482,8 +482,6 @@ module Config_file = struct
         (`O
           [
             ("activated", `Bool dal_config.activated);
-            ( "use_mock_srs_for_testing",
-              `Bool dal_config.use_mock_srs_for_testing );
             ( "bootstrap_peers",
               `A
                 (List.map (fun peer -> `String peer) dal_config.bootstrap_peers)
@@ -607,12 +605,31 @@ let handle_event node {name; value; timestamp = _} =
   match name with
   | "node_is_ready.v0" -> set_ready node
   | "head_increment.v0" | "branch_switch.v0" -> (
-      match JSON.(value |-> "level" |> as_int_opt) with
-      | None ->
-          (* There are several kinds of events and maybe
-             this one is not the one with the level: ignore it. *)
-          ()
-      | Some level -> update_level node level)
+      if
+        (* Consider [head_increment] and [branch_switch] events only
+           with the local RPC server. *)
+        not node.persistent_state.rpc_external
+      then
+        match JSON.(value |-> "level" |> as_int_opt) with
+        | None ->
+            (* Names [head_increment] and [branch_switch] correspond to
+               multiple different events. Some of those events carry a
+               [level], some do not. *)
+            ()
+        | Some level -> update_level node level)
+  | "store_synchronized_on_head.v0" -> (
+      if
+        (* Consider [store_synchronized_on_head] event only with the
+           external RPC server. *)
+        node.persistent_state.rpc_external
+      then
+        match JSON.(value |-> "level" |> as_int_opt) with
+        | None ->
+            (* Names [head_increment] and [branch_switch] correspond to
+               multiple different events. Some of those events carry a
+               [level], some do not. *)
+            ()
+        | Some level -> update_level node level)
   | "read_identity.v0" -> update_identity node (JSON.as_string value)
   | "compilation_error.v0" -> (
       match JSON.as_string_opt value with
@@ -630,7 +647,9 @@ let handle_event node {name; value; timestamp = _} =
   | "set_head.v0" -> (
       match JSON.(value |> geti 1 |> as_int_opt) with
       | None -> ()
-      | Some level -> update_level node level)
+      | Some level ->
+          if not node.persistent_state.rpc_external then update_level node level
+      )
   | _ -> ()
 
 let check_event ?where node name promise =
@@ -639,6 +658,14 @@ let check_event ?where node name promise =
   | None ->
       raise (Terminated_before_event {daemon = node.name; event = name; where})
   | Some x -> return x
+
+let wait_for_synchronisation ~statuses node =
+  let filter json =
+    let status = JSON.as_string json in
+    Log.info "%s: %s" (name node) status ;
+    if List.exists (fun st -> st =~ rex status) statuses then Some () else None
+  in
+  wait_for node "synchronisation_status.v0" filter
 
 let wait_for_ready node =
   match node.status with
@@ -658,9 +685,14 @@ let wait_for_level node level =
       let promise, resolver = Lwt.task () in
       node.persistent_state.pending_level <-
         (level, resolver) :: node.persistent_state.pending_level ;
+      let event_name =
+        if node.persistent_state.rpc_external then
+          "store_synchronized_on_head.v0"
+        else "head_increment.v0 / branch_switch.v0"
+      in
       check_event
         node
-        "head_increment.v0 / branch_switch.v0"
+        event_name
         ~where:("level >= " ^ string_of_int level)
         promise
 
@@ -726,11 +758,21 @@ let wait_for_disconnections node disconnections =
   let* () = wait_for_ready node in
   waiter
 
+let enable_external_rpc_process =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_RPC_TESTS" -> true
+  | _ -> false
+
+let enable_singleprocess =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_VALIDATION_TESTS" -> true
+  | _ -> false
+
 let create ?runner ?(path = Uses.path Constant.octez_node) ?name ?color
     ?data_dir ?event_pipe ?net_addr ?net_port ?advertised_net_port ?metrics_addr
-    ?metrics_port ?(rpc_external = false) ?(rpc_host = Constant.default_host)
-    ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
-    ?(max_active_rpc_connections = 500) arguments =
+    ?metrics_port ?(rpc_external = enable_external_rpc_process)
+    ?(rpc_host = Constant.default_host) ?rpc_port ?rpc_tls
+    ?(allow_all_rpc = true) ?(max_active_rpc_connections = 500) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -842,8 +884,9 @@ let runlike_command_arguments node command arguments =
             node.persistent_state.metrics_addr
           ^ ":" )
     | Some _ ->
+        let any_addr = Unix.(string_of_inet_addr inet_addr_any) ^ ":" in
         (* FIXME spawn an ssh tunnel in case of remote host *)
-        ("0.0.0.0:", "0.0.0.0:", "0.0.0.0:")
+        (any_addr, any_addr, any_addr)
   in
   let arguments =
     List.fold_left
@@ -875,13 +918,13 @@ let runlike_command_arguments node command arguments =
   :: "--metrics-addr"
   :: (metrics_addr ^ string_of_int node.persistent_state.metrics_port)
   :: (if node.persistent_state.rpc_external then "--external-rpc-addr"
-     else "--rpc-addr")
+      else "--rpc-addr")
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
   :: "--max-active-rpc-connections"
   :: string_of_int node.persistent_state.max_active_rpc_connections
   :: command_args
 
-let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
+let do_runlike_command ?env ?(on_terminate = fun _ -> ()) ?event_level
     ?event_sections_levels node arguments =
   (match node.status with
   | Not_running -> ()
@@ -901,6 +944,7 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     unit
   in
   run
+    ?env
     ?runner:node.persistent_state.runner
     ?event_level
     ?event_sections_levels
@@ -909,15 +953,34 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     arguments
     ~on_terminate
 
-let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
-    arguments =
+let run ?env ?patch_config ?on_terminate ?event_level ?event_sections_levels
+    node arguments =
   let* () =
     match patch_config with
     | None -> Lwt.return_unit
     | Some patch -> Config_file.update node patch
   in
-  let arguments = runlike_command_arguments node "run" arguments in
+  (* It is necessary to check the [enable_singleprocess] flag to
+     ensure that the EXTENDED_VALIDATION_TESTS pipeline will
+     effectively start all nodes with the `--singleprocess`
+     flag. Indeed, as this option is not set in the config file (it is
+     just a command line argument), if one starts a node with
+     `Node.init`, terminates it, an then calls `Node.run`, the
+     [Singleprocess] will not be activated anymore -- see the
+     [Node.init] code and documentation. Thanks to this, we always
+     enable it if it is required.*)
+  let arguments =
+    let args =
+      if enable_singleprocess then
+        (* Avoids to repeat the option if already enabled *)
+        if List.mem Singleprocess arguments then arguments
+        else arguments @ [Singleprocess]
+      else arguments
+    in
+    runlike_command_arguments node "run" args
+  in
   do_runlike_command
+    ?env
     ?on_terminate
     ?event_level
     ?event_sections_levels
@@ -938,7 +1001,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     node
     arguments
 
-let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
+let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_external ?rpc_host
     ?rpc_port ?rpc_tls ?event_level ?event_sections_levels ?patch_config
     ?snapshot arguments =
@@ -982,7 +1045,13 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     | None -> unit
   in
   let* () =
-    run ?patch_config ?event_level ?event_sections_levels node singleprocess_arg
+    run
+      ?env
+      ?patch_config
+      ?event_level
+      ?event_sections_levels
+      node
+      singleprocess_arg
   in
   let* () = wait_for_ready node in
   return node
@@ -1040,12 +1109,13 @@ module RPC = struct
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?extra_headers
         (as_rpc_endpoint node)
         rpc
 

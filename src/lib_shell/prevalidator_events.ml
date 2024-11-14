@@ -100,11 +100,11 @@ let operations_to_reclassify =
     ~pp1:Format.pp_print_int
     ("count", Data_encoding.int31)
 
-let operation_reclassified =
+let operation_classified =
   declare_1
     ~section
-    ~name:"operation_reclassified"
-    ~msg:"operation {oph} reclassified"
+    ~name:"operation_classified"
+    ~msg:"operation {oph} classified"
     ~level:Debug
     ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
@@ -214,3 +214,14 @@ let operation_not_fetched =
     ~level:Debug
     ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
+
+let pending_operation_context_error =
+  declare_1
+    ~section
+    ~name:"pending_operations_context_error"
+    ~msg:
+      "The sources from the RPC results will not be filtered. Unable to \
+       retrieve the context; got: {errors}"
+    ~level:Warning
+    ~pp1:Error_monad.pp_print_trace
+    ("errors", Error_monad.trace_encoding)

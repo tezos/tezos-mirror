@@ -1,0 +1,24 @@
+[package]
+name = "riscv-dummy"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies.tezos_crypto_rs]
+version = "0.6.0"
+default-features = false
+
+[dependencies.tezos-smart-rollup]
+path = "../../kernel_sdk/sdk"
+version = "0.2.2"
+default-features = false
+features = [
+  "debug_alloc",
+  "proto-alpha",
+  "panic-hook",
+  "data-encoding",
+  "alloc",
+  "experimental-host-in-memory-store",
+]
+
+[dependencies.tezos-smart-rollup-constants]
+path = "../../kernel_sdk/constants"

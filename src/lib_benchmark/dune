@@ -12,13 +12,12 @@
   octez-libs.crypto
   octez-libs.micheline
   octez-libs.clic
-  data-encoding
+  octez-libs.data-encoding
   prbnmcn-linalg
   prbnmcn-stats
   pringo
   pyml
-  ocamlgraph
-  ocaml-migrate-parsetree)
+  ocamlgraph)
  (inline_tests
   (flags -verbose)
   (modes native)

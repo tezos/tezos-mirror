@@ -25,11 +25,13 @@
 
 open Base
 
+let team = Tag.layer1
+
 let change_logging_configuration =
   Protocol.register_test
     ~__FILE__
     ~title:"logging configuration RPCs"
-    ~tags:["rpc"; "node"; "logging"]
+    ~tags:[team; "rpc"; "node"; "logging"]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* client = Client.init ~endpoint:(Node main_node) () in
@@ -156,7 +158,7 @@ let change_logging_configuration =
     (* More noise *)
     let* () = Client.bake_for client in
     let* files = Lwt_unix.files_of_directory tmpdir |> Lwt_stream.to_list in
-    let should_be_two =
+    let count_files =
       List.fold_left
         (fun count f ->
           match String.sub f 0 (String.length interesting_prefix) with
@@ -165,10 +167,19 @@ let change_logging_configuration =
         0
         files
     in
-    if should_be_two = 2 then ()
-    else Test.fail "with-pid created %d files, not 2" should_be_two ;
-    Lwt.return_unit
+    (* When the node runs with the singleprocess validation, only one
+       log output is expected. On the contrary, with the default
+       validation mode, an additional log file for the external
+       process is expected. *)
+    let () =
+      let expected_count = if Node.enable_singleprocess then 1 else 2 in
+      Check.(
+        (count_files = expected_count)
+          int
+          ~error_msg:"with-pid created %L files, not %R")
+    in
+    unit
   in
-  Lwt.return_unit
+  unit
 
 let register ~protocols = change_logging_configuration protocols

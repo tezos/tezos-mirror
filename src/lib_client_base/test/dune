@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
-
 (library
  (name src_lib_client_base_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
@@ -11,7 +9,6 @@
   octez-libs.base
   octez-shell-libs.client-base
   octez-alcotezt)
- (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -24,7 +21,6 @@
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
- (modes native)
  (libraries
   src_lib_client_base_test_tezt_lib
   tezt)
@@ -37,31 +33,8 @@
  (alias runtest)
  (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)
  (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
-
-(executable
- (name main_js)
- (instrumentation (backend bisect_ppx --bisect-sigterm))
- (modes js)
- (libraries
-  src_lib_client_base_test_tezt_lib
-  tezt.js)
- (js_of_ocaml)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
- (modules main_js))
-
-(rule
- (alias runtest_js)
- (package octez-shell-libs)
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run node %{dep:./main_js.bc.js})))
-
-(rule
- (targets main_js.ml)
- (action (with-stdout-to %{targets} (echo "let () = Tezt_js.Test.run ()"))))

@@ -11,9 +11,7 @@ use core::fmt;
 use crate::error::UpgradeProcessError;
 use crate::event::Event;
 use crate::storage;
-use crate::storage::read_optional_rlp;
-use crate::storage::store_sequencer;
-use crate::storage::store_sequencer_pool_address;
+use crate::storage::{store_sequencer, store_sequencer_pool_address};
 use anyhow::Context;
 use primitive_types::H160;
 use rlp::Decodable;
@@ -22,19 +20,19 @@ use rlp::Encodable;
 use tezos_ethereum::rlp_helpers::append_public_key;
 use tezos_ethereum::rlp_helpers::append_timestamp;
 use tezos_ethereum::rlp_helpers::decode_field;
-use tezos_ethereum::rlp_helpers::decode_h160;
 use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::path::RefPath;
-use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
+use tezos_storage::read_optional_rlp;
 
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
 pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
@@ -168,7 +166,7 @@ impl Decodable for SequencerUpgrade {
 
         let mut it = decoder.iter();
         let sequencer = decode_public_key(&next(&mut it)?)?;
-        let pool_address = decode_h160(&next(&mut it)?)?;
+        let pool_address: H160 = decode_field(&next(&mut it)?, "sequencer_pool_address")?;
         let activation_timestamp = decode_timestamp(&next(&mut it)?)?;
 
         Ok(Self {

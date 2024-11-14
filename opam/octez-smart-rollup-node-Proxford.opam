@@ -20,10 +20,9 @@ depends: [
   "tezos-dac-client-lib" { = version }
   "octez-l2-libs" { = version }
   "octez-crawler" { = version }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
   "octez-internal-libs" { = version }
-  "aches" { >= "1.0.0" }
-  "aches-lwt" { >= "1.0.0" }
+  "aches" { >= "1.1.0" }
+  "aches-lwt" { >= "1.1.0" }
   "octez-injector" { = version }
   "octez-smart-rollup-node-lib" { = version }
   "octez-version" { = version }

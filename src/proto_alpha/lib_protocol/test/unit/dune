@@ -75,7 +75,8 @@
   test_adaptive_issuance_ema
   test_percentage
   test_full_staking_balance_repr
-  test_slashing_percentage))
+  test_slashing_percentage
+  test_staking_operations))
 
 (executable
  (name main)
@@ -92,7 +93,7 @@
  (alias runtest)
  (package tezos-protocol-alpha-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

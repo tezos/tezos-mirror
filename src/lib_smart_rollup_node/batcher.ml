@@ -140,21 +140,55 @@ let get_batches state ~only_full =
 
 let produce_batches state ~only_full =
   let open Lwt_result_syntax in
+  let start_timestamp = Time.System.now () in
   let batches, to_remove = get_batches state ~only_full in
+  let get_timestamp = Time.System.now () in
+  Metrics.wrap (fun () ->
+      Metrics.Batcher.set_messages_queue_size
+      @@ Message_queue.length state.messages ;
+      Metrics.Batcher.set_messages_size @@ List.length to_remove ;
+      Metrics.Batcher.set_batches_size @@ List.length batches ;
+      Metrics.Batcher.set_get_time @@ Ptime.diff get_timestamp start_timestamp) ;
   match batches with
   | [] -> return_unit
   | _ ->
+      let* () =
+        Metrics.wrap_lwt (fun () ->
+            Metrics.Batcher.set_last_batch_time start_timestamp ;
+            let* block = Node_context.last_processed_head_opt state.node_ctxt in
+            let () =
+              match block with
+              | Some block ->
+                  Metrics.Batcher.set_last_batch_level block.header.level
+              | None -> ()
+            in
+            return_unit)
+      in
       let* () = inject_batches state batches in
       let*! () =
         Batcher_events.(emit batched)
           (List.length batches, List.length to_remove)
       in
+      let inject_timestamp = Time.System.now () in
+      Metrics.Batcher.set_inject_time
+      @@ Ptime.diff inject_timestamp get_timestamp ;
       List.iter
         (fun tr_hash -> Message_queue.remove state.messages tr_hash)
         to_remove ;
       return_unit
 
-let on_register state (messages : string list) =
+let message_already_added state msg_id =
+  match Batched_messages.find_opt state.batched msg_id with
+  | None -> false
+  | Some {l1_id; _} ->
+      (* If injector know about the operation then it's either
+         pending, injected or included and we don't re-inject the
+         operation. If the injector has no status for that operation,
+         then it's consider too old (more than the injector's
+         `retention_period`) and the user wants to re-inject it. *)
+      Option.is_some @@ Injector.operation_status l1_id
+
+let on_register ~drop_duplicate state (messages : string list) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let max_size_msg =
@@ -168,16 +202,22 @@ let on_register state (messages : string list) =
       (fun i message ->
         if message_size message > max_size_msg then
           error_with "Message %d is too large (max size is %d)" i max_size_msg
-        else Ok (L2_message.make message))
+        else Ok (L2_message.make ~unique:(not drop_duplicate) message))
       messages
   in
   let*! () = Batcher_events.(emit queue) (List.length messages) in
-  let ids =
-    List.map
+  let*! ids =
+    List.map_s
       (fun message ->
         let msg_id = L2_message.id message in
-        Message_queue.replace state.messages msg_id message ;
-        msg_id)
+        let*! () =
+          if drop_duplicate && message_already_added state msg_id then
+            Batcher_events.(emit dropped_msg) msg_id
+          else (
+            Message_queue.replace state.messages msg_id message ;
+            Lwt.return_unit)
+        in
+        Lwt.return msg_id)
       messages
   in
   let+ () = produce_batches state ~only_full:true in
@@ -229,8 +269,8 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Register messages ->
-        protect @@ fun () -> on_register state messages
+    | Request.Register {messages; drop_duplicate} ->
+        protect @@ fun () -> on_register ~drop_duplicate state messages
     | Request.Produce_batches -> protect @@ fun () -> on_new_head state
 
   type launch_error = error trace
@@ -291,7 +331,7 @@ let start_in_mode mode =
   match mode with
   | Batcher | Operator -> true
   | Observer | Accuser | Bailout | Maintenance -> false
-  | Custom ops -> purpose_matches_mode (Custom ops) Batching
+  | Custom ops -> purposes_matches_mode (Custom ops) [Batching]
 
 let init plugin (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
@@ -308,12 +348,12 @@ let init plugin (node_ctxt : _ Node_context.t) =
       else return_unit
 
 (* This is a batcher worker for a single scoru *)
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail exn -> Error (Error_monad.error_of_exn exn)
-    | Lwt.Sleep -> Error Rollup_node_errors.No_batcher)
+let worker () =
+  let open Result_syntax in
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> return worker
+  | Lwt.Fail exn -> tzfail (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> tzfail Rollup_node_errors.No_batcher
 
 let active () =
   match Lwt.state worker_promise with
@@ -322,13 +362,13 @@ let active () =
 
 let find_message id =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   Message_queue.find_opt state.messages id
 
 let get_queue () =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   Message_queue.bindings state.messages
 
@@ -342,25 +382,27 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let register_messages messages =
+let register_messages ~drop_duplicate messages =
   let open Lwt_result_syntax in
-  let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
-  Worker.Queue.push_request_and_wait w (Request.Register messages)
+  let*? w = worker () in
+  Worker.Queue.push_request_and_wait
+    w
+    (Request.Register {messages; drop_duplicate})
   |> handle_request_error
 
 let produce_batches () =
   let open Lwt_result_syntax in
-  match Lazy.force worker with
-  | Error Rollup_node_errors.No_batcher ->
+  match worker () with
+  | Error (Rollup_node_errors.No_batcher :: _) ->
       (* There is no batcher, nothing to do *)
       return_unit
-  | Error e -> tzfail e
+  | Error e -> fail e
   | Ok w ->
       Worker.Queue.push_request_and_wait w Request.Produce_batches
       |> handle_request_error
 
 let shutdown () =
-  match Lazy.force worker with
+  match worker () with
   | Error _ ->
       (* There is no batcher, nothing to do *)
       Lwt.return_unit
@@ -376,6 +418,12 @@ let message_status state msg_id =
 
 let message_status msg_id =
   let open Result_syntax in
-  let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
+  let+ w = worker () in
   let state = Worker.state w in
   message_status state msg_id
+
+let worker_status () =
+  match Lwt.state worker_promise with
+  | Lwt.Return _ -> `Running
+  | Lwt.Fail exn -> `Crashed exn
+  | Lwt.Sleep -> `Not_running

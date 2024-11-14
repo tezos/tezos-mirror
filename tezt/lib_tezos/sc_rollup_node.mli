@@ -32,7 +32,12 @@
 (** Smart contract rollup node states. *)
 type t
 
-type purpose = Operating | Batching | Cementing | Recovering
+type purpose =
+  | Operating
+  | Batching
+  | Cementing
+  | Recovering
+  | Executing_outbox
 
 type operation_kind =
   | Publish
@@ -74,6 +79,8 @@ type argument =
   | Rollup of string
   | Pre_images_endpoint of string
   | Apply_unsafe_patches
+  | Injector_retention_period of int
+  | Acl_allow_all
 
 type event = {name : string; value : JSON.t; timestamp : float}
 
@@ -178,7 +185,15 @@ val rpc_host : t -> string
 (** Get the RPC port given as [--rpc-addr] to an sc node. *)
 val rpc_port : t -> int
 
-(** Return the endpoint of the sc node, i.e., http://rpc_host:rpc_port. *)
+(** Return the endpoint of the sc node, i.e., http://rpc_host:rpc_port.
+
+    If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument).
+*)
+val rpc_endpoint : ?local:bool -> t -> string
+
+(** An alias for [rpc_endpoint] *)
 val endpoint : t -> string
 
 (** Get the data-dir of an sc node. *)
@@ -202,7 +217,7 @@ val string_of_purpose : purpose -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
+(** [run ?endpoint ?event_level ?event_sections_levels ?loser_mode ?allow_degraded
     ?wait_ready node rollup_address arguments ]
     launches the given smart contract rollup node for the rollup at
     [rollup_address] with the given extra arguments. [event_level] and
@@ -213,6 +228,8 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
     ready. If [restart] is [true], it will stop and restart the node if it is
     already running.  *)
 val run :
+  ?env:string String_map.t ->
+  ?endpoint:string ->
   ?legacy:bool ->
   ?restart:bool ->
   ?mode:mode ->
@@ -270,6 +287,14 @@ module Config_file : sig
   val update : t -> (JSON.t -> JSON.t) -> unit
 end
 
+type unsafe_pvm_patch = Increase_max_nb_ticks of int
+
+val patch_config_unsafe_pvm_patches : unsafe_pvm_patch list -> JSON.t -> JSON.t
+
+val patch_config_execute_outbox : JSON.t -> JSON.t
+
+val patch_durable_storage : t -> key:string -> value:string -> unit Lwt.t
+
 (** Wait until the sc node is ready.
 
     More precisely, wait until a [node_is_ready] event occurs.
@@ -309,7 +334,13 @@ val wait_sync : t -> timeout:float -> int Lwt.t
     returns [Some _]) is produced, in which case the result of the filter is
     returned. [where], if present, should describe the constraint that [filter]
     applies. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?where:string ->
+  ?timeout:float ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Add a callback to be called whenever the daemon emits an event. *)
 val on_event : t -> (event -> unit) -> unit
@@ -322,6 +353,10 @@ val change_node_and_restart :
 (** Change the rollup mode. This does not terminate nor restart the
     node. Change will take effect when the node is run/restart. *)
 val change_node_mode : t -> mode -> t
+
+(** Change the rollup node operators. This does not terminate nor restart the
+    node. Change will take effect when the node is run/restart. *)
+val change_operators : t -> (purpose * string) list -> unit
 
 (** [dump_durable_storage ~sc_rollup_node ~dump ?string ()] writes to [dump] the current
     state of the WASM PVM from [sc_rollup_node]. *)
@@ -337,10 +372,15 @@ val export_snapshot :
   string ->
   string Runnable.process
 
-(** [import_snapshot ?force rollup_node ~snapshot_file] imports the snapshot
-    [snapshot_file] in the rollup node [rollup_node].  *)
+(** [import_snapshot ?apply_unsafe_patches ?force rollup_node
+    ~snapshot_file] imports the snapshot [snapshot_file] in the rollup
+    node [rollup_node].  *)
 val import_snapshot :
-  ?force:bool -> t -> snapshot_file:string -> unit Runnable.process
+  ?apply_unsafe_patches:bool ->
+  ?force:bool ->
+  t ->
+  snapshot_file:string ->
+  unit Runnable.process
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t

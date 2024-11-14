@@ -64,14 +64,14 @@ val create :
 
 type block_validity =
   | Valid
-  | Unapplicable_after_precheck of
-      error trace (* precheck succeeded but application failed *)
+  | Inapplicable_after_validation of
+      error trace (* validation succeeded but application failed *)
   | Invalid of error trace
-(* Invalid (precheck failed) *)
+(* Invalid (validation failed) *)
 
-(** [precheck_and_apply ?precheck_and_notify validator ddb hash header ops]
-    validates a block [header] [ops] of hash [hash]. It is a no-op in the
-    following cases:
+(** [validate_and_apply ?canceler ?peer ?notify_new_block
+    ~advertise_after_validation validator ddb hash header ops] validates a block
+    [header] [ops] of hash [hash]. It is a no-op in the following cases:
 
     - If the block has already been validated.
 
@@ -80,7 +80,11 @@ type block_validity =
     Otherwise it calls the [Block_validator_process] process
    associated to the current [validator].
 
-    - [canceler] is trigerred when the validation of a block fails.
+    - [advertise_after_validation] if set to true, the block is
+    advertised to its peers after its validation. It aims to be set to
+    false during bootstrapping.
+
+    - [canceler] is triggered when the validation of a block fails.
 
     - [peer] is the peer which sent the block.
 
@@ -101,12 +105,12 @@ type block_validity =
    block a second time.
 
  *)
-val precheck_and_apply :
+val validate_and_apply :
   t ->
   ?canceler:Lwt_canceler.t ->
   ?peer:P2p_peer.Id.t ->
   ?notify_new_block:(new_block -> unit) ->
-  ?precheck_and_notify:bool ->
+  advertise_after_validation:bool ->
   Distributed_db.chain_db ->
   Block_hash.t ->
   Block_header.t ->

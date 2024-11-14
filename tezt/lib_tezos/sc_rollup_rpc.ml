@@ -33,19 +33,24 @@ let get_global_block_outbox ?(block = "cemented") ~outbox_level () =
 let get_global_smart_rollup_address () =
   make GET ["global"; "smart_rollup_address"] JSON.as_string
 
-let get_global_block_aux ?(block = "head") ?(path = []) () =
-  make GET (["global"; "block"; block] @ path) Fun.id
+let get_global_block_aux ?(block = "head") ?(path = []) ?query_string () =
+  make ?query_string GET (["global"; "block"; block] @ path) Fun.id
 
-let get_global_block = get_global_block_aux ~path:[]
+let get_global_block ?block ?(outbox = false) () =
+  let query_string = if outbox then Some [("outbox", "true")] else None in
+  get_global_block_aux ?block ~path:[] ?query_string ()
 
 let get_global_block_inbox ?(block = "head") () =
   make GET ["global"; "block"; block; "inbox"] RPC.smart_rollup_inbox_from_json
 
-let get_global_block_hash = get_global_block_aux ~path:["hash"]
+let get_global_block_hash ?block () =
+  get_global_block_aux ~path:["hash"] ?block ()
 
-let get_global_block_level = get_global_block_aux ~path:["level"]
+let get_global_block_level ?block () =
+  get_global_block_aux ~path:["level"] ?block ()
 
-let get_global_block_num_messages = get_global_block_aux ~path:["num_messages"]
+let get_global_block_num_messages ?block () =
+  get_global_block_aux ~path:["num_messages"] ?block ()
 
 let get_global_tezos_head () = make GET ["global"; "tezos_head"] Fun.id
 
@@ -186,13 +191,22 @@ let get_local_last_published_commitment () =
 let get_local_commitments ~commitment_hash () =
   make GET ["local"; "commitments"; commitment_hash] commitment_info_from_json
 
-type gc_info = {last_gc_level : int; first_available_level : int}
+type gc_info = {
+  first_available_level : int;
+  last_gc_started_at : int option;
+  last_context_split_level : int option;
+  last_successful_gc_target : int option;
+}
 
 let get_local_gc_info () =
   make GET ["local"; "gc_info"] (fun obj ->
       {
-        last_gc_level = JSON.(obj |-> "last_gc_level" |> as_int);
         first_available_level = JSON.(obj |-> "first_available_level" |> as_int);
+        last_gc_started_at = JSON.(obj |-> "last_gc_level" |> as_int_opt);
+        last_context_split_level =
+          JSON.(obj |-> "last_context_split_level" |> as_int_opt);
+        last_successful_gc_target =
+          JSON.(obj |-> "last_successful_gc_target" |> as_int_opt);
       })
 
 let get_global_block_state ?(block = "head") ~key () =
@@ -229,15 +243,50 @@ let get_global_block_durable_state_value ?(block = "head") ~pvm_kind ~operation
     ["global"; "block"; block; "durable"; pvm_kind; op]
     (f operation)
 
-let post_local_batcher_injection ~messages =
+let post_local_batcher_injection ?drop_duplicate ~messages () =
   let data =
     Data (`A (List.map (fun s -> `String Hex.(of_string s |> show)) messages))
+  in
+  let query_string =
+    Option.map (fun b -> [("drop_duplicate", string_of_bool b)]) drop_duplicate
   in
   make
     POST
     ["local"; "batcher"; "injection"]
+    ?query_string
     ~data
     JSON.(fun json -> as_list json |> List.map as_string)
+
+let as_empty_object_or_fail t =
+  match JSON.as_object t with
+  | [] -> ()
+  | _ -> JSON.error t "Not an empty object"
+
+let post_local_dal_batcher_injection ~messages =
+  let json = `A (List.map Dal_common.RPC.unistring_to_json messages) in
+  let data = Data json in
+  make
+    POST
+    ["local"; "dal"; "batcher"; "injection"]
+    ~data
+    as_empty_object_or_fail
+
+let post_dal_slot_indices ~slot_indices =
+  let data =
+    `O
+      [
+        ( "indices",
+          `A (List.map (fun i -> `Float (float_of_int i)) slot_indices) );
+      ]
+  in
+  make
+    POST
+    ["local"; "dal"; "slot"; "indices"]
+    ~data:(Data data)
+    as_empty_object_or_fail
+
+let get_dal_injected_operations_statuses () =
+  make GET ["local"; "dal"; "injected"; "operations"; "statuses"] JSON.as_list
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
@@ -264,3 +313,25 @@ let outbox_proof_simple ?(block = "head") ~outbox_level ~message_index () =
       (* There is 0x return in the proof hash as it is a hex *)
       let proof_hex = sf "0x%s" proof_string in
       Some {commitment_hash; proof = proof_hex})
+
+type outbox_msg = {message_index : int; message : JSON.t}
+
+let outbox_list_of_json json =
+  let open JSON in
+  as_list json
+  |> List.map @@ fun json ->
+     let outbox_level = json |-> "outbox_level" |> as_int in
+     let msgs =
+       json |-> "messages" |> as_list
+       |> List.map @@ fun json ->
+          let message_index = json |-> "message_index" |> as_int in
+          let message = json |-> "message" in
+          {message_index; message}
+     in
+     (outbox_level, msgs)
+
+let get_local_outbox_pending_executable () =
+  make GET ["local"; "outbox"; "pending"; "executable"] outbox_list_of_json
+
+let get_local_outbox_pending_unexecutable () =
+  make GET ["local"; "outbox"; "pending"; "unexecutable"] outbox_list_of_json

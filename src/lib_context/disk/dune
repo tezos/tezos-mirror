@@ -18,8 +18,7 @@
   octez-libs.context.sigs
   octez-libs.tezos-context.helpers
   octez-libs.tezos-context.encoding
-  octez-libs.tezos-context.memory
-  octez-libs.tezos-context.dump)
+  octez-libs.tezos-context.memory)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

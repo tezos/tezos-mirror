@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +27,13 @@ open Store_types
 open Block_repr
 open Store_errors
 
+module Profiler = struct
+  include (val Profiler.wrap Shell_profiling.merge_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    Shell_profiling.create_reset_block_section Shell_profiling.merge_profiler
+end
+
 let default_block_cache_limit = 1_000
 
 type merge_status = Not_running | Running | Merge_failed of tztrace
@@ -48,6 +55,8 @@ type block_store = {
   merge_scheduler : Lwt_idle_waiter.t;
   (* Target level x Merging thread *)
   mutable merging_thread : (int32 * unit tzresult Lwt.t) option;
+  lockfile : Lwt_unix.file_descr;
+  stored_data_lockfile : Lwt_unix.file_descr;
 }
 
 type t = block_store
@@ -410,11 +419,11 @@ let cement_blocks ?(check_consistency = true) ~write_metadata block_store
   in
   let {cemented_store; _} = block_store in
   let* () =
-    Cemented_block_store.cement_blocks
-      ~check_consistency
-      cemented_store
-      ~write_metadata
-      chunk_iterator
+    (Cemented_block_store.cement_blocks
+       ~check_consistency
+       cemented_store
+       ~write_metadata
+       chunk_iterator [@profiler.record_s "cement blocks"])
   in
   let*! () = Store_events.(emit end_cementing_blocks) () in
   return_unit
@@ -913,7 +922,10 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_updating_floating_stores) () in
   let* lpbl_block =
-    read_predecessor_block_by_level block_store ~head:new_head new_head_lpbl
+    (read_predecessor_block_by_level
+       block_store
+       ~head:new_head
+       new_head_lpbl [@profiler.record_s "read lpbl block"])
   in
   let final_hash, final_level = Block_repr.descriptor lpbl_block in
   (* 1. Append to the new RO [new_store] blocks between
@@ -932,15 +944,18 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     [ro_store; rw_store]
   in
   let*! lpbl_predecessors =
-    try_retrieve_n_predecessors
-      floating_stores
-      final_hash
-      max_nb_blocks_to_retrieve
+    (try_retrieve_n_predecessors
+       floating_stores
+       final_hash
+       max_nb_blocks_to_retrieve
+     [@profiler.record_s "retrieve N lpbl's predecessors"])
   in
   (* [min_level_to_preserve] is the lowest block that we want to keep
      in the floating stores. *)
   let*! min_level_to_preserve =
-    match lpbl_predecessors with
+    match[@profiler.record_s "read min level block to preserve"]
+      lpbl_predecessors
+    with
     | [] -> Lwt.return new_head_lpbl
     | oldest_predecessor :: _ -> (
         let*! o =
@@ -957,10 +972,11 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
      the resulting [new_store] will be correct and will contain older
      blocks before more recent ones. *)
   let* () =
-    Floating_block_store.raw_copy_all
-      ~src_floating_stores:floating_stores
-      ~block_hashes:lpbl_predecessors
-      ~dst_floating_store:new_store
+    (Floating_block_store.raw_copy_all
+       ~src_floating_stores:floating_stores
+       ~block_hashes:lpbl_predecessors
+       ~dst_floating_store:new_store
+     [@profiler.record_s "copy all lpbl predecessors"])
   in
   (* 2. Retrieve ALL cycles (potentially more than one) *)
   (* 2.1. We write back to the new store all the blocks from
@@ -975,53 +991,70 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let blocks_lpbl = ref BlocksLPBL.empty in
   let*! () = Store_events.(emit start_retreiving_cycles) () in
   let* () =
-    List.iter_es
-      (fun store ->
-        Floating_block_store.raw_iterate
-          (fun (block_bytes, total_block_length) ->
-            let block_level = Block_repr_unix.raw_get_block_level block_bytes in
-            (* Ignore blocks that are below the cementing highwatermark *)
-            if Compare.Int32.(block_level <= cementing_highwatermark) then
-              return_unit
-            else
-              let block_lpbl_opt =
-                Block_repr_unix.raw_get_last_preserved_block_level
-                  block_bytes
-                  total_block_length
+    (List.iter_es
+       (fun store ->
+         let[@warning "-26"] kind =
+           match Floating_block_store.kind store with
+           | RO -> "RO"
+           | RW -> "RW"
+           | _ -> assert false
+         in
+         (Floating_block_store.raw_iterate
+            (fun (block_bytes, total_block_length) ->
+              let block_level =
+                Block_repr_unix.raw_get_block_level block_bytes
               in
-              (* Start by updating the set of cycles *)
-              Option.iter
-                (fun block_lpbl ->
-                  if
-                    Compare.Int32.(
-                      cementing_highwatermark < block_lpbl
-                      && block_lpbl <= new_head_lpbl)
-                  then blocks_lpbl := BlocksLPBL.add block_lpbl !blocks_lpbl)
-                block_lpbl_opt ;
-              (* Append block if its predecessor was visited and update
-                 the visited set. *)
-              let block_predecessor =
-                Block_repr_unix.raw_get_block_predecessor block_bytes
-              in
-              let block_hash = Block_repr_unix.raw_get_block_hash block_bytes in
-              if Block_hash.Set.mem block_predecessor !visited then (
-                visited := Block_hash.Set.add block_hash !visited ;
-                let*! {predecessors; resulting_context_hash} =
-                  let*! pred_opt =
-                    Floating_block_store.find_info store block_hash
-                  in
-                  Lwt.return (WithExceptions.Option.get ~loc:__LOC__ pred_opt)
+              (* Ignore blocks that are below the cementing highwatermark *)
+              if Compare.Int32.(block_level <= cementing_highwatermark) then
+                return_unit
+              else
+                let block_lpbl_opt =
+                  Block_repr_unix.raw_get_last_preserved_block_level
+                    block_bytes
+                    total_block_length
                 in
-                Floating_block_store.raw_append
-                  new_store
-                  ( block_hash,
-                    block_bytes,
-                    total_block_length,
-                    predecessors,
-                    resulting_context_hash ))
-              else return_unit)
-          store)
-      [ro_store; rw_store]
+                (* Start by updating the set of cycles *)
+                Option.iter
+                  (fun block_lpbl ->
+                    if
+                      Compare.Int32.(
+                        cementing_highwatermark < block_lpbl
+                        && block_lpbl <= new_head_lpbl)
+                    then blocks_lpbl := BlocksLPBL.add block_lpbl !blocks_lpbl)
+                  block_lpbl_opt ;
+                (* Append block if its predecessor was visited and update
+                   the visited set. *)
+                let block_predecessor =
+                  Block_repr_unix.raw_get_block_predecessor block_bytes
+                in
+                let block_hash =
+                  Block_repr_unix.raw_get_block_hash block_bytes
+                in
+                if Block_hash.Set.mem block_predecessor !visited then (
+                  visited := Block_hash.Set.add block_hash !visited ;
+                  let*! {predecessors; resulting_context_hash} =
+                    let*! pred_opt =
+                      (Floating_block_store.find_info
+                         store
+                         block_hash
+                       [@profiler.aggregate_s "find block index info"])
+                    in
+                    Lwt.return (WithExceptions.Option.get ~loc:__LOC__ pred_opt)
+                  in
+                  (Floating_block_store.raw_append
+                     new_store
+                     ( block_hash,
+                       block_bytes,
+                       total_block_length,
+                       predecessors,
+                       resulting_context_hash )
+                   [@profiler.aggregate_s "raw append block"]))
+                else return_unit)
+            store
+          [@profiler.record_s
+            Printf.sprintf "iterate over floating store '%s'" kind]))
+       [ro_store; rw_store]
+     [@profiler.record_s "iterate and prune floating stores"])
   in
   let is_cementing_highwatermark_genesis =
     Compare.Int32.(
@@ -1048,27 +1081,31 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let sorted_lpbl =
     List.sort Compare.Int32.compare (BlocksLPBL.elements !blocks_lpbl)
   in
-
   let* cycles_to_cement =
-    let* cycles = loop [] initial_pred sorted_lpbl in
+    let* cycles =
+      (loop
+         []
+         initial_pred
+         sorted_lpbl [@profiler.record_s "retrieve cycle to cement"])
+    in
     return (may_shrink_cycles cycles ~cycle_size_limit)
   in
   let* new_savepoint =
-    compute_new_savepoint
-      block_store
-      history_mode
-      ~new_store
-      ~min_level_to_preserve
-      ~new_head
-      ~cycles_to_cement
+    (compute_new_savepoint
+       block_store
+       history_mode
+       ~new_store
+       ~min_level_to_preserve
+       ~new_head
+       ~cycles_to_cement [@profiler.record_s "compute new savepoint"])
   in
   let* new_caboose =
-    compute_new_caboose
-      block_store
-      history_mode
-      ~new_savepoint
-      ~min_level_to_preserve
-      ~new_head
+    (compute_new_caboose
+       block_store
+       history_mode
+       ~new_savepoint
+       ~min_level_to_preserve
+       ~new_head [@profiler.record_s "compute new caboose"])
   in
   return (cycles_to_cement, new_savepoint, new_caboose)
 
@@ -1127,21 +1164,25 @@ let move_all_floating_stores block_store ~new_ro_store =
     (fun () ->
       (* (atomically?) Promote [new_ro] to [ro] *)
       let* () =
-        move_floating_store block_store ~src:new_ro_store ~dst_kind:RO
+        (move_floating_store
+           block_store
+           ~src:new_ro_store
+           ~dst_kind:RO [@profiler.record_s "promote new ro floating as ro"])
       in
       (* ...and [new_rw] to [rw]  *)
       let* () =
-        move_floating_store
-          block_store
-          ~src:block_store.rw_floating_block_store
-          ~dst_kind:RW
+        (move_floating_store
+           block_store
+           ~src:block_store.rw_floating_block_store
+           ~dst_kind:RW [@profiler.record_s "promote new rw floating as rw"])
       in
       (* Load the swapped stores *)
-      let*! ro = Floating_block_store.init chain_dir ~readonly:false RO in
-      block_store.ro_floating_block_stores <- [ro] ;
-      let*! rw = Floating_block_store.init chain_dir ~readonly:false RW in
-      block_store.rw_floating_block_store <- rw ;
-      return_unit)
+      (let*! ro = Floating_block_store.init chain_dir ~readonly:false RO in
+       block_store.ro_floating_block_stores <- [ro] ;
+       let*! rw = Floating_block_store.init chain_dir ~readonly:false RW in
+       block_store.rw_floating_block_store <- rw ;
+       return_unit)
+      [@profiler.record_s "open new floating stores"])
 
 let check_store_consistency block_store ~cementing_highwatermark =
   let open Lwt_result_syntax in
@@ -1190,7 +1231,7 @@ let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
               Block_repr.max_operations_ttl new_head_metadata
           | Some metadata -> Block_repr.max_operations_ttl metadata)))
 
-let instanciate_temporary_floating_store block_store =
+let instantiate_temporary_floating_store block_store =
   let open Lwt_result_syntax in
   protect
     ~on_error:(fun err ->
@@ -1215,13 +1256,28 @@ let instanciate_temporary_floating_store block_store =
            block_store.rw_floating_block_store
            :: block_store.ro_floating_block_stores ;
          let*! new_rw_store =
-           Floating_block_store.init
-             block_store.chain_dir
-             ~readonly:false
-             RW_TMP
+           (Floating_block_store.init
+              block_store.chain_dir
+              ~readonly:false
+              RW_TMP [@profiler.record_s "initializing RW TMP"])
          in
          block_store.rw_floating_block_store <- new_rw_store ;
          return (ro_store, rw_store, new_rw_store)))
+
+let create_lockfile path chain_dir =
+  let open Lwt_syntax in
+  protect (fun () ->
+      let* fd =
+        Lwt_unix.openfile
+          (path chain_dir |> Naming.file_path)
+          [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+          0o777
+      in
+      return_ok fd)
+
+let lock lockfile = Lwt_unix.lockf lockfile Unix.F_LOCK 0
+
+let unlock lockfile = Lwt_unix.lockf lockfile Unix.F_ULOCK 0
 
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
@@ -1229,23 +1285,26 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_merging_thread) () in
   let*! new_ro_store =
-    Floating_block_store.init block_store.chain_dir ~readonly:false RO_TMP
+    (Floating_block_store.init
+       block_store.chain_dir
+       ~readonly:false
+       RO_TMP [@profiler.record_s "initializing RO TMP floating store"])
   in
   let* new_savepoint, new_caboose =
     Lwt.catch
       (fun () ->
         let* cycles_interval_to_cement, new_savepoint, new_caboose =
-          update_floating_stores
-            block_store
-            ~history_mode
-            ~ro_store:old_ro_store
-            ~rw_store:old_rw_store
-            ~new_store:new_ro_store
-            ~new_head
-            ~new_head_lpbl
-            ~lowest_bound_to_preserve_in_floating
-            ~cementing_highwatermark
-            ~cycle_size_limit
+          (update_floating_stores
+             block_store
+             ~history_mode
+             ~ro_store:old_ro_store
+             ~rw_store:old_rw_store
+             ~new_store:new_ro_store
+             ~new_head
+             ~new_head_lpbl
+             ~lowest_bound_to_preserve_in_floating
+             ~cementing_highwatermark
+             ~cycle_size_limit [@profiler.record_s "update floating stores"])
         in
         let*! () =
           Store_events.(emit cementing_block_ranges) cycles_interval_to_cement
@@ -1291,9 +1350,13 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                 in
                 (* Clean-up the files that are below the offset *)
                 let*! () =
-                  Cemented_block_store.trigger_gc
-                    block_store.cemented_store
-                    history_mode
+                  let*! () = lock block_store.lockfile in
+                  Lwt.finalize
+                    (fun () ->
+                      Cemented_block_store.trigger_gc
+                        block_store.cemented_store
+                        history_mode)
+                    (fun () -> unlock block_store.lockfile)
                 in
                 return_unit
               else (* Don't cement any cycles! *)
@@ -1321,9 +1384,13 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                 in
                 (* Clean-up the files that are below the offset *)
                 let*! () =
-                  Cemented_block_store.trigger_gc
-                    block_store.cemented_store
-                    history_mode
+                  let*! () = lock block_store.lockfile in
+                  Lwt.finalize
+                    (fun () ->
+                      Cemented_block_store.trigger_gc
+                        block_store.cemented_store
+                        history_mode)
+                    (fun () -> unlock block_store.lockfile)
                 in
                 return_unit
               else
@@ -1378,6 +1445,9 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
+  ()
+  [@profiler.reset_block_section Block_repr.hash new_head]
+  [@profiler.record "merge store"] ;
   let*! () = Lwt_mutex.lock block_store.merge_mutex in
   protect
     ~on_error:(fun err ->
@@ -1392,7 +1462,14 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
              {status = Format.asprintf "%a" Block_store_status.pp store_status})
       in
       (* Mark the store's status as Merging *)
-      let* () = Block_store_status.set_merge_status block_store.status_data in
+      let* () =
+        Lwt.finalize
+          (fun () ->
+            (let*! () = lock block_store.stored_data_lockfile in
+             Block_store_status.set_merge_status block_store.status_data)
+            [@profiler.span_s ["write status"]])
+          (fun () -> unlock block_store.stored_data_lockfile)
+      in
       let new_head_lpbl =
         Block_repr.last_preserved_block_level new_head_metadata
       in
@@ -1407,10 +1484,21 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
       in
       let merge_start = Time.System.now () in
       let* () =
+        () [@profiler.record "waiting for lock (start)"] ;
         Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
+            () [@profiler.stop] ;
             (* Move the rw in the ro stores and create a new tmp *)
             let* old_ro_store, old_rw_store, _new_rw_store =
-              instanciate_temporary_floating_store block_store
+              Lwt.finalize
+                (fun () ->
+                  (* Lock the block store to avoid RO instances to open the
+                     state while the file descriptors are being updated. *)
+                  let*! () = lock block_store.lockfile in
+
+                  (instantiate_temporary_floating_store
+                     block_store
+                   [@profiler.record_s "instanciate tmp floating stores"]))
+                (fun () -> unlock block_store.lockfile)
             in
             (* Important: do not clean-up the temporary stores on
                failures as they will delete the recently arrived
@@ -1432,53 +1520,83 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                         on_error (Merge_error :: err))
                       (fun () ->
                         let* new_ro_store, new_savepoint, new_caboose =
-                          create_merging_thread
-                            block_store
-                            ~cycle_size_limit
-                            ~history_mode
-                            ~old_ro_store
-                            ~old_rw_store
-                            ~new_head
-                            ~new_head_lpbl
-                            ~lowest_bound_to_preserve_in_floating
-                            ~cementing_highwatermark
+                          (create_merging_thread
+                             block_store
+                             ~cycle_size_limit
+                             ~history_mode
+                             ~old_ro_store
+                             ~old_rw_store
+                             ~new_head
+                             ~new_head_lpbl
+                             ~lowest_bound_to_preserve_in_floating
+                             ~cementing_highwatermark
+                           [@profiler.record_s "merging thread"])
                         in
                         let* () =
+                          () [@profiler.record "waiting for lock (end)"] ;
                           Lwt_idle_waiter.force_idle
                             block_store.merge_scheduler
                             (fun () ->
-                              (* Critical section: update on-disk values *)
-                              let* () =
-                                move_all_floating_stores
-                                  block_store
-                                  ~new_ro_store
-                              in
-                              let* () = write_caboose block_store new_caboose in
-                              let* () =
-                                write_savepoint block_store new_savepoint
-                              in
-                              return_unit)
+                              Lwt.finalize
+                                (fun () ->
+                                  (* Lock the block store to avoid RO
+                                     instances to open the state while
+                                     the file descriptors are being
+                                     updated. *)
+                                  let*! () = lock block_store.lockfile in
+                                  (* Critical section: update on-disk values *)
+                                  let* () =
+                                    (move_all_floating_stores
+                                       block_store
+                                       ~new_ro_store
+                                     [@profiler.record_s
+                                       "move all floating stores"])
+                                  in
+                                  let*! () =
+                                    lock block_store.stored_data_lockfile
+                                  in
+                                  (let* () =
+                                     write_caboose block_store new_caboose
+                                   in
+                                   let* () =
+                                     write_savepoint block_store new_savepoint
+                                   in
+                                   return_unit)
+                                  [@profiler.span_s ["write new checkpoints"]])
+                                (fun () ->
+                                  let*! () =
+                                    unlock block_store.stored_data_lockfile
+                                  in
+                                  unlock block_store.lockfile))
                         in
                         (* We can now trigger the context GC: if the
                            GC is performed, this call will block until
                            its end. *)
                         let* () =
-                          may_trigger_gc
-                            ~disable_context_pruning
-                            block_store
-                            history_mode
-                            ~previous_savepoint
-                            ~new_savepoint
+                          (may_trigger_gc
+                             ~disable_context_pruning
+                             block_store
+                             history_mode
+                             ~previous_savepoint
+                             ~new_savepoint [@profiler.span_s ["performing GC"]])
                         in
                         (* Don't call the finalizer in the critical
                            section, in case it needs to access the block
                            store. *)
                         let* () = finalizer new_head_lpbl in
-                        (* The merge operation succeeded, the store is now idle. *)
+                        (* The merge operation succeeded, the store is
+                           now idle. *)
                         block_store.merging_thread <- None ;
                         let* () =
-                          Block_store_status.set_idle_status
-                            block_store.status_data
+                          Lwt.finalize
+                            (fun () ->
+                              let*! () =
+                                lock block_store.stored_data_lockfile
+                              in
+                              (Block_store_status.set_idle_status
+                                 block_store.status_data
+                               [@profiler.record_s "set idle status"]))
+                            (fun () -> unlock block_store.stored_data_lockfile)
                         in
                         return_unit))
                   (fun () ->
@@ -1491,6 +1609,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
               Prometheus.Gauge.set
                 Store_metrics.metrics.last_store_merge_time
                 (Ptime.Span.to_float_s merging_time) ;
+              () [@profiler.stop] ;
               return_unit
             in
             block_store.merging_thread <- Some (new_head_lpbl, merging_thread) ;
@@ -1599,69 +1718,201 @@ let may_recover_merge block_store =
 
 let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   let open Lwt_result_syntax in
-  let* cemented_store = Cemented_block_store.init chain_dir ~readonly in
-  let*! ro_floating_block_store =
-    Floating_block_store.init chain_dir ~readonly RO
-  in
-  let ro_floating_block_stores = [ro_floating_block_store] in
-  let*! rw_floating_block_store =
-    Floating_block_store.init chain_dir ~readonly RW
-  in
-  let genesis_descr = Block_repr.descriptor genesis_block in
-  let* savepoint =
-    Stored_data.init
-      (Naming.savepoint_file chain_dir)
-      ~initial_data:genesis_descr
-  in
-  let*! _, savepoint_level = Stored_data.get savepoint in
-  Prometheus.Gauge.set
-    Store_metrics.metrics.savepoint_level
-    (Int32.to_float savepoint_level) ;
-  let* caboose =
-    Stored_data.init (Naming.caboose_file chain_dir) ~initial_data:genesis_descr
-  in
-  let*! _, caboose_level = Stored_data.get caboose in
-  Prometheus.Gauge.set
-    Store_metrics.metrics.caboose_level
-    (Int32.to_float caboose_level) ;
-  let* status_data =
-    Stored_data.init
-      (Naming.block_store_status_file chain_dir)
-      ~initial_data:Block_store_status.create_idle_status
-  in
-  let block_cache =
-    Block_lru_cache.create
-      (Option.value block_cache_limit ~default:default_block_cache_limit)
-  in
-  let merge_scheduler = Lwt_idle_waiter.create () in
-  let merge_mutex = Lwt_mutex.create () in
-  let block_store =
-    {
-      chain_dir;
-      genesis_block;
-      readonly;
-      cemented_store;
-      ro_floating_block_stores;
-      rw_floating_block_store;
-      caboose;
-      savepoint;
-      status_data;
-      block_cache;
-      gc_callback = None;
-      split_callback = None;
-      merge_mutex;
-      merge_scheduler;
-      merging_thread = None;
-    }
-  in
-  let* () =
-    if not readonly then may_recover_merge block_store else return_unit
-  in
-  let*! status = Stored_data.get status_data in
-  let* () =
-    fail_unless (Block_store_status.is_idle status) Cannot_load_degraded_store
+  let* lockfile = create_lockfile Naming.block_store_lockfile chain_dir in
+  let* block_store =
+    Lwt.finalize
+      (fun () ->
+        let*! () = lock lockfile in
+        let* cemented_store = Cemented_block_store.init chain_dir ~readonly in
+        let*! ro_floating_block_store =
+          Floating_block_store.init chain_dir ~readonly RO
+        in
+        let ro_floating_block_stores = [ro_floating_block_store] in
+        let*! rw_floating_block_store =
+          Floating_block_store.init chain_dir ~readonly RW
+        in
+        let genesis_descr = Block_repr.descriptor genesis_block in
+        let* savepoint =
+          Stored_data.init
+            (Naming.savepoint_file chain_dir)
+            ~initial_data:genesis_descr
+        in
+        let*! _, savepoint_level = Stored_data.get savepoint in
+        Prometheus.Gauge.set
+          Store_metrics.metrics.savepoint_level
+          (Int32.to_float savepoint_level) ;
+        let* caboose =
+          Stored_data.init
+            (Naming.caboose_file chain_dir)
+            ~initial_data:genesis_descr
+        in
+        let*! _, caboose_level = Stored_data.get caboose in
+        Prometheus.Gauge.set
+          Store_metrics.metrics.caboose_level
+          (Int32.to_float caboose_level) ;
+        let* status_data =
+          Stored_data.init
+            (Naming.block_store_status_file chain_dir)
+            ~initial_data:Block_store_status.create_idle_status
+        in
+        let block_cache =
+          Block_lru_cache.create
+            (Option.value block_cache_limit ~default:default_block_cache_limit)
+        in
+        let merge_scheduler = Lwt_idle_waiter.create () in
+        let merge_mutex = Lwt_mutex.create () in
+        let* stored_data_lockfile =
+          create_lockfile Naming.stored_data_lockfile chain_dir
+        in
+        let block_store =
+          {
+            chain_dir;
+            genesis_block;
+            readonly;
+            cemented_store;
+            ro_floating_block_stores;
+            rw_floating_block_store;
+            caboose;
+            savepoint;
+            status_data;
+            block_cache;
+            gc_callback = None;
+            split_callback = None;
+            merge_mutex;
+            merge_scheduler;
+            merging_thread = None;
+            lockfile;
+            stored_data_lockfile;
+          }
+        in
+        let* () =
+          if not readonly then may_recover_merge block_store else return_unit
+        in
+        let*! status = Stored_data.get status_data in
+        let* () =
+          fail_when
+            (Block_store_status.is_merging status && not readonly)
+            Cannot_load_degraded_store
+        in
+        return block_store)
+      (fun () -> unlock lockfile)
   in
   return block_store
+
+let lock_block_store {lockfile; _} = lock lockfile
+
+let unlock_block_store {lockfile; _} = unlock lockfile
+
+let sync ~last_status block_store =
+  let open Lwt_result_syntax in
+  Lwt.finalize
+    (fun () ->
+      let*! () = lock block_store.lockfile in
+      let chain_dir = block_store.chain_dir in
+      let readonly = true in
+      let* stored_status =
+        Stored_data.load (Naming.block_store_status_file chain_dir)
+      in
+      let*! current_status = Stored_data.get stored_status in
+      let fbs =
+        block_store.rw_floating_block_store
+        :: block_store.ro_floating_block_stores
+      in
+      (* Prepare resources cleaners for former resources. *)
+      let cleanups () = List.iter_s Floating_block_store.close fbs in
+      let no_cleanup () = Lwt.return_unit in
+      let is_last_status_merging = Block_store_status.is_merging last_status in
+      let is_current_status_merging =
+        Block_store_status.is_merging current_status
+      in
+      let last_status_id = Block_store_status.get_status_value last_status in
+      let current_status_id =
+        Block_store_status.get_status_value current_status
+      in
+      let* new_block_store, cleanups =
+        match (is_last_status_merging, is_current_status_merging) with
+        | (false, false | true, true) when last_status_id = current_status_id ->
+            (* The status has not changed (Idle to Idle or Merging to
+               Merging where status ids are equal)since the last sync:
+               we only reload the floating stores. *)
+            let () = List.iter Floating_block_store.may_sync fbs in
+            return (block_store, no_cleanup)
+        | false, false | true, false ->
+            (* A complete merge occurred (Idle to Idle where status
+               ids are different) since the last sync or a merge (that
+               was ongoing during the last sync) finished.
+               We need to:
+               - open the new floating stores and update some store
+               values,
+               - synchronize the new cemented store indexes and block
+                 files. *)
+            let*! ro_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RO
+            in
+            let ro_floating_block_stores = [ro_floating_block_store] in
+            let*! rw_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RW
+            in
+            let () =
+              Cemented_block_store.may_synchronize_indexes
+                block_store.cemented_store
+            in
+            let* () =
+              Cemented_block_store.reload_cemented_blocks_files
+                block_store.cemented_store
+            in
+            let* savepoint =
+              Stored_data.load (Naming.savepoint_file chain_dir)
+            in
+            let* caboose = Stored_data.load (Naming.caboose_file chain_dir) in
+            let status_data = block_store.status_data in
+            return
+              ( {
+                  block_store with
+                  ro_floating_block_stores;
+                  rw_floating_block_store;
+                  savepoint;
+                  caboose;
+                  status_data;
+                },
+                cleanups )
+        | false, true | true, true ->
+            (* A merge has started (Idle to Merging) since the last
+               sync or a merge that was ongoing during the last sync
+               finished and a new one is now ongoing (Merging to
+               Merging where status ids are different): we need to
+               open the temporary floating stores and update some
+               store values. *)
+            let*! ro_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RO
+            in
+            let*! rw_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RW
+            in
+            let ro_floating_block_stores =
+              [ro_floating_block_store; rw_floating_block_store]
+            in
+            let*! rw_floating_block_store =
+              Floating_block_store.init chain_dir ~readonly RW_TMP
+            in
+            let* savepoint =
+              Stored_data.load (Naming.savepoint_file chain_dir)
+            in
+            let* caboose = Stored_data.load (Naming.caboose_file chain_dir) in
+            let status_data = block_store.status_data in
+            return
+              ( {
+                  block_store with
+                  ro_floating_block_stores;
+                  rw_floating_block_store;
+                  savepoint;
+                  caboose;
+                  status_data;
+                },
+                cleanups )
+      in
+      return (new_block_store, current_status, cleanups))
+    (fun () -> unlock block_store.lockfile)
 
 let create ?block_cache_limit chain_dir ~genesis_block =
   let open Lwt_result_syntax in
@@ -1717,22 +1968,31 @@ let close block_store =
     Floating_block_store.close
     (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)
 
+let stat_metadata_cycles block_store =
+  Cemented_block_store.stat_metadata_cycles block_store.cemented_store
+
 (***************** Upgrade to V3.1 *****************)
 
 let v_3_1_upgrade chain_dir =
   let open Lwt_result_syntax in
-  (* Load using the legacy block_store_status encoding *)
-  let*! () = Store_events.(emit load_block_store_status ()) in
-  let* legacy_status_data =
-    Stored_data.init
-      (Naming.legacy_block_store_status_file chain_dir)
-      ~initial_data:Block_store_status.Legacy.create_idle_status
+  let legacy_block_store_status_file =
+    Naming.legacy_block_store_status_file chain_dir
   in
-  (* Convert to the new encoding *)
-  let* status = Block_store_status.of_legacy legacy_status_data in
-  (* Overwrite the status file *)
-  let* () =
-    Stored_data.write_file (Naming.block_store_status_file chain_dir) status
-  in
-  let*! () = Store_events.(emit fixed_block_store_status ()) in
-  return_unit
+  let*! exists = Lwt_unix.file_exists legacy_block_store_status_file.path in
+  if exists then
+    (* Load using the legacy block_store_status encoding *)
+    let*! () = Store_events.(emit load_block_store_status ()) in
+    let* legacy_status_data =
+      Stored_data.init
+        legacy_block_store_status_file
+        ~initial_data:Block_store_status.Legacy.create_idle_status
+    in
+    (* Convert to the new encoding *)
+    let* status = Block_store_status.of_legacy legacy_status_data in
+    (* Overwrite the status file *)
+    let* () =
+      Stored_data.write_file (Naming.block_store_status_file chain_dir) status
+    in
+    let*! () = Store_events.(emit fixed_block_store_status ()) in
+    return_unit
+  else (* The store is not containing any data to upgrade yet.*) return_unit

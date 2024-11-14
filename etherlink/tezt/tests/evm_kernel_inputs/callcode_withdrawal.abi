@@ -1,0 +1,11 @@
+[
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "testCallcode",
+		"outputs": [],
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "function"
+	}
+]

@@ -24,7 +24,7 @@ let apply_end_cycle current_cycle previous_block block state :
       state
   in
   (* Apply autostaking *)
-  let*? state = State_ai_flags.Autostake.run_at_cycle_end block state in
+  let* state = State_ai_flags.Autostake.run_at_cycle_end block state in
   (* Sets initial frozen for future cycle *)
   let* state = update_map_es ~f:(compute_future_frozen_rights block) state in
   (* Apply parameter changes *)
@@ -76,6 +76,77 @@ let check_all_balances block state : unit tzresult Lwt.t =
       total_supply
   in
   Assert.join_errors r1 r2
+
+(** Misc checks at block end *)
+let check_misc block state : unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let State.{account_map; _} = state in
+  String.Map.fold_s
+    (fun name account acc ->
+      match account.delegate with
+      | Some x when String.equal x name ->
+          let ufd_state =
+            List.map
+              (fun ({cycle; current; _} : Unstaked_frozen.r) ->
+                (cycle, current))
+              account.unstaked_frozen
+          in
+          let ufnlz_state =
+            Unstaked_finalizable.total account.unstaked_finalizable
+          in
+          let ufd_state_map =
+            List.fold_left
+              (fun acc (cycle, v) -> CycleMap.add cycle v acc)
+              CycleMap.empty
+              ufd_state
+          in
+          let* u_rpc =
+            Context.Delegate.unstaked_frozen_deposits (B block) account.pkh
+          in
+          let u_rpc =
+            List.map
+              (fun ({cycle; deposit} :
+                     Plugin.Alpha_services.Delegate.deposit_per_cycle) ->
+                (cycle, deposit))
+              u_rpc
+          in
+          let finalizable_cycle =
+            Cycle.sub
+              (Block.current_cycle block)
+              (state.State.constants.consensus_rights_delay + 2)
+          in
+          let ufnlz_rpc, ufd_rpc =
+            match finalizable_cycle with
+            | None -> (Tez.zero, u_rpc)
+            | Some finalizable_cycle -> (
+                match
+                  List.partition
+                    (fun (cycle, _) -> Cycle.equal cycle finalizable_cycle)
+                    u_rpc
+                with
+                | [], l -> (Tez.zero, l)
+                | [(_, s)], l -> (s, l)
+                | _ -> assert false)
+          in
+          let*! r1 = Assert.equal_tez ~loc:__LOC__ ufnlz_rpc ufnlz_state in
+          let*! r2 =
+            List.fold_left
+              (fun acc (cycle, v) ->
+                let state_val =
+                  CycleMap.find cycle ufd_state_map
+                  |> Option.value ~default:Tez.zero
+                in
+                let*! r = Assert.equal_tez ~loc:__LOC__ v state_val in
+                let*! acc in
+                Assert.join_errors r acc)
+              return_unit
+              ufd_rpc
+          in
+          let*! r = Assert.join_errors r1 r2 in
+          Assert.join_errors r acc
+      | _ -> Lwt.return acc)
+    account_map
+    Result.return_unit
 
 let check_issuance_rpc block : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -165,20 +236,10 @@ let bake ?baker : t -> t tzresult Lwt.t =
         Some (Block.By_account pkh)
   in
   let* baker, _, _, _ = Block.get_next_baker ?policy block in
-  let baker_name, ({contract = baker_contract; _} as baker_acc) =
+  let baker_name, {contract = baker_contract; _} =
     State.find_account_from_pkh baker state
   in
   let current_cycle = Block.current_cycle block in
-  (* update baker activity *)
-  let state =
-    State.update_map
-      ~f:(fun acc_map ->
-        String.Map.add
-          baker_name
-          {baker_acc with last_active_cycle = current_cycle}
-          acc_map)
-      state
-  in
   let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
   assert (Protocol.Alpha_context.Cycle.(level.cycle = Block.current_cycle block)) ;
   Log.info
@@ -219,62 +280,152 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return (block, state)
     else return (block', state)
   in
+  let baker_acc = State.find_account baker_name state in
+  (* update baker and attesters activity *)
+  let update_activity delegate_account =
+    Account_helpers.update_activity
+      delegate_account
+      state.constants
+      ~level:block.header.shell.level
+      (Block.current_cycle block)
+  in
+  let* attesters =
+    let open Tezos_raw_protocol_alpha.Alpha_context in
+    let* ctxt = Context.get_alpha_ctxt (B previous_block) in
+    List.filter_map_es
+      (fun op ->
+        let ({protocol_data = Operation_data protocol_data; _}
+              : packed_operation) =
+          op
+        in
+        match protocol_data.contents with
+        | Single (Attestation {consensus_content; _}) ->
+            let*@ _, owner =
+              Stake_distribution.slot_owner
+                ctxt
+                (Level.from_raw ctxt consensus_content.level)
+                consensus_content.slot
+            in
+            return_some owner.delegate
+        | _ -> return_none)
+      operations
+  in
+  let state =
+    State.update_map
+      ~f:(fun acc_map ->
+        let acc_map =
+          String.Map.add baker_name (update_activity baker_acc) acc_map
+        in
+        List.fold_left
+          (fun acc_map delegate_pkh ->
+            let delegate_name, delegate_acc =
+              State.find_account_from_pkh delegate_pkh state
+            in
+            String.Map.add delegate_name (update_activity delegate_acc) acc_map)
+          acc_map
+          attesters)
+      state
+  in
   let* state =
     State_ai_flags.AI_Activation.check_activation_cycle block state
   in
   let* state = State.apply_rewards ~baker:baker_name block state in
-  (* First block of a new cycle *)
-  let new_current_cycle = Block.current_cycle block in
-  let* state =
-    if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
-      return state
-    else (
-      Log.info
-        ~color:time_color
-        "Cycle %d"
-        (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
-      return @@ apply_new_cycle new_current_cycle state)
-  in
-  (* Dawn of a new cycle *)
+  let new_future_current_cycle = Cycle.succ (Block.current_cycle block) in
+  (* Dawn of a new cycle: apply cycle end operations *)
   let* state =
     if not (Block.last_block_of_cycle block) then return state
     else apply_end_cycle current_cycle previous_block block state
   in
   let* () = check_all_balances block state in
+  let* () = check_misc block state in
+  (* Dawn of a new cycle: update finalizables *)
+  (* Note: this is done after the checks, because it is not observable by RPCs by calling
+     the previous block (which is still in the previous cycle *)
+  let* state =
+    if not (Block.last_block_of_cycle block) then return state
+    else (
+      Log.info
+        ~color:time_color
+        "Cycle %d"
+        (Protocol.Alpha_context.Cycle.to_int32 new_future_current_cycle
+        |> Int32.to_int) ;
+      return @@ apply_new_cycle new_future_current_cycle state)
+  in
   let* block, state =
     if state.force_attest_all then attest_all_ (block, state)
     else return (block, state)
   in
   return (block, state)
 
+let rec repeat n f acc =
+  let open Lwt_result_syntax in
+  if n <= 0 then return acc
+  else
+    let* acc = f acc in
+    repeat (n - 1) f acc
+
+(* adopted from tezt/lib_tezos/client.ml *)
+let bake_until_level ~target_level : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
+  let open Lwt_result_syntax in
+  Log.info "Bake until level %d." target_level ;
+  let current_level = Int32.to_int @@ Block.current_level init_block in
+  if target_level < current_level then
+    Test.fail
+      "bake_until_level(%d): already at level %d"
+      target_level
+      current_level ;
+  let* final_block, final_state =
+    repeat (target_level - current_level) bake (init_block, init_state)
+  in
+  let final_level = Int32.to_int @@ Block.current_level final_block in
+  Check.((final_level = target_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
+  return (final_block, final_state)
+
+let bake_until ~target_cycle condition : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
+  let blocks_per_cycle = Int32.to_int init_block.constants.blocks_per_cycle in
+  let target_level, str =
+    match condition with
+    | `New_cycle -> (target_cycle * blocks_per_cycle, "first block")
+    | `Cycle_end -> (((target_cycle + 1) * blocks_per_cycle) - 1, "last block")
+    | `Cycle_end_but_one ->
+        (((target_cycle + 1) * blocks_per_cycle) - 2, "last but one block")
+  in
+  Log.info "Bake until cycle %d (level %d); %s" target_cycle target_level str ;
+  bake_until_level ~target_level (init_block, init_state)
+
 (** Bake until a cycle is reached, using [bake] instead of [Block.bake] *)
 let bake_until_next_cycle : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
-  let open Lwt_result_syntax in
-  let current_cycle = Block.current_cycle init_block in
-  let rec step (old_block, old_state) =
-    let step_cycle = Block.current_cycle old_block in
-    if Protocol.Alpha_context.Cycle.(step_cycle > current_cycle) then
-      return (old_block, old_state)
-    else
-      let* new_block, new_state = bake (old_block, old_state) in
-      step (new_block, new_state)
+  let next_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Cycle.succ
+    @@ Block.current_cycle init_block
   in
-  step (init_block, init_state)
+  bake_until `New_cycle ~target_cycle:next_cycle (init_block, init_state)
 
 (** Bake all the remaining blocks of the current cycle *)
 let bake_until_dawn_of_next_cycle : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
-  let open Lwt_result_syntax in
-  let current_cycle = Block.current_cycle init_block in
-  let rec step (old_block, old_state) =
-    let* new_block, new_state = bake (old_block, old_state) in
-    let step_cycle = Block.current_cycle new_block in
-    if Protocol.Alpha_context.Cycle.(step_cycle > current_cycle) then
-      return (old_block, old_state)
-    else step (new_block, new_state)
+  let current_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Block.current_cycle init_block
   in
-  step (init_block, init_state)
+  bake_until `Cycle_end ~target_cycle:current_cycle (init_block, init_state)
+
+let bake_until_next_cycle_end_but_one : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
+  let current_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Block.current_cycle init_block
+  in
+  let next_cycle =
+    Int32.to_int @@ Cycle.to_int32 @@ Cycle.succ
+    @@ Block.current_cycle init_block
+  in
+  let target_cycle =
+    if Block.last_block_of_cycle init_block then next_cycle else current_cycle
+  in
+  bake_until `Cycle_end_but_one ~target_cycle (init_block, init_state)
 
 (* ======== Operations ======== *)
 

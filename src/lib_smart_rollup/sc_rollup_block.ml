@@ -39,6 +39,7 @@ type content = {
   inbox : Inbox.t;
   messages : string list;
   commitment : Commitment.t option;
+  outbox : (int * Outbox_message.summary) list option;
 }
 
 type ('header, 'content) block = {
@@ -148,9 +149,11 @@ let header_size =
 let content_encoding =
   let open Data_encoding in
   conv
-    (fun {inbox; messages; commitment} -> (inbox, messages, commitment))
-    (fun (inbox, messages, commitment) -> {inbox; messages; commitment})
-  @@ obj3
+    (fun {inbox; messages; commitment; outbox} ->
+      (inbox, messages, commitment, outbox))
+    (fun (inbox, messages, commitment, outbox) ->
+      {inbox; messages; commitment; outbox})
+  @@ obj4
        (req "inbox" Inbox.encoding ~description:"Inbox for this block.")
        (req
           "messages"
@@ -160,6 +163,13 @@ let content_encoding =
           "commitment"
           Commitment.encoding
           ~description:"Commitment, if any is computed for this block.")
+       (opt
+          "outbox"
+          (list
+             (merge_objs
+                (obj1 (req "message_index" int31))
+                Outbox_message.summary_encoding))
+          ~description:"Outbox messages produced by PVM execution of inbox")
 
 let block_encoding header_encoding content_encoding =
   let open Data_encoding in

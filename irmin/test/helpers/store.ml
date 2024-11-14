@@ -2470,17 +2470,17 @@ let suite sleep (speed, x) =
     @ List.map (fun (n, test) -> ("Watch." ^ n, speed, test x)) T_watch.tests)
     (speed, x)
 
-let slow_suite (speed, x) =
+let slow_suite (_speed, x) =
   let (module S) = Suite.store_generic_key x in
   let module T = Make (S) in
   suite' ~prefix:"SLOW_"
     [
-      ("Commit wide node", speed, T.test_commit_wide_node x);
+      ("Commit wide node", `Slow, T.test_commit_wide_node x);
       ("Wide nodes", `Slow, T.test_wide_nodes x);
     ]
-    (speed, x)
+    (`Slow, x)
 
-let run name ?(slow = false) ?random_seed ~sleep ~misc tl =
+let run ~__FILE__ name ?(slow = false) ?random_seed ~sleep ~misc tl =
   let () =
     match random_seed with
     | Some x -> Random.init x

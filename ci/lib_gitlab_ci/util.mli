@@ -10,7 +10,8 @@
 open Types
 
 (** Constructs a [default:] configuration element. *)
-val default : ?image:image -> ?interruptible:bool -> unit -> default
+val default :
+  ?image:image -> ?interruptible:bool -> ?retry:retry -> unit -> default
 
 (** Constructs a job rule.
 
@@ -19,7 +20,7 @@ val default : ?image:image -> ?interruptible:bool -> unit -> default
     If [when_] is set to [Manual] then the default [allow_failure]
     will be overwritten to allow failure, to avoid blocking jobs.
     This typically makes sense unless you truly want a job to block
-    the execution of all later jobs (i.e. for a trigger-type job).  If
+    the execution of all later jobs (i.e. for a "start"-type job).  If
     you want to make such a job, set [~allow_failure] explicitly:
     [job_rule ~when_:Manual ~allow_failure:false ()]. *)
 val job_rule :
@@ -39,6 +40,7 @@ val workflow_rule :
   ?if_:If.t ->
   ?variables:variables ->
   ?when_:when_workflow ->
+  ?auto_cancel:auto_cancel ->
   unit ->
   workflow_rule
 
@@ -74,18 +76,29 @@ val job :
   ?tags:string list ->
   ?when_:when_job ->
   ?coverage:string ->
-  ?retry:int ->
+  ?retry:retry ->
   ?parallel:parallel ->
   name:string ->
   script:string list ->
   unit ->
   job
 
+(** [trigger_job child_pipeline_path] constructs a {!trigger_job} job. *)
+val trigger_job :
+  ?needs:need list ->
+  ?rules:job_rule list ->
+  ?stage:string ->
+  ?when_:when_trigger_job ->
+  name:string ->
+  string ->
+  trigger_job
+
 (** [artifacts paths] Construct an [artifacts:] clause storing [paths].
 
     - [expire_in:] is omitted if [expire_in] is [None].
     - [reports:] is omitted if [reports] is [None].
-    - [when:] is omitted if [when_] is [None].
+    - [when:] is omitted if [when_] is [None] (this is equivalent to
+      [~when_:On_success]).
     - [expose_as:] is omitted if [expose_as] is [None].
 
     At least one of [paths] or [reports] must be non-empty. *)
@@ -109,3 +122,8 @@ val reports :
   ?coverage_report:coverage_report ->
   unit ->
   reports
+
+(** [cache ~key paths] is a cache indexed [key] for [paths].
+
+    - [policy:] is [Push_pull] if [policy] is [omitted]. *)
+val cache : ?policy:cache_policy -> key:string -> string list -> cache

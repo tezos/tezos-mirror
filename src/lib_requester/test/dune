@@ -13,8 +13,7 @@
   octez-libs.stdlib
   octez-libs.stdlib-unix
   octez-libs.requester
-  octez-alcotezt
-  qcheck-alcotest)
+  octez-libs.qcheck-tezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -24,8 +23,7 @@
   -open Tezos_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_stdlib
-  -open Tezos_requester
-  -open Octez_alcotezt)
+  -open Tezos_requester)
  (modules requester_impl test_requester test_fuzzing_requester shared))
 
 (executable
@@ -40,7 +38,7 @@
  (alias runtest)
  (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe})))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
 (rule
  (targets main.ml)

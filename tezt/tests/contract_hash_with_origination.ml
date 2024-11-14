@@ -31,6 +31,7 @@
    Subject:      Tests that `get contract script hash for <contract>` return the
                  same value as directly hashing the script.
 *)
+let team = Tag.layer1
 
 let test_contract_hash_with_origination ~protocol () =
   let* client = Client.init_mockup ~protocol () in
@@ -61,7 +62,7 @@ let register ~protocols =
       Protocol.register_test
         ~__FILE__
         ~title
-        ~tags:["client"; "michelson"]
+        ~tags:[team; "client"; "michelson"]
         ~uses_node:false
         (fun protocol -> test_function ~protocol ())
         protocols)

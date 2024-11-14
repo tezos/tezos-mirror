@@ -8,35 +8,39 @@
 use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
 };
+use crate::block_storage;
 use crate::blueprint_storage::{drop_blueprint, read_next_blueprint};
+use crate::configuration::ConfigurationMode;
+use crate::configuration::Limits;
+use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
-use crate::indexable_storage::IndexableStorage;
-use crate::internal_storage::InternalRuntime;
-use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::storage;
-use crate::storage::init_account_index;
-use crate::tick_model::constants::MAX_ALLOWED_TICKS;
-use crate::tick_model::{maximum_ticks_per_blueprint, ticks_for_next_blueprint};
+use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
-use crate::{current_timestamp, upgrade};
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
+use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
-use tezos_evm_logging::{log, Level::*};
+use tezos_ethereum::transaction::TransactionHash;
+use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
-use tezos_smart_rollup_host::path::Path;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::path::{Path, RefPath};
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 use tezos_ethereum::block::BlockConstants;
+
+pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
+
+pub const GAS_LIMIT: u64 = 1 << 50;
 
 /// Struct used to allow the compiler to check that the tick counter value is
 /// correctly moved and updated. Copy and Clone should NOT be derived.
@@ -56,6 +60,14 @@ impl TickCounter {
 }
 
 #[derive(PartialEq, Debug)]
+pub enum BlockComputationResult {
+    RebootNeeded,
+    Finished {
+        included_delayed_transactions: Vec<TransactionHash>,
+    },
+}
+
+#[derive(PartialEq, Debug)]
 pub enum ComputationResult {
     RebootNeeded,
     Finished,
@@ -69,11 +81,11 @@ fn compute<Host: Runtime>(
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
-    accounts_index: &mut IndexableStorage,
     is_first_block_of_reboot: bool,
-    ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
-) -> Result<ComputationResult, anyhow::Error> {
+    limits: &Limits,
+    tracer_input: Option<TracerInput>,
+) -> Result<BlockComputationResult, anyhow::Error> {
     log!(
         host,
         Debug,
@@ -86,8 +98,10 @@ fn compute<Host: Runtime>(
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
         let data_size: u64 = transaction.data_size();
 
+        log!(host, Benchmarking, "Transaction data size: {}", data_size);
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
+            limits.maximum_allowed_ticks,
             block_in_progress.estimated_ticks_in_run,
             data_size,
         );
@@ -110,7 +124,7 @@ fn compute<Host: Runtime>(
                     be allocated enough ticks even alone in a kernel run."
                 );
             }
-            return Ok(ComputationResult::RebootNeeded);
+            return Ok(BlockComputationResult::RebootNeeded);
         }
 
         // If `apply_transaction` returns `None`, the transaction should be
@@ -123,17 +137,21 @@ fn compute<Host: Runtime>(
             &transaction,
             block_in_progress.index,
             evm_account_storage,
-            accounts_index,
             allocated_ticks,
             retriable,
-            ticketer,
             sequencer_pool_address,
+            limits,
+            tracer_input,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
                 object_info,
                 estimated_ticks_used,
             }) => {
+                if transaction.is_delayed() {
+                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
+                }
+
                 block_in_progress.register_valid_transaction(
                     &transaction,
                     object_info,
@@ -160,9 +178,13 @@ fn compute<Host: Runtime>(
                          current reboot but will be retried."
                 );
                 block_in_progress.repush_tx(transaction);
-                return Ok(ComputationResult::RebootNeeded);
+                return Ok(BlockComputationResult::RebootNeeded);
             }
             ExecutionResult::Invalid => {
+                if transaction.is_delayed() {
+                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
+                }
+
                 block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
                     host,
@@ -174,38 +196,28 @@ fn compute<Host: Runtime>(
         };
         is_first_transaction = false;
     }
-    Ok(ComputationResult::Finished)
-}
-
-fn has_enough_ticks_for_next_blueprint(tick_counter: &TickCounter) -> bool {
-    maximum_ticks_per_blueprint() < MAX_ALLOWED_TICKS.saturating_sub(tick_counter.c)
+    Ok(BlockComputationResult::Finished {
+        included_delayed_transactions: block_in_progress.delayed_txs.clone(),
+    })
 }
 
 enum BlueprintParsing {
     Next(Box<BlockInProgress>),
     None,
-    RebootNeeded,
 }
 
+#[cfg_attr(feature = "benchmark", inline(never))]
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
     current_block_parent_hash: H256,
-    current_constants: &mut BlockConstants,
+    block_fees: &mut BlockFees,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<BlueprintParsing, anyhow::Error> {
-    // The size of a blueprint will be limited by the sum of the size of 512kB,
-    // if we cannot read it during this kernel_run, we simply abort and enforce a reboot.
-    if !has_enough_ticks_for_next_blueprint(tick_counter) {
-        return Ok(BlueprintParsing::RebootNeeded);
-    }
-
     let (blueprint, size) = read_next_blueprint(host, config)?;
-    let ticks = tick_counter
-        .c
-        .saturating_add(ticks_for_next_blueprint(size as u64));
+    log!(host, Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
@@ -217,18 +229,13 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 }
             }
             let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
-            crate::gas_price::store_new_base_fee_per_gas(
-                host,
-                gas_price,
-                &mut current_constants.block_fees,
-            )?;
+            crate::gas_price::store_new_base_fee_per_gas(host, gas_price, block_fees)?;
 
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
                 current_block_number,
                 current_block_parent_hash,
-                current_constants,
-                ticks,
+                tick_counter.c,
             );
 
             tezos_evm_logging::log!(
@@ -243,35 +250,41 @@ fn next_bip_from_blueprints<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn compute_bip<Host: KernelRuntime>(
+fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
-    current_constants: &mut BlockConstants,
     current_block_number: &mut U256,
     current_block_parent_hash: &mut H256,
+    previous_receipts_root: &mut Vec<u8>,
+    previous_transactions_root: &mut Vec<u8>,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
-    accounts_index: &mut IndexableStorage,
     tick_counter: &mut TickCounter,
     first_block_of_reboot: &mut bool,
-    ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
-) -> anyhow::Result<ComputationResult> {
+    limits: &Limits,
+    tracer_input: Option<TracerInput>,
+    chain_id: U256,
+    block_fees: &BlockFees,
+    coinbase: H160,
+) -> anyhow::Result<BlockComputationResult> {
+    let constants: BlockConstants =
+        block_in_progress.constants(chain_id, block_fees, GAS_LIMIT, coinbase);
     let result = compute(
         host,
         outbox_queue,
         &mut block_in_progress,
-        current_constants,
+        &constants,
         precompiles,
         evm_account_storage,
-        accounts_index,
         *first_block_of_reboot,
-        ticketer,
         sequencer_pool_address,
+        limits,
+        tracer_input,
     )?;
-    match result {
-        ComputationResult::RebootNeeded => {
+    match &result {
+        BlockComputationResult::RebootNeeded => {
             log!(host, Info, "Ask for reboot.");
             log!(
                 host,
@@ -281,17 +294,24 @@ fn compute_bip<Host: KernelRuntime>(
             );
             storage::store_block_in_progress(host, &block_in_progress)?;
         }
-        ComputationResult::Finished => {
+        BlockComputationResult::Finished {
+            included_delayed_transactions: _,
+        } => {
             crate::gas_price::register_block(host, &block_in_progress)?;
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
-                .finalize_and_store(host)
+                .finalize_and_store(
+                    host,
+                    &constants,
+                    previous_receipts_root.clone(),
+                    previous_transactions_root.clone(),
+                )
                 .context("Failed to finalize the block in progress")?;
             *current_block_number = new_block.number + 1;
             *current_block_parent_hash = new_block.hash;
-            *current_constants = new_block
-                .constants(current_constants.chain_id, current_constants.block_fees);
+            *previous_receipts_root = new_block.receipts_root;
+            *previous_transactions_root = new_block.transactions_root;
 
             *first_block_of_reboot = false;
         }
@@ -300,7 +320,7 @@ fn compute_bip<Host: KernelRuntime>(
 }
 
 fn revert_block<Host: Runtime>(
-    safe_host: &mut SafeStorage<&mut Host, &mut impl InternalRuntime>,
+    safe_host: &mut SafeStorage<&mut Host>,
     block_in_progress: bool,
     number: U256,
     error: anyhow::Error,
@@ -318,20 +338,34 @@ fn revert_block<Host: Runtime>(
     Ok(())
 }
 
+fn clean_delayed_transactions(
+    host: &mut impl Runtime,
+    delayed_inbox: &mut DelayedInbox,
+    delayed_txs: Vec<TransactionHash>,
+) -> anyhow::Result<()> {
+    for hash in delayed_txs {
+        delayed_inbox.delete(host, hash.into())?;
+    }
+    Ok(())
+}
+
 fn promote_block<Host: Runtime>(
-    safe_host: &mut SafeStorage<&mut Host, &mut impl InternalRuntime>,
+    safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: bool,
     number: U256,
+    config: &mut Configuration,
+    delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
     if block_in_progress {
         storage::delete_block_in_progress(safe_host)?;
     }
     safe_host.promote()?;
+    safe_host.promote_trace()?;
     drop_blueprint(safe_host.host, number)?;
 
-    let number = storage::read_current_block_number(safe_host.host)?;
-    let hash = storage::read_current_block_hash(safe_host.host)?;
+    let number = block_storage::read_current_number(safe_host.host)?;
+    let hash = block_storage::read_current_hash(safe_host.host)?;
 
     Event::BlueprintApplied { number, hash }.store(safe_host.host)?;
 
@@ -345,51 +379,54 @@ fn promote_block<Host: Runtime>(
         written
     );
 
+    if let ConfigurationMode::Sequencer { delayed_inbox, .. } = &mut config.mode {
+        clean_delayed_transactions(safe_host.host, delayed_inbox, delayed_txs)?;
+    }
+
     Ok(())
 }
+
+const AT_MOST_ONE_BLOCK: RefPath = RefPath::assert_from(b"/__at_most_one_block");
 
 pub fn produce<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
-    block_fees: BlockFees,
+    mut block_fees: BlockFees,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
-    let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
-        match storage::read_current_block(host) {
-            Ok(block) => (
-                block.constants(chain_id, block_fees),
-                block.number + 1,
-                block.hash,
-            ),
-            Err(_) => {
-                let timestamp = current_timestamp(host);
-                let timestamp = U256::from(timestamp.as_u64());
-                (
-                    BlockConstants::first_block(timestamp, chain_id, block_fees),
-                    U256::zero(),
-                    H256::from_slice(&hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()),
-                )
-            }
-        };
+    // If there's a pool address, the coinbase in block constants and miner
+    // in blocks is set to the pool address.
+    let coinbase = sequencer_pool_address.unwrap_or_default();
+
+    let (
+        mut current_block_number,
+        mut current_block_parent_hash,
+        mut previous_receipts_root,
+        mut previous_transactions_root,
+    ) = match block_storage::read_current(host) {
+        Ok(block) => (
+            block.number + 1,
+            block.hash,
+            block.receipts_root,
+            block.transactions_root,
+        ),
+        Err(_) => (U256::zero(), GENESIS_PARENT_HASH, vec![0; 32], vec![0; 32]),
+    };
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
-    let mut accounts_index = init_account_index()?;
     let mut tick_counter = TickCounter::new(0u64);
     let mut first_block_of_reboot = true;
 
-    #[cfg(not(test))]
-    let mut internal_storage = crate::internal_storage::InternalStorage();
-    #[cfg(test)]
-    let mut internal_storage = crate::mock_internal::MockInternal();
-    let mut safe_host = SafeStorage {
-        host,
-        internal: &mut internal_storage,
-    };
+    let at_most_one_block = host.store_has(&AT_MOST_ONE_BLOCK)?.is_some();
+
+    let mut safe_host = SafeStorage { host };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let precompiles = precompiles::precompile_set::<SafeStorage<&mut Host, _>>();
+    let precompiles =
+        precompiles::precompile_set::<SafeStorage<&mut Host>>(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
     match storage::read_block_in_progress(&safe_host)? {
@@ -400,24 +437,37 @@ pub fn produce<Host: Runtime>(
                 &mut safe_host,
                 &outbox_queue,
                 block_in_progress,
-                &mut current_constants,
                 &mut current_block_number,
                 &mut current_block_parent_hash,
+                &mut previous_receipts_root,
+                &mut previous_transactions_root,
                 &precompiles,
                 &mut evm_account_storage,
-                &mut accounts_index,
                 &mut tick_counter,
                 &mut first_block_of_reboot,
-                &config.tezos_contracts.ticketer,
                 sequencer_pool_address,
+                &config.limits,
+                tracer_input,
+                chain_id,
+                &block_fees,
+                coinbase,
             ) {
-                Ok(ComputationResult::Finished) => promote_block(
-                    &mut safe_host,
-                    &outbox_queue,
-                    true,
-                    processed_blueprint,
-                )?,
-                Ok(ComputationResult::RebootNeeded) => {
+                Ok(BlockComputationResult::Finished {
+                    included_delayed_transactions,
+                }) => {
+                    promote_block(
+                        &mut safe_host,
+                        &outbox_queue,
+                        true,
+                        processed_blueprint,
+                        config,
+                        included_delayed_transactions,
+                    )?;
+                    if at_most_one_block {
+                        return Ok(ComputationResult::Finished);
+                    }
+                }
+                Ok(BlockComputationResult::RebootNeeded) => {
                     // The computation still needs to reboot, we do nothing.
                     return Ok(ComputationResult::RebootNeeded);
                 }
@@ -446,7 +496,7 @@ pub fn produce<Host: Runtime>(
             safe_host.host,
             current_block_number,
             current_block_parent_hash,
-            &mut current_constants,
+            &mut block_fees,
             &tick_counter,
             config,
             &kernel_upgrade,
@@ -461,15 +511,6 @@ pub fn produce<Host: Runtime>(
                 );
                 return Ok(ComputationResult::Finished);
             }
-            BlueprintParsing::RebootNeeded => {
-                log!(
-                    safe_host,
-                    Benchmarking,
-                    "Estimated ticks: {}",
-                    tick_counter.c
-                );
-                return Ok(ComputationResult::RebootNeeded);
-            }
         };
         // We are going to execute a new block, we copy the storage to allow
         // to revert if the block fails.
@@ -481,23 +522,45 @@ pub fn produce<Host: Runtime>(
             &mut safe_host,
             &outbox_queue,
             *block_in_progress,
-            &mut current_constants,
             &mut current_block_number,
             &mut current_block_parent_hash,
+            &mut previous_receipts_root,
+            &mut previous_transactions_root,
             &precompiles,
             &mut evm_account_storage,
-            &mut accounts_index,
             &mut tick_counter,
             &mut first_block_of_reboot,
-            &config.tezos_contracts.ticketer,
             sequencer_pool_address,
+            &config.limits,
+            tracer_input,
+            chain_id,
+            &block_fees,
+            coinbase,
         ) {
-            Ok(ComputationResult::Finished) => {
-                promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?
+            Ok(BlockComputationResult::Finished {
+                included_delayed_transactions,
+            }) => {
+                promote_block(
+                    &mut safe_host,
+                    &outbox_queue,
+                    false,
+                    processed_blueprint,
+                    config,
+                    included_delayed_transactions,
+                )?;
+                if at_most_one_block {
+                    return Ok(ComputationResult::Finished);
+                }
             }
-            Ok(ComputationResult::RebootNeeded) => {
+            Ok(BlockComputationResult::RebootNeeded) => {
                 // The computation will resume at next reboot, we leave the
                 // storage untouched.
+                log!(
+                    safe_host,
+                    Benchmarking,
+                    "Estimated ticks: {}",
+                    tick_counter.c
+                );
                 return Ok(ComputationResult::RebootNeeded);
             }
             Err(err) => {
@@ -506,6 +569,12 @@ pub fn produce<Host: Runtime>(
                 // which point did it fail nor why. We cannot make assumption
                 // on how many ticks it consumed before failing. Therefore
                 // the safest solution is to simply reboot after a failure.
+                log!(
+                    safe_host,
+                    Benchmarking,
+                    "Estimated ticks: {}",
+                    tick_counter.c
+                );
                 return Ok(ComputationResult::RebootNeeded);
             }
         }
@@ -515,16 +584,16 @@ pub fn produce<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block_storage;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::current_timestamp;
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
     use crate::inbox::TransactionContent::EthereumDelayed;
     use crate::storage::read_block_in_progress;
-    use crate::storage::read_current_block;
-    use crate::storage::{init_blocks_index, init_transaction_hashes_index};
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::tick_model;
     use crate::{retrieve_block_fees, retrieve_chain_id};
@@ -537,8 +606,10 @@ mod tests {
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
@@ -749,12 +820,13 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
     }
 
     fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
-        match storage::read_current_block(host) {
+        match block_storage::read_current(host) {
             Ok(_) => (),
             Err(e) => {
                 panic!("Block reading failed: {:?}\n", e)
@@ -765,7 +837,7 @@ mod tests {
     #[test]
     // Test if the invalid transactions are producing receipts
     fn test_invalid_transactions_receipt_status() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -796,6 +868,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -808,7 +881,7 @@ mod tests {
     #[test]
     // Test if a valid transaction is producing a receipt with a success status
     fn test_valid_transactions_receipt_status() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -840,6 +913,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -851,7 +925,7 @@ mod tests {
     #[test]
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -887,6 +961,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
@@ -905,7 +980,7 @@ mod tests {
     #[test]
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -927,7 +1002,7 @@ mod tests {
     #[test]
     // Test if several valid proposals can produce valid blocks
     fn test_several_valid_proposals() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -967,6 +1042,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -981,7 +1057,7 @@ mod tests {
     #[test]
     // Test transfers gas consumption consistency
     fn test_cumulative_transfers_gas_consumption() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let base_gas = U256::from(21000);
         crate::storage::store_minimum_base_fee_per_gas(&mut host, base_gas).unwrap();
@@ -1025,6 +1101,7 @@ mod tests {
             dummy_block_fees,
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
         let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
@@ -1043,7 +1120,7 @@ mod tests {
     // Test if we're able to read current block (with a filled queue) after
     // a block production
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -1055,7 +1132,7 @@ mod tests {
     #[test]
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1089,6 +1166,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -1113,127 +1191,20 @@ mod tests {
     }
 
     #[test]
-    //Test accounts are indexed at the end of the block production
-    fn test_accounts_are_indexed() {
-        let mut host = MockHost::default();
+    fn test_blocks_are_indexed() {
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
-        let accounts_index = init_account_index().unwrap();
+        let blocks_index =
+            block_storage::internal_for_tests::init_blocks_index().unwrap();
 
-        let tx = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: Ethereum(dummy_eth_transaction_zero()),
-        };
-
-        let transactions = vec![tx];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
-
-        let indexed_accounts = accounts_index.length(&host).unwrap();
-
-        let sender = dummy_eth_caller();
-        println!("caller {sender:?}");
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut Configuration::default(),
-            None,
-        )
-        .expect("The block production failed.");
-
-        let indexed_accounts_after_produce = accounts_index.length(&host).unwrap();
-
-        // The sender and receiver have never been indexed yet, and are indexed
-        // whether the transaction succeeds or not.
-        assert_eq!(
-            indexed_accounts_after_produce,
-            indexed_accounts + 2,
-            "The new accounts haven't been indexed"
-        )
-    }
-
-    #[test]
-    //Test accounts are indexed at the end of the block production
-    fn test_accounts_are_indexed_once() {
-        let mut host = MockHost::default();
-
-        let accounts_index = init_account_index().unwrap();
-
-        let tx = Transaction {
-            tx_hash: [0; TRANSACTION_HASH_SIZE],
-            content: Ethereum(dummy_eth_transaction_zero()),
-        };
-
-        let transactions = vec![tx];
-        store_blueprints(&mut host, vec![blueprint(transactions.clone())]);
-
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut Configuration::default(),
-            None,
-        )
-        .expect("The block production failed.");
-
-        let indexed_accounts = accounts_index.length(&host).unwrap();
-        // Next blueprint
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
-        produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            dummy_block_fees(),
-            &mut Configuration::default(),
-            None,
-        )
-        .expect("The block production failed.");
-
-        let indexed_accounts_after_second_produce = accounts_index.length(&host).unwrap();
-
-        // The sender and receiver have never been indexed yet
-        assert_eq!(
-            indexed_accounts, indexed_accounts_after_second_produce,
-            "Accounts have been indexed twice"
-        )
-    }
-
-    #[test]
-    fn test_blocks_and_transactions_are_indexed() {
-        let mut host = MockHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
-
-        let blocks_index = init_blocks_index().unwrap();
-        let transaction_hashes_index = init_transaction_hashes_index().unwrap();
-
-        let tx_hash = [0; TRANSACTION_HASH_SIZE];
-
-        let tx = Transaction {
-            tx_hash,
-            content: Ethereum(dummy_eth_transaction_zero()),
-        };
-
-        let transactions = vec![tx];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints(&mut host, vec![blueprint(vec![])]);
 
         let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-        let number_of_transactions_indexed =
-            transaction_hashes_index.length(&host).unwrap();
-
         let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
@@ -1248,36 +1219,23 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-        let new_number_of_transactions_indexed =
-            transaction_hashes_index.length(&host).unwrap();
 
-        let current_block_hash = storage::read_current_block(&mut host)
+        let current_block_hash = block_storage::read_current(&mut host)
             .unwrap()
             .hash
             .as_bytes()
             .to_vec();
 
         assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
-        assert_eq!(
-            number_of_transactions_indexed + 1,
-            new_number_of_transactions_indexed
-        );
 
         assert_eq!(
             Ok(current_block_hash),
             blocks_index.get_value(&host, new_number_of_blocks_indexed - 1)
-        );
-
-        let last_indexed_transaction =
-            transaction_hashes_index.length(&host).unwrap() - 1;
-
-        assert_eq!(
-            Ok(tx_hash.to_vec()),
-            transaction_hashes_index.get_value(&host, last_indexed_transaction)
         );
     }
 
@@ -1288,17 +1246,22 @@ mod tests {
         let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
         assert!(block_fees.is_ok(), "block fees should be defined");
-        BlockConstants::first_block(timestamp, chain_id.unwrap(), block_fees.unwrap())
+        BlockConstants::first_block(
+            timestamp,
+            chain_id.unwrap(),
+            block_fees.unwrap(),
+            crate::block::GAS_LIMIT,
+            H160::zero(),
+        )
     }
 
     #[test]
     fn test_stop_computation() {
         // init host
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let block_constants = first_block(&mut host);
-        let precompiles = precompiles::precompile_set();
-        let mut accounts_index = init_account_index().unwrap();
+        let precompiles = precompiles::precompile_set(false);
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
@@ -1318,11 +1281,10 @@ mod tests {
         let transactions = vec![valid_tx].into();
 
         // init block in progress
-        let mut block_in_progress =
-            BlockInProgress::new(U256::from(1), U256::from(1), transactions);
+        let mut block_in_progress = BlockInProgress::new(U256::from(1), transactions);
         // run is almost full wrt ticks
-        block_in_progress.estimated_ticks_in_run =
-            tick_model::constants::MAX_TICKS - 1000;
+        let limits = Limits::default();
+        block_in_progress.estimated_ticks_in_run = limits.maximum_allowed_ticks - 1000;
 
         // act
         let result = compute(
@@ -1332,9 +1294,9 @@ mod tests {
             &block_constants,
             &precompiles,
             &mut evm_account_storage,
-            &mut accounts_index,
             true,
-            &None,
+            None,
+            &limits,
             None,
         )
         .expect("Should safely ask for a reboot");
@@ -1343,7 +1305,7 @@ mod tests {
 
         assert_eq!(
             result,
-            ComputationResult::RebootNeeded,
+            BlockComputationResult::RebootNeeded,
             "Should have asked for a reboot"
         );
         // block in progress should not have registered any gas or ticks
@@ -1374,7 +1336,7 @@ mod tests {
 
     #[test]
     fn invalid_transaction_should_bump_nonce() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -1410,6 +1372,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
         assert!(
@@ -1438,14 +1401,14 @@ mod tests {
     }
 
     fn check_current_block_number<Host: Runtime>(host: &mut Host, nb: usize) {
-        let current_nb = storage::read_current_block_number(host)
+        let current_nb = block_storage::read_current_number(host)
             .expect("Should have manage to check block number");
         assert_eq!(current_nb, U256::from(nb), "Incorrect block number");
     }
 
     #[test]
     fn test_first_blocks() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         // first block should be 0
         let blueprint = almost_empty_blueprint();
@@ -1455,6 +1418,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("Empty block should have been produced");
@@ -1469,6 +1433,7 @@ mod tests {
             dummy_block_fees(),
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
@@ -1481,6 +1446,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("Empty block should have been produced");
@@ -1555,7 +1521,7 @@ mod tests {
     #[test]
     fn test_reboot_many_tx_one_proposal() {
         // init host
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1564,7 +1530,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -1607,18 +1573,30 @@ mod tests {
 
         host.reboot_left().expect("should be some reboot left");
 
+        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let limits = Limits {
+            maximum_allowed_ticks: 9_000_000_000,
+            ..Limits::default()
+        };
+
+        let mut configuration = Configuration {
+            limits,
+            ..Configuration::default()
+        };
+
         let computation_result = produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
+            None,
             None,
         )
         .expect("Should have produced");
 
         // test no new block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -1629,7 +1607,7 @@ mod tests {
     #[test]
     fn test_reboot_many_tx_many_proposal() {
         // init host
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
 
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -1639,7 +1617,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            storage::read_current_block_number(&host).is_err(),
+            block_storage::read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
         //provision sender account
@@ -1681,18 +1659,29 @@ mod tests {
 
         store_blueprints(&mut host, proposals);
 
+        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let limits = Limits {
+            maximum_allowed_ticks: 9_000_000_000,
+            ..Limits::default()
+        };
+
+        let mut configuration = Configuration {
+            limits,
+            ..Configuration::default()
+        };
         let computation_result = produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
+            None,
             None,
         )
         .expect("Should have produced");
 
         // test no new block
         assert_eq!(
-            storage::read_current_block_number(&host)
+            block_storage::read_current_number(&host)
                 .expect("should have found a block number"),
             U256::zero(),
             "There should have been one block registered"
@@ -1702,11 +1691,7 @@ mod tests {
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
-        let mut mock_internal = MockHost::default();
-        let safe_host = SafeStorage {
-            host: &mut host,
-            internal: &mut mock_internal,
-        };
+        let safe_host = SafeStorage { host: &mut host };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
@@ -1734,7 +1719,7 @@ mod tests {
         // address.
 
         // init host
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         // ensure we're using the default block fees to test.
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
 
@@ -1781,6 +1766,7 @@ mod tests {
             block_fees,
             &mut Configuration::default(),
             None,
+            None,
         )
         .expect("The block production failed.");
 
@@ -1797,18 +1783,12 @@ mod tests {
     #[test]
     fn test_non_retriable_transaction_are_marked_as_failed() {
         // init host
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
-
-        // sanity check: no current block
-        assert!(
-            storage::read_current_block_number(&host).is_err(),
-            "Should not have found current block number"
-        );
 
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
@@ -1841,17 +1821,33 @@ mod tests {
 
         store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
 
+        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let limits = Limits {
+            maximum_allowed_ticks: 9_000_000_000,
+            ..Limits::default()
+        };
+
+        let mut configuration = Configuration {
+            limits,
+            ..Configuration::default()
+        };
+        // sanity check: no current block
+        assert!(
+            block_storage::read_current_number(&host).is_err(),
+            "Should not have found current block number"
+        );
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
+            None,
             None,
         )
         .expect("Should have produced");
 
         assert!(
-            storage::read_current_block_number(&host).is_ok(),
+            block_storage::read_current_number(&host).is_ok(),
             "Should have found a block"
         );
 
@@ -1865,12 +1861,14 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
+            None,
             None,
         )
         .expect("Should have produced");
 
-        let block = read_current_block(&mut host).expect("Should have found a block");
+        let block =
+            block_storage::read_current(&mut host).expect("Should have found a block");
         let failed_loop_hash = block
             .transactions
             .first()
@@ -1908,7 +1906,7 @@ mod tests {
     #[test]
     // Test if a valid transaction is producing a receipt with a success status
     fn test_type_propagation() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
             DUMMY_BASE_FEE_PER_GAS.into(),
@@ -1952,6 +1950,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
             None,
         )
         .expect("The block production failed.");

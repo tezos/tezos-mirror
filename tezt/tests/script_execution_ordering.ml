@@ -31,6 +31,8 @@
    Subject:      Tests for contract execution order.
 *)
 
+let team = Tag.layer1
+
 type 'a tree = Leaf of 'a | Node of 'a tree list
 
 (* This test to verifies contract execution order.
@@ -56,7 +58,7 @@ let test_execution_ordering =
   Protocol.register_test
     ~__FILE__
     ~title:"Test contract execution order."
-    ~tags:["client"; "script"]
+    ~tags:[team; "client"; "script"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

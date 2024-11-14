@@ -53,16 +53,18 @@ export CC=clang
 
 ## Features
 
-| Feature         | Default? | Enables                             | About                                         |
-|-----------------|----------|-------------------------------------|-----------------------------------------------|
-| `std`           | ✅       | `alloc`                             | Disable for `#![no_std]` integration          |
-| `alloc`         | ✅       |                                     | Enables methods/types requiring `alloc` crate |
-| `panic-hook`    | ✅       |                                     | Print panics to debug log and abort           |
-| `dlmalloc`      | ✅       |                                     | Enables `dlmalloc` as default allocator       |
-| `crypto`        | ✅       | `tezos_crypto_rs`                   | Integration with `tezos_crypto_rs` types      |
-| `bls`           | ✅       | `tezos_crypto_rs/bls`               | Dac Certificate signature verification        |
-| `data-encoding` | ✅       | `tezos_data_encoding`               | Integration with `tezos_data_encoding` traits |
-| `testing`       | ❌       | `crypto`, `tezos_smart_rollup_mock` | Enables `MockHost` for writing tests          |
+| Feature         | Enables                             | About                                             |
+|-----------------|-------------------------------------|---------------------------------------------------|
+| `std`           | `alloc`                             | Disable for `#![no_std]` integration              |
+| `alloc`         |                                     | Enables methods/types requiring `alloc` crate     |
+| `panic-hook`    |                                     | Print panics to debug log and abort               |
+| `dlmalloc`      |                                     | Enables `dlmalloc` as default allocator           |
+| `crypto`        | `tezos_crypto_rs`                   | Integration with `tezos_crypto_rs` types          |
+| `bls`           | `tezos_crypto_rs/bls`               | Dac Certificate signature verification            |
+| `data-encoding` | `tezos_data_encoding`               | Integration with `tezos_data_encoding` traits     |
+| `testing`       | `crypto`, `tezos_smart_rollup_mock` | Enables `MockHost` for writing tests              |
+| `extra`         | `alloc`, `std`, `utils`             | Additional tooling not targetted at kernels       |
+| `utils`         |                                     | Interaction with other tooling outside of the SDK |
 
 ## Usage
 
@@ -95,10 +97,8 @@ This kernel will run once per inbox level.
 
 ```rust
 use tezos_smart_rollup::prelude::*;
-use tezos_smart_rollup::kernel_entry;
 
-kernel_entry!(hello_kernel);
-
+#[entrypoint::main]
 fn hello_kernel(host: &mut impl Runtime) {
   debug_msg!(host, "Hello, kernel!\n");
 }

@@ -71,7 +71,7 @@ module Info : sig
         (** Port we're actually connected to. This port is equal to the
             contact (listening) port in case of an outgoing connection,
             and may be different in case of an incoming connection. *)
-    announced_version : Network_version.t;
+    announced_version : Tezos_version.Network_version.t;
     private_node : bool;
     local_metadata : 'meta;
     remote_metadata : 'meta;

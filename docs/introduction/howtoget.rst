@@ -31,6 +31,11 @@ There are several options for getting the binaries, depending on how you plan to
 
 These different options are described in the following sections.
 
+Some Octez binaries also require some parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is currently described in section :ref:`compiling_with_make`, but those instructions may be used for other installation types:
+
+- :ref:`setup_zcash_params`
+- :ref:`setup_dal_crypto_params`
+
 Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current development version (see :doc:`../releases/releases` for more information).
 
 When choosing between the installation options, you may take into account the
@@ -84,6 +89,55 @@ There are several packages:
 - ``octez-smartrollup``: the Octez Smart Rollup daemons
 - ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
+.. _installing_packages:
+
+Ubuntu and Debian Octez packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you're using Ubuntu or Debian, you can install the same packages as in the release page
+using ``apt`` directly from our APT repository, instead of going to the Octez
+release page as explained above.
+
+We support the following distribution/releases:
+- ``debian/bookworm``
+- ``ubuntu/noble``
+- ``ubuntu/jammy``
+
+both on ``amd64`` and ``arm64`` architectures.
+
+In order to add the Tezos package repository to your machine, do:
+
+::
+
+    export distribution=debian
+    export release=bookworm
+    export bucket="tezos-linux-protected-repo"
+
+and run:
+
+.. literalinclude:: install-bin-deb.sh
+   :language: shell
+   :start-after: [install prerequisites]
+   :end-before: [ preeseed octez ]
+
+We also maintain a separate repository for release candidates. To install
+the last release candidate simply prepend ``RC/`` to the distribution name
+as in ``export distribution=RC/debian``
+
+Then, to install the binaries, run the following commands:
+
+.. literalinclude:: install-bin-deb.sh
+   :language: shell
+   :start-after: [install tezos]
+   :end-before: [install octez additional packages]
+
+To remove the Octez packages you can simply run the following command.
+
+.. literalinclude:: install-bin-deb.sh
+   :language: shell
+   :start-after: [test autopurge]
+   :end-before: [check autopurge]
+
 Also there are some experimental packages:
 
 - ``octez-experimental`` - binaries that are considered experimental including
@@ -98,24 +152,33 @@ possible to configure the software to use a different user (even root).
 The documentation for these packages, originally developed by Chris Pinnock,
 can be found here: https://chrispinnock.com/tezos/packages/
 
-Ubuntu and Debian Octez packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _new_packages:
 
-If you're using Ubuntu or Debian, you can install packages with Octez binaries
-using ``dpkg`` or ``apt``. Currently it supports the two latest LTS releases
-for Ubuntu and for Debian, the stable and testing release.
+New set of Debian packages
+""""""""""""""""""""""""""
 
-Upgrading to a newer release requires downloading again all the ``deb``
-packages and repeat the installation.
+There is also a new generation of Debian packages that are available for testing.
+These packages will replace the currently available packages mentioned above.
 
-For example using dpkg::
+The new set of packages can be installed by adding the following apt repository::
 
-     dpkg -i octez-client_19.1-1_arm64.deb
+  export distribution=debian
+  export release=bookworm
+  export bucket="tezos-linux-protected-repo"
+
+  curl "https://$bucket.storage.googleapis.com/next/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+  echo "deb [arch=amd64] https://$bucket.storage.googleapis.com/next/$distribution $release main" | sudo tee /etc/apt/sources.list.d/octez.list
+  sudo apt-get update
+  sudo apt-get install octez-node ...
+
+Once the Octez binary packages are installed, they can be set up as services
+as explained in :doc:`./services`.
 
 Fedora Octez packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Octez binaries
+from the Octez release page indicated above
 using ``rpm`` or ``dnf``. Currently it supports the latest LTS release for
 Fedora and for RockyLinux.
 
@@ -128,7 +191,7 @@ For example using ``yum``::
 
 .. _using_docker_images:
 
-Using Docker Images And Docker-Compose
+Using Docker images and docker-compose
 --------------------------------------
 
 For every change committed in the GitLab repository, Docker images are
@@ -136,18 +199,26 @@ automatically generated and published on `DockerHub
 <https://hub.docker.com/r/tezos/tezos/>`_. This provides a convenient
 way to run an always up-to-date ``octez-node``.
 
+From version 22.0 all Octez Docker images are signed using Cosign.
+You can verify if the images are correctly signed using the Cosign utility, as explained below:
+
+.. toctree::
+   :maxdepth: 2
+
+   cosign-verify
+
 One way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
 We provide ``docker-compose`` files for all active
-protocols. You can pick one and start with the following command (we'll assume alpha on this guide):
+protocols in directory :src:`scripts/docker`. You can pick one and start with the following command (where ``$PROTO`` is the protocol of your choice):
 
 ::
 
     cd scripts/docker
     export LIQUIDITY_BAKING_VOTE=pass # You can choose between 'on', 'pass' or 'off'.
-    docker-compose -f alpha.yml up
+    docker-compose -f $PROTO.yml up
 
 The above command will launch a node, a client, a baker, and an accuser for
-the Alpha protocol.
+the given protocol.
 
 You can open a new shell session and run ``docker ps`` in it, to display all the available containers, e.g.::
 
@@ -160,7 +231,7 @@ The node's RPC interface will be available on localhost and can be queried with 
 
 ::
 
-    docker exec node-alpha octez-client rpc list
+    docker exec octez-node-$PROTO octez-client rpc list
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -191,9 +262,9 @@ environment variables:
 - ``NODE_RPC_ADDR``: The RPC address **inside the container** the node binds to (defaults to ``[::]``).
 - ``PROTOCOL``: The protocol used.
 
-These variables can be set in the docker-compose file, as demonstrated in ``alpha.yml``::
+These variables can be set in the docker-compose file, as demonstrated in :src:`scripts/docker/alpha.yml`::
 
-    node:
+    octez-node:
       ...
       environment:
         PROTOCOL: alpha
@@ -205,8 +276,8 @@ If the above options are not enough, you can always replace the default ``entryp
 
     version: "3"
     services:
-      node:
-        container_name: node-alpha
+      octez-node:
+        container_name: octez-node-alpha
         entrypoint: /bin/sh
         command: /etc/my-init-script.sh
         volumes:
@@ -249,12 +320,22 @@ developed in the future.
     Docker container, you have to give extended privileges to this container,
     by passing option ``--privileged`` to the ``docker run`` command.
 
+.. warning::
+
+   Mixing LLVM and GNU binutils toolchains can cause issues when building Octez. If you encounter
+   an error like this, it may be that you have tools from both LLVM and GNU in scope.
+
+   ::
+
+     Error: ExternalToolError { reason: "Failed to create archive index with `ranlib`", tool: "ranlib", args: ["liboctez_rust_deps.a"], stdout: "", stderr: "LLVM ERROR: Invalid encoding\n" }
+
+   In this case, refer to :ref:`Mixing LLVM and GNU binutils <mixing_llvm_gnu_binutils>`.
 
 Install OPAM
 ~~~~~~~~~~~~
 
 First, you need to install the `OPAM <https://opam.ocaml.org/>`__
-package manager, at least version 2.0, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
+package manager, at least version 2.1, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
 
 After the first install of OPAM, use ``opam init --bare`` to set it up
 while avoiding to compile an OCaml compiler now, as this will be done in
@@ -283,7 +364,7 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
 .. literalinclude:: install-opam.sh
   :language: shell
   :start-after: [install ocaml compiler]
-  :end-before: [get system dependencies]
+  :end-before: [install tezos]
 
 .. note::
 
@@ -300,13 +381,6 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
    env --switch $ocaml_version)`` (replace ``$ocaml_version`` with its value
    in ``scripts/version.sh``) to see if it fixes the problem.
 
-In order to get the system dependencies of the binaries, do:
-
-.. literalinclude:: install-opam.sh
-  :language: shell
-  :start-after: [get system dependencies]
-  :end-before: [install tezos]
-
 .. note::
 
    If an OPAM commands times out, you may allocate it more time for its
@@ -322,9 +396,7 @@ Now, install all the binaries by:
   :end-before: [test executables]
 
 You can be more specific and only ``opam install octez-node``, ``opam
-install octez-baker-alpha``, ... In that case, it is enough to install
-the system dependencies of this package only by running ``opam depext
-octez-node`` for example instead of ``opam depext tezos``.
+install octez-baker-alpha``, ...
 
 .. warning::
 
@@ -346,7 +418,6 @@ released, you can update by:
 ::
 
    opam update
-   opam depext
    opam upgrade
 
 It is recommended to also run the command ``opam remove -a`` in order
@@ -383,8 +454,9 @@ Setting up the development environment from scratch
 If you plan to contribute to the Octez codebase, the way to go is to set up a
 complete development environment, by cloning the repository and compiling the
 sources using the provided makefile.
+You may either build all the executables, as illustrated below, or only a subset of the executables, as detailed in section :ref:`compile_sources`.
 
-**TL;DR**: From a fresh Debian Bullseye or Ubuntu Mantic x86_64, you typically want to select a source branch in the Octez repository, e.g.:
+**TL;DR**: From a fresh Debian Bookworm x86_64, you typically want to select a source branch in the Octez repository, e.g.:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
@@ -501,6 +573,19 @@ and ``sapling-output.params``. Here is where you should expect to find those fil
 
 Note that the script ``fetch-params.sh`` downloads a third file containing parameters for Sprout (currently called ``sprout-groth16.params``), which is not loaded by Sapling and can be deleted to save a significant amount of space (this file is *much* bigger than the two other files).
 
+.. _setup_dal_crypto_params:
+
+Install DAL trusted setup
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Users running :doc:`DAL<../shell/dal>` as :ref:`slot producers<dal_profiles>`
+need to have a set of cryptographic parameters (known as an SRS) installed in
+order to run their :doc:`DAL node<../shell/dal_node>`. The parameters can be
+retrieved via the following script::
+
+  scripts/install_dal_trusted_setup.sh
+
+
 Get the sources
 ~~~~~~~~~~~~~~~
 
@@ -549,16 +634,23 @@ command instead:
    * As a last resort, removing the ``_opam`` folder (as part of a ``git
      clean -dxf`` for example) allows to restart in a fresh environment.
 
+.. _compile_sources:
+
 Compile
 ~~~~~~~
 
 Once the dependencies are installed we can update OPAM's environment to
-refer to the new switch and compile the project:
+refer to the new switch and compile the project to build all the executables:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
   :start-after: [compile sources]
   :end-before: [optional setup]
+
+.. note::
+
+  Instead of the simple ``make`` command above, you may use more restrictive targets in :src:`the makefile <Makefile>` to build only some subset of the executables.
+  For instance, you may exclude experimental executables using ``make release``; furthermore exclude executables such as the EVM node using ``make octez``; or even restrict to Layer 1 executables using ``make octez-layer1``.
 
 Lastly, you can also add the Octez binaries to your ``PATH`` variable,
 and after reading the Disclaimer a few

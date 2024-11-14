@@ -308,6 +308,25 @@ let make ~version ~reveal_builtins ~write_debug state =
         in
         return result)
   in
+  let ec_pairing_check_bls12_381 =
+    fn
+      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun point1_addr point2_addr point3_addr point4_addr ->
+        Lwt.map (Result.fold ~ok:Fun.id ~error:Fun.id)
+        @@ with_mem
+        @@ fun memory ->
+        let open Lwt_result_syntax in
+        let*! is_pairing_valid =
+          Host_funcs.Aux.ec_pairing_check_bls12_381
+            ~memory
+            point1_addr
+            point2_addr
+            point3_addr
+            point4_addr
+        in
+
+        return is_pairing_valid)
+  in
 
   let base =
     [
@@ -337,6 +356,8 @@ let make ~version ~reveal_builtins ~write_debug state =
   let v2 = v1 @ [("store_exists", store_exists)] in
   let v3 = v2 @ [("reveal", reveal_raw)] in
   let v4 = v3 in
+  let v5 = v4 in
+  let v6 = v5 @ [("ec_pairing_check_bls12_381", ec_pairing_check_bls12_381)] in
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []
@@ -344,6 +365,8 @@ let make ~version ~reveal_builtins ~write_debug state =
     | V2 -> v2
     | V3 -> v3
     | V4 -> v4
+    | V5 -> v5
+    | V6 -> v6
   in
   List.map
     (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))

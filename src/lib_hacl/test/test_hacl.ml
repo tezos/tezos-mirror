@@ -205,11 +205,6 @@ let test_keccak_256 () =
   let digest = Hash.Keccak_256.digest msg in
   Alcotest.(check bytes "keccak_256" resp digest)
 
-let is_js_of_ocaml_backend =
-  match Sys.backend_type with
-  | Other "js_of_ocaml" -> true
-  | Native | Bytecode | Other _ -> false
-
 let hash =
   [
     ("hmac_sha256", `Quick, test_hmac_sha256);
@@ -219,11 +214,8 @@ let hash =
     ("sha3_256", `Quick, test_sha3_256);
     ("sha3_512", `Quick, test_sha3_512);
     ("keccak_256", `Quick, test_keccak_256);
+    ("sha256_seq", `Quick, test_sha256_seq);
   ]
-  @
-  (* Hacl wasm does not support incremental hashing yet *)
-  if is_js_of_ocaml_backend then []
-  else [("sha256_seq", `Quick, test_sha256_seq)]
 
 (** Compares a Blake2b hash from [data_in] with [key] to the expected
    output [data_out].

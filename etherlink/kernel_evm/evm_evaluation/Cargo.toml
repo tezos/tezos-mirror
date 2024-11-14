@@ -14,6 +14,7 @@ thiserror.workspace = true
 evm-execution = { workspace = true, features = ["debug"] }
 tezos_ethereum.workspace = true
 tezos-evm-logging.workspace = true
+tezos-evm-runtime.workspace = true
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-core.workspace = true

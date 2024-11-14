@@ -37,7 +37,9 @@ type ('repo, 'tree) pvm_context_impl =
 
 let equiv (a, b) (c, d) = (Equality_witness.eq a c, Equality_witness.eq b d)
 
-type hash = Context_hash.t
+module Hash = Smart_rollup_context_hash
+
+type hash = Hash.t
 
 type 'a t =
   | Context : {
@@ -92,7 +94,9 @@ let checkout (type a)
     (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
       a t) hash : a t option Lwt.t =
   let open Lwt_syntax in
-  let+ ctx = Pvm_Context_Impl.checkout index hash in
+  let+ ctx =
+    Pvm_Context_Impl.checkout index (Pvm_Context_Impl.hash_of_context_hash hash)
+  in
   match ctx with
   | None -> None
   | Some {index; tree} -> Some (Context {o with index; tree})
@@ -106,12 +110,19 @@ let empty (type a)
 let commit ?message
     (Context {pvm_context_impl = (module Pvm_Context_Impl); index; tree; _} :
       [> `Write] t) =
-  Pvm_Context_Impl.commit ?message {index; tree}
+  let open Lwt_syntax in
+  let+ hash = Pvm_Context_Impl.commit ?message {index; tree} in
+  Pvm_Context_Impl.context_hash_of_hash hash
 
 let is_gc_finished
     (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
       [> `Write] t) =
   Pvm_Context_Impl.is_gc_finished index
+
+let cancel_gc
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] t) =
+  Pvm_Context_Impl.cancel_gc index
 
 let split (type a)
     (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t) =
@@ -120,7 +131,10 @@ let split (type a)
 let gc
     (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
       [> `Write] t) ?callback hash =
-  Pvm_Context_Impl.gc index ?callback hash
+  Pvm_Context_Impl.gc
+    index
+    ?callback
+    (Pvm_Context_Impl.hash_of_context_hash hash)
 
 let wait_gc_completion
     (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
@@ -128,8 +142,11 @@ let wait_gc_completion
   Pvm_Context_Impl.wait_gc_completion index
 
 let export_snapshot (type a)
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t) =
-  Pvm_Context_Impl.export_snapshot index
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t)
+    hash =
+  Pvm_Context_Impl.export_snapshot
+    index
+    (Pvm_Context_Impl.hash_of_context_hash hash)
 
 type pvmstate =
   | PVMState : {
@@ -182,6 +199,15 @@ module PVMState = struct
              ~equality_witness
              ~pvmstate
              ~impl_name)
+
+  let get ctxt =
+    let open Lwt_result_syntax in
+    let*! pvm_state = find ctxt in
+    match pvm_state with
+    | None ->
+        failwith
+          "Could not retrieve PVM state from context, this shouldn't happen."
+    | Some pvm_state -> return pvm_state
 
   let lookup : value -> string list -> bytes option Lwt.t =
    fun (PVMState {pvm_context_impl = (module Pvm_Context_Impl); pvmstate; _})

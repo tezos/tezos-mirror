@@ -30,6 +30,8 @@
    Subject:      Integration tests of p2p layer.
 *)
 
+let team = Tag.layer1
+
 module ACL = struct
   (* Test.
 
@@ -53,7 +55,7 @@ module ACL = struct
     Test.register
       ~__FILE__
       ~title:"check ip greylisting"
-      ~tags:["p2p"; "acl"; "greylist"]
+      ~tags:[team; "p2p"; "acl"; "greylist"]
     @@ fun () ->
     let localhost_ips =
       [
@@ -116,7 +118,7 @@ let check_peer_option =
   Protocol.register_test
     ~__FILE__
     ~title:"check peer option"
-    ~tags:["p2p"; "cli"; "peer"]
+    ~tags:[team; "p2p"; "cli"; "peer"]
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
   let* client = Client.init ~endpoint:(Node node_1) () in
@@ -145,7 +147,7 @@ let test_one_connection =
   Protocol.register_test
     ~__FILE__
     ~title:"check --connection=1 option"
-    ~tags:["p2p"; "cli"; "connections"]
+    ~tags:[team; "p2p"; "cli"; "connections"]
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
   let* client = Client.init ~endpoint:(Node node_1) () in
@@ -207,7 +209,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-disabled"
-      ~tags:["p2p"; "node"; "maintenance"]
+      ~tags:[team; "p2p"; "node"; "maintenance"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -323,7 +325,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-init-expected_connections"
-      ~tags:["p2p"; "node"; "maintenance"; Tag.memory_4k]
+      ~tags:[team; "p2p"; "node"; "maintenance"; Tag.memory_4k]
     @@ fun () ->
     (* Connections values evaluated from --connections option. *)
     let min_connections = expected_connections / 2 in
@@ -578,7 +580,7 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap"
-      ~tags:["p2p"; "node"; "swap"; Tag.ci_disabled]
+      ~tags:[team; "p2p"; "node"; "swap"; Tag.ci_disabled]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () -> test_swap_raw ()
@@ -589,7 +591,7 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap-disable"
-      ~tags:["p2p"; "node"; "swap"; Tag.memory_4k]
+      ~tags:[team; "p2p"; "node"; "swap"; Tag.memory_4k]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -649,7 +651,7 @@ let test_advertised_port () =
   Test.register
     ~__FILE__
     ~title:"check --advertised-net-port=PORT option"
-    ~tags:["p2p"; "cli"; "connections"]
+    ~tags:[team; "p2p"; "cli"; "connections"]
     ~uses_client:false
     ~uses_admin_client:false
   @@ fun () ->
@@ -730,7 +732,7 @@ module Known_Points_GC = struct
     Test.register
       ~__FILE__
       ~title:"check preservation of trusted known points and peers"
-      ~tags:["p2p"; "pool"; "gc"]
+      ~tags:[team; "p2p"; "pool"; "gc"]
     @@ fun () ->
     let* node_1 = create_node () in
     let nodes = List.init 6 (fun _ -> Node.create []) in
@@ -762,7 +764,7 @@ module Known_Points_GC = struct
     Test.register
       ~__FILE__
       ~title:"check non-preservation of known points"
-      ~tags:["p2p"; "pool"; "gc"]
+      ~tags:[team; "p2p"; "pool"; "gc"]
     @@ fun () ->
     let* node_1 = create_node () in
     let node_A = Node.create [] in
@@ -816,7 +818,7 @@ module Connect_handler = struct
     Test.register
       ~__FILE__
       ~title:"peers with different chain name"
-      ~tags:["p2p"; "connect_handler"]
+      ~tags:[team; "p2p"; "connect_handler"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -895,7 +897,9 @@ let trusted_ring () =
   Test.register
     ~__FILE__
     ~title:"p2p - set a trusted ring"
-    ~tags:["p2p"; "connection"; "trusted"; "ring"]
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7276
+         This test is flaky because it times out sometimes. *)
+    ~tags:[team; "p2p"; "connection"; "trusted"; "ring"; Tag.flaky]
     ~uses_client:false
     ~uses_admin_client:false
   @@ fun () ->
@@ -1007,7 +1011,7 @@ let expected_peer_id () =
   Test.register
     ~__FILE__
     ~title:"Test expected_peer_id"
-    ~tags:["p2p"; "connections"; "expected_peer_id"]
+    ~tags:[team; "p2p"; "connections"; "expected_peer_id"]
     ~uses_client:false
     ~uses_admin_client:false
   @@ fun () ->
@@ -1252,7 +1256,7 @@ module P2p_stat = struct
     Test.register
       ~__FILE__
       ~title:"Test [octez-admin-client p2p stat]"
-      ~tags:["p2p"; "connections"; "p2p_stat"; Tag.memory_3k]
+      ~tags:[team; "p2p"; "connections"; "p2p_stat"; Tag.memory_3k]
     @@ fun () ->
     let num_nodes = 5 in
     Log.info "Start a clique of %d nodes" num_nodes ;
@@ -1379,7 +1383,7 @@ module Peer_discovery = struct
     Test.register
       ~__FILE__
       ~title:"p2p-peer-discovery"
-      ~tags:["p2p"; "node"; "peer_discovery"]
+      ~tags:[team; "p2p"; "node"; "peer_discovery"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -1396,7 +1400,7 @@ module Peer_discovery = struct
     Test.register
       ~__FILE__
       ~title:"p2p-peer-discovery-disable"
-      ~tags:["p2p"; "node"; "peer_discovery"]
+      ~tags:[team; "p2p"; "node"; "peer_discovery"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->

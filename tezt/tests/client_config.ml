@@ -30,6 +30,8 @@
    Subject:      .
 *)
 
+let team = Tag.layer1
+
 let iteri l f = Lwt_list.iteri_s f l
 
 let iter l f = Lwt_list.iter_s f l
@@ -38,7 +40,7 @@ let additional_bootstrap_accounts =
   Protocol.register_test
     ~__FILE__
     ~title:"additional bootstrap accounts"
-    ~tags:["client"; "bootstrap"; "accounts"]
+    ~tags:[team; "client"; "bootstrap"; "accounts"]
   @@ fun protocol ->
   let* _node, client =
     Client.init_with_protocol
@@ -89,7 +91,7 @@ let test_config_init () =
   Test.register
     ~__FILE__
     ~title:"Config init"
-    ~tags:["config"; "init"]
+    ~tags:[team; "config"; "init"]
     ~uses_node:false
   @@ fun () ->
   let* client = Client.init () in
@@ -119,7 +121,7 @@ let test_config_init_roundtrip () =
   Test.register
     ~__FILE__
     ~title:"Config init roundtrip"
-    ~tags:["config"; "init"]
+    ~tags:[team; "config"; "init"]
     ~uses_node:false
   @@ fun () ->
   Log.info "Config init roundtrip" ;
@@ -155,7 +157,7 @@ let test_config_show () =
   Test.register
     ~__FILE__
     ~title:"Config show"
-    ~tags:["config"; "show"]
+    ~tags:[team; "config"; "show"]
     ~uses_node:false
   @@ fun () ->
   let* client = Client.init () in
@@ -175,7 +177,7 @@ let test_config_show_roundtrip () =
   Test.register
     ~__FILE__
     ~title:"Config show roundtrip"
-    ~tags:["config"; "show"]
+    ~tags:[team; "config"; "show"]
     ~uses_node:false
   @@ fun () ->
   Log.info "Config show roundtrip" ;
@@ -272,7 +274,7 @@ let test_config_validation () =
   Test.register
     ~__FILE__
     ~title:"Test the clients config validation"
-    ~tags:["config"; "validation"]
+    ~tags:[team; "config"; "validation"]
     ~uses_node:false
   @@ fun () ->
   let valid =

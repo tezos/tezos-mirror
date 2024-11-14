@@ -1,21 +1,16 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
-
 (library
  (name tezos_version_value)
  (public_name octez-version.value)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.base
   octez-libs.version
   octez-libs.version.parser)
- (js_of_ocaml)
  (flags
   (:standard)
-  -opaque
-  -open Tezos_base.TzPervasives))
+  -opaque))
 
 (rule
  (targets generated_git_info.ml)

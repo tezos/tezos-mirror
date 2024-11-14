@@ -10,7 +10,9 @@ use primitive_types::{H256, U256};
 use rlp::{DecoderError, Encodable, RlpIterator};
 use thiserror::Error;
 
-use crate::rlp_helpers::{decode_field, decode_field_h256, next};
+use crate::rlp_helpers::{
+    append_compressed_h256, decode_compressed_h256, decode_field, next,
+};
 
 /// Represents a **valid** Ethereum signature
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -210,8 +212,8 @@ impl TxSignature {
 impl Encodable for TxSignature {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.append(&self.v);
-        stream.append(&self.r);
-        stream.append(&self.s);
+        append_compressed_h256(stream, self.r);
+        append_compressed_h256(stream, self.s);
     }
 }
 
@@ -236,8 +238,8 @@ pub fn rlp_decode_opt(
     it: &mut RlpIterator<'_, '_>,
 ) -> Result<Option<TxSignature>, DecoderError> {
     let v: U256 = decode_field(&next(it)?, "v")?;
-    let r: H256 = decode_field_h256(&next(it)?, "r")?;
-    let s: H256 = decode_field_h256(&next(it)?, "s")?;
+    let r: H256 = decode_compressed_h256(&next(it)?)?;
+    let s: H256 = decode_compressed_h256(&next(it)?)?;
     if r == H256::zero() && s == H256::zero() && v == U256::zero() {
         Ok(None)
     } else {

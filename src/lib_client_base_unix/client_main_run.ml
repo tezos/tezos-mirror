@@ -121,15 +121,23 @@ let register_default_signer ?other_registrations ?logger
   let module Socket = Tezos_signer_backends_unix.Socket.Make (Remote_params) in
   Client_keys.register_signer
     (module Tezos_signer_backends.Encrypted.Make (struct
+      let scheme = Tezos_signer_backends.Encrypted.scheme
+
       let cctxt = cctxt
     end)) ;
-  Client_keys.register_aggregate_signer
-    (module Tezos_signer_backends.Encrypted.Make_aggregate (struct
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Encrypted.Make (struct
+      let scheme = Tezos_signer_backends.Encrypted.aggregate_scheme
+
       let cctxt = cctxt
     end)) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
-  Client_keys.register_aggregate_signer
-    (module Tezos_signer_backends.Unencrypted.Aggregate) ;
+  Client_keys.register_signer
+    (module struct
+      include Tezos_signer_backends.Unencrypted
+
+      let scheme = Tezos_signer_backends.Unencrypted.aggregate_scheme
+    end) ;
   Client_keys.register_signer
     (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
   Client_keys.register_signer (module Socket.Unix) ;
@@ -462,9 +470,20 @@ let main (module C : M) ~select_commands =
           let require_auth = parsed.Client_config.require_auth in
           let*! () =
             let open Tezos_base_unix.Internal_event_unix in
+            (* Update config with color logging switch *)
+            let log_cfg =
+              match parsed_args with
+              | None -> Tezos_base_unix.Logs_simple_config.default_cfg
+              | Some parsed_args ->
+                  {
+                    Tezos_base_unix.Logs_simple_config.default_cfg with
+                    colors = Option.value parsed_args.log_coloring ~default:true;
+                  }
+            in
             let config =
               make_with_defaults
                 ?enable_default_daily_logs_at:daily_logs_path
+                ~log_cfg
                 ()
             in
             match parsed_config_file with
@@ -533,7 +552,7 @@ let main (module C : M) ~select_commands =
               ~executable_name
               ~global_options
               (if Unix.isatty Unix.stdout then Tezos_clic.Ansi
-              else Tezos_clic.Plain)
+               else Tezos_clic.Plain)
               Format.std_formatter
               (C.clic_commands
                  ~base_dir

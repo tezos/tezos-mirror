@@ -16,19 +16,24 @@ depends: [
   "lwt" { >= "5.7.0" }
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
-  "tezos-rust-libs" { = "1.6" }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
+  "octez-rust-deps" { = version }
   "index" { >= "1.6.0" & < "1.7.0" }
   "octez-internal-libs" { = version }
-  "aches-lwt" { >= "1.0.0" }
+  "aches-lwt" { >= "1.1.0" }
+  "octez-riscv-pvm" { = version }
+  "camlzip" { >= "1.12" & < "1.13" }
+  "tar"
+  "tar-unix" { >= "2.0.1" & < "3.0.0" }
+  "caqti"
+  "caqti-lwt" { >= "2.0.1" }
+  "caqti-driver-sqlite3" { >= "2.0.1" }
   "yaml" { >= "3.1.0" }
+  "crunch" { >= "3.3.0" }
+  "re" { >= "1.10.0" }
   "ppx_import"
   "qcheck-alcotest" { >= "0.20" }
   "octez-alcotezt" { = version }
-  "tezt" { >= "4.0.0" & < "5.0.0" }
-]
-x-opam-monorepo-opam-provided: [
-  "tezos-rust-libs"
+  "tezt" { >= "4.1.0" & < "5.0.0" }
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }

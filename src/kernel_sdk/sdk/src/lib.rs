@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -13,6 +13,13 @@ extern crate alloc;
 #[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
 extern crate hermit;
 
+#[cfg(feature = "utils")]
+#[doc(inline)]
+pub use tezos_smart_rollup_utils as utils;
+
+pub mod entrypoint;
+
+#[allow(deprecated)]
 pub use tezos_smart_rollup_entrypoint::kernel_entry;
 
 pub mod host {
@@ -25,7 +32,7 @@ pub mod host {
     //!
     //! [core_unsafe]: crate::core_unsafe
 
-    pub use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+    pub use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
     #[doc(inline)]
     pub use tezos_smart_rollup_host::Error as HostError;
 }
@@ -46,18 +53,17 @@ pub mod prelude {
     //!
     //! ```
     //! use tezos_smart_rollup::prelude::*;
-    //! use tezos_smart_rollup::kernel_entry;
     //!
+    //! #[entrypoint::main]
     //! fn kernel_run(host: &mut impl Runtime) {
     //!   debug_msg!(host, "Hello, world!");
     //! }
-    //!
-    //! kernel_entry!(kernel_run);
     //!
     //! # use tezos_smart_rollup::testing::prelude::MockHost;
     //! # let mut host = MockHost::default();
     //! # host.run_level(kernel_run);
     //! ```
+    pub use crate::entrypoint;
     #[cfg(feature = "debug_alloc")]
     pub use tezos_smart_rollup_debug::debug_msg;
     #[cfg(not(feature = "debug_alloc"))]
@@ -70,12 +76,17 @@ pub mod types {
     //! Types used/returned elsewhere in the SDK.
 
     pub use tezos_smart_rollup_encoding::{
-        contract::Contract, entrypoint::Entrypoint, entrypoint::EntrypointError,
-        public_key::PublicKey, public_key_hash::PublicKeyHash,
-        smart_rollup::SmartRollupAddress, timestamp::Timestamp,
+        contract::Contract,
+        entrypoint::{Entrypoint, EntrypointError},
+        public_key::PublicKey,
+        public_key_hash::PublicKeyHash,
+        smart_rollup::SmartRollupAddress,
+        timestamp::Timestamp,
     };
     pub use tezos_smart_rollup_host::input::Message;
     pub use tezos_smart_rollup_host::metadata::RollupMetadata;
+
+    pub use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 }
 
 #[doc(inline)]

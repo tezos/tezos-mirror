@@ -32,7 +32,7 @@ module Scenarios = struct
     sc_rollup_address : string;
     sc_rollup_node : Sc_rollup_node.t;
     coordinator_node : Dac_node.t;
-    committee_members : Account.aggregate_key list;
+    committee_members : Account.key list;
     committee_members_nodes : Dac_node.t list;
     observer_nodes : Dac_node.t list;
     rollup_nodes : Sc_rollup_node.t list;
@@ -130,9 +130,7 @@ let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
       ?reveal_data_dir
       ~allow_v1_api
       ~committee_members:
-        (List.map
-           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key)
-           committee_members)
+        (List.map (fun (dc : Account.key) -> dc.public_key) committee_members)
       ()
   in
   let* _dir = Dac_node.init_config dac_node in
@@ -246,7 +244,8 @@ let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
           (fun keys i ->
             let* keys in
             let* key =
-              Client.bls_gen_and_show_keys
+              Client.gen_and_show_keys
+                ~sig_alg:"bls"
                 ~alias:(Format.sprintf "committee-member-%d" i)
                 client
             in
@@ -256,8 +255,11 @@ let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
       in
       let* () =
         Lwt_list.iter_s
-          (fun (aggregate_key : Account.aggregate_key) ->
-            Client.bls_import_secret_key aggregate_key client)
+          (fun (aggregate_key : Account.key) ->
+            Client.import_secret_key
+              client
+              aggregate_key.secret_key
+              ~alias:aggregate_key.alias)
           custom_committee_members
       in
       let committee_members =
@@ -277,14 +279,14 @@ let scenario_with_full_dac_infrastructure ?supports ?(tags = ["dac"; "full"])
       @@ fun coordinator_node committee_members ->
       let committee_members_nodes =
         List.mapi
-          (fun i Account.{aggregate_public_key_hash; _} ->
+          (fun i Account.{public_key_hash; _} ->
             Dac_node.create_committee_member
               ~name:("committee-member-" ^ Int.to_string i)
               ~node
               ~client
               ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
               ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
-              ~address:aggregate_public_key_hash
+              ~address:public_key_hash
               ~allow_v1_api
               ())
           committee_members

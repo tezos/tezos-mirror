@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "19.1 (dd3a30f891)"
+    "version": "Octez 20.3 (4ec59046)"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -645,6 +645,13 @@
                             "$ref": "#/components/schemas/unistring"
                           }
                         },
+                        "external-listen-addrs": {
+                          "description": "Hosts to listen to. If the port is not specified, the default port 8732 will be assumed.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
                         "listen-addr": {
                           "description": "Legacy value: Host to listen to",
                           "oneOf": [
@@ -736,6 +743,14 @@
                             "json",
                             "any",
                             "binary"
+                          ]
+                        },
+                        "max_active_rpc_connections": {
+                          "description": "The maximum number of active connections per RPC endpoint.",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/max_active_rpc_connections"
+                            }
                           ]
                         }
                       }
@@ -1609,6 +1624,41 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "description": "Returns whether or not the node is ready to answer to requests.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ready"
+                  ]
+                }
               }
             }
           },
@@ -2563,34 +2613,6 @@
     "/network/greylist": {
       "delete": {
         "description": "Clear all greylists tables. This will unban all addresses and peers automatically greylisted by the system.",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/greylist/clear": {
-      "get": {
-        "description": "DEPRECATED: Clear all greylists tables. This will unban all addresses and peers automatically greylisted by the system. Use DELETE `/network/greylist` instead",
         "responses": {
           "200": {
             "description": "",
@@ -6246,45 +6268,6 @@
         }
       }
     },
-    "/network/peers/{peer_id}/ban": {
-      "get": {
-        "description": "DEPRECATED: Blacklist the given peer and remove it from the whitelist if present. Use PATCH `network/peers/<peer_id>` instead.",
-        "parameters": [
-          {
-            "name": "peer_id",
-            "in": "path",
-            "description": "A cryptographic node identity (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/network/peers/{peer_id}/banned": {
       "get": {
         "description": "Check if a given peer is blacklisted or greylisted.",
@@ -6355,123 +6338,6 @@
                   "items": {
                     "$ref": "#/components/schemas/p2p_peer.pool_event"
                   }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/peers/{peer_id}/trust": {
-      "get": {
-        "description": "DEPRECATED: Whitelist a given peer permanently and remove it from the blacklist if present. The peer cannot be blocked (but its host IP still can). Use PATCH `network/peers/<peer_id>` instead.",
-        "parameters": [
-          {
-            "name": "peer_id",
-            "in": "path",
-            "description": "A cryptographic node identity (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/peers/{peer_id}/unban": {
-      "get": {
-        "description": "DEPRECATED: Remove the given peer from the blacklist. Use PATCH `network/peers/<peer_id>` instead.",
-        "parameters": [
-          {
-            "name": "peer_id",
-            "in": "path",
-            "description": "A cryptographic node identity (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/peers/{peer_id}/untrust": {
-      "get": {
-        "description": "DEPRECATED: Remove a given peer from the whitelist. Use PATCH `network/peers/<peer_id>` instead.",
-        "parameters": [
-          {
-            "name": "peer_id",
-            "in": "path",
-            "description": "A cryptographic node identity (Base58Check-encoded)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
                 }
               }
             }
@@ -6851,45 +6717,6 @@
         }
       }
     },
-    "/network/points/{point}/ban": {
-      "get": {
-        "description": "DEPRECATED: Blacklist the given address and remove it from the whitelist if present. Use PATCH `/network/point/<point_id>` instead.",
-        "parameters": [
-          {
-            "name": "point",
-            "in": "path",
-            "description": "A network point (ipv4:port or [ipv6]:port).",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/network/points/{point}/banned": {
       "get": {
         "description": "Check if a given address is blacklisted or greylisted. Port component is unused.",
@@ -6977,123 +6804,6 @@
         }
       }
     },
-    "/network/points/{point}/trust": {
-      "get": {
-        "description": "DEPRECATED: Trust a given address permanently and remove it from the blacklist if present. Connections from this address can still be closed on authentication if the peer is greylisted. Use PATCH`/network/point/<point_id>` instead.",
-        "parameters": [
-          {
-            "name": "point",
-            "in": "path",
-            "description": "A network point (ipv4:port or [ipv6]:port).",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/points/{point}/unban": {
-      "get": {
-        "description": "DEPRECATED: Remove an address from the blacklist. Use PATCH `/network/point/<point_id>` instead.",
-        "parameters": [
-          {
-            "name": "point",
-            "in": "path",
-            "description": "A network point (ipv4:port or [ipv6]:port).",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/points/{point}/untrust": {
-      "get": {
-        "description": "DEPRECATED: Remove an address from the whitelist. Use PATCH `/network/point/<point_id>` instead.",
-        "parameters": [
-          {
-            "name": "point",
-            "in": "path",
-            "description": "A network point (ipv4:port or [ipv6]:port).",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/network/self": {
       "get": {
         "description": "Return the node's peer id",
@@ -7161,80 +6871,6 @@
                     "current_inflow",
                     "current_outflow"
                   ]
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/version": {
-      "get": {
-        "description": "DEPRECATED: use `version` instead.",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "A version number for the network protocol (includes distributed DB version and p2p version)",
-                  "type": "object",
-                  "properties": {
-                    "chain_name": {
-                      "$ref": "#/components/schemas/distributed_db_version.name"
-                    },
-                    "distributed_db_version": {
-                      "$ref": "#/components/schemas/distributed_db_version"
-                    },
-                    "p2p_version": {
-                      "$ref": "#/components/schemas/p2p_version"
-                    }
-                  },
-                  "required": [
-                    "chain_name",
-                    "distributed_db_version",
-                    "p2p_version"
-                  ]
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/network/versions": {
-      "get": {
-        "description": "DEPRECATED: use `version` instead.",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/network_version"
-                  }
                 }
               }
             }
@@ -7676,6 +7312,34 @@
                               },
                               "required": [
                                 "rc_dev"
+                              ]
+                            },
+                            {
+                              "title": "Beta",
+                              "type": "object",
+                              "properties": {
+                                "beta": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              },
+                              "required": [
+                                "beta"
+                              ]
+                            },
+                            {
+                              "title": "Beta_dev",
+                              "type": "object",
+                              "properties": {
+                                "beta_dev": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              },
+                              "required": [
+                                "beta_dev"
                               ]
                             }
                           ]
@@ -10299,6 +9963,27 @@
         "title": "64 bit integers",
         "description": "Decimal representation of 64 bit integers",
         "type": "string"
+      },
+      "max_active_rpc_connections": {
+        "title": "max_active_rpc_connections",
+        "description": "The maximum alowed number of RPC connections",
+        "oneOf": [
+          {
+            "title": "unlimited",
+            "description": "There is not limit of the number of RPC connections allowed.",
+            "type": "string",
+            "enum": [
+              "unlimited"
+            ]
+          },
+          {
+            "title": "limited",
+            "description": "The number of maximum RPC connections allowed is limited to the given integer's value.",
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          }
+        ]
       },
       "mempool": {
         "description": "A batch of operation. This format is used to gossip operations between peers.",

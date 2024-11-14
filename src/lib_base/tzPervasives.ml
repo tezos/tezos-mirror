@@ -71,6 +71,9 @@ module Bytes = struct
   include Tezos_stdlib.TzBytes
 end
 
+module Network_version = Tezos_version.Network_version
+module Distributed_db_version = Tezos_version.Distributed_db_version
+module P2p_version = Tezos_version.P2p_version
 module Time = Time
 module Fitness = Fitness
 module User_activated = User_activated
@@ -87,11 +90,8 @@ module P2p_peer = P2p_peer
 module P2p_point = P2p_point
 module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
-module P2p_version = P2p_version
 module P2p_rejection = P2p_rejection
 module P2p_params = P2p_params
-module Distributed_db_version = Distributed_db_version
-module Network_version = Network_version
 include Tezos_crypto.Hashed
 module Signature = Tezos_crypto.Signature
 include Utils.Infix

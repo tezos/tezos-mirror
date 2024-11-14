@@ -462,13 +462,13 @@ you specified in the reviewers field.
 As mentioned previously, it is the responsibility of authors to find reviewers.
 To find reviewers, either:
 
-  - Advertize your merge request on the ``#mr-advertizing`` channel of
-    the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack. Good advertisement
-    consists of a link to the MR and a one sentence summary.
-  - Look at authors of the code you are modifying using
-    `git blame <https://git-scm.com/docs/git-blame>`_.
-  - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
-    by asking them on Slack or mentioning them in a comment (see next paragraph).
+- Advertize your merge request on the ``#mr-advertizing`` channel of
+  the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack. Good advertisement
+  consists of a link to the MR and a one sentence summary.
+- Look at authors of the code you are modifying using
+  `git blame <https://git-scm.com/docs/git-blame>`_.
+- Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
+  by asking them on Slack or mentioning them in a comment (see next paragraph).
 
 Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
 you may or may not be able to use the *Reviewers* field for specifying
@@ -553,7 +553,7 @@ In the special case where your MR adds a new Python, Rust, JavaScript, or other
 dependency, additional steps must also be followed.
 
 * for Python, you can refer to the related section in the :ref:`python testing documentation <python_adding_new_dependencies>`.
-* the Rust dependencies are located in the GitLab repository `tezos-rust-libs <https://gitlab.com/tezos/tezos-rust-libs>`_ and the instructions are listed there.
+* the Rust dependencies are located in the ``src/rust_deps`` folder
 
 For others, there is currently no dedicated guide. Do not hesitate to ask for
 help on the ``#devteam`` channel on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack.

@@ -67,6 +67,8 @@ let fetching_step_from_peer =
     ("predecessor", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
+(* debug level events *)
+
 let fetching_block_header_from_peer =
   declare_4
     ~section
@@ -77,8 +79,6 @@ let fetching_block_header_from_peer =
     ("peer_id", P2p_peer.Id.encoding)
     ("block_fetched", Data_encoding.int31)
     ("step_length", Data_encoding.int31)
-
-(* debug level events *)
 
 let fetching_all_steps_from_peer =
   declare_1

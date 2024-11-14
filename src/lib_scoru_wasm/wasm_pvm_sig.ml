@@ -35,6 +35,10 @@ module type Unsafe = sig
       to be used only for tests or to increase the tick limit in a non-refutable
       setting. *)
   val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
+
+  (** Set a value to a given key in the durable storage of [tree].
+      If there is an existing value, it is overwritten. *)
+  val durable_set : key:string -> value:string -> tree -> tree Lwt.t
 end
 
 module type Internal_for_tests = sig
@@ -64,6 +68,7 @@ module type Internal_for_tests = sig
   val compute_step_many_until :
     wasm_entrypoint:string ->
     ?max_steps:int64 ->
+    ?hooks:Hooks.t ->
     ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->
     (pvm_state -> bool Lwt.t) ->
@@ -71,8 +76,6 @@ module type Internal_for_tests = sig
     (tree * int64) Lwt.t
 
   include Unsafe with type tree := tree
-
-  include Wasm_vm_sig.Internal_for_tests with type state := tree
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)
@@ -101,6 +104,8 @@ module type S = sig
       [Sc_rollup_PVM_sem.output_encoding]. If the output is missing, this
       function may raise an exception. *)
   val get_output : output_info -> tree -> string option Lwt.t
+
+  val get_wasm_version : tree -> Wasm_pvm_state.version Lwt.t
 
   module Unsafe : Unsafe with type tree := tree
 

@@ -102,8 +102,8 @@ end
  *  - 2.0     : introduce context GC (upgrade to irmin.3.4) -- v15.0
  *  - 3.0     : change blocks' context hash semantics and introduce
                 context split (upgrade to irmin.3.5) -- v16.0
- *  - 3.1     : change encoding for block store status -- v20.3 
- *  - 3.2     : update offset format for cemented files to 64-bit -- v20.3 *)
+ *  - 3.1     : change encoding for block store status -- v21.0
+ *  - 3.2     : update offset format for cemented files to 64-bit -- v22.0 *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
@@ -131,11 +131,11 @@ let upgradable_data_version =
   let open Lwt_result_syntax in
   let v_3_1_upgrade ~data_dir genesis =
     let store_dir = store_dir data_dir in
-    Store.v_3_1_upgrade ~store_dir genesis
+    Store.Upgrade.v_3_1_upgrade ~store_dir genesis
   in
   let v_3_2_upgrade ~data_dir genesis =
     let store_dir = store_dir data_dir in
-    Store.v_3_2_upgrade ~store_dir genesis
+    Store.Upgrade.v_3_2_upgrade ~store_dir genesis
   in
   [
     ( v_3_0,
@@ -174,8 +174,8 @@ let () =
         Version.pp
         exp
         (if Version.compare got exp < 0 then
-         "incompatible and cannot be automatically upgraded."
-        else "too recent for this node version."))
+           "incompatible and cannot be automatically upgraded."
+         else "too recent for this node version."))
     Data_encoding.(
       obj2
         (req "expected_version" Version.encoding)

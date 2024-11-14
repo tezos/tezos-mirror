@@ -26,10 +26,16 @@
 open Tezos_scoru_wasm
 open Tezos_webassembly_interpreter
 
+(** [preload_kernel ~hooks durable] can be used to parse and load in the module
+    cache the kernel from [durable], as a way to speed-up further executions
+    involving this kernel. *)
+val preload_kernel : hooks:Hooks.t -> Durable.t -> unit Lwt.t
+
 (** [compute durable buffers] execute [wasm_entrypoint] once. Defaults to
     {!Constants.wasm_entrypoint} when omitted. *)
 val compute :
   ?wasm_entrypoint:string ->
+  hooks:Hooks.t ->
   version:Wasm_pvm_state.version ->
   reveal_builtins:Builtins.reveals ->
   write_debug:Builtins.write_debug ->

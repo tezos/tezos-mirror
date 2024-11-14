@@ -210,4 +210,3 @@ download. These include:
 
 * `Tzinit snapshots <https://snapshots.tzinit.org/>`_
 * `Lambs on acid <https://lambsonacid.nl/>`_
-* `Marigold snapshots <https://snapshots.tezos.marigold.dev/>`_

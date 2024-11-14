@@ -19,9 +19,14 @@
   (select void_for_linking-octez_smart_rollup_node_PtNairob from
    (octez_smart_rollup_node_PtNairob -> void_for_linking-octez_smart_rollup_node_PtNairob.empty)
    (-> void_for_linking-octez_smart_rollup_node_PtNairob.empty))
-  octez_smart_rollup_node_Proxford
-  octez_smart_rollup_node_PtParisB
+  (select void_for_linking-octez_smart_rollup_node_Proxford from
+   (octez_smart_rollup_node_Proxford -> void_for_linking-octez_smart_rollup_node_Proxford.empty)
+   (-> void_for_linking-octez_smart_rollup_node_Proxford.empty))
+  (select void_for_linking-octez_smart_rollup_node_PtParisB from
+   (octez_smart_rollup_node_PtParisB -> void_for_linking-octez_smart_rollup_node_PtParisB.empty)
+   (-> void_for_linking-octez_smart_rollup_node_PtParisB.empty))
   octez_smart_rollup_node_PsParisC
+  octez_smart_rollup_node_PsQuebec
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))
@@ -40,4 +45,6 @@
  (action
   (progn
    (write-file void_for_linking-octez_smart_rollup_node_PtNairob.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_Proxford.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_PtParisB.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))

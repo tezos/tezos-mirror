@@ -25,9 +25,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Mempool = Mempool
 module View_helpers = View_helpers
 module RPC = RPC
 module Metrics = Metrics_plugin
 module Script_interpreter_logging = Script_interpreter_logging
-module Shell_helpers = Shell_helpers
+module Http_cache_headers = Http_cache_headers

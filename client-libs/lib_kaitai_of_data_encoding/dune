@@ -6,5 +6,5 @@
  (public_name kaitai-of-data-encoding)
  (libraries
   yaml
-  data-encoding
+  octez-libs.data-encoding
   kaitai))

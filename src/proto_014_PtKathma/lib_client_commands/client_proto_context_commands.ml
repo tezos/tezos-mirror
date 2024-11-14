@@ -125,7 +125,7 @@ let commands_ro () =
           ()
         >>=? fun {timestamp = v; _} ->
         (if seconds then cctxt#message "%Ld" (Time.Protocol.to_seconds v)
-        else cctxt#message "%s" (Time.Protocol.to_notation v))
+         else cctxt#message "%s" (Time.Protocol.to_notation v))
         >>= fun () -> return_unit);
     command
       ~group
@@ -489,8 +489,8 @@ let commands_ro () =
                           (Tez.of_mutez_exn w)
                           Operation_result.tez_sym
                           (if List.mem ~equal:Protocol_hash.equal p known_protos
-                          then ""
-                          else "not "))
+                           then ""
+                           else "not "))
                       ranks ;
                     pp_close_box ppf ())
               >>= fun () -> return_unit

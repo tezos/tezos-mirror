@@ -10,3 +10,9 @@ opam
 script-inputs
 scripts
 irmin
+brassaia
+rust-toolchain
+data-encoding
+cohttp
+prometheus
+resto

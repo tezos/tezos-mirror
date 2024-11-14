@@ -15,7 +15,7 @@
   "voting_period_info":
     { "voting_period":
         { "index": 0, "kind": "proposal", "start_position": 0 },
-      "position": 1, "remaining": 122878 }, "nonce_hash": null,
+      "position": 1, "remaining": 153598 }, "nonce_hash": null,
   "deactivated": [],
   "balance_updates":
     [ { "kind": "minted", "category": "bootstrap",
@@ -55,17 +55,17 @@
       { "kind": "contract",
         "contract": "[PUBLIC_KEY_HASH]",
         "change": "3600000000000", "origin": "migration" },
-      { "kind": "minted", "category": "baking rewards", "change": "-333334",
+      { "kind": "minted", "category": "baking rewards", "change": "-266667",
         "origin": "block" },
       { "kind": "freezer", "category": "deposits",
         "staker":
           { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
-        "change": "333334", "origin": "block" },
-      { "kind": "minted", "category": "baking rewards", "change": "-2999999",
+        "change": "266667", "origin": "block" },
+      { "kind": "minted", "category": "baking rewards", "change": "-2399999",
         "origin": "block" },
       { "kind": "contract",
         "contract": "[PUBLIC_KEY_HASH]",
-        "change": "2999999", "origin": "block" } ],
+        "change": "2399999", "origin": "block" } ],
   "liquidity_baking_toggle_ema": 0, "adaptive_issuance_vote_ema": 0,
   "adaptive_issuance_activation_cycle": 5,
   "implicit_operations_results":
@@ -117,15 +117,15 @@
         "storage_size": "1911", "paid_storage_size_diff": "1911" },
       { "kind": "transaction",
         "storage":
-          [ { "int": "1" }, { "int": "833433" }, { "int": "100" },
+          [ { "int": "1" }, { "int": "666766" }, { "int": "100" },
             { "bytes": "01e927f00ef734dfc85919635e9afc9166c83ef9fc00" },
             { "bytes": "0115eb0104481a6d7921160bc982c5e0a561cd8a3a00" } ],
         "balance_updates":
-          [ { "kind": "minted", "category": "subsidy", "change": "-833333",
+          [ { "kind": "minted", "category": "subsidy", "change": "-666666",
               "origin": "subsidy" },
             { "kind": "contract",
               "contract": "[CONTRACT_HASH]",
-              "change": "833333", "origin": "subsidy" } ],
+              "change": "666666", "origin": "subsidy" } ],
         "consumed_milligas": "2261927", "storage_size": "4629",
         "paid_storage_size_diff": "1" } ],
   "proposer_consensus_key": "[PUBLIC_KEY_HASH]",

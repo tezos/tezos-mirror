@@ -142,7 +142,7 @@ let test_participation ~sufficient_participation () =
       del2
       attesting_rewards
   in
-  let attesting_rewards = Test_tez.to_mutez attesting_rewards in
+  let attesting_rewards = Tez_helpers.to_mutez attesting_rewards in
   let expected_bal2_at_b =
     Int64.(sub (add bal2_at_pred_b attesting_rewards) autostaked)
   in
@@ -175,7 +175,8 @@ let test_participation_rpc () =
       ~reward_kind:Attesting_reward_per_slot
   in
   let expected_attesting_rewards =
-    Test_tez.(attesting_reward_per_slot *! Int64.of_int expected_cycle_activity)
+    Tez_helpers.(
+      attesting_reward_per_slot *! Int64.of_int expected_cycle_activity)
   in
   let* b1 = Block.bake ~policy:(By_account del1) b0 in
   let* _, _, _ =

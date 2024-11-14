@@ -20,6 +20,27 @@ open Scenario
 
 let fs = Format.asprintf
 
+let fail_to_stake_refuse_external_staking ~loc staker ~amount =
+  assert_failure
+    ~expected_error:(fun _ errs ->
+      Error_helpers.check_error_constructor_name
+        ~loc
+        ~expected:
+          Protocol.Apply.Staking_to_delegate_that_refuses_external_staking
+        errs)
+    (stake staker amount)
+
+let fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount =
+  assert_failure
+    ~expected_error:(fun _ errs ->
+      Error_helpers.check_error_constructor_name
+        ~loc
+        ~expected:
+          Protocol.Staking
+          .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+        errs)
+    (stake staker amount)
+
 (** Initializes of scenarios with 2 cases:
      - staker = delegate
      - staker != delegate
@@ -65,7 +86,7 @@ let wait_for_unfreeze_and_check wait =
   (* Balance didn't change yet, but will change next cycle *)
   --> check_snapshot_balances "wait snap"
   --> next_cycle
-  --> assert_failure (check_snapshot_balances "wait snap")
+  --> assert_failure_in_check_snapshot_balances ~loc:__LOC__ "wait snap"
 
 let unstake_wait (_, state) =
   let crd = state.State.constants.consensus_rights_delay in
@@ -73,7 +94,11 @@ let unstake_wait (_, state) =
   crd + msp
 
 let finalize staker =
-  assert_failure (check_balance_field staker `Unstaked_finalizable Tez.zero)
+  assert_failure_in_check_balance_field
+    ~loc:__LOC__
+    staker
+    `Unstaked_finalizable
+    Tez.zero
   --> finalize_unstake staker
   --> check_balance_field staker `Unstaked_finalizable Tez.zero
 
@@ -231,8 +256,11 @@ let scenario_finalize =
   --> wait_n_cycles_f unstake_wait
   --> (Tag "minimal wait after unstake" --> Empty
       |+ Tag "wait longer after unstake" --> wait_n_cycles 2)
-  --> assert_failure
-        (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> assert_failure_in_check_balance_field
+        ~loc:__LOC__
+        "staker"
+        `Unstaked_finalizable
+        Tez.zero
   --> (Tag "finalize with finalize" --> finalize_unstake "staker"
       |+ Tag "finalize with stake" --> stake "staker" (Amount Tez.one_mutez)
       |+ Tag "finalize with unstake" --> unstake "staker" (Amount Tez.one_mutez)
@@ -247,13 +275,19 @@ let scenario_not_finalize =
   init_staker_delegate_or_external --> stake "staker" Half --> next_cycle
   --> unstake "staker" All
   --> wait_n_cycles_f (unstake_wait ++ 2)
-  --> assert_failure
-        (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> assert_failure_in_check_balance_field
+        ~loc:__LOC__
+        "staker"
+        `Unstaked_finalizable
+        Tez.zero
   --> snapshot_balances "not finalize" ["staker"]
   --> (Tag "no finalize with unstake if staked = 0"
       --> unstake "staker" (Amount Tez.one_mutez))
-  --> assert_failure
-        (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> assert_failure_in_check_balance_field
+        ~loc:__LOC__
+        "staker"
+        `Unstaked_finalizable
+        Tez.zero
   --> check_snapshot_balances "not finalize"
 
 (* TODO: there's probably more... *)
@@ -268,11 +302,33 @@ let scenario_forbidden_operations =
   init_staker_delegate_or_external
   --> (* Staking everything works for self delegates, but not for delegated accounts *)
   assert_failure
+    ~expected_error:(fun (_, state) errs ->
+      if State.(is_self_delegate "staker" state) then
+        Error_helpers.expect_failwith
+          ~loc:__LOC__
+          ~str:(Str.regexp_string "_self_delegate_exit_")
+          errs
+      else
+        let staker = State.find_account "staker" state in
+        Error_helpers.expect_empty_implicit_delegated_contract
+          ~loc:__LOC__
+          ~contract:staker.contract
+          errs)
     (fail_if_staker_is_self_delegate "staker" --> stake "staker" All)
   (* stake is always forbidden when amount is zero *)
-  --> assert_failure (stake "staker" Nothing)
+  --> assert_failure
+        ~expected_error:(fun (_, state) errs ->
+          let staker = State.find_account "staker" state in
+          Error_helpers.expect_empty_transaction
+            ~loc:__LOC__
+            ~contract:staker.contract
+            errs)
+        (stake "staker" Nothing)
   (* One cannot stake more that one has *)
-  --> assert_failure (stake "staker" Max_tez)
+  --> assert_failure
+        ~expected_error:(fun _ errs ->
+          Error_helpers.expect_balance_too_low ~loc:__LOC__ errs)
+        (stake "staker" Max_tez)
   (* unstake is actually authorized for amount 0, but does nothing (doesn't even finalize if possible) *)
   --> unstake "staker" Nothing
 
@@ -287,6 +343,8 @@ let full_balance_in_finalizable =
   (* At this point, almost all the balance (but one mutez) of the stake is in finalizable *)
   (* Staking is possible, but not transfer *)
   --> assert_failure
+        ~expected_error:(fun _ errs ->
+          Error_helpers.expect_balance_too_low ~loc:__LOC__ errs)
         (transfer "staker" "dummy" (Amount (Tez.of_mutez 10_000_000L)))
   --> stake "staker" (Amount (Tez.of_mutez 10_000_000L))
   (* After the stake, transfer is possible again because the funds were finalized *)
@@ -300,6 +358,60 @@ let odd_behavior =
     no_tag --> stake "staker" Half --> unstake "staker" Half --> next_cycle
   in
   loop 20 one_cycle
+
+(* Test changing delegate to self delegation while having staked funds. *)
+let change_delegate_to_self =
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
+  in
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai `Force --> begin_test ["delegate"]
+  --> set_delegate_params "delegate" init_params
+  --> add_account_with_funds
+        "staker"
+        ~funder:"delegate"
+        (Amount (Tez.of_mutez 2_000_000_000_000L))
+  --> set_delegate "staker" (Some "delegate")
+  --> wait_delegate_parameters_activation --> stake "staker" Half --> next_cycle
+  --> set_delegate "staker" (Some "staker")
+  (* Can't stake: "A contract tries to stake to its delegate while
+     having unstake requests to a previous delegate that cannot be
+     finalized yet. Try again in a later cycle (no more than
+     consensus_rights_delay + max_slashing_period)." *)
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
+  --> unstake "staker" Max_tez
+  --> wait_n_cycles_f (unstake_wait -- 1) (* Still can't stake. *)
+  --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
+  --> next_cycle
+  (* The unstake request from changing delegates is now finalizable. *)
+  --> assert_failure_in_check_balance_field
+        ~loc:__LOC__
+        "staker"
+        `Unstaked_finalizable
+        Tez.zero
+  --> assert_success
+        (* Can directly stake again, which automatically finalizes,
+           even though the finalizable unstaked request is about a
+           previous delegate. *)
+        (stake "staker" Half
+        --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> (Tag "finalize"
+       --> (* Explicitly finalize, so that we can check that the balances
+              are identical to the beginning. This proves that changing
+              delegates has indeed unstaked all staked funds. *)
+       finalize "staker"
+       --> check_snapshot_balances "init"
+       --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+      |+ Tag "don't finalize" --> Empty)
+  --> stake "staker" Half --> unstake "staker" Half --> stake "staker" Half
 
 (* Test changing delegates while having staked funds. *)
 let change_delegate =
@@ -326,28 +438,44 @@ let change_delegate =
      having unstake requests to a previous delegate that cannot be
      finalized yet. Try again in a later cycle (no more than
      consensus_rights_delay + max_slashing_period)." *)
-  --> assert_failure (stake "staker" Half)
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
+  --> unstake "staker" Max_tez
   --> wait_n_cycles_f (unstake_wait -- 1) (* Still can't stake. *)
   --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
-  --> assert_failure (stake "staker" Half)
+  --> fail_to_stake_with_unfinalizable_unstake_requests
+        ~loc:__LOC__
+        "staker"
+        ~amount:Half
   --> next_cycle
   (* The unstake request from changing delegates is now finalizable. *)
-  --> assert_failure
-        (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> assert_failure_in_check_balance_field
+        ~loc:__LOC__
+        "staker"
+        `Unstaked_finalizable
+        Tez.zero
   --> assert_success
         (* Can directly stake again, which automatically finalizes,
            even though the finalizable unstaked request is about a
            previous delegate. *)
         (stake "staker" Half
         --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
-  --> (* Explicitly finalize, so that we can check that the balances
-         are identical to the beginning. This proves that changing
-         delegates has indeed unstaked all staked funds. *)
-  finalize "staker"
-  --> check_snapshot_balances "init"
-  --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
-  --> (* Staking again is also possible. *) stake "staker" Half
-  --> check_snapshot_balances "after_stake"
+  --> (Tag "finalize"
+       --> (* Explicitly finalize, so that we can check that the balances
+              are identical to the beginning. This proves that changing
+              delegates has indeed unstaked all staked funds. *)
+       finalize "staker"
+       --> check_snapshot_balances "init"
+       --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+       --> (* Staking again is also possible. *) stake "staker" Half
+       --> check_snapshot_balances "after_stake"
+      |+ Tag "don't finalize" --> stake "staker" Half)
+  --> (Tag "finally, unstake" --> unstake "staker" Half
+      |+ Tag "finally, change delegate one last time"
+         --> set_delegate "staker" (Some "delegate1")
+      |+ Tag "finally, unset delegate" --> set_delegate "staker" None)
 
 let unset_delegate =
   let init_params =
@@ -420,7 +548,7 @@ let forbid_costaking =
   --> stake "staker" amount
   --> next_cycle
   (* External staking is now forbidden *)
-  --> assert_failure (stake "staker" amount)
+  --> fail_to_stake_refuse_external_staking ~loc:__LOC__ "staker" ~amount
   (* Can still self-stake *)
   --> stake "delegate" amount
   (* Can still unstake *)
@@ -431,7 +559,7 @@ let forbid_costaking =
   --> set_delegate_params "delegate" init_params
   --> wait_cycle_until `right_before_delegate_parameters_activation
   (* Not yet... *)
-  --> assert_failure (stake "staker" amount)
+  --> fail_to_stake_refuse_external_staking ~loc:__LOC__ "staker" ~amount
   --> next_cycle
   (* Now possible *)
   --> stake "staker" amount
@@ -442,13 +570,15 @@ let test_deactivation =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  let fail_if_deactivated delegate =
+  let check_deactivated_status ~loc ~expected delegate =
     let open Lwt_result_syntax in
     exec_unit (fun (block, state) ->
         let dlgt = State.find_account delegate state in
         let* deactivated = Context.Delegate.deactivated (B block) dlgt.pkh in
-        Assert.is_true ~loc:__LOC__ (not deactivated))
+        Assert.equal_bool ~loc deactivated expected)
   in
+  let check_is_deactivated = check_deactivated_status ~expected:true in
+  let check_is_not_deactivated = check_deactivated_status ~expected:false in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai `Force
@@ -477,7 +607,14 @@ let test_deactivation =
   --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
   --> next_cycle
   (* ...But not in the following cycle *)
-  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> assert_failure
+        ~expected_error:(fun (_, state) errs ->
+          let delegate = State.find_account "delegate" state in
+          Error_helpers.expect_no_slots_found_for
+            ~loc:__LOC__
+            ~pkh:delegate.pkh
+            errs)
+        (next_block_with_baker "delegate")
   (* The stakers still have stake, and can still stake/unstake *)
   --> check_balance_field "staker1" `Staked (Tez.of_mutez 100_000_000_000L)
   --> check_balance_field "staker2" `Staked (Tez.of_mutez 100_000_000_000L)
@@ -487,14 +624,14 @@ let test_deactivation =
         (unstake "staker2" Half --> wait_n_cycles 5
        --> finalize_unstake "staker2")
   (* We wait until the delegate is completely deactivated *)
-  --> assert_success ~loc:__LOC__ (fail_if_deactivated "delegate")
+  --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   (* We already waited for [consensus_rights_delay] + 1 cycles since 0 stake,
      we must wait for [consensus_rights_delay] more. *)
   --> wait_n_cycles_f (fun (_, state) ->
           state.State.constants.consensus_rights_delay)
-  --> assert_success ~loc:__LOC__ (fail_if_deactivated "delegate")
+  --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   --> next_cycle
-  --> assert_failure ~loc:__LOC__ (fail_if_deactivated "delegate")
+  --> check_is_deactivated ~loc:__LOC__ "delegate"
   --> next_cycle
   (* The stakers still have stake, and can still stake/unstake *)
   --> check_balance_field "staker1" `Staked (Tez.of_mutez 100_000_000_000L)
@@ -509,11 +646,25 @@ let test_deactivation =
   --> set_delegate "delegate" (Some "delegate")
   --> stake "delegate" (Amount (Tez.of_mutez 2_000_000_000_000L))
   (* It cannot bake right away *)
-  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> assert_failure
+        ~expected_error:(fun (_, state) errs ->
+          let delegate = State.find_account "delegate" state in
+          Error_helpers.expect_no_slots_found_for
+            ~loc:__LOC__
+            ~pkh:delegate.pkh
+            errs)
+        (next_block_with_baker "delegate")
   --> wait_n_cycles_f (fun (_, state) ->
           state.State.constants.consensus_rights_delay)
   (* After consensus_rights_delay, the delegate still has no rights... *)
-  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> assert_failure
+        ~expected_error:(fun (_, state) errs ->
+          let delegate = State.find_account "delegate" state in
+          Error_helpers.expect_no_slots_found_for
+            ~loc:__LOC__
+            ~pkh:delegate.pkh
+            errs)
+        (next_block_with_baker "delegate")
   --> next_cycle
   (* ...But has enough to bake in the following cycle *)
   --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
@@ -521,6 +672,77 @@ let test_deactivation =
           let dlgt = State.find_account "delegate" state in
           let total = Frozen_tez.total_current dlgt.frozen_deposits in
           Assert.equal_tez ~loc:__LOC__ total (Tez.of_mutez 2_200_000_000_000L))
+
+let change_delegate_and_wait_then_stake ~loc ~staker ~delegate ~amount ~wait =
+  let check_is_last_level_of_cycle ~loc =
+    exec_unit (fun (block, _state) ->
+        Assert.equal_bool ~loc (Block.last_block_of_cycle block) true)
+  in
+  let amount = Amount (Tez.of_mutez amount) in
+  set_delegate staker (Some delegate)
+  --> fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount
+  --> wait_n_cycles_f (unstake_wait -- 1)
+  --> exec bake_until_next_cycle_end_but_one
+  --> fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount
+  --> next_block --> stake staker amount --> wait_n_cycles wait
+  (* Create unstake request for cycle N *)
+  --> unstake staker Half
+  (* Bake until right before the end of the cycle *)
+  --> exec bake_until_next_cycle_end_but_one
+  (* Modify unstake request for cycle N, [unstake] also bakes a block,
+     so we are now at the end of the cycle. *)
+  --> unstake staker Half
+  --> check_is_last_level_of_cycle ~loc:__LOC__
+  --> stake staker amount
+  (* Create unstake request for cycle N + 1 *)
+  --> unstake staker Half
+
+let test_change_delegates =
+  let set_limit name l =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.of_float l;
+        edge_of_baking_over_staking = Q.zero;
+      }
+    in
+    set_delegate_params name params
+  in
+  init_constants () --> activate_ai `Force
+  --> begin_test ["delegate1"; "delegate2"; "delegate3"; "faucet"]
+  --> add_account_with_funds
+        "staker"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_limit "delegate1" 5. --> set_limit "delegate2" 4.
+  --> set_limit "delegate3" 3. --> wait_delegate_parameters_activation
+  --> set_delegate "staker" (Some "delegate1")
+  --> stake "staker" (Amount (Tez.of_mutez 10_000_000_000L))
+  --> wait_n_cycles 2
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"delegate2"
+        ~amount:10_000_000_000L
+        ~wait:3
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"delegate3"
+        ~amount:10_000_000_000L
+        ~wait:4
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"delegate1"
+        ~amount:15_000_000_000L
+        ~wait:1
+  --> change_delegate_and_wait_then_stake
+        ~loc:__LOC__
+        ~staker:"staker"
+        ~delegate:"staker"
+        ~amount:10_000_000_000L
+        ~wait:2
+  --> wait_n_cycles 2
 
 let tests =
   tests_of_scenarios
@@ -534,10 +756,12 @@ let tests =
        ("Test full balance in finalizable", full_balance_in_finalizable);
        ("Test stake unstake every cycle", odd_behavior);
        ("Test change delegate", change_delegate);
+       ("Test change delegate to self", change_delegate_to_self);
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
        ("Test deactivation under AI", test_deactivation);
+       ("Test change delegates", test_change_delegates);
      ]
 
 let () = register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "stake"] tests

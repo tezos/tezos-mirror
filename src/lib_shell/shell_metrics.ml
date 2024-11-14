@@ -440,13 +440,14 @@ module Block_validator = struct
 
   type t = {
     already_commited_blocks_count : Counter.t;
-    outdated_blocks_count : Counter.t;
+    already_known_invalid_blocks_count : Counter.t;
     validated_blocks_count : Counter.t;
     validation_errors_count : Counter.t;
+    commit_block_failed_count : Counter.t;
     preapplied_blocks_count : Counter.t;
     preapplication_errors_count : Counter.t;
-    validation_errors_after_precheck_count : Counter.t;
-    precheck_failed_count : Counter.t;
+    application_errors_after_validation_count : Counter.t;
+    validation_failed_count : Counter.t;
     worker_timestamps : Worker.timestamps;
     worker_counters : Worker.counters;
   }
@@ -457,12 +458,11 @@ module Block_validator = struct
       let help = "Number of requests to validate a block already handled" in
       Counter.v ~help ~namespace ?subsystem "already_commited_blocks_count"
     in
-    let outdated_blocks_count =
+    let already_known_invalid_blocks_count =
       let help =
-        "Number of requests to validate a block older than the node's \
-         checkpoint"
+        "Number of requests to validate a block already known as invalid"
       in
-      Counter.v ~help ~namespace ?subsystem "outdated_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "already_known_invalid_blocks_count"
     in
     let validated_blocks_count =
       let help = "Number of requests to validate a valid block" in
@@ -472,6 +472,10 @@ module Block_validator = struct
       let help = "Number of requests to validate an invalid block" in
       Counter.v ~help ~namespace ?subsystem "validation_errors_count"
     in
+    let commit_block_failed_count =
+      let help = "Number of requests that failed to commit a block" in
+      Counter.v ~help ~namespace ?subsystem "commit_block_failed_count"
+    in
     let preapplied_blocks_count =
       let help = "Number of successful application simulations of blocks" in
       Counter.v ~help ~namespace ?subsystem "preapplied_blocks_count"
@@ -480,22 +484,22 @@ module Block_validator = struct
       let help = "Number of refused application simulations of blocks" in
       Counter.v ~help ~namespace ?subsystem "preapplication_errors_count"
     in
-    let validation_errors_after_precheck_count =
+    let application_errors_after_validation_count =
       let help =
-        "Number of requests to validate an invalid but precheckable block"
+        "Number of requests to validate an inapplicable but validated block"
       in
       Counter.v
         ~help
         ~namespace
         ?subsystem
-        "validation_errors_after_precheck_count"
+        "application_errors_after_validation_count"
     in
-    let precheck_failed_count =
+    let validation_failed_count =
       let help =
-        "Number of block validation requests where the prechecking of a block \
+        "Number of block validation requests where the validation of a block \
          failed"
       in
-      Counter.v ~help ~namespace ?subsystem "precheck_failed_count"
+      Counter.v ~help ~namespace ?subsystem "validation_failed_count"
     in
     let worker_timestamps =
       Worker.declare_timestamps ~label_names:[] ~namespace ?subsystem () []
@@ -532,13 +536,14 @@ module Block_validator = struct
     operations_per_pass_metrics () ;
     {
       already_commited_blocks_count;
-      outdated_blocks_count;
+      already_known_invalid_blocks_count;
       validated_blocks_count;
       validation_errors_count;
+      commit_block_failed_count;
       preapplied_blocks_count;
       preapplication_errors_count;
-      validation_errors_after_precheck_count;
-      precheck_failed_count;
+      application_errors_after_validation_count;
+      validation_failed_count;
       worker_timestamps;
       worker_counters;
     }

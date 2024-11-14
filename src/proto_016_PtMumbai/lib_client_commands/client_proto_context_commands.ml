@@ -692,9 +692,12 @@ let commands_ro () =
                             (Tez.of_mutez_exn w)
                             Operation_result.tez_sym
                             (if
-                             List.mem ~equal:Protocol_hash.equal p known_protos
-                            then ""
-                            else "not "))
+                               List.mem
+                                 ~equal:Protocol_hash.equal
+                                 p
+                                 known_protos
+                             then ""
+                             else "not "))
                         ranks ;
                       pp_close_box ppf ())
               else cctxt#message "The proposals have already been cleared."

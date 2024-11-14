@@ -17,6 +17,11 @@ open Protocol
 open Manager_operation_helpers
 open Generators
 
+let register_test =
+  Tezt_helpers.register_test
+    ~__FILE__
+    ~file_tags:["1m"; "validation"; "operation"]
+
 let count = 100
 
 (** Local default values for the tests. *)
@@ -208,6 +213,4 @@ let tests : (string * [`Quick | `Slow] * (unit -> unit Lwt.t)) trace =
       conflict_free_tests;
     ]
 
-let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("one-manager restriction", tests)]
-  |> Lwt_main.run
+let () = List.iter (fun (s, _, f) -> register_test ~title:s f) tests

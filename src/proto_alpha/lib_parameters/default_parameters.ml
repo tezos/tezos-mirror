@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -147,7 +148,7 @@ let default_dal =
     }
 
 let constants_mainnet : Constants.Parametric.t =
-  let block_time = 10 in
+  let block_time = 8 in
   let consensus_committee_size = 7000 in
   let Constants.Generated.
         {
@@ -194,12 +195,12 @@ let constants_mainnet : Constants.Parametric.t =
     consensus_rights_delay = 2;
     blocks_preservation_cycles = 1;
     delegate_parameters_activation_delay = 5;
-    blocks_per_cycle = 24576l;
-    blocks_per_commitment = 192l;
-    nonce_revelation_threshold = 768l;
+    blocks_per_cycle = 30720l;
+    blocks_per_commitment = 240l;
+    nonce_revelation_threshold = 960l;
     cycles_per_voting_period = 5l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
-    hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_733_333);
+    hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_386_666);
     (* When reducing blocks time, consider adapting this constant so
        the block production's overhead is not too important. *)
     proof_of_work_threshold = Int64.(sub (shift_left 1L 48) 1L);
@@ -207,7 +208,7 @@ let constants_mainnet : Constants.Parametric.t =
     minimal_frozen_stake = Tez.(mul_exn one 600);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
-          - 8000 ~= 768 * 10 that is nonce_revelation_threshold * block time
+          - 8000 ~= 960 * 8 that is nonce_revelation_threshold * block time
           - .2M  ~= number of modular squaring per second on benchmark machine
          with 2.8GHz CPU
           - 5: security factor (strictly higher than the ratio between highest CPU
@@ -245,9 +246,9 @@ let constants_mainnet : Constants.Parametric.t =
 
        The unit for this value is a block.
     *)
-    max_operations_time_to_live = 360;
+    max_operations_time_to_live = 450;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
-    delay_increment_per_round = Period.of_seconds_exn 5L;
+    delay_increment_per_round = Period.of_seconds_exn 4L;
     consensus_committee_size;
     consensus_threshold;
     (* 4667 slots *)
@@ -265,11 +266,12 @@ let constants_mainnet : Constants.Parametric.t =
     (* A cache for contract source code and storage. Its size has been
        chosen not too exceed 100 000 000 bytes. *)
     cache_script_size = 100_000_000;
-    (* A cache for the stake distribution for all cycles stored at any
-       moment: consensus_rights_delay + max_slashing_period + 1 = 8 currently. *)
-    cache_stake_distribution_cycles = 8;
+    (* A cache for the stake distribution for all cycles stored at any moment:
+       consensus_rights_delay + max_slashing_period + 1 = 2 + 2 + 1 = 5
+       currently. *)
+    cache_stake_distribution_cycles = 5;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
-    cache_sampler_state_cycles = 8;
+    cache_sampler_state_cycles = 5;
     dal = default_dal;
     sc_rollup;
     zk_rollup =
@@ -283,8 +285,8 @@ let constants_mainnet : Constants.Parametric.t =
       };
     adaptive_issuance =
       {
-        global_limit_of_staking_over_baking = 5;
-        edge_of_staking_over_delegation = 2;
+        global_limit_of_staking_over_baking = 9;
+        edge_of_staking_over_delegation = 3;
         launch_ema_threshold = 0l;
         adaptive_rewards_params =
           {

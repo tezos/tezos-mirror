@@ -3,15 +3,38 @@
 // SPDX-License-Identifier: MIT
 
 #[doc(hidden)]
-pub use tezos_smart_rollup_debug::debug_msg;
+pub use tezos_smart_rollup_debug::debug_str;
 
-#[derive(PartialEq)]
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+
+#[repr(u8)]
+#[derive(PartialEq, Clone, Copy, PartialOrd, FromPrimitive)]
 pub enum Level {
-    Info,
+    Fatal = 0,
     Error,
-    Fatal,
+    Info,
     Debug,
     Benchmarking,
+}
+
+impl TryFrom<u8> for Level {
+    type Error = ();
+    fn try_from(value: u8) -> Result<Self, ()> {
+        FromPrimitive::from_u8(value).ok_or(())
+    }
+}
+
+impl Default for Level {
+    fn default() -> Self {
+        if cfg!(feature = "debug") {
+            Self::Debug
+        } else if cfg!(feature = "benchmark") {
+            Self::Benchmarking
+        } else {
+            Self::Info
+        }
+    }
 }
 
 impl std::fmt::Display for Level {
@@ -26,17 +49,17 @@ impl std::fmt::Display for Level {
     }
 }
 
+pub trait Verbosity {
+    fn verbosity(&self) -> Level;
+}
+
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! log {
-    ($host: expr, $level: expr, $($args: expr),*) => {
-        {
-            // Display `Debug` level only if the feature flag is actived
-            if ($level != $crate::Level::Debug && $level != $crate::Level::Benchmarking)
-                || ($level == $crate::Level::Debug && cfg!(feature = "debug"))
-                || ($level == $crate::Level::Benchmarking && cfg!(feature = "benchmark")) {
-                $crate::debug_msg!($host, "[{}] {}\n", $level, { &alloc::format!($($args), *) });
-            }
+    ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {
+        if $host.verbosity() >= $level {
+            let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
+            $crate::debug_str!($host, &msg);
         }
     };
 }
