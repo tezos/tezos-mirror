@@ -782,6 +782,7 @@ function update_protocol_tests() {
       sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
       sed "/| payload when String.equal payload Constants.proto_${protocol_source}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
       sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${protocol_source}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_beta_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
+      sed -r "s/Proto_${protocol_source} -> (V.*)/ Proto_${protocol_source} -> \1 | ${capitalized_label} -> \1/" -i.old src/lib_scoru_wasm/wasm_vm.ml
     fi
     ocamlformat -i src/lib_scoru_wasm/constants.ml
     ocamlformat -i src/lib_scoru_wasm/pvm_input_kind.ml
@@ -823,11 +824,18 @@ function update_source() {
     git add "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${label}/g" -i.old "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${version}/g" \
-      -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+      -e "s/${capitalized_source}/${capitalized_label}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
     ocamlformat -i "teztale/bin_teztale_archiver/${label}_machine.real.ml"
   fi
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
   commit_if_changes "teztale: update teztale_archiver_main.ml"
+
+  if [[ ${is_snapshot} == false ]]; then
+    log_blue "update proto_alpha constants_parametric_previous_repr.ml"
+    # Previous parametrics constants are the same in Alpha and Beta, so it is correct to just replace the Alpha previous one by the Alpha current one
+    cp src/proto_alpha/lib_protocol/constants_parametric_repr.ml src/proto_alpha/lib_protocol/constants_parametric_previous_repr.ml
+    cp src/proto_alpha/lib_protocol/constants_parametric_repr.mli src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+  fi
 
   log_blue "update raw_context.ml"
   # add  "else if Compare.String.(s = "$label") then return ($capitalized_label, ctxt)" before else Lwt.return @@ storage_error (Incompatible_protocol_version s)
@@ -887,8 +895,9 @@ function update_source() {
     escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
     #replace all multiline code between $start_predecessor and $end_predecessor with the content of prepare_first_block_patched in src/proto_alpha/lib_protocol/raw_context.ml using perl
     perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
-    # remove all code between $start_remove and $end_remove in src/proto_alpha/lib_protocol/raw_context.ml
+    # remove all code between $start_remove and $end_remove in src/proto_alpha/lib_protocol/raw_context.ml and init_storage.ml
     perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
+    perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "src/proto_alpha/lib_protocol/init_storage.ml"
     #replace code between "$type_to_remove' and '$type_to_remove' with capitalized_label in src/proto_alpha/lib_protocol/raw_context.ml
     perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "src/proto_alpha/lib_protocol/raw_context.ml"
     perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "src/proto_alpha/lib_protocol/raw_context.mli"
