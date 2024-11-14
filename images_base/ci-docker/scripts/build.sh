@@ -4,13 +4,13 @@ set -x
 # Bash fork from Kaniko GitLab template
 # https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Kaniko.gitlab-ci.yml
 
-. ./scripts/tag.sh
+. ./images_base/ci-docker/scripts/tag.sh
 
 ### Log in to Gitlab and GCP Artifact container registries
-./scripts/docker_registry_auth.sh
+./images_base/ci-docker/scripts/docker_registry_auth.sh
 
 ## Build multi-arch Docker image
-gitlab="${CI_REGISTRY_IMAGE}:${DOCKER_IMAGE_TAG}"
+gitlab="${CONTAINER_NAME}:${DOCKER_IMAGE_TAG}"
 gcp="${GCP_ARTIFACT_REGISTRY_IMAGE}:${DOCKER_IMAGE_TAG}"
 
 # Cross-platform emulator collection
@@ -28,7 +28,7 @@ if [ "${CI_COMMIT_REF_PROTECTED:-false}" = false ]; then
     --tag "${gitlab}" \
     --tag "${gcp}" \
     --build-arg DOCKER_VERSION=${DOCKER_VERSION} \
-    -f Dockerfile .
+    -f ./images_base/ci-docker/Dockerfile .
 else
   # In the case where we run on a protected branch is available we push the image
   # also to the protected GCP Artifact Resgitry.
@@ -40,5 +40,5 @@ else
     --tag "${gcp}" \
     --tag "${protected_gcp}" \
     --build-arg DOCKER_VERSION=${DOCKER_VERSION} \
-    -f Dockerfile .
+    -f ./images_base/ci-docker/Dockerfile .
 fi
