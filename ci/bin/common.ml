@@ -1506,6 +1506,7 @@ module Documentation = struct
              "docs/*/octez-*.html";
              "docs/api/octez-*.txt";
              "docs/developer/metrics.csv";
+             "docs/developer/rollup_metrics.csv";
              "docs/user/node-config.json";
            ])
       ["./scripts/ci/documentation:manuals.sh"]
