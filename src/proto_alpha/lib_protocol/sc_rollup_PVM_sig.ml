@@ -221,9 +221,8 @@ type reveal =
   | Request_adal_page of {
       page_id : Dal_slot_repr.Page.t;
           (* The id of the DAL page we want to import. *)
-      min_attested_shards : int;
-          (* The expected minimal number of attested shards of the slot. *)
-      expected_total_shards : int; (* The total number of shards of the slot. *)
+      attestation_threshold_percent : int;
+          (* The required attestation ratio expressed as percentage . *)
       restricted_commitments_publishers : Contract_repr.t list option;
           (* If none, no filtering by commitments publishers is made. *)
     }
@@ -273,11 +272,10 @@ let reveal_encoding =
     case
       ~title:"Request_adaptive_dal_page"
       (Tag 4)
-      (obj5
+      (obj4
          (kind "request_adaptive_dal_page")
          (req "page_id" Dal_slot_repr.Page.encoding)
-         (req "min_attested_shards" Data_encoding.uint16)
-         (req "expected_total_shards" Data_encoding.uint16)
+         (req "attestation_threshold_percent" Data_encoding.uint8)
          (dft
             "restricted_commitments_publishers"
             (option (list ~max_length:10 Contract_repr.encoding))
@@ -286,27 +284,23 @@ let reveal_encoding =
         | Request_adal_page
             {
               page_id;
-              min_attested_shards;
-              expected_total_shards;
+              attestation_threshold_percent;
               restricted_commitments_publishers;
             } ->
             Some
               ( (),
                 page_id,
-                min_attested_shards,
-                expected_total_shards,
+                attestation_threshold_percent,
                 restricted_commitments_publishers )
         | _ -> None)
       (fun ( (),
              page_id,
-             min_attested_shards,
-             expected_total_shards,
+             attestation_threshold_percent,
              restricted_commitments_publishers ) ->
         Request_adal_page
           {
             page_id;
-            min_attested_shards;
-            expected_total_shards;
+            attestation_threshold_percent;
             restricted_commitments_publishers;
           })
   in
@@ -407,18 +401,15 @@ let pp_reveal fmt = function
   | Request_adal_page
       {
         page_id;
-        min_attested_shards;
-        expected_total_shards;
+        attestation_threshold_percent;
         restricted_commitments_publishers;
       } ->
       Format.fprintf
         fmt
-        "ADAL:{page:%a; min_attested_shards:%d; expected_total_shards:%d; \
-         publishers:%a}"
+        "ADAL:{page:%a; attestation_threshold_percent:%d; publishers:%a}"
         Dal_slot_repr.Page.pp
         page_id
-        min_attested_shards
-        expected_total_shards
+        attestation_threshold_percent
         (Format.pp_print_option
            ~none:(fun fmt () -> Format.fprintf fmt "Any")
            (Format.pp_print_list
@@ -455,14 +446,14 @@ let reveal_equal p1 p2 =
   | ( Request_adal_page
         {
           page_id;
-          min_attested_shards;
-          expected_total_shards;
+          attestation_threshold_percent;
           restricted_commitments_publishers;
         },
       Request_adal_page b ) ->
       Dal_slot_repr.Page.equal page_id b.page_id
-      && Compare.Int.equal min_attested_shards b.min_attested_shards
-      && Compare.Int.equal expected_total_shards b.expected_total_shards
+      && Compare.Int.equal
+           attestation_threshold_percent
+           b.attestation_threshold_percent
       && Option.equal
            (List.equal Contract_repr.equal)
            restricted_commitments_publishers
