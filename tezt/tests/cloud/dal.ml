@@ -720,6 +720,14 @@ module Cli = struct
       false
 end
 
+type etherlink_configuration = {
+  enabled : bool;
+  etherlink_sequencer : bool;
+  etherlink_producers : int;
+  (* Empty list means DAL FF is set to false. *)
+  etherlink_dal_slots : int list;
+}
+
 type configuration = {
   stake : int list;
   stake_machine_type : string list option;
@@ -727,16 +735,11 @@ type configuration = {
   observer_slot_indices : int list;
   protocol : Protocol.t;
   producer_machine_type : string option;
-  etherlink : bool;
-  etherlink_sequencer : bool;
-  etherlink_producers : int;
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
   disconnect : (int * int) option;
   network : Network.t;
   bootstrap : bool;
-  (* Empty list means DAL FF is set to false. *)
-  etherlink_dal_slots : int list;
   teztale : bool;
   memtrace : bool;
   data_dir : string option;
@@ -791,6 +794,7 @@ type etherlink_producer_setup = {
 }
 
 type etherlink = {
+  configuration : etherlink_configuration;
   operator : etherlink_operator_setup;
   producers : etherlink_producer_setup list;
   accounts : Tezt_etherlink.Eth_account.t Array.t;
@@ -1357,7 +1361,8 @@ let init_teztale (configuration : configuration) cloud agent =
     Lwt.return_some teztale
   else Lwt.return_none
 
-let init_public_network cloud (configuration : configuration) teztale agent
+let init_public_network cloud (configuration : configuration)
+    ?(etherlink_configuration : etherlink_configuration option) teztale agent
     (network : Network.public_network) =
   toplog "Init public network" ;
   let* bootstrap =
@@ -1478,7 +1483,7 @@ let init_public_network cloud (configuration : configuration) teztale agent
     Client.get_balance_for ~account:"fundraiser" bootstrap.client
   in
   let* etherlink_rollup_operator_key =
-    if configuration.etherlink then
+    if Some true = Option.map (fun c -> c.enabled) etherlink_configuration then
       let () = toplog "Generating a key pair for Etherlink operator" in
       Client.stresstest_gen_keys
         ~alias_prefix:"etherlink_operator"
@@ -1520,7 +1525,7 @@ let init_public_network cloud (configuration : configuration) teztale agent
     (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
 
 let init_sandbox_and_activate_protocol cloud (configuration : configuration)
-    agent =
+    ?(etherlink_configuration : etherlink_configuration option) agent =
   let dal_bootstrap_node_net_port = Agent.next_available_port agent in
   let dal_config : Cryptobox.Config.t =
     {
@@ -1566,7 +1571,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       client
   in
   let* etherlink_rollup_operator_key =
-    if configuration.etherlink then
+    if Some true = Option.map (fun c -> c.enabled) etherlink_configuration then
       Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
     else Lwt.return []
   in
@@ -1960,9 +1965,9 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
       in
       some reverse_proxy_dal_node
 
-let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
-    account agent next_agent =
-  let is_sequencer = configuration.etherlink_sequencer in
+let init_etherlink_operator_setup cloud configuration etherlink_configuration
+    name ~bootstrap ~dal_slots account agent next_agent =
+  let is_sequencer = etherlink_configuration.etherlink_sequencer in
   let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -2016,7 +2021,7 @@ let init_etherlink_operator_setup cloud configuration name ~bootstrap ~dal_slots
       ~bootstrap
       ~next_agent
       ~name
-      ~dal_slots:configuration.etherlink_dal_slots
+      ~dal_slots:etherlink_configuration.etherlink_dal_slots
       ~network:configuration.network
       ~memtrace:configuration.memtrace
   in
@@ -2199,14 +2204,15 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   in
   return operator
 
-let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
-    ~dal_slots next_agent =
+let init_etherlink cloud configuration etherlink_configuration ~bootstrap
+    etherlink_rollup_operator_key ~dal_slots next_agent =
   let () = toplog "Initializing an Etherlink operator" in
   let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
   let* operator =
     init_etherlink_operator_setup
       cloud
       configuration
+      etherlink_configuration
       ~dal_slots
       "operator"
       ~bootstrap
@@ -2216,7 +2222,7 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
   in
   let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
   let* producers_agents =
-    List.init configuration.etherlink_producers (fun i ->
+    List.init etherlink_configuration.etherlink_producers (fun i ->
         let name = Format.asprintf "etherlink-producer-%d" i in
         next_agent ~name)
     |> Lwt.all
@@ -2234,7 +2240,8 @@ let init_etherlink cloud configuration ~bootstrap etherlink_rollup_operator_key
              agent)
     |> Lwt.all
   in
-  return {operator; accounts; producers}
+  return
+    {configuration = etherlink_configuration; operator; accounts; producers}
 
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : baker list) (producers : producer list)
@@ -2250,7 +2257,9 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
       | [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
 
-let init ~(configuration : configuration) cloud next_agent =
+let init ~(configuration : configuration)
+    ?(etherlink_configuration : etherlink_configuration option) cloud next_agent
+    =
   let () = toplog "Init" in
   let* bootstrap_agent =
     if configuration.bootstrap then
@@ -2292,9 +2301,19 @@ let init ~(configuration : configuration) cloud next_agent =
     match configuration.network with
     | Network.Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
-        init_sandbox_and_activate_protocol cloud configuration bootstrap_agent
+        init_sandbox_and_activate_protocol
+          cloud
+          configuration
+          ?etherlink_configuration
+          bootstrap_agent
     | Public network ->
-        init_public_network cloud configuration teztale bootstrap_agent network
+        init_public_network
+          cloud
+          configuration
+          ?etherlink_configuration
+          teztale
+          bootstrap_agent
+          network
   in
   let* bakers =
     Lwt_list.mapi_p
@@ -2327,40 +2346,45 @@ let init ~(configuration : configuration) cloud next_agent =
   in
   let () = toplog "Init: all producers and observers have been initialized" in
   let* etherlink =
-    if configuration.etherlink then
-      let () = toplog "Init: initializing Etherlink" in
-      let () = toplog "Init: Getting Etherlink operator key" in
-      let etherlink_rollup_operator_key =
-        Option.get etherlink_rollup_operator_key
-      in
-      let () = toplog "Init: Getting allowed DAL slot indices" in
-      let dal_slots =
-        match configuration.etherlink_dal_slots with
-        | [] -> None
-        | slots -> Some slots
-      in
-      let () =
-        toplog "Init: Etherlink+DAL feature flag: %b" (Option.is_some dal_slots)
-      in
-      let* etherlink =
-        let () = toplog "Init: calling init_etherlink" in
-        init_etherlink
-          cloud
-          configuration
-          ~bootstrap
-          etherlink_rollup_operator_key
-          next_agent
-          ~dal_slots
-      in
-      some etherlink
-    else
-      let () =
-        toplog
-          "Init: skipping Etherlink initialization because --etherlink was not \
-           given on the CLI"
-      in
-      none
+    match etherlink_configuration with
+    | Some etherlink_configuration when etherlink_configuration.enabled ->
+        let () = toplog "Init: initializing Etherlink" in
+        let () = toplog "Init: Getting Etherlink operator key" in
+        let etherlink_rollup_operator_key =
+          Option.get etherlink_rollup_operator_key
+        in
+        let () = toplog "Init: Getting allowed DAL slot indices" in
+        let dal_slots =
+          match etherlink_configuration.etherlink_dal_slots with
+          | [] -> None
+          | slots -> Some slots
+        in
+        let () =
+          toplog
+            "Init: Etherlink+DAL feature flag: %b"
+            (Option.is_some dal_slots)
+        in
+        let* etherlink =
+          let () = toplog "Init: calling init_etherlink" in
+          init_etherlink
+            cloud
+            configuration
+            etherlink_configuration
+            ~bootstrap
+            etherlink_rollup_operator_key
+            next_agent
+            ~dal_slots
+        in
+        some etherlink
+    | _ ->
+        let () =
+          toplog
+            "Init: skipping Etherlink initialization because --etherlink was \
+             not given on the CLI"
+        in
+        none
   in
+
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
   let* first_level =
@@ -2417,18 +2441,20 @@ let wait_for_level t level =
       let* _ = Node.wait_for_level node level in
       Lwt.return_unit
 
-let on_new_level t level =
+let on_new_level t ?etherlink level =
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
+  let etherlink_operator =
+    Option.map
+      (fun etherlink -> etherlink.operator.account.public_key_hash)
+      etherlink
+  in
   let* infos_per_level =
     get_infos_per_level
       ~client:t.bootstrap.client
       ~endpoint:t.bootstrap.node_rpc_endpoint
       ~level
-      ~etherlink_operator:
-        (Option.map
-           (fun setup -> setup.operator.account.public_key_hash)
-           t.etherlink)
+      ~etherlink_operator
   in
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
@@ -2570,7 +2596,7 @@ let etherlink_loop (etherlink : etherlink) =
     |> Array.to_list |> Lwt.join
   else Lwt.return_unit
 
-let configuration =
+let configuration, etherlink_configuration =
   let stake = Cli.stake in
   let stake_machine_type = Cli.stake_machine_type in
   let dal_node_producers =
@@ -2598,25 +2624,32 @@ let configuration =
   let memtrace = Cli.memtrace in
   let data_dir = Cli.data_dir in
   let fundraiser = Cli.fundraiser in
-  {
-    stake;
-    stake_machine_type;
-    dal_node_producers;
-    observer_slot_indices;
-    protocol;
-    producer_machine_type;
-    etherlink;
-    etherlink_sequencer;
-    etherlink_producers;
-    disconnect;
-    network;
-    bootstrap;
-    etherlink_dal_slots;
-    teztale;
-    memtrace;
-    data_dir;
-    fundraiser;
-  }
+  let etherlink =
+    {
+      enabled = etherlink;
+      etherlink_sequencer;
+      etherlink_producers;
+      etherlink_dal_slots;
+    }
+  in
+  let t =
+    {
+      stake;
+      stake_machine_type;
+      dal_node_producers;
+      observer_slot_indices;
+      protocol;
+      producer_machine_type;
+      disconnect;
+      network;
+      bootstrap;
+      teztale;
+      memtrace;
+      data_dir;
+      fundraiser;
+    }
+  in
+  (t, etherlink)
 
 let benchmark () =
   toplog "Parsing CLI done" ;
@@ -2626,15 +2659,15 @@ let benchmark () =
       List.map (fun i -> `Baker i) configuration.stake;
       List.map (fun _ -> `Producer) configuration.dal_node_producers;
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
-      (if configuration.etherlink then [`Etherlink_operator] else []);
-      (if configuration.etherlink then
-         match configuration.etherlink_dal_slots with
+      (if etherlink_configuration.enabled then [`Etherlink_operator] else []);
+      (if etherlink_configuration.enabled then
+         match etherlink_configuration.etherlink_dal_slots with
          | [] -> []
          | [_] -> [`Etherlink_dal_node]
          | dal_slots ->
              `Reverse_proxy :: List.map (fun _ -> `Etherlink_dal_node) dal_slots
        else []);
-      List.init configuration.etherlink_producers (fun i ->
+      List.init etherlink_configuration.etherlink_producers (fun i ->
           `Etherlink_producer i);
     ]
     |> List.concat
