@@ -192,12 +192,35 @@ let test_valid_double_attestation_evidence () =
       (Int64.of_int
          constants.adaptive_issuance.global_limit_of_staking_over_baking)
   in
-  let evidence_reward = Tez_helpers.(frozen_deposits_after /! divider) in
+  let evidence_reward =
+    Tez_helpers.((frozen_deposits_before -! frozen_deposits_after) /! divider)
+  in
   let expected_reward = Tez_helpers.(baking_reward +! evidence_reward) in
   let* full_balance_with_rewards =
     Context.Delegate.full_balance (B blk_eoc) baker
   in
   let real_reward = Tez_helpers.(full_balance_with_rewards -! full_balance) in
+  Log.info
+    "@[<v>frozen_deposits_before = %a@,\
+     frozen_deposits_after = %a@,\
+     baking_reward = %a@,\
+     divider = %Ld@,\
+     evidence_reward = %a@,\
+     expected_reward = %a@,\
+     real_reward = %a@]"
+    Tez.pp
+    frozen_deposits_before
+    Tez.pp
+    frozen_deposits_after
+    Tez.pp
+    baking_reward
+    divider
+    Tez.pp
+    evidence_reward
+    Tez.pp
+    expected_reward
+    Tez.pp
+    real_reward ;
   Assert.equal_tez ~loc:__LOC__ expected_reward real_reward
 
 (** Check that a double (pre)attestation evidence with equivalent
