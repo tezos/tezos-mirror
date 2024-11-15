@@ -68,8 +68,8 @@ module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?dal_node_rpc_ctxt
       ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
       ?votes ?extra_operations ?dal_node_timeout_percentage
-      ?pre_emptive_forge_time ?force_apply_from_round ?context_path
-      ?state_recorder ~chain ~keep_alive delegates =
+      ?pre_emptive_forge_time ?force_apply_from_round ?remote_calls_timeout
+      ?context_path ?state_recorder ~chain ~keep_alive delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades =
@@ -110,6 +110,7 @@ module Baker = struct
       let pre_emptive_forge_time =
         Time.System.Span.of_seconds_exn pre_emptive_forge_time
       in
+      let remote_calls_timeout = Option.map Q.to_float remote_calls_timeout in
       let config =
         Baking_configuration.make
           ?minimal_fees
@@ -120,6 +121,7 @@ module Baker = struct
           ?dal_node_timeout_percentage
           ~pre_emptive_forge_time
           ?force_apply_from_round
+          ?remote_calls_timeout
           ?context_path
           ~user_activated_upgrades
           ?state_recorder

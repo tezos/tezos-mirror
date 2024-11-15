@@ -71,6 +71,7 @@ type t = {
   dal_node_endpoint : Uri.t option;
   dal_node_timeout_percentage : int;
   pre_emptive_forge_time : Time.System.Span.t;
+  remote_calls_timeout : float option;
 }
 
 val default_fees_config : fees_config
@@ -95,6 +96,8 @@ val default_extra_operations : Operations_source.t option
 
 val default_pre_emptive_forge_time : Time.System.Span.t
 
+val default_remote_calls_timeout : float option
+
 val default_config : t
 
 val make :
@@ -113,6 +116,7 @@ val make :
   ?dal_node_endpoint:Uri.t ->
   ?dal_node_timeout_percentage:int ->
   ?pre_emptive_forge_time:Time.System.Span.t ->
+  ?remote_calls_timeout:float ->
   unit ->
   t
 

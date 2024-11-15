@@ -673,6 +673,19 @@ let pre_emptive_forge_time_arg =
          try return (Q.of_string s)
          with _ -> failwith "pre-emptive-forge-time expected int or float."))
 
+let remote_calls_timeout_arg =
+  let open Lwt_result_syntax in
+  Tezos_clic.arg
+    ~long:"remote-calls-timeout"
+    ~placeholder:"seconds"
+    ~doc:
+      "Sets a timeout for client calls such as signing block header or \
+       attestation and for the creation of deterministic nonce. Use only if \
+       your remote signer can handle concurrent requests."
+    (Tezos_clic.parameter (fun _ s ->
+         try return (Q.of_string s)
+         with _ -> failwith "remote-calls-timeout expected int or float."))
+
 let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let open Lwt_syntax in
   let default_filename = Per_block_vote_file.default_vote_json_filename in
@@ -713,7 +726,7 @@ let check_dal_node cctxt dal_node_rpc_ctxt =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args16
+  Tezos_clic.args17
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -730,6 +743,7 @@ let baker_args =
     dal_node_timeout_percentage_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
+    remote_calls_timeout_arg
 
 let run_baker
     ( pidfile,
@@ -747,7 +761,8 @@ let run_baker
       dal_node_endpoint,
       dal_node_timeout_percentage,
       state_recorder,
-      pre_emptive_forge_time ) baking_mode sources cctxt =
+      pre_emptive_forge_time,
+      remote_calls_timeout ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
   may_lock_pidfile pidfile @@ fun () ->
   let* () =
@@ -793,6 +808,7 @@ let run_baker
     ?dal_node_timeout_percentage
     ?pre_emptive_forge_time
     ?force_apply_from_round
+    ?remote_calls_timeout
     ~chain:cctxt#chain
     ?context_path
     ~keep_alive
