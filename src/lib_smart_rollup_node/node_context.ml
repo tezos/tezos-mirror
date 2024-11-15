@@ -891,6 +891,10 @@ let save_slot_header {store; _} ~published_in_block_hash
   Store.Dal_slots_headers.store store published_in_block_hash slot_header
 
 let find_slot_status {store; _} ~confirmed_in_block_hash slot_index =
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7604
+
+     Remove Dal_slots_statuses if MR
+     https://gitlab.com/tezos/tezos/-/merge_requests/15640 is merged. *)
   Store.Dal_slots_statuses.find_slot_status
     store
     confirmed_in_block_hash
