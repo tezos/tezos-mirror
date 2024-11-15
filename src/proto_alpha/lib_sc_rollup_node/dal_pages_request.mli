@@ -37,10 +37,6 @@ open Alpha_context
     the rollup node.
 *)
 
-(** This error is returned when a slot, identified by its ID, is not found in
-    the store. *)
-type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
-
 (** Retrieve the pages' content of the given slot ID's from the store.
 
     The function returns [Dal_slot_not_found_in_store] if no entry is found in

@@ -34,20 +34,9 @@ open Alpha_context
       is not confirmed. *)
 
 type error +=
-  | Dal_slot_not_found_in_store of Dal.Slot.Header.id
   | Dal_invalid_page_for_slot of Dal.Page.t
 
 let () =
-  Sc_rollup_node_errors.register_error_kind
-    `Permanent
-    ~id:"dal_pages_request.dal_slot_not_found_in_store"
-    ~title:"Dal slot not found in store"
-    ~description:"The Dal slot whose ID is given is not found in the store"
-    ~pp:(fun ppf ->
-      Format.fprintf ppf "Dal slot not found in store %a" Dal.Slot.Header.pp_id)
-    Data_encoding.(obj1 (req "slot_id" Dal.Slot.Header.id_encoding))
-    (function Dal_slot_not_found_in_store slot_id -> Some slot_id | _ -> None)
-    (fun slot_id -> Dal_slot_not_found_in_store slot_id) ;
   Sc_rollup_node_errors.register_error_kind
     `Permanent
     ~id:"dal_pages_request.dal_invalid_page_for_slot"
