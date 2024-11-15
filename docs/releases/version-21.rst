@@ -62,6 +62,12 @@ Smart Rollup Node
 Octez v21.0 brings forth many quality of life improvements to the Smart Rollup
 node, driven by the deployment of Etherlink Mainnet beta in May. These include:
 
+- New SQLite store backend which is more robust. The store will be migrated on
+  startup in the background so no user action is required, but the performance
+  of the rollup node may be slightly degraded during that time. Importing
+  snapshots with the old format will take more time as the store will be
+  migrated during the final phase. Existing stores can also be migrated manually
+  using the command ``migrate store``.
 - The rollup node's *garbage collector* (the mechanism enabling it to only keep
   most recent rollup states) is now leaner and more reliable.
 - New exposed metrics which can be used to monitor the rollup state (notably
