@@ -307,9 +307,9 @@ let try_migrate_legacy_nonces state =
   | Error _ -> return_unit
 
 (** [partition_unrevealed_nonces state nonces current_cycle current_level] partitions
-    nonces into 2 groups: 
+    nonces into 2 groups:
      - nonces that need to be re/revealed
-     - nonces that are live 
+     - nonces that are live
     Nonces that are not relevant can be dropped.
 *)
 let partition_unrevealed_nonces {cctxt; chain; _} nonces current_cycle
@@ -374,17 +374,43 @@ let partition_unrevealed_nonces {cctxt; chain; _} nonces current_cycle
 
 (* Nonce creation *)
 
-let generate_seed_nonce (nonce_config : Baking_configuration.nonce_config)
+let generate_deterministic_nonce ?timeout secret_key_uri data =
+  let open Lwt_result_syntax in
+  let*! result =
+    match timeout with
+    | None ->
+        let*! res = Client_keys.deterministic_nonce secret_key_uri data in
+        Lwt.return (`Nonce_result res)
+    | Some timeout ->
+        Lwt.pick
+          [
+            (let*! () = Lwt_unix.sleep timeout in
+             Lwt.return (`Nonce_timeout timeout));
+            (let*! nonce =
+               Client_keys.deterministic_nonce secret_key_uri data
+             in
+             Lwt.return (`Nonce_result nonce));
+          ]
+  in
+  match result with
+  | `Nonce_timeout timeout ->
+      let*! () = Events.(emit deterministic_nonce_timeout timeout) in
+      tzfail (Baking_errors.Deterministic_nonce_timeout timeout)
+  | `Nonce_result (Error errs) ->
+      let*! () = Events.(emit deterministic_nonce_error errs) in
+      Lwt.return (Error errs)
+  | `Nonce_result (Ok nonce) ->
+      return (Data_encoding.Binary.of_bytes_exn Nonce.encoding nonce)
+
+let generate_seed_nonce ?timeout
+    (nonce_config : Baking_configuration.nonce_config)
     (delegate : Baking_state.consensus_key) level =
   let open Lwt_result_syntax in
   let* nonce =
     match nonce_config with
     | Deterministic ->
         let data = Data_encoding.Binary.to_bytes_exn Raw_level.encoding level in
-        let* nonce =
-          Client_keys.deterministic_nonce delegate.secret_key_uri data
-        in
-        return (Data_encoding.Binary.of_bytes_exn Nonce.encoding nonce)
+        generate_deterministic_nonce ?timeout delegate.secret_key_uri data
     | Random -> (
         match
           Nonce.of_bytes (Tezos_crypto.Rand.generate Constants.nonce_length)
@@ -436,7 +462,7 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
       ~orphaned_location [@profiler.record_s {verbosity = Info} "save nonces"]))
   [@profiler.record_s {verbosity = Notice} "register nonce"]
 
-(** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one 
+(** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one
     [Seed_nonce_revelation] operation per each nonce to be revealed, together with
     a signature and then injects these operations. *)
 let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
@@ -479,7 +505,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
           return_unit)
         nonces
 
-(** [reveal_potential_nonces state new_proposal] updates the internal [state] 
+(** [reveal_potential_nonces state new_proposal] updates the internal [state]
     of the worker each time a proposal with a new predecessor is received; this means
     revealing the necessary nonces. *)
 let reveal_potential_nonces state new_proposal =
