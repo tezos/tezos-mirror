@@ -165,6 +165,9 @@ let leq_int32 ~loc (a : int32) (b : int32) =
 let lt_int32 ~loc (a : int32) (b : int32) =
   lt ~loc Compare.Int32.compare "Int32 comparison" Int32.pp a b
 
+let lt_int64 ~loc (a : int64) (b : int64) =
+  lt ~loc Compare.Int64.compare "Int64 comparison" Int64.pp a b
+
 (* int64 *)
 let equal_int64 ~loc (a : int64) (b : int64) =
   equal ~loc Compare.Int64.( = ) "Int64 aren't equal" Int64.pp a b

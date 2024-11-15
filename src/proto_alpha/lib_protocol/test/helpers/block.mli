@@ -75,6 +75,9 @@ val get_next_baker :
 
 val get_round : block -> Round.t Environment.Error_monad.tzresult
 
+(** Returns the consensus key that was used to bake the block. *)
+val block_producer : block -> Consensus_key.pk tzresult Lwt.t
+
 module Forge : sig
   val contents :
     ?proof_of_work_threshold:Int64.t ->
