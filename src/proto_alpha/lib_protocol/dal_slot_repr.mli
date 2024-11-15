@@ -84,6 +84,23 @@ module Commitment_proof : sig
   val zero : t
 end
 
+(** The module below provides some data types and helper functions for DAL
+    commitments published at some level on some slot index. There are mainly
+    three important levels for a DAL commitment successfully included in a
+    block:
+
+    - `published_level`: The level of the block that contains the DAL publish
+    commitment operation. Such operations are typically injected on top of the
+    block whose level is `published_level - 1` or earlier.
+
+    - `attested_level`: The level of the block / context that includes the
+    attestation status of a slot published `attestation_lag` levels
+    earlier. Formally, `attested_level = published_level + attestation_lag`.
+
+   - `attestation_level`: The level of the block on top of which DAL
+   attestations are injected for a commitment published at published_level.
+   Formally, attestation_level = attested_level - 1 = published_level +
+   attestation_lag - 1. *)
 module Header : sig
   (** For Layer-1, a slot is identified by the level at which it is published
       and the slot's index. *)
