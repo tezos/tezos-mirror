@@ -834,8 +834,9 @@ impl<Mode: Parsable> InputResult<Mode> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+    use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::input::Message;
 
@@ -863,5 +864,83 @@ mod tests {
             ),
             InputResult::Unparsable
         )
+    }
+
+    pub fn sequencer_signed_blueprint_chunk_bytes(
+        unsigned_blueprint: &UnsignedSequencerBlueprint,
+        sk: SecretKeyEd25519,
+    ) -> Vec<u8> {
+        let unsigned_blueprint_bytes = unsigned_blueprint.rlp_bytes();
+        let blueprint_signature = sk.sign(unsigned_blueprint_bytes).unwrap();
+        let blueprint = crate::sequencer_blueprint::SequencerBlueprint {
+            blueprint: unsigned_blueprint.clone(),
+            signature: blueprint_signature.into(),
+        };
+        blueprint.rlp_bytes().into()
+    }
+
+    #[test]
+    fn test_parsing_blueprint_chunk() {
+        let pk = PublicKey::from_b58check(
+            "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
+        )
+        .unwrap();
+        let sk = SecretKeyEd25519::from_base58_check(
+            "edsk422LGdmDnai4Cya6csM6oFmgHpDQKUhatTURJRAY4h7NHNz9sz",
+        )
+        .unwrap();
+        let head_level: Option<U256> = Some(6.into());
+
+        let blueprint = UnsignedSequencerBlueprint {
+            chunk: vec![],
+            number: 7.into(),
+            nb_chunks: 3,
+            chunk_index: 0,
+        };
+
+        // Blueprint chunk for level 7 is ok.
+        let res = parse_blueprint_chunk(
+            &sequencer_signed_blueprint_chunk_bytes(&blueprint, sk.clone()),
+            &pk,
+            &head_level,
+        );
+        assert!(matches!(res, SequencerBlueprintRes::SequencerBlueprint(_)));
+
+        let invalid_sk = SecretKeyEd25519::from_base58_check(
+            "edsk37VEgDUMt7wje8vxfao55y7JhiamjTbVM1xABSCamFgtcUqhdT",
+        )
+        .unwrap();
+        let res = parse_blueprint_chunk(
+            &sequencer_signed_blueprint_chunk_bytes(&blueprint, invalid_sk),
+            &pk,
+            &head_level,
+        );
+        assert!(matches!(res, SequencerBlueprintRes::InvalidSignature));
+
+        let res = parse_blueprint_chunk(
+            &sequencer_signed_blueprint_chunk_bytes(
+                &UnsignedSequencerBlueprint {
+                    number: 5.into(),
+                    ..blueprint.clone()
+                },
+                sk.clone(),
+            ),
+            &pk,
+            &head_level,
+        );
+        assert!(matches!(res, SequencerBlueprintRes::InvalidNumber));
+
+        let res = parse_blueprint_chunk(
+            &sequencer_signed_blueprint_chunk_bytes(
+                &UnsignedSequencerBlueprint {
+                    number: 6.into(),
+                    ..blueprint
+                },
+                sk.clone(),
+            ),
+            &pk,
+            &head_level,
+        );
+        assert!(matches!(res, SequencerBlueprintRes::InvalidNumber));
     }
 }
