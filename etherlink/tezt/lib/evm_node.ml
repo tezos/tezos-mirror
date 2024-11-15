@@ -376,6 +376,10 @@ let wait_for_rollup_node_follower_disabled ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"rollup_node_follower_disabled.v0"
   @@ Fun.const (Some ())
 
+let wait_for_flush_delayed_inbox ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"flush_delayed_inbox.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_blueprint_invalid ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"blueprint_invalid.v0"
   @@ Fun.const (Some ())
