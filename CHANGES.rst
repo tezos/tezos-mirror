@@ -132,8 +132,11 @@ Smart Rollup node
 
 - Improved error messages for RPC
   ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
+
 - Fix file descriptor leak in resto for connections with the L1 node.
   (MR :gl:`!15322`)
+
+- Fix potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
 
 Smart Rollup WASM Debugger
 --------------------------
