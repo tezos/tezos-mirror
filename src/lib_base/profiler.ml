@@ -450,15 +450,16 @@ let wrap profiler =
 
 type 'a section_maker = 'a * metadata -> unit
 
-let section_maker equal to_string profiler : 'a section_maker =
+let section_maker ?verbosity equal to_string profiler : 'a section_maker =
   let last = ref None in
+  let () = at_exit (fun () -> Option.iter (fun _ -> stop profiler) !last) in
   fun (id, metadata) ->
     match !last with
     | None ->
-        record profiler (to_string id, metadata) ;
+        record ?verbosity profiler (to_string id, metadata) ;
         last := Some id
     | Some id' when equal id' id -> ()
     | Some _ ->
         stop profiler ;
-        record profiler (to_string id, metadata) ;
+        record ?verbosity profiler (to_string id, metadata) ;
         last := Some id
