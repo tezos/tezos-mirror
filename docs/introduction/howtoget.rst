@@ -156,12 +156,13 @@ can be found here: https://chrispinnock.com/tezos/packages/
 New set of Debian packages
 """"""""""""""""""""""""""
 
-There is also a new generation of Debian packages that are available for testing.
+For testing purposes only, we provide an experimental (or "next") version of the Debian packages for the latest release. You can use them to test new packaging features, compatibility and integration with other softwares and :doc:`share your feedback with us <../developer/contributing>`.
+
 These packages will replace the currently available packages mentioned above.
 
 The new set of packages can be installed by adding the following apt repository::
 
-  export distribution=debian
+  export distribution=next/debian
   export release=bookworm
 
 .. literalinclude:: install-bin-deb.sh
