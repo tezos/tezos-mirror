@@ -139,6 +139,17 @@ module Event = struct
          multiple RPCs fetching."
       ~level:Warning
       ()
+
+  let event_flush_delayed_inbox =
+    declare_2
+      ~section
+      ~name:"flush_delayed_inbox"
+      ~msg:
+        "The delayed inbox has been flushed in a blueprint at level {level} (timestamp: \
+         {timestamp})."
+      ~level:Notice
+      ("timestamp", Time.Protocol.encoding)
+      ("level", Data_encoding.n)
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -175,3 +186,6 @@ let unexpected_number_of_events ~expected ~fetched =
     (expected, fetched)
 
 let fallback () = Internal_event.Simple.emit Event.fallback ()
+
+let flush_delayed_inbox ~timestamp Ethereum_types.(Qty level) =
+  Internal_event.Simple.emit Event.event_flush_delayed_inbox (timestamp, level)

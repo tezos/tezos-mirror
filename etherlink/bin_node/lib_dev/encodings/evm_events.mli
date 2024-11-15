@@ -54,11 +54,16 @@ module Blueprint_applied : sig
   type t = {number : quantity; hash : block_hash}
 end
 
+module Flushed_blueprint : sig
+  type t = {hashes : hash list; timestamp : Time.Protocol.t; level : quantity}
+end
+
 type t =
   | Upgrade_event of Upgrade.t
   | Sequencer_upgrade_event of Sequencer_upgrade.t
   | Blueprint_applied of Blueprint_applied.t
   | New_delayed_transaction of Delayed_transaction.t
+  | Flush_delayed_inbox of Flushed_blueprint.t
 
 val pp : Format.formatter -> t -> unit
 

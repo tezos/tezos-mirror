@@ -36,3 +36,16 @@ let encoding_with_optional_last_param encoding second_param_encoding
         (fun (t, _) -> Some t)
         (fun t -> (t, default_second_param));
     ]
+
+(* A variation of List.fold_left where the function f returns an option.
+   If f returns None, the fold stops and returns None.
+   If f returns Some, the fold continues with the updated accumulator.
+   This is a lazy fold_left to avoid iterating over the entire list unnecessarily. *)
+let fold_left_option f acc l =
+  let rec aux f acc l =
+    match (acc, l) with
+    | None, _ -> None
+    | _, [] -> acc
+    | Some acc, hd :: tl -> aux f (f acc hd) tl
+  in
+  aux f (Some acc) l

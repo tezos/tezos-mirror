@@ -197,11 +197,43 @@ module Blueprint_applied = struct
       (tup2 z string)
 end
 
+module Flushed_blueprint = struct
+  type t = {hashes : hash list; timestamp : Time.Protocol.t; level : quantity}
+
+  let of_rlp = function
+    | Rlp.List [List hashes; Value timestamp; Value level] ->
+        let hashes =
+          Helpers.fold_left_option
+            (fun acc -> function
+              | Rlp.Value i -> Some (decode_hash i :: acc)
+              | _ -> None)
+            []
+            hashes
+        in
+        Option.map
+          (fun hashes ->
+            {
+              hashes;
+              timestamp = timestamp_of_bytes timestamp;
+              level = decode_number_le level;
+            })
+          hashes
+    | _ -> None
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {hashes; timestamp; level = Qty level} -> (hashes, timestamp, level))
+      (fun (hashes, timestamp, level) -> {hashes; timestamp; level = Qty level})
+      (tup3 (Data_encoding.list hash_encoding) Time.Protocol.encoding z)
+end
+
 type t =
   | Upgrade_event of Upgrade.t
   | Sequencer_upgrade_event of Sequencer_upgrade.t
   | Blueprint_applied of Blueprint_applied.t
   | New_delayed_transaction of Delayed_transaction.t
+  | Flush_delayed_inbox of Flushed_blueprint.t
 
 let of_bytes bytes =
   match bytes |> Rlp.decode with
@@ -225,6 +257,9 @@ let of_bytes bytes =
               in
               Option.map (fun u -> New_delayed_transaction u) transaction
           | _ -> None)
+      | "\x05" ->
+          let flushed_blueprint = Flushed_blueprint.of_rlp rlp_content in
+          Option.map (fun u -> Flush_delayed_inbox u) flushed_blueprint
       | _ -> None)
   | _ -> None
 
@@ -260,6 +295,14 @@ let pp fmt = function
         "New delayed transaction:@ %a"
         Delayed_transaction.pp_short
         delayed_transaction
+  | Flush_delayed_inbox {hashes = _; timestamp; level = Qty level} ->
+      Format.fprintf
+        fmt
+        "Flush delayed inbox:@,timestamp:%a@, level: %a"
+        Time.Protocol.pp
+        timestamp
+        Z.pp_print
+        level
 
 let encoding =
   let open Data_encoding in
@@ -302,4 +345,11 @@ let encoding =
           | _ -> None)
         ~inj:(fun delayed_transaction ->
           New_delayed_transaction delayed_transaction);
+      case
+        ~kind:"flush_delayed_inbox"
+        ~tag:4
+        ~event_encoding:Flushed_blueprint.encoding
+        ~proj:(function
+          | Flush_delayed_inbox blueprint -> Some blueprint | _ -> None)
+        ~inj:(fun blueprint -> Flush_delayed_inbox blueprint);
     ]
