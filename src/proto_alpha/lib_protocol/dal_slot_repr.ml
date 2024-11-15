@@ -1326,6 +1326,8 @@ module History = struct
 
     let content = Skip_list.content
 
+    let content_id = Content_v2.content_id
+
     module Internal_for_tests = struct
       let proof_statement_is serialized_proof expected =
         match deserialize_proof serialized_proof with

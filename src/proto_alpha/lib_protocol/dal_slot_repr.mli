@@ -259,6 +259,9 @@ module History : sig
   (** Returns the {!cell_content} of the given skip list cell. *)
   val content : t -> cell_content
 
+  (** Returns the slot id of the cell whose content is given. *)
+  val content_id : cell_content -> Header.id
+
   module Pointer_hash : S.HASH
 
   (** Type of hashes of history. *)

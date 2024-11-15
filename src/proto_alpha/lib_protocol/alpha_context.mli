@@ -2937,6 +2937,8 @@ module Dal : sig
 
     val content : t -> cell_content
 
+    val content_id : cell_content -> Slot.Header.id
+
     module Pointer_hash : S.HASH
 
     type hash = Pointer_hash.t
