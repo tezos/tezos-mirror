@@ -24,7 +24,6 @@
   "minimal_participation_ratio": { "numerator": 2, "denominator": 3 },
   "limit_of_delegation_over_baking": 9,
   "percentage_of_frozen_deposits_slashed_per_double_baking": 700,
-  "percentage_of_frozen_deposits_slashed_per_double_attestation": 5000,
   "max_slashing_per_block": 10000, "max_slashing_threshold": 2334,
   "cache_script_size": 100000000, "cache_stake_distribution_cycles": 5,
   "cache_sampler_state_cycles": 5,
@@ -70,6 +69,6 @@
       "center_dz": { "numerator": "1", "denominator": "2" },
       "radius_dz": { "numerator": "1", "denominator": "50" } },
   "adaptive_issuance_activation_vote_enable": true,
-  "adaptive_issuance_force_activation": false, "ns_enable": true,
+  "adaptive_issuance_force_activation": false,
   "direct_ticket_spending_enable": false, "aggregate_attestation": false,
   "allow_tz4_delegate_enable": false, "all_bakers_attest_enable": false }
