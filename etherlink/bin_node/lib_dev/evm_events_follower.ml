@@ -62,7 +62,7 @@ let fetch_event ({rollup_node_endpoint; keep_alive; _} : Types.state)
   in
   return event_opt
 
-let on_new_head
+let fetch_events_one_by_one
     ({rollup_node_endpoint; keep_alive; filter_event} as state : Types.state)
     rollup_block_lvl =
   let open Lwt_result_syntax in
@@ -74,13 +74,13 @@ let on_new_head
       rollup_node_endpoint
   in
   match nb_of_events_bytes with
-  | None -> Evm_context.new_last_known_l1_level rollup_block_lvl
+  | None -> return_nil
   | Some nb_of_events_bytes ->
       let (Qty nb_of_events) =
         Ethereum_types.decode_number_le nb_of_events_bytes
       in
       let nb_of_events = Z.to_int nb_of_events in
-      let* events =
+      let+ events =
         List.init_ep
           ~when_negative_length:
             (error_of_fmt
@@ -89,13 +89,67 @@ let on_new_head
           nb_of_events
           (fetch_event state rollup_block_lvl)
       in
-      let events =
-        List.filter_map
-          (function
-            | Some event when filter_event event -> Some event | _ -> None)
-          events
-      in
-      Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
+      List.filter_map
+        (function
+          | Some event when filter_event event -> Some event | _ -> None)
+        events
+
+let fetch_events_at_once
+    ({rollup_node_endpoint; keep_alive; filter_event} : Types.state)
+    rollup_block_lvl =
+  let open Lwt_result_syntax in
+  let path = Durable_storage_path.Evm_events.events in
+  let* bindings =
+    let open Rollup_services in
+    call_service
+      ~keep_alive
+      ~base:rollup_node_endpoint
+      durable_state_values
+      ((), Block_id.Level rollup_block_lvl)
+      {key = path}
+      ()
+  in
+  let*! unsorted =
+    List.filter_map_s
+      (fun (key, value) ->
+        let open Lwt_syntax in
+        match key with
+        | "length" ->
+            (* ignore length field *)
+            return_none
+        | index -> (
+            match int_of_string_opt index with
+            | None ->
+                Format.eprintf "Unexpected key %S in /evm/events@." index ;
+                return_none
+            | Some event_index -> (
+                match Evm_events.of_bytes value with
+                | None -> return_none
+                | Some event -> return_some (event_index, event))))
+      bindings
+  in
+  unsorted
+  |> List.fast_sort (fun (i1, _) (i2, _) -> Compare.Int.compare i1 i2)
+  |> List.filter_map (fun (_, e) -> if filter_event e then Some e else None)
+  |> return
+
+let fetch_events state rollup_block_lvl =
+  let open Lwt_result_syntax in
+  let*! res =
+    protect @@ fun () -> fetch_events_at_once state rollup_block_lvl
+  in
+  match res with
+  | Ok events -> return events
+  | Error _ ->
+      let*! () = Evm_events_follower_events.fallback () in
+      fetch_events_one_by_one state rollup_block_lvl
+
+let on_new_head state rollup_block_lvl =
+  let open Lwt_result_syntax in
+  let* events = fetch_events state rollup_block_lvl in
+  match events with
+  | [] -> Evm_context.new_last_known_l1_level rollup_block_lvl
+  | _ -> Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
 
 module Handlers = struct
   open Evm_events_follower_types

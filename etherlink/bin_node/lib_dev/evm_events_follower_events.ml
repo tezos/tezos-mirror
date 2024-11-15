@@ -109,6 +109,16 @@ module Event = struct
       ~pp1:Evm_events_follower_types.Request.pp
       ("errors", Error_monad.trace_encoding)
       ~pp2:Error_monad.pp_print_trace
+
+  let fallback =
+    declare_0
+      ~section
+      ~name:"evm_events_follower_fallback"
+      ~msg:
+        "Rollup node does not support fetching all events, falling back to \
+         multiple RPCs fetching."
+      ~level:Warning
+      ()
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -136,3 +146,5 @@ let out_of_sync ~received ~expected =
 
 let worker_request_failed request_view errs =
   Internal_event.Simple.emit Event.worker_request_failed (request_view, errs)
+
+let fallback () = Internal_event.Simple.emit Event.fallback ()
