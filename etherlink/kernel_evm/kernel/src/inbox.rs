@@ -12,8 +12,8 @@ use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
 use crate::delayed_inbox::DelayedInbox;
 use crate::parsing::{
-    Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
-    MAX_SIZE_PER_CHUNK,
+    Input, InputResult, Parsable, ProxyInput, SequencerBlueprintRes::*, SequencerInput,
+    SequencerParsingContext, MAX_SIZE_PER_CHUNK,
 };
 
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
@@ -325,8 +325,19 @@ impl InputHandler for SequencerInput {
                 log!(host, Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)
             }
-            Self::SequencerBlueprint(seq_blueprint) => {
+            Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
                 handle_blueprint_chunk(host, seq_blueprint.blueprint)
+            }
+            Self::SequencerBlueprint(
+                InvalidNumberOfChunks | InvalidSignature | InvalidNumber | Unparsable,
+            ) => {
+                log!(
+                    host,
+                    Debug,
+                    "Sequencer blueprint refused because: {:?}",
+                    input
+                );
+                Ok(())
             }
             Self::DalSlotImportSignals(DalSlotImportSignals {
                 signals,

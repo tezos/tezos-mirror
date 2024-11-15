@@ -112,9 +112,18 @@ pub enum ProxyInput {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum SequencerBlueprintRes {
+    SequencerBlueprint(SequencerBlueprint),
+    InvalidNumberOfChunks,
+    InvalidSignature,
+    InvalidNumber,
+    Unparsable,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum SequencerInput {
     DelayedInput(Box<Transaction>),
-    SequencerBlueprint(SequencerBlueprint),
+    SequencerBlueprint(SequencerBlueprintRes),
     DalSlotImportSignals(DalSlotImportSignals),
 }
 
@@ -318,30 +327,37 @@ pub fn parse_blueprint_chunk(
     bytes: &[u8],
     sequencer: &PublicKey,
     head_level: &Option<U256>,
-) -> Option<SequencerBlueprint> {
+) -> SequencerBlueprintRes {
     // Parse the sequencer blueprint
-    let seq_blueprint: SequencerBlueprint =
-        parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+    match SequencerBlueprint::from_rlp_bytes(bytes).ok() {
+        None => SequencerBlueprintRes::Unparsable,
+        Some(seq_blueprint) => {
+            // Creates and encodes the unsigned blueprint:
+            let unsigned_seq_blueprint: UnsignedSequencerBlueprint =
+                (&seq_blueprint).into();
+            if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
+                return SequencerBlueprintRes::InvalidNumberOfChunks;
+            }
 
-    // Creates and encodes the unsigned blueprint:
-    let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
-    if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
-        return None;
-    }
+            if let Some(head_level) = head_level {
+                if unsigned_seq_blueprint.number.le(head_level) {
+                    return SequencerBlueprintRes::InvalidNumber;
+                }
+            }
 
-    if let Some(head_level) = head_level {
-        if unsigned_seq_blueprint.number.le(head_level) {
-            return None;
+            let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
+
+            let correctly_signed = sequencer
+                .verify_signature(&seq_blueprint.signature.clone().into(), &bytes)
+                .unwrap_or(false);
+
+            if correctly_signed {
+                SequencerBlueprintRes::SequencerBlueprint(seq_blueprint)
+            } else {
+                SequencerBlueprintRes::InvalidSignature
+            }
         }
     }
-
-    let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
-
-    let correctly_signed = sequencer
-        .verify_signature(&seq_blueprint.signature.clone().into(), &bytes)
-        .unwrap_or(false);
-
-    correctly_signed.then_some(seq_blueprint)
 }
 
 impl SequencerInput {
@@ -356,15 +372,8 @@ impl SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
-        if let Some(seq_blueprint) =
-            parse_blueprint_chunk(bytes, &context.sequencer, &context.head_level)
-        {
-            InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(
-                seq_blueprint,
-            )))
-        } else {
-            InputResult::Unparsable
-        }
+        let res = parse_blueprint_chunk(bytes, &context.sequencer, &context.head_level);
+        InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(res)))
     }
 
     pub fn parse_dal_slot_import_signal(
