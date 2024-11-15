@@ -607,7 +607,7 @@ module Outbox_messages = struct
       INSERT INTO outbox_messages
       (outbox_level, messages, executed_messages)
       VALUES ($1, $2, 0)
-      ON CONFLICT DO UPDATE SET messages = $2
+      ON CONFLICT (outbox_level) DO UPDATE SET messages = $2
       |sql}
 
     let range =
