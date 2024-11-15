@@ -2,12 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![allow(unused)]
+//! Initial support for debugging RISC-V programs using gdb.
+//!
+//! This is achieved by implementing 'just enough' of the gdb server protocol to be useful.
 
+use crate::cli::GdbServerOptions;
 use gdbstub::arch::Arch;
 use gdbstub::common::Signal;
 use gdbstub::conn::{Connection, ConnectionExt};
-use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, SingleThreadStopReason};
+use gdbstub::stub::{run_blocking, GdbStub, SingleThreadStopReason};
 use gdbstub::target::ext::base::singlethread::{
     SingleThreadBase, SingleThreadResume, SingleThreadResumeOps, SingleThreadSingleStep,
     SingleThreadSingleStepOps,
@@ -19,20 +22,18 @@ use gdbstub::target::ext::breakpoints::{
 use gdbstub::target::ext::exec_file::ExecFile;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
+use octez_riscv::machine_state::bus::main_memory::OutOfBounds;
 use octez_riscv::machine_state::bus::main_memory::M1G;
-use octez_riscv::machine_state::bus::OutOfBounds;
-use octez_riscv::machine_state::mode::Mode;
-use octez_riscv::machine_state::registers::XRegister;
-use octez_riscv::stepper::test::TestStepper;
+use octez_riscv::pvm::PvmHooks;
+use octez_riscv::stepper::pvm::PvmStepper;
 use octez_riscv::stepper::{StepResult, Stepper, StepperStatus};
-
-use crate::cli::GdbServerOptions;
 use std::collections::HashSet;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
 use std::ops::Bound;
 use std::{fs, io};
+use tezos_smart_rollup::utils::inbox::InboxBuilder;
 
 /// Run a gdb server that can be used for debugging RISC-V programs.
 pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {
@@ -42,19 +43,31 @@ pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {
         .ok_or("File name cannot be converted to string")?;
 
     let program = fs::read(fname)?;
-    let (mut stepper, _symbols) =
-        TestStepper::<M1G>::new_with_parsed_program(program.as_slice(), None, Mode::User)?;
+
+    let initrd = opts.initrd.as_ref().map(fs::read).transpose()?;
+
+    let inbox = InboxBuilder::new().build();
+
+    let mut stepper = PvmStepper::<M1G>::new(
+        program.as_slice(),
+        initrd.as_deref(),
+        inbox,
+        PvmHooks::default(),
+        [0; 20],
+        0,
+    )?;
 
     // loop
     let mut target = RiscvGdb {
         fname,
         stepper: &mut stepper,
         breakpoints: HashSet::new(),
+        single_step: false,
     };
 
     let connection = wait_for_gdb_connection(opts.port)?;
     let connection: Box<dyn ConnectionExt<Error = std::io::Error>> = Box::new(connection);
-    let mut debugger = GdbStub::new(connection);
+    let debugger = GdbStub::new(connection);
 
     let disconnect = debugger.run_blocking::<RiscvEventLoop<_>>(&mut target)?;
 
@@ -71,13 +84,14 @@ fn wait_for_gdb_connection(port: u16) -> io::Result<TcpStream> {
     let (stream, addr) = sock.accept()?;
 
     eprintln!("Debugger connected from {}", addr);
-    Ok(stream) // `TcpStream` implements `gdbstub::Connection`
+    Ok(stream)
 }
 
 struct RiscvGdb<'a, S: Stepper> {
     fname: &'a str,
     stepper: &'a mut S,
     breakpoints: HashSet<u64>,
+    single_step: bool,
 }
 
 impl<'a, S: Stepper> RiscvGdb<'a, S> {
@@ -86,11 +100,14 @@ impl<'a, S: Stepper> RiscvGdb<'a, S> {
         conn: &mut <RiscvEventLoop<'a, S> as run_blocking::BlockingEventLoop>::Connection,
     ) -> RiscvGdbEvent {
         let mut poll_incoming_data = || {
-            // gdbstub takes ownership of the underlying connection, so the `borrow_conn`
-            // method is used to borrow the underlying connection back from the stub to
-            // check for incoming data.
+            // borrow the connection from gdbstub to check for pending input
             conn.peek().map(|b| b.is_some()).unwrap_or(true)
         };
+
+        if self.single_step {
+            self.single_step = false;
+            return RiscvGdbEvent::DoneStep;
+        }
 
         loop {
             match self
@@ -121,6 +138,7 @@ impl<'a, S: Stepper> RiscvGdb<'a, S> {
 enum RiscvGdbEvent {
     IncomingData,
     BreakpointHit,
+    DoneStep,
 }
 
 impl<'a, S: Stepper> Target for RiscvGdb<'a, S> {
@@ -161,27 +179,24 @@ impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
 
     fn write_registers(
         &mut self,
-        regs: &<Self::Arch as Arch>::Registers,
+        _regs: &<Self::Arch as Arch>::Registers,
     ) -> TargetResult<(), Self> {
-        todo!()
+        unimplemented!()
     }
 
     fn read_addrs(&mut self, start_addr: u64, data: &mut [u8]) -> TargetResult<usize, Self> {
-        const EFAULT: u8 = 14;
-        eprintln!("read_addrs: {start_addr:x} -> {}", data.len());
+        const DEFAULT: u8 = 14;
 
         let state = self.stepper.machine_state();
 
-        use octez_riscv::machine_state::bus::AddressableRead;
-
         match state.main_memory.read_all(start_addr, data) {
             Ok(()) => Ok(data.len()),
-            Err(OutOfBounds) => Err(TargetError::Errno(EFAULT)),
+            Err(OutOfBounds) => Err(TargetError::Errno(DEFAULT)),
         }
     }
 
-    fn write_addrs(&mut self, start_addr: u64, data: &[u8]) -> TargetResult<(), Self> {
-        todo!()
+    fn write_addrs(&mut self, _start_addr: u64, _data: &[u8]) -> TargetResult<(), Self> {
+        unimplemented!()
     }
 
     #[inline(always)]
@@ -191,7 +206,7 @@ impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
 }
 
 impl<'a, S: Stepper> SingleThreadResume for RiscvGdb<'a, S> {
-    fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
+    fn resume(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -203,9 +218,11 @@ impl<'a, S: Stepper> SingleThreadResume for RiscvGdb<'a, S> {
 
 impl<'a, S: Stepper> SingleThreadSingleStep for RiscvGdb<'a, S> {
     fn step(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
+        self.single_step = true;
+
         let None = signal else { return Ok(()) };
 
-        // todo! status
+        // handle status
         let _status = self
             .stepper
             .step_max(Bound::Included(1))
@@ -229,30 +246,24 @@ impl<'a, S: Stepper> SwBreakpoint for RiscvGdb<'a, S> {
     fn add_sw_breakpoint(
         &mut self,
         addr: u64,
-        kind: <Self::Arch as Arch>::BreakpointKind,
+        _kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self> {
-        eprintln!("add_sw_breakpoint {addr:x}");
-
         self.breakpoints.insert(addr);
 
-        return Ok(true);
+        Ok(true)
     }
 
     fn remove_sw_breakpoint(
         &mut self,
         addr: u64,
-        kind: <Self::Arch as Arch>::BreakpointKind,
+        _kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self> {
-        eprintln!("rm_sw_breakpoint {addr:x}");
-
         Ok(self.breakpoints.remove(&addr))
     }
 }
 
 struct RiscvEventLoop<'a, S: Stepper>(PhantomData<&'a S>);
 
-// The `run_blocking::BlockingEventLoop` groups together various callbacks
-// the `GdbStub::run_blocking` event loop requires you to implement.
 impl<'a, S: Stepper> run_blocking::BlockingEventLoop for RiscvEventLoop<'a, S> {
     type Target = RiscvGdb<'a, S>;
     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
@@ -292,6 +303,9 @@ impl<'a, S: Stepper> run_blocking::BlockingEventLoop for RiscvEventLoop<'a, S> {
             RiscvGdbEvent::BreakpointHit => {
                 run_blocking::Event::TargetStopped(gdbstub::stub::BaseStopReason::SwBreak(()))
             }
+            RiscvGdbEvent::DoneStep => {
+                run_blocking::Event::TargetStopped(gdbstub::stub::BaseStopReason::DoneStep)
+            }
         };
 
         Ok(event)
@@ -299,23 +313,25 @@ impl<'a, S: Stepper> run_blocking::BlockingEventLoop for RiscvEventLoop<'a, S> {
 
     // Invoked when the GDB client sends a Ctrl-C interrupt.
     fn on_interrupt(
-        target: &mut Self::Target,
+        _target: &mut Self::Target,
     ) -> Result<Option<SingleThreadStopReason<u64>>, <Self::Target as Target>::Error> {
         // notify the target that a ctrl-c interrupt has occurred.
         // target.stop_in_response_to_ctrl_c_interrupt()?;
 
         // a pretty typical stop reason in response to a Ctrl-C interrupt is to
         // report a "Signal::SIGINT".
-        Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT).into()))
+        Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT)))
     }
 }
 
 impl<'a, S: Stepper> ExecFile for RiscvGdb<'a, S> {
+    // returns the input filename that we're currently executing
+    // this allows hermit to load the file from the local filesystem
     fn get_exec_file(
         &self,
-        pid: Option<gdbstub::common::Pid>,
+        _pid: Option<gdbstub::common::Pid>,
         offset: u64,
-        length: usize,
+        _length: usize,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self> {
         let offset = offset as usize;
@@ -325,10 +341,10 @@ impl<'a, S: Stepper> ExecFile for RiscvGdb<'a, S> {
             return Ok(0);
         }
 
-        let read = usize::min(bytes.len() - offset as usize, buf.len());
-        let slice = &bytes[offset as usize..(offset as usize) + read];
+        let read = usize::min(bytes.len() - offset, buf.len());
+        let slice = &bytes[offset..offset + read];
 
-        (&mut buf[..read]).copy_from_slice(slice);
+        buf[..read].copy_from_slice(slice);
 
         Ok(read)
     }
