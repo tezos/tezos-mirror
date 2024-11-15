@@ -203,6 +203,18 @@ let dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id =
       | Some res -> return res
       | None -> tzfail @@ Dal_expected_skip_list_cell_not_found slot_id)
 
+let _slot_proto_attestation_status node_ctxt dal_constants slot_id =
+  let open Lwt_result_syntax in
+  let* res =
+    dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id
+  in
+  match res with
+  | Dal.Slots_history.Unpublished _
+  | Dal.Slots_history.Published {is_proto_attested = false; _} ->
+      return `Unattested
+  | Dal.Slots_history.Published {is_proto_attested = true; _} ->
+      return `Attested
+
 let get_page node_ctxt ~inbox_level page_id =
   let open Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
