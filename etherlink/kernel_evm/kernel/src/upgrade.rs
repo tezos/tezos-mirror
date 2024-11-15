@@ -236,7 +236,7 @@ pub fn possible_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Res
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(host)?;
         if ipl_timestamp >= upgrade.activation_timestamp {
             sequencer_upgrade(host, upgrade.pool_address, &upgrade.sequencer)?;
-            blueprint_storage::clear_all_blueprint(host)?;
+            blueprint_storage::clear_all_blueprints(host)?;
         }
     }
     Ok(())

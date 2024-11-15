@@ -10,6 +10,7 @@
 - Maximum gas per transaction is stored in the durable storage. (!15468)
 - Minimum base fee per gas is stored in the durable storage. (!15475)
 - Blueprints from the past are refused on parsing. (!15636)
+- Clear blueprints on migration (!15637)
 
 ### Bug fixes
 
