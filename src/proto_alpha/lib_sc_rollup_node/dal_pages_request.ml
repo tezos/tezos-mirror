@@ -35,6 +35,7 @@ open Alpha_context
 
 type error +=
   | Dal_invalid_page_for_slot of Dal.Page.t
+  | Dal_expected_skip_list_cell_not_found of Dal.Slot.Header.id
 
 let () =
   Sc_rollup_node_errors.register_error_kind
@@ -47,6 +48,21 @@ let () =
     Data_encoding.(obj1 (req "page_id" Dal.Page.encoding))
     (function Dal_invalid_page_for_slot page_id -> Some page_id | _ -> None)
     (fun page_id -> Dal_invalid_page_for_slot page_id)
+
+let () =
+  Sc_rollup_node_errors.register_error_kind
+    `Permanent
+    ~id:"dal_pages_request.dal_expected_skip_list_cell_not_found"
+    ~title:"Expected DAL skip list cell not found"
+    ~description:
+      "The skip list cell whose ID is given is not found in the context"
+    ~pp:(fun ppf ->
+      Format.fprintf ppf "Dal slot not found in store %a" Dal.Slot.Header.pp_id)
+    Data_encoding.(obj1 (req "slot_id" Dal.Slot.Header.id_encoding))
+    (function
+      | Dal_expected_skip_list_cell_not_found slot_id -> Some slot_id
+      | _ -> None)
+    (fun slot_id -> Dal_expected_skip_list_cell_not_found slot_id)
 
 module Event = struct
   include Internal_event.Simple
@@ -125,6 +141,67 @@ let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
     {slot_level = header.id.published_level; slot_index = header.id.index}
   in
   get_slot_pages dal_cctxt slot_id
+
+module Slots_statuses_cache =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      type t = Dal.Slot.Header.id
+
+      let equal = Dal.Slot.Header.slot_id_equal
+
+      let hash id = Hashtbl.hash id
+    end)
+
+let download_skip_list_cells_of_level node_ctxt
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~published_level =
+  let attested_level =
+    Int32.add
+      (Raw_level.to_int32 published_level)
+      (Int32.of_int dal_constants.attestation_lag)
+  in
+  Plugin.RPC.Dal.skip_list_cells_of_level
+    (new Protocol_client_context.wrap_full node_ctxt.Node_context.cctxt)
+    (`Main, `Level attested_level)
+    ()
+
+(* We have currently 32 slots per level. We retain the information for 32 levels
+   (assuming no reorgs with different payload occur). *)
+let skip_list_cells_content_cache =
+  (* Attestation lag * number of slots * 32 retention levels, assuming no
+     reorgs. *)
+  let attestation_lag = 8 in
+  let number_of_slots = 32 in
+  let retention_levels = 32 in
+  Slots_statuses_cache.create
+    (attestation_lag * number_of_slots * retention_levels)
+
+let dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id =
+  let open Lwt_result_syntax in
+  match Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id with
+  | Some res -> return res
+  | None -> (
+      let* hash_with_cells =
+        download_skip_list_cells_of_level
+          node_ctxt
+          dal_constants
+          ~published_level:slot_id.published_level
+      in
+      List.iter
+        (fun (_hash, cell) ->
+          let content = Dal.Slots_history.content cell in
+          Slots_statuses_cache.replace
+            skip_list_cells_content_cache
+            (Dal.Slots_history.content_id content)
+            content)
+        hash_with_cells ;
+      (* The [find] below validates the fact that we fetched the info of
+         commitments published at level [slot_id.published_level]. *)
+      match
+        Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id
+      with
+      | Some res -> return res
+      | None -> tzfail @@ Dal_expected_skip_list_cell_not_found slot_id)
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Lwt_result_syntax in
