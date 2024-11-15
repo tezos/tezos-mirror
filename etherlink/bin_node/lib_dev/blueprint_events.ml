@@ -129,7 +129,7 @@ let missing_blueprints =
 let worker_request_failed =
   declare_2
     ~section
-    ~name:"request_failed"
+    ~name:"blueprints_publisher_request_failed"
     ~msg:"[Warning]: Request {view} failed: {errors}"
     ~level:Error
     ("view", Blueprints_publisher_types.Request.encoding)
