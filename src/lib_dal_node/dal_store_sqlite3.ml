@@ -172,7 +172,7 @@ module Skip_list_cells = struct
       INSERT INTO skip_list_slots
       (attested_level, slot_index, skip_list_cell_hash)
       VALUES ($1, $2, $3)
-      ON CONFLICT DO UPDATE SET skip_list_cell_hash = $3
+      ON CONFLICT(attested_level, slot_index) DO UPDATE SET skip_list_cell_hash = $3
       |sql}
 
     let insert_skip_list_cell :
@@ -182,7 +182,7 @@ module Skip_list_cells = struct
       INSERT INTO skip_list_cells
       (hash, cell)
       VALUES ($1, $2)
-      ON CONFLICT DO UPDATE SET cell = $2
+      ON CONFLICT(hash) DO UPDATE SET cell = $2
       |sql}
 
     let delete_skip_list_cell : (level, unit, [`Zero]) Caqti_request.t =

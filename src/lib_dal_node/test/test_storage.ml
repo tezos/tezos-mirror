@@ -256,15 +256,27 @@ module Helpers = struct
       (Format.pp_print_list Action.pp)
       actions
 
-  let gen_with_state state n =
+  (** [gen_with_state ?insert_dist ?find_dist ?remove_dist state n]
+      generates a [scenario] containing a list of [n] actions and a
+      [state] resulting from their interpretations. Actions are
+      selected according to the probability distribution defined by
+      [insert_dist], [find_dist], and [remove_dist] (each defaulting
+      to 1).
+
+      The sum of distribution weights must be non-zero. Additionally,
+      [insert_dist] must be non-zero since [find] and [remove] actions
+      operate on payloads introduced by prior [insert] actions. *)
+  let gen_with_state ?(insert_dist = 1) ?(find_dist = 1) ?(remove_dist = 1)
+      state n =
     let open Bam.Std.Syntax in
     assert (n >= 0) ;
     let rec loop acc state n =
       if n = 0 then return {state; actions = List.rev acc}
       else
         let choices =
-          (1, Action.gen_Insert) :: (1, Action.gen_Find)
-          :: [(1, Action.gen_Remove)]
+          (insert_dist, Action.gen_Insert)
+          :: (find_dist, Action.gen_Find)
+          :: [(remove_dist, Action.gen_Remove)]
         in
         let* choice = Bam.Std.oneof choices in
         let* res = choice state in
@@ -274,7 +286,8 @@ module Helpers = struct
     in
     loop [] state n
 
-  let gen = gen_with_state State.zero
+  let gen ?insert_dist ?find_dist ?remove_dist n =
+    gen_with_state ?insert_dist ?find_dist ?remove_dist State.zero n
 end
 
 open Helpers
@@ -399,3 +412,41 @@ let consistency_test =
     ~gen:(Helpers.gen 20)
     ~property
     ()
+
+(** Test skip list storage migrations.
+
+    This test validates the migration from the key-value store to
+    sqlite. More precisely, it
+    - initializes a kvs store,
+    - executes a sequence of insertions,
+    - initializes a sqlite store and migrates the data from the kvs one,
+    - performs a handshake to verify data consistency between the two stores. *)
+let migration_skip_list_test {state; actions} =
+  let open Lwt_result_syntax in
+  let data_dir = Tezt.Temp.dir "data-dir" in
+  let* kvs_store = init_skip_list_cells_store data_dir in
+  let* () = run_kvs kvs_store actions in
+  let* sql_store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+  let* () = Store_migrations.migrate_skip_list_store kvs_store sql_store in
+  let* () = handshake state kvs_store sql_store in
+  Kvs_skip_list_cells_store.close kvs_store
+
+let () =
+  let open Tezt_bam in
+  let open Lwt_result_syntax in
+  let title = "skip list storage migration test" in
+  Test.register ~seed:Random ~__FILE__ ~title ~tags:["kvs"; "sqlite"]
+  @@ fun () ->
+  (* [seed] and [get_state] as found in [Tezt_bam.Runner.register] *)
+  let seed = Random.full_int Int.max_int in
+  let state = Bam.Gen.Random.make [|seed|] in
+  let state = snd (Bam.Gen.Random.split state) in
+  let tree = Gen.run (gen 10 ~find_dist:0 ~remove_dist:0) state in
+  let*! res = migration_skip_list_test (Tree.root tree) in
+  match res with
+  | Ok () -> Lwt.return_unit
+  | Error err ->
+      Test.fail
+        "Test fails with the following errors: %a"
+        Error_monad.pp_print_trace
+        err

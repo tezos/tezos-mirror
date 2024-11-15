@@ -43,7 +43,8 @@ module Version = struct
   (* Version history:
      - 0: came with octez release v20; used Irmin for storing slots
      - 1: removed Irmin dependency; added slot and status stores; changed layout of shard
-       store by indexing on slot ids instead of commitments *)
+       store by indexing on slot ids instead of commitments
+     - 2: switch the KVS skip list store for a sqlite3 one. *)
   let current_version = 1
 
   type error += Could_not_read_data_dir_version of string
@@ -507,26 +508,33 @@ module Storage_backend = struct
       (fun (current, specified) ->
         Storage_backend_mismatch {current; specified})
 
-  (** [set_store ~sqlite3_backend] configures the storage backend
-      based on the value of [sqlite3_backend]. If [sqlite3_backend] is
-      [true], it sets the [SQLite3] storage backend; otherwise, it sets
-      the [Legacy] backend. This function fails with
-      [Storage_backend_mismatch] if the previously used storage backend
-      does not match the one specified by [sqlite3_backend]. *)
-  let set store ~sqlite3_backend =
+  (** [set ?force store ~sqlite3_backend] configures the storage
+      backend based on the value of [sqlite3_backend]. If
+      [sqlite3_backend] is [true], it sets the [SQLite3] storage
+      backend; otherwise, it sets the [Legacy] backend. This function
+      fails with [Storage_backend_mismatch] if the previously used
+      storage backend does not match the one specified by
+      [sqlite3_backend] and [force] is false. If [force] is true, then
+      overwrite the storage backend without taking into account the
+      previous one. *)
+  let set ?(force = false) store ~sqlite3_backend =
     let open Lwt_result_syntax in
     let* current_opt = load store in
     let specified = if sqlite3_backend then SQLite3 else Legacy in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7528
        Update the following code according to the migration from KVS
        to SQLite3 once it is done.*)
-    match (current_opt, specified) with
-    | Some current, specified ->
-        if current = specified then return current
-        else tzfail (Storage_backend_mismatch {current; specified})
-    | None, specified ->
-        let+ () = save store specified in
-        specified
+    if force then
+      let+ () = save store specified in
+      specified
+    else
+      match current_opt with
+      | Some current ->
+          if current = specified then return current
+          else tzfail (Storage_backend_mismatch {current; specified})
+      | None ->
+          let+ () = save store specified in
+          specified
 end
 
 (** Store context *)
@@ -582,6 +590,20 @@ module Skip_list_cells = struct
     | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.remove t.sqlite3
 end
 
+let init_skip_list_cells_store base_dir =
+  (* We support at most 64 back-pointers, each of which takes 32 bytes.
+     The cells content itself takes less than 64 bytes. *)
+  let padded_encoded_cell_size = 64 * (32 + 1) in
+  (* A pointer hash is 32 bytes length, but because of the double
+     encoding in Dal_proto_types and then in skip_list_cells_store, we
+     have an extra 4 bytes for encoding the size. *)
+  let encoded_hash_size = 32 + 4 in
+  Kvs_skip_list_cells_store.init
+    ~node_store_dir:base_dir
+    ~skip_list_store_dir:Stores_dirs.skip_list_cells
+    ~padded_encoded_cell_size
+    ~encoded_hash_size
+
 let cache_entry node_store commitment slot shares shard_proofs =
   Commitment_indexed_cache.replace
     node_store.cache
@@ -591,6 +613,7 @@ let cache_entry node_store commitment slot shares shard_proofs =
 let upgrade_from_v0_to_v1 ~base_dir =
   let open Lwt_syntax in
   let ( // ) = Filename.Infix.( // ) in
+  let* () = Event.(emit store_upgrade_start (Version.make 0, Version.make 1)) in
   let rec move_directory_contents src dst =
     let stream = Lwt_unix.files_of_directory src in
     Lwt_stream.iter_s
@@ -665,6 +688,51 @@ let upgrade_from_v0_to_v1 ~base_dir =
   in
   Event.(emit store_upgraded (Version.make 0, Version.make 1))
 
+let upgrade_from_v1_to_v2 ~base_dir =
+  let open Lwt_result_syntax in
+  let*! () =
+    Event.(emit store_upgrade_start (Version.make 1, Version.make 2))
+  in
+  (* Initialize both stores and migrate. *)
+  let* kvs_store = init_skip_list_cells_store base_dir in
+  let* sql_store =
+    Dal_store_sqlite3.init ~data_dir:base_dir ~perm:`Read_write ()
+  in
+  let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
+  let*! res = Store_migrations.migrate_skip_list_store kvs_store sql_store in
+  let* () = Kvs_skip_list_cells_store.close kvs_store in
+  match res with
+  | Ok () ->
+      (* Set the new storage backend to sqlite3. *)
+      let* (_ : Storage_backend.kind) =
+        Storage_backend.set
+          storage_backend_store
+          ~sqlite3_backend:true
+          ~force:true
+      in
+      (* Remove the Stores_dirs.skip_list_cells directory. *)
+      let*! () =
+        Lwt_utils_unix.remove_dir
+          Filename.Infix.(base_dir // Stores_dirs.skip_list_cells)
+      in
+      (* The storage upgrade has been done. *)
+      let*! () = Event.(emit store_upgraded (Version.make 1, Version.make 2)) in
+      return_unit
+  | Error err ->
+      (* Clean the sqlite store unless the storage backend was already set to sqlite. *)
+      let* storage_backend = Storage_backend.load storage_backend_store in
+      let*! () =
+        match storage_backend with
+        | None | Some Legacy ->
+            Lwt_utils_unix.remove_dir
+              Filename.Infix.(base_dir // Dal_store_sqlite3.sqlite_file_name)
+        | Some SQLite3 -> Lwt.return_unit
+      in
+      (* The store upgrade failed. *)
+      let*! () = Event.(emit store_upgrade_error ()) in
+      Format.eprintf "%a" Error_monad.pp_print_trace err ;
+      fail err
+
 (* Returns [upgradable old_version new_version] returns an upgrade function if
    the store is upgradable from [old_version] to [new_version]. Otherwise it
    returns [None]. *)
@@ -677,6 +745,12 @@ let upgradable old_version new_version :
         (fun ~base_dir ->
           let*! () = upgrade_from_v0_to_v1 ~base_dir in
           return_unit)
+  | 0, 2 ->
+      Some
+        (fun ~base_dir ->
+          let*! () = upgrade_from_v0_to_v1 ~base_dir in
+          upgrade_from_v1_to_v2 ~base_dir)
+  | 1, 2 -> Some (fun ~base_dir -> upgrade_from_v1_to_v2 ~base_dir)
   | _ -> None
 
 (* Checks the version of the store with the respect to the current
@@ -706,20 +780,6 @@ let check_version_and_may_upgrade base_dir =
         tzfail
           (Version.Invalid_data_dir_version
              {actual = version; expected = Version.current_version})
-
-let init_skip_list_cells_store base_dir =
-  (* We support at most 64 back-pointers, each of which takes 32 bytes.
-     The cells content itself takes less than 64 bytes. *)
-  let padded_encoded_cell_size = 64 * (32 + 1) in
-  (* A pointer hash is 32 bytes length, but because of the double
-     encoding in Dal_proto_types and then in skip_list_cells_store, we
-     have an extra 4 bytes for encoding the size. *)
-  let encoded_hash_size = 32 + 4 in
-  Kvs_skip_list_cells_store.init
-    ~node_store_dir:base_dir
-    ~skip_list_store_dir:Stores_dirs.skip_list_cells
-    ~padded_encoded_cell_size
-    ~encoded_hash_size
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)

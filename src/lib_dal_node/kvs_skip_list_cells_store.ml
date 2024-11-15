@@ -240,3 +240,13 @@ module Internal_for_tests = struct
     let {Cells.store; file_layout; _} = cells_store in
     KVS.value_exists store file_layout hash ()
 end
+
+module Internal_for_migrations = struct
+  let get_attested_levels t =
+    let store = KVS.root_dir t.hashes_store.store in
+    let files = Lwt_unix.files_of_directory store in
+    Lwt_stream.filter_map Int32.of_string_opt files
+
+  let find_hash {cells_store = _; hashes_store} ~attested_level ~slot_index =
+    Hashes.read_value hashes_store attested_level slot_index
+end

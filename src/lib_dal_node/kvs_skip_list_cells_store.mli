@@ -98,3 +98,20 @@ module Internal_for_tests : sig
   val skip_list_hash_exists :
     t -> Dal_proto_types.Skip_list_hash.t -> bool tzresult Lwt.t
 end
+
+(** Internal functions for storage migrations. *)
+module Internal_for_migrations : sig
+  (** [get_attested_levels store] returns the attested levels
+      registered in the [store]. Since the number of attested levels
+      can be large, it returns a stream. *)
+  val get_attested_levels : t -> int32 Lwt_stream.t
+
+  (** [find_hash store ~attested_level ~slot_index] returns the cell hash
+      associated to the [attested_level] and the [slot_index] in the
+      [store], if any. *)
+  val find_hash :
+    t ->
+    attested_level:int32 ->
+    slot_index:int ->
+    Dal_proto_types.Skip_list_hash.t Error_monad.tzresult Lwt.t
+end

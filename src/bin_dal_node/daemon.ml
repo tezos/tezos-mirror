@@ -1161,14 +1161,6 @@ let run ~data_dir ~configuration_override =
       p2p_limits
       ~network_name
   in
-  (* Initialize store *)
-  let* store = Store.init config in
-  let* last_processed_level =
-    let last_processed_level_store = Store.last_processed_level store in
-    Store.Last_processed_level.load last_processed_level_store
-  in
-  let first_seen_level_store = Store.first_seen_level store in
-  let* first_seen_level = Store.First_seen_level.load first_seen_level_store in
   (* Get the current L1 head and its DAL plugin and parameters. *)
   let* header = Shell_services.Blocks.Header.shell_header cctxt () in
   let head_level = header.Block_header.level in
@@ -1184,12 +1176,22 @@ let run ~data_dir ~configuration_override =
   let* proto_parameters =
     Plugin.get_constants `Main (`Level head_level) cctxt
   in
+  (* Set proto number of slots hook. *)
+  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   let* profile_ctxt = build_profile_context config in
   let*? () =
     Profile_manager.validate_slot_indexes
       profile_ctxt
       ~number_of_slots:proto_parameters.number_of_slots
   in
+  (* Initialize store *)
+  let* store = Store.init config in
+  let* last_processed_level =
+    let last_processed_level_store = Store.last_processed_level store in
+    Store.Last_processed_level.load last_processed_level_store
+  in
+  let first_seen_level_store = Store.first_seen_level store in
+  let* first_seen_level = Store.First_seen_level.load first_seen_level_store in
   (* Check the DAL node's and L1 node's history mode. *)
   let* () = check_history_mode config profile_ctxt proto_parameters in
   let* () =
@@ -1211,6 +1213,9 @@ let run ~data_dir ~configuration_override =
   let* cryptobox, shards_proofs_precomputation =
     init_cryptobox config proto_parameters
   in
+  (* Set crypto box share size hook. *)
+  Value_size_hooks.set_share_size
+    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
   let ctxt =
     Node_context.init
       config
@@ -1246,10 +1251,6 @@ let run ~data_dir ~configuration_override =
         let*! _metrics_server = Metrics.launch metrics_addr in
         return_unit
   in
-  (* Set value size hooks. *)
-  Value_size_hooks.set_share_size
-    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   (* Start RPC server. We do that before the waiting for the L1 node to be
      bootstrapped so that queries can already be issued. Note that that the node
      will thus already respond to the baker about shards status if queried. *)
