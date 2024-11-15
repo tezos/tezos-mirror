@@ -16,6 +16,7 @@ use gdbstub::target::ext::base::BaseOps;
 use gdbstub::target::ext::breakpoints::{
     Breakpoints, BreakpointsOps, SwBreakpoint, SwBreakpointOps,
 };
+use gdbstub::target::ext::exec_file::ExecFile;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
 use octez_riscv::machine_state::bus::main_memory::M1G;
@@ -33,18 +34,18 @@ use std::{fs, io};
 
 /// Run a gdb server that can be used for debugging RISC-V programs.
 pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {
-    let fname = opts
-        .input
-        .file_name()
-        .ok_or("Invalid program path")?
+    let fname = fs::canonicalize(opts.input).map_err(|_| "Invalid program path")?;
+    let fname = fname
         .to_str()
         .ok_or("File name cannot be converted to string")?;
-    let program = fs::read(&opts.input)?;
+
+    let program = fs::read(fname)?;
     let (mut stepper, _symbols) =
         TestStepper::<M1G>::new_with_parsed_program(program.as_slice(), None, Mode::User)?;
 
     // loop
     let mut target = RiscvGdb {
+        fname,
         stepper: &mut stepper,
     };
 
@@ -71,13 +72,14 @@ fn wait_for_gdb_connection(port: u16) -> io::Result<TcpStream> {
 }
 
 struct RiscvGdb<'a, S: Stepper> {
+    fname: &'a str,
     stepper: &'a mut S,
 }
 
 impl<'a, S: Stepper> RiscvGdb<'a, S> {
     fn run_and_check_for_incoming_data(
         &mut self,
-        conn: &mut <RiscvEventLoop<S> as run_blocking::BlockingEventLoop>::Connection,
+        conn: &mut <RiscvEventLoop<'a, S> as run_blocking::BlockingEventLoop>::Connection,
     ) -> RiscvGdbEvent {
         let mut poll_incoming_data = || {
             // gdbstub takes ownership of the underlying connection, so the `borrow_conn`
@@ -110,6 +112,13 @@ impl<'a, S: Stepper> Target for RiscvGdb<'a, S> {
     fn support_breakpoints(&mut self) -> Option<BreakpointsOps<Self>> {
         Some(self)
     }
+
+    #[inline(always)]
+    fn support_exec_file(
+        &mut self,
+    ) -> Option<gdbstub::target::ext::exec_file::ExecFileOps<'_, Self>> {
+        Some(self)
+    }
 }
 
 impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
@@ -119,6 +128,7 @@ impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
 
         let array = state.hart.xregisters.struct_ref();
         for i in 0..31 {
+            // first is x0 == zero, only x1..=x31 are set
             regs.x[i + 1] = array.read(i);
         }
         Ok(())
@@ -255,5 +265,29 @@ impl<'a, S: Stepper> run_blocking::BlockingEventLoop for RiscvEventLoop<'a, S> {
         // a pretty typical stop reason in response to a Ctrl-C interrupt is to
         // report a "Signal::SIGINT".
         Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT).into()))
+    }
+}
+
+impl<'a, S: Stepper> ExecFile for RiscvGdb<'a, S> {
+    fn get_exec_file(
+        &self,
+        pid: Option<gdbstub::common::Pid>,
+        offset: u64,
+        length: usize,
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self> {
+        let offset = offset as usize;
+        let bytes = self.fname.as_bytes();
+
+        if offset >= bytes.len() {
+            return Ok(0);
+        }
+
+        let read = usize::min(bytes.len() - offset as usize, buf.len());
+        let slice = &bytes[offset as usize..(offset as usize) + read];
+
+        (&mut buf[..read]).copy_from_slice(slice);
+
+        Ok(read)
     }
 }
