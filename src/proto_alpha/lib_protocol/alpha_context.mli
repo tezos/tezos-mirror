@@ -2883,6 +2883,8 @@ module Dal : sig
       val pp : Format.formatter -> t -> unit
 
       val equal : t -> t -> bool
+
+      val slot_id_equal : id -> id -> bool
     end
 
     val register_slot_header :

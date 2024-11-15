@@ -125,6 +125,9 @@ module Header : sig
   (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
 
+  (** equal function for values of type id. *)
+  val slot_id_equal : id -> id -> bool
+
   (** [verify_commitment cryptobox commitment commitment_proof] check
      that for the given commitment, the commitment proof is correct
      using the [cryptbox] primitives. *)
