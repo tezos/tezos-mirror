@@ -60,9 +60,7 @@ struct
   (** Check insertion of a new slot in the given skip list. *)
   let skip_list_ordering skip_list ~mk_level ~mk_slot_index ~check_result =
     let open Lwt_result_wrap_syntax in
-    let id =
-      Hist.Internal_for_tests.content skip_list |> Dal_helpers.content_slot_id
-    in
+    let id = Hist.content skip_list |> Dal_helpers.content_slot_id in
     let level = mk_level id in
     let index = mk_slot_index id in
     let* _data, _poly, slot = mk_slot ~level ~index () in
@@ -148,8 +146,7 @@ struct
       genesis skip list. Proof production is expected to succeed. *)
   let unconfirmed_page_on_genesis () =
     let Dal_slot_repr.Header.{published_level; index} =
-      Hist.Internal_for_tests.content genesis_history
-      |> Dal_helpers.content_slot_id
+      Hist.content genesis_history |> Dal_helpers.content_slot_id
     in
     let page_id = mk_page_id published_level index P.Index.zero in
     produce_and_verify_proof
@@ -167,8 +164,7 @@ struct
       history cache. *)
   let unconfirmed_page_on_genesis_bad_cache () =
     let Dal_slot_repr.Header.{published_level; index} =
-      Hist.Internal_for_tests.content genesis_history
-      |> Dal_helpers.content_slot_id
+      Hist.content genesis_history |> Dal_helpers.content_slot_id
     in
     let level, sindex =
       if false then (Raw_level_repr.succ published_level, index)

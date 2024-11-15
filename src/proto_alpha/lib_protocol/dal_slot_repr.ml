@@ -1327,18 +1327,6 @@ module History = struct
     let content = Skip_list.content
 
     module Internal_for_tests = struct
-      type cell_content = Content.t =
-        | Unpublished of Header.id
-        | Published of {
-            header : Header.t;
-            publisher : Contract_repr.t;
-            is_proto_attested : bool;
-            attested_shards : int;
-            total_shards : int;
-          }
-
-      let content cell : cell_content = Skip_list.content cell
-
       let proof_statement_is serialized_proof expected =
         match deserialize_proof serialized_proof with
         | Error _ -> false
