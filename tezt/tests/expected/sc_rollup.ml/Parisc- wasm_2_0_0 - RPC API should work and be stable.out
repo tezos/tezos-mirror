@@ -253,6 +253,10 @@ GET http://[HOST]:[PORT]/global/block/head/durable/wasm_2_0_0/subkeys?key=/reado
 200 OK
 ["boot.wasm","env"]
 
+GET http://[HOST]:[PORT]/global/block/head/durable/wasm_2_0_0/values?key=/numbers
+200 OK
+[{"key":"number02","value":"02"},{"key":"number24","value":"18"},{"key":"number01","value":"01"},{"key":"number12","value":"0c"},{"key":"number04","value":"04"},{"key":"number00","value":"00"},{"key":"number03","value":"03"},{"key":"number10","value":"0a"},{"key":"number21","value":"15"},{"key":"number14","value":"0e"},{"key":"number15","value":"0f"},{"key":"number20","value":"14"},{"key":"number05","value":"05"},{"key":"number25","value":"19"},{"key":"number26","value":"1a"},{"key":"number16","value":"10"},{"key":"number29","value":"1d"},{"key":"number06","value":"06"},{"key":"number23","value":"17"},{"key":"number13","value":"0d"},{"key":"number09","value":"09"},{"key":"number08","value":"08"},{"key":"number27","value":"1b"},{"key":"number19","value":"13"},{"key":"number22","value":"16"},{"key":"number07","value":"07"},{"key":"number18","value":"12"},{"key":"number11","value":"0b"},{"key":"number28","value":"1c"},{"key":"number17","value":"11"}]
+
 GET http://[HOST]:[PORT]/global/block/head/status
 200 OK
 "Waiting for input message"

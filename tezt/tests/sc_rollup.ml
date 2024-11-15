@@ -4700,8 +4700,46 @@ let test_rpcs ~kind
         in
         Check.((kernel_subkeys = ["boot.wasm"; "env"]) (list string))
           ~error_msg:"The key's subkeys are %L but should be %R" ;
-        return ()
-    | "riscv" -> return ()
+
+        Log.info "Add elements in the durable storage" ;
+        (* Stop the rollup node. *)
+        let* () = Sc_rollup_node.terminate sc_rollup_node in
+
+        let elements =
+          List.init 30 (fun i ->
+              (Format.sprintf "number%02d" i, Format.sprintf "%02x" i))
+        in
+        let* () =
+          Lwt_list.iter_s
+            (fun (key, value) ->
+              Sc_rollup_node.patch_durable_storage
+                sc_rollup_node
+                ~key:("/numbers/" ^ key)
+                ~value)
+            elements
+        in
+        let* () =
+          Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+        in
+
+        let* number_values =
+          Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+          @@ Sc_rollup_rpc.get_global_block_durable_state_value
+               ~pvm_kind:kind
+               ~operation:Sc_rollup_rpc.Values
+               ~key:"/numbers"
+               ()
+        in
+        let number_values =
+          List.fast_sort
+            (fun (k1, _) (k2, _) -> String.compare k1 k2)
+            number_values
+        in
+        Check.((number_values = elements) (list (tuple2 string string)))
+          ~error_msg:"/numbers has %L but should contain values for %R" ;
+
+        unit
+    | "riscv" -> unit
     | _ -> failwith "incorrect kind"
   in
   let* _status =
