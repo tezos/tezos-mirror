@@ -38,7 +38,11 @@ let get_verbosity_map () : verbosity option VerbosityMap.t =
     | Some Debug -> Some Debug
     | Some Info -> Some Info
     | Some Notice -> Some Notice
-    | _ -> None
+    | Some invalid_value ->
+        Fmt.failwith
+          "Invalid PROFILING value '%s', disabling profiling."
+          (Internal_event.Level.to_string invalid_value)
+    | None -> None
   in
   List.fold_left
     (fun acc (name, rule) ->
