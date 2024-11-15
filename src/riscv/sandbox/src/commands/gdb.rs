@@ -24,12 +24,14 @@ use octez_riscv::machine_state::bus::OutOfBounds;
 use octez_riscv::machine_state::mode::Mode;
 use octez_riscv::machine_state::registers::XRegister;
 use octez_riscv::stepper::test::TestStepper;
-use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::{StepResult, Stepper, StepperStatus};
 
 use crate::cli::GdbServerOptions;
+use std::collections::HashSet;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
+use std::ops::Bound;
 use std::{fs, io};
 
 /// Run a gdb server that can be used for debugging RISC-V programs.
@@ -47,6 +49,7 @@ pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {
     let mut target = RiscvGdb {
         fname,
         stepper: &mut stepper,
+        breakpoints: HashSet::new(),
     };
 
     let connection = wait_for_gdb_connection(opts.port)?;
@@ -74,6 +77,7 @@ fn wait_for_gdb_connection(port: u16) -> io::Result<TcpStream> {
 struct RiscvGdb<'a, S: Stepper> {
     fname: &'a str,
     stepper: &'a mut S,
+    breakpoints: HashSet<u64>,
 }
 
 impl<'a, S: Stepper> RiscvGdb<'a, S> {
@@ -88,14 +92,35 @@ impl<'a, S: Stepper> RiscvGdb<'a, S> {
             conn.peek().map(|b| b.is_some()).unwrap_or(true)
         };
 
-        while !poll_incoming_data() {}
+        loop {
+            match self
+                .stepper
+                .step_max(Bound::Included(1))
+                .to_stepper_status()
+            {
+                StepperStatus::Running { .. } => {
+                    if poll_incoming_data() {
+                        return RiscvGdbEvent::IncomingData;
+                    }
 
-        RiscvGdbEvent::IncomingData
+                    if self.at_breakpoint() {
+                        return RiscvGdbEvent::BreakpointHit;
+                    }
+                }
+                _ => continue,
+            }
+        }
+    }
+
+    fn at_breakpoint(&self) -> bool {
+        let pc = self.stepper.machine_state().hart.pc.read();
+        self.breakpoints.contains(&pc)
     }
 }
 
 enum RiscvGdbEvent {
     IncomingData,
+    BreakpointHit,
 }
 
 impl<'a, S: Stepper> Target for RiscvGdb<'a, S> {
@@ -143,7 +168,7 @@ impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
 
     fn read_addrs(&mut self, start_addr: u64, data: &mut [u8]) -> TargetResult<usize, Self> {
         const EFAULT: u8 = 14;
-        eprintln!("read_addrs: {start_addr} -> {}", data.len());
+        eprintln!("read_addrs: {start_addr:x} -> {}", data.len());
 
         let state = self.stepper.machine_state();
 
@@ -167,7 +192,7 @@ impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
 
 impl<'a, S: Stepper> SingleThreadResume for RiscvGdb<'a, S> {
     fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
-        todo!()
+        Ok(())
     }
 
     #[inline(always)]
@@ -178,7 +203,15 @@ impl<'a, S: Stepper> SingleThreadResume for RiscvGdb<'a, S> {
 
 impl<'a, S: Stepper> SingleThreadSingleStep for RiscvGdb<'a, S> {
     fn step(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
-        todo!()
+        let None = signal else { return Ok(()) };
+
+        // todo! status
+        let _status = self
+            .stepper
+            .step_max(Bound::Included(1))
+            .to_stepper_status();
+
+        Ok(())
     }
 }
 
@@ -198,7 +231,11 @@ impl<'a, S: Stepper> SwBreakpoint for RiscvGdb<'a, S> {
         addr: u64,
         kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self> {
-        todo!()
+        eprintln!("add_sw_breakpoint {addr:x}");
+
+        self.breakpoints.insert(addr);
+
+        return Ok(true);
     }
 
     fn remove_sw_breakpoint(
@@ -206,7 +243,9 @@ impl<'a, S: Stepper> SwBreakpoint for RiscvGdb<'a, S> {
         addr: u64,
         kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self> {
-        todo!()
+        eprintln!("rm_sw_breakpoint {addr:x}");
+
+        Ok(self.breakpoints.remove(&addr))
     }
 }
 
@@ -249,6 +288,9 @@ impl<'a, S: Stepper> run_blocking::BlockingEventLoop for RiscvEventLoop<'a, S> {
                     .map_err(run_blocking::WaitForStopReasonError::Connection)?;
 
                 run_blocking::Event::IncomingData(byte)
+            }
+            RiscvGdbEvent::BreakpointHit => {
+                run_blocking::Event::TargetStopped(gdbstub::stub::BaseStopReason::SwBreak(()))
             }
         };
 
