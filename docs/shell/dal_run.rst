@@ -25,18 +25,18 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
 #. Install the DAL trusted setup as described in :ref:`Install DAL trusted setup <setup_dal_crypto_params>`.
 
-#. Initialize the DAL node by running its ``config init`` command.
+#. Initialize the DAL node by running its ``config init`` command, passing the address of a local ``octez-node`` instance and your attester's address.
    For example, this command initializes the DAL node with the address of a local ``octez-node`` instance on port 8732 and stores data in the default DAL node directory (``~/.tezos-dal-node``):
 
    .. code-block:: shell
 
-      octez-dal-node config init --endpoint http://127.0.0.1:8732
+      octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles="$MY_ADDRESS"
 
    You can specify a custom directory to store the DAL node data in by using the ``--data-dir`` argument:
 
    .. code-block:: shell
 
-      octez-dal-node config init --endpoint http://127.0.0.1:8732 --data-dir .tezos-dal-node
+      octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles="$MY_ADDRESS" --data-dir my-attester-tezos-dal-node
 
    You can specify parameters such as the RPC node in the ``config init`` command or in the ``run`` command.
    These commands have the same parameters. For information about them, run ``octez-dal-node config init --help`` or see :ref:`DAL node commands <dal-node-commands>`.
