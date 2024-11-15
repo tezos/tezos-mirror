@@ -21,6 +21,7 @@ use crate::{
 };
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::TICKS_PER_FA_DEPOSIT_PARSING;
+use primitive_types::U256;
 use rlp::Encodable;
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeySignatureVerifier};
@@ -293,6 +294,10 @@ pub struct SequencerParsingContext {
     // Delayed inbox transactions may come in chunks. If the buffer is
     // [Some _] a chunked transaction is being parsed,
     pub buffer_transaction_chunks: Option<BufferTransactionChunks>,
+    // Head level of the chain, handling blueprints before the head is useless.
+    // It is optional to handle when the first block has not been produced
+    // yet.
+    pub head_level: Option<U256>,
 }
 
 pub fn parse_unsigned_blueprint_chunk(
@@ -312,6 +317,7 @@ pub fn parse_unsigned_blueprint_chunk(
 pub fn parse_blueprint_chunk(
     bytes: &[u8],
     sequencer: &PublicKey,
+    head_level: &Option<U256>,
 ) -> Option<SequencerBlueprint> {
     // Parse the sequencer blueprint
     let seq_blueprint: SequencerBlueprint =
@@ -321,6 +327,12 @@ pub fn parse_blueprint_chunk(
     let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
     if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
         return None;
+    }
+
+    if let Some(head_level) = head_level {
+        if unsigned_seq_blueprint.number.le(head_level) {
+            return None;
+        }
     }
 
     let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
@@ -344,7 +356,9 @@ impl SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
-        if let Some(seq_blueprint) = parse_blueprint_chunk(bytes, &context.sequencer) {
+        if let Some(seq_blueprint) =
+            parse_blueprint_chunk(bytes, &context.sequencer, &context.head_level)
+        {
             InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(
                 seq_blueprint,
             )))

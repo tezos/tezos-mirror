@@ -29,6 +29,7 @@ use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
 use evm_execution::fa_bridge::deposit::FaDeposit;
+use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -646,6 +647,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // during this kernel run.
     let mut inbox_is_empty = true;
     let limits = fetch_limits(host);
+    let head_level: Option<U256> = crate::block_storage::read_current_number(host).ok();
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
@@ -654,6 +656,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
         dal_configuration: dal,
         buffer_transaction_chunks: None,
+        head_level,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of
