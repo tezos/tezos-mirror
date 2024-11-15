@@ -201,8 +201,8 @@ end
 module Summary : sig
   include METRIC
 
-  (** [observe t v] increases the total by [v] and the count by one. *)
-  val observe : t -> float -> unit
+  (** [observe ?n t v] increases the total by [v] and the count by [n] (default: by one). *)
+  val observe : ?n:float -> t -> float -> unit
 
   (** [time t gettime f] calls [gettime ()] before and after executing [f ()] and
       observes the difference. *)
