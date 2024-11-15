@@ -109,24 +109,33 @@ let fetch_events_at_once
       {key = path}
       ()
   in
+  let expected = ref 0 in
   let*! unsorted =
     List.filter_map_s
       (fun (key, value) ->
         let open Lwt_syntax in
         match key with
         | "length" ->
-            (* ignore length field *)
+            let (Qty len) = Ethereum_types.decode_number_le value in
+            expected := Z.to_int len ;
             return_none
         | index -> (
             match int_of_string_opt index with
             | None ->
-                Format.eprintf "Unexpected key %S in /evm/events@." index ;
+                let*! () = Evm_events_follower_events.unexpected_key index in
                 return_none
             | Some event_index -> (
                 match Evm_events.of_bytes value with
                 | None -> return_none
                 | Some event -> return_some (event_index, event))))
       bindings
+  in
+  let*! () =
+    let fetched = List.length unsorted in
+    let expected = !expected in
+    if fetched <> expected then
+      Evm_events_follower_events.unexpected_number_of_events ~fetched ~expected
+    else Lwt.return_unit
   in
   unsorted
   |> List.fast_sort (fun (i1, _) (i2, _) -> Compare.Int.compare i1 i2)
