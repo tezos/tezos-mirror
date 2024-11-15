@@ -99,12 +99,6 @@ module Event = struct
       ~pp5:pp_content_elipsis
 end
 
-let store_entry_from_published_level ~dal_attestation_lag ~published_level
-    node_ctxt =
-  Node_context.hash_of_level node_ctxt
-  @@ Int32.(
-       add (of_int dal_attestation_lag) (Raw_level.to_int32 published_level))
-
 module Slot_id = struct
   include Tezos_dal_node_services.Types.Slot_id
 
@@ -203,7 +197,7 @@ let dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id =
       | Some res -> return res
       | None -> tzfail @@ Dal_expected_skip_list_cell_not_found slot_id)
 
-let _slot_proto_attestation_status node_ctxt dal_constants slot_id =
+let slot_proto_attestation_status node_ctxt dal_constants slot_id =
   let open Lwt_result_syntax in
   let* res =
     dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id
@@ -235,14 +229,6 @@ let get_page node_ctxt ~inbox_level page_id =
       in
       return @@ Some page
   | None -> tzfail @@ Dal_invalid_page_for_slot page_id
-
-let storage_invariant_broken published_level index =
-  failwith
-    "Internal error: [Node_context.find_slot_status] is supposed to have \
-     registered the status of the slot %d published at level %a in the store"
-    index
-    Raw_level.pp
-    published_level
 
 let slot_id_is_valid
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
@@ -304,31 +290,23 @@ let slot_pages
          slot_id
   then return_none
   else
-    let* confirmed_in_block_hash =
-      store_entry_from_published_level
-        ~dal_attestation_lag:dal_constants.attestation_lag
-        ~published_level
-        node_ctxt
+    let* status =
+      slot_proto_attestation_status node_ctxt dal_constants slot_id
     in
-    let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
-    let* processed =
-      Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
-    in
-    match processed with
-    | Some `Confirmed ->
+    match status with
+    | `Attested ->
+        let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
         let* pages =
           download_confirmed_slot_pages node_ctxt ~published_level ~index
         in
         return (Some pages)
-    | Some `Unconfirmed -> return_none
-    | None -> storage_invariant_broken published_level index
+    | `Unattested -> return_none
 
 let page_content
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt page_id
     ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
-  let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
   let Node_context.{genesis_info = {level = origination_level; _}; _} =
     node_ctxt
   in
@@ -343,17 +321,12 @@ let page_content
          page_id
   then return_none
   else
-    let* confirmed_in_block_hash =
-      store_entry_from_published_level
-        ~dal_attestation_lag:dal_constants.attestation_lag
-        ~published_level
+    let* status =
+      slot_proto_attestation_status
         node_ctxt
+        dal_constants
+        page_id.Dal.Page.slot_id
     in
-    let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
-    let* processed =
-      Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
-    in
-    match processed with
-    | Some `Confirmed -> get_page node_ctxt ~inbox_level page_id
-    | Some `Unconfirmed -> return_none
-    | None -> storage_invariant_broken published_level index
+    match status with
+    | `Attested -> get_page node_ctxt ~inbox_level page_id
+    | `Unattested -> return_none
