@@ -8,6 +8,9 @@
 
 ### Internals
 
+- Use a single RPC (if the rollup node supports it) when fetching EVM events.
+  (!15629)
+
 ## Version 0.8 (2024-11-15)
 
 This is a bug fixes release, notably improving verbosity of the evm-node on
