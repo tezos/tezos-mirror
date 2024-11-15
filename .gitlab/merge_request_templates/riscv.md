@@ -47,6 +47,9 @@ make -C src/riscv all
 - [ ] Make sure the documentation for updated functions, methods, and types is correct.
 - [ ] Add tests for bugs that have been fixed.
 - [ ] Put in reasonable effort to ensure that CI will pass.
+  - `make -C src/riscv`
+  - `dune build src/lib_riscv`
+  - `dune build src/rust_deps`
 - [ ] Benchmark performance and populate the table above if needed.
 - [ ] Write commit messages to reflect the changes they're about.
 - [ ] Self-review your changes to ensure they are high-quality.
