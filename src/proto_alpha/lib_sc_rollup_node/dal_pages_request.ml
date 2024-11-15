@@ -114,10 +114,10 @@ module Pages_cache =
 
 let get_slot_pages =
   let pages_cache = Pages_cache.create 16 (* 130MB *) in
-  fun dal_cctxt commitment ->
+  fun dal_cctxt slot_id ->
     Pages_cache.bind_or_put
       pages_cache
-      commitment
+      slot_id
       (Dal_node_client.get_slot_pages dal_cctxt)
       Lwt.return
 
