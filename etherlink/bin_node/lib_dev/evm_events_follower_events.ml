@@ -98,6 +98,17 @@ module Event = struct
       ~level:Error
       ("received", Data_encoding.int32)
       ("expected", Data_encoding.int32)
+
+  let worker_request_failed =
+    declare_2
+      ~section
+      ~name:"evm_events_request_failed"
+      ~msg:"[Warning]: Request {view} failed: {errors}"
+      ~level:Warning
+      ("view", Evm_events_follower_types.Request.encoding)
+      ~pp1:Evm_events_follower_types.Request.pp
+      ("errors", Error_monad.trace_encoding)
+      ~pp2:Error_monad.pp_print_trace
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -122,3 +133,6 @@ let rollup_node_ahead Ethereum_types.(Qty level) =
 
 let out_of_sync ~received ~expected =
   Internal_event.Simple.emit Event.out_of_sync (received, expected)
+
+let worker_request_failed request_view errs =
+  Internal_event.Simple.emit Event.worker_request_failed (request_view, errs)

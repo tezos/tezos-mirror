@@ -66,6 +66,24 @@ module Event = struct
         "Waiting {duration} sec before trying to reconnect to the rollup node"
       ~level:Info
       ("duration", Data_encoding.float)
+
+  let connection_failed =
+    declare_1
+      ~section
+      ~name:"rollup_node_follower_connection_failed"
+      ~msg:"Connection with the rollup node failed with {trace}"
+      ~level:Error
+      ~pp1:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let stream_failed =
+    declare_1
+      ~section
+      ~name:"rollup_node_follower_stream_failed"
+      ~msg:"Stream from the rollup node failed with {trace}"
+      ~level:Error
+      ~pp1:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
 end
 
 let disabled = Internal_event.Simple.emit Event.disabled
@@ -82,3 +100,7 @@ let trying_reconnection duration =
   Internal_event.Simple.emit Event.trying_reconnection duration
 
 let connection_acquired = Internal_event.Simple.emit Event.connection_acquired
+
+let connection_failed = Internal_event.Simple.emit Event.connection_failed
+
+let stream_failed = Internal_event.Simple.emit Event.stream_failed
