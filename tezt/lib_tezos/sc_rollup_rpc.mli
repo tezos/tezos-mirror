@@ -156,6 +156,7 @@ type 'output_type durable_state_operation =
   | Value : string option durable_state_operation
   | Length : int64 option durable_state_operation
   | Subkeys : string list durable_state_operation
+  | Values : (string * string) list durable_state_operation
 
 (** RPC: [GET global/block/<block>/durable/<pvm_kind>/<operation>] gets the
     corresponding durable PVM state information (depending on [operation]) mapped to [key] for the [block]
