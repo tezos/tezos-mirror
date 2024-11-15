@@ -184,9 +184,10 @@ let apply_slashing_account all_denunciations_to_apply
         slashed_pct
         frozen_deposits
     in
-    let slashed_pct_q = Protocol.Percentage.to_q slashed_pct in
-    let slashed_pct = Q.(100 // 1 * slashed_pct_q |> to_int) in
-    Log.info "Slashed %d%% of frozen deposits@." slashed_pct ;
+    Log.info
+      "Slashed %a of frozen deposits@."
+      Protocol.Percentage.Internal_for_tests.pp_human
+      slashed_pct ;
     let unstaked_frozen, slashed_unstaked =
       Unstaked_frozen.slash
         state.constants

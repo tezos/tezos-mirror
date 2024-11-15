@@ -54,6 +54,8 @@ val json_of_parameters :
   ?chain_id:Chain_id.t -> Parameters.t -> Data_encoding.json
 
 module Internal_for_tests : sig
+  val bootstrap_balance : Tez.t
+
   val make_sc_rollup_parameter :
     dal_activation_level:Raw_level.t ->
     dal_attested_slots_validity_lag:int ->

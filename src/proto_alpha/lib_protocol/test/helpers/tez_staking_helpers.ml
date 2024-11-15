@@ -11,6 +11,7 @@
     and are related to pseudotokens. *)
 
 module Cycle = Protocol.Alpha_context.Cycle
+module Percentage = Protocol.Percentage
 
 module Tez = struct
   include Tez_helpers
@@ -259,13 +260,13 @@ module Frozen_tez = struct
     let a, amount = sub_current amount account a in
     ({a with initial = Tez.(a.initial -! amount)}, amount)
 
-  let slash ~limit cst base_amount (pct : Protocol.Percentage.t) a =
+  let slash ~limit cst base_amount pct a =
     Log.info
-      "Slashing frozen tez for delegate %s with percentage %a"
-      a.delegate
-      Q.pp_print
-    @@ Protocol.Percentage.to_q pct ;
-    let pct_q = Protocol.Percentage.to_q pct in
+      "Slashing %a of frozen tez for delegate %S"
+      Percentage.Internal_for_tests.pp_human
+      pct
+      a.delegate ;
+    let pct_q = Percentage.to_q pct in
     let total_current = total_current a in
     let slashed_amount =
       Tez.mul_q base_amount pct_q
@@ -318,7 +319,7 @@ module Unstaked_frozen = struct
     (* initial requests, don't apply slash unless finalize or balance query *)
     requests : Tez.t String.Map.t;
     (* slash pct memory for requests *)
-    slash_pct : int;
+    slash_pct : Percentage.t;
   }
 
   type t = r list
@@ -340,19 +341,16 @@ module Unstaked_frozen = struct
       initial = request;
       current = request;
       requests = String.Map.singleton account request;
-      slash_pct = 0;
+      slash_pct = Percentage.p0;
     }
 
   let apply_slash_to_request slash_pct amount =
-    let slashed_amount =
-      Tez.mul_q amount Q.(slash_pct // 100) |> Tez.of_q ~round:`Up
-    in
+    let slashed_amount = Tez.mul_percentage ~rounding:`Up amount slash_pct in
     Tez.(amount -! slashed_amount)
 
   let apply_slash_to_current cst slash_pct initial current =
     let slashed_amount =
-      Tez.mul_q initial Q.(slash_pct // 100)
-      |> Tez.of_q ~round:`Down |> Tez.min current
+      Tez.mul_percentage ~rounding:`Down initial slash_pct |> Tez.min current
     in
     let rat =
       cst.Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
@@ -402,7 +400,7 @@ module Unstaked_frozen = struct
     | ({cycle = c; requests; initial; current; slash_pct} as h) :: t ->
         let open Tez in
         if Cycle.equal c cycle then (
-          assert (Int.equal slash_pct 0) ;
+          assert (Percentage.(Internal_for_tests.equal slash_pct p0)) ;
           {
             cycle;
             initial = initial +! amount;
@@ -421,7 +419,7 @@ module Unstaked_frozen = struct
   (* Happens in stake from unstake *)
   let sub_unstake amount account : r -> r =
    fun {cycle; requests; initial; current; slash_pct} ->
-    assert (slash_pct = 0) ;
+    assert (Percentage.(Internal_for_tests.equal slash_pct p0)) ;
     let open Tez in
     {
       cycle;
@@ -458,7 +456,7 @@ module Unstaked_frozen = struct
           let info, rest = pop_cycle cycle t in
           (info, h :: rest)
 
-  let slash cst ~slashable_deposits_period slashed_cycle pct_times_100 a =
+  let slash cst ~slashable_deposits_period slashed_cycle pct a =
     remove_zeros a
     |> List.map
          (fun
@@ -472,9 +470,9 @@ module Unstaked_frozen = struct
            then (r, (Tez.zero, Tez.zero))
            else
              let new_current, burnt, rewarded =
-               apply_slash_to_current cst pct_times_100 initial current
+               apply_slash_to_current cst pct initial current
              in
-             let slash_pct = min 100 (pct_times_100 + old_slash_pct) in
+             let slash_pct = Percentage.add_bounded pct old_slash_pct in
              ({r with slash_pct; current = new_current}, (burnt, rewarded)))
     |> List.split
 end

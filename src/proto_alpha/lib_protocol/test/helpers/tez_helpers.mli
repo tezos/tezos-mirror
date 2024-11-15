@@ -60,6 +60,9 @@ val pp : Format.formatter -> t -> unit
 
 val to_string : t -> string
 
+(** See {!Protocol.Tez_repr.mul_percentage}. *)
+val mul_percentage : rounding:[`Down | `Up] -> t -> Protocol.Percentage.t -> t
+
 (* Helper functions, not exported from the protocol *)
 val ratio : t -> t -> Q.t
 

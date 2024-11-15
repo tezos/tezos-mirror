@@ -8,7 +8,10 @@
 type t = int
 
 (* The factor by which to multiply the smallest non-zero representation in
-   order to obtain 1%. A factor of 100 means that the precision is 0.01%. *)
+   order to obtain 1%. A factor of 100 means that the precision is 0.01%.
+
+   If you change this, don't forget to update
+   [Internal_for_tests.pp_human]. *)
 let precision_factor = 100
 
 let one_hundred_percent = 100 * precision_factor
@@ -72,4 +75,16 @@ let p100 = one_hundred_percent
 
 module Compare = struct
   include Compare.Int
+end
+
+module Internal_for_tests = struct
+  let equal = Compare.equal
+
+  let pp_human fmt t =
+    (* /!\ This relies on [precision_factor = 100]. *)
+    let d, r = (t / precision_factor, t mod precision_factor) in
+    Format.fprintf fmt "%d" d ;
+    if Compare.(r mod 10 > 0) then Format.fprintf fmt ".%02d" r
+    else if Compare.(r > 0) then Format.fprintf fmt ".%d" (r / 10) ;
+    Format.fprintf fmt "%%"
 end

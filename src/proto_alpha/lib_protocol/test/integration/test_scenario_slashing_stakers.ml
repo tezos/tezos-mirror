@@ -17,7 +17,6 @@ open Adaptive_issuance_helpers
 open State_account
 open Tez_helpers.Ez_tez
 open Scenario
-open Scenario_constants
 
 let fs = Format.asprintf
 
@@ -79,7 +78,7 @@ let init_with_stakers () =
     |+ Empty
   in
   init_constants () --> activate_ai `Force
-  --> branch_flag S.Adaptive_issuance.ns_enable
+  --> set S.Adaptive_issuance.ns_enable true
   --> begin_test
         ~force_attest_all:true
         [
@@ -100,7 +99,6 @@ let init_with_stakers () =
   - several staking parameters
  *)
 let test_simple_slash =
-  let open Lwt_result_syntax in
   let any_slash delegate =
     Tag "double baking" --> double_bake delegate
     |+ Tag "double attesting"
@@ -116,17 +114,15 @@ let test_simple_slash =
   --> any_slash first_slashed_delegate
   --> log "make denunciations"
   --> snapshot_balances "before slash" [first_slashed_delegate]
-  --> ((Tag "denounce same cycle" --> make_denunciations ()
+  --> (Tag "denouncer with maybe staker" --> set_baker never_slashed_delegate1
+       (* ensure denunciation is included by never_slashed_delegate1 *)
+      |+ Tag "denouncer without staker" --> set_baker never_slashed_delegate2)
+  --> ((Tag "denounce same cycle" --> make_denunciations () --> next_cycle
         (* delegate can be forbidden in this case, so we exclude it from list of potential bakers *)
         --> exclude_bakers [first_slashed_delegate]
        |+ Tag "denounce next cycle" --> next_cycle --> make_denunciations ()
           (* delegate can be forbidden in this case, so we set another baker *)
           --> exclude_bakers [first_slashed_delegate])
-       --> (Tag "denouncer with maybe staker"
-            --> set_baker never_slashed_delegate1
-            (* ensure denunciation is included by never_slashed_delegate1 *)
-           |+ Tag "denouncer without staker"
-              --> set_baker never_slashed_delegate2)
        --> next_block
        --> (* only exclude "delegate" *) exclude_bakers [first_slashed_delegate]
        --> (Empty
@@ -136,22 +132,21 @@ let test_simple_slash =
               (* bootstrap1 can be forbidden in this case, so we exclude it from list of potential bakers *)
               --> exclude_bakers
                     [first_slashed_delegate; second_slashed_delegate])
+       (* Whether the denunciation was in the same cycle or the next
+          cycle, we are in the next cycle after the misbehavior, so
+          the slashing has not been applied yet. *)
        --> check_snapshot_balances "before slash"
        --> exec_unit (check_pending_slashings ~loc:__LOC__)
        --> next_cycle
-       --> assert_failure
-             ~expected_error:(fun (_, state) errs ->
-               let str =
-                 if State_ai_flags.Delayed_slashing.enabled state then
-                   Str.regexp_string "ns_enable = true: slash not applied yet"
-                 else Str.regexp ".*\n.*is not equal to.*"
-               in
-               Error_helpers.expect_failwith ~loc:__LOC__ ~str errs)
-             (exec_unit (fun (_block, state) ->
-                  if State_ai_flags.Delayed_slashing.enabled state then
-                    failwith "ns_enable = true: slash not applied yet"
-                  else return_unit)
-             --> check_snapshot_balances "before slash")
+       (* The slashing has been applied. *)
+       --> check_snapshot_balances
+             ~f:
+               (assert_balance_evolution
+                  ~loc:__LOC__
+                  ~for_accounts:[first_slashed_delegate]
+                  ~part:`staked
+                  Q.lt)
+             "before slash"
        --> exec_unit (check_pending_slashings ~loc:__LOC__)
        --> next_cycle
       |+ Tag "denounce too late" --> next_cycle --> next_cycle

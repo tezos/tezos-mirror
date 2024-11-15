@@ -224,7 +224,8 @@ let test_delegate_forbidden =
          --> wait_n_cycles_f crd
          --> check_is_not_forbidden "delegate"
       |+ Tag "Is not forbidden after a denunciation is outdated"
-         --> double_attest "delegate" --> wait_n_cycles 2
+         --> double_attest "delegate"
+         --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
          --> assert_failure
                ~expected_error:(fun (_block, state) errs ->
                  Error_helpers.expect_outdated_denunciation_state
@@ -332,7 +333,7 @@ let test_slash_timing =
   --> List.fold_left
         (fun acc i ->
           acc |+ Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
-        (wait_n_cycles 2)
+        (wait_n_cycles Protocol.Constants_repr.max_slashing_period)
         [3; 4; 5; 6]
   --> double_bake "delegate"
   --> exclude_bakers ["delegate"]
@@ -344,11 +345,12 @@ let test_no_shortcut_for_cheaters =
     Default_parameters.constants_test.consensus_rights_delay
   in
   init_constants () --> activate_ai `Force
+  --> set S.Adaptive_issuance.ns_enable true
   --> begin_test ["delegate"; "bootstrap1"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
   --> set_baker "bootstrap1" (* exclude_bakers ["delegate"] *)
-  --> next_cycle
+  --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
   --> snapshot_balances "init" ["delegate"]
   --> unstake "delegate" amount
   --> (List.fold_left
@@ -363,29 +365,102 @@ let test_no_shortcut_for_cheaters =
          --> check_snapshot_balances "init")
 
 let test_slash_correct_amount_after_stake_from_unstake =
-  let amount_to_unstake = Amount (Tez.of_mutez 200_000_000_000L) in
-  let amount_to_restake = Amount (Tez.of_mutez 100_000_000_000L) in
-  let amount_expected_in_unstake_after_slash = Tez.of_mutez 50_000_000_000L in
+  let tez_to_unstake = Tez.of_int 150_000 in
+  let tez_to_restake = Tez.of_int 120_000 in
+  assert (
+    Tez.(
+      tez_to_restake < tez_to_unstake
+      && tez_to_unstake < Account.default_initial_staked_balance)) ;
+  let unstaked_before_slash = Tez.(tez_to_unstake -! tez_to_restake) in
+  let staked_before_slash =
+    Tez.(Account.default_initial_staked_balance -! unstaked_before_slash)
+  in
+  let slashed_percentage =
+    Default_parameters.constants_test
+      .percentage_of_frozen_deposits_slashed_per_double_baking
+  in
+  let expected_unstaked_after_slash =
+    Tez.(
+      unstaked_before_slash
+      -! mul_percentage ~rounding:`Up unstaked_before_slash slashed_percentage)
+  in
+  let expected_staked_after_slash ~staked_when_computing_misbehaviour_rights =
+    Tez.(
+      staked_before_slash
+      -! mul_percentage
+           ~rounding:`Up
+           staked_when_computing_misbehaviour_rights
+           slashed_percentage)
+  in
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
+  let check_balances ~loc ~staked ~unstaked_frozen ~unstaked_finalizable =
+    check_balance_fields
+      ~loc
+      "delegate"
+      ~liquid:Account.default_initial_spendable_balance
+      ~staked
+      ~unstaked_frozen_total:unstaked_frozen
+      ~unstaked_finalizable
+      ()
+  in
   init_constants () --> activate_ai `Force
+  --> set S.Adaptive_issuance.ns_enable true
   --> begin_test ["delegate"; "bootstrap1"]
-  --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle
-  --> unstake "delegate" amount_to_unstake
-  --> stake "delegate" amount_to_restake
-  --> List.fold_left
-        (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
-        (Tag "wait 0 cycles" --> Empty)
-        (Stdlib.List.init (consensus_rights_delay - 2) (fun i -> i + 1))
-  --> double_attest "delegate" --> make_denunciations ()
-  --> exclude_bakers ["delegate"]
-  --> next_cycle
-  --> check_balance_field
-        "delegate"
-        `Unstaked_frozen_total
-        amount_expected_in_unstake_after_slash
+  --> unstake "delegate" (Amount tez_to_unstake)
+  --> stake "delegate" (Amount tez_to_restake)
+  --> list_map_branched
+        Protocol.Misc.(0 --> (consensus_rights_delay + 1))
+        (fun cycles_to_wait ->
+          Tag (sf "wait %i cycles" cycles_to_wait)
+          --> wait_n_cycles cycles_to_wait
+          --> check_balances
+                ~loc:__LOC__
+                ~staked:staked_before_slash
+                ~unstaked_frozen:unstaked_before_slash
+                ~unstaked_finalizable:Tez.zero
+          --> exclude_bakers ["delegate"]
+          --> double_bake "delegate" --> make_denunciations ()
+          --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
+          -->
+          if cycles_to_wait > consensus_rights_delay then
+            (* The misbehaviour happens at least two full cycles after
+               the unstake operation, meaning that
+               1) the unstake request is too old to be slashed and
+               2) the staked balance at the time rights for the
+                  misbehaviour block was computed was
+                  [staked_before_slash]. *)
+            let staked =
+              expected_staked_after_slash
+                ~staked_when_computing_misbehaviour_rights:staked_before_slash
+            in
+            check_balances
+              ~loc:__LOC__
+              ~staked
+              ~unstaked_frozen:Tez.zero
+              ~unstaked_finalizable:unstaked_before_slash
+          else
+            (* 1) The unstake request is slashed and
+               2) the staked balance when computing the relevant
+                  rights was the initial staked balance. *)
+            let staked =
+              expected_staked_after_slash
+                ~staked_when_computing_misbehaviour_rights:
+                  Account.default_initial_staked_balance
+            in
+            let unstaked_frozen, unstaked_finalizable =
+              if cycles_to_wait >= consensus_rights_delay then
+                (* The unstake request is finalizable. *)
+                (Tez.zero, expected_unstaked_after_slash)
+              else (expected_unstaked_after_slash, Tez.zero)
+            in
+            check_balances
+              ~loc:__LOC__
+              ~staked
+              ~unstaked_frozen
+              ~unstaked_finalizable)
 
 (* Test a non-zero request finalizes for a non-zero amount if it hasn't been slashed 100% *)
 let test_mini_slash =
@@ -484,7 +559,8 @@ let test_mega_slash =
   -->
   (* The "incident" *)
   let incident =
-    double_attest "delegate" --> make_denunciations () --> wait_n_cycles 2
+    double_attest "delegate" --> make_denunciations ()
+    --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
     (* We check stakers can still unstake and change delegates *)
     --> assert_success (unstake "staker1" Half)
     --> assert_success (unstake "staker1" All)
@@ -536,7 +612,8 @@ let test_mega_slash =
   loop 3 incident
   (*  but 4 will. *)
   --> double_attest "delegate"
-  --> make_denunciations () --> wait_n_cycles 2
+  --> make_denunciations ()
+  --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
   (* We check stakers can still unstake and finalize, despite everything *)
   --> assert_success
         (unstake "staker1" Half

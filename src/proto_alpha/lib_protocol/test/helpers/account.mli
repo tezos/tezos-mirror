@@ -57,8 +57,14 @@ val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
 
 val find_alternate : Signature.Public_key_hash.t -> t
 
-(** 4.000.000.000 tez *)
-val default_initial_balance : Tez.t
+(** Default full balance of bootstrap accounts: 4_000_000 tez *)
+val default_initial_full_balance : Tez.t
+
+(** Default staked balance of bootstrap accounts: 200_000 tez *)
+val default_initial_staked_balance : Tez.t
+
+(** Default spendable balance of bootstrap accounts: 3_800_000 tez *)
+val default_initial_spendable_balance : Tez.t
 
 (** [generate_accounts ?rng_state n] first frees the global account state then
     generates [n] random accounts with [rng_state] to generate the seed and adds
@@ -74,9 +80,9 @@ val new_commitment :
 (** Fails if the contract is not an implicit one  *)
 val pkh_of_contract_exn : Contract.t -> Signature.Public_key_hash.t
 
-(** [make_bootstrap_account ~initial_balance ~delegate_to account] creates a
+(** [make_bootstrap_account ~balance ~delegate_to account] creates a
     {!Parameters.bootstrap_account} from an account with the default or set
-    values. default [initial_balance] is [default_initial_balance],
+    values. default [balance] is {!default_initial_full_balance},
     [delegate_to] is [None] and [consensus_key] is [None].
 *)
 val make_bootstrap_account :

@@ -90,20 +90,18 @@ let test_simple_staking_rights () =
   let open Lwt_result_syntax in
   let* b, (a1, _a2) = Context.init2 () in
   let* balance = Context.Contract.balance (B b) a1 in
-  let delegate1 = Context.Contract.pkh a1 in
-  let* frozen_deposits =
-    Context.Delegate.current_frozen_deposits (B b) delegate1
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      balance
+      Account.default_initial_spendable_balance
   in
-  let expected_initial_balance =
-    Account.default_initial_balance -! frozen_deposits
-  in
-  let* () = Assert.equal_tez ~loc:__LOC__ balance expected_initial_balance in
   let* m1 = Context.Contract.manager (B b) a1 in
   let* info = Context.Delegate.info (B b) m1.pkh in
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
-      Account.default_initial_balance
+      Account.default_initial_full_balance
       info.staking_balance
   in
   check_stake ~loc:__LOC__ b m1

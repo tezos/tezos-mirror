@@ -510,5 +510,7 @@ let json_of_parameters ?chain_id parameters =
     Protocol_parameters_overrides.{parameters; chain_id}
 
 module Internal_for_tests = struct
+  let bootstrap_balance = bootstrap_balance
+
   let make_sc_rollup_parameter = make_sc_rollup_parameter
 end
