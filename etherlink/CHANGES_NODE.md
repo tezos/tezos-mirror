@@ -4,6 +4,20 @@
 
 ### Features
 
+### Bug fixes
+
+### Internals
+
+## Version 0.8 (2024-11-15)
+
+This is a bug fixes release, notably improving verbosity of the evm-node on
+communication errors with the rollup node.
+
+This release will not apply any migration to the node’s store (version 13),
+meaning it is possible to downgrade to the previous version.
+
+### Features
+
 #### Metrics
 
 - Adds `l1_level` to expose the last processed L1 block. If the node is connected
