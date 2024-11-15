@@ -1314,6 +1314,18 @@ module History = struct
 
     let hash = hash ?with_migration:None
 
+    type cell_content = Content_v2.t =
+      | Unpublished of Header.id
+      | Published of {
+          header : Header.t;
+          publisher : Contract_repr.t;
+          is_proto_attested : bool;
+          attested_shards : int;
+          total_shards : int;
+        }
+
+    let content = Skip_list.content
+
     module Internal_for_tests = struct
       type cell_content = Content.t =
         | Unpublished of Header.id

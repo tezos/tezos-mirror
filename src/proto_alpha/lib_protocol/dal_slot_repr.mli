@@ -239,6 +239,26 @@ module History : sig
        confirmed slot headers. *)
   type t
 
+  (** The content of a cell in the DAL skip list. We have [number_of_slots] new
+      cells per level (one per slot index). For a given slot index in
+      [0..number_of_slots-1], the commitment is either [Unpublished] or
+      [Published]. In this second case, we attach extra information in addition
+      to the id such as the commitment, the publisher, the number of attested
+      shards and whether the commitment is attested from the point of view of
+      the protocol. *)
+  type cell_content = private
+    | Unpublished of Header.id
+    | Published of {
+        header : Header.t;
+        publisher : Contract_repr.t;
+        is_proto_attested : bool;
+        attested_shards : int;
+        total_shards : int;
+      }
+
+  (** Returns the {!cell_content} of the given skip list cell. *)
+  val content : t -> cell_content
+
   module Pointer_hash : S.HASH
 
   (** Type of hashes of history. *)

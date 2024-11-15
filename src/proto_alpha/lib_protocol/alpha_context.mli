@@ -2925,6 +2925,18 @@ module Dal : sig
   module Slots_history : sig
     type t
 
+    type cell_content = private
+      | Unpublished of Slot.Header.id
+      | Published of {
+          header : Slot.Header.t;
+          publisher : Contract.t;
+          is_proto_attested : bool;
+          attested_shards : int;
+          total_shards : int;
+        }
+
+    val content : t -> cell_content
+
     module Pointer_hash : S.HASH
 
     type hash = Pointer_hash.t
