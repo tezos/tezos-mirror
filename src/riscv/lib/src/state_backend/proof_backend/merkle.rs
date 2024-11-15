@@ -8,23 +8,44 @@
 
 use crate::state_backend::hash::{Hash, HashError, DIGEST_SIZE};
 
-/// A variable-width Merkle tree with optional `AccessInfo` metadata for leaves.
+/// A variable-width Merkle tree with [`AccessInfo`] metadata for leaves.
 /// Values of this type are produced by the proof-generating backend to capture
 /// a snapshot of the machine state along with access information for leaves
 /// which hold data that was used in a particular evaluation step.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MerkleTree {
     Leaf(Hash, AccessInfo, Vec<u8>),
     Node(Hash, Vec<Self>),
 }
 
-/// Type of access associated with leaves in a `MerkleTree`.
-#[derive(Debug)]
+/// Type of access associated with leaves in a [`MerkleTree`].
+#[derive(Debug, Clone, PartialEq)]
 pub enum AccessInfo {
     NoAccess,
-    Read,
     Write,
+    Read,
     ReadWrite,
+}
+
+/// Intermediary representation obtained when compressing a [`MerkleTree`].
+///
+/// It only holds the initial data in the non-blinded leaves.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum CompressedMerkleTree {
+    Leaf(Hash, CompressedAccessInfo),
+    Node(Hash, Vec<Self>),
+}
+
+/// Type of access associated with leaves in a [`CompressedMerkleTree`].
+///
+/// If a subtree is made up of only [`AccessInfo::NoAccess`] or of only [`AccessInfo::Read`]
+/// then the subtree can be compressed to a leaf of the corresponding access type.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum CompressedAccessInfo {
+    NoAccess,
+    Write,
+    Read(Vec<u8>),
+    ReadWrite(Vec<u8>),
 }
 
 impl MerkleTree {
