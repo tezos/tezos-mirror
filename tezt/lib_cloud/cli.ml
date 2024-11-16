@@ -218,6 +218,7 @@ let dns_domains =
   Clap.list_string
     ~section
     ~long:"dns-domain"
+    ~long_synonyms:["dns"]
     ~description:
       "Enable to register a list of DNS domains. By default no domain is \
        registered. The format expected here is domain such that the suffix \
