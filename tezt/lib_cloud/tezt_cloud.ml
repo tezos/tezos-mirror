@@ -153,27 +153,22 @@ let register_dns_remove ~tags =
     ~title:"Remove a DNS entry"
     ~tags:("dns" :: "remove" :: tags)
   @@ fun _cloud ->
-  let domain =
-    match Cli.get_string_opt "dns-domain" with
-    | None ->
-        Test.fail
-          "You must provide a domain name via -a dns-domain=<name>.  The \
-           format expected is the same one as the CLI argument '--dns-domain' \
-           of tezt-loucd."
-    | Some domain -> domain
-  in
-  let* res = Gcloud.DNS.find_zone_for_subdomain domain in
-  let zone =
-    match res with
-    | None -> Test.fail "No suitable zone for %s" domain
-    | Some (zone, _) -> zone
-  in
-  let* ip = Gcloud.DNS.get_value ~zone ~domain in
-  match ip with
-  | None -> Test.fail "No record found for the current domain"
-  | Some ip ->
-      let* () = Gcloud.DNS.remove_subdomain ~zone ~name:domain ~value:ip in
-      unit
+  let* domains = Env.dns_domains () in
+  Lwt_list.iter_s
+    (fun domain ->
+      let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+      let zone =
+        match res with
+        | None -> Test.fail "No suitable zone for %s" domain
+        | Some (zone, _) -> zone
+      in
+      let* ip = Gcloud.DNS.get_value ~zone ~domain in
+      match ip with
+      | None -> Test.fail "No record found for the current domain"
+      | Some ip ->
+          let* () = Gcloud.DNS.remove_subdomain ~zone ~name:domain ~value:ip in
+          unit)
+    domains
 
 let register ~tags =
   register_docker_push ~tags ;
