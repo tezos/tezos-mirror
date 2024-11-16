@@ -170,10 +170,24 @@ let run_command ?cmd_wrapper cmd args =
 let dns_domains () =
   (* When we use the proxy mode, by default a domain name is
      registered for the `tezt-cloud` zone. *)
-  match mode with
-  | `Host -> (
-      let* domain = Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt_cloud" in
-      match domain with
-      | None -> Lwt.return Cli.dns_domains
-      | Some domain -> Lwt.return (domain :: Cli.dns_domains))
-  | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains
+  let* domains =
+    match mode with
+    | `Host -> (
+        let* domain = Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt-cloud" in
+        match domain with
+        | None -> Lwt.return Cli.dns_domains
+        | Some domain -> Lwt.return (domain :: Cli.dns_domains))
+    | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains
+  in
+  (* A fully-qualified domain name requires to end with a dot.
+     However, the usage tends to omit this final dot. Because having a
+     domain name ending with a dot is always valid, we add one if
+     there is none.
+
+     See http://www.dns-sd.org/trailingdotsindomainnames.html for more
+     details.
+  *)
+  domains
+  |> List.map (fun domain ->
+         if String.ends_with ~suffix:"." domain then domain else domain ^ ".")
+  |> Lwt.return
