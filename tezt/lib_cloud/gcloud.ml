@@ -122,6 +122,11 @@ module DNS = struct
       "gcloud"
       ["dns"; "managed-zones"; "describe"; zone]
 
+  let list ~zone () =
+    Process.run_and_read_stdout
+      "gcloud"
+      ["dns"; "record-sets"; "list"; "--zone"; zone]
+
   let list_entries ?name_filter ~zone () =
     let name_filter =
       match name_filter with

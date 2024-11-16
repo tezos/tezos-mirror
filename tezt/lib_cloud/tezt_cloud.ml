@@ -117,6 +117,20 @@ let register_describe_dns_zone ~tags =
       unit)
     zones
 
+let register_list_dns_domains ~tags =
+  Cloud.register
+    ?vms:None
+    ~__FILE__
+    ~title:"List the DNS domains currently in use"
+    ~tags:("describe" :: "dns" :: "list" :: tags)
+  @@ fun _cloud ->
+  let* zones = Gcloud.DNS.list_zones () in
+  Lwt_list.iter_s
+    (fun (zone, _) ->
+      let* _ = Gcloud.DNS.list ~zone () in
+      unit)
+    zones
+
 let register_dns_add ~tags =
   Cloud.register
     ?vms:None
@@ -180,5 +194,6 @@ let register ~tags =
   register_list_vms ~tags ;
   register_create_dns_zone ~tags ;
   register_describe_dns_zone ~tags ;
+  register_list_dns_domains ~tags ;
   register_dns_add ~tags ;
   register_dns_remove ~tags

@@ -57,6 +57,8 @@ module DNS : sig
 
   val describe : zone:string -> unit -> string Lwt.t
 
+  val list : zone:string -> unit -> string Lwt.t
+
   (** [get_fqdn ~zone ~name] returns the fully qualified domain name (FQDN)
       corresponding to the subdomain or hostname [name] in the GCP zone [zone].
 
