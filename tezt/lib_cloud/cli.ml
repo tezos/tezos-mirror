@@ -219,9 +219,10 @@ let dns_domains =
     ~section
     ~long:"dns-domain"
     ~description:
-      "Register the specified domain name for the proxy node. Relies on gcloud\n\
-      \      in order to add the specified entry in an authorized zone. Multiple\n\
-      \      occurrences allowed."
+      "Enable to register a list of DNS domains. By default no domain is \
+       registered. The format expected here is domain such that the suffix \
+       matches one of the domain registered with the GCP project. Mind that \
+       the domain must end with a dot."
     ()
 
 let octez_release =
