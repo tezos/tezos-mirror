@@ -231,3 +231,12 @@ let open_telemetry =
     ~set_long_synonyms:["otel"]
     ~description:"Run the Open Telemetry stack"
     false
+
+let alert_manager =
+  Clap.list_string
+    ~section
+    ~description:
+      "Specify an alert manager configuration to be run. If this option is \
+       used multiple times, configurations will be concatenated."
+    ~long:"alert-manager"
+    ()
