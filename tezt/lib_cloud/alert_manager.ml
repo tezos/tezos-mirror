@@ -7,7 +7,7 @@
 
 type t = unit
 
-let run () =
+let run ~configuration_files:_ =
   let* () =
     Process.run
       "docker"
