@@ -132,7 +132,10 @@ let register_dns_add ~tags =
   let domain =
     match Cli.get_string_opt "dns-domain" with
     | None ->
-        Test.fail "You must provide a domain name via -a dns-domain=<name>"
+        Test.fail
+          "You must provide a domain name via -a dns-domain=<domain>. The \
+           format expected is the same one as the CLI argument '--dns-domain' \
+           of tezt-cloud. "
     | Some domain -> domain
   in
   let* res = Gcloud.DNS.find_zone_for_subdomain domain in
@@ -153,7 +156,10 @@ let register_dns_remove ~tags =
   let domain =
     match Cli.get_string_opt "dns-domain" with
     | None ->
-        Test.fail "You must provide a domain name via -a dns-domain=<name>"
+        Test.fail
+          "You must provide a domain name via -a dns-domain=<name>.  The \
+           format expected is the same one as the CLI argument '--dns-domain' \
+           of tezt-loucd."
     | Some domain -> domain
   in
   let* res = Gcloud.DNS.find_zone_for_subdomain domain in
