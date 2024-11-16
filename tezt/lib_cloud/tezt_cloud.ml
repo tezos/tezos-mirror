@@ -87,7 +87,8 @@ let register_create_dns_zone ~tags =
     ~title:"Create a new DNS zone"
     ~tags:("create" :: "dns" :: "zone" :: tags)
   @@ fun _cloud ->
-  match Env.dns_domains with
+  let* domains = Env.dns_domains () in
+  match domains with
   | [] ->
       Test.fail "You must specify the domains to use via --dns-domain option."
   | domains ->

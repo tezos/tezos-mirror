@@ -346,7 +346,6 @@ dig ns <gcp-project>.<domain>
 
 You should see the name servers you just added.
 
-
 ## Recommendation when writing experiments
 
 0. Even though there is a time to live for the VM, please don't forget

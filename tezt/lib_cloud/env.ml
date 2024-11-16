@@ -64,8 +64,6 @@ let max_run_duration = Cli.max_run_duration
 
 let no_max_run_duration = Cli.no_max_run_duration
 
-let dns_domains = Cli.dns_domains
-
 let os = Cli.os
 
 let open_telemetry = Cli.open_telemetry
@@ -168,3 +166,14 @@ let run_command ?cmd_wrapper cmd args =
   | None -> Process.spawn cmd args
   | Some cmd_wrapper ->
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
+
+let dns_domains () =
+  (* When we use the proxy mode, by default a domain name is
+     registered for the `tezt-cloud` zone. *)
+  match mode with
+  | `Host -> (
+      let* domain = Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt_cloud" in
+      match domain with
+      | None -> Lwt.return Cli.dns_domains
+      | Some domain -> Lwt.return (domain :: Cli.dns_domains))
+  | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains

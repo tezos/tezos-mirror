@@ -214,10 +214,11 @@ module Remote = struct
     let* t =
       if proxy then
         let* agent = deploy_proxy () in
+        let* domains = Env.dns_domains () in
         let* () =
           Lwt_list.iter_s
             (fun domainname -> dns_add_record agent domainname)
-            Env.dns_domains
+            domains
         in
         Lwt.return {agents = agent :: agents}
       else Lwt.return {agents}

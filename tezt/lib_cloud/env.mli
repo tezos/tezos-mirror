@@ -73,7 +73,7 @@ val max_run_duration : int
 
 val no_max_run_duration : bool
 
-val dns_domains : string list
+val dns_domains : unit -> string list Lwt.t
 
 val os : string
 

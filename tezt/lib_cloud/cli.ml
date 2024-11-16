@@ -220,10 +220,13 @@ let dns_domains =
     ~long:"dns-domain"
     ~long_synonyms:["dns"]
     ~description:
-      "Enable to register a list of DNS domains. By default no domain is \
-       registered. The format expected here is domain such that the suffix \
-       matches one of the domain registered with the GCP project. Mind that \
-       the domain must end with a dot."
+      "Enable to register a list of DNS domains. By default a domain is \
+       registered when using the proxy mode. In that case the domain will be \
+       prepended by the value of the `tezt-cloud` parameter and suffixed by \
+       the domain registered under the zone name `tezt-cloud` (check the \
+       README to get more details). The format expected here is domain such \
+       that the suffix matches one of the domain registered with the GCP \
+       project. Mind that the domain must end with a dot."
     ()
 
 let octez_release =
