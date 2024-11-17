@@ -38,7 +38,7 @@ type error +=
   | Dal_expected_skip_list_cell_not_found of Dal.Slot.Header.id
 
 let () =
-  Sc_rollup_node_errors.register_error_kind
+  register_error_kind
     `Permanent
     ~id:"dal_pages_request.dal_invalid_page_for_slot"
     ~title:"Invalid Dal page requested for slot"
@@ -50,7 +50,7 @@ let () =
     (fun page_id -> Dal_invalid_page_for_slot page_id)
 
 let () =
-  Sc_rollup_node_errors.register_error_kind
+  register_error_kind
     `Permanent
     ~id:"dal_pages_request.dal_expected_skip_list_cell_not_found"
     ~title:"Expected DAL skip list cell not found"
