@@ -519,9 +519,8 @@ module History = struct
         ->
           Format.fprintf
             fmt
-            "Published { @[header: %a@@] @[publisher: %a@@] \
-             @[is_proto_attested: %b@@] @[attested_shards: %d@@] \
-             @[total_shards: %d@@] }"
+            "Published { @[header: %a@] @[publisher: %a@] @[is_proto_attested: \
+             %b@] @[attested_shards: %d@] @[total_shards: %d@] }"
             Header.pp
             header
             Contract_repr.pp
@@ -1327,6 +1326,8 @@ module History = struct
     let content = Skip_list.content
 
     let content_id = Content_v2.content_id
+
+    let pp_content = Content_v2.pp
 
     module Internal_for_tests = struct
       let proof_statement_is serialized_proof expected =
