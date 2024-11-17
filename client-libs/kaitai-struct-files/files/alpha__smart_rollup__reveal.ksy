@@ -59,10 +59,8 @@ types:
     seq:
     - id: page_id
       type: page_id
-    - id: min_attested_shards
-      type: u2be
-    - id: expected_total_shards
-      type: u2be
+    - id: attestation_threshold_percent
+      type: u1
     - id: restricted_commitments_publishers
       type: restricted_commitments_publishers
   restricted_commitments_publishers:
