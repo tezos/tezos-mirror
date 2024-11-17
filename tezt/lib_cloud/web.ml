@@ -19,44 +19,10 @@ let pp_docker_image fmt = function
   | Env.Gcp {alias} -> Format.fprintf fmt "%s" alias
   | Octez_release {tag} -> Format.fprintf fmt "Octez %s release" tag
 
-let configuration ~agents =
-  let str =
-    agents
-    |> List.map (fun agent ->
-           let Configuration.
-                 {
-                   machine_type;
-                   docker_image;
-                   max_run_duration;
-                   binaries_path;
-                   os;
-                 } =
-             Agent.configuration agent
-           in
-           Format.asprintf
-             {|
-## %s
-
-- **Machine type**: %s
-- **Docker_image**: %a
-- **Max_run_duration**: %s
-- **Binaries_path**: %s
-- **OS**: %s
-
-           |}
-             (Agent.name agent)
-             machine_type
-             pp_docker_image
-             docker_image
-             (Option.fold
-                ~none:"no limit"
-                ~some:(fun time -> string_of_int time ^ "s")
-                max_run_duration)
-             binaries_path
-             os)
-    |> String.concat "\n"
-  in
-  Format.asprintf "# Configurations@.%s\n" str
+let domain agents =
+  match Env.mode with
+  | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> Option.get |> fst
+  | `Host | `Localhost | `Cloud -> "localhost"
 
 let string_docker_command agent =
   match Agent.runner agent with
@@ -83,107 +49,68 @@ let string_vm_command agent =
   | Some cmd_wrapper ->
       String.concat " " (cmd_wrapper.Gcloud.cmd :: cmd_wrapper.args)
 
-let debugging ~agents =
-  let str =
-    agents
-    |> List.map (fun agent ->
-           let host_run_command =
-             Printf.sprintf
-               {|
-```bash
-%s
-```
-            |}
-               (string_vm_command agent)
-           in
-           let docker_command =
-             Printf.sprintf {|
-```bash
-%s
-```
-|} (string_docker_command agent)
-           in
-           Printf.sprintf
-             {|
-## %s
-Connect on the VM:
-%s
-
-Connect on the Docker:
-%s
-|}
-             (Agent.name agent)
-             host_run_command
-             docker_command)
-    |> String.concat "\n"
+let agent_jingo_template agent =
+  let open Jingoo.Jg_types in
+  let Configuration.
+        {machine_type; docker_image; max_run_duration; binaries_path; os} =
+    Agent.configuration agent
   in
-  Format.asprintf "# Debugging@.%s\n" str
+  Tobj
+    [
+      ("name", Tstr (Agent.name agent));
+      ("machine_type", Tstr machine_type);
+      ("docker_image", Tstr (Format.asprintf "%a" pp_docker_image docker_image));
+      ( "max_run_duration",
+        Tstr
+          (Option.fold
+             ~none:"no limit"
+             ~some:(fun time -> string_of_int time ^ "s")
+             max_run_duration) );
+      ("binaries_path", Tstr binaries_path);
+      ("os", Tstr os);
+      ("vm_command", Tstr (string_vm_command agent));
+      ("docker_command", Tstr (string_docker_command agent));
+    ]
 
-let monitoring ~agents =
-  if Env.monitoring then
-    let str =
-      agents
-      |> List.map (fun agent ->
-             let address = Agent.runner agent |> Runner.address in
-             Format.asprintf
-               "- [%s](http://%s:19999)"
-               (Agent.name agent)
-               address)
-      |> String.concat "\n"
-    in
-    Format.asprintf "# Monitoring@.%s\n" str
-  else
-    "# Monitoring\n Monitoring disabled. Use `--monitoring` to activate it.\n"
+let service_jingo_template {name; url} =
+  let open Jingoo.Jg_types in
+  Tobj [("title", Tstr (String.capitalize_ascii name)); ("uri", Tstr url)]
 
-let prometheus ~agents =
-  let domain =
-    match Env.mode with
-    | `Orchestrator ->
-        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
-    | `Host | `Localhost | `Cloud -> "localhost"
-  in
-  if Env.prometheus then
-    Format.asprintf
-      "# Prometheus\n [Prometheus dashboard](http://%s:%d)\n"
-      domain
-      Env.prometheus_port
-  else "Prometheus disabled. Use `--prometheus` to activate it.\n"
-
-let grafana ~agents =
-  let domain =
-    match Env.mode with
-    | `Orchestrator ->
-        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
-    | `Host | `Localhost | `Cloud -> "localhost"
-  in
-  if Env.grafana then
-    Format.asprintf "# Grafana\n [Grafana dashboard](http://%s:3000)\n" domain
-  else "Grafana disabled. Use `--grafana` to activate it.\n"
-
-let service {name; url} =
-  Format.asprintf
-    "# %s\n [%s](%s)\n"
-    (String.capitalize_ascii name)
-    (String.lowercase_ascii name)
-    url
-
-let markdown_content ~agents ~services =
+let jingo_template t agents =
+  let open Jingoo.Jg_types in
   [
-    configuration ~agents;
-    grafana ~agents;
-    prometheus ~agents;
-    monitoring ~agents;
+    ( "grafana",
+      Tobj
+        [
+          ("activated", Tbool Env.grafana);
+          ("uri", Tstr (Format.asprintf "http://%s:3000" (domain agents)));
+        ] );
+    ( "prometheus",
+      Tobj
+        [
+          ("activated", Tbool Env.prometheus);
+          ("uri", Tstr (Format.asprintf "http://%s:9090" (domain agents)));
+        ] );
+    ( "monitoring",
+      Tobj
+        [
+          ("activated", Tbool Env.monitoring);
+          ("uri", Tstr (Format.asprintf "http://%s:19999" (domain agents)));
+        ] );
+    ("agents", Tlist (List.map agent_jingo_template agents));
+    ("services", Tlist (List.map service_jingo_template t.services));
   ]
-  @ List.map service services
-  @ [debugging ~agents]
-  |> String.concat "\n"
 
 let index dir = dir // "index.md"
 
 let write t ~agents =
   (* The content is formatted in markdown and will be rendered in html via
      pandoc. *)
-  let content = markdown_content ~agents ~services:t.services in
+  let content =
+    Jingoo.Jg_template.from_file
+      Path.website_index
+      ~models:(jingo_template t agents)
+  in
   let dir = t.dir in
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
