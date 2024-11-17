@@ -3271,8 +3271,7 @@ module Sc_rollup : sig
     | Request_dal_page of Dal.Page.t
     | Request_adal_page of {
         page_id : Dal.Page.t;
-        min_attested_shards : int;
-        expected_total_shards : int;
+        attestation_threshold_percent : int;
         restricted_commitments_publishers : Contract.t list option;
       }
     | Reveal_dal_parameters
