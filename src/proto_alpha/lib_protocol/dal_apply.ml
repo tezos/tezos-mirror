@@ -28,22 +28,12 @@
 open Alpha_context
 open Dal_errors
 
-let assert_dal_feature_enabled ctxt =
-  let open Constants in
-  let Parametric.{dal = {feature_enable; _}; _} = parametric ctxt in
-  error_unless Compare.Bool.(feature_enable = true) Dal_feature_disabled
-
-let only_if_dal_feature_enabled ctxt ~default f =
-  let open Constants in
-  let Parametric.{dal = {feature_enable; _}; _} = parametric ctxt in
-  if feature_enable then f ctxt else default ctxt
-
 let slot_of_int_e ~number_of_slots n =
   let open Result_syntax in
   match Dal.Slot_index.of_int_opt ~number_of_slots n with
   | None ->
       tzfail
-      @@ Dal_errors.Dal_slot_index_above_hard_limit
+      @@ Dal_slot_index_above_hard_limit
            {given = n; limit = number_of_slots - 1}
   | Some slot_index -> return slot_index
 
@@ -55,7 +45,7 @@ let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
 
 let validate_attestation ctxt level slot consensus_key attestation =
   let open Lwt_result_syntax in
-  let*? () = assert_dal_feature_enabled ctxt in
+  let*? () = Dal.assert_feature_enabled ctxt in
   let number_of_slots = Constants.dal_number_of_slots ctxt in
   let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
   let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
@@ -73,7 +63,7 @@ let validate_attestation ctxt level slot consensus_key attestation =
 
 let apply_attestation ctxt attestation ~power =
   let open Result_syntax in
-  let* () = assert_dal_feature_enabled ctxt in
+  let* () = Dal.assert_feature_enabled ctxt in
   return
     (Dal.Attestation.record_number_of_attested_shards ctxt attestation power)
 
@@ -85,7 +75,7 @@ let apply_attestation ctxt attestation ~power =
    malicious (or if there is a bug). In that case, it is better to
    ensure fees will be taken. *)
 let validate_publish_commitment ctxt _operation =
-  assert_dal_feature_enabled ctxt
+  Dal.assert_feature_enabled ctxt
 
 let apply_publish_commitment ctxt operation ~source =
   let open Result_syntax in
@@ -105,7 +95,7 @@ let apply_publish_commitment ctxt operation ~source =
 
 let finalisation ctxt =
   let open Lwt_result_syntax in
-  only_if_dal_feature_enabled
+  Dal.only_if_feature_enabled
     ctxt
     ~default:(fun ctxt -> return (ctxt, Dal.Attestation.empty))
     (fun ctxt ->

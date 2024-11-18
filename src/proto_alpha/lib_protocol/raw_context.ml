@@ -2196,6 +2196,20 @@ module Dal = struct
       dal.slot_accountability
       ~threshold
       ~number_of_shards
+
+  let assert_feature_enabled ctxt =
+    let constants = constants ctxt in
+    error_unless
+      Compare.Bool.(constants.dal.feature_enable = true)
+      Dal_errors_repr.Dal_feature_disabled
+
+  let only_if_feature_enabled ctxt ~default f =
+    let constants = constants ctxt in
+    if constants.dal.feature_enable then f ctxt else default ctxt
+
+  let only_if_incentives_enabled ctxt ~default f =
+    let constants = constants ctxt in
+    if constants.dal.incentives_enable then f ctxt else default ctxt
 end
 
 (* The type for relative context accesses instead from the root. In order for

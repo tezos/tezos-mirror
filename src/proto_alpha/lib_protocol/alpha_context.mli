@@ -2750,6 +2750,12 @@ module Dal : sig
 
   val make : context -> (context * cryptobox) tzresult
 
+  val assert_feature_enabled : t -> unit tzresult
+
+  val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
     type t
