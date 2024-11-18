@@ -129,6 +129,68 @@ module Network = struct
     JSON.(json |-> "level" |> as_int) |> Lwt.return
 
   let expected_pow = function Public _ -> 26. | Sandbox -> 0.
+
+  let versions network =
+    match network with
+    | Public ((Mainnet | Ghostnet) as public_network) ->
+        let uri =
+          Format.sprintf
+            "https://api.%s.tzkt.io/v1/delegates?limit=5000&active=true"
+            (to_string (Public public_network))
+        in
+        let* output =
+          Process.spawn "curl" [uri] |> Process.check_and_read_stdout
+        in
+        let json_accounts =
+          JSON.parse ~origin:"Network.versions" output |> JSON.as_list
+        in
+        json_accounts |> List.to_seq
+        |> Seq.map (fun json_account ->
+               JSON.
+                 ( json_account |-> "address" |> as_string,
+                   json_account |-> "software" |-> "version" |> as_string_opt ))
+        |> Seq.filter_map (function
+               | address, None -> Some (address, "unknown")
+               | address, Some version -> Some (address, version))
+        |> Hashtbl.of_seq |> Lwt.return
+    | Public (Weeklynet _) ->
+        (* No easy way to get this information. *)
+        Lwt.return (Hashtbl.create 0)
+    | Sandbox ->
+        (* Not sure what to do here since it depends on the docker image. We can figure that out later. *)
+        Lwt.return (Hashtbl.create 0)
+
+  let aliases ?(accounts = []) network =
+    match network with
+    | Public ((Mainnet | Ghostnet) as public_network) ->
+        let uri =
+          Format.sprintf
+            "https://api.%s.tzkt.io/v1/delegates?limit=5000&active=true"
+            (to_string (Public public_network))
+        in
+        let* output =
+          Process.spawn "curl" [uri] |> Process.check_and_read_stdout
+        in
+        let json_accounts =
+          JSON.parse ~origin:"Network.aliases" output |> JSON.as_list
+        in
+        json_accounts |> List.to_seq
+        |> Seq.map (fun json_account ->
+               JSON.
+                 ( json_account |-> "address" |> as_string,
+                   json_account |-> "alias" |> as_string_opt ))
+        |> Seq.filter_map (function
+               | _, None -> None
+               | address, Some alias -> Some (address, alias))
+        |> Hashtbl.of_seq |> Lwt.return
+    | Public (Weeklynet _) ->
+        (* There is no aliases for weeklynet. *)
+        Lwt.return (Hashtbl.create 0)
+    | Sandbox ->
+        accounts |> List.to_seq
+        |> Seq.map (fun account ->
+               (account.Account.public_key_hash, account.alias))
+        |> Hashtbl.of_seq |> Lwt.return
 end
 
 module Node = struct
@@ -860,6 +922,10 @@ type t = {
   disconnection_state : Disconnect.t option;
   first_level : int;
   teztale : Teztale.t option;
+  aliases : (string, string) Hashtbl.t;
+      (* mapping from baker addresses to their Tzkt aliases (if known)*)
+  versions : (string, string) Hashtbl.t;
+      (* mapping from baker addresses to their octez versions (if known) *)
 }
 
 let pp_metrics t
@@ -2423,6 +2489,11 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       observers
       etherlink
   in
+  let* aliases =
+    let accounts = List.map (fun ({account; _} : baker) -> account) bakers in
+    Network.aliases ~accounts configuration.network
+  in
+  let* versions = Network.versions configuration.network in
   Lwt.return
     {
       cloud;
@@ -2439,6 +2510,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       disconnection_state;
       first_level;
       teztale;
+      aliases;
+      versions;
     }
 
 let wait_for_level t level =
