@@ -494,6 +494,13 @@ module Cli = struct
         "All the options related to running DAL scenarions onto the cloud"
       "Cloud DAL"
 
+  let blocks_history =
+    Clap.default_int
+      ~section
+      ~long:"blocks-history"
+      ~description:"Number of blocks history kept in memory. Default value: 100"
+      100
+
   let fundraiser =
     Clap.default_string
       ~section
@@ -743,6 +750,7 @@ type configuration = {
   memtrace : bool;
   data_dir : string option;
   fundraiser : string;
+  blocks_history : int;
 }
 
 type bootstrap = {
@@ -2440,9 +2448,14 @@ let wait_for_level t level =
       let* _ = Node.wait_for_level node level in
       Lwt.return_unit
 
+let clean_up t level =
+  Hashtbl.remove t.infos level ;
+  Hashtbl.remove t.metrics level
+
 let on_new_level t ?etherlink level =
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
+  clean_up t (level - t.configuration.blocks_history) ;
   let etherlink_operator =
     Option.map
       (fun etherlink -> etherlink.operator.account.public_key_hash)
@@ -2628,6 +2641,7 @@ let configuration, etherlink_configuration =
       Some {etherlink_sequencer; etherlink_producers; etherlink_dal_slots}
     else None
   in
+  let blocks_history = Cli.blocks_history in
   let t =
     {
       stake;
@@ -2643,6 +2657,7 @@ let configuration, etherlink_configuration =
       memtrace;
       data_dir;
       fundraiser;
+      blocks_history;
     }
   in
   (t, etherlink)
