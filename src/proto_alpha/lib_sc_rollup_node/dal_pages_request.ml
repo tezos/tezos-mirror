@@ -33,9 +33,7 @@ open Alpha_context
     - Add entries [None] for the slot's pages in the store, if the slot
       is not confirmed. *)
 
-type error +=
-  | Dal_invalid_page_for_slot of Dal.Page.t
-  | Dal_expected_skip_list_cell_not_found of Dal.Slot.Header.id
+type error += Dal_invalid_page_for_slot of Dal.Page.t
 
 let () =
   register_error_kind
@@ -48,21 +46,6 @@ let () =
     Data_encoding.(obj1 (req "page_id" Dal.Page.encoding))
     (function Dal_invalid_page_for_slot page_id -> Some page_id | _ -> None)
     (fun page_id -> Dal_invalid_page_for_slot page_id)
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal_pages_request.dal_expected_skip_list_cell_not_found"
-    ~title:"Expected DAL skip list cell not found"
-    ~description:
-      "The skip list cell whose ID is given is not found in the context"
-    ~pp:(fun ppf ->
-      Format.fprintf ppf "Dal slot not found in store %a" Dal.Slot.Header.pp_id)
-    Data_encoding.(obj1 (req "slot_id" Dal.Slot.Header.id_encoding))
-    (function
-      | Dal_expected_skip_list_cell_not_found slot_id -> Some slot_id
-      | _ -> None)
-    (fun slot_id -> Dal_expected_skip_list_cell_not_found slot_id)
 
 module Event = struct
   include Internal_event.Simple
@@ -146,14 +129,7 @@ module Slots_statuses_cache =
       let hash id = Hashtbl.hash id
     end)
 
-let download_skip_list_cells_of_level node_ctxt
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~published_level =
-  let attested_level =
-    Int32.add
-      (Raw_level.to_int32 published_level)
-      (Int32.of_int dal_constants.attestation_lag)
-  in
+let download_skip_list_cells_of_level node_ctxt ~attested_level =
   Plugin.RPC.Dal.skip_list_cells_of_level
     (new Protocol_client_context.wrap_full node_ctxt.Node_context.cctxt)
     (`Main, `Level attested_level)
@@ -170,16 +146,25 @@ let skip_list_cells_content_cache =
   Slots_statuses_cache.create
     (attestation_lag * number_of_slots * retention_levels)
 
-let dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id =
+let dal_skip_list_cell_content_of_slot_id node_ctxt
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants) slot_id
+    =
   let open Lwt_result_syntax in
+  let attested_level =
+    Int32.add
+      (Raw_level.to_int32 slot_id.Dal.Slot.Header.published_level)
+      (Int32.of_int dal_constants.attestation_lag)
+  in
+  let* attested_level_hash =
+    Node_context.hash_of_level node_ctxt attested_level
+  in
   match Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id with
-  | Some res -> return res
-  | None -> (
+  | Some (cell_content, block_hash)
+    when Block_hash.equal attested_level_hash block_hash ->
+      return cell_content
+  | None | Some _ -> (
       let* hash_with_cells =
-        download_skip_list_cells_of_level
-          node_ctxt
-          dal_constants
-          ~published_level:slot_id.published_level
+        download_skip_list_cells_of_level node_ctxt ~attested_level
       in
       List.iter
         (fun (_hash, cell) ->
@@ -187,15 +172,35 @@ let dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id =
           Slots_statuses_cache.replace
             skip_list_cells_content_cache
             (Dal.Slots_history.content_id content)
-            content)
+            (content, attested_level_hash))
         hash_with_cells ;
       (* The [find] below validates the fact that we fetched the info of
          commitments published at level [slot_id.published_level]. *)
       match
         Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id
       with
-      | Some res -> return res
-      | None -> tzfail @@ Dal_expected_skip_list_cell_not_found slot_id)
+      | Some (cell_content, block_hash)
+        when Block_hash.equal attested_level_hash block_hash ->
+          return cell_content
+      | None ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Unreachable: We expect to find some data for slot %a, but got \
+                none"
+               Dal.Slot.Header.pp_id
+               slot_id)
+      | Some (_, got_hash) ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Unreachable: We expect to find some data for slot %a \
+                associated to block hash %a, but got data associated to block \
+                hash %a"
+               Dal.Slot.Header.pp_id
+               slot_id
+               Block_hash.pp_short
+               attested_level_hash
+               Block_hash.pp_short
+               got_hash))
 
 let slot_proto_attestation_status node_ctxt dal_constants slot_id =
   let open Lwt_result_syntax in
