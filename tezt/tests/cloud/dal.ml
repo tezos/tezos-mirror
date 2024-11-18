@@ -721,7 +721,6 @@ module Cli = struct
 end
 
 type etherlink_configuration = {
-  enabled : bool;
   etherlink_sequencer : bool;
   etherlink_producers : int;
   (* Empty list means DAL FF is set to false. *)
@@ -1483,14 +1482,13 @@ let init_public_network cloud (configuration : configuration)
     Client.get_balance_for ~account:"fundraiser" bootstrap.client
   in
   let* etherlink_rollup_operator_key =
-    match etherlink_configuration with
-    | Some {enabled = true; _} ->
-        let () = toplog "Generating a key pair for Etherlink operator" in
-        Client.stresstest_gen_keys
-          ~alias_prefix:"etherlink_operator"
-          1
-          bootstrap.client
-    | _ -> Lwt.return_nil
+    if etherlink_configuration <> None then
+      let () = toplog "Generating a key pair for Etherlink operator" in
+      Client.stresstest_gen_keys
+        ~alias_prefix:"etherlink_operator"
+        1
+        bootstrap.client
+    else Lwt.return_nil
   in
   let accounts_to_fund =
     List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
@@ -1572,10 +1570,9 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       client
   in
   let* etherlink_rollup_operator_key =
-    match etherlink_configuration with
-    | Some {enabled = true; _} ->
-        Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
-    | _ -> Lwt.return_nil
+    if etherlink_configuration <> None then
+      Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
+    else Lwt.return_nil
   in
   let* parameter_file =
     let base =
@@ -2349,7 +2346,7 @@ let init ~(configuration : configuration)
   let () = toplog "Init: all producers and observers have been initialized" in
   let* etherlink =
     match etherlink_configuration with
-    | Some etherlink_configuration when etherlink_configuration.enabled ->
+    | Some etherlink_configuration ->
         let () = toplog "Init: initializing Etherlink" in
         let () = toplog "Init: Getting Etherlink operator key" in
         let etherlink_rollup_operator_key =
@@ -2378,7 +2375,7 @@ let init ~(configuration : configuration)
             ~dal_slots
         in
         some etherlink
-    | _ ->
+    | None ->
         let () =
           toplog
             "Init: skipping Etherlink initialization because --etherlink was \
@@ -2627,12 +2624,9 @@ let configuration, etherlink_configuration =
   let data_dir = Cli.data_dir in
   let fundraiser = Cli.fundraiser in
   let etherlink =
-    {
-      enabled = etherlink;
-      etherlink_sequencer;
-      etherlink_producers;
-      etherlink_dal_slots;
-    }
+    if etherlink then
+      Some {etherlink_sequencer; etherlink_producers; etherlink_dal_slots}
+    else None
   in
   let t =
     {
@@ -2661,16 +2655,17 @@ let benchmark () =
       List.map (fun i -> `Baker i) configuration.stake;
       List.map (fun _ -> `Producer) configuration.dal_node_producers;
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
-      (if etherlink_configuration.enabled then [`Etherlink_operator] else []);
-      (if etherlink_configuration.enabled then
-         match etherlink_configuration.etherlink_dal_slots with
-         | [] -> []
-         | [_] -> [`Etherlink_dal_node]
-         | dal_slots ->
-             `Reverse_proxy :: List.map (fun _ -> `Etherlink_dal_node) dal_slots
-       else []);
-      List.init etherlink_configuration.etherlink_producers (fun i ->
-          `Etherlink_producer i);
+      (if etherlink_configuration <> None then [`Etherlink_operator] else []);
+      (match etherlink_configuration with
+      | None | Some {etherlink_dal_slots = []; _} -> []
+      | Some {etherlink_dal_slots = [_]; _} -> [`Etherlink_dal_node]
+      | Some {etherlink_dal_slots; _} ->
+          `Reverse_proxy
+          :: List.map (fun _ -> `Etherlink_dal_node) etherlink_dal_slots);
+      (match etherlink_configuration with
+      | None -> []
+      | Some {etherlink_producers; _} ->
+          List.init etherlink_producers (fun i -> `Etherlink_producer i));
     ]
     |> List.concat
   in
