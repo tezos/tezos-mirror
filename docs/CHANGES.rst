@@ -25,6 +25,12 @@ Smart Rollup node
 - Fixed a bug which would make injection of messages in the batcher with the RPC
   ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
 
+DAL node
+~~~~~~~~
+
+- **Breaking** Changed binary encoding of /config/network/dal. This change is not retro-compatible.
+  As a result, the v21 DAL node is not compatible with earlier Octez nodes.
+
 Version 21.0~rc3
 ================
 

@@ -178,7 +178,8 @@ DAL node
   default behavior is now to list peers only for topics the current peer is
   subscribed to, while the ``all`` flag can be used to recover the previous
   behavior. (MR :gl:`!14518`)
-- Fix file descriptor leak in resto for connections with the L1 node.
+
+- Fixed file descriptor leak in resto affecting connections to the L1 node.
   (MR :gl:`!15322`)
 
 
