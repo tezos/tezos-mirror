@@ -56,6 +56,11 @@ catches up the Octez node. Finally, the DAL node can now start one of the 4 prof
 bootstrap, attester, operator, and observer; the last two profiles match the
 corresponding modes of an accompanying smart rollup node.
 
+.. warning::
+
+   The binary encoding of ``/config/netwok/dal`` changed.
+      As a result, The v21 DAL node is not compatible with earlier versions of Octez -- it cannot interact with earlier versioned Octez nodes. If you are operating a Tezos DAL node, make sure to upgrade all Octez infra to v21.0
+
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
 
