@@ -125,7 +125,9 @@ module Make (SimulationBackend : SimulationBackend) = struct
       let+ bytes = SimulationBackend.read simulation_state path in
       Option.map Ethereum_types.decode_number_le bytes
     in
-    let* da_fee_per_byte = read_qty Durable_storage_path.da_fee_per_byte in
+    let* da_fee_per_byte =
+      Durable_storage.da_fee_per_byte (SimulationBackend.read simulation_state)
+    in
     let* (Qty gas_price) =
       (* In future iterations of the kernel, the default value will be
          written to the storage. This default value will no longer need to
@@ -137,7 +139,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
           return (Ethereum_types.quantity_of_z (Z.of_string "1_000_000_000"))
       | Some gas_price -> return gas_price
     in
-    let da_fee = Fees.gas_for_fees ?da_fee_per_byte ~gas_price tx_data in
+    let da_fee = Fees.gas_for_fees ~da_fee_per_byte ~gas_price tx_data in
     return da_fee
 
   let check_node_da_fees ~execution_gas ~node_da_fees ~simulation_version
