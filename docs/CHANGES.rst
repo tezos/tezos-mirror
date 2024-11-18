@@ -6,6 +6,11 @@ Changelog
 Version 21.0
 ============
 
+General
+-------
+
+- Integrated binaries for Quebec (MR :gl:`!15611`).
+
 Smart Rollup node
 -----------------
 
