@@ -84,6 +84,23 @@ module Commitment_proof : sig
   val zero : t
 end
 
+(** The module below provides some data types and helper functions for DAL
+    commitments published at some level on some slot index. There are mainly
+    three important levels for a DAL commitment successfully included in a
+    block:
+
+    - `published_level`: The level of the block that contains the DAL publish
+    commitment operation. Such operations are typically injected on top of the
+    block whose level is `published_level - 1` or earlier.
+
+    - `attested_level`: The level of the block / context that includes the
+    attestation status of a slot published `attestation_lag` levels
+    earlier. Formally, `attested_level = published_level + attestation_lag`.
+
+   - `attestation_level`: The level of the block on top of which DAL
+   attestations are injected for a commitment published at published_level.
+   Formally, attestation_level = attested_level - 1 = published_level +
+   attestation_lag - 1. *)
 module Header : sig
   (** For Layer-1, a slot is identified by the level at which it is published
       and the slot's index. *)
@@ -107,6 +124,9 @@ module Header : sig
 
   (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
+
+  (** equal function for values of type id. *)
+  val slot_id_equal : id -> id -> bool
 
   (** [verify_commitment cryptobox commitment commitment_proof] check
      that for the given commitment, the commitment proof is correct
@@ -218,6 +238,29 @@ module History : sig
   (** Abstract representation of a skip list specialized for
        confirmed slot headers. *)
   type t
+
+  (** The content of a cell in the DAL skip list. We have [number_of_slots] new
+      cells per level (one per slot index). For a given slot index in
+      [0..number_of_slots-1], the commitment is either [Unpublished] or
+      [Published]. In this second case, we attach extra information in addition
+      to the id such as the commitment, the publisher, the number of attested
+      shards and whether the commitment is attested from the point of view of
+      the protocol. *)
+  type cell_content = private
+    | Unpublished of Header.id
+    | Published of {
+        header : Header.t;
+        publisher : Contract_repr.t;
+        is_proto_attested : bool;
+        attested_shards : int;
+        total_shards : int;
+      }
+
+  (** Returns the {!cell_content} of the given skip list cell. *)
+  val content : t -> cell_content
+
+  (** Returns the slot id of the cell whose content is given. *)
+  val content_id : cell_content -> Header.id
 
   module Pointer_hash : S.HASH
 
@@ -398,26 +441,6 @@ module History : sig
     | Unexpected_page_size of {expected_size : int; page_size : int}
 
   module Internal_for_tests : sig
-    (** The content of a cell in the DAL skip list. We have [number_of_slots]
-        new cells per level (one per slot index). For a given slot index in
-        [0..number_of_slots-1], the commitment is either [Unpublished] or
-        [Published]. In this second case, we attach extra information in
-        addition to the id such as the commitment, the publisher, the number of
-        attested shards and whether the commitment is attested from the point of
-        view of the protocol. *)
-    type cell_content =
-      | Unpublished of Header.id
-      | Published of {
-          header : Header.t;
-          publisher : Contract_repr.t;
-          is_proto_attested : bool;
-          attested_shards : int;
-          total_shards : int;
-        }
-
-    (** Returns the content of the last cell in the given skip list. *)
-    val content : t -> cell_content
-
     (** [proof_statement_is serialized_proof expected] will return [true] if
         the deserialized proof and the [expected] proof shape match and [false]
         otherwise.

@@ -114,10 +114,10 @@ module Pages_cache =
 
 let get_slot_pages =
   let pages_cache = Pages_cache.create 16 (* 130MB *) in
-  fun dal_cctxt commitment ->
+  fun dal_cctxt slot_id ->
     Pages_cache.bind_or_put
       pages_cache
-      commitment
+      slot_id
       (Dal_node_client.get_slot_pages dal_cctxt)
       Lwt.return
 
@@ -136,6 +136,27 @@ let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
     {slot_level = header.id.published_level; slot_index = header.id.index}
   in
   get_slot_pages dal_cctxt slot_id
+
+let get_page node_ctxt ~inbox_level page_id =
+  let open Lwt_result_syntax in
+  let Dal.Page.{slot_id; page_index} = page_id in
+  let Dal.Slot.Header.{published_level; index} = slot_id in
+  let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
+  let* pages =
+    download_confirmed_slot_pages node_ctxt ~published_level ~index
+  in
+  match List.nth_opt pages page_index with
+  | Some page ->
+      let*! () =
+        Event.(emit page_reveal)
+          ( index,
+            page_index,
+            Raw_level.to_int32 published_level,
+            inbox_level,
+            page )
+      in
+      return @@ Some page
+  | None -> tzfail @@ Dal_invalid_page_for_slot page_id
 
 let storage_invariant_broken published_level index =
   failwith
@@ -229,8 +250,7 @@ let page_content
     ~dal_activation_level ~inbox_level node_ctxt page_id
     ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
-  let Dal.Page.{slot_id; page_index} = page_id in
-  let Dal.Slot.Header.{published_level; index} = slot_id in
+  let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
   let Node_context.{genesis_info = {level = origination_level; _}; _} =
     node_ctxt
   in
@@ -256,21 +276,6 @@ let page_content
       Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
     in
     match processed with
-    | Some `Confirmed -> (
-        let* pages =
-          download_confirmed_slot_pages node_ctxt ~published_level ~index
-        in
-        match List.nth_opt pages page_index with
-        | Some page ->
-            let*! () =
-              Event.(emit page_reveal)
-                ( index,
-                  page_index,
-                  Raw_level.to_int32 published_level,
-                  inbox_level,
-                  page )
-            in
-            return @@ Some page
-        | None -> tzfail @@ Dal_invalid_page_for_slot page_id)
+    | Some `Confirmed -> get_page node_ctxt ~inbox_level page_id
     | Some `Unconfirmed -> return_none
     | None -> storage_invariant_broken published_level index

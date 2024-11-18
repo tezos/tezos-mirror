@@ -2883,6 +2883,8 @@ module Dal : sig
       val pp : Format.formatter -> t -> unit
 
       val equal : t -> t -> bool
+
+      val slot_id_equal : id -> id -> bool
     end
 
     val register_slot_header :
@@ -2922,6 +2924,20 @@ module Dal : sig
 
   module Slots_history : sig
     type t
+
+    type cell_content = private
+      | Unpublished of Slot.Header.id
+      | Published of {
+          header : Slot.Header.t;
+          publisher : Contract.t;
+          is_proto_attested : bool;
+          attested_shards : int;
+          total_shards : int;
+        }
+
+    val content : t -> cell_content
+
+    val content_id : cell_content -> Slot.Header.id
 
     module Pointer_hash : S.HASH
 

@@ -1314,19 +1314,21 @@ module History = struct
 
     let hash = hash ?with_migration:None
 
+    type cell_content = Content_v2.t =
+      | Unpublished of Header.id
+      | Published of {
+          header : Header.t;
+          publisher : Contract_repr.t;
+          is_proto_attested : bool;
+          attested_shards : int;
+          total_shards : int;
+        }
+
+    let content = Skip_list.content
+
+    let content_id = Content_v2.content_id
+
     module Internal_for_tests = struct
-      type cell_content = Content.t =
-        | Unpublished of Header.id
-        | Published of {
-            header : Header.t;
-            publisher : Contract_repr.t;
-            is_proto_attested : bool;
-            attested_shards : int;
-            total_shards : int;
-          }
-
-      let content cell : cell_content = Skip_list.content cell
-
       let proof_statement_is serialized_proof expected =
         match deserialize_proof serialized_proof with
         | Error _ -> false
