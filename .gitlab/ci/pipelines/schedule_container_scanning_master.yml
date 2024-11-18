@@ -27,3 +27,5 @@ container_scanning:
   variables:
     CS_IMAGE: tezos/tezos:master
     SECURE_LOG_LEVEL: "debug"
+    CS_DOCKERFILE_PATH: "build.Dockerfile"
+    GIT_STRATEGY: fetch
