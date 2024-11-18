@@ -441,6 +441,11 @@ module Pipeline = struct
         && var "CI_PIPELINE_SOURCE" == str "push"
         && var "CI_COMMIT_BRANCH" == str ci_docker_branch)
     in
+    let schedule_container_scanning_master_if_expr =
+      Gitlab_ci.If.(
+        var "CI_PIPELINE_SOURCE" == str "schedule"
+        && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_MASTER")
+    in
     let workflow =
       let ci_docker_workflow_rule : Gitlab_ci.Types.workflow_rule =
         {
@@ -451,7 +456,23 @@ module Pipeline = struct
           auto_cancel = None;
         }
       in
-      {workflow with rules = ci_docker_workflow_rule :: workflow.rules}
+      let schedule_container_scanning_master_workflow_rule :
+          Gitlab_ci.Types.workflow_rule =
+        {
+          changes = None;
+          if_ = Some schedule_container_scanning_master_if_expr;
+          variables =
+            Some [("PIPELINE_TYPE", "schedule_container_scanning_master")];
+          when_ = Always;
+          auto_cancel = None;
+        }
+      in
+      {
+        workflow with
+        rules =
+          ci_docker_workflow_rule
+          :: schedule_container_scanning_master_workflow_rule :: workflow.rules;
+      }
     in
     let includes =
       let ci_docker_include_rule : Gitlab_ci.Types.include_ =
@@ -461,7 +482,22 @@ module Pipeline = struct
             [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
         }
       in
-      ci_docker_include_rule :: includes
+      let schedule_container_scanning_master_include_rule :
+          Gitlab_ci.Types.include_ =
+        {
+          local = ".gitlab/ci/pipelines/schedule_container_scanning_master.yml";
+          rules =
+            [
+              {
+                changes = None;
+                if_ = Some schedule_container_scanning_master_if_expr;
+                when_ = Always;
+              };
+            ];
+        }
+      in
+      ci_docker_include_rule :: schedule_container_scanning_master_include_rule
+      :: includes
     in
     (* end of temporary manual addition *)
     let config =
