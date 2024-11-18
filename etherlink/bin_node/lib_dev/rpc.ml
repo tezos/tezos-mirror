@@ -88,7 +88,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
     when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
     Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
   in
-  Blueprints_watcher.notify blueprint ;
+  Broadcast.notify @@ Broadcast.Blueprint blueprint ;
   Metrics.set_level ~level:number ;
   let* () = set_metrics_confirmed_levels ctxt in
   return_unit

@@ -44,7 +44,7 @@ let blueprint_watcher_service =
 let create_blueprint_watcher_service get_next_blueprint_number find_blueprint
     from_level =
   let open Lwt_syntax in
-  let blueprint_stream, stopper = Blueprints_watcher.create_stream () in
+  let blueprint_stream, stopper = Broadcast.create_blueprint_stream () in
   let shutdown () = Lwt_watcher.shutdown stopper in
   (* input source block creating a stream to observe the events *)
   let* (Ethereum_types.Qty next) = get_next_blueprint_number () in
