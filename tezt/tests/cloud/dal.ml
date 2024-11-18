@@ -124,14 +124,9 @@ module Network = struct
         "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
     | Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
 
-  let get_level network endpoint =
-    match network with
-    | Sandbox -> Lwt.return 1
-    | Public _ ->
-        let* json =
-          RPC_core.call endpoint (RPC.get_chain_block_header_shell ())
-        in
-        JSON.(json |-> "level" |> as_int) |> Lwt.return
+  let get_level endpoint =
+    let* json = RPC_core.call endpoint (RPC.get_chain_block_header_shell ()) in
+    JSON.(json |-> "level" |> as_int) |> Lwt.return
 
   let expected_pow = function Public _ -> 26. | Sandbox -> 0.
 end
@@ -2410,7 +2405,9 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
   let* first_level =
-    Network.get_level configuration.network bootstrap.node_rpc_endpoint
+    match configuration.network with
+    | Sandbox -> Lwt.return 1
+    | Public _public_network -> Network.get_level bootstrap.node_rpc_endpoint
   in
   Hashtbl.replace metrics first_level default_metrics ;
   let disconnection_state =
@@ -2448,11 +2445,7 @@ let wait_for_level t level =
   match t.bootstrap.node with
   | None ->
       let rec loop () =
-        let* head_level =
-          Network.get_level
-            t.configuration.network
-            t.bootstrap.node_rpc_endpoint
-        in
+        let* head_level = Network.get_level t.bootstrap.node_rpc_endpoint in
         if head_level >= level then Lwt.return_unit
         else
           let* () = Lwt_unix.sleep 4. in
