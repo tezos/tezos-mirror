@@ -1483,13 +1483,14 @@ let init_public_network cloud (configuration : configuration)
     Client.get_balance_for ~account:"fundraiser" bootstrap.client
   in
   let* etherlink_rollup_operator_key =
-    if Some true = Option.map (fun c -> c.enabled) etherlink_configuration then
-      let () = toplog "Generating a key pair for Etherlink operator" in
-      Client.stresstest_gen_keys
-        ~alias_prefix:"etherlink_operator"
-        1
-        bootstrap.client
-    else Lwt.return []
+    match etherlink_configuration with
+    | Some {enabled = true; _} ->
+        let () = toplog "Generating a key pair for Etherlink operator" in
+        Client.stresstest_gen_keys
+          ~alias_prefix:"etherlink_operator"
+          1
+          bootstrap.client
+    | _ -> Lwt.return_nil
   in
   let accounts_to_fund =
     List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
@@ -1571,9 +1572,10 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       client
   in
   let* etherlink_rollup_operator_key =
-    if Some true = Option.map (fun c -> c.enabled) etherlink_configuration then
-      Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
-    else Lwt.return []
+    match etherlink_configuration with
+    | Some {enabled = true; _} ->
+        Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
+    | _ -> Lwt.return_nil
   in
   let* parameter_file =
     let base =
