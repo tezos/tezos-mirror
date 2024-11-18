@@ -140,6 +140,14 @@ module Contract : sig
        and type value = missed_attestations_info
        and type t := Raw_context.t
 
+  (** The number of protocol-attested DAL slots attested by a delegate during a
+      cycle. *)
+  module Attested_dal_slots :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Int32.t
+       and type t := Raw_context.t
+
   (** The manager of a contract *)
   module Manager :
     Indexed_data_storage_with_local_context
@@ -688,6 +696,7 @@ module Ramp_up : sig
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
     attesting_reward_per_slot : Tez_repr.t;
+    dal_attesting_reward_per_shard : Tez_repr.t;
   }
 
   module Rewards :
@@ -1046,6 +1055,10 @@ module Dal : sig
              attested or to access its attestation ratio). *)
           (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list
   end
+
+  (** The number of protocol-attested DAL slots for the current cycle. *)
+  module Total_attested_slots :
+    Single_data_storage with type t := Raw_context.t and type value = Int32.t
 end
 
 module Zk_rollup : sig

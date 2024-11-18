@@ -45,10 +45,12 @@ val validate_attestation :
   Dal.Attestation.t ->
   unit tzresult Lwt.t
 
-(** [apply_attestation ctxt attestation] records in the context that the given
-    [attestation] was issued and the corresponding attester has the given
+(** [apply_attestation ctxt attestation ~tb_slot ~power] records in the context
+    that the given [attestation] was issued by the delegate with initial
+    Tenderbake slot [tb_slot] and the corresponding attester has the given
     [power]. *)
-val apply_attestation : t -> Dal.Attestation.t -> power:int -> t tzresult
+val apply_attestation :
+  t -> Dal.Attestation.t -> tb_slot:Slot.t -> power:int -> t tzresult
 
 (** [validate_publish_commitment ctxt slot] ensures that [slot_header] is
    valid and prevents an operation containing [slot_header] to be
@@ -65,6 +67,16 @@ val apply_publish_commitment :
   Dal.Operations.Publish_commitment.t ->
   source:Contract.t ->
   (t * Dal.Slot.Header.t) tzresult
+
+(** [record_dal_participation ctxt delegate tb_slot dal_attestation] records the
+    number of protocol-attested slots (given in [dal_attestation] attested by
+    [delegate] (with the initial TB slot [tb_slot]) in the current block. *)
+val record_dal_participation :
+  t ->
+  Signature.Public_key_hash.t ->
+  Slot.t ->
+  Dal.Attestation.t ->
+  t tzresult Lwt.t
 
 (** [finalisation ctxt] should be executed at block finalisation
    time. A set of slots attested at level [ctxt.current_level - lag]

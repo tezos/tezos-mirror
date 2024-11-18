@@ -838,8 +838,6 @@ module Constants : sig
       rewards_ratio : Q.t;
     }
 
-    val dal_encoding : dal Data_encoding.t
-
     type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level.t}
 
     type sc_rollup_reveal_activation_level = {
@@ -1054,11 +1052,15 @@ module Constants : sig
 
   val testnet_dictator : context -> public_key_hash option
 
+  val dal_enable : context -> bool
+
+  val dal_number_of_slots : context -> int
+
+  val dal_number_of_shards : context -> int
+
   val sc_rollup_arith_pvm_enable : context -> bool
 
   val sc_rollup_riscv_pvm_enable : context -> bool
-
-  val dal_enable : context -> bool
 
   val sc_rollup_origination_size : context -> int
 
@@ -2163,9 +2165,11 @@ module Receipt : sig
     | Attesting_rewards : Tez.t balance
     | Baking_rewards : Tez.t balance
     | Baking_bonuses : Tez.t balance
+    | Dal_attesting_rewards : Tez.t balance
     | Storage_fees : Tez.t balance
     | Double_signing_punishments : Tez.t balance
     | Lost_attesting_rewards : public_key_hash * bool * bool -> Tez.t balance
+    | Lost_dal_attesting_rewards : public_key_hash -> Tez.t balance
     | Liquidity_baking_subsidies : Tez.t balance
     | Burned : Tez.t balance
     | Commitments : Blinded_public_key_hash.t -> Tez.t balance
@@ -2319,6 +2323,12 @@ module Delegate : sig
     attesting_power:int ->
     context tzresult Lwt.t
 
+  val record_dal_participation :
+    context ->
+    delegate:Signature.Public_key_hash.t ->
+    number_of_attested_slots:int ->
+    context tzresult Lwt.t
+
   val current_frozen_deposits :
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
@@ -2364,6 +2374,8 @@ module Delegate : sig
 
     val attesting_reward_per_slot : t -> Tez.t tzresult
 
+    val dal_attesting_reward_per_shard : t -> Tez.t tzresult
+
     val liquidity_baking_subsidy : t -> Tez.t tzresult
 
     val seed_nonce_revelation_tip : t -> Tez.t tzresult
@@ -2375,6 +2387,7 @@ module Delegate : sig
         | Baking_reward_fixed_portion
         | Baking_reward_bonus_per_slot
         | Attesting_reward_per_slot
+        | Dal_attesting_reward_per_shard
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
 
@@ -2748,9 +2761,11 @@ module Dal : sig
 
   val make : context -> (context * cryptobox) tzresult
 
-  val number_of_slots : context -> int
+  val assert_feature_enabled : t -> unit tzresult
 
-  val number_of_shards : context -> int
+  val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
@@ -2810,7 +2825,15 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
+    val number_of_attested_slots : t -> int
+
+    val intersection : t -> t -> t
+
     val record_number_of_attested_shards : context -> t -> int -> context
+
+    val record_attestation : context -> tb_slot:Slot.t -> t -> context
+
+    val attestations : context -> t Slot.Map.t
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
@@ -5278,6 +5301,7 @@ module Token : sig
     | `Attesting_rewards
     | `Baking_rewards
     | `Baking_bonuses
+    | `Dal_attesting_rewards
     | `Minted
     | `Liquidity_baking_subsidies
     | `Sc_rollup_refutation_rewards
@@ -5287,6 +5311,7 @@ module Token : sig
     [ `Storage_fees
     | `Double_signing_punishments
     | `Lost_attesting_rewards of public_key_hash * bool * bool
+    | `Lost_dal_attesting_rewards of public_key_hash
     | `Burned
     | `Sc_rollup_refutation_punishments
     | container ]

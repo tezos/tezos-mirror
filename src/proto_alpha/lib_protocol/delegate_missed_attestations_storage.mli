@@ -30,20 +30,45 @@
     This module is responsible for maintaining the
     {!Storage.Contract.Missed_attestations} table.  *)
 
+(** Computes the number of validator slots that a delegate is expected to be
+    allocated during a cycle. This number is proportional to its active stake
+    wrt to total active stake. *)
 val expected_slots_for_given_active_stake :
   Raw_context.t ->
   total_active_stake_weight:int64 ->
   active_stake_weight:int64 ->
   int
 
+(** Computes the number of DAL shards that a delegate is expected to be
+    allocated during a cycle. This number is proportional to its active stake
+    wrt to total active stake. *)
+val expected_dal_shards_for_given_active_stake :
+  Raw_context.t ->
+  total_active_stake_weight:int64 ->
+  active_stake_weight:int64 ->
+  int
+
+(** Removes the [Storage.Dal.Total_attested_slots] value from the context. *)
+val remove_total_dal_attested_slots : Raw_context.t -> Raw_context.t Lwt.t
+
 type level_participation = Participated | Didn't_participate
 
-(** Record the participation of a delegate as a validator. *)
+(** Update the participation of a delegate as a validator in the current cycle
+    with its participation at the current level. *)
 val record_attesting_participation :
   Raw_context.t ->
   delegate:Signature.Public_key_hash.t ->
   participation:level_participation ->
   attesting_power:int ->
+  Raw_context.t tzresult Lwt.t
+
+(** Update the participation of a delegate as a DAL attester in the current
+    cycle with its participation (ie the number of DAL slots it attested) at the
+    current level. *)
+val record_dal_participation :
+  Raw_context.t ->
+  delegate:Signature.Public_key_hash.t ->
+  number_of_attested_slots:int ->
   Raw_context.t tzresult Lwt.t
 
 (** Sets the payload and block producer as active. Pays the baking
@@ -64,6 +89,13 @@ val check_and_reset_delegate_participation :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   (Raw_context.t * bool) tzresult Lwt.t
+
+(** Retrieve the number of DAL slots a delegate DAL-attested during the last
+    cycle, and then reset the participation for preparing the next cycle. *)
+val get_and_reset_delegate_dal_participation :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  (Raw_context.t * int32) tzresult Lwt.t
 
 module For_RPC : sig
   (** Participation information. We denote by:

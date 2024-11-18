@@ -95,6 +95,22 @@ let update_skip_list ctxt ~slot_headers_statuses ~published_level
   in
   return ctxt
 
+let update_number_of_attested_slots ctxt num_attested_slots =
+  let open Lwt_result_syntax in
+  Raw_context.Dal.only_if_incentives_enabled ctxt ~default:return (fun ctxt ->
+      if Compare.Int.(num_attested_slots = 0) then return ctxt
+      else
+        let* res = Storage.Dal.Total_attested_slots.find ctxt in
+        match res with
+        | None ->
+            Storage.Dal.Total_attested_slots.init
+              ctxt
+              (Int32.of_int num_attested_slots)
+        | Some v ->
+            Storage.Dal.Total_attested_slots.update
+              ctxt
+              Int32.(add v (of_int num_attested_slots)))
+
 let finalize_pending_slot_headers ctxt ~number_of_slots =
   let open Lwt_result_syntax in
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
@@ -115,6 +131,12 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
                   slot.Dal_slot_repr.Header.id.index
               in
               compute_slot_headers_statuses ~is_slot_attested published_slots
+            in
+            let num_attested_slots =
+              Dal_attestation_repr.number_of_attested_slots attestation
+            in
+            let* ctxt =
+              update_number_of_attested_slots ctxt num_attested_slots
             in
             return (ctxt, attestation, slot_headers_statuses)
       in

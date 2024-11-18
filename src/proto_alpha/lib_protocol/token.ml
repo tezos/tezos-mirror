@@ -39,6 +39,7 @@ type infinite_source =
   | `Attesting_rewards
   | `Baking_rewards
   | `Baking_bonuses
+  | `Dal_attesting_rewards
   | `Minted
   | `Liquidity_baking_subsidies
   | `Sc_rollup_refutation_rewards ]
@@ -49,6 +50,7 @@ type infinite_sink =
   [ `Storage_fees
   | `Double_signing_punishments
   | `Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
+  | `Lost_dal_attesting_rewards of Signature.Public_key_hash.t
   | `Sc_rollup_refutation_punishments
   | `Burned ]
 
@@ -73,6 +75,7 @@ let credit ctxt receiver amount origin =
           | `Storage_fees -> Storage_fees
           | `Double_signing_punishments -> Double_signing_punishments
           | `Lost_attesting_rewards (d, p, r) -> Lost_attesting_rewards (d, p, r)
+          | `Lost_dal_attesting_rewards d -> Lost_dal_attesting_rewards d
           | `Sc_rollup_refutation_punishments ->
               Sc_rollup_refutation_punishments
           | `Burned -> Burned
@@ -149,6 +152,7 @@ let spend ctxt giver amount origin =
           | `Attesting_rewards -> Attesting_rewards
           | `Baking_rewards -> Baking_rewards
           | `Baking_bonuses -> Baking_bonuses
+          | `Dal_attesting_rewards -> Dal_attesting_rewards
           | `Sc_rollup_refutation_rewards -> Sc_rollup_refutation_rewards
         in
         let* old_total_supply = Storage.Contract.Total_supply.get ctxt in

@@ -131,6 +131,8 @@ val sc_rollup_private_enable : Raw_context.t -> bool
 
 val dal_number_of_slots : Raw_context.t -> int
 
+val dal_number_of_shards : Raw_context.t -> int
+
 val dal_enable : Raw_context.t -> bool
 
 val zk_rollup_enable : Raw_context.t -> bool

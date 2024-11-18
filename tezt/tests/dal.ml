@@ -235,6 +235,18 @@ let make_string_parameter name = function
   | None -> []
   | Some value -> [(name, `String value)]
 
+let make_q_parameter name = function
+  | None -> []
+  | Some q ->
+      [
+        ( name,
+          `O
+            [
+              ("numerator", `String (Q.num q |> Z.to_int |> string_of_int));
+              ("denominator", `String (Q.den q |> Z.to_int |> string_of_int));
+            ] );
+      ]
+
 let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
     ?(supports = Protocol.From_protocol 19) title f =
   let tags = Tag.tezos2 :: "dal" :: tags in
@@ -246,6 +258,9 @@ let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
 
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
+
+let incentives_enable_param enable =
+  make_bool_parameter ["dal_parametric"; "incentives_enable"] enable
 
 let sc_rollup_activation_dal_params dal_enable =
   if Option.value dal_enable ~default:false then
@@ -440,10 +455,11 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
     ?attestation_lag ?slot_size ?number_of_slots ?page_size
     ?attestation_threshold ?number_of_shards ?redundancy_factor
-    ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
-    ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) ?(prover = true) ?smart_rollup_timeout_period_in_blocks
-    ?l1_history_mode f ~protocol =
+    ?commitment_period ?challenge_window ?dal_enable ?incentives_enable
+    ?dal_rewards_weight ?event_sections_levels ?node_arguments
+    ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
+    ?(prover = true) ?smart_rollup_timeout_period_in_blocks ?l1_history_mode f
+    ~protocol =
   let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -460,6 +476,9 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
     @ make_int_parameter
+        ["issuance_weights"; "dal_rewards_weight"]
+        dal_rewards_weight
+    @ make_int_parameter
         ["smart_rollup_commitment_period_in_blocks"]
         commitment_period
     @ make_int_parameter
@@ -468,6 +487,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     (* this will produce the empty list if dal_enable is not passed to the function invocation,
        hence the value from the protocol constants will be used. *)
     @ dal_enable_param dal_enable
+    @ incentives_enable_param incentives_enable
     @ sc_rollup_activation_dal_params dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
     @ make_int_parameter ["consensus_committee_size"] consensus_committee_size
@@ -577,9 +597,10 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 let scenario_with_layer1_node ?regression ?(tags = [])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
     ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?event_sections_levels ?node_arguments
-    ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
-    ?delay_increment_per_round variant scenario =
+    ?(dal_enable = true) ?incentives_enable ?dal_rewards_weight
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
+    variant scenario =
   let description = "Testing DAL L1 integration" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -601,6 +622,8 @@ let scenario_with_layer1_node ?regression ?(tags = [])
         ?attestation_lag
         ?number_of_shards
         ?number_of_slots
+        ?incentives_enable
+        ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
         ?event_sections_levels
@@ -615,8 +638,9 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
     ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?activation_timestamp
-    ?bootstrap_profile ?producer_profiles ?history_mode ?prover ?l1_history_mode
+    ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
+    ?producer_profiles ?history_mode ?prover ?l1_history_mode
     ?skip_list_storage_backend variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
@@ -647,6 +671,8 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?number_of_shards
         ?attestation_lag
         ?attestation_threshold
+        ?incentives_enable
+        ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
         ?activation_timestamp
@@ -667,11 +693,12 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
 let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?consensus_committee_size ?slot_size ?page_size ?number_of_shards
     ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
-    ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
-    ?challenge_window ?minimal_block_delay ?delay_increment_per_round
-    ?activation_timestamp ?bootstrap_profile ?producer_profiles
-    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover
-    ?attestation_threshold ?l1_history_mode variant scenario =
+    ?(pvm_name = "arith") ?(dal_enable = true) ?incentives_enable
+    ?dal_rewards_weight ?commitment_period ?challenge_window
+    ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
+    ?bootstrap_profile ?producer_profiles ?smart_rollup_timeout_period_in_blocks
+    ?(regression = true) ?prover ?attestation_threshold ?l1_history_mode variant
+    scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -702,6 +729,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?number_of_shards
         ?redundancy_factor
         ?attestation_lag
+        ?incentives_enable
+        ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
         ?minimal_block_delay
@@ -7936,35 +7965,43 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
   check_packs published_slots annotated_messages ;
   unit
 
+(* Produce a slot, store it in the DAL node, and then (try to) publish the same
+   commitment for each level between [from] and [into]. *)
 let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
     =
-  let loop ~from ~into ~task =
-    Seq.ints from
-    |> Seq.take (into - from + 1)
-    |> Seq.map task |> List.of_seq |> Lwt.join
-  in
   (* This is the account used to sign injected slot headers on L1. *)
   let source = Constant.bootstrap2 in
-  let task current_level =
-    let* level = Node.wait_for_level l1_node current_level in
-    (* We expected to advance level by level, otherwise, the test should fail. *)
-    Check.(
-      (current_level = level) int ~error_msg:"Expected level is %L (got %R)") ;
-    let (publish_level as payload) = level in
-    Log.info
-      "[slot_producer] publish slot %d for level %d with payload %d at level %d"
-      slot_index
-      publish_level
-      payload
-      level ;
-    let* _ =
-      Helpers.publish_and_store_slot l1_client dal_node source ~index:slot_index
-      @@ Helpers.make_slot ~slot_size (sf " %d " payload)
-    in
-    let* () = bake_for l1_client in
-    unit
+  let slot = Helpers.make_slot ~slot_size "some data" in
+  let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
+  (* Keep track of the counter to avoid an additional RPC call. *)
+  let counter = ref 1 in
+  let rec loop current_level =
+    if current_level > into then unit
+    else
+      let* level = Node.wait_for_level l1_node current_level in
+      (* We expected to advance level by level. *)
+      if current_level < level then
+        Log.info
+          "Missed some levels (expected level is %d, got %d)"
+          current_level
+          level ;
+      Log.info
+        "[slot_producer] publish at slot index %d at level %d"
+        slot_index
+        level ;
+      let* _op_hash =
+        publish_commitment
+          ~counter:!counter
+          ~source
+          ~index:slot_index
+          ~commitment
+          ~proof
+          l1_client
+      in
+      incr counter ;
+      loop (level + 1)
   in
-  let* () = loop ~from ~into ~task in
+  let* () = loop from in
   Log.info "[slot_producer] will terminate" ;
   unit
 
@@ -8217,6 +8254,102 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
       ~error_msg:
         "Expected a DAL attestation for slot 0 for the new attester: got %L, \
          expected %R") ;
+  unit
+
+(* We have one DAL attester node, and two baker daemons (for a two-sized
+   partition of the attesters). The first baker daemon runs as expected, the
+   other one runs without a DAL node for a small part of a cycle (so that its
+   participation is smaller than the required ratio, but non-zero). We check
+   that the attesters receive or not the DAL rewards depending on which daemon
+   they run on. *)
+let test_attesters_receive_dal_rewards protocol dal_parameters _cryptobox node
+    client dal_node =
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  assert (blocks_per_cycle >= dal_parameters.Dal.Parameters.attestation_lag) ;
+
+  let all_delegates =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.map (fun key -> key.Account.alias)
+  in
+  let delegate_a = List.hd all_delegates in
+  let rest_delegates = List.tl all_delegates in
+
+  let* first_level = Node.get_level node in
+  let middle_of_cycle_level =
+    first_level + blocks_per_cycle + (blocks_per_cycle / 4)
+  in
+  let last_level = first_level + (2 * blocks_per_cycle) in
+  Log.info
+    "Bake from first_level = %d to last_level = %d"
+    first_level
+    last_level ;
+  let _promise =
+    slot_producer
+      ~slot_index:0
+      ~slot_size:dal_parameters.cryptobox.slot_size
+      ~from:first_level
+      ~into:last_level
+      dal_node
+      node
+      client
+  in
+  let* baker_a =
+    Baker.init ~protocol ~dal_node ~delegates:[delegate_a] node client
+  in
+  let* client_b = Client.init ~endpoint:(Node node) () in
+  let* baker_b =
+    Baker.init ~protocol ~dal_node ~delegates:rest_delegates node client_b
+  in
+  let* _level = Node.wait_for_level node middle_of_cycle_level in
+  let* () = Baker.terminate baker_a in
+  Log.info "Restart one of the bakers without a DAL node." ;
+  let* baker_a = Baker.init ~protocol ~delegates:[delegate_a] node client in
+  let* _level = Node.wait_for_level node last_level in
+  let* () = Baker.terminate baker_a in
+  let* () = Baker.terminate baker_b in
+  (* the last block in the cycle *)
+  let block = string_of_int (last_level - 1) in
+  let* level =
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ~block ()
+  in
+  assert (level.cycle_position = blocks_per_cycle - 1) ;
+  let* metadata =
+    Node.RPC.call node @@ RPC.get_chain_block_metadata_raw ~block ()
+  in
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  let dal_rewards =
+    List.filter
+      (fun json ->
+        JSON.(json |-> "kind" |> as_string) |> String.equal "minted"
+        && JSON.(json |-> "category" |> as_string)
+           |> String.equal "DAL attesting rewards")
+      balance_updates
+  in
+  Check.(List.length dal_rewards > 1)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R minted DAL-related balance updates, got %L" ;
+  let lost_dal_rewards =
+    List.filter
+      (fun json ->
+        JSON.(json |-> "kind" |> as_string) |> String.equal "burned"
+        && JSON.(json |-> "category" |> as_string)
+           |> String.equal "lost DAL attesting rewards")
+      balance_updates
+  in
+  Check.(List.length lost_dal_rewards = 1)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R lost DAL reward, got %L" ;
+  let json = List.hd lost_dal_rewards in
+  let losing_delegate = JSON.(json |-> "delegate" |> as_string) in
+  Check.(Account.Bootstrap.keys.(0).public_key_hash = losing_delegate)
+    ~__LOC__
+    Check.string
+    ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
   unit
 
 let register ~protocols =
@@ -8472,6 +8605,17 @@ let register ~protocols =
     "new attester attests"
     test_new_attester_attests
     protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~number_of_slots:1
+    ~producer_profiles:[0]
+    ~activation_timestamp:Now
+    ~minimal_block_delay:"3"
+    ~incentives_enable:true
+    ~dal_rewards_weight:5120
+    "attesters receive DAL rewards"
+    test_attesters_receive_dal_rewards
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_and_dal_nodes
     ~uses:(fun protocol -> [Protocol.baker protocol])
     ~tags:["restart"]

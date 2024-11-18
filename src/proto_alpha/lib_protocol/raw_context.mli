@@ -432,10 +432,6 @@ module Dal : sig
 
   val make : t -> (t * cryptobox) tzresult
 
-  val number_of_slots : t -> int
-
-  val number_of_shards : t -> int
-
   (** [record_number_of_attested_shards ctxt attestation number_of_shards]
       records that the [number_of_shards] shards were attested (declared
       available by some attester). *)
@@ -448,6 +444,14 @@ module Dal : sig
       already registered previously. Returns an error if the slot is invalid. *)
   val register_slot_header :
     t -> Dal_slot_repr.Header.t -> source:Contract_repr.t -> t tzresult
+
+  (** [record_attestation ctxt ~tb_slot attestation] records that the delegate
+      with Tenderbake slot [tb_slot] emitted [attestation]. *)
+  val record_attestation :
+    t -> tb_slot:Slot_repr.t -> Dal_attestation_repr.t -> t
+
+  (** [attestations] returns the recorded attestations *)
+  val attestations : t -> Dal_attestation_repr.t Slot_repr.Map.t
 
   (** [candidates ctxt] returns the current list of slot for which there is at
       least one candidate alongside the addresses that published them. *)
@@ -465,4 +469,15 @@ module Dal : sig
     t ->
     Dal_slot_index_repr.t ->
     Dal_attestation_repr.Accountability.attestation_status
+
+  (* Check whether the DAL feature flag is set and return an error if not. *)
+  val assert_feature_enabled : t -> unit tzresult
+
+  (* [only_if_dal_feature_enabled ctxt ~default f] executes [f ctxt] if the DAL
+     feature flag is enabled and otherwise [default ctxt]. *)
+  val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  (* [only_if_dal_incentives_enabled ctxt ~default f] executes [f ctxt] if the
+     DAL incentives flag is enabled and otherwise [default ctxt]. *)
+  val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 end

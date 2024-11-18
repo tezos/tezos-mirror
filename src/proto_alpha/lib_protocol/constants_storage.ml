@@ -249,6 +249,10 @@ let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots
 
+let dal_number_of_shards c =
+  let constants = Raw_context.constants c in
+  constants.dal.cryptobox_parameters.number_of_shards
+
 let dal_enable c =
   let constants = Raw_context.constants c in
   constants.dal.feature_enable

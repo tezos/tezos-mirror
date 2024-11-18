@@ -52,6 +52,82 @@ let update_activity ctxt last_cycle =
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
+let distribute_dal_attesting_rewards ctxt delegate
+    ~dal_attesting_reward_per_shard ~total_dal_attested_slots
+    ~total_active_stake_weight ~active_stake_weight active_stake =
+  let open Lwt_result_syntax in
+  let* ctxt, dal_attested_slots_by_delegate =
+    Delegate_missed_attestations_storage
+    .get_and_reset_delegate_dal_participation
+      ctxt
+      delegate
+  in
+  let minimal_dal_participation_ratio =
+    (Raw_context.constants ctxt).dal.minimal_participation_ratio
+  in
+  let sufficient_dal_participation =
+    let open Z in
+    geq
+      (of_int32 dal_attested_slots_by_delegate)
+      (div
+         (mul
+            (of_int32 total_dal_attested_slots)
+            minimal_dal_participation_ratio.num)
+         minimal_dal_participation_ratio.den)
+  in
+  let expected_dal_shards =
+    Delegate_missed_attestations_storage
+    .expected_dal_shards_for_given_active_stake
+      ctxt
+      ~total_active_stake_weight
+      ~active_stake_weight
+  in
+  let dal_rewards =
+    Tez_repr.mul_exn dal_attesting_reward_per_shard expected_dal_shards
+  in
+  if sufficient_dal_participation then
+    Shared_stake.pay_rewards
+      ctxt
+      ~active_stake
+      ~source:`Dal_attesting_rewards
+      ~delegate
+      dal_rewards
+  else
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7606
+       Handle the case when the delegate had no DAL slot during the
+       cycle. Currently the probability for this to happen is very low:
+       (1-f)^(number_of_shards * blocks_per_cycle), where f if the delegate's
+       stake fraction. For the smallest baker, f is around 6000 / 7 * 10^8. With
+       the Q parameters, that's 2.6e-21. *)
+    Token.transfer
+      ctxt
+      `Dal_attesting_rewards
+      (`Lost_dal_attesting_rewards delegate)
+      dal_rewards
+
+let maybe_distribute_dal_attesting_rewards ctxt delegate
+    ~dal_attesting_reward_per_shard ~total_dal_attested_slots
+    ~total_active_stake_weight ~active_stake_weight active_stake =
+  let open Lwt_result_syntax in
+  Raw_context.Dal.only_if_incentives_enabled
+    ctxt
+    ~default:(fun ctxt -> return (ctxt, []))
+    (fun ctxt ->
+      let dal_attesting_reward_per_shard, total_dal_attested_slots =
+        match (dal_attesting_reward_per_shard, total_dal_attested_slots) with
+        | Some v1, Some v2 -> (v1, v2)
+        | _ -> (* unreachable *) (Tez_repr.zero, 0l)
+      in
+      distribute_dal_attesting_rewards
+        ctxt
+        delegate
+        ~dal_attesting_reward_per_shard
+        ~total_dal_attested_slots
+        ~total_active_stake_weight
+        ~active_stake_weight
+        active_stake)
+
+(* This includes DAL rewards. *)
 let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   let open Lwt_result_syntax in
   let*? attesting_reward_per_slot =
@@ -69,6 +145,18 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   in
   let total_active_stake_weight =
     Stake_repr.staking_weight total_active_stake
+  in
+  let* dal_attesting_reward_per_shard, total_dal_attested_slots =
+    Raw_context.Dal.only_if_incentives_enabled
+      ctxt
+      ~default:(fun _ctxt -> return (None, None))
+      (fun ctxt ->
+        let*? dal_attesting_reward_per_shard =
+          Delegate_rewards.dal_attesting_reward_per_shard ctxt
+        in
+        let+ total_opt = Storage.Dal.Total_attested_slots.find ctxt in
+        let total = match total_opt with None -> Some 0l | v -> v in
+        (Some dal_attesting_reward_per_shard, total))
   in
   let* delegates = Stake_storage.get_selected_distribution ctxt last_cycle in
   List.fold_left_es
@@ -91,28 +179,38 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
           ~active_stake_weight
       in
       let rewards = Tez_repr.mul_exn attesting_reward_per_slot expected_slots in
-      if sufficient_participation && has_revealed_nonces then
-        (* Sufficient participation: we pay the rewards *)
-        let+ ctxt, payed_rewards_receipts =
+      let* ctxt, payed_rewards_receipts =
+        if sufficient_participation && has_revealed_nonces then
+          (* Sufficient participation: we pay the rewards *)
           Shared_stake.pay_rewards
             ctxt
             ~active_stake
             ~source:`Attesting_rewards
             ~delegate
             rewards
-        in
-        (ctxt, payed_rewards_receipts @ balance_updates)
-      else
-        (* Insufficient participation or unrevealed nonce: no rewards *)
-        let+ ctxt, payed_rewards_receipts =
+        else
+          (* Insufficient participation or unrevealed nonce: no rewards *)
           Token.transfer
             ctxt
             `Attesting_rewards
             (`Lost_attesting_rewards
               (delegate, not sufficient_participation, not has_revealed_nonces))
             rewards
-        in
-        (ctxt, payed_rewards_receipts @ balance_updates))
+      in
+      let* ctxt, payed_dal_rewards_receipts =
+        maybe_distribute_dal_attesting_rewards
+          ctxt
+          delegate
+          ~dal_attesting_reward_per_shard
+          ~total_dal_attested_slots
+          ~total_active_stake_weight
+          ~active_stake_weight
+          active_stake
+      in
+      return
+        ( ctxt,
+          payed_dal_rewards_receipts @ payed_rewards_receipts @ balance_updates
+        ))
     (ctxt, [])
     delegates
 
@@ -122,6 +220,9 @@ let cycle_end ctxt last_cycle =
   let* ctxt, unrevealed_nonces = Seed_storage.cycle_end ctxt last_cycle in
   let* ctxt, attesting_balance_updates =
     distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
+  in
+  let*! ctxt =
+    Delegate_missed_attestations_storage.remove_total_dal_attested_slots ctxt
   in
   (* Applying slashing related to expiring denunciations *)
   let* ctxt, slashing_balance_updates =

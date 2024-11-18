@@ -231,6 +231,7 @@ let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
                 constants.issuance_weights.base_total_issued_per_minute;
               baking_reward_bonus_per_slot = Tez_repr.zero;
               attesting_reward_per_slot = Tez_repr.zero;
+              dal_attesting_reward_per_shard = Tez_repr.zero;
             })
   in
   (ctxt, balance_updates)

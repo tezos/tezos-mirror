@@ -286,6 +286,14 @@ module Contract = struct
       end)
       (Missed_attestations_info)
 
+  module Attested_dal_slots =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["attested_dal_slots"]
+      end)
+      (Encoding.Int32)
+
   module Manager =
     Indexed_context.Make_map
       (Registered)
@@ -1564,6 +1572,7 @@ module Ramp_up = struct
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
     attesting_reward_per_slot : Tez_repr.t;
+    dal_attesting_reward_per_shard : Tez_repr.t;
   }
 
   module Rewards =
@@ -1583,22 +1592,27 @@ module Ramp_up = struct
                      baking_reward_fixed_portion;
                      baking_reward_bonus_per_slot;
                      attesting_reward_per_slot;
+                     dal_attesting_reward_per_shard;
                    } ->
                 ( baking_reward_fixed_portion,
                   baking_reward_bonus_per_slot,
-                  attesting_reward_per_slot ))
+                  attesting_reward_per_slot,
+                  dal_attesting_reward_per_shard ))
               (fun ( baking_reward_fixed_portion,
                      baking_reward_bonus_per_slot,
-                     attesting_reward_per_slot ) ->
+                     attesting_reward_per_slot,
+                     dal_attesting_reward_per_shard ) ->
                 {
                   baking_reward_fixed_portion;
                   baking_reward_bonus_per_slot;
                   attesting_reward_per_slot;
+                  dal_attesting_reward_per_shard;
                 })
-              (obj3
+              (obj4
                  (req "baking_reward_fixed_portion" Tez_repr.encoding)
                  (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-                 (req "attesting_reward_per_slot" Tez_repr.encoding)))
+                 (req "attesting_reward_per_slot" Tez_repr.encoding)
+                 (req "dal_attesting_reward_per_shard" Tez_repr.encoding)))
       end)
 end
 
@@ -2210,6 +2224,13 @@ module Dal = struct
                  (req "cell" H.encoding))
         end)
   end
+
+  module Total_attested_slots =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["total_attested_slots"]
+      end)
+      (Encoding.Int32)
 end
 
 module Zk_rollup = struct

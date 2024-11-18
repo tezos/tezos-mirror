@@ -223,6 +223,27 @@ module Raw_consensus = struct
     {t with attestation_branch = Some attestation_branch}
 end
 
+module Raw_dal = struct
+  type t = {
+    cryptobox : Dal.t option;
+    slot_fee_market : Dal_slot_repr.Slot_market.t;
+        (** records the published slot headers *)
+    slot_accountability : Dal_attestation_repr.Accountability.t;
+        (** records attested shards, in order to determine protocol-attested slots *)
+    attestations : Dal_attestation_repr.t Slot_repr.Map.t;
+        (** records the included DAL attestations *)
+  }
+
+  let init ~number_of_slots =
+    {
+      cryptobox = None;
+      slot_fee_market = Dal_slot_repr.Slot_market.init ~length:number_of_slots;
+      slot_accountability =
+        Dal_attestation_repr.Accountability.init ~number_of_slots;
+      attestations = Slot_repr.Map.empty;
+    }
+end
+
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -246,22 +267,7 @@ type back = {
     Stake_repr.t Signature.Public_key_hash.Map.t option;
   reward_coeff_for_current_cycle : Q.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
-  dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
-  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
-
-     We associate to a slot header some fees. This enable the use
-     of a fee market for slot publication. However, this is not
-     resilient from the game theory point of view. Probably we can find
-     better incentives here. In any case, because we want the following
-     invariant:
-
-         - For each level and for each slot there is at most one slot
-     header.
-
-         - We need to provide an incentive to avoid byzantines to post
-     dummy slot headers. *)
-  dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
-  dal_cryptobox : Dal.t option;
+  dal : Raw_dal.t;
   adaptive_issuance_enable : bool;
 }
 
@@ -332,6 +338,8 @@ let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
+let[@inline] dal ctxt = ctxt.back.dal
+
 let[@inline] adaptive_issuance_enable ctxt = ctxt.back.adaptive_issuance_enable
 
 let[@inline] update_back ctxt back = {ctxt with back}
@@ -378,6 +386,8 @@ let[@inline] update_sampler_state ctxt sampler_state =
 let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
+
+let[@inline] update_dal ctxt dal = update_back ctxt {ctxt.back with dal}
 
 let[@inline] set_adaptive_issuance_enable ctxt =
   update_back ctxt {ctxt.back with adaptive_issuance_enable = true}
@@ -869,14 +879,10 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
         stake_distribution_for_current_cycle = None;
         reward_coeff_for_current_cycle = Q.one;
         sc_rollup_current_messages;
-        dal_slot_fee_market =
-          Dal_slot_repr.Slot_market.init
-            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_attestation_slot_accountability =
-          Dal_attestation_repr.Accountability.init
+        dal =
+          Raw_dal.init
             ~number_of_slots:
               constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_cryptobox = None;
         adaptive_issuance_enable;
       };
   }
@@ -2137,69 +2143,89 @@ module Dal = struct
     let open Result_syntax in
     (* Dal.make takes some time (on the order of 10ms) so we memoize
        its result to avoid calling it more than once per block. *)
-    match ctxt.back.dal_cryptobox with
+    let dal = dal ctxt in
+    match dal.cryptobox with
     | Some cryptobox -> return (ctxt, cryptobox)
     | None -> (
-        let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
-          ctxt.back.constants
-        in
-        match Dal.make cryptobox_parameters with
+        match Dal.make (constants ctxt).dal.cryptobox_parameters with
         | Ok cryptobox ->
-            let back = {ctxt.back with dal_cryptobox = Some cryptobox} in
-            return ({ctxt with back}, cryptobox)
+            let ctxt = update_dal ctxt {dal with cryptobox = Some cryptobox} in
+            return (ctxt, cryptobox)
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
-  let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
-
-  let number_of_shards ctxt =
-    ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
-
   let record_number_of_attested_shards ctxt attestation number =
-    let dal_attestation_slot_accountability =
+    let dal = dal ctxt in
+    let slot_accountability =
       Dal_attestation_repr.Accountability.record_number_of_attested_shards
-        ctxt.back.dal_attestation_slot_accountability
+        dal.slot_accountability
         attestation
         number
     in
-    {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
+    update_dal ctxt {dal with slot_accountability}
 
   let register_slot_header ctxt slot_header ~source =
     let open Result_syntax in
+    let dal = dal ctxt in
     match
-      Dal_slot_repr.Slot_market.register
-        ctxt.back.dal_slot_fee_market
-        slot_header
-        ~source
+      Dal_slot_repr.Slot_market.register dal.slot_fee_market slot_header ~source
     with
     | None ->
-        let length =
-          Dal_slot_repr.Slot_market.length ctxt.back.dal_slot_fee_market
-        in
+        let length = Dal_slot_repr.Slot_market.length dal.slot_fee_market in
         tzfail
           (Dal_errors_repr.Dal_register_invalid_slot_header
              {length; slot_header})
-    | Some (dal_slot_fee_market, updated) ->
+    | Some (slot_fee_market, updated) ->
         if not updated then
           tzfail
             (Dal_errors_repr.Dal_publish_commitment_duplicate {slot_header})
-        else return {ctxt with back = {ctxt.back with dal_slot_fee_market}}
+        else return @@ update_dal ctxt {dal with slot_fee_market}
 
-  let candidates ctxt =
-    Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
+  let[@inline] candidates ctxt =
+    let dal = dal ctxt in
+    Dal_slot_repr.Slot_market.candidates dal.slot_fee_market
+
+  let record_attestation ctxt ~tb_slot attestation =
+    let dal = dal ctxt in
+    update_dal
+      ctxt
+      {
+        dal with
+        attestations = Slot_repr.Map.add tb_slot attestation dal.attestations;
+      }
+
+  let[@inline] attestations ctxt =
+    let dal = dal ctxt in
+    dal.attestations
 
   let is_slot_index_attested ctxt =
+    let dal = dal ctxt in
+    let constants = constants ctxt in
     let threshold =
-      ctxt.back.constants.Constants_parametric_repr.dal.attestation_threshold
+      constants.Constants_parametric_repr.dal.attestation_threshold
     in
     let number_of_shards =
-      ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
+      constants.Constants_parametric_repr.dal.cryptobox_parameters
         .number_of_shards
     in
     Dal_attestation_repr.Accountability.is_slot_attested
-      ctxt.back.dal_attestation_slot_accountability
+      dal.slot_accountability
       ~threshold
       ~number_of_shards
+
+  let assert_feature_enabled ctxt =
+    let constants = constants ctxt in
+    error_unless
+      Compare.Bool.(constants.dal.feature_enable = true)
+      Dal_errors_repr.Dal_feature_disabled
+
+  let only_if_feature_enabled ctxt ~default f =
+    let constants = constants ctxt in
+    if constants.dal.feature_enable then f ctxt else default ctxt
+
+  let only_if_incentives_enabled ctxt ~default f =
+    let constants = constants ctxt in
+    if constants.dal.incentives_enable then f ctxt else default ctxt
 end
 
 (* The type for relative context accesses instead from the root. In order for

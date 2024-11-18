@@ -80,6 +80,8 @@ let expected_size_in_bits ~max_index =
 
 let number_of_attested_slots = Bitset.hamming_weight
 
+let intersection = Bitset.inter
+
 type shard_index = int
 
 module Shard_map = Map.Make (struct

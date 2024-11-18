@@ -43,6 +43,23 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake_weight
           (Z.of_int number_of_attestations_per_cycle))
        (Z.of_int64 total_active_stake_weight))
 
+let expected_dal_shards_for_given_active_stake ctxt ~total_active_stake_weight
+    ~active_stake_weight =
+  let blocks_per_cycle =
+    Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
+  in
+  let number_of_shards = Constants_storage.dal_number_of_shards ctxt in
+  let number_of_shards_per_cycle = number_of_shards * blocks_per_cycle in
+  Z.to_int
+    (Z.div
+       (Z.mul
+          (Z.of_int64 active_stake_weight)
+          (Z.of_int number_of_shards_per_cycle))
+       (Z.of_int64 total_active_stake_weight))
+
+let remove_total_dal_attested_slots ctxt =
+  Storage.Dal.Total_attested_slots.remove ctxt
+
 type level_participation = Participated | Didn't_participate
 
 (* Note that the participation for the last block of a cycle is
@@ -105,6 +122,24 @@ let record_attesting_participation ctxt ~delegate ~participation
                 contract
                 {remaining_slots; missed_levels = 1}))
 
+let record_dal_participation ctxt ~delegate ~number_of_attested_slots =
+  let open Lwt_result_syntax in
+  if Compare.Int.(number_of_attested_slots = 0) then return ctxt
+  else
+    let contract = Contract_repr.Implicit delegate in
+    let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
+    match result with
+    | Some already_attested_slots ->
+        Storage.Contract.Attested_dal_slots.update
+          ctxt
+          contract
+          Int32.(add already_attested_slots (of_int number_of_attested_slots))
+    | None ->
+        Storage.Contract.Attested_dal_slots.init
+          ctxt
+          contract
+          (Int32.of_int number_of_attested_slots)
+
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
   let open Lwt_result_syntax in
@@ -152,6 +187,16 @@ let check_and_reset_delegate_participation ctxt delegate =
   | Some missed_attestations ->
       let*! ctxt = Storage.Contract.Missed_attestations.remove ctxt contract in
       return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
+
+let get_and_reset_delegate_dal_participation ctxt delegate =
+  let open Lwt_result_syntax in
+  let contract = Contract_repr.Implicit delegate in
+  let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
+  match result with
+  | None -> return (ctxt, 0l)
+  | Some num_slots ->
+      let*! ctxt = Storage.Contract.Attested_dal_slots.remove ctxt contract in
+      return (ctxt, num_slots)
 
 module For_RPC = struct
   type participation_info = {
