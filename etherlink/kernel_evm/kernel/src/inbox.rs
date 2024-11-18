@@ -12,8 +12,8 @@ use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
 use crate::delayed_inbox::DelayedInbox;
 use crate::parsing::{
-    Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
-    MAX_SIZE_PER_CHUNK,
+    Input, InputResult, Parsable, ProxyInput, SequencerBlueprintRes::*, SequencerInput,
+    SequencerParsingContext, MAX_SIZE_PER_CHUNK,
 };
 
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
@@ -29,6 +29,7 @@ use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
 use evm_execution::fa_bridge::deposit::FaDeposit;
+use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -324,8 +325,19 @@ impl InputHandler for SequencerInput {
                 log!(host, Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)
             }
-            Self::SequencerBlueprint(seq_blueprint) => {
+            Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
                 handle_blueprint_chunk(host, seq_blueprint.blueprint)
+            }
+            Self::SequencerBlueprint(
+                InvalidNumberOfChunks | InvalidSignature | InvalidNumber | Unparsable,
+            ) => {
+                log!(
+                    host,
+                    Debug,
+                    "Sequencer blueprint refused because: {:?}",
+                    input
+                );
+                Ok(())
             }
             Self::DalSlotImportSignals(DalSlotImportSignals {
                 signals,
@@ -646,6 +658,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // during this kernel run.
     let mut inbox_is_empty = true;
     let limits = fetch_limits(host);
+    let head_level: Option<U256> = crate::block_storage::read_current_number(host).ok();
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
@@ -654,6 +667,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
         dal_configuration: dal,
         buffer_transaction_chunks: None,
+        head_level,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of
@@ -711,6 +725,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blueprint_storage::blueprint_path;
     use crate::configuration::TezosContracts;
     use crate::dal_slot_import_signal::{
         DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
@@ -718,14 +733,16 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::parsing::RollupType;
     use crate::storage::*;
+    use primitive_types::U256;
     use std::fmt::Write;
-    use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_crypto_rs::hash::UnknownSignature;
+    use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519};
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::michelson::{MichelsonBytes, MichelsonOr};
@@ -1299,5 +1316,114 @@ mod tests {
 
         // Ensure that the encoded and decoded structures match
         assert_eq!(dal_slot_signal_list, decoded);
+    }
+
+    fn insert_blueprint_and_read_inbox(
+        head_level: U256,
+        sk: &SecretKeyEd25519,
+        pk: &PublicKey,
+        unsigned_blueprint: &UnsignedSequencerBlueprint,
+    ) -> bool {
+        // Prepare the host.
+        let mut host = MockKernelHost::default();
+        let address = smart_rollup_address();
+        crate::block_storage::internal_for_tests::store_current_number(
+            &mut host, head_level,
+        )
+        .unwrap();
+
+        // Prepare the blueprint.
+        let mut blueprint_bytes =
+            crate::parsing::tests::sequencer_signed_blueprint_chunk_bytes(
+                unsigned_blueprint,
+                sk.clone(),
+            );
+        blueprint_bytes.insert(0, 3);
+        let framed = ExternalMessageFrame::Targetted {
+            address: address.clone(),
+            contents: blueprint_bytes,
+        };
+        // Add to the inbox.
+        host.host.add_external(framed);
+        // Consume the inbox
+        let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
+        let _ = read_sequencer_inbox(
+            &mut host,
+            SMART_ROLLUP_ADDRESS,
+            &TezosContracts::default(),
+            ContractKt1Hash::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                .unwrap(),
+            pk.clone(),
+            &mut delayed_inbox,
+            false,
+            None,
+        )
+        .unwrap();
+
+        let path = blueprint_path(unsigned_blueprint.number).unwrap();
+        // The blueprint was valid if it was stored in the storage.
+        host.host.store_has(&path).unwrap().is_some()
+    }
+
+    #[test]
+    fn test_read_sequencer_inbox_blueprint_chunk() {
+        let head_level: U256 = U256::from(6);
+
+        // Pick a sequencer public key.
+        let pk = PublicKey::from_b58check(
+            "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
+        )
+        .unwrap();
+
+        // This is the secret key associated to the sequencer key in
+        // this test.
+        let valid_sk = SecretKeyEd25519::from_base58_check(
+            "edsk422LGdmDnai4Cya6csM6oFmgHpDQKUhatTURJRAY4h7NHNz9sz",
+        )
+        .unwrap();
+
+        // Insert a valid blueprint chunk on level 7.
+        let blueprint = UnsignedSequencerBlueprint {
+            chunk: vec![],
+            number: 7.into(),
+            nb_chunks: 3,
+            chunk_index: 0,
+        };
+        let is_valid =
+            insert_blueprint_and_read_inbox(head_level, &valid_sk, &pk, &blueprint);
+        assert!(is_valid);
+
+        // Insert a blueprint chunk on level 7 incorrectly signed.
+        let invalid_sk = SecretKeyEd25519::from_base58_check(
+            "edsk37VEgDUMt7wje8vxfao55y7JhiamjTbVM1xABSCamFgtcUqhdT",
+        )
+        .unwrap();
+        let is_valid =
+            insert_blueprint_and_read_inbox(head_level, &invalid_sk, &pk, &blueprint);
+        assert!(!is_valid);
+
+        // Insert a blueprint chunk on level 6.
+        let is_valid = insert_blueprint_and_read_inbox(
+            head_level,
+            &valid_sk,
+            &pk,
+            &UnsignedSequencerBlueprint {
+                number: 6.into(),
+                ..blueprint.clone()
+            },
+        );
+        assert!(!is_valid);
+
+        // Insert a blueprint chunk on level 5.
+        let is_valid = insert_blueprint_and_read_inbox(
+            head_level,
+            &valid_sk,
+            &pk,
+            &UnsignedSequencerBlueprint {
+                number: 5.into(),
+                ..blueprint
+            },
+        );
+        assert!(!is_valid);
     }
 }
