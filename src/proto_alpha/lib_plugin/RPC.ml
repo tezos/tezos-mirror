@@ -3203,6 +3203,14 @@ module Forge = struct
                  }))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
+
+    let consensus_operations =
+      RPC_service.post_service
+        ~description:"Forge a consensus operation in BLS mode"
+        ~query:RPC_query.empty
+        ~input:Operation.unsigned_encoding
+        ~output:(obj2 (req "sign" (bytes Hex)) (req "inject" (bytes Hex)))
+        RPC_path.(path / "bls_consensus_operations")
   end
 
   let register () =
@@ -3215,6 +3223,14 @@ module Forge = struct
           (Data_encoding.Binary.to_bytes_exn
              Operation.unsigned_encoding
              operation)) ;
+    Registration.register0_noctxt
+      ~chunked:true
+      S.consensus_operations
+      (fun () operation ->
+        return
+          Data_encoding.Binary.
+            ( to_bytes_exn Operation.bls_mode_unsigned_encoding operation,
+              to_bytes_exn Operation.unsigned_encoding operation )) ;
     Registration.register0_noctxt
       ~chunked:true
       S.protocol_data
