@@ -16,7 +16,6 @@ Thus, Octez now uses Attestations:
 
 DAC node and client executables are released for experimental usage only.
 Users can experimentally integrate a DAC in their Smart Rollups workflow to achieve higher data throughput and lower gas fees.
-Please refer to :doc:`Data Availability Committees <../shell/data_availability_committees>` for more details.
 
 .. warning::
 
