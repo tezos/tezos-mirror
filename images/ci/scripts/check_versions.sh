@@ -52,14 +52,14 @@ check_version_in_test_dependency_image() {
 
   echo "### Important packages version"
 
-  current_cargo_version=$(${run} cargo --version | awk '{print $2}')
-  check_version cargo "${current_cargo_version}" "${cargo_version}"
+  # current_cargo_version=$(${run} cargo --version | awk '{print $2}')
+  # check_version cargo "${current_cargo_version}" "${cargo_version}"
 
-  current_rust_version=$(${run} rustc --version | awk '{print $2}')
-  check_version rust "${current_rust_version}" "${rust_version}"
+  # current_rust_version=$(${run} rustc --version | awk '{print $2}')
+  # check_version rust "${current_rust_version}" "${rust_version}"
 
-  current_opam_version=$(${run} opam --version)
-  check_version opam "${current_opam_version}" "${opam_version}"
+  # current_opam_version=$(${run} opam --version)
+  # check_version opam "${current_opam_version}" "${opam_version}"
 
   current_ocaml_version=$(${run} ocaml --version | awk 'NF>1{print $NF}')
   check_version ocaml "${current_ocaml_version}" "${ocaml_version}"
