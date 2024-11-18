@@ -970,11 +970,11 @@ let pp_metrics t
          with
          | None -> Log.info "No ratio for %s" account.Account.public_key_hash
          | Some ratio ->
-             Log.info
-               "Ratio for %s (with stake %d): %f"
-               account.Account.public_key_hash
-               stake
-               ratio) ;
+             let alias =
+               Hashtbl.find_opt t.aliases account.Account.public_key_hash
+               |> Option.value ~default:account.Account.public_key_hash
+             in
+             Log.info "Ratio for %s (with stake %d): %f" alias stake ratio) ;
   Log.info
     "Balance of the Etherlink operator: %s tez"
     (Tez.to_string etherlink_operator_balance)
@@ -992,27 +992,23 @@ let push_metrics t
       ratio_attested_commitments_per_baker;
       etherlink_operator_balance;
     } =
-  (* There are three metrics grouped by labels. *)
-  t.bakers |> List.to_seq
-  |> Seq.iter (fun {account; stake; _} ->
-         let name =
-           Format.asprintf
-             "%s (stake: %d)"
-             account.Account.public_key_hash
-             stake
+  Hashtbl.to_seq ratio_attested_commitments_per_baker
+  |> Seq.iter (fun (public_key_hash, value) ->
+         (* Highly unoptimised since this is done everytime the metric is updated. *)
+         let alias =
+           Hashtbl.find_opt t.aliases public_key_hash
+           |> Option.map (fun alias -> [("alias", alias)])
+           |> Option.value ~default:[]
          in
-         let value =
-           match
-             Hashtbl.find_opt
-               ratio_attested_commitments_per_baker
-               account.Account.public_key_hash
-           with
-           | None -> 0.
-           | Some d -> d
+         let version =
+           Hashtbl.find_opt t.versions public_key_hash
+           |> Option.map (fun version -> [("version", version)])
+           |> Option.value ~default:[]
          in
+         let labels = [("attester", public_key_hash)] @ alias @ version in
          Cloud.push_metric
            t.cloud
-           ~labels:[("attester", name)]
+           ~labels
            ~name:"tezt_attested_ratio_per_baker"
            value) ;
   Cloud.push_metric
@@ -1061,11 +1057,14 @@ let update_level_first_commitment_published _t per_level_info metrics =
       else None
   | Some l -> Some l
 
-let update_level_first_commitment_attested _t per_level_info metrics =
+let update_level_first_commitment_attested t per_level_info metrics =
   match metrics.level_first_commitment_attested with
   | None ->
       if Z.popcount per_level_info.attested_commitments > 0 then
         Some per_level_info.level
+      else if
+        per_level_info.level > t.first_level + t.parameters.attestation_lag
+      then Some per_level_info.level
       else None
   | Some l -> Some l
 
@@ -1151,8 +1150,13 @@ let update_ratio_attested_commitments t per_level_info metrics =
               ratio)
 
 let update_ratio_attested_commitments_per_baker t per_level_info metrics =
+  let default () =
+    Hashtbl.to_seq_keys per_level_info.attestations
+    |> Seq.map (fun key -> (key, 0.))
+    |> Hashtbl.of_seq
+  in
   match metrics.level_first_commitment_attested with
-  | None -> Hashtbl.create 0
+  | None -> default ()
   | Some level_first_commitment_attested -> (
       let published_level =
         published_level_of_attested_level t per_level_info.level
@@ -1163,29 +1167,32 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
            precedes the earliest available level (%d)."
           published_level
           t.first_level ;
-        Hashtbl.create 0)
+        default ())
       else
         match Hashtbl.find_opt t.infos published_level with
         | None ->
             Log.warn
               "Unexpected error: The level %d is missing in the infos table"
               published_level ;
-            Hashtbl.create 0
+            default ()
         | Some old_per_level_info ->
             let n = Hashtbl.length old_per_level_info.published_commitments in
             let weight =
               per_level_info.level - level_first_commitment_attested
               |> float_of_int
             in
-            t.bakers |> List.to_seq
-            |> Seq.map (fun ({account; _} : baker) ->
+            let table =
+              Hashtbl.copy metrics.ratio_attested_commitments_per_baker
+            in
+            Hashtbl.to_seq_keys per_level_info.attestations
+            |> Seq.filter_map (fun public_key_hash ->
                    let bitset =
                      float_of_int
                      @@
                      match
                        Hashtbl.find_opt
                          per_level_info.attestations
-                         account.Account.public_key_hash
+                         public_key_hash
                      with
                      | None -> (* No attestation in block *) 0
                      | Some (Some z) when n = 0 ->
@@ -1201,20 +1208,20 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                          (* Attestation without DAL payload: no DAL rights. *)
                          100
                    in
-                   let old_ratio =
-                     match
-                       Hashtbl.find_opt
-                         metrics.ratio_attested_commitments_per_baker
-                         account.Account.public_key_hash
-                     with
-                     | None -> 0.
-                     | Some ratio -> ratio
-                   in
-                   if n = 0 then (account.Account.public_key_hash, old_ratio)
-                   else
-                     ( account.Account.public_key_hash,
-                       ((old_ratio *. weight) +. bitset) /. (weight +. 1.) ))
-            |> Hashtbl.of_seq)
+                   match
+                     Hashtbl.find_opt
+                       metrics.ratio_attested_commitments_per_baker
+                       public_key_hash
+                   with
+                   | None -> None
+                   | Some _old_ratio when n = 0 -> None
+                   | Some old_ratio ->
+                       Some
+                         ( public_key_hash,
+                           ((old_ratio *. weight) +. bitset) /. (weight +. 1.)
+                         ))
+            |> Hashtbl.replace_seq table ;
+            table)
 
 let get_metrics t infos_per_level metrics =
   let level_first_commitment_published =
