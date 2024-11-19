@@ -284,6 +284,13 @@ module Delegate_slots = struct
 
   let min_slot slots = SlotMap.min_binding slots.own_delegate_slots
 
+  let own_round_owner slots ~committee_size ~round =
+    let open Result_syntax in
+    let* slot =
+      Round.to_slot ~committee_size round |> Environment.wrap_tzresult
+    in
+    return @@ SlotMap.find slot slots.own_delegate_slots
+
   let voting_power slots ~slot =
     SlotMap.find slot slots.all_delegate_voting_power
 end
@@ -1168,9 +1175,9 @@ let round_proposer state ~level round =
   let committee_size =
     state.global_state.constants.parametric.consensus_committee_size
   in
-  Round.to_slot round ~committee_size |> function
+  match Delegate_slots.own_round_owner slots ~round ~committee_size with
   | Error _ -> None
-  | Ok slot -> Delegate_slots.own_slot_owner slots ~slot
+  | Ok owner -> owner
 
 let cache_size_limit = 100
 

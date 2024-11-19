@@ -125,6 +125,11 @@ module Delegate_slots : sig
       given slot is not the delegate's first slot). *)
   val own_slot_owner : t -> slot:Slot.t -> delegate_slot option
 
+  (** Returns, among our *own* delegates, the delegate (together with its
+      first attesting slot) that owns the given round, if any. *)
+  val own_round_owner :
+    t -> committee_size:int -> round:Round.t -> delegate_slot option tzresult
+
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
   val voting_power : t -> slot:Slot.t -> int option

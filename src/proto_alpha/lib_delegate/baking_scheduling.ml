@@ -299,6 +299,8 @@ let first_potential_round_at_next_level state ~earliest_round =
      within the range [0 ... committee_size], look for the first subsequent slot
      we own, and finally translate it back to a round by restoring the original
      offset. *)
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/7931
+     The use of Round.to_slot should be avoided *)
   let*? earliest_slot = Round.to_slot ~committee_size earliest_round in
   let*? earliest_round = Round.to_int earliest_round in
   let period_offset = earliest_round / committee_size in
