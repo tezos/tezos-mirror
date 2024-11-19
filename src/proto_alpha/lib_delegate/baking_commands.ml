@@ -735,8 +735,6 @@ let run_baker
       ~per_block_vote_file
   in
   let dal_node_rpc_ctxt =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4674
-       Treat case when no endpoint was given and DAL is enabled *)
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint
   in
   let* delegates = get_delegates cctxt sources in
