@@ -54,7 +54,7 @@ only provide a user/developer perspective.
 
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
-stake, in the same way as endorsers were selected in Emmy*. We let
+stake, in much the same way as endorsers were selected in Emmy*. We let
 ``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_alpha>` per level.
 Furthermore, we use ``CONSENSUS_THRESHOLD`` to denote two thirds of ``CONSENSUS_COMMITTEE_SIZE``.
 
@@ -180,7 +180,7 @@ behavior. Notable changes however are as follows:
 * At the end of a cycle ``c``, the following actions happen:
 
   - the distribution of attesting rewards,
-  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution.
+  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current distribution of baking power.
 
 
 Fees
@@ -216,7 +216,7 @@ the included attestations represent. The bonus is also distributed
 immediately.
 
 The attesting rewards are distributed at the end of the cycle.
-Attesting rewards may be received even if not all of the validator's attestations are included in the cycle's blocks and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
+Attesting rewards may be received even if not all of the validator's attestations are included in the cycle's blocks and is proportional to the validator's baking power (in other words, to its *expected* number of validator slots, and not its actual number of slots).
 However, two conditions must be met:
 
 - the validator has revealed its nonces, and
@@ -267,7 +267,7 @@ producing the block's payload. Concerning the bonus, given that
 Therefore B receives the bonus ``(5251 - 4667) * 0.001143 = 0.667512`` tez. (Note
 that B only included attestations corresponding to ``584 = 5251 - 4667`` additional validator slots, about a quarter of the
 maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
-delegate C, whose active stake at some cycle is 1% of the total stake. Note that
+delegate C, whose baking power at some cycle is 1% of the total stake. Note that
 his expected number of validator slots for that cycle is
 ``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 10800 * 7000 = 756,000``
 slots. Assume also that the attesting power of C's attestations
