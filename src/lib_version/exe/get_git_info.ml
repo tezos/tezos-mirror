@@ -71,7 +71,7 @@ let raw_current_version = "$Format:%(describe:tags)$"
    If one commit is associated with two or more tags,
    output always the most recently added tag that match the regexp `v*`
 *)
-let git_describe product =
+let git_describe products =
   let parse s =
     match parse_version s with
     | Some v -> v
@@ -87,7 +87,7 @@ let git_describe product =
       query
         ~env:"GIT_VERSION"
         ~default:"dev"
-        ("git describe --tags --match " ^ product)
+        (String.concat " --match " ("git describe --tags" :: products))
     else raw_current_version
   in
   parse s
@@ -99,11 +99,15 @@ let lines =
     Format.asprintf
       "let git_describe_octez = %a"
       Tezos_version_parser.pp
-      (git_describe "octez-v*");
+      (git_describe ["octez-v*"]);
     Format.asprintf
       "let git_describe_octez_evm_node = %a"
       Tezos_version_parser.pp
-      (git_describe "octez-evm-node-v*");
+      (git_describe ["octez-evm-node-v*"]);
+    Format.asprintf
+      "let git_describe_octez_smart_rollup_node = %a"
+      Tezos_version_parser.pp
+      (git_describe ["octez-smart-rollup-node-v*"; "octez-v*"]);
   ]
 
 let () =

@@ -81,6 +81,8 @@ module type M = sig
     Tezos_client_base.Client_context.full Tezos_clic.command list
 
   val logger : RPC_client_unix.logger option
+
+  val version : string option
 end
 
 let register_default_signer ?other_registrations ?logger
@@ -581,7 +583,9 @@ let main (module C : M) ~select_commands =
         | Ok () -> Lwt.return 0
         | Error [Tezos_clic.Version] ->
             let version =
-              Tezos_version_value.Bin_version.octez_version_string
+              Option.value
+                C.version
+                ~default:Tezos_version_value.Bin_version.octez_version_string
             in
             Format.printf "%s\n" version ;
             Lwt.return 0

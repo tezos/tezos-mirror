@@ -710,6 +710,9 @@ module Daemon_node_config = struct
   let clic_commands ~base_dir:_ ~config_commands:_ ~builtin_commands:_
       ~other_commands ~require_auth:_ =
     other_commands
+
+  let version =
+    Some Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
 end
 
 let () = Client_main_run.run (module Daemon_node_config) ~select_commands
