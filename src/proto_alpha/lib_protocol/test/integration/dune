@@ -31,7 +31,6 @@
  (modules
   test_constants
   test_frozen_bonds
-  test_adaptive_issuance_launch
   test_scenario_base
   test_scenario_stake
   test_scenario_rewards
