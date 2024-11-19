@@ -78,7 +78,10 @@ pub trait ManagerBase {
 }
 
 /// Manager with allocation capabilities
-pub trait ManagerAlloc: ManagerBase {
+///
+/// Any `ManagerAlloc` inherently has read & write capabilities,
+/// since the manager creates the values on the first allocation.
+pub trait ManagerAlloc: 'static + ManagerReadWrite {
     /// Allocate a region in the state storage.
     fn allocate_region<E, const LEN: usize>(
         &mut self,
