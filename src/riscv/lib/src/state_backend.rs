@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -400,6 +400,7 @@ pub(crate) mod test_helpers {
     use super::{
         AllocatedOf, Layout, ManagerClone, ManagerDeserialise, ManagerReadWrite, ManagerSerialise,
     };
+    use crate::jit::state_access::JitStateAccess;
 
     /// Generate a test against all test backends.
     #[macro_export]
@@ -420,7 +421,11 @@ pub(crate) mod test_helpers {
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
         /// Manager used in testing
-        type Manager: ManagerReadWrite + ManagerSerialise + ManagerDeserialise + ManagerClone;
+        type Manager: ManagerReadWrite
+            + ManagerSerialise
+            + ManagerDeserialise
+            + ManagerClone
+            + JitStateAccess;
 
         /// Allocate using the test backend manager.
         fn allocate<L: Layout>() -> AllocatedOf<L, Self::Manager>;

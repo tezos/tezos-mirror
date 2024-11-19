@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -104,7 +104,7 @@ use std::u64;
 const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
 
 /// The maximum number of instructions that may be contained in a block.
-const CACHE_INSTR: usize = 20;
+pub const CACHE_INSTR: usize = 20;
 
 /// Layout for an [`ICallPlaced`].
 pub struct ICallLayout<ML> {
@@ -893,6 +893,14 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
         M: ManagerRead,
     {
         self.instr.iter().map(|cell| cell.read_stored()).collect()
+    }
+}
+
+impl<'a, ML: MainMemoryLayout, M: ManagerBase> From<&'a mut [EnrichedCell<ICallPlaced<ML>, M>]>
+    for Block<'a, ML, M>
+{
+    fn from(value: &'a mut [EnrichedCell<ICallPlaced<ML>, M>]) -> Self {
+        Self { instr: value }
     }
 }
 
