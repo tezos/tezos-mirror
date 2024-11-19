@@ -41,10 +41,21 @@ let blueprint_watcher_service =
     ~output:Blueprint_types.with_events_encoding
     Path.(evm_services_root / "blueprints")
 
-let create_blueprint_watcher_service get_next_blueprint_number find_blueprint
-    from_level =
+let message_watcher_service =
+  let level_query =
+    Query.(query Fun.id |+ field "from_level" Arg.uint63 0L Fun.id |> seal)
+  in
+
+  Service.get_service
+    ~description:"Watch for new messages"
+    ~query:level_query
+    ~output:Broadcast.message_encoding
+    Path.(evm_services_root / "messages")
+
+let create_blueprint_stream get_next_blueprint_number find_blueprint from_level
+    create_stream return_blueprint =
   let open Lwt_syntax in
-  let blueprint_stream, stopper = Broadcast.create_blueprint_stream () in
+  let stream, stopper = create_stream () in
   let shutdown () = Lwt_watcher.shutdown stopper in
   (* input source block creating a stream to observe the events *)
   let* (Ethereum_types.Qty next) = get_next_blueprint_number () in
@@ -53,7 +64,6 @@ let create_blueprint_watcher_service get_next_blueprint_number find_blueprint
       Stdlib.failwith "Cannot start watching from a level too far in the future"
     else return_unit
   in
-
   (* generate the next asynchronous event *)
   let next =
     let next_level_requested = ref Z.(of_int64 from_level) in
@@ -63,14 +73,32 @@ let create_blueprint_watcher_service get_next_blueprint_number find_blueprint
         (next_level_requested := Z.(succ current_request)) ;
         let* blueprint = find_blueprint (Ethereum_types.Qty current_request) in
         match blueprint with
-        | Ok (Some blueprint) -> return_some blueprint
+        | Ok (Some blueprint) -> return_blueprint blueprint
         | Ok None -> return_none
         | Error _ ->
             Stdlib.failwith
               "Something went wrong when trying to fetch a blueprint")
-      else Lwt_stream.get blueprint_stream
+      else Lwt_stream.get stream
   in
   Tezos_rpc.Answer.return_stream {next; shutdown}
+
+let create_blueprint_watcher_service get_next_blueprint_number find_blueprint
+    from_level =
+  create_blueprint_stream
+    get_next_blueprint_number
+    find_blueprint
+    from_level
+    Broadcast.create_blueprint_stream
+    Lwt_syntax.return_some
+
+let create_broadcast_service get_next_blueprint_number find_blueprint from_level
+    =
+  create_blueprint_stream
+    get_next_blueprint_number
+    find_blueprint
+    from_level
+    Broadcast.create_broadcast_stream
+    (fun b -> Lwt_syntax.return_some @@ Broadcast.Blueprint b)
 
 let register_get_smart_rollup_address_service smart_rollup_address dir =
   Directory.register0 dir get_smart_rollup_address_service (fun () () ->
@@ -97,12 +125,17 @@ let register_blueprint_watcher_service find_blueprint get_next_blueprint_number
         find_blueprint
         level)
 
+let register_broadcast_service find_blueprint get_next_blueprint_number dir =
+  Directory.gen_register0 dir message_watcher_service (fun level () ->
+      create_broadcast_service get_next_blueprint_number find_blueprint level)
+
 let register get_next_blueprint_number find_blueprint smart_rollup_address
     time_between_blocks dir =
   register_get_smart_rollup_address_service smart_rollup_address dir
   |> register_get_blueprint_service find_blueprint
   |> register_blueprint_watcher_service find_blueprint get_next_blueprint_number
   |> register_get_time_between_block_service time_between_blocks
+  |> register_broadcast_service find_blueprint get_next_blueprint_number
 
 let get_smart_rollup_address ~evm_node_endpoint =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service
