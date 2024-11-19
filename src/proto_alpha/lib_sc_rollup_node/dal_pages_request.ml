@@ -309,8 +309,9 @@ let slot_pages
 
 let page_content
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~inbox_level node_ctxt page_id
-    ~dal_attested_slots_validity_lag =
+    ~dal_activation_level ~inbox_level node_ctxt
+    ~attestation_threshold_percent:_ ~restricted_commitments_publishers:_
+    page_id ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let Node_context.{genesis_info = {level = origination_level; _}; _} =
     node_ctxt

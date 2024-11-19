@@ -147,6 +147,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               ~dal_activation_level
               ~dal_attested_slots_validity_lag
               ~inbox_level:(Int32.of_int level)
+              ~attestation_threshold_percent:None
+              ~restricted_commitments_publishers:None
               node_ctxt
               dal_page
           in
@@ -289,6 +291,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                   ~inbox_level:(Int32.of_int level)
                   ~dal_activation_level
                   ~dal_attested_slots_validity_lag
+                  ~attestation_threshold_percent:None
+                  ~restricted_commitments_publishers:None
                   node_ctxt
                   page_id
               in

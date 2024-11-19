@@ -77,6 +77,8 @@ val page_content :
   dal_activation_level:Raw_level.t option ->
   inbox_level:int32 ->
   _ Node_context.t ->
+  attestation_threshold_percent:int option ->
+  restricted_commitments_publishers:Contract.t list option ->
   Dal.Page.t ->
   dal_attested_slots_validity_lag:int ->
   Dal.Page.content option tzresult Lwt.t
