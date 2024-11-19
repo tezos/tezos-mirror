@@ -1941,6 +1941,48 @@
          }
       },
       {
+         "type": "timeseries",
+         "title": "Amplification delays (histogram quantiles)",
+         "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 140
+         },
+         "datasource": "Prometheus",
+         "id": 26,
+         "targets": [
+            {
+               "refId": "A",
+               "expr": "histogram_quantile(0.95, sum(rate(dal_node_amplification_start_reconstruction_duration_seconds_bucket{app=\"$node_instance\"}[$__rate_interval])) by  (le))",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Delay from first shard received to start of amplification"
+            },
+            {
+               "refId": "B",
+               "expr": "histogram_quantile(0.95, sum(rate(dal_node_amplification_abort_reconstruction_duration_seconds_bucket{app=\"$node_instance\"}[$__rate_interval])) by  (le))",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Delay from first shard received to abortion of amplification"
+            },
+            {
+               "refId": "C",
+               "expr": "histogram_quantile(0.95, sum(rate(dal_node_amplification_enough_shards_received_duration_seconds_bucket{app=\"$node_instance\"}[$__rate_interval])) by  (le))",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Delay from first shard received to enough of shards received"
+            },
+            {
+               "refId": "D",
+               "expr": "histogram_quantile(0.95, sum(rate(dal_node_amplification_all_shards_received_duration_seconds_bucket{app=\"$node_instance\"}[$__rate_interval])) by  (le))",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Delay from first shard received to all shards received"
+            }
+         ]
+      },
+      {
          "id": 27,
          "type": "timeseries",
          "title": "Amplification queue length (octez-dal-node main process)",
