@@ -1008,41 +1008,59 @@ let push_metrics t
          let labels = [("attester", public_key_hash)] @ alias @ version in
          Cloud.push_metric
            t.cloud
+           ~help:
+             "Ratio between the number of attested and expected commitments \
+              per baker"
+           ~typ:`Gauge
            ~labels
            ~name:"tezt_dal_commitments_attested_ratio"
            value) ;
   Cloud.push_metric
     t.cloud
+    ~help:"Ratio between the number of published and expected commitments"
+    ~typ:`Gauge
     ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "published")]
     ratio_published_commitments ;
   Cloud.push_metric
     t.cloud
+    ~help:"Ratio between the number of attested and expected commitments"
+    ~typ:`Gauge
     ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "attested")]
     ratio_attested_commitments ;
   Cloud.push_metric
     t.cloud
+    ~help:
+      "Ratio between the number of attested and expected commitments per level"
+    ~typ:`Gauge
     ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "published_last_level")]
     ratio_published_commitments_last_level ;
   Cloud.push_metric
     t.cloud
+    ~help:"Number of commitments expected to be published"
+    ~typ:`Counter
     ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "expected")]
     (float_of_int expected_published_commitments) ;
   Cloud.push_metric
     t.cloud
+    ~help:"Number of published commitments "
+    ~typ:`Counter
     ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "published")]
     (float_of_int total_published_commitments) ;
   Cloud.push_metric
     t.cloud
+    ~help:"Number of  attested commitments"
+    ~typ:`Counter
     ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "attested")]
     (float_of_int total_attested_commitments) ;
   Cloud.push_metric
     t.cloud
+    ~help:"Balance of the etherlink operator"
     ~typ:`Gauge
     ~name:"tezt_etherlink_operator_balance_total"
     (Tez.to_float etherlink_operator_balance)
