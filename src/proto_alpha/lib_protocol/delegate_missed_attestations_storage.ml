@@ -209,7 +209,32 @@ let check_and_reset_delegate_participation ctxt delegate =
   | None -> return (ctxt, true)
   | Some missed_attestations ->
       let*! ctxt = Storage.Contract.Missed_attestations.remove ctxt contract in
-      return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
+      let current_cycle = (Raw_context.current_level ctxt).cycle in
+      let cycle_eras = Raw_context.cycle_eras ctxt in
+      let first_level_of_cycle =
+        Level_repr.first_level_in_cycle_from_eras ~cycle_eras current_cycle
+      in
+      let all_bakers_attest_enabled =
+        Delegate_sampler.check_all_bakers_attest_at_level
+          ctxt
+          first_level_of_cycle
+      in
+      if all_bakers_attest_enabled then
+        let Ratio_repr.{numerator; denominator} =
+          Constants_storage.minimal_participation_ratio ctxt
+        in
+        let blocks_per_cycle =
+          Constants_storage.blocks_per_cycle ctxt |> Int32.to_int
+        in
+        let max_tolerated_missed_levels =
+          blocks_per_cycle * (denominator - numerator) / denominator
+        in
+        return
+          ( ctxt,
+            Compare.Int.(
+              missed_attestations.missed_levels <= max_tolerated_missed_levels)
+          )
+      else return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
 
 let get_and_maybe_reset_delegate_dal_participation ~reset ctxt delegate =
   let open Lwt_result_syntax in
