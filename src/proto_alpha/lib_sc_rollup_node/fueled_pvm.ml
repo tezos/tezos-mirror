@@ -295,7 +295,27 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                 PVM_mut_state.set_input (Reveal (Metadata metadata)) state
               in
               go fuel (Int64.succ current_tick) failing_ticks state)
-      | Needs_reveal (Request_dal_page page_id) -> (
+      | Needs_reveal
+          ((Request_dal_page _ | Request_adal_page _) as xdal_request) -> (
+          let ( page_id,
+                attestation_threshold_percent,
+                restricted_commitments_publishers ) =
+            match xdal_request with
+            | Request_dal_page page_id -> (page_id, None, None)
+            | Request_adal_page
+                {
+                  page_id;
+                  attestation_threshold_percent;
+                  restricted_commitments_publishers;
+                } ->
+                ( page_id,
+                  Some attestation_threshold_percent,
+                  restricted_commitments_publishers )
+            | _ ->
+                (* This case is not reachable because we know that [xdal_request]
+                   is either [Request_dal_page] or [Request_adal_page] *)
+                assert false
+          in
           match F.consume F.one_tick_consumption fuel with
           | None -> abort fuel current_tick
           | Some fuel ->
@@ -305,9 +325,9 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                   ~inbox_level:(Int32.of_int level)
                   ~dal_activation_level
                   ~dal_attested_slots_validity_lag
-                  ~attestation_threshold_percent:None
-                  ~restricted_commitments_publishers:None
                   node_ctxt
+                  ~attestation_threshold_percent
+                  ~restricted_commitments_publishers
                   page_id
               in
               let*! () =
@@ -328,11 +348,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               go fuel (Int64.succ current_tick) failing_ticks state)
       | Initial | First_after _ ->
           return @@ Completed {fuel; current_tick; failing_ticks}
-      | Needs_reveal (Request_adal_page _) ->
-          (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
-
-             to be implemented. *)
-          assert false
     in
     go fuel start_tick failing_ticks state
 
