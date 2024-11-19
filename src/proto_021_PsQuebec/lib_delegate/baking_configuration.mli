@@ -69,7 +69,6 @@ type t = {
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
   dal_node_endpoint : Uri.t option;
-  dal_node_timeout_percentage : int;
   pre_emptive_forge_time : Time.System.Span.t;
 }
 
@@ -111,7 +110,6 @@ val make :
   ?state_recorder:state_recorder_config ->
   ?extra_operations:Operations_source.t ->
   ?dal_node_endpoint:Uri.t ->
-  ?dal_node_timeout_percentage:int ->
   ?pre_emptive_forge_time:Time.System.Span.t ->
   unit ->
   t
