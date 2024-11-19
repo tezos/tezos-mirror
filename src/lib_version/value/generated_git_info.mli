@@ -29,3 +29,5 @@ val committer_date : string
 val git_describe_octez : Tezos_version_parser.t
 
 val git_describe_octez_evm_node : Tezos_version_parser.t
+
+val git_describe_octez_smart_rollup_node : Tezos_version_parser.t

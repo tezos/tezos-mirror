@@ -200,7 +200,7 @@ let () =
   let open Lwt_result_syntax in
   let version =
     Tezos_version.Version.to_string
-      Tezos_version_value.Current_git_info.octez_version
+      Tezos_version_value.Current_git_info.octez_smart_rollup_node_version
   in
   let store_version = Format.asprintf "%a" Store_version.pp Store.version in
   let context_version = Context.Version.(to_string version) in

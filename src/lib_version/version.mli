@@ -65,7 +65,10 @@ type additional_info = Tezos_version_parser.additional_info =
 val string_of_additional_info : additional_info -> string
 
 (** Product information. *)
-type product = Tezos_version_parser.product = Octez | Octez_evm_node
+type product = Tezos_version_parser.product =
+  | Octez
+  | Octez_evm_node
+  | Octez_smart_rollup_node
 
 (** Convert the product information to a string. *)
 val string_of_product : product -> string

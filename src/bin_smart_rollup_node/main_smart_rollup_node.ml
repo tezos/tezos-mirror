@@ -761,6 +761,9 @@ module Daemon_node_config = struct
     other_commands
 
   let advertise_log_levels = Some true
+
+  let version =
+    Some Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
 end
 
 let () = Tezos_layer2_store.Snapshot_utils.add_download_command ()
