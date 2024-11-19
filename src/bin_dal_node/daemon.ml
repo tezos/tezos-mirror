@@ -728,9 +728,75 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
+(** [update_timing_shards_received node_ctxt timing slot_id
+   ~number_of_already_stored_shards ~number_of_shards] update the shards timing
+   table values [timing] associated to slot_id [slot_id] and returns the
+   corresponding slot_metrics.
+   This function is intended to be called on each received shard, even
+   duplicates, but uses the [number_of_already_stored_shards] to only update
+   slot_metrics if the count of shards has been incremented.
+   This function execution is expected to be relatively fast: no IO is
+   involved, an update of Vache map is involved *)
+let update_timing_shard_received node_ctxt shards_timing_table slot_id
+    ~number_of_already_stored_shards ~number_of_shards =
+  let now = Unix.gettimeofday () in
+  let open Dal_metrics in
+  let timing =
+    match
+      Dal_metrics.Slot_id_bounded_map.find_opt shards_timing_table slot_id
+    with
+    | None ->
+        (* Note: we expect the entry is None only on the first received shard,
+           while lwt might actually process this code after the second or third
+           shard. This should be rare and the delta between values is pretty
+           minimal *)
+        {
+          time_first_shard = now;
+          duration_enough_shards = None;
+          duration_all_shards = None;
+        }
+    | Some timing ->
+        let is_all_shard_received =
+          number_of_already_stored_shards = number_of_shards
+        in
+        if is_all_shard_received then (
+          let duration = now -. timing.time_first_shard in
+          Dal_metrics.update_amplification_all_shards_received_duration duration ;
+          {timing with duration_all_shards = Some duration})
+        else
+          let cryptobox = Node_context.get_cryptobox node_ctxt in
+          let redundancy_factor =
+            Cryptobox.(parameters cryptobox).redundancy_factor
+          in
+          let is_enough_shard_received =
+            Option.is_none timing.duration_enough_shards
+            && number_of_already_stored_shards
+               >= number_of_shards / redundancy_factor
+          in
+          if is_enough_shard_received then (
+            let duration = now -. timing.time_first_shard in
+            Dal_metrics.update_amplification_enough_shards_received_duration
+              duration ;
+            {timing with duration_enough_shards = Some duration})
+          else timing
+  in
+  let () =
+    Dal_metrics.Slot_id_bounded_map.replace shards_timing_table slot_id timing
+  in
+  timing
+
 let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
     amplificator =
   let open Gossipsub in
+  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
+  let timing_table_size =
+    2 * proto_parameters.attestation_lag
+    * proto_parameters.cryptobox_parameters.number_of_shards
+    * proto_parameters.number_of_slots
+  in
+  let shards_timing_table =
+    Dal_metrics.Slot_id_bounded_map.create timing_table_size
+  in
   let shards_handler shards =
     let save_and_notify = Store.Shards.write_all shards in
     fun Types.Message.{share; _}
@@ -740,6 +806,22 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
       let* () =
         Seq.return {Cryptobox.share; index = shard_index}
         |> save_and_notify slot_id |> Errors.to_tzresult
+      in
+      let number_of_shards =
+        proto_parameters.cryptobox_parameters.number_of_shards
+      in
+      (* Introduce a new store read at each received shard. Not sure it can be
+         a problem, though *)
+      let* number_of_already_stored_shards =
+        Store.Shards.count_values node_store slot_id
+      in
+      let _slot_metrics =
+        update_timing_shard_received
+          node_ctxt
+          shards_timing_table
+          slot_id
+          ~number_of_already_stored_shards
+          ~number_of_shards
       in
       match
         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
@@ -1234,10 +1316,10 @@ let run ~data_dir ~configuration_override =
      This forks a process and should be kept early to avoid copying opened file
      descriptors. *)
   let* amplificator =
-    if not is_prover_profile then return_none
-    else
+    if is_prover_profile then
       let* amplificator = Amplificator.make ctxt in
       return_some amplificator
+    else return_none
   in
   (* Starts the metrics *after* the amplificator fork, to avoid forked opened
      sockets *)

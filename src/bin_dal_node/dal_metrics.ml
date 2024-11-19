@@ -144,6 +144,26 @@ module Node_metrics = struct
       ~namespace
       ~subsystem
       name
+
+  let amplification_enough_shards_received_duration =
+    let name = "amplification_enough_shards_received_duration_seconds" in
+    Prometheus.DefaultHistogram.v
+      ~help:
+        "Duration between the reception of the first shard and enough shards \
+         to reconstruct"
+      ~namespace
+      ~subsystem
+      name
+
+  let amplification_all_shards_received_duration =
+    let name = "amplification_all_shards_received_duration_seconds" in
+    Prometheus.DefaultHistogram.v
+      ~help:
+        "Duration between the reception of the first shard and the complete \
+         set of shards"
+      ~namespace
+      ~subsystem
+      name
 end
 
 module GS = struct
@@ -208,7 +228,7 @@ module GS = struct
 
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
 
-       Be able to clean peers from metrics onces they are disconnected. *)
+       Be able to clean peers from metrics once they are disconnected. *)
     let collect_peers_per_topic_metrics gs_state =
       let module W = Gossipsub.Worker in
       W.GS.Topic.Map.fold
@@ -437,6 +457,17 @@ module GS = struct
   let () = List.iter add_metric metrics
 end
 
+(* Stores metrics about reception of shards *)
+type slot_metrics = {
+  time_first_shard : float;
+  duration_enough_shards : float option;
+  duration_all_shards : float option;
+}
+
+(* Bounded map, serving as cache to store shard reception timing values *)
+module Slot_id_bounded_map =
+  Aches.Vache.Map (Aches.Vache.LRU_Sloppy) (Aches.Vache.Strong) (Types.Slot_id)
+
 let reconstruction_started () =
   Prometheus.Counter.inc_one Node_metrics.number_of_reconstructions_started
 
@@ -490,6 +521,16 @@ let update_kvs_shards_metrics ~opened_files ~ongoing_actions =
     Node_metrics.kvs_shards_ongoing_actions
     (float ongoing_actions) ;
   Prometheus.Gauge.set Node_metrics.kvs_shards_opened_files (float opened_files)
+
+let update_amplification_enough_shards_received_duration duration =
+  Prometheus.DefaultHistogram.observe
+    Node_metrics.amplification_enough_shards_received_duration
+    duration
+
+let update_amplification_all_shards_received_duration duration =
+  Prometheus.DefaultHistogram.observe
+    Node_metrics.amplification_all_shards_received_duration
+    duration
 
 let sample_time ~sampling_frequency ~to_sample ~metric_updater =
   if sampling_frequency > 0 && Random.int sampling_frequency <> 0 then

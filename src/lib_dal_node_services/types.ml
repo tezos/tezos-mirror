@@ -308,6 +308,10 @@ module Slot_id = struct
     let open Compare in
     or_else (Int32.compare l1 l2) (fun () -> Int.compare i1 i2)
 
+  let equal left right = compare left right = 0
+
+  let hash = Stdlib.Hashtbl.hash
+
   module Comparable = struct
     type nonrec t = t
 
