@@ -176,6 +176,9 @@ The new set of packages can be installed by adding the following apt repository:
 Once the Octez binary packages are installed, they can be set up as services
 as explained in :doc:`./services`.
 
+If migrating from Serokell packages you can check out migration documentation
+:doc:`./serokell`.
+
 Fedora Octez packages
 ~~~~~~~~~~~~~~~~~~~~~
 

@@ -151,6 +151,7 @@ Platform developers are also provided reference materials for internal APIs of O
    introduction/howtouse
    introduction/howtorun
    introduction/services
+   introduction/serokell
    introduction/versioning
    BREAKING CHANGES <introduction/breaking_changes>
 
