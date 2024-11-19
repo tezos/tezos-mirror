@@ -65,6 +65,12 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Updated batcher with a new order structure. The RPC
+  ``/local/batcher/injection`` now has a new query argument
+  possibility ``"order": <int>``. The batcher will batch the
+  received chunk with the following priority order: First chunks with
+  ascending order then chunks by order of arrival. (MR :gl:`!15672`)
+
 - Updated RPC ``/local/batcher/injection`` with a new query argument
   possibility. When the rpc contains ``"drop_duplicate": true`` then
   the batcher will drop the messages that were already injected with a

@@ -451,8 +451,11 @@ let () =
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.injection
-  @@ fun _node_ctxt drop_duplicate messages ->
-  Batcher.register_messages ~drop_duplicate messages
+  @@ fun _node_ctxt query messages ->
+  Batcher.register_messages
+    ?order:query#order
+    ~drop_duplicate:query#drop_duplicate
+    messages
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.dal_batcher_injection
@@ -466,10 +469,7 @@ let () =
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.batcher_queue
-  @@ fun _node_ctxt () () ->
-  let open Lwt_result_syntax in
-  let*? queue = Batcher.get_queue () in
-  return queue
+  @@ fun _node_ctxt () () -> Batcher.get_queue () |> Lwt.return
 
 (** [commitment_level_of_inbox_level node_ctxt inbox_level] returns the level
       of the commitment which should include the inbox of level
