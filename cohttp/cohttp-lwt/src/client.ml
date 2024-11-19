@@ -28,12 +28,13 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
          * You may therefore not call into Lwt from a finaliser. *)
         Gc.finalise_last
           (fun () ->
-            if not !closed then
+            if not !closed then (
+              closefn () ;
               Log.warn (fun m ->
                   m
                     "Body not consumed, leaking stream! Refer to \
                      https://github.com/mirage/ocaml-cohttp/issues/730 for \
-                     additional details"))
+                     additional details")))
           stream ;
         body
     | `No ->
@@ -74,20 +75,21 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
             req
             oc
     in
-    sent >>= fun () ->
-    (Response.read ic >>= function
-     | `Invalid reason ->
-         Lwt.fail (Failure ("Failed to read response: " ^ reason))
-     | `Eof -> Lwt.fail (Failure "Server closed connection prematurely.")
-     | `Ok res -> (
-         match meth with
-         | `HEAD ->
-             closefn () ;
-             Lwt.return (res, `Empty)
-         | _ ->
-             let body = read_body ~closefn ic res in
-             Lwt.return (res, body)))
-    |> fun t ->
+    let t =
+      sent >>= fun () ->
+      Response.read ic >>= function
+      | `Invalid reason ->
+          Lwt.fail (Failure ("Failed to read response: " ^ reason))
+      | `Eof -> Lwt.fail (Failure "Server closed connection prematurely.")
+      | `Ok res -> (
+          match meth with
+          | `HEAD ->
+              closefn () ;
+              Lwt.return (res, `Empty)
+          | _ ->
+              let body = read_body ~closefn ic res in
+              Lwt.return (res, body))
+    in
     Lwt.on_cancel t closefn ;
     Lwt.on_failure t (fun _exn -> closefn ()) ;
     Lwt.return (t, closefn)
