@@ -383,6 +383,15 @@ let get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level =
     ()
     ()
 
+let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
+    ~attestation_level delegate_slots =
+  let attested_level = Int32.succ attestation_level in
+  List.map
+    (fun delegate_slot ->
+      let pkh = snd delegate_slot.consensus_key_and_delegate in
+      (pkh, get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level))
+    delegate_slots
+
 let register_dal_profiles dal_node_rpc_ctxt delegates =
   let profiles =
     Tezos_dal_node_services.Operator_profile.make
