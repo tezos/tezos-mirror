@@ -697,6 +697,11 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       | ContextIndex index -> return (Local index))
   in
   let cache = Baking_state.create_cache () in
+  let dal_node_rpc_ctxt =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4674
+       Treat case when no endpoint was given and DAL is enabled *)
+    Option.map create_dal_node_rpc_ctxt config.dal_node_endpoint
+  in
   let global_state =
     {
       cctxt;
@@ -714,10 +719,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       validation_mode;
       delegates;
       cache;
-      dal_node_rpc_ctxt =
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4674
-           Treat case when no endpoint was given and DAL is enabled *)
-        Option.map create_dal_node_rpc_ctxt config.dal_node_endpoint;
+      dal_node_rpc_ctxt;
     }
   in
   (* Trick to provide the global state to the forge worker without
@@ -754,9 +756,30 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       Some {proposal = current_proposal; attestation_qc = []}
     else None
   in
+  let current_level = current_proposal.block.shell.level in
+  let dal_attestable_slots =
+    Option.fold
+      ~none:[]
+      ~some:(fun dal_node_rpc_ctxt ->
+        Node_rpc.dal_attestable_slots
+          dal_node_rpc_ctxt
+          ~attestation_level:current_level
+          (Delegate_slots.own_delegates delegate_slots))
+      dal_node_rpc_ctxt
+  in
+  let next_level_dal_attestable_slots =
+    Option.fold
+      ~none:[]
+      ~some:(fun dal_node_rpc_ctxt ->
+        Node_rpc.dal_attestable_slots
+          dal_node_rpc_ctxt
+          ~attestation_level:(Int32.succ current_level)
+          (Delegate_slots.own_delegates next_level_delegate_slots))
+      dal_node_rpc_ctxt
+  in
   let level_state =
     {
-      current_level = current_proposal.block.shell.level;
+      current_level;
       latest_proposal = current_proposal;
       is_latest_proposal_applied =
         true (* this proposal is expected to be the current head *);
@@ -766,6 +789,8 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round = None;
+      dal_attestable_slots;
+      next_level_dal_attestable_slots;
     }
   in
   let* round_state =

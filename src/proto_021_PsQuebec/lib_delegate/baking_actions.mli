@@ -54,6 +54,8 @@ and level_update = {
     current_round:Round.t ->
     delegate_slots:delegate_slots ->
     next_level_delegate_slots:delegate_slots ->
+    dal_attestable_slots:dal_attestable_slots ->
+    next_level_dal_attestable_slots:dal_attestable_slots ->
     (state * action) Lwt.t;
 }
 
