@@ -3000,6 +3000,12 @@ module Dal : sig
       (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       (t * History_cache.t) tzresult
 
+    val is_commitment_attested :
+      attestation_threshold_percent:int option ->
+      restricted_commitments_publishers:Contract.t list option ->
+      cell_content ->
+      Slot.Commitment.t option
+
     type proof
   end
 

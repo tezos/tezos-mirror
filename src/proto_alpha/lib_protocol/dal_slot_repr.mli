@@ -380,6 +380,20 @@ module History : sig
       print the serialized version of the proof (i.e. a sequence of bytes). *)
   val pp_proof : serialized:bool -> Format.formatter -> proof -> unit
 
+  (** This function returns some commitment if and only if the skip list cell
+      whose content is given is supposed to be attested.
+
+      Attestation status is either checked by inspecting the protocol's boolean
+      flag stored in the content if [attestation_threshold_percent] is None
+      (Regular DAL), or by checking that attestation threshold is reached and
+      the publisher is whitelisted, if [restricted_commitments_publishers] is
+      set to some whitelist, when using Adjustable DAL. *)
+  val is_commitment_attested :
+    attestation_threshold_percent:int option ->
+    restricted_commitments_publishers:Contract_repr.t list option ->
+    cell_content ->
+    Commitment.t option
+
   (** [produce_proof dal_parameters page_id page_info ~get_history slots_hist]
       produces a proof that either:
       - there exists a confirmed slot in the skip list that contains
