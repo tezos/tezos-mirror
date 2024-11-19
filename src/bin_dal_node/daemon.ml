@@ -815,7 +815,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
       let* number_of_already_stored_shards =
         Store.Shards.count_values node_store slot_id
       in
-      let _slot_metrics =
+      let slot_metrics =
         update_timing_shard_received
           node_ctxt
           shards_timing_table
@@ -833,7 +833,11 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
               let*! () = Event.(emit amplificator_uninitialized ()) in
               return_unit
           | Some amplificator ->
-              Amplificator.try_amplification commitment slot_id amplificator)
+              Amplificator.try_amplification
+                commitment
+                slot_metrics
+                slot_id
+                amplificator)
       | _ -> return_unit
   in
   Lwt.dont_wait

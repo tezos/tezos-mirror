@@ -58,6 +58,12 @@ val update_amplification_enough_shards_received_duration : float -> unit
 (** Update the DAL metrics timing value when all the shards are received. *)
 val update_amplification_all_shards_received_duration : float -> unit
 
+(** Add a DAL metrics timing value when a reconstruction is started. *)
+val update_amplification_start_reconstruction_duration : float -> unit
+
+(** Add a the DAL metrics timing value when a reconstruction is aborted. *)
+val update_amplification_abort_reconstruction_duration : float -> unit
+
 (** [sample_time ~sampling_frequency ~to_sample ~metric_updater] samples
     execution time of function [to_sample] at frequency
     [sampling_frequency]. Execution time if any is then provided to

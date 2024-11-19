@@ -164,6 +164,26 @@ module Node_metrics = struct
       ~namespace
       ~subsystem
       name
+
+  let amplification_abort_reconstruction_duration =
+    let name = "amplification_abort_reconstruction_duration_seconds" in
+    Prometheus.DefaultHistogram.v
+      ~help:
+        "Duration between the reception of a first shard and the abortion of \
+         its reconstruction"
+      ~namespace
+      ~subsystem
+      name
+
+  let amplification_start_reconstruction_duration =
+    let name = "amplification_start_reconstruction_duration_seconds" in
+    Prometheus.DefaultHistogram.v
+      ~help:
+        "Duration between the reception of the first shard and the beginning \
+         of the reconstruction"
+      ~namespace
+      ~subsystem
+      name
 end
 
 module GS = struct
@@ -530,6 +550,16 @@ let update_amplification_enough_shards_received_duration duration =
 let update_amplification_all_shards_received_duration duration =
   Prometheus.DefaultHistogram.observe
     Node_metrics.amplification_all_shards_received_duration
+    duration
+
+let update_amplification_start_reconstruction_duration duration =
+  Prometheus.DefaultHistogram.observe
+    Node_metrics.amplification_start_reconstruction_duration
+    duration
+
+let update_amplification_abort_reconstruction_duration duration =
+  Prometheus.DefaultHistogram.observe
+    Node_metrics.amplification_abort_reconstruction_duration
     duration
 
 let sample_time ~sampling_frequency ~to_sample ~metric_updater =
