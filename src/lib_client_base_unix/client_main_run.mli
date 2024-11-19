@@ -82,6 +82,11 @@ sig
        logger that might come from elsewhere. Default (in [Client_config]) is
        [None], but [Main_signer] uses this overriding feature. *)
     RPC_client_unix.logger option
+
+  val version :
+    (* Optionally provide your own version string. Defaults to the Octez
+       version. *)
+    string option
 end
 
 val register_default_signer :

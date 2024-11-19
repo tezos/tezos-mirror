@@ -1324,3 +1324,5 @@ let clic_commands ~base_dir:_ ~config_commands ~builtin_commands ~other_commands
   config_commands @ builtin_commands @ other_commands
 
 let logger = None
+
+let version = None

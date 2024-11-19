@@ -31,7 +31,10 @@ type additional_info = Tezos_version_parser.additional_info =
   | RC_dev of int
   | Release
 
-type product = Tezos_version_parser.product = Octez | Octez_evm_node
+type product = Tezos_version_parser.product =
+  | Octez
+  | Octez_evm_node
+  | Octez_smart_rollup_node
 
 type t = Tezos_version_parser.t = {
   product : product;
@@ -53,6 +56,7 @@ let string_of_additional_info = function
 let string_of_product = function
   | Octez -> "Octez"
   | Octez_evm_node -> "octez-evm-node"
+  | Octez_smart_rollup_node -> "octez-smart-rollup-node"
 
 let pp f {product; major; minor; additional_info} =
   Format.fprintf

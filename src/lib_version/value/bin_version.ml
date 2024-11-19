@@ -45,3 +45,9 @@ let octez_evm_node_version_string =
 
 let octez_evm_node_simple_version_string =
   simple_version_string Current_git_info.octez_evm_node_version
+
+let octez_smart_rollup_node_version_string =
+  version_string Current_git_info.octez_smart_rollup_node_version
+
+let octez_smart_rollup_node_simple_version_string =
+  simple_version_string Current_git_info.octez_smart_rollup_node_version
