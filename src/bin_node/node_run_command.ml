@@ -171,18 +171,13 @@ module Event = struct
       ("stacktrace", Data_encoding.string)
 
   let incorrect_history_mode =
-    declare_2
+    declare_1
       ~section
       ~name:"incorrect_history_mode"
-      ~msg:
-        "The given history mode {given_history_mode} does not correspond to \
-         the stored history mode {stored_history_mode}. If you wish to force \
-         the switch, use the flag '--force-history-mode-switch'."
+      ~msg:"{switch_error}"
       ~level:Error
-      ~pp1:History_mode.pp
-      ("given_history_mode", History_mode.encoding)
-      ~pp2:History_mode.pp
-      ("stored_history_mode", History_mode.encoding)
+      ~pp1:Error_monad.pp
+      ("switch_error", Error_monad.error_encoding)
 
   let enable_http_cache_headers_for_local =
     declare_0
@@ -779,9 +774,8 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Result.iter_error_s
       (function
-        | Store_errors.Cannot_switch_history_mode {previous_mode; next_mode}
-          :: _ ->
-            Event.(emit incorrect_history_mode) (previous_mode, next_mode)
+        | (Store_errors.Cannot_switch_history_mode _ as err) :: _ ->
+            Event.(emit incorrect_history_mode) err
         | _ -> Lwt.return_unit)
       node
   in
