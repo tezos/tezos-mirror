@@ -26,6 +26,7 @@
 module Request = struct
   type ('a, 'b) t =
     | Register : {
+        order : Z.t option;
         messages : string list;
         drop_duplicate : bool;
       }
@@ -43,16 +44,17 @@ module Request = struct
         case
           (Tag 0)
           ~title:"Register"
-          (obj3
+          (obj4
              (req "request" (constant "register"))
+             (opt "order" n)
              (req "messages" (list L2_message.content_encoding))
              (req "drop_duplicate" bool))
           (function
-            | View (Register {messages; drop_duplicate}) ->
-                Some ((), messages, drop_duplicate)
+            | View (Register {order; messages; drop_duplicate}) ->
+                Some ((), order, messages, drop_duplicate)
             | _ -> None)
-          (fun ((), messages, drop_duplicate) ->
-            View (Register {messages; drop_duplicate}));
+          (fun ((), order, messages, drop_duplicate) ->
+            View (Register {order; messages; drop_duplicate}));
         case
           (Tag 1)
           ~title:"Produce_batches"
@@ -63,7 +65,7 @@ module Request = struct
 
   let pp ppf (View r) =
     match r with
-    | Register {messages; drop_duplicate} ->
+    | Register {order = _; messages; drop_duplicate} ->
         Format.fprintf
           ppf
           "register %d new L2 message%a"

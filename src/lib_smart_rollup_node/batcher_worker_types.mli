@@ -30,6 +30,7 @@ module Request : sig
   (** Type of requests accepted by the batcher worker. *)
   type ('a, 'b) t =
     | Register : {
+        order : Z.t option;
         messages : string list;
         drop_duplicate : bool;
       }

@@ -54,14 +54,19 @@ val find_message : L2_message.id -> L2_message.t option tzresult
 
 (** List all queued messages in the order they appear in the queue, i.e. the
     message that were added first to the queue are at the end of list. *)
-val get_queue : unit -> (L2_message.id * L2_message.t) list tzresult
+val get_queue : unit -> L2_message.t list tzresult
 
-(** [register_messages ~drop_duplicate messages] registers new L2
-    [messages] in the queue of the batcher for future injection on
-    L1. If [drop_duplicate = false] then it injects the message even
-    if it was already injected in a previous l1 operations. *)
+(** [register_messages ?order ~drop_duplicate messages] registers
+    new L2 [messages] in the queue of the batcher for future injection
+    on L1. If [drop_duplicate = false] then it injects the message
+    even if it was already injected in a previous l1 operations. If
+    the priority is set then add the message in the heap at the
+    correct place. *)
 val register_messages :
-  drop_duplicate:bool -> string list -> L2_message.id list tzresult Lwt.t
+  ?order:Z.t ->
+  drop_duplicate:bool ->
+  string list ->
+  L2_message.id list tzresult Lwt.t
 
 (** The status of a message in the batcher. Returns [None] if the message is not
     known by the batcher (the batcher only keeps the batched status of the last
