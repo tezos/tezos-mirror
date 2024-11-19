@@ -4,13 +4,13 @@
   "staker": {
     "baker_own_stake": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -19,13 +19,13 @@
   "staker": {
     "baker_own_stake": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -34,13 +34,13 @@
   "staker": {
     "baker_own_stake": "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -49,13 +49,13 @@
   "staker": {
     "baker_own_stake": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -64,13 +64,13 @@
   "staker": {
     "baker_own_stake": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 GET http://[HOST]:[PORT]/chains/main/blocks/head/context/issuance/expected_issuance
@@ -108,13 +108,13 @@ GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY
   "staker": {
     "baker_own_stake": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -123,13 +123,13 @@ GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY
   "staker": {
     "baker_own_stake": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 GET http://[HOST]:[PORT]/chains/main/blocks/head/context/issuance/expected_issuance
