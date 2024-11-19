@@ -60,11 +60,14 @@ module Cloud : sig
     (t -> unit Lwt.t) ->
     unit
 
-  (** [push_metric t ?labels ~name v] pushes the value [v] for [metric] on
-        Prometheus. [labels] can be used to categorised the metric (each set of
-        label define a single curve). *)
+  (** [push_metric t ?help ?typ ?labels ~name v] pushes the value [v]
+      for [metric] on Prometheus. [labels] can be used to categorise
+      the metric (each set of label define a single curve). [typ] can
+      be used to provide the type of the metric. [help] can be used to
+      provide some naive documentation about the metrics. *)
   val push_metric :
     t ->
+    ?help:string ->
     ?typ:[`Counter | `Gauge] ->
     ?labels:(string * string) list ->
     name:string ->

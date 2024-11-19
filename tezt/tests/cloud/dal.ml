@@ -1009,41 +1009,42 @@ let push_metrics t
          Cloud.push_metric
            t.cloud
            ~labels
-           ~name:"tezt_attested_ratio_per_baker"
+           ~name:"tezt_dal_commitments_attested_ratio"
            value) ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments_ratio"
+    ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "published")]
     ratio_published_commitments ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments_ratio"
+    ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "attested")]
     ratio_attested_commitments ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments_ratio"
+    ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "published_last_level")]
     ratio_published_commitments_last_level ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments"
+    ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "expected")]
     (float_of_int expected_published_commitments) ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments"
+    ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "published")]
     (float_of_int total_published_commitments) ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments"
+    ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "attested")]
     (float_of_int total_attested_commitments) ;
   Cloud.push_metric
     t.cloud
-    ~name:"etherlink_operator_balance"
+    ~typ:`Gauge
+    ~name:"tezt_etherlink_operator_balance_total"
     (Tez.to_float etherlink_operator_balance)
 
 let published_level_of_attested_level t level =

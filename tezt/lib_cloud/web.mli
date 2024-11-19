@@ -18,6 +18,7 @@ val shutdown : t -> unit Lwt.t
   [/metrics.txt]. This page can be scrapped by Prometheus if activated. *)
 val push_metric :
   t ->
+  ?help:string ->
   ?typ:[`Counter | `Gauge] ->
   ?labels:(string * string) list ->
   name:string ->

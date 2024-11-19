@@ -26,6 +26,7 @@ val get_configuration : Agent.t -> Configuration.t
 
 val push_metric :
   t ->
+  ?help:string ->
   ?typ:[`Counter | `Gauge] ->
   ?labels:(string * string) list ->
   name:string ->
