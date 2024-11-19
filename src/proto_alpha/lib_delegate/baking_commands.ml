@@ -358,18 +358,6 @@ let dal_node_endpoint_arg =
     ~doc:"endpoint of the DAL node, e.g. 'http://localhost:8933'"
     (Tezos_clic.parameter (fun _ s -> return @@ Uri.of_string s))
 
-let dal_node_timeout_percentage_arg =
-  Tezos_clic.arg
-    ~long:"dal-node-timeout-percentage"
-    ~placeholder:"percentage"
-    ~doc:
-      "percentage of the time until the end of round, which determines the \
-       timeout to wait for the DAL node to provide shards' attestation status; \
-       the default value is 10%; use with care: too small a value may mean not \
-       being able to attest DAL slots, while too big a value may mean the \
-       baker's consensus attestations may be injected late and not included"
-  @@ Client_proto_args.positive_int_parameter ()
-
 let block_count_arg =
   Tezos_clic.default_arg
     ~long:"count"
@@ -726,7 +714,7 @@ let check_dal_node cctxt dal_node_rpc_ctxt =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args17
+  Tezos_clic.args16
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -740,7 +728,6 @@ let baker_args =
     per_block_vote_file_arg
     operations_arg
     dal_node_endpoint_arg
-    dal_node_timeout_percentage_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
@@ -759,7 +746,6 @@ let run_baker
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
-      dal_node_timeout_percentage,
       state_recorder,
       pre_emptive_forge_time,
       remote_calls_timeout ) baking_mode sources cctxt =
@@ -804,7 +790,6 @@ let run_baker
     ~minimal_nanotez_per_byte
     ~votes
     ?extra_operations
-    ?dal_node_timeout_percentage
     ?pre_emptive_forge_time
     ?force_apply_from_round
     ?remote_calls_timeout
