@@ -114,6 +114,10 @@ module type T = sig
        and type Dal.commitment_proof =
         Tezos_crypto_dal.Cryptobox.Verifier.commitment_proof
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
+       and type Dal.share = Tezos_crypto_dal.Cryptobox.Verifier.share
+       and type Dal.shard = Tezos_crypto_dal.Cryptobox.Verifier.shard
+       and type Dal.shard_proof =
+        Tezos_crypto_dal.Cryptobox.Verifier.shard_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
        and type Wasm_2_0_0.version = Tezos_scoru_wasm.Wasm_pvm_state.version

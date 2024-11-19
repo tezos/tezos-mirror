@@ -115,3 +115,29 @@ val verify_page :
   page ->
   page_proof ->
   (bool, [> `Segment_index_out_of_range | `Page_length_mismatch]) Result.t
+
+type share
+
+val share_encoding : share Data_encoding.t
+
+type shard = {index : int; share : share}
+
+val shard_encoding : shard Data_encoding.t
+
+type shard_proof
+
+val shard_proof_encoding : shard_proof Data_encoding.t
+
+type ('a, 'b) error_container
+
+val verify_shard :
+  t ->
+  commitment ->
+  shard ->
+  shard_proof ->
+  ( unit,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container
+    | `Invalid_shard
+    | `Shard_length_mismatch
+    | `Shard_index_out_of_range of string ] )
+  Result.t
