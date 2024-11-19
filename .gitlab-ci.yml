@@ -13,6 +13,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_container_scanning_master
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
+    variables:
+      PIPELINE_TYPE: schedule_container_scanning_octez_releases
+    when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
       && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
     variables:
@@ -125,6 +129,10 @@ include:
 - local: .gitlab/ci/pipelines/schedule_container_scanning_master.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
     when: always
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:

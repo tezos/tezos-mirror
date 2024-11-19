@@ -1,0 +1,42 @@
+stages:
+  - start
+  - octez_releases
+
+datadog_pipeline_trace:
+  image: datadog/ci:v2.44.0
+  stage: start
+  tags:
+  - gcp
+  dependencies: []
+  allow_failure: true
+  timeout: 3 minutes
+  interruptible: false
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+
+include:
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+
+
+container_scanning:
+  stage: octez_releases
+  tags:
+  - gcp
+  needs: []
+  parallel:
+    matrix:
+      - IMAGE:
+          - "tezos/tezos:octez-v21.0"
+          - "tezos/tezos:octez-v20.3"
+          - "tezos/tezos:octez-v20.2"
+          - "tezos/tezos:octez-v20.1"
+          - "tezos/tezos:octez-v20.0"
+
+
+  variables:
+    CS_IMAGE: $IMAGE
+    SECURE_LOG_LEVEL: "debug"
+    CS_DOCKERFILE_PATH: "build.Dockerfile"
+    GIT_STRATEGY: fetch

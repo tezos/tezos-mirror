@@ -495,6 +495,9 @@ module Pipeline = struct
           :: scheduled_pipeline_worflow_rule
                "CONTAINER_SCANNING_MASTER"
                "schedule_container_scanning_master"
+          :: scheduled_pipeline_worflow_rule
+               "CONTAINER_SCANNING_OCTEZ_RELEASES"
+               "schedule_container_scanning_octez_releases"
           :: workflow.rules;
       }
     in
@@ -503,6 +506,9 @@ module Pipeline = struct
       :: scheduled_pipeline_include_rule
            ".gitlab/ci/pipelines/schedule_container_scanning_master.yml"
            "CONTAINER_SCANNING_MASTER"
+      :: scheduled_pipeline_include_rule
+           ".gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml"
+           "CONTAINER_SCANNING_OCTEZ_RELEASES"
       :: includes
     in
     (* end of temporary manual addition *)
