@@ -109,10 +109,6 @@ module Name = struct
 end
 
 module Request = struct
-  type block_request =
-    | Number of Ethereum_types.quantity
-    | Hash of Ethereum_types.block_hash
-
   type (_, _) t =
     | Apply_evm_events : {
         finalized_level : int32 option;
@@ -125,7 +121,6 @@ module Request = struct
         delayed_transactions : Evm_events.Delayed_transaction.t list;
       }
         -> (unit, tztrace) t
-    | Last_produce_blueprint : (Blueprint_types.t, tztrace) t
     | Blueprint : {
         level : Ethereum_types.quantity;
       }
@@ -138,9 +133,6 @@ module Request = struct
     | Last_known_L1_level : (int32 option, tztrace) t
     | New_last_known_L1_level : int32 -> (unit, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
-    | Evm_state_after : block_request -> (Evm_state.t option, tztrace) t
-    | Earliest_state : (Evm_state.t option, tztrace) t
-    | Earliest_number : (Ethereum_types.quantity option, tztrace) t
     | Reconstruct : {
         rollup_node_store : [`Read] Octez_smart_rollup_node_store.Store.t;
         genesis_level : int32;
@@ -159,28 +151,6 @@ module Request = struct
   type view = View : _ t -> view
 
   let view req = View req
-
-  let block_request_encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"number"
-          (obj2
-             (req "kind" (constant "number"))
-             (req "number" Ethereum_types.quantity_encoding))
-          (function Number number -> Some ((), number) | _ -> None)
-          (fun ((), number) -> Number number);
-        case
-          (Tag 1)
-          ~title:"hash"
-          (obj2
-             (req "kind" (constant "number"))
-             (req "hash" Ethereum_types.block_hash_encoding))
-          (function Hash hash -> Some ((), hash) | _ -> None)
-          (fun ((), hash) -> Hash hash);
-      ]
 
   let encoding =
     let open Data_encoding in
@@ -218,12 +188,6 @@ module Request = struct
             View (Apply_blueprint {timestamp; payload; delayed_transactions}));
         case
           (Tag 2)
-          ~title:"Last_produce_blueprint"
-          (obj1 (req "request" (constant "last_produce_blueprint")))
-          (function View Last_produce_blueprint -> Some () | _ -> None)
-          (fun () -> View Last_produce_blueprint);
-        case
-          (Tag 4)
           ~title:"Blueprint"
           (obj2
              (req "request" (constant "blueprint"))
@@ -231,7 +195,7 @@ module Request = struct
           (function View (Blueprint {level}) -> Some ((), level) | _ -> None)
           (fun ((), level) -> View (Blueprint {level}));
         case
-          (Tag 5)
+          (Tag 3)
           ~title:"Blueprints_range"
           (obj3
              (req "request" (constant "Blueprints_range"))
@@ -242,13 +206,13 @@ module Request = struct
             | _ -> None)
           (fun ((), from, to_) -> View (Blueprints_range {from; to_}));
         case
-          (Tag 6)
+          (Tag 4)
           ~title:"Last_known_L1_level"
           (obj1 (req "request" (constant "last_known_l1_level")))
           (function View Last_known_L1_level -> Some () | _ -> None)
           (fun () -> View Last_known_L1_level);
         case
-          (Tag 7)
+          (Tag 5)
           ~title:"New_last_known_L1_level"
           (obj2
              (req "request" (constant "new_last_known_l1_level"))
@@ -257,35 +221,13 @@ module Request = struct
             | View (New_last_known_L1_level l) -> Some ((), l) | _ -> None)
           (fun ((), l) -> View (New_last_known_L1_level l));
         case
-          (Tag 8)
+          (Tag 6)
           ~title:"Delayed_inbox_hashes"
           (obj1 (req "request" (constant "Delayed_inbox_hashes")))
           (function View Delayed_inbox_hashes -> Some () | _ -> None)
           (fun () -> View Delayed_inbox_hashes);
         case
-          (Tag 9)
-          ~title:"Evm_state_after"
-          (obj2
-             (req "request" (constant "evm_state_after"))
-             (req "payload" block_request_encoding))
-          (function
-            | View (Evm_state_after block_request) -> Some ((), block_request)
-            | _ -> None)
-          (fun ((), block_request) -> View (Evm_state_after block_request));
-        case
-          (Tag 10)
-          ~title:"Earliest_state"
-          (obj1 (req "request" (constant "earliest_state")))
-          (function View Earliest_state -> Some () | _ -> None)
-          (fun () -> View Earliest_state);
-        case
-          (Tag 11)
-          ~title:"Earliest_number"
-          (obj1 (req "request" (constant "earliest_number")))
-          (function View Earliest_number -> Some () | _ -> None)
-          (fun () -> View Earliest_number);
-        case
-          (Tag 12)
+          (Tag 7)
           ~title:"Reconstruct"
           (obj3
              (req "request" (constant "reconstruct"))
@@ -300,7 +242,7 @@ module Request = struct
             (* This case cannot be used to decode, which is acceptable because
                the only use case for the encoding is logging (so encoding). *));
         case
-          (Tag 13)
+          (Tag 8)
           ~title:"Patch_state"
           (obj5
              (req "request" (constant "patch_state"))
@@ -315,7 +257,7 @@ module Request = struct
           (fun ((), commit, key, value, block_number) ->
             View (Patch_state {commit; key; value; block_number}));
         case
-          (Tag 14)
+          (Tag 9)
           ~title:"Wasm_pvm_version"
           (obj1 (req "request" (constant "wasm_pvm_version")))
           (function View Wasm_pvm_version -> Some () | _ -> None)
@@ -1211,16 +1153,6 @@ module State = struct
     Evm_store.with_transaction conn @@ fun store ->
     Evm_store.reset_after store ~l2_level
 
-  let last_produced_blueprint (ctxt : t) =
-    let open Lwt_result_syntax in
-    let (Qty next) = ctxt.session.next_blueprint_number in
-    let current = Ethereum_types.Qty Z.(pred next) in
-    Evm_store.use ctxt.store @@ fun conn ->
-    let* blueprint = Evm_store.Blueprints.find conn current in
-    match blueprint with
-    | Some blueprint -> return blueprint
-    | None -> failwith "Could not fetch the last produced blueprint"
-
   let delayed_inbox_hashes evm_state =
     let open Lwt_syntax in
     let* keys =
@@ -1237,14 +1169,6 @@ module State = struct
         keys
     in
     return hashes
-
-  let block_number_of_hash evm_state hash =
-    let open Lwt_result_syntax in
-    let*! bytes =
-      Evm_state.inspect evm_state (Durable_storage_path.Block.by_hash hash)
-    in
-    let block = Option.map Ethereum_types.block_from_rlp bytes in
-    return (Option.map (fun block -> block.Ethereum_types.number) block)
 
   let messages_of_level store level =
     let open Lwt_result_syntax in
@@ -1521,10 +1445,6 @@ module Handlers = struct
         protect @@ fun () ->
         let ctxt = Worker.state self in
         State.apply_blueprint ctxt timestamp payload delayed_transactions
-    | Last_produce_blueprint ->
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        State.last_produced_blueprint ctxt
     | Blueprint {level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1556,52 +1476,6 @@ module Handlers = struct
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
         return hashes
-    | Evm_state_after block_request -> (
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        let* number =
-          match block_request with
-          | Number number -> return number
-          | Hash hash -> (
-              let* number =
-                if ctxt.block_storage_sqlite3 then
-                  Evm_store.use ctxt.store @@ fun conn ->
-                  Evm_store.Blocks.find_number_of_hash conn hash
-                else State.block_number_of_hash ctxt.session.evm_state hash
-              in
-              match number with
-              | Some number -> return number
-              | None ->
-                  (* To respect EIP-1898 we can return error code -32001. *)
-                  failwith "Block was not found")
-        in
-        Evm_store.use ctxt.store @@ fun conn ->
-        let* checkpoint = Evm_store.Context_hashes.find conn number in
-        match checkpoint with
-        | Some checkpoint ->
-            let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
-            let*! evm_state = Irmin_context.PVMState.get context in
-            return_some evm_state
-        | None -> return_none)
-    | Earliest_state -> (
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        Evm_store.use ctxt.store @@ fun conn ->
-        let* checkpoint = Evm_store.Context_hashes.find_earliest conn in
-        match checkpoint with
-        | Some (_level, checkpoint) ->
-            let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
-            let*! evm_state = Irmin_context.PVMState.get context in
-            return_some evm_state
-        | None -> return_none)
-    | Earliest_number -> (
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        Evm_store.use ctxt.store @@ fun conn ->
-        let* checkpoint = Evm_store.Context_hashes.find_earliest conn in
-        match checkpoint with
-        | Some (level, _checkpoint) -> return_some level
-        | None -> return_none)
     | Reconstruct {rollup_node_store; genesis_level; finalized_level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1957,8 +1831,6 @@ let apply_blueprint timestamp payload delayed_transactions =
   worker_wait_for_request
     (Apply_blueprint {timestamp; payload; delayed_transactions})
 
-let last_produced_blueprint () = worker_wait_for_request Last_produce_blueprint
-
 let head_info () =
   let open Lwt_syntax in
   let+ head_info in
@@ -2017,35 +1889,6 @@ let patch_sequencer_key ?block_number pk =
 let patch_state ?block_number ~key ~value () =
   worker_wait_for_request
     (Patch_state {commit = true; key; value; block_number})
-
-let block_param_to_block_number
-    (block_param : Ethereum_types.Block_parameter.extended) =
-  let open Lwt_result_syntax in
-  match block_param with
-  | Block_parameter (Number n) -> return n
-  | Block_parameter (Latest | Pending) ->
-      let*! {next_blueprint_number = Qty next_number; _} = head_info () in
-      return Ethereum_types.(Qty Z.(pred next_number))
-  | Block_parameter Finalized ->
-      let*! {finalized_number; _} = head_info () in
-      return finalized_number
-  | Block_parameter Earliest -> (
-      let* res = worker_wait_for_request Earliest_number in
-      match res with
-      | Some res -> return res
-      | None -> failwith "The EVM node does not have any state available")
-  | Block_hash {hash; _} -> (
-      let*! head_info = head_info () in
-      let*! bytes =
-        Evm_state.inspect
-          head_info.evm_state
-          Durable_storage_path.(Block.by_hash hash)
-      in
-      match bytes with
-      | Some bytes ->
-          let block = Ethereum_types.block_from_rlp bytes in
-          return block.number
-      | None -> failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
 
 let shutdown () =
   let open Lwt_result_syntax in

@@ -120,10 +120,6 @@ val reset :
 val apply_evm_events :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
-(** [last_produced_blueprint ctxt] returns the blueprint used to
-    create the current head of the chain. *)
-val last_produced_blueprint : unit -> Blueprint_types.t tzresult Lwt.t
-
 (** [apply_blueprint timestamp payload delayed_transactions] applies
     [payload] in the freshest EVM state stored under [ctxt] at
     timestamp [timestamp], forwards the {!Blueprint_types.with_events}.
@@ -175,10 +171,6 @@ val patch_state :
   value:string ->
   unit ->
   unit tzresult Lwt.t
-
-val block_param_to_block_number :
-  Ethereum_types.Block_parameter.extended ->
-  Ethereum_types.quantity tzresult Lwt.t
 
 module State : sig
   (** Path of EVM state store. *)
