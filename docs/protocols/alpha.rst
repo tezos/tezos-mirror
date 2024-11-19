@@ -12,6 +12,8 @@ branch of Octez.
 Environment Version
 -------------------
 
+This protocol requires a different protocol environment version than Quebec.
+It requires protocol environment V14, compared to V13 for Quebec.
 
 
 Smart Rollups
