@@ -86,6 +86,11 @@ sig
 
   (** Activate logging of levels when set to [true]. *)
   val advertise_log_levels : bool option
+
+  val version :
+    (* Optionally provide your own version string. Defaults to the Octez
+       version. *)
+    string option
 end
 
 val register_default_signer :

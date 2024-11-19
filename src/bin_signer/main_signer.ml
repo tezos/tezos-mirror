@@ -458,6 +458,8 @@ module Signer_config = struct
   let logger = Some (RPC_client_unix.full_logger Format.err_formatter)
 
   let advertise_log_levels = None
+
+  let version = None
 end
 
 let () =

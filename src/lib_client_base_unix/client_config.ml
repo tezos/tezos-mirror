@@ -1354,3 +1354,5 @@ let clic_commands ~base_dir:_ ~config_commands ~builtin_commands ~other_commands
 let logger = None
 
 let advertise_log_levels = None
+
+let version = None

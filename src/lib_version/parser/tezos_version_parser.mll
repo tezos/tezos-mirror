@@ -27,11 +27,12 @@
     | RC_dev of int
     | Release [@@deriving show]
 
-  type product = Octez | Octez_evm_node
+  type product = Octez | Octez_evm_node | Octez_smart_rollup_node
 
   let pp_product ppf = function
   | Octez -> Format.fprintf ppf "Octez"
   | Octez_evm_node -> Format.fprintf ppf "Octez_evm_node"
+  | Octez_smart_rollup_node -> Format.fprintf ppf "Octez_smart_rollup_node"
 
   type t = {
     product: product;
@@ -49,12 +50,13 @@ let num = ['0'-'9']+
 let hexa = ['0'-'9' 'A'-'F' 'a'-'f']+
 
 rule version_tag = parse
-  | ("octez" | "octez-evm-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+  | ("octez" | "octez-evm-node" | "octez-smart-rollup-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
       {
-        let product = match product with 
+        let product = match product with
           | "octez-evm-node" -> Octez_evm_node
           | "octez" -> Octez
-          | _ -> (* this case cannot happen, see pattern above *)  
+          | "octez-smart-rollup-node" -> Octez_smart_rollup_node
+          | _ -> (* this case cannot happen, see pattern above *)
                  assert false
         in
         Some {
@@ -80,13 +82,14 @@ and extra = parse
   | _
       { Dev }
 
-and version_commit = parse 
-  | ("octez" | "octez-evm-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+and version_commit = parse
+  | ("octez" | "octez-evm-node" | "octez-smart-rollup-node" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
       {
-        let product = match product with 
+        let product = match product with
           | "octez-evm-node" -> Octez_evm_node
           | "octez" -> Octez
-          | _ -> (* this case cannot happen, see pattern above *)  
+          | "octez-smart-rollup-node" -> Octez_smart_rollup_node
+          | _ -> (* this case cannot happen, see pattern above *)
                  assert false
         in
         let extra = extra_noeof lexbuf in
