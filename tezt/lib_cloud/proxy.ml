@@ -39,6 +39,12 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
       ~destination:
         ("/root" // ".ssh" // Filename.basename ssh_private_key_filename)
   in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.website_index
+      ~destination:("/root" // Path.website_index)
+  in
   (* If the Proxy agent uses grafana, it needs some dashboards. We copy them to
      the proxy VM and then import them.
 
