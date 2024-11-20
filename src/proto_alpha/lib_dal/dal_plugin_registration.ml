@@ -33,7 +33,7 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type dal_attestation = Bitset.t
+  type dal_attestation = Environment.Bitset.t
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -143,7 +143,7 @@ module Plugin = struct
                   ( Slot.to_int consensus_content.slot,
                     delegate_opt,
                     (Option.map (fun d -> d.attestation) dal_content
-                      :> Bitset.t option) )
+                      :> Environment.Bitset.t option) )
             | _ -> None)
           consensus_ops
 
@@ -168,10 +168,12 @@ module Plugin = struct
         ~none:
           (TzTrace.make @@ Layer1_services.Cannot_read_block_metadata block.hash)
     in
-    return (metadata.protocol_data.dal_attestation :> Bitset.t)
+    return (metadata.protocol_data.dal_attestation :> Environment.Bitset.t)
 
   let is_attested attestation slot_index =
-    match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
+    match Environment.Bitset.mem attestation slot_index with
+    | Ok b -> b
+    | Error _ -> false
 
   (* Section of helpers for Skip lists *)
 

@@ -61,6 +61,8 @@ module type T = sig
 
   module Map : [%sig "v14/map.mli"]
 
+  module Bitset : [%sig "v14/bitset.mli"]
+
   module Option : [%sig "v14/option.mli"]
 
   module Result : [%sig "v14/result.mli"]

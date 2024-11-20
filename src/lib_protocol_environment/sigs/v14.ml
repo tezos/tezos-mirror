@@ -8155,6 +8155,93 @@ end
 # 62 "v14.in.ml"
 
 
+  module Bitset : sig
+# 1 "v14/bitset.mli"
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(*****************************************************************************)
+
+open Error_monad
+
+(** A bitset is a compact structure to store a set of integers. *)
+type t
+
+type error += Bitset_invalid_position of int | Bitset_invalid_input of string
+
+val encoding : t Data_encoding.t
+
+(** A bitset encoding the empty set. *)
+val empty : t
+
+(** [is_empty i] is [true] if [i] is empty. *)
+val is_empty : t -> bool
+
+(** [equal i j] is [true] if [i] and [j] are identical. *)
+val equal : t -> t -> bool
+
+(** [mem bitset i] returns [true] iff [i] has been added in [bitset].
+
+    This functions returns [Invalid_position i] if [i] is negative. *)
+val mem : t -> int -> bool tzresult
+
+(** [add bitset i] returns a new bitset which contains [i] in
+    addition to the previous integers of [bitset].
+
+    This functions returns [Invalid_position i] if [i] is negative. *)
+val add : t -> int -> t tzresult
+
+(** [remove bitset i] returns a new bitset in which [i] is
+    removed from [bitset].
+
+    This functions returns [Invalid_position i] if [i] is negative. *)
+val remove : t -> int -> t tzresult
+
+(** [from_list positions] folds [add] over the [positions] starting from [empty].
+    This function returns [Invalid_position i] if [i] is negative and appears in
+    [positions]. *)
+val from_list : int list -> t tzresult
+
+(** [to_list t] returns the list of integers in the bitset. *)
+val to_list : t -> int list
+
+(** [fill ~length] is equivalent to setting all bits for positions in [0, length
+    - 1] to one, or to [from_list (0 -- size-1)], or to [from_z ((2 ^ length) -
+    1)]. But it's more efficient than folding on individual positions to set
+    them.
+
+    The function returns [Invalid_input "fill"] if [length] is negative.
+*)
+val fill : length:int -> t tzresult
+
+(** [inter set_l set_r] returns [set] which is result of the
+    intersection of [set_l] and [set_r]. *)
+val inter : t -> t -> t
+
+(** [diff set_l set_r] returns a bitset containing integers in [set_l] that are
+    not in [set_r]. *)
+val diff : t -> t -> t
+
+(** [occupied_size_in_bits bitset] returns the current number of bits
+   occupied by the [bitset]. *)
+val occupied_size_in_bits : t -> int
+
+(** [cardinat bitset] returns the number of elements in the [bitsest]. *)
+val cardinal : t -> int
+
+(** [to_z t] returns the sum of powers of two of the integers in the given
+    bitset. *)
+val to_z : t -> Z.t
+
+(** [from_z] builds a bitset from its integer representation. Returns
+    [Invalid_input "from_z"] if the given argument is negative. *)
+val from_z : Z.t -> t tzresult
+end
+# 64 "v14.in.ml"
+
+
   module Option : sig
 # 1 "v14/option.mli"
 (*****************************************************************************)
@@ -8300,7 +8387,7 @@ val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
 end
-# 64 "v14.in.ml"
+# 66 "v14.in.ml"
 
 
   module Result : sig
@@ -8466,7 +8553,7 @@ val catch_f :
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
 end
-# 66 "v14.in.ml"
+# 68 "v14.in.ml"
 
 
   module RPC_arg : sig
@@ -8536,7 +8623,7 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-# 68 "v14.in.ml"
+# 70 "v14.in.ml"
 
 
   module RPC_path : sig
@@ -8592,7 +8679,7 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-# 70 "v14.in.ml"
+# 72 "v14.in.ml"
 
 
   module RPC_query : sig
@@ -8664,7 +8751,7 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-# 72 "v14.in.ml"
+# 74 "v14.in.ml"
 
 
   module RPC_service : sig
@@ -8741,7 +8828,7 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-# 74 "v14.in.ml"
+# 76 "v14.in.ml"
 
 
   module RPC_answer : sig
@@ -8802,7 +8889,7 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-# 76 "v14.in.ml"
+# 78 "v14.in.ml"
 
 
   module RPC_directory : sig
@@ -9072,7 +9159,7 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-# 78 "v14.in.ml"
+# 80 "v14.in.ml"
 
 
   module Base58 : sig
@@ -9137,7 +9224,7 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
     not start with a registered prefix. *)
 val decode : string -> data option
 end
-# 80 "v14.in.ml"
+# 82 "v14.in.ml"
 
 
   module S : sig
@@ -9514,7 +9601,7 @@ module type CURVE = sig
   val mul : t -> Scalar.t -> t
 end
 end
-# 82 "v14.in.ml"
+# 84 "v14.in.ml"
 
 
   module Blake2B : sig
@@ -9579,7 +9666,7 @@ end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
 end
-# 84 "v14.in.ml"
+# 86 "v14.in.ml"
 
 
   module Bls : sig
@@ -9625,7 +9712,7 @@ module Primitive : sig
   val pairing_check : (G1.t * G2.t) list -> bool
 end
 end
-# 86 "v14.in.ml"
+# 88 "v14.in.ml"
 
 
   module Ed25519 : sig
@@ -9659,7 +9746,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 88 "v14.in.ml"
+# 90 "v14.in.ml"
 
 
   module Secp256k1 : sig
@@ -9693,7 +9780,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 90 "v14.in.ml"
+# 92 "v14.in.ml"
 
 
   module P256 : sig
@@ -9727,7 +9814,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 92 "v14.in.ml"
+# 94 "v14.in.ml"
 
 
   module Chain_id : sig
@@ -9759,7 +9846,7 @@ end
 
 include S.HASH
 end
-# 94 "v14.in.ml"
+# 96 "v14.in.ml"
 
 
   module Signature : sig
@@ -9827,7 +9914,7 @@ include
 
 val size : t -> int
 end
-# 96 "v14.in.ml"
+# 98 "v14.in.ml"
 
 
   module Block_hash : sig
@@ -9860,7 +9947,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 98 "v14.in.ml"
+# 100 "v14.in.ml"
 
 
   module Operation_hash : sig
@@ -9893,7 +9980,7 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 100 "v14.in.ml"
+# 102 "v14.in.ml"
 
 
   module Operation_list_hash : sig
@@ -9926,7 +10013,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 102 "v14.in.ml"
+# 104 "v14.in.ml"
 
 
   module Operation_list_list_hash : sig
@@ -9959,7 +10046,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 104 "v14.in.ml"
+# 106 "v14.in.ml"
 
 
   module Protocol_hash : sig
@@ -9992,7 +10079,7 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 106 "v14.in.ml"
+# 108 "v14.in.ml"
 
 
   module Context_hash : sig
@@ -10045,7 +10132,7 @@ end
 
 type version = Version.t
 end
-# 108 "v14.in.ml"
+# 110 "v14.in.ml"
 
 
   module Sapling : sig
@@ -10193,7 +10280,7 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 110 "v14.in.ml"
+# 112 "v14.in.ml"
 
 
   module Timelock : sig
@@ -10250,7 +10337,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 112 "v14.in.ml"
+# 114 "v14.in.ml"
 
 
   module Vdf : sig
@@ -10338,7 +10425,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
     @raise Invalid_argument when inputs are invalid *)
 val verify : discriminant -> challenge -> difficulty -> result -> proof -> bool
 end
-# 114 "v14.in.ml"
+# 116 "v14.in.ml"
 
 
   module Micheline : sig
@@ -10398,7 +10485,7 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 116 "v14.in.ml"
+# 118 "v14.in.ml"
 
 
   module Block_header : sig
@@ -10455,7 +10542,7 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 118 "v14.in.ml"
+# 120 "v14.in.ml"
 
 
   module Bounded : sig
@@ -10604,7 +10691,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
 module Uint8 (B : BOUNDS with type ocaml_type := int) :
   S with type ocaml_type := int
 end
-# 120 "v14.in.ml"
+# 122 "v14.in.ml"
 
 
   module Fitness : sig
@@ -10638,7 +10725,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 122 "v14.in.ml"
+# 124 "v14.in.ml"
 
 
   module Operation : sig
@@ -10682,7 +10769,7 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 124 "v14.in.ml"
+# 126 "v14.in.ml"
 
 
   module Context : sig
@@ -11319,7 +11406,7 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 126 "v14.in.ml"
+# 128 "v14.in.ml"
 
 
   module Updater : sig
@@ -11848,7 +11935,7 @@ end
     not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 128 "v14.in.ml"
+# 130 "v14.in.ml"
 
 
   module RPC_context : sig
@@ -12002,7 +12089,7 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 130 "v14.in.ml"
+# 132 "v14.in.ml"
 
 
   module Context_binary : sig
@@ -12045,7 +12132,7 @@ module Tree :
 
 val make_empty_context : ?root:string -> unit -> t
 end
-# 132 "v14.in.ml"
+# 134 "v14.in.ml"
 
 
   module Wasm_2_0_0 : sig
@@ -12119,7 +12206,7 @@ module Make
   val get_info : Tree.tree -> info Lwt.t
 end
 end
-# 134 "v14.in.ml"
+# 136 "v14.in.ml"
 
 
   module Plonk : sig
@@ -12238,7 +12325,7 @@ val scalar_array_encoding : scalar array Data_encoding.t
     on the given [inputs] according to the [public_parameters]. *)
 val verify : public_parameters -> verifier_inputs -> proof -> bool
 end
-# 136 "v14.in.ml"
+# 138 "v14.in.ml"
 
 
   module Dal : sig
@@ -12387,7 +12474,7 @@ val verify_shard :
     | `Shard_index_out_of_range of string ] )
   Result.t
 end
-# 138 "v14.in.ml"
+# 140 "v14.in.ml"
 
 
   module Skip_list : sig
@@ -12619,7 +12706,7 @@ module Make (_ : sig
   val basis : int
 end) : S
 end
-# 140 "v14.in.ml"
+# 142 "v14.in.ml"
 
 
   module Smart_rollup : sig
@@ -12676,6 +12763,6 @@ module Inbox_hash : S.HASH
 (** Smart rollup merkelized payload hashes' hash *)
 module Merkelized_payload_hashes_hash : S.HASH
 end
-# 142 "v14.in.ml"
+# 144 "v14.in.ml"
 
 end

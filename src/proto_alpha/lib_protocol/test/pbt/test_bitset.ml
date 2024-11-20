@@ -32,7 +32,7 @@
 *)
 
 open Qcheck2_helpers
-open Protocol.Bitset
+open Environment.Bitset
 
 let gen_ofs = QCheck2.Gen.int_bound (64 * 10)
 
