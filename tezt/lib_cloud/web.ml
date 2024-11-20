@@ -76,7 +76,7 @@ let service_jingo_template {name; url} =
   let open Jingoo.Jg_types in
   Tobj [("title", Tstr (String.capitalize_ascii name)); ("uri", Tstr url)]
 
-let jingo_template t agents =
+let jingoo_template t agents =
   let open Jingoo.Jg_types in
   [
     ( "grafana",
@@ -109,7 +109,7 @@ let write t ~agents =
   let content =
     Jingoo.Jg_template.from_file
       Path.website_index
-      ~models:(jingo_template t agents)
+      ~models:(jingoo_template t agents)
   in
   let dir = t.dir in
   let index = index dir in
