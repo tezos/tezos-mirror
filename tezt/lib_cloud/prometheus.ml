@@ -26,13 +26,23 @@ let job_jingoo_template job =
       ("targets", Tlist (List.map target_jingoo_template job.targets));
     ]
 
+type alert = {name : string; expr : string; for_ : string option}
+
+let alert_jingoo_template alert =
+  let open Jingoo.Jg_types in
+  Tobj
+    ([("name", Tstr alert.name); ("expr", Tstr alert.expr)]
+    @ match alert.for_ with None -> [] | Some for_ -> [("for_", Tstr for_)])
+
 type t = {
   configuration_file : string;
+  rules_file : string;
   alert_manager : bool;
   mutable jobs : job list;
   scrape_interval : int;
   snapshot_filename : string option;
   port : int;
+  mutable alerts : alert list;
 }
 
 let netdata_source_of_agents agents =
@@ -60,7 +70,7 @@ let tezt_source =
       ];
   }
 
-let jingoo_template t =
+let jingoo_configuration_template t =
   let open Jingoo.Jg_types in
   [
     ("scrape_interval", Tint t.scrape_interval);
@@ -72,9 +82,24 @@ let write_configuration_file t =
   let content =
     Jingoo.Jg_template.from_file
       Path.prometheus_configuration
-      ~models:(jingoo_template t)
+      ~models:(jingoo_configuration_template t)
   in
   with_open_out t.configuration_file (fun oc ->
+      Stdlib.seek_out oc 0 ;
+      output_string oc content)
+
+let jingoo_alert_template t =
+  let open Jingoo.Jg_types in
+  [("alerts", Tlist (List.map alert_jingoo_template t.alerts))]
+
+let write_rules_file t =
+  let content =
+    Jingoo.Jg_template.from_file
+      ~env:{Jingoo.Jg_types.std_env with autoescape = false}
+      Path.prometheus_rules_configuration
+      ~models:(jingoo_alert_template t)
+  in
+  with_open_out t.rules_file (fun oc ->
       Stdlib.seek_out oc 0 ;
       output_string oc content)
 
@@ -90,18 +115,29 @@ let add_job t ?(metrics_path = "/metrics") ~name targets =
   write_configuration_file t ;
   reload t
 
+let add_alert t ?for_ ~name ~expr () =
+  let alert = {name; expr; for_} in
+  t.alerts <- alert :: t.alerts ;
+  write_rules_file t ;
+  ()
+
 let start ~alert_manager agents =
   let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
   in
   let* () =
-    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "prometheus"]
+    Process.run
+      "mkdir"
+      ["-p"; Filename.get_temp_dir_name () // "prometheus" // "rules"]
   in
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let configuration_file =
     Filename.get_temp_dir_name () // "prometheus" // "prometheus.yml"
+  in
+  let rules_file =
+    Filename.get_temp_dir_name () // "prometheus" // "rules" // "tezt.rules"
   in
   let snapshot_filename = Env.prometheus_snapshot_filename in
   let port = Env.prometheus_port in
@@ -109,13 +145,16 @@ let start ~alert_manager agents =
   let t =
     {
       configuration_file;
+      rules_file;
       jobs;
       scrape_interval;
       snapshot_filename;
       port;
       alert_manager;
+      alerts = [];
     }
   in
+  write_rules_file t ;
   write_configuration_file t ;
   let process =
     Process.spawn
@@ -131,7 +170,9 @@ let start ~alert_manager agents =
         (* We use the host mode so that in [localhost], prometheus can see the
            metrics endpoint run by other docker containers. *)
         "-v";
-        Format.asprintf "%s:/etc/prometheus/prometheus.yml" configuration_file;
+        Format.asprintf
+          "%s:/etc/prometheus"
+          (Filename.dirname configuration_file);
         "prom/prometheus";
         "--config.file=/etc/prometheus/prometheus.yml";
         "--web.enable-admin-api";
@@ -236,9 +277,11 @@ let run_with_snapshot () =
   Lwt.return
     {
       configuration_file;
+      rules_file = "";
       alert_manager = false;
       jobs = [];
       scrape_interval = 0;
       snapshot_filename = Some snapshot_filename;
       port;
+      alerts = [];
     }
