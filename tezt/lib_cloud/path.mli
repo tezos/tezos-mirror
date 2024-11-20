@@ -40,8 +40,14 @@ val proxy_deployement : tezt_cloud:string -> string
 (** Path where are stored grafana dashboards. *)
 val grafana_dashboards : string
 
-(** Path where is store the website index. *)
+(** Path where is stored the website index. *)
 val website_index : string
 
 (** CSS file for the website. *)
 val website_style : string
+
+(** Path where is stored the prometheus configuration file. *)
+val prometheus_configuration : string
+
+(** Path where is stored the prometheus rules file. *)
+val prometheus_rules_configuration : string

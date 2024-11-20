@@ -7,7 +7,24 @@
 
 type target = {address : string; port : int; app_name : string}
 
+let target_jingoo_template target =
+  let open Jingoo.Jg_types in
+  Tobj
+    [
+      ("point", Tstr (Format.asprintf "%s:%d" target.address target.port));
+      ("app", Tstr target.app_name);
+    ]
+
 type job = {job_name : string; metric_path : string; targets : target list}
+
+let job_jingoo_template job =
+  let open Jingoo.Jg_types in
+  Tobj
+    [
+      ("name", Tstr job.job_name);
+      ("metrics_path", Tstr job.metric_path);
+      ("targets", Tlist (List.map target_jingoo_template job.targets));
+    ]
 
 type t = {
   configuration_file : string;
@@ -29,49 +46,6 @@ let netdata_source_of_agents agents =
   let targets = List.map target agents in
   {job_name; metric_path; targets}
 
-let alert_manager_configuration () =
-  Format.asprintf
-    {|
-alerting:
-    alertmanagers:
-      - static_configs:
-          - targets: ['localhost:9093']
-|}
-
-let prefix ~scrape_interval () =
-  Format.asprintf
-    {|
-global:
-  scrape_interval: %ds
-scrape_configs:  
-|}
-    scrape_interval
-
-let str_of_target {address; port; app_name} =
-  Format.asprintf
-    {|
-    - targets: ['%s:%d']
-      labels:
-        app: '%s'
-    |}
-    address
-    port
-    app_name
-
-let str_of_source {job_name; metric_path; targets} =
-  Format.asprintf
-    {|
-  - job_name: %s
-    metrics_path: %s
-    params:
-      format: ['prometheus'] 
-    static_configs:      
-%s      
-|}
-    job_name
-    metric_path
-    (targets |> List.map str_of_target |> String.concat "")
-
 let tezt_source =
   {
     job_name = "tezt_metrics";
@@ -86,17 +60,23 @@ let tezt_source =
       ];
   }
 
-let config ~alert_manager ~scrape_interval sources =
-  let sources = List.map str_of_source sources |> String.concat "" in
-  prefix ~scrape_interval () ^ sources
-  ^ if alert_manager then alert_manager_configuration () else ""
+let jingoo_template t =
+  let open Jingoo.Jg_types in
+  [
+    ("scrape_interval", Tint t.scrape_interval);
+    ("jobs", Tlist (List.map job_jingoo_template t.jobs));
+    ("alert_manager", Tbool t.alert_manager);
+  ]
 
-let write_configuration_file
-    {scrape_interval; configuration_file; jobs; alert_manager; _} =
-  let config = config ~alert_manager ~scrape_interval jobs in
-  with_open_out configuration_file (fun oc ->
+let write_configuration_file t =
+  let content =
+    Jingoo.Jg_template.from_file
+      Path.prometheus_configuration
+      ~models:(jingoo_template t)
+  in
+  with_open_out t.configuration_file (fun oc ->
       Stdlib.seek_out oc 0 ;
-      output_string oc config)
+      output_string oc content)
 
 (* Prometheus can reload its configuration by first sending the POST RPC and
    then the signal SIGHUP. *)
