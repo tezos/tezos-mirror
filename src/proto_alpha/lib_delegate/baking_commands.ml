@@ -793,8 +793,7 @@ let run_baker
   let* delegates = get_delegates cctxt sources in
   let context_path =
     match baking_mode with
-    | Local {local_data_dir_path} ->
-        Some Filename.Infix.(local_data_dir_path // "context")
+    | Local {local_data_dir_path} -> Some local_data_dir_path
     | Remote -> None
   in
   Client_daemon.Baker.run

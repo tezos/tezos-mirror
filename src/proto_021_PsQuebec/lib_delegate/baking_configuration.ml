@@ -68,7 +68,7 @@ type fees_config = {
 }
 
 type validation_config =
-  | Local of {context_path : string}
+  | Local of {context_root_path : string}
   | Node
   | ContextIndex of Abstract_context_index.t
 
@@ -162,7 +162,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(minimal_nanotez_per_gas_unit =
       default_fees_config.minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_fees_config.minimal_nanotez_per_byte)
-    ?(nonce = default_nonce_config) ?context_path
+    ?(nonce = default_nonce_config) ?context_root_path
     ?(retries_on_failure = default_retries_on_failure_config)
     ?(user_activated_upgrades = default_user_activated_upgrades)
     ?(votes = default_votes_config) ?force_apply_from_round
@@ -175,9 +175,9 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
   in
   let validation =
-    match context_path with
+    match context_root_path with
     | None -> Node
-    | Some context_path -> Local {context_path}
+    | Some context_root_path -> Local {context_root_path}
   in
   let force_apply_from_round =
     match force_apply_from_round with
@@ -228,8 +228,9 @@ let validation_config_encoding =
         ~title:"Local"
         (Tag 0)
         (obj1 (req "local" string))
-        (function Local {context_path} -> Some context_path | _ -> None)
-        (fun context_path -> Local {context_path});
+        (function
+          | Local {context_root_path} -> Some context_root_path | _ -> None)
+        (fun context_root_path -> Local {context_root_path});
       case
         ~title:"Node"
         (Tag 1)

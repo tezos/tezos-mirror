@@ -185,7 +185,7 @@ let operations_arg =
              Operations_source.(Local {filename = Uri.to_string uri}))
        uri_parameter)
 
-let context_path_arg =
+let context_root_path_arg =
   Tezos_clic.arg
     ~long:"context"
     ~placeholder:"path"
@@ -514,7 +514,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_apply_from_round_arg
          force_switch
          operations_arg
-         context_path_arg
+         context_root_path_arg
          adaptive_issuance_vote_arg
          do_not_monitor_node_mempool_arg
          endpoint_arg
@@ -528,7 +528,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force_apply_from_round,
              force,
              extra_operations,
-             context_path,
+             context_root_path,
              adaptive_issuance_vote,
              do_not_monitor_node_mempool,
              dal_node_endpoint,
@@ -547,7 +547,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~force
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
           ?extra_operations
-          ?context_path
+          ?context_root_path
           ?dal_node_endpoint
           ~count:block_count
           ?votes:
@@ -587,7 +587,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_apply_from_round_arg
          force_switch
          operations_arg
-         context_path_arg
+         context_root_path_arg
          state_recorder_switch_arg)
       (prefixes ["propose"; "for"] @@ sources_param)
       (fun ( minimal_fees,
@@ -597,7 +597,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force_apply_from_round,
              force,
              extra_operations,
-             context_path,
+             context_root_path,
              state_recorder )
            sources
            cctxt ->
@@ -611,7 +611,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?force_apply_from_round
           ~force
           ?extra_operations
-          ?context_path
+          ?context_root_path
           ~state_recorder
           delegates);
   ]
@@ -751,10 +751,9 @@ let run_baker
       ~per_block_vote_file
   in
   let* delegates = get_delegates cctxt sources in
-  let context_path =
+  let context_root_path =
     match baking_mode with
-    | Local {local_data_dir_path} ->
-        Some Filename.Infix.(local_data_dir_path // "context")
+    | Local {local_data_dir_path} -> Some local_data_dir_path
     | Remote -> None
   in
   Client_daemon.Baker.run
@@ -770,7 +769,7 @@ let run_baker
     ?force_apply_from_round
     ?remote_calls_timeout
     ~chain:cctxt#chain
-    ?context_path
+    ?context_root_path
     ~keep_alive
     ~state_recorder
     delegates

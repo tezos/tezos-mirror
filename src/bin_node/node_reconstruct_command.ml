@@ -72,15 +72,15 @@ module Term = struct
         ~when_locked:(`Fail Locked_directory)
         ~filename:(Data_version.lock_file data_dir)
       @@ fun () ->
-      let context_dir = Data_version.context_dir data_dir in
       let store_dir = Data_version.store_dir data_dir in
+      let context_root_dir = data_dir in
       let patch_context =
         Patch_context.patch_context genesis sandbox_parameters
       in
       Reconstruction.reconstruct
         ~patch_context
         ~store_dir
-        ~context_dir
+        ~context_root_dir
         genesis
         ~user_activated_upgrades:
           node_config.blockchain_network.user_activated_upgrades

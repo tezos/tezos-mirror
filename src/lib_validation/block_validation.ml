@@ -1433,7 +1433,7 @@ type apply_environment = {
   max_operations_ttl : int;
   chain_id : Chain_id.t;
   predecessor_block_header : Block_header.t;
-  predecessor_context : Tezos_protocol_environment.Context.t;
+  predecessor_context : Tezos_context_ops.Context_ops.t;
   predecessor_resulting_context_hash : Context_hash.t;
   predecessor_block_metadata_hash : Block_metadata_hash.t option;
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;

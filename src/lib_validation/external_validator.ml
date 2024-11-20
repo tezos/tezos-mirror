@@ -91,7 +91,7 @@ module Processing = struct
 
   let initial_state
       {
-        External_validation.context_root;
+        External_validation.context_root_dir;
         genesis;
         readonly;
         sandbox_parameters;
@@ -107,7 +107,7 @@ module Processing = struct
         ~patch_context:(fun ctxt ->
           Patch_context.patch_context genesis sandbox_parameters ctxt)
         ~readonly
-        context_root
+        context_root_dir
     in
     let headless =
       Tezos_base.Profiler.instance

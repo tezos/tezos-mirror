@@ -3074,8 +3074,8 @@ let check_history_mode_consistency chain_dir history_mode =
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ?(disable_context_pruning = false)
-    ?(maintenance_delay = Storage_maintenance.Disabled) ~store_dir ~context_dir
-    ~allow_testchains genesis =
+    ?(maintenance_delay = Storage_maintenance.Disabled) ~store_dir
+    ~context_root_dir ~allow_testchains genesis =
   let open Lwt_result_syntax in
   let*! () =
     Store_events.(emit init_store) (readonly, disable_context_pruning)
@@ -3088,12 +3088,16 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     match commit_genesis with
     | Some commit_genesis ->
         let*! context_index =
-          Context_ops.init ~kind:`Disk ~readonly:true ?patch_context context_dir
+          Context_ops.init
+            ~kind:`Disk
+            ~readonly:true
+            ?patch_context
+            context_root_dir
         in
         Lwt.return (context_index, commit_genesis)
     | None ->
         let*! context_index =
-          Context_ops.init ~kind:`Disk ~readonly ?patch_context context_dir
+          Context_ops.init ~kind:`Disk ~readonly ?patch_context context_root_dir
         in
         let commit_genesis ~chain_id =
           Context_ops.commit_genesis
@@ -3252,7 +3256,8 @@ let close_store global_store =
   let* () = Chain.close_chain_store main_chain_store in
   Context_ops.close global_store.context_index
 
-let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
+let may_switch_history_mode ~store_dir ~context_root_dir genesis
+    ~new_history_mode =
   let open Lwt_result_syntax in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
@@ -3264,7 +3269,7 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
     return_unit
   else
     let*! context_index =
-      Context_ops.init ~kind:`Disk ~readonly:false context_dir
+      Context_ops.init ~kind:`Disk ~readonly:false context_root_dir
     in
     let* store =
       load_store
@@ -3628,7 +3633,7 @@ module Unsafe = struct
 
   let load_testchain = Chain.load_testchain
 
-  let open_for_snapshot_export ~store_dir ~context_dir genesis
+  let open_for_snapshot_export ~store_dir ~context_root_dir genesis
       ~(locked_f : chain_store -> 'a tzresult Lwt.t) =
     let open Lwt_result_syntax in
     let store_dir = Naming.store_dir ~dir_path:store_dir in
@@ -3662,7 +3667,7 @@ module Unsafe = struct
     protect
       (fun () ->
         let*! context_index =
-          Context_ops.init ~kind:`Disk ~readonly:true context_dir
+          Context_ops.init ~kind:`Disk ~readonly:true context_root_dir
         in
         let* store =
           load_store
