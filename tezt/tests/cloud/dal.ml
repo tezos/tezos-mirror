@@ -1057,29 +1057,37 @@ let update_ratio_attested_commitments t per_level_info metrics =
       let published_level =
         published_level_of_attested_level t per_level_info.level
       in
-      match Hashtbl.find_opt t.infos published_level with
-      | None ->
-          Log.warn
-            "Unexpected error: The level %d is missing in the infos table"
-            published_level ;
-          0.
-      | Some old_per_level_info ->
-          let n = Hashtbl.length old_per_level_info.published_commitments in
-          let weight =
-            per_level_info.level - level_first_commitment_attested
-            |> float_of_int
-          in
-          if n = 0 then metrics.ratio_attested_commitments
-          else
-            let bitset =
-              Z.popcount per_level_info.attested_commitments * 100 / n
+      if published_level <= t.first_level then (
+        Log.warn
+          "Unable to retrieve information for published level %d because it \
+           precedes the earliest available level (%d)."
+          published_level
+          t.first_level ;
+        0.)
+      else
+        match Hashtbl.find_opt t.infos published_level with
+        | None ->
+            Log.warn
+              "Unexpected error: The level %d is missing in the infos table"
+              published_level ;
+            0.
+        | Some old_per_level_info ->
+            let n = Hashtbl.length old_per_level_info.published_commitments in
+            let weight =
+              per_level_info.level - level_first_commitment_attested
               |> float_of_int
             in
-            let ratio =
-              ((metrics.ratio_attested_commitments *. weight) +. bitset)
-              /. (weight +. 1.)
-            in
-            ratio)
+            if n = 0 then metrics.ratio_attested_commitments
+            else
+              let bitset =
+                Z.popcount per_level_info.attested_commitments * 100 / n
+                |> float_of_int
+              in
+              let ratio =
+                ((metrics.ratio_attested_commitments *. weight) +. bitset)
+                /. (weight +. 1.)
+              in
+              ratio)
 
 let update_ratio_attested_commitments_per_baker t per_level_info metrics =
   match metrics.level_first_commitment_attested with
