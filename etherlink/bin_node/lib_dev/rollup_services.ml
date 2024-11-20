@@ -381,12 +381,28 @@ let durable_state_subkeys :
   Tezos_rpc.Service.get_service
     ~description:
       "Retrieve subkeys by key from PVM durable storage. PVM state is taken \
-       with respect to the specified block level. Value returned in hex \
-       format."
+       with respect to the specified block level."
     ~query:state_value_query
     ~output:Data_encoding.(option (list string))
     (open_root / "global" / "block" /: Block_id.arg / "durable" / "wasm_2_0_0"
    / "subkeys")
+
+let durable_state_values :
+    ( [`GET],
+      unit,
+      unit * Block_id.t,
+      state_value_query,
+      unit,
+      (string * bytes) list )
+    Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Retrieve values directly under a given key from PVM durable storage. \
+       PVM state is taken with respect to the specified block level."
+    ~query:state_value_query
+    ~output:Data_encoding.(list (obj2 (req "key" string) (req "value" bytes)))
+    (open_root / "global" / "block" /: Block_id.arg / "durable" / "wasm_2_0_0"
+   / "values")
 
 (** [smart_rollup_address base] asks for the smart rollup node's
     address, using the endpoint [base]. *)

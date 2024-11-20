@@ -109,6 +109,36 @@ module Event = struct
       ~pp1:Evm_events_follower_types.Request.pp
       ("errors", Error_monad.trace_encoding)
       ~pp2:Error_monad.pp_print_trace
+
+  let unexpected_key =
+    declare_1
+      ~section
+      ~name:"evm_events_follower_unexpected_key"
+      ~msg:"Unexpected key in {key} /evm/events."
+      ~level:Warning
+      ("key", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
+  let unexpected_number_of_events =
+    declare_2
+      ~section
+      ~name:"evm_events_follower_unexpected_number_of_events"
+      ~msg:
+        "Unexpected number of events in /evm/events. Fetched {fetched}, \
+         expected {expected}."
+      ~level:Warning
+      ("expected", Data_encoding.int31)
+      ("fetched", Data_encoding.int31)
+
+  let fallback =
+    declare_0
+      ~section
+      ~name:"evm_events_follower_fallback"
+      ~msg:
+        "Rollup node does not support fetching all events, falling back to \
+         multiple RPCs fetching."
+      ~level:Warning
+      ()
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -136,3 +166,12 @@ let out_of_sync ~received ~expected =
 
 let worker_request_failed request_view errs =
   Internal_event.Simple.emit Event.worker_request_failed (request_view, errs)
+
+let unexpected_key key = Internal_event.Simple.emit Event.unexpected_key key
+
+let unexpected_number_of_events ~expected ~fetched =
+  Internal_event.Simple.emit
+    Event.unexpected_number_of_events
+    (expected, fetched)
+
+let fallback () = Internal_event.Simple.emit Event.fallback ()

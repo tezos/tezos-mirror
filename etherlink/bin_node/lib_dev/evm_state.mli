@@ -51,7 +51,7 @@ val exists : t -> string -> bool Lwt.t
     [evm_state], if any. *)
 val inspect : t -> string -> bytes option Lwt.t
 
-(** [subkeys evm_state key] returns the list of value stored under [key] in
+(** [subkeys evm_state key] returns the list of keys stored under [key] in
     [evm_state]. *)
 val subkeys : t -> string -> string trace Lwt.t
 
