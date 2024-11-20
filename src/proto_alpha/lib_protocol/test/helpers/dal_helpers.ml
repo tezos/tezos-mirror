@@ -185,7 +185,14 @@ struct
       skip_list ~page_info ~page_id =
     let open Lwt_result_wrap_syntax in
     let*!@ res =
-      Hist.produce_proof params ~page_info page_id ~get_history skip_list
+      Hist.produce_proof
+        params
+        ~page_info
+        ~attestation_threshold_percent:None
+        ~restricted_commitments_publishers:None
+        page_id
+        ~get_history
+        skip_list
     in
     let* () = check_produce res page_info in
     match check_verify with

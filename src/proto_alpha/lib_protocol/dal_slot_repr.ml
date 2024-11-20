@@ -1240,8 +1240,9 @@ module History = struct
         Under these assumptions, we recall that we maintain an invariant
         ensuring that we a have a cell per slot index in the skip list at every level
         after DAL activation. *)
-    let produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
-        =
+    let produce_proof_repr dal_params ~attestation_threshold_percent:_
+        ~restricted_commitments_publishers:_ page_id ~page_info ~get_history
+        slots_hist =
       let open Lwt_result_syntax in
       let Page.{slot_id = target_slot_id; page_index = _} = page_id in
       (* We first search for the slots attested at level [published_level]. *)
@@ -1315,11 +1316,19 @@ module History = struct
                    "The page ID's slot is not confirmed, but page content and \
                     proof are provided.")
 
-    let produce_proof dal_params page_id ~page_info ~get_history slots_hist :
-        (proof * Page.content option) tzresult Lwt.t =
+    let produce_proof dal_params ~attestation_threshold_percent
+        ~restricted_commitments_publishers page_id ~page_info ~get_history
+        slots_hist : (proof * Page.content option) tzresult Lwt.t =
       let open Lwt_result_syntax in
       let* proof_repr, page_data =
-        produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
+        produce_proof_repr
+          dal_params
+          ~attestation_threshold_percent
+          ~restricted_commitments_publishers
+          page_id
+          ~page_info
+          ~get_history
+          slots_hist
       in
       let*? serialized_proof = serialize_proof proof_repr in
       return (serialized_proof, page_data)

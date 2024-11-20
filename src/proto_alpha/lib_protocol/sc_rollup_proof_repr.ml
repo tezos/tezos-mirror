@@ -317,8 +317,10 @@ module Dal_helpers = struct
     else return_none
 
   let produce ~metadata ~dal_activation_level ~dal_attestation_lag
-      ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id ~page_info
-      ~get_history confirmed_slots_history ~dal_attested_slots_validity_lag =
+      ~dal_number_of_slots ~commit_inbox_level dal_parameters
+      ~attestation_threshold_percent ~restricted_commitments_publishers page_id
+      ~page_info ~get_history confirmed_slots_history
+      ~dal_attested_slots_validity_lag =
     let open Lwt_result_syntax in
     if
       page_id_is_valid
@@ -334,6 +336,8 @@ module Dal_helpers = struct
       let* proof, content_opt =
         Dal_slot_repr.History.produce_proof
           dal_parameters
+          ~attestation_threshold_percent
+          ~restricted_commitments_publishers
           page_id
           ~page_info
           ~get_history
@@ -571,6 +575,8 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           dal_parameters
           ~dal_attestation_lag
           ~commit_inbox_level
+          ~attestation_threshold_percent:None
+          ~restricted_commitments_publishers:None
           page_id
           ~page_info
           ~get_history
