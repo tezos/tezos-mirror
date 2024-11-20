@@ -17,6 +17,7 @@
 module Bits = Bits
 module Bloomer = Bloomer
 module Bounded_heap = Bounded_heap
+module Bounded_min_heap = Bounded_min_heap
 module Circular_buffer = Circular_buffer
 module Compare = Compare
 module FallbackArray = FallbackArray
