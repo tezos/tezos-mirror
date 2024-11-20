@@ -1,5 +1,5 @@
 Name: octez-signer
-Version: 0.0.1
+Version: 1.0.0
 Release: 1%{?dist}
 Summary: Signing client for the Tezos blockchain.
 License: MIT
@@ -17,5 +17,12 @@ Suggests: wireguard openssh-client
 %install
 mkdir -p %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-signer %{buildroot}/usr/bin/
+install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-signer.1 %{buildroot}%{_mandir}/man1/octez-signer.1
+gzip %{buildroot}%{_mandir}/man1/octez-signer.1
 %files
+%exclude /usr/lib/.build-id
 /usr/bin/octez-signer
+%{_mandir}/man1/octez-signer.1*
+%postun
+%post
+%preun
