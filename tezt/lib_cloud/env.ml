@@ -70,6 +70,8 @@ let os = Cli.os
 
 let open_telemetry = Cli.open_telemetry
 
+let alert_manager = Cli.alert_manager
+
 let docker_image =
   (* In localhost mode, we don't want to interact with GCP. The image is taken
      locally. *)

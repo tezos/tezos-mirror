@@ -103,13 +103,22 @@ let grafana =
     ~description:"Flag to set whether to run grafana"
     (((not localhost) || proxy) && os = "cos")
 
+let alert_manager =
+  Clap.list_string
+    ~section
+    ~description:
+      "Specify an alert manager configuration to be run. If this option is \
+       used multiple times, configurations will be concatenated."
+    ~long:"alert-manager"
+    ()
+
 let prometheus =
   Clap.flag
     ~section
     ~set_long:"prometheus"
     ~unset_long:"no-prometheus"
     ~description:"Flag to set whether metrics are exported into prometheus"
-    grafana
+    (grafana || alert_manager <> [])
 
 let prometheus_export =
   Clap.flag

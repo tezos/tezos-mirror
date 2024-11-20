@@ -11,6 +11,7 @@ type source = {job_name : string; metric_path : string; targets : target list}
 
 type t = {
   configuration_file : string;
+  alert_manager : bool;
   mutable sources : source list;
   scrape_interval : int;
   snapshot_filename : string option;
@@ -27,6 +28,15 @@ let netdata_source_of_agents agents =
   in
   let targets = List.map target agents in
   {job_name; metric_path; targets}
+
+let alert_manager_configuration () =
+  Format.asprintf
+    {|
+alerting:
+    alertmanagers:
+      - static_configs:
+          - targets: ['localhost:9093']
+|}
 
 let prefix ~scrape_interval () =
   Format.asprintf
@@ -76,12 +86,14 @@ let tezt_source =
       ];
   }
 
-let config ~scrape_interval sources =
+let config ~alert_manager ~scrape_interval sources =
   let sources = List.map str_of_source sources |> String.concat "" in
   prefix ~scrape_interval () ^ sources
+  ^ if alert_manager then alert_manager_configuration () else ""
 
-let write_configuration_file {scrape_interval; configuration_file; sources; _} =
-  let config = config ~scrape_interval sources in
+let write_configuration_file
+    {scrape_interval; configuration_file; sources; alert_manager; _} =
+  let config = config ~alert_manager ~scrape_interval sources in
   with_open_out configuration_file (fun oc ->
       Stdlib.seek_out oc 0 ;
       output_string oc config)
@@ -98,7 +110,7 @@ let add_source t ?(metric_path = "/metrics") ~job_name targets =
   write_configuration_file t ;
   reload t
 
-let start agents =
+let start ~alert_manager agents =
   let sources =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
@@ -115,7 +127,14 @@ let start agents =
   let port = Env.prometheus_port in
   let scrape_interval = Env.prometheus_scrape_interval in
   let t =
-    {configuration_file; sources; scrape_interval; snapshot_filename; port}
+    {
+      configuration_file;
+      sources;
+      scrape_interval;
+      snapshot_filename;
+      port;
+      alert_manager;
+    }
   in
   write_configuration_file t ;
   let process =
@@ -237,6 +256,7 @@ let run_with_snapshot () =
   Lwt.return
     {
       configuration_file;
+      alert_manager = false;
       sources = [];
       scrape_interval = 0;
       snapshot_filename = Some snapshot_filename;

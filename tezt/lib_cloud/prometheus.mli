@@ -9,8 +9,8 @@ type t
 
 type target = {address : string; port : int; app_name : string}
 
-(** [start agents] starts the prometheus server. *)
-val start : Agent.t List.t -> t Lwt.t
+(** [start ~alert_manager agents] starts the prometheus server. *)
+val start : alert_manager:bool -> Agent.t List.t -> t Lwt.t
 
 (** [shutdown prometheus] shutdowns the prometheus server. *)
 val shutdown : t -> unit Lwt.t

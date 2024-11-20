@@ -88,6 +88,7 @@ type t = {
   website : Web.t option;
   prometheus : Prometheus.t option;
   grafana : Grafana.t option;
+  alert_manager : Alert_manager.t option;
   otel : Otel.t option;
   jaeger : Jaeger.t option;
   deployement : Deployement.t option;
@@ -163,6 +164,12 @@ let shutdown ?exn t =
         Lwt.return_unit)
   in
   let* () =
+    Option.fold
+      ~none:Lwt.return_unit
+      ~some:Alert_manager.shutdown
+      t.alert_manager
+  in
+  let* () =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
   in
   let* () = Option.fold ~none:Lwt.return_unit ~some:Otel.shutdown t.otel in
@@ -209,7 +216,9 @@ let orchestrator deployement f =
   in
   let* prometheus =
     if Env.prometheus then
-      let* prometheus = Prometheus.start agents in
+      let* prometheus =
+        Prometheus.start ~alert_manager:(Env.alert_manager <> []) agents
+      in
       Lwt.return_some prometheus
     else Lwt.return_none
   in
@@ -226,6 +235,13 @@ let orchestrator deployement f =
       Lwt.return (Some otel, Some jaeger)
     else Lwt.return (None, None)
   in
+  let* alert_manager =
+    match Env.alert_manager with
+    | [] -> Lwt.return_none
+    | configuration_files ->
+        let* alert_manager = Alert_manager.run ~configuration_files in
+        Lwt.return_some alert_manager
+  in
   Log.info "Post prometheus" ;
   let t =
     {
@@ -233,6 +249,7 @@ let orchestrator deployement f =
       agents;
       prometheus;
       grafana;
+      alert_manager;
       otel;
       jaeger;
       deployement = Some deployement;
@@ -522,6 +539,7 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
           otel = None;
           jaeger = None;
           prometheus = None;
+          alert_manager = None;
           deployement = None;
         }
   | Some configurations -> (
