@@ -2333,14 +2333,25 @@ let commands_rw () =
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter)
            src_pkh
-           (name_pk, consensus_pk)
+           (name_pk, public_key)
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
-        let* consensus_pk =
-          match consensus_pk with
-          | Some pk -> return pk
-          | None -> Client_keys.public_key name_pk
+        let* consensus_keys =
+          let* public_key =
+            match public_key with
+            | Some pk -> return pk
+            | None -> Client_keys.public_key name_pk
+          in
+          let* secret_key_uri =
+            match public_key with
+            | Bls _ ->
+                let pkh = Signature.Public_key.hash public_key in
+                let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+                return_some secret_key_uri
+            | _ -> return_none
+          in
+          return (public_key, secret_key_uri)
         in
         let*! r =
           register_as_delegate
@@ -2353,7 +2364,7 @@ let commands_rw () =
             ~verbose_signing
             ?fee
             ~manager_sk:src_sk
-            ~consensus_pk
+            ~consensus_keys
             src_pk
         in
         match r with
@@ -2377,16 +2388,24 @@ let commands_rw () =
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter)
            delegate_pkh
-           (name_pk, consensus_pk)
+           (name_pk, public_key)
            cctxt ->
         let open Lwt_result_syntax in
         let* _, delegate_pk, delegate_sk =
           Client_keys.get_key cctxt delegate_pkh
         in
-        let* consensus_pk =
-          match consensus_pk with
+        let* public_key =
+          match public_key with
           | Some pk -> return pk
           | None -> Client_keys.public_key name_pk
+        in
+        let* secret_key_uri =
+          match public_key with
+          | Bls _ ->
+              let pkh = Signature.Public_key.hash public_key in
+              let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+              return_some secret_key_uri
+          | _ -> return_none
         in
         let*! r =
           update_consensus_key
@@ -2398,7 +2417,8 @@ let commands_rw () =
             ~fee_parameter
             ~verbose_signing
             ?fee
-            ~consensus_pk
+            ?secret_key_uri
+            ~public_key
             ~manager_sk:delegate_sk
             delegate_pk
         in

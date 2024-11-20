@@ -336,20 +336,35 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ~fee_parameter
     opt_delegate
 
-let build_update_consensus_key ?fee ?gas_limit ?storage_limit public_key =
-  let operation = Update_consensus_key {public_key; proof = None} in
-  Injection.prepare_manager_operation
-    ~fee:(Limit.of_option fee)
-    ~gas_limit:(Limit.of_option gas_limit)
-    ~storage_limit:(Limit.of_option storage_limit)
-    operation
+let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
+    ?secret_key_uri public_key =
+  let open Lwt_result_syntax in
+  let* proof =
+    match ((public_key : Signature.public_key), secret_key_uri) with
+    | Bls _, Some secret_key_uri ->
+        let bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Public_key.encoding
+            public_key
+        in
+        let* proof = Client_keys.sign cctxt secret_key_uri bytes in
+        return_some proof
+    | _ -> return_none
+  in
+  let operation = Update_consensus_key {public_key; proof} in
+  return
+  @@ Injection.prepare_manager_operation
+       ~fee:(Limit.of_option fee)
+       ~gas_limit:(Limit.of_option gas_limit)
+       ~storage_limit:(Limit.of_option storage_limit)
+       operation
 
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_pk src_pk =
+    ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_keys src_pk =
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
   let delegate_op = build_delegate_operation ?fee (Some source) in
-  match consensus_pk with
+  match consensus_keys with
   | None -> (
       let operation = Annotated_manager_operation.Single_manager delegate_op in
       let* oph, _, op, result =
@@ -372,12 +387,14 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
       match Apply_results.pack_contents_list op result with
       | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
           return ((oph, op, result), None))
-  | Some consensus_pk -> (
-      let operation =
+  | Some (public_key, secret_key_uri) -> (
+      let* operation =
+        let+ operation_content =
+          build_update_consensus_key cctxt ?fee ?secret_key_uri public_key
+        in
         Annotated_manager_operation.Cons_manager
           ( delegate_op,
-            Annotated_manager_operation.Single_manager
-              (build_update_consensus_key ?fee consensus_pk) )
+            Annotated_manager_operation.Single_manager operation_content )
       in
       let* oph, _, op, result =
         Injection.inject_manager_operation
@@ -408,11 +425,13 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
           return ((oph, op1, res1), Some (op2, res2)))
 
 let update_consensus_key cctxt ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ~consensus_pk ~manager_sk ~fee_parameter
-    src_pk =
+    ?verbose_signing ?simulation ?fee ?secret_key_uri ~public_key ~manager_sk
+    ~fee_parameter src_pk =
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
-  let operation = build_update_consensus_key ?fee consensus_pk in
+  let* operation =
+    build_update_consensus_key cctxt ?fee ?secret_key_uri public_key
+  in
   let operation = Annotated_manager_operation.Single_manager operation in
   let* oph, _, op, result =
     Injection.inject_manager_operation
