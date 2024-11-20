@@ -336,8 +336,8 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ~fee_parameter
     opt_delegate
 
-let build_update_consensus_key ?fee ?gas_limit ?storage_limit consensus_pk =
-  let operation = Update_consensus_key consensus_pk in
+let build_update_consensus_key ?fee ?gas_limit ?storage_limit public_key =
+  let operation = Update_consensus_key {public_key; proof = None} in
   Injection.prepare_manager_operation
     ~fee:(Limit.of_option fee)
     ~gas_limit:(Limit.of_option gas_limit)

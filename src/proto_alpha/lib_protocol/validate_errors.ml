@@ -1526,6 +1526,18 @@ module Manager = struct
         counter : Manager_counter.t;
       }
     | Incorrect_reveal_position
+    | Update_consensus_key_with_tz4_without_proof of {
+        source : public_key_hash;
+        public_key : public_key;
+      }
+    | Update_consensus_key_with_incorrect_proof of {
+        public_key : public_key;
+        proof : signature;
+      }
+    | Update_consensus_key_with_unused_proof of {
+        source : public_key_hash;
+        public_key : public_key;
+      }
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
     | Sc_rollup_arith_pvm_disabled
@@ -1614,6 +1626,79 @@ module Manager = struct
       Data_encoding.empty
       (function Incorrect_reveal_position -> Some () | _ -> None)
       (fun () -> Incorrect_reveal_position) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.update_consensus_key_with_tz4_without_proof"
+      ~title:"update consensus key with tz4 without proof"
+      ~description:"Update to a tz4 consensus key without proof of possession"
+      ~pp:(fun ppf (pk, source) ->
+        Format.fprintf
+          ppf
+          "Update to a BLS consensus key %a from %a should contain a proof of \
+           possession."
+          Signature.Public_key_hash.pp
+          pk
+          Signature.Public_key.pp
+          source)
+      Data_encoding.(
+        obj2
+          (req "source" Signature.Public_key_hash.encoding)
+          (req "public_key" Signature.Public_key.encoding))
+      (function
+        | Update_consensus_key_with_tz4_without_proof {source; public_key} ->
+            Some (source, public_key)
+        | _ -> None)
+      (fun (source, public_key) ->
+        Update_consensus_key_with_tz4_without_proof {source; public_key}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.update_consensus_key_with_with_incorrect_proof"
+      ~title:"update consensus key with tz4 with incorrect proof"
+      ~description:
+        "Update to a tz4 consensus key with an incorrect proof of possession"
+      ~pp:(fun ppf (pk, proof) ->
+        Format.fprintf
+          ppf
+          "Update to a BLS consensus key %a contains an incorrect proof of \
+           possession %a."
+          Signature.Public_key.pp
+          pk
+          Signature.pp
+          proof)
+      Data_encoding.(
+        obj2
+          (req "public_key" Signature.Public_key.encoding)
+          (req "proof" Signature.encoding))
+      (function
+        | Update_consensus_key_with_incorrect_proof {public_key; proof} ->
+            Some (public_key, proof)
+        | _ -> None)
+      (fun (public_key, proof) ->
+        Update_consensus_key_with_incorrect_proof {public_key; proof}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.update_consensus_key_with_unused_proof"
+      ~title:"update consensus key with unused proof"
+      ~description:"Update consensus key with unused proof of possession"
+      ~pp:(fun ppf (pk, source) ->
+        Format.fprintf
+          ppf
+          "Consensus key update to %a from %a contains an unused proof of \
+           possession."
+          Signature.Public_key_hash.pp
+          pk
+          Signature.Public_key.pp
+          source)
+      Data_encoding.(
+        obj2
+          (req "source" Signature.Public_key_hash.encoding)
+          (req "public_key" Signature.Public_key.encoding))
+      (function
+        | Update_consensus_key_with_unused_proof {source; public_key} ->
+            Some (source, public_key)
+        | _ -> None)
+      (fun (source, public_key) ->
+        Update_consensus_key_with_unused_proof {source; public_key}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.insufficient_gas_for_manager"

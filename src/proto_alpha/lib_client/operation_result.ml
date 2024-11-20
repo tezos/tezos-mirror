@@ -234,12 +234,18 @@ let pp_manager_operation_content (type kind) source ppf
         source
         Contract_hash.pp
         destination
-  | Update_consensus_key pk ->
+  | Update_consensus_key {public_key = pk; proof} ->
       Format.fprintf
         ppf
-        "Update_consensus_key:@,Public key hash: %a"
+        "Update_consensus_key:@,Public key hash: %a%a"
         Signature.Public_key_hash.pp
         (Signature.Public_key.hash pk)
+        (fun ppf proof ->
+          match proof with
+          | None -> ()
+          | Some proof ->
+              Format.fprintf ppf "@,Proof of possession: %a" Signature.pp proof)
+        proof
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
       Format.fprintf
         ppf

@@ -25,5 +25,7 @@
 
 open Alpha_context
 
+val serialization_cost : int -> Gas.cost
+
 val check_signature_cost :
   Michelson_v1_gas.Cost_of.Interpreter.algo -> _ operation -> Gas.cost

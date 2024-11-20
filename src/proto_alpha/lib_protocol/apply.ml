@@ -1425,14 +1425,49 @@ let apply_manager_operation :
             }
         in
         (ctxt, result, [])
-    | Update_consensus_key pk ->
+    | Update_consensus_key {public_key; proof} ->
         let*! is_registered = Delegate.registered ctxt source in
         let*? () =
           error_unless
             is_registered
             (Update_consensus_key_on_unregistered_delegate source)
         in
-        let* ctxt = Delegate.Consensus_key.register_update ctxt source pk in
+        let* ctxt =
+          match (public_key, proof) with
+          | Bls bls_public_key, Some (Bls _ as proof) ->
+              let*? ctxt =
+                let gas_cost_for_sig_check =
+                  let open Saturation_repr.Syntax in
+                  let size = Bls.Public_key.size bls_public_key in
+                  Operation_costs.serialization_cost size
+                  + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+                      Bls
+                      size
+                in
+                Gas.consume ctxt gas_cost_for_sig_check
+              in
+              let bytes =
+                match
+                  Data_encoding.Binary.to_bytes_opt
+                    Signature.Public_key.encoding
+                    public_key
+                with
+                | None -> Bytes.empty (* Should never happen *)
+                | Some bytes -> bytes
+              in
+              let* () =
+                fail_unless
+                  (Signature.check public_key proof bytes)
+                  (Validate_errors.Manager
+                   .Update_consensus_key_with_incorrect_proof
+                     {public_key; proof})
+              in
+              return ctxt
+          | _, _ -> return ctxt
+        in
+        let* ctxt =
+          Delegate.Consensus_key.register_update ctxt source public_key
+        in
         return
           ( ctxt,
             Update_consensus_key_result

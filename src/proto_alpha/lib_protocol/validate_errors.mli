@@ -245,6 +245,18 @@ module Manager : sig
         counter : Manager_counter.t;
       }
     | Incorrect_reveal_position
+    | Update_consensus_key_with_tz4_without_proof of {
+        source : public_key_hash;
+        public_key : public_key;
+      }
+    | Update_consensus_key_with_incorrect_proof of {
+        public_key : public_key;
+        proof : signature;
+      }
+    | Update_consensus_key_with_unused_proof of {
+        source : public_key_hash;
+        public_key : public_key;
+      }
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
     | Sc_rollup_arith_pvm_disabled

@@ -333,8 +333,10 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
-  | Update_consensus_key :
-      Signature.Public_key.t
+  | Update_consensus_key : {
+      public_key : Signature.Public_key.t;
+      proof : Signature.signature option;
+    }
       -> Kind.update_consensus_key manager_operation
   | Transfer_ticket : {
       contents : Script_repr.lazy_expr;
@@ -725,12 +727,19 @@ module Encoding = struct
         {
           tag = update_consensus_key_tag;
           name = "update_consensus_key";
-          encoding = obj1 (req "pk" Signature.Public_key.encoding);
+          encoding =
+            obj2
+              (req "pk" Signature.Public_key.encoding)
+              (opt "proof" (dynamic_size Signature.encoding));
           select =
             (function
             | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);
-          proj = (function Update_consensus_key consensus_pk -> consensus_pk);
-          inj = (fun consensus_pk -> Update_consensus_key consensus_pk);
+          proj =
+            (fun (Update_consensus_key {public_key; proof}) ->
+              (public_key, proof));
+          inj =
+            (fun (public_key, proof) ->
+              Update_consensus_key {public_key; proof});
         }
 
     let transfer_ticket_case =

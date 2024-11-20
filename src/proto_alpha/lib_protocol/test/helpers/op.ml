@@ -1036,7 +1036,7 @@ let zk_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   originated_zk_rollup op |> fun addr -> (op, addr)
 
 let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ctxt (src : Contract.t) pkh =
+    ctxt (src : Contract.t) public_key =
   let open Lwt_result_syntax in
   let* to_sign_op =
     manager_operation
@@ -1047,7 +1047,7 @@ let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ?storage_limit
       ~source:src
       ctxt
-      (Update_consensus_key pkh)
+      (Update_consensus_key {public_key; proof = None})
   in
   let+ account = Context.Contract.manager ctxt src in
   sign account.sk (Context.branch ctxt) to_sign_op
