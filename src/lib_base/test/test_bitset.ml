@@ -26,13 +26,14 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/main.exe \
-                  -- --file test_bitset.ml
+    Invocation:   dune exec src/lib_base/test/main.exe -- --file test_bitset.ml
     Subject:      Bitset structure
 *)
 
 open Qcheck2_helpers
-open Environment.Bitset
+open Bitset
+open Tezos_stdlib.Utils.Infix
+open Error_monad
 
 let gen_ofs = QCheck2.Gen.int_bound (64 * 10)
 
@@ -42,7 +43,7 @@ let value_of res =
   | Error e ->
       Alcotest.failf
         "An unxpected error %a occurred when generating Bitset.t"
-        Environment.Error_monad.pp_trace
+        pp_print_trace
         e
 
 let gen_storage =
@@ -53,7 +54,7 @@ let gen_storage =
 let test_get_set (c, ofs) =
   List.for_all
     (fun ofs' ->
-      let open Result_syntax in
+      let open Error_monad.Result_syntax in
       value_of
       @@ let* c' = add c ofs in
          let* v = mem c ofs' in
@@ -104,7 +105,7 @@ let test_fill =
 let () =
   Alcotest.run
     ~__FILE__
-    Protocol.name
+    "Bitset"
     [
       ( "quantity",
         qcheck_wrap

@@ -29,7 +29,8 @@
   test_protocol
   test_p2p_addr
   test_sized
-  test_skip_list))
+  test_skip_list
+  test_bitset))
 
 (executable
  (name main)
