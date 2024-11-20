@@ -1096,55 +1096,64 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
       let published_level =
         published_level_of_attested_level t per_level_info.level
       in
-      match Hashtbl.find_opt t.infos published_level with
-      | None ->
-          Log.warn
-            "Unexpected error: The level %d is missing in the infos table"
-            published_level ;
-          Hashtbl.create 0
-      | Some old_per_level_info ->
-          let n = Hashtbl.length old_per_level_info.published_commitments in
-          let weight =
-            per_level_info.level - level_first_commitment_attested
-            |> float_of_int
-          in
-          t.bakers |> List.to_seq
-          |> Seq.map (fun ({account; _} : baker) ->
-                 let bitset =
-                   float_of_int
-                   @@
-                   match
-                     Hashtbl.find_opt
-                       per_level_info.attestations
-                       account.Account.public_key_hash
-                   with
-                   | None -> (* No attestation in block *) 0
-                   | Some (Some z) when n = 0 ->
-                       if z = Z.zero then (* No slot were published. *) 100
-                       else
-                         Test.fail
-                           "Wow wow wait! It seems an invariant is broken. \
-                            Either on the test side, or on the DAL node side"
-                   | Some (Some z) ->
-                       (* Attestation with DAL payload *)
-                       if n = 0 then 100 else Z.popcount z * 100 / n
-                   | Some None ->
-                       (* Attestation without DAL payload: no DAL rights. *) 100
-                 in
-                 let old_ratio =
-                   match
-                     Hashtbl.find_opt
-                       metrics.ratio_attested_commitments_per_baker
-                       account.Account.public_key_hash
-                   with
-                   | None -> 0.
-                   | Some ratio -> ratio
-                 in
-                 if n = 0 then (account.Account.public_key_hash, old_ratio)
-                 else
-                   ( account.Account.public_key_hash,
-                     ((old_ratio *. weight) +. bitset) /. (weight +. 1.) ))
-          |> Hashtbl.of_seq)
+      if published_level <= t.first_level then (
+        Log.warn
+          "Unable to retrieve information for published level %d because it \
+           precedes the earliest available level (%d)."
+          published_level
+          t.first_level ;
+        Hashtbl.create 0)
+      else
+        match Hashtbl.find_opt t.infos published_level with
+        | None ->
+            Log.warn
+              "Unexpected error: The level %d is missing in the infos table"
+              published_level ;
+            Hashtbl.create 0
+        | Some old_per_level_info ->
+            let n = Hashtbl.length old_per_level_info.published_commitments in
+            let weight =
+              per_level_info.level - level_first_commitment_attested
+              |> float_of_int
+            in
+            t.bakers |> List.to_seq
+            |> Seq.map (fun ({account; _} : baker) ->
+                   let bitset =
+                     float_of_int
+                     @@
+                     match
+                       Hashtbl.find_opt
+                         per_level_info.attestations
+                         account.Account.public_key_hash
+                     with
+                     | None -> (* No attestation in block *) 0
+                     | Some (Some z) when n = 0 ->
+                         if z = Z.zero then (* No slot were published. *) 100
+                         else
+                           Test.fail
+                             "Wow wow wait! It seems an invariant is broken. \
+                              Either on the test side, or on the DAL node side"
+                     | Some (Some z) ->
+                         (* Attestation with DAL payload *)
+                         if n = 0 then 100 else Z.popcount z * 100 / n
+                     | Some None ->
+                         (* Attestation without DAL payload: no DAL rights. *)
+                         100
+                   in
+                   let old_ratio =
+                     match
+                       Hashtbl.find_opt
+                         metrics.ratio_attested_commitments_per_baker
+                         account.Account.public_key_hash
+                     with
+                     | None -> 0.
+                     | Some ratio -> ratio
+                   in
+                   if n = 0 then (account.Account.public_key_hash, old_ratio)
+                   else
+                     ( account.Account.public_key_hash,
+                       ((old_ratio *. weight) +. bitset) /. (weight +. 1.) ))
+            |> Hashtbl.of_seq)
 
 let get_metrics t infos_per_level metrics =
   let level_first_commitment_published =
