@@ -65,8 +65,8 @@ For more details on the node invocation and configuration, see :doc:`../user/nod
 
 .. _dal_node_manual:
 
-DAL node manual (Experimental)
-==============================
+DAL node manual
+===============
 
 The command line of the Octez DAL node is documented in Unix ``man`` format, as shown below. You can also obtain this manual by running ``octez-dal-node --help``.
 
