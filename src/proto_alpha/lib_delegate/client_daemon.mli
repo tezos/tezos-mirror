@@ -35,7 +35,6 @@ module Baker : sig
     ?minimal_nanotez_per_byte:Q.t ->
     ?votes:Baking_configuration.per_block_votes_config ->
     ?extra_operations:Baking_configuration.Operations_source.t ->
-    ?dal_node_timeout_percentage:int ->
     ?pre_emptive_forge_time:Q.t ->
     ?force_apply_from_round:int ->
     ?remote_calls_timeout:Q.t ->

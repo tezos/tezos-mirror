@@ -86,13 +86,15 @@ val await_protocol_activation :
 val fetch_dal_config :
   #Protocol_client_context.rpc_context -> Cryptobox.Config.t tzresult Lwt.t
 
-(** [get_attestable_slots ctxt pkh ~level] calls the DAL node RPC
-    GET /profiles/<pkh>/attested_levels/<level>/attestable_slots *)
-val get_attestable_slots :
+(** [dal_attestable_slots ctxt ~attestation_level delegates_slots] calls the DAL
+    node RPC GET /profiles/<pkh>/attested_levels/<level>/attestable_slots/<pkh>
+    for each of the delegates in [delegate_slots] and returns the corresponding
+    promises. *)
+val dal_attestable_slots :
   Tezos_rpc.Context.generic ->
-  public_key_hash ->
-  attested_level:int32 ->
-  Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t
+  attestation_level:int32 ->
+  Baking_state.delegate_slot list ->
+  Baking_state.dal_attestable_slots
 
 (** [register_dal_profiles ctxt delegates] calls the DAL node RPC PATCH
     /profiles/ to register each profile corresponding to a delegate in

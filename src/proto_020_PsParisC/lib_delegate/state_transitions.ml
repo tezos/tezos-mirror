@@ -419,7 +419,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
     let* () = Events.(emit new_head_with_increasing_level ()) in
     let new_level = new_proposal.block.shell.level in
     let compute_new_state ~current_round ~delegate_slots
-        ~next_level_delegate_slots =
+        ~next_level_delegate_slots ~dal_attestable_slots
+        ~next_level_dal_attestable_slots =
       let round_state =
         {
           current_round;
@@ -441,6 +442,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           delegate_slots;
           next_level_delegate_slots;
           next_level_proposed_round = None;
+          dal_attestable_slots;
+          next_level_dal_attestable_slots;
         }
       in
       (* recursive call with the up-to-date state to handle the new

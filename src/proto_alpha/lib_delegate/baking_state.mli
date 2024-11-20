@@ -94,6 +94,14 @@ val compute_delegate_slots :
 
 (** {2 Consensus operations types functions} *)
 
+(* An association list between delegates and promises for their DAL attestations
+   at some level (as obtained through the [get_attestable_slots] RPC). See usage
+   in {!level_state}. *)
+type dal_attestable_slots =
+  (Signature.Public_key_hash.t
+  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
+  list
+
 type consensus_vote_kind = Attestation | Preattestation
 
 val consensus_vote_kind_encoding : consensus_vote_kind Data_encoding.t
@@ -292,6 +300,11 @@ type level_state = {
   next_level_proposed_round : Round.t option;
       (** Some if a proposal has been injected for the next level on the given
           round *)
+  dal_attestable_slots : dal_attestable_slots;
+      (** For each (own) delegate having a DAL slot at the current level, store
+          a promise to obtain the attestable slots for that level. *)
+  next_level_dal_attestable_slots : dal_attestable_slots;
+      (** and similarly for the next level *)
 }
 
 val pp_level_state : Format.formatter -> level_state -> unit

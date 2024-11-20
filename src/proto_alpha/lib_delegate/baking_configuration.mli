@@ -68,7 +68,6 @@ type t = {
   force : bool;
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
-  dal_node_timeout_percentage : int;
   pre_emptive_forge_time : Time.System.Span.t;
   remote_calls_timeout : float option;
 }
@@ -112,7 +111,6 @@ val make :
   ?force:bool ->
   ?state_recorder:state_recorder_config ->
   ?extra_operations:Operations_source.t ->
-  ?dal_node_timeout_percentage:int ->
   ?pre_emptive_forge_time:Time.System.Span.t ->
   ?remote_calls_timeout:float ->
   unit ->
