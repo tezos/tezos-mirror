@@ -39,3 +39,6 @@ val proxy_deployement : tezt_cloud:string -> string
 
 (** Path where are stored grafana dashboards. *)
 val grafana_dashboards : string
+
+(** Path where is store the website index. *)
+val website_index : string

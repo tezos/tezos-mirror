@@ -35,3 +35,5 @@ let proxy_deployement ~tezt_cloud =
   // Format.asprintf "%s-tezt-cloud-deployement" tezt_cloud
 
 let grafana_dashboards = project // "grafana" // "dashboards"
+
+let website_index = project // "website" // "index.md.jingoo"
