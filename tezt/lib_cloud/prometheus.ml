@@ -7,12 +7,12 @@
 
 type target = {address : string; port : int; app_name : string}
 
-type source = {job_name : string; metric_path : string; targets : target list}
+type job = {job_name : string; metric_path : string; targets : target list}
 
 type t = {
   configuration_file : string;
   alert_manager : bool;
-  mutable sources : source list;
+  mutable jobs : job list;
   scrape_interval : int;
   snapshot_filename : string option;
   port : int;
@@ -92,8 +92,8 @@ let config ~alert_manager ~scrape_interval sources =
   ^ if alert_manager then alert_manager_configuration () else ""
 
 let write_configuration_file
-    {scrape_interval; configuration_file; sources; alert_manager; _} =
-  let config = config ~alert_manager ~scrape_interval sources in
+    {scrape_interval; configuration_file; jobs; alert_manager; _} =
+  let config = config ~alert_manager ~scrape_interval jobs in
   with_open_out configuration_file (fun oc ->
       Stdlib.seek_out oc 0 ;
       output_string oc config)
@@ -106,12 +106,12 @@ let reload _t =
 
 let add_source t ?(metric_path = "/metrics") ~job_name targets =
   let source = {job_name; metric_path; targets} in
-  t.sources <- source :: t.sources ;
+  t.jobs <- source :: t.jobs ;
   write_configuration_file t ;
   reload t
 
 let start ~alert_manager agents =
-  let sources =
+  let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
   in
@@ -129,7 +129,7 @@ let start ~alert_manager agents =
   let t =
     {
       configuration_file;
-      sources;
+      jobs;
       scrape_interval;
       snapshot_filename;
       port;
@@ -257,7 +257,7 @@ let run_with_snapshot () =
     {
       configuration_file;
       alert_manager = false;
-      sources = [];
+      jobs = [];
       scrape_interval = 0;
       snapshot_filename = Some snapshot_filename;
       port;
