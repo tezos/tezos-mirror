@@ -37,7 +37,7 @@ use super::instruction::{Args, Instruction, OpCode};
 use crate::cache_utils::{FenceCounter, Sizes};
 use crate::default::ConstDefault;
 use crate::machine_state::address_translation::PAGE_SIZE;
-use crate::machine_state::bus::Address;
+use crate::machine_state::bus::main_memory::Address;
 use crate::parser::instruction::Instr;
 use crate::parser::{parse_compressed_instruction, parse_uncompressed_instruction};
 use crate::state_backend::{

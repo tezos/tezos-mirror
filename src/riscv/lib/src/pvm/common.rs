@@ -262,7 +262,7 @@ mod tests {
     use super::*;
     use crate::{
         machine_state::{
-            bus::{main_memory::M1M, AddressableRead},
+            bus::main_memory::M1M,
             registers::{a0, a1, a2, a3, a6, a7},
             TestCacheLayouts,
         },

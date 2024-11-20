@@ -22,14 +22,16 @@ extern crate proptest;
 
 pub use self::cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
 use self::{
-    block_cache::BlockCache, bus::main_memory::MainMemory, instruction::Instruction,
+    block_cache::BlockCache,
+    bus::main_memory::{Address, MainMemory, OutOfBounds},
+    instruction::Instruction,
     instruction_cache::InstructionCache,
 };
 use crate::{
     bits::u64,
     devicetree,
     machine_state::{
-        bus::{main_memory, Address, AddressableRead, AddressableWrite, OutOfBounds},
+        bus::main_memory,
         csregisters::CSRegister,
         hart_state::{HartState, HartStateLayout},
     },
@@ -684,10 +686,7 @@ mod tests {
                 pte::{PPNField, PageTableEntry},
                 PAGE_SIZE,
             },
-            bus::{
-                main_memory::{self, M1M, M8K},
-                AddressableWrite,
-            },
+            bus::main_memory::{self, M1M, M8K},
             cache_layouts,
             csregisters::{
                 satp::{Satp, TranslationAlgorithm},

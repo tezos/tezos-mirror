@@ -17,7 +17,7 @@ use self::{
     values::CSRValue,
     xstatus::{ExtensionValue, MNStatus, MStatus, SStatus},
 };
-use super::{bus::Address, hart_state::HartState, mode::TrapMode};
+use super::{bus::main_memory::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
     bits::{ones, u64, Bits64},
     machine_state::mode::Mode,
