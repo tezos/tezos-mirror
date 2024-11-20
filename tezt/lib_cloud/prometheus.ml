@@ -15,13 +15,13 @@ let target_jingoo_template target =
       ("app", Tstr target.app_name);
     ]
 
-type job = {job_name : string; metrics_path : string; targets : target list}
+type job = {name : string; metrics_path : string; targets : target list}
 
 let job_jingoo_template job =
   let open Jingoo.Jg_types in
   Tobj
     [
-      ("name", Tstr job.job_name);
+      ("name", Tstr job.name);
       ("metrics_path", Tstr job.metrics_path);
       ("targets", Tlist (List.map target_jingoo_template job.targets));
     ]
@@ -36,7 +36,7 @@ type t = {
 }
 
 let netdata_source_of_agents agents =
-  let job_name = "netdata" in
+  let name = "netdata" in
   let metrics_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
   let target agent =
     let app_name = Agent.name agent in
@@ -44,11 +44,11 @@ let netdata_source_of_agents agents =
     {address; port = 19999; app_name}
   in
   let targets = List.map target agents in
-  {job_name; metrics_path; targets}
+  {name; metrics_path; targets}
 
 let tezt_source =
   {
-    job_name = "tezt_metrics";
+    name = "tezt_metrics";
     metrics_path = "/metrics.txt";
     targets =
       [
@@ -84,8 +84,8 @@ let reload _t =
   let* () = Process.run "curl" ["-XPOST"; "http://localhost:9090/-/reload"] in
   Process.run "docker" ["kill"; "--signal"; "SIGHUP"; "prometheus"]
 
-let add_source t ?(metrics_path = "/metrics") ~job_name targets =
-  let source = {job_name; metrics_path; targets} in
+let add_job t ?(metrics_path = "/metrics") ~name targets =
+  let source = {name; metrics_path; targets} in
   t.jobs <- source :: t.jobs ;
   write_configuration_file t ;
   reload t

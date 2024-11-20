@@ -638,7 +638,7 @@ let push_metric t ?help ?typ ?labels ~name value =
 
 type target = {agent : Agent.t; port : int; app_name : string}
 
-let add_prometheus_source t ?metric_path ~job_name targets =
+let add_prometheus_source t ?metrics_path ~name targets =
   match t.prometheus with
   | None -> Lwt.return_unit
   | Some prometheus ->
@@ -647,7 +647,7 @@ let add_prometheus_source t ?metric_path ~job_name targets =
         Prometheus.{address; port; app_name}
       in
       let targets = List.map prometheus_target targets in
-      Prometheus.add_source prometheus ?metric_path ~job_name targets
+      Prometheus.add_job prometheus ?metrics_path ~name targets
 
 let add_service t ~name ~url =
   match t.website with

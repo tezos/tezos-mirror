@@ -83,13 +83,13 @@ module Cloud : sig
 
   type target = {agent : Agent.t; port : int; app_name : string}
 
-  (** [add_prometheus_source ?metric_path ~job_name targets] allows to add a new
+  (** [add_prometheus_source ?metrics_path ~name targets] allows to add a new
       source of metrics that Prometheus can scrap. By default [metric_path] is
       [/metrics]. [job_name] is just the name to give for the job that will
       scrap the metrics. It must be unique. A target enables to define a list of
       points to scrap. Each point can have a name defined by [app_name]. *)
   val add_prometheus_source :
-    t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
+    t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
 
   val add_service : t -> name:string -> url:string -> unit Lwt.t
 end
