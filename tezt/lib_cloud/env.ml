@@ -171,13 +171,17 @@ let dns_domains () =
   (* When we use the proxy mode, by default a domain name is
      registered for the `tezt-cloud` zone. *)
   let* domains =
-    match mode with
-    | `Host -> (
-        let* domain = Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt-cloud" in
-        match domain with
-        | None -> Lwt.return Cli.dns_domains
-        | Some domain -> Lwt.return (domain :: Cli.dns_domains))
-    | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains
+    if Cli.no_dns then Lwt.return []
+    else
+      match mode with
+      | `Host -> (
+          let* domain =
+            Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt-cloud"
+          in
+          match domain with
+          | None -> Lwt.return Cli.dns_domains
+          | Some domain -> Lwt.return (domain :: Cli.dns_domains))
+      | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains
   in
   (* A fully-qualified domain name requires to end with a dot.
      However, the usage tends to omit this final dot. Because having a

@@ -93,6 +93,9 @@ val tezt_cloud : string option
     authorized zones*)
 val dns_domains : string list
 
+(** No DNS entry will be added for the proxy container. *)
+val no_dns : bool
+
 (** OS used by the VM. *)
 val os : string
 

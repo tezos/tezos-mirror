@@ -228,6 +228,16 @@ let dns_domains =
        domains registered with the GCP project."
     ()
 
+let no_dns =
+  Clap.flag
+    ~section
+    ~set_long:"no-dns"
+    ~set_long_synonyms:["no-dns-domain"]
+    ~description:
+      "Prevent from adding any DNS domain associated with the experiment. This \
+       cancel any effect of [--dns-domain]."
+    false
+
 let octez_release =
   Clap.optional_string
     ~section
