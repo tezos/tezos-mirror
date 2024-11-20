@@ -582,11 +582,31 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~get_history
           ~dal_attested_slots_validity_lag
           confirmed_slots_history
-    | Needs_reveal (Request_adal_page _info) ->
-        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
-
-           Implement refutations for adaptive DAL *)
-        assert false
+    | Needs_reveal
+        (Request_adal_page
+          {
+            page_id;
+            attestation_threshold_percent;
+            restricted_commitments_publishers;
+          }) ->
+        let open Dal_with_history in
+        let attestation_threshold_percent =
+          Some attestation_threshold_percent
+        in
+        Dal_helpers.produce
+          ~dal_number_of_slots
+          ~metadata
+          ~dal_activation_level
+          dal_parameters
+          ~dal_attestation_lag
+          ~commit_inbox_level
+          ~attestation_threshold_percent
+          ~restricted_commitments_publishers
+          page_id
+          ~page_info
+          ~get_history
+          ~dal_attested_slots_validity_lag
+          confirmed_slots_history
     | Needs_reveal Reveal_dal_parameters ->
         let open Dal_with_history in
         return
