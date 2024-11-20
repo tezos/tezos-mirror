@@ -63,20 +63,6 @@ For more details on the node invocation and configuration, see :doc:`../user/nod
 
 .. include:: ../api/octez-node.txt
 
-.. _dac_node_manual:
-
-DAC node manual (Experimental)
-==============================
-.. raw:: html
-        :file: ../api/octez-dac-node.html
-
-.. _dac_client_manual:
-
-DAC client manual (Experimental)
-================================
-.. raw:: html
-        :file: ../api/octez-dac-client.html
-
 .. _dal_node_manual:
 
 DAL node manual (Experimental)

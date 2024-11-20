@@ -81,8 +81,6 @@ manuals: \
 	 api/octez-signer.html \
 	 api/octez-codec.html \
 	 api/octez-snoop.html \
-	 api/octez-dac-node.html \
-	 api/octez-dac-client.html \
 	 api/octez-smart-rollup-node.html \
 	 api/octez-node.txt \
 	 api/octez-dal-node.txt \

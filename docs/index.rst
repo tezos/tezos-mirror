@@ -88,7 +88,7 @@ If you want to know more about the *technology* underlying Octez and the Tezos p
 
 - Page ``Octez Protocol`` explains the design principles and the salient features of the Tezos protocol. In fact, these pages are versioned for several Tezos protocols, current or upcoming, such as: the :doc:`active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
 
-- Other pages are related to the important Smart Rollups feature, and present tools such as the Smart rollup node and Data Availability Committees.
+- Other pages are related to the important Smart Rollups feature, and present tools such as the Smart rollup node and the Data Availability Layer.
 
 .. raw:: html
 
@@ -173,7 +173,6 @@ Platform developers are also provided reference materials for internal APIs of O
 
    shell/the_big_picture
    shell/shell
-   shell/data_availability_committees
    shell/dal
    shell/smart_rollup_node
    shell/p2p_api
