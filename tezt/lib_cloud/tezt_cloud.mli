@@ -83,13 +83,22 @@ module Cloud : sig
 
   type target = {agent : Agent.t; port : int; app_name : string}
 
-  (** [add_prometheus_source ?metrics_path ~name targets] allows to add a new
+  (** [add_prometheus_source t ?metrics_path ~name targets] allows to add a new
       source of metrics that Prometheus can scrap. By default [metric_path] is
       [/metrics]. [job_name] is just the name to give for the job that will
       scrap the metrics. It must be unique. A target enables to define a list of
       points to scrap. Each point can have a name defined by [app_name]. *)
   val add_prometheus_source :
     t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
+
+  (** [add_alert t ?for_ ~name ~promql_query ()] allows to add an
+      alert when Prometheus and Alert manager are enabled. [name] is
+      the name of the alert, [promqal_query] is the query triggering
+      the alert. [for_] is an optional argument which if it is set, is
+      the number of seconds for which the [promql_query] must be
+      satisfied before triggering an actual alert. *)
+  val add_alert :
+    t -> ?for_:string -> name:string -> promql_query:string -> unit -> unit
 
   val add_service : t -> name:string -> url:string -> unit Lwt.t
 end

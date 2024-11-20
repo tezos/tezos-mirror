@@ -649,6 +649,12 @@ let add_prometheus_source t ?metrics_path ~name targets =
       let targets = List.map prometheus_target targets in
       Prometheus.add_job prometheus ?metrics_path ~name targets
 
+let add_alert t ?for_ ~name ~promql_query () =
+  match (t.alert_manager, t.prometheus) with
+  | None, _ | _, None -> ()
+  | Some _alert_manager, Some prometheus ->
+      Prometheus.add_alert prometheus ?for_ ~name ~expr:promql_query ()
+
 let add_service t ~name ~url =
   match t.website with
   | None -> Lwt.return_unit
