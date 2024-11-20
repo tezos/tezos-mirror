@@ -27,7 +27,10 @@
     suffix to the file name. *)
 val register_backend :
   string list ->
-  (directory:string -> name:string -> Profiler.instance option) ->
+  (verbosity:Profiler.verbosity ->
+  directory:string ->
+  name:string ->
+  Profiler.instance) ->
   unit
 
 (** [selected_backend ()] returns the backend selected using the environment

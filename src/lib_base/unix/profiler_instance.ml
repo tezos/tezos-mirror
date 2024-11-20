@@ -10,7 +10,9 @@ module BackendMap = Map.Make (String)
 module VerbosityMap = Map.Make (String)
 
 let registered_backends :
-    (directory:string -> name:string -> instance option) BackendMap.t ref =
+    (verbosity:verbosity -> directory:string -> name:string -> instance)
+    BackendMap.t
+    ref =
   ref BackendMap.empty
 
 (** Get the verbosity map from the contents of the PROFILING environment
@@ -69,13 +71,14 @@ let register_backend env driver =
   | None ->
       registered_backends :=
         List.fold_left
-          (fun acc k ->
-            BackendMap.add
-              k
-              (fun ~directory ~name -> driver ~directory ~name)
-              acc)
+          (fun acc k -> BackendMap.add k driver acc)
           !registered_backends
           env
+
+let wrap_backend_verbosity backend ~directory ~name =
+  match get_profiler_verbosity ~name with
+  | None -> None
+  | Some verbosity -> Some (backend ~verbosity ~directory ~name)
 
 let selected_backend () =
   let fail s =
@@ -103,15 +106,15 @@ let selected_backend () =
           |> fail)
   | Some b -> (
       match BackendMap.find b !registered_backends with
-      | Some _ as x -> x
+      | Some x -> Some (wrap_backend_verbosity x)
       | None ->
           Format.sprintf "No backend registered for value \"%s\"" b |> fail)
 
 (** Default profilers. *)
 
 let profiler ?(suffix = "")
-    (backend : (module DRIVER with type config = string * verbosity)) ~directory
-    ~name =
+    (backend : (module DRIVER with type config = string * verbosity)) ~verbosity
+    ~directory ~name =
   let output_dir =
     (* If [PROFILING_OUTPUT_DIR] environment variable is set, it overwrites the
        directory provided by the application *)
@@ -128,14 +131,9 @@ let profiler ?(suffix = "")
         Tezos_stdlib_unix.Utils.create_dir ~perm:0o777 output_dir ;
         output_dir
   in
-  match get_profiler_verbosity ~name with
-  | None -> None
-  | Some max_verbosity ->
-      Some
-        (Profiler.instance
-           backend
-           Filename.Infix.
-             (output_dir // (name ^ "_profiling" ^ suffix), max_verbosity))
+  Profiler.instance
+    backend
+    Filename.Infix.(output_dir // (name ^ "_profiling" ^ suffix), verbosity)
 
 let () =
   register_backend

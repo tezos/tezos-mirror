@@ -119,5 +119,4 @@ let prometheus =
 let () =
   Profiler_instance.register_backend
     ["prometheus"]
-    (fun max_verbosity ~directory:_ ~name ->
-      instance prometheus (name, max_verbosity))
+    (fun ~verbosity ~directory:_ ~name -> instance prometheus (name, verbosity))
