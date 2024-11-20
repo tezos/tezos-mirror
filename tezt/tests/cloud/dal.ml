@@ -1142,14 +1142,14 @@ let update_ratio_attested_commitments t per_level_info metrics =
            precedes the earliest available level (%d)."
           published_level
           t.first_level ;
-        0.)
+        metrics.ratio_attested_commitments)
       else
         match Hashtbl.find_opt t.infos published_level with
         | None ->
             Log.warn
               "Unexpected error: The level %d is missing in the infos table"
               published_level ;
-            0.
+            metrics.ratio_attested_commitments
         | Some old_per_level_info ->
             let n = Hashtbl.length old_per_level_info.published_commitments in
             let weight =
