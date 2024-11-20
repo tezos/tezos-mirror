@@ -103,9 +103,20 @@ impl<ML: MainMemoryLayout> state_backend::Layout for MLCapture<ML> {
     fn allocate<M: ManagerAlloc>(_backend: &mut M) -> Self::Allocated<M> {}
 }
 
+/// Layout for an address cell
+pub struct AddressCellLayout;
+
+impl state_backend::Layout for AddressCellLayout {
+    type Allocated<M: state_backend::ManagerBase> = Cell<Address, M>;
+
+    fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+        Cell::bind(backend.allocate_region([!0]))
+    }
+}
+
 /// The layout of block cache entries, see [`Cached`] for more information.
 pub type CachedLayout<ML> = (
-    Atom<Address>,
+    AddressCellLayout,
     Atom<FenceCounter>,
     Atom<u8>,
     [Atom<Instruction>; CACHE_INSTR],
@@ -139,7 +150,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
     where
         M: ManagerWrite,
     {
-        self.address.write(0);
+        self.address.write(!0);
         self.len_instr.write(0);
     }
 
@@ -147,7 +158,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
     where
         M: ManagerWrite,
     {
-        self.address.write(0);
+        self.address.write(!0);
         self.fence_counter.write(FenceCounter::INITIAL);
         self.len_instr.write(0);
         self.instr
@@ -210,7 +221,7 @@ pub const TEST_CACHE_BITS: usize = 12;
 pub const TEST_CACHE_SIZE: usize = 1 << TEST_CACHE_BITS;
 
 /// Layout of a partial block.
-pub type PartialBlockLayout = (Atom<u64>, Atom<bool>, Atom<u8>);
+pub type PartialBlockLayout = (Atom<Address>, Atom<bool>, Atom<u8>);
 
 /// Structure used to remember that a block was only partway executed
 /// before needing to pause due to `steps == steps_max`.
@@ -221,7 +232,7 @@ pub type PartialBlockLayout = (Atom<u64>, Atom<bool>, Atom<u8>);
 /// then the partial block is reset, and execution will continue with
 /// a potentially different block.
 pub struct PartialBlock<M: ManagerBase> {
-    phys_addr: Cell<u64, M>,
+    phys_addr: Cell<Address, M>,
     in_progress: Cell<bool, M>,
     progress: Cell<u8, M>,
 }
@@ -299,8 +310,8 @@ pub trait BlockCacheLayout: state_backend::Layout {
 
 /// The layout of the block cache.
 pub type Layout<ML, const BITS: usize, const SIZE: usize> = (
-    Atom<Address>,
-    Atom<Address>,
+    AddressCellLayout,
+    AddressCellLayout,
     Atom<FenceCounter>,
     PartialBlockLayout,
     Sizes<BITS, SIZE, CachedLayout<ML>>,
@@ -400,7 +411,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     {
         let counter = self.fence_counter.read();
         self.fence_counter.write(counter.next());
-        self.reset_to(0);
+        self.reset_to(!0);
         BCL::entry_mut(&mut self.entries, counter.0 as Address).invalidate();
     }
 
@@ -410,7 +421,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
         M: ManagerWrite,
     {
         self.fence_counter.write(FenceCounter::INITIAL);
-        self.reset_to(0);
+        self.reset_to(!0);
         BCL::entries_reset(&mut self.entries);
         self.partial_block.reset();
     }
@@ -504,6 +515,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
 
         if entry.address.read() == phys_addr
             && self.fence_counter.read() == entry.fence_counter.read()
+            && entry.len_instr.read() > 0
         {
             Some(entry.block())
         } else {
@@ -737,10 +749,12 @@ mod tests {
             address_translation::PAGE_SIZE,
             bus,
             instruction::{Args, Instruction, OpCode},
+            instruction_cache::cacheable_uncompressed,
             main_memory::tests::T1K,
-            registers::{a0, a1, t0, t1},
+            registers::{a0, a1, a2, t0, t1},
             MachineCoreState, MachineCoreStateLayout,
         },
+        state_backend::owned_backend::Owned,
     };
 
     pub type TestLayout<ML> = Layout<ML, TEST_CACHE_BITS, TEST_CACHE_SIZE>;
@@ -950,4 +964,65 @@ mod tests {
         assert_eq!(0, block_state.partial_block.phys_addr.read());
         assert_eq!(block_addr + 10 * 4, core_state.hart.pc.read());
     });
+
+    /// The initialised block cache must not return any blocks. This is especially important for
+    /// blocks at address 0 which at one point were accidentally valid but empty which caused loops.
+    #[test]
+    fn test_init_block() {
+        type Layout = super::Layout<T1K, TEST_CACHE_BITS, TEST_CACHE_SIZE>;
+
+        // This test only makes sense if the test cache size isn't 0.
+        if TEST_CACHE_SIZE < 1 {
+            panic!("Test cache size must be at least 1");
+        }
+
+        let check_block = |block: &mut BlockCache<Layout, T1K, Owned>| {
+            for i in 0..TEST_CACHE_SIZE {
+                assert!(block.get_block(i as Address).is_none());
+            }
+        };
+
+        let populate_block = |block: &mut BlockCache<Layout, T1K, Owned>| {
+            for i in 0..TEST_CACHE_SIZE {
+                if !cacheable_uncompressed(i as Address) {
+                    continue;
+                }
+
+                block.push_instr::<4>(ValidatedCacheEntry::from_raw(
+                    i as Address,
+                    Instruction {
+                        opcode: OpCode::Add,
+                        args: Args {
+                            rd: a1,
+                            rs1: a1,
+                            rs2: a2,
+                            ..Args::DEFAULT
+                        },
+                    },
+                ));
+            }
+        };
+
+        let mut block: BlockCache<Layout, T1K, Owned> =
+            BlockCache::bind(Owned::allocate::<Layout>());
+
+        // The initial block cache should not return any blocks.
+        check_block(&mut block);
+
+        populate_block(&mut block);
+        block.reset();
+
+        // The reset block cache should not return any blocks.
+        check_block(&mut block);
+
+        // We check the invalidation logic multiple times because it works progressively, not in
+        // one go.
+        for _ in 0..TEST_CACHE_SIZE {
+            populate_block(&mut block);
+            block.invalidate();
+
+            // The invalidated block cache should not return any blocks.
+            check_block(&mut block);
+        }
+    }
 }
