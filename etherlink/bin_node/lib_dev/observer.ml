@@ -149,7 +149,10 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
             keep_alive = config.keep_alive;
             filter_event =
               (function
-              | New_delayed_transaction _ | Upgrade_event _ -> false | _ -> true);
+              | New_delayed_transaction _ | Upgrade_event _
+              | Flush_delayed_inbox _ ->
+                  false
+              | _ -> true);
           }
       in
       let () =

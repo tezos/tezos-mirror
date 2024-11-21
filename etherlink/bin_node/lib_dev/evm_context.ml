@@ -26,6 +26,7 @@ type parameters = {
   store_perm : [`Read_only | `Read_write];
   block_storage_sqlite3 : bool;
   garbage_collector : Configuration.garbage_collector option;
+  sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
 
 type session_state = {
@@ -56,6 +57,7 @@ type t = {
   fail_on_missing_blueprint : bool;
   block_storage_sqlite3 : bool;
   history : history;
+  sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
 
 type store_info = {
@@ -492,11 +494,23 @@ module State = struct
         let root_hash = `Hex root_hash in
         Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
 
-  let reset_to_finalized_level exit_error ctxt conn =
+  let reset_to_finalized_level ?expected_finalized_number exit_error ctxt conn =
     let open Lwt_result_syntax in
     let* safe_checkpoint = Evm_store.Context_hashes.find_finalized conn in
     match safe_checkpoint with
     | Some (finalized_number, checkpoint) ->
+        let* () =
+          match expected_finalized_number with
+          | None -> return_unit
+          | Some expected_finalized_number ->
+              when_ (finalized_number <> expected_finalized_number) (fun () ->
+                  let*! () =
+                    Evm_context_events.reset_incoherent_finalized_state
+                      ~expected_finalized_number
+                      ~finalized_number
+                  in
+                  tzfail exit_error)
+        in
         let*! () = Evm_context_events.reset_at_level finalized_number in
         (* Find the "finalized" evm_state. *)
         let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
@@ -861,7 +875,34 @@ module State = struct
           Tezos_crypto.Hashed.Smart_rollup_address.t;
       }
 
-  let rec apply_blueprint ?(events = []) ctxt timestamp payload
+  let prepare_local_flushed_blueprint cctxt smart_rollup_address sequencer_key
+      evm_state parent_hash
+      Evm_events.Flushed_blueprint.
+        {hashes; timestamp; level = Qty flushed_level} =
+    let open Lwt_result_syntax in
+    let* delayed_transactions =
+      List.map_es (Evm_state.get_delayed_inbox_item evm_state) hashes
+    in
+    let* blueprint_chunks =
+      Sequencer_blueprint.prepare
+        ~sequencer_key
+        ~cctxt
+        ~timestamp
+        ~transactions:[]
+        ~delayed_transactions:hashes
+        ~parent_hash
+        ~number:(Qty flushed_level)
+    in
+    let payload =
+      Sequencer_blueprint.create_inbox_payload
+        ~smart_rollup_address:
+          (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+             smart_rollup_address)
+        ~chunks:blueprint_chunks
+    in
+    return (payload, delayed_transactions)
+
+  let rec apply_blueprint ?conn ?(events = []) ctxt timestamp payload
       delayed_transactions =
     let open Lwt_result_syntax in
     let* ( evm_state,
@@ -870,14 +911,18 @@ module State = struct
            applied_kernel_upgrade,
            split_info,
            gc_info ) =
-      with_store_transaction ctxt @@ fun conn ->
-      let* () = apply_evm_events conn ctxt events in
-      apply_blueprint_store_unsafe
-        ctxt
-        conn
-        timestamp
-        payload
-        delayed_transactions
+      let kont conn =
+        let* () = apply_evm_events conn ctxt events in
+        apply_blueprint_store_unsafe
+          ctxt
+          conn
+          timestamp
+          payload
+          delayed_transactions
+      in
+      match conn with
+      | None -> with_store_transaction ctxt @@ fun conn -> kont conn
+      | Some conn -> kont conn
     in
     let kernel_upgrade =
       match ctxt.session.pending_upgrade with
@@ -962,6 +1007,7 @@ module State = struct
             ~timestamp:flushed_blueprint.timestamp
             flushed_blueprint.level
         in
+        let* evm_state = flush_delayed_inbox ctxt conn flushed_blueprint in
         return (evm_state, on_success)
 
   and apply_evm_events ?finalized_level conn (ctxt : t) events =
@@ -1050,6 +1096,43 @@ module State = struct
       return_unit)
     else return_unit
 
+  and flush_delayed_inbox ctxt conn flushed_blueprint =
+    let open Lwt_result_syntax in
+    let (Qty flushed_level) =
+      flushed_blueprint.Evm_events.Flushed_blueprint.level
+    in
+    let before_flushed_level = Ethereum_types.Qty (Z.pred flushed_level) in
+    (* The kernel has produced a block for level [flushed_level]. The first thing
+       to do is go back to an EVM state before this flushed blueprint. *)
+    let* evm_state =
+      reset_to_finalized_level
+        ~expected_finalized_number:before_flushed_level
+        (Node_error.Cannot_handle_flushed_blueprint (Qty flushed_level))
+        ctxt
+        conn
+    in
+    let* parent_hash = Evm_state.current_block_hash evm_state in
+    (* Prepare a blueprint payload signed by the sequencer to execute locally. *)
+    let* payload, delayed_transactions =
+      match ctxt.sequencer_wallet with
+      | None ->
+          failwith "Only sequencer is capable to handle the flushed blueprint"
+      | Some (sequencer_key, cctxt) ->
+          prepare_local_flushed_blueprint
+            cctxt
+            ctxt.smart_rollup_address
+            sequencer_key
+            evm_state
+            parent_hash
+            flushed_blueprint
+    in
+    (* Apply the blueprint. *)
+    let timestamp = flushed_blueprint.Evm_events.Flushed_blueprint.timestamp in
+    let* () =
+      apply_blueprint ~conn ctxt timestamp payload delayed_transactions
+    in
+    return ctxt.session.evm_state
+
   let () =
     register_error_kind
       `Permanent
@@ -1113,7 +1196,7 @@ module State = struct
 
   let init ?kernel_path ~block_storage_sqlite3 ?garbage_collector
       ~fail_on_missing_blueprint ~data_dir ~preimages ~preimages_endpoint
-      ?smart_rollup_address ~store_perm () =
+      ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1233,6 +1316,7 @@ module State = struct
         fail_on_missing_blueprint;
         block_storage_sqlite3;
         history;
+        sequencer_wallet;
       }
     in
 
@@ -1505,6 +1589,7 @@ module Handlers = struct
         store_perm;
         block_storage_sqlite3;
         garbage_collector;
+        sequencer_wallet;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -1518,6 +1603,7 @@ module Handlers = struct
         ~store_perm
         ~block_storage_sqlite3
         ?garbage_collector
+        ?sequencer_wallet
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1676,7 +1762,7 @@ let export_store ~data_dir ~output_db_file =
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
-    ~block_storage_sqlite3 ?garbage_collector () =
+    ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1693,6 +1779,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         store_perm;
         block_storage_sqlite3;
         garbage_collector;
+        sequencer_wallet;
       }
       (module Handlers)
   in

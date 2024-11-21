@@ -113,6 +113,19 @@ let reset_impossible_missing_finalized_state =
     ~msg:"[Warning] Cannot found finalized state we must exit on divergence"
     ()
 
+let reset_incoherent_finalized_state =
+  declare_2
+    ~section
+    ~name:"evm_context_reset_incoherent_finalized_state"
+    ~level:Warning
+    ~msg:
+      "[Warning] Finalized state was expected on level \
+       {expected_finalized_number} but found {finalized_number}"
+    ~pp1:Ethereum_types.pp_quantity
+    ~pp2:Ethereum_types.pp_quantity
+    ("expected_finalized_number", Ethereum_types.quantity_encoding)
+    ("finalized_number", Ethereum_types.quantity_encoding)
+
 let reset_at_level =
   declare_1
     ~section
@@ -146,5 +159,11 @@ let processed_l1_level level = emit processed_l1_level level
 
 let reset_impossible_missing_finalized_state =
   emit reset_impossible_missing_finalized_state
+
+let reset_incoherent_finalized_state ~expected_finalized_number
+    ~finalized_number =
+  emit
+    reset_incoherent_finalized_state
+    (expected_finalized_number, finalized_number)
 
 let reset_at_level level = emit reset_at_level level

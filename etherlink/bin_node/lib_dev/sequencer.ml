@@ -74,6 +74,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~block_storage_sqlite3:
         configuration.experimental_features.block_storage_sqlite3
       ?garbage_collector:configuration.experimental_features.garbage_collector
+      ~sequencer_wallet:(sequencer_config.sequencer, cctxt)
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
