@@ -1610,6 +1610,20 @@ let jobs pipeline_type =
         ["cargo test --manifest-path contrib/mir/Cargo.toml"]
       |> enable_cargo_cache
     in
+    let job_mir_tzt =
+      job
+        ~__POS__
+        ~name:"mir_tzt"
+        ~image:Images.CI.test
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_start
+        ~rules:(make_rules ~changes:changeset_mir_tzt ())
+        [
+          "cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner \
+           tzt_reference_test_suite/*.tzt";
+        ]
+      |> enable_cargo_cache
+    in
     let jobs_misc =
       [
         job_kaitai_checks;
@@ -1624,6 +1638,7 @@ let jobs pipeline_type =
         job_oc_test_liquidity_baking_scripts;
         job_test_release_versions;
         job_mir_unit;
+        job_mir_tzt;
       ]
     in
     let jobs_debian =

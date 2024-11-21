@@ -14,8 +14,8 @@ use crate::ast::michelson_key_hash::KeyHash;
 use super::{ByteReprError, ByteReprTrait};
 
 use tezos_crypto_rs::hash::{
-    ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash,
-    HashTrait, SmartRollupHash,
+    ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, HashTrait,
+    SmartRollupHash,
 };
 
 macro_rules! address_hash_type_and_impls {
