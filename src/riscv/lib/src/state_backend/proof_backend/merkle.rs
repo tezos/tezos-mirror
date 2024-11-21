@@ -8,8 +8,11 @@ use super::{
     proof::{MerkleProof, MerkleProofLeaf},
     DynAccess,
 };
-use crate::state_backend::hash::{Hash, HashError, RootHashable};
-use itertools::Itertools;
+use crate::state_backend::{
+    hash::{Hash, HashError, RootHashable},
+    proof_backend::tree::{impl_modify_map_collect, ModifyResult},
+};
+use std::convert::Infallible;
 
 /// A variable-width Merkle tree with [`AccessInfo`] metadata for leaves.
 ///
@@ -45,20 +48,19 @@ impl MerkleTree {
     /// (subtrees of only [`AccessInfo::NoAccess`] or only [`AccessInfo::Write`])
     /// into a leaf of the corresponding [`AccessInfo`] variant.
     fn compress(self) -> Result<CompressedMerkleTree, HashError> {
-        // TODO: RV-290 Change to non-recursive implentation to avoid stackoverflow.
         use CompressedMerkleTree::Leaf as CompresedLeaf;
         use CompressedMerkleTree::Node as CompresedNode;
 
-        match self {
-            Self::Leaf(hash, access, data) => Ok(CompresedLeaf(hash, access.to_compressed(data))),
-            Self::Node(hash, children) => {
-                // compress each children individually
-                let compact_children: Vec<_> =
-                    children.into_iter().map(Self::compress).try_collect()?;
-
-                // obtain array of hashes and corresponding array of
-                // the compression performed for each child node.
-                // A subtree can either be compressed to a `Read` / `ReadWrite` leaf or not be fully compressed.
+        impl_modify_map_collect(
+            self,
+            |subtree| match subtree {
+                MerkleTree::Leaf(hash, access_info, data) => {
+                    Ok(ModifyResult::LeafStop((hash, access_info, data)))
+                }
+                MerkleTree::Node(hash, children) => Ok(ModifyResult::NodeContinue(hash, children)),
+            },
+            |(hash, access, data)| Ok((hash, access.to_compressed(data))),
+            |hash, compact_children| {
                 let (hashes, compressions) = compact_children
                     .iter()
                     .map(|child| {
@@ -89,8 +91,8 @@ impl MerkleTree {
                 };
 
                 Ok(compressed_tree)
-            }
-        }
+            },
+        )
     }
 
     /// Produce a minimal Merkle proof on the compressed representation of the
@@ -148,17 +150,36 @@ enum CompressedMerkleTree {
 
 impl From<CompressedMerkleTree> for MerkleProof {
     fn from(value: CompressedMerkleTree) -> Self {
-        // TODO: RV-290 iterative implementation to avoid overflowing the stack
-        use CompressedAccessInfo::*;
-        match value {
-            CompressedMerkleTree::Leaf(hash, access_info) => match access_info {
-                NoAccess | Write => MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
-                Read(data) | ReadWrite(data) => MerkleProof::Leaf(MerkleProofLeaf::Read(data)),
+        // Explicitly stating error type to enforce the infallible error type
+        let res: Result<_, Infallible> = impl_modify_map_collect(
+            value,
+            |subtree| match subtree {
+                CompressedMerkleTree::Leaf(hash, access) => {
+                    Ok(ModifyResult::LeafStop((hash, access)))
+                }
+                CompressedMerkleTree::Node(_, children) => {
+                    Ok(ModifyResult::NodeContinue((), children))
+                }
             },
-            CompressedMerkleTree::Node(_, vec) => {
-                MerkleProof::Node(vec.into_iter().map(MerkleProof::from).collect())
-            }
-        }
+            |(hash, access)| {
+                use CompressedAccessInfo::*;
+                Ok(match access {
+                    NoAccess | Write => MerkleProofLeaf::Blind(hash),
+                    Read(data) | ReadWrite(data) => MerkleProofLeaf::Read(data),
+                })
+            },
+            |(), children| Ok(MerkleProof::Node(children)),
+        );
+
+        // No panic: error type is infallible
+        res.unwrap()
+    }
+}
+
+/// Used in [`impl_modify_map_collect`]
+impl From<(Hash, CompressedAccessInfo)> for CompressedMerkleTree {
+    fn from(data: (Hash, CompressedAccessInfo)) -> CompressedMerkleTree {
+        CompressedMerkleTree::Leaf(data.0, data.1)
     }
 }
 
