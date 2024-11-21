@@ -3349,6 +3349,124 @@ let test_delayed_inbox_flushing_event =
 
   unit
 
+let test_flushed_blueprint_reorg =
+  register_all
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
+    ~title:"Flush delayed inbox event leads to reorg"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* () = Evm_node.terminate observer in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* Add a transaction to the delayed inbox. *)
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* We mark at which level the delayed inbox item was added. *)
+  let* add_delayed_inbox_level = Client.level client in
+  let wait_for_add_delayed_inbox =
+    Evm_node.wait_for_processed_l1_level
+      ~level:add_delayed_inbox_level
+      sequencer
+  in
+  (* We mark at which level the delayed inbox was flushed. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* flushed_delayed_inbox_level = Client.level client in
+  let wait_for_processed_l1_level =
+    Evm_node.wait_for_processed_l1_level
+      ~level:flushed_delayed_inbox_level
+      sequencer
+  in
+  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  (* A new block will make the {!add_delayed_inbox_level} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = wait_for_add_delayed_inbox in
+
+  (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
+     item but refuses to include it. *)
+  let* () =
+    repeat 5 (fun _ ->
+        let*@ _ =
+          Rpc.produce_block ~with_delayed_transactions:false sequencer
+        in
+        unit)
+  in
+  let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
+
+  (* A new block will make the {!flushed_delayed_inbox_levle} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Wait until the event is completely processed. Head of sequencer and proxy
+     should be in sync. *)
+  let* () = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  (* Speculative head has been removed as the sequencer was forced to
+     reorganize the blocks because of the flushed blueprint. *)
+  let*@? (err : Rpc.error) =
+    Rpc.get_block_by_hash ~block:speculative_head.hash sequencer
+  in
+
+  Check.(err.message =~ rex "Block .* not found")
+    ~error_msg:"Expected error to match %R, got %L" ;
+
+  (* Sequencer resumes block production. *)
+  let* () =
+    repeat 5 (fun _ ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+
+  (* As the observer was done during the reorganization, restarting it
+     will be enough, it'll apply the new branch as expected. *)
+  let* () = Evm_node.run observer in
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+
+  unit
+
 let test_delayed_transfer_timeout =
   register_all
     ~delayed_inbox_timeout:3
@@ -7456,6 +7574,7 @@ let () =
   test_forced_blueprint_takes_pred_timestamp protocols ;
   test_forced_blueprint_takes_l1_timestamp protocols ;
   test_delayed_inbox_flushing_event protocols ;
+  test_flushed_blueprint_reorg protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
   test_non_increasing_timestamp protocols ;

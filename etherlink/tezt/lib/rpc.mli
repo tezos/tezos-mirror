@@ -24,6 +24,9 @@ module Request : sig
   val eth_getBlockByNumber :
     block:string -> full_tx_objects:bool -> Evm_node.request
 
+  val eth_getBlockByHash :
+    block:string -> full_tx_objects:bool -> Evm_node.request
+
   val produceBlock :
     ?with_delayed_transactions:bool ->
     ?timestamp:string ->
@@ -82,6 +85,13 @@ val block_number_opt : Evm_node.t -> (int32 option, error) result Lwt.t
     the block contains the transaction hashes. [block] can be
     ["latest"] or its number. *)
 val get_block_by_number :
+  ?full_tx_objects:bool ->
+  block:string ->
+  Evm_node.t ->
+  (Block.t, error) result Lwt.t
+
+(** Same as {!get_block_by_number} but uses the hash instead of the number. *)
+val get_block_by_hash :
   ?full_tx_objects:bool ->
   block:string ->
   Evm_node.t ->

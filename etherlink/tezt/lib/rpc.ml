@@ -70,6 +70,12 @@ module Request = struct
       parameters = `A [`String block; `Bool full_tx_objects];
     }
 
+  let eth_getBlockByHash ~block ~full_tx_objects =
+    {
+      method_ = "eth_getBlockByHash";
+      parameters = `A [`String block; `Bool full_tx_objects];
+    }
+
   let produceBlock ?with_delayed_transactions ?timestamp () =
     let with_delayed_transactions =
       match with_delayed_transactions with
@@ -253,6 +259,17 @@ let get_block_by_number ?(full_tx_objects = false) ~block evm_node =
     Evm_node.call_evm_rpc
       evm_node
       (Request.eth_getBlockByNumber ~block ~full_tx_objects)
+  in
+  return
+    (decode_or_error
+       (fun json -> JSON.(json |-> "result" |> Block.of_json))
+       json)
+
+let get_block_by_hash ?(full_tx_objects = false) ~block evm_node =
+  let* json =
+    Evm_node.call_evm_rpc
+      evm_node
+      (Request.eth_getBlockByHash ~block ~full_tx_objects)
   in
   return
     (decode_or_error
