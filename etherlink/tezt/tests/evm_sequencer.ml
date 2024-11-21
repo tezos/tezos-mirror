@@ -3279,6 +3279,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
 let test_delayed_inbox_flushing_event =
   register_all
+    ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:1
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -3298,10 +3299,8 @@ let test_delayed_inbox_flushing_event =
            _;
          }
              _protocol ->
-  (* Kill the sequencer *)
-  let* () = Evm_node.terminate sequencer in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let _ = Rpc.block_number proxy in
+  let* () = Evm_node.terminate observer in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
   let* raw_transfer =
@@ -3325,7 +3324,7 @@ let test_delayed_inbox_flushing_event =
   in
   (* Bake a few blocks, should be enough for the tx to time out and be
      forced *)
-  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox observer in
+  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   let* _ =
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
