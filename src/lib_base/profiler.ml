@@ -325,45 +325,6 @@ let span_s p ?(verbosity = Notice) ids f =
 
 let unplugged () = Stdlib.Hashtbl.create 10
 
-let with_new_profiler driver state f =
-  let p = unplugged () in
-  let i = instance driver state in
-  plug p i ;
-  let r =
-    try f p
-    with exn ->
-      close i ;
-      raise exn
-  in
-  let rec collect acc =
-    match report i with None -> List.rev acc | Some r -> collect (r :: acc)
-  in
-  let reports = collect [] in
-  close i ;
-  (r, reports)
-
-let with_new_profiler_s driver state f =
-  let p = unplugged () in
-  let i = instance driver state in
-  plug p i ;
-  Lwt.bind
-    (Lwt.catch
-       (fun () -> Lwt.bind (f p) (fun r -> Lwt.return (Ok r)))
-       (fun exn -> Lwt.return (Error exn)))
-    (function
-      | Ok r ->
-          let rec collect acc =
-            match report i with
-            | None -> List.rev acc
-            | Some r -> collect (r :: acc)
-          in
-          let reports = collect [] in
-          close i ;
-          Lwt.return (r, reports)
-      | Error exn ->
-          close i ;
-          Lwt.fail exn)
-
 let main = unplugged ()
 
 module type GLOBAL_PROFILER = sig

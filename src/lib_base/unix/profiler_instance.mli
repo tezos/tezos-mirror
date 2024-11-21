@@ -5,13 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [max_verbosity] determines the level of details of the profiling output
-    (notice / info / debug). It is defined by the PROFILING environment
-    variable (with default: notice). This dictates the "maximum" level of
-    detail for a profiling log to be produced (notice < info < debug). In case
-    of an unknown value is provided, an error is produced.*)
-val max_verbosity : Profiler.verbosity
-
 (** [register_backend identifiers profiler] associates one or more
     identifier(s) with a profiler instantiator.
 
@@ -34,10 +27,13 @@ val max_verbosity : Profiler.verbosity
     suffix to the file name. *)
 val register_backend :
   string list ->
-  (Profiler.verbosity -> directory:string -> name:string -> Profiler.instance) ->
+  (verbosity:Profiler.verbosity ->
+  directory:string ->
+  name:string ->
+  Profiler.instance) ->
   unit
 
 (** [selected_backend ()] returns the backend selected using the environment
     variable [PROFILING_BACKEND]. *)
 val selected_backend :
-  unit -> (directory:string -> name:string -> Profiler.instance) option
+  unit -> (directory:string -> name:string -> Profiler.instance option) option
