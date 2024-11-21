@@ -17,5 +17,9 @@
     
     You MUST avoid metric names that are too unique such as block or
     operation hashes because prometheus will quickly fail at handling
-    a too high metrics cardinality otherwise. *)
+    a too high metrics cardinality otherwise.
+
+    Note that if a parent node is not marked as the "prometheus" attribute,
+    its children will be skipped. In order to skip the node but not its
+    children, use the special value ["__ENABLE_CHILDREN_ONLY__"]. *)
 val prometheus : (string * Profiler.verbosity) Profiler.driver
