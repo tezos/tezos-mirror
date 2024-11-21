@@ -8,6 +8,9 @@
   block instead of exiting immediately. The node will also no longer exit
   on invalid blueprint provided by its upstream EVM Node endpoint but will keep
   waiting for a valid blueprint. (!15751)
+- If the delayed inbox is flushed by the rollup node, the sequencer
+  reorganizes its history. It clears all blocks produced on the
+  invalid branch if any and start processing new ones. (!15676)
 
 ### Bug fixes
 
