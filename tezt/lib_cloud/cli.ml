@@ -218,11 +218,25 @@ let dns_domains =
   Clap.list_string
     ~section
     ~long:"dns-domain"
+    ~long_synonyms:["dns"]
     ~description:
-      "Register the specified domain name for the proxy node. Relies on gcloud\n\
-      \      in order to add the specified entry in an authorized zone. Multiple\n\
-      \      occurrences allowed."
+      "Register a list of DNS domains. By default a domain is registered when \
+       using the proxy mode. In that case the domain will be prepended by the \
+       value of the `tezt-cloud` parameter and suffixed by the domain \
+       registered under the zone name `tezt-cloud` (check the README to get \
+       more details). The format expects domains that have suffixes matching \
+       domains registered with the GCP project."
     ()
+
+let no_dns =
+  Clap.flag
+    ~section
+    ~set_long:"no-dns"
+    ~set_long_synonyms:["no-dns-domain"]
+    ~description:
+      "Prevent from adding any DNS domain associated with the experiment. This \
+       cancel any effect of [--dns-domain]."
+    false
 
 let octez_release =
   Clap.optional_string

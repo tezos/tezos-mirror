@@ -122,6 +122,11 @@ module DNS = struct
       "gcloud"
       ["dns"; "managed-zones"; "describe"; zone]
 
+  let list ~zone () =
+    Process.run_and_read_stdout
+      "gcloud"
+      ["dns"; "record-sets"; "list"; "--zone"; zone]
+
   let list_entries ?name_filter ~zone () =
     let name_filter =
       match name_filter with
@@ -185,11 +190,13 @@ module DNS = struct
       |> List.find_opt (String.starts_with ~prefix:"dnsName:")
     in
     match line with
-    | None -> Test.fail "Unable to find a managed zone. Have you create it?"
-    | Some line ->
-        let parent = String.split_on_char ' ' line |> Fun.flip List.nth 1 in
-        if String.ends_with name ~suffix:parent then Lwt.return name
-        else Lwt.return (Format.asprintf "%s.%s" name parent)
+    | None -> Lwt.return_none
+    | Some line -> (
+        try
+          let parent = String.split_on_char ' ' line |> Fun.flip List.nth 1 in
+          if String.ends_with name ~suffix:parent then Lwt.return_some name
+          else Lwt.return_some (Format.asprintf "%s.%s" name parent)
+        with _ -> Lwt.return_none)
 
   let get_value ~zone ~domain =
     let* output = list_entries ~name_filter:domain ~zone () in
@@ -221,12 +228,22 @@ module DNS = struct
     return zone
 
   let add_subdomain ~zone ~name ~value =
-    Log.report "add_subdomain: name=%s" name ;
     let* name = get_fqdn ~zone ~name in
-    Log.report "add_subdomain: fqdn=%s" name ;
-    Transaction.(try_update ~zone @@ add ~zone ~name ~value) ()
+    match name with
+    | None ->
+        Log.report "No domain found for zone: '%s'" zone ;
+        Lwt.return_unit
+    | Some name ->
+        Log.report "Adding subdomain '%s'" name ;
+        Transaction.(try_update ~zone @@ add ~zone ~name ~value) ()
 
   let remove_subdomain ~zone ~name ~value =
     let* name = get_fqdn ~zone ~name in
-    Transaction.(try_update ~zone @@ remove ~zone ~name ~value) ()
+    match name with
+    | None ->
+        Log.report "No domain found for zone: '%s'" zone ;
+        Lwt.return_unit
+    | Some name ->
+        Log.report "Removing subdomain '%s'" name ;
+        Transaction.(try_update ~zone @@ remove ~zone ~name ~value) ()
 end

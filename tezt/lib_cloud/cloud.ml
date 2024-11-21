@@ -338,17 +338,14 @@ let attach agent =
     Log.info "Detach from the proxy process." ;
     if !has_sigint then on_sigint
     else
-      let* uri =
-        if Env.dns_domains <> [] then
-          let* domain =
-            Gcloud.DNS.get_fqdn ~name:Env.tezt_cloud ~zone:"tezt-cloud"
-          in
-          Lwt.return (Format.asprintf "http://%s" domain)
-        else
-          Lwt.return
-            (Format.asprintf
-               "http://%s"
-               (Agent.point agent |> Option.get |> fst))
+      let* domain =
+        Gcloud.DNS.get_fqdn ~name:Env.tezt_cloud ~zone:"tezt-cloud"
+      in
+      let uri =
+        match domain with
+        | None ->
+            Format.asprintf "http://%s" (Agent.point agent |> Option.get |> fst)
+        | Some domain -> Format.asprintf "http://%s" domain
       in
       Log.info "Deployment website can be accessed here: %s" uri ;
       Lwt.return_unit

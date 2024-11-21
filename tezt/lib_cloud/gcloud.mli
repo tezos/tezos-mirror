@@ -53,13 +53,21 @@ module DNS : sig
       domain the parent domain attached to the zone *)
   val find_zone_for_subdomain : string -> (string * string) option Lwt.t
 
+  (** [create_zone ~domain ~zone ()] creates a [zone] associated with
+      [domain]. *)
   val create_zone : domain:string -> zone:string -> unit -> unit Lwt.t
 
+  (** [describe ~zone ()] describes the given [zone]. *)
   val describe : zone:string -> unit -> string Lwt.t
 
+  (** [list ~zone ()] lists the DNS entries for the given [zone]. *)
+  val list : zone:string -> unit -> string Lwt.t
+
   (** [get_fqdn ~zone ~name] returns the fully qualified domain name (FQDN)
-      corresponding to the subdomain or hostname [name] in the GCP zone [zone] *)
-  val get_fqdn : zone:string -> name:string -> string Lwt.t
+      corresponding to the subdomain or hostname [name] in the GCP zone [zone].
+
+      The function returns [None] if the [zone] does not exists. *)
+  val get_fqdn : zone:string -> name:string -> string option Lwt.t
 
   (** [get_value ~zone ~domain] returns the value associated to [domain] in the
       zone [zone]. For example, an ip associated to a hostname. *)
