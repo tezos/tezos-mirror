@@ -2371,9 +2371,17 @@ pub(crate) fn typecheck_value<'a>(
         (T::Timestamp, V::String(n)) => {
             ctx.gas
                 .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
-            let dt = DateTime::parse_from_rfc3339(n)
-                .map_err(|e| TcError::InvalidValueForType(e.to_string(), T::Timestamp))?;
-            TV::Timestamp(dt.timestamp().into())
+            // First, try to parse the string as an integer
+            if let Ok(int_value) = n.parse::<i64>() {
+                TV::Timestamp(int_value.into())
+            } else {
+                // If integer parsing fails, try to parse as RFC3339 datetime
+                let dt = DateTime::parse_from_rfc3339(&n);
+                match dt {
+                    Ok(dt) => TV::Timestamp(dt.timestamp().into()),
+                    Err(_) => return Err(invalid_value_for_type!()),
+                }
+            }
         }
         (
             T::Lambda(tys),
@@ -7647,6 +7655,36 @@ mod typecheck_tests {
                 stk
             ),
             Ok(Push(TypedValue::timestamp(1571659294)))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"1571659294\"").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(Push(TypedValue::timestamp(1571659294)))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"ABCD\"").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::InvalidValueForType("String(\"ABCD\")".to_string(), Type::Timestamp))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"3.5\"").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::InvalidValueForType("String(\"3.5\")".to_string(), Type::Timestamp))
         );
     }
 
