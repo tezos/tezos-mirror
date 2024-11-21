@@ -12,6 +12,8 @@
 
 - Use a single RPC (if the rollup node supports it) when fetching EVM events.
   (!15629)
+- Private RPC `produceBlock` can produce a block without delayed transactions,
+  useful for testing purposes. (!15681)
 
 ## Version 0.8 (2024-11-15)
 

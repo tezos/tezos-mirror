@@ -70,10 +70,18 @@ module Request = struct
       parameters = `A [`String block; `Bool full_tx_objects];
     }
 
-  let produceBlock ?timestamp () =
-    let parameters =
-      match timestamp with None -> `Null | Some timestamp -> `String timestamp
+  let produceBlock ?with_delayed_transactions ?timestamp () =
+    let with_delayed_transactions =
+      match with_delayed_transactions with
+      | Some false -> [("with_delayed_transactions", `Bool false)]
+      | _ -> []
     in
+    let timestamp =
+      match timestamp with
+      | Some timestamp -> [("timestamp", `String timestamp)]
+      | None -> []
+    in
+    let parameters = `O (with_delayed_transactions @ timestamp) in
     {method_ = "produceBlock"; parameters}
 
   let stateValue path = {method_ = "stateValue"; parameters = `String path}
@@ -282,12 +290,12 @@ module Syntax = struct
     | Error err -> f err
 end
 
-let produce_block ?timestamp evm_node =
+let produce_block ?with_delayed_transactions ?timestamp evm_node =
   let* json =
     Evm_node.call_evm_rpc
       ~private_:true
       evm_node
-      (Request.produceBlock ?timestamp ())
+      (Request.produceBlock ?with_delayed_transactions ?timestamp ())
   in
   return
   @@ decode_or_error

@@ -77,7 +77,7 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Produce_block : (Time.Protocol.t * bool) -> (int, tztrace) t
+    | Produce_block : (bool * Time.Protocol.t * bool) -> (int, tztrace) t
 
   type view = View : _ t -> view
 
@@ -90,15 +90,17 @@ module Request = struct
         case
           (Tag 0)
           ~title:"Produce_block"
-          (obj3
+          (obj4
              (req "request" (constant "produce_block"))
+             (req "with_delayed_transactions" bool)
              (req "timestamp" Time.Protocol.encoding)
              (req "force" bool))
           (function
-            | View (Produce_block (timestamp, force)) ->
-                Some ((), timestamp, force))
-          (fun ((), timestamp, force) ->
-            View (Produce_block (timestamp, force)));
+            | View (Produce_block (with_delayed_transactions, timestamp, force))
+              ->
+                Some ((), with_delayed_transactions, timestamp, force))
+          (fun ((), with_delayed_transactions, timestamp, force) ->
+            View (Produce_block (with_delayed_transactions, timestamp, force)));
       ]
 
   let pp _ppf (View _) = ()
@@ -213,19 +215,26 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
     return n
   else return 0
 
-let head_info_and_delayed_transactions maximum_number_of_chunks =
+let head_info_and_delayed_transactions ~with_delayed_transactions
+    maximum_number_of_chunks =
   let open Lwt_result_syntax in
   (* We need to first fetch the delayed transactions then requests the head info.
      If the order is swapped, we might face a race condition where the delayed
      transactions are fetched from state more recent than head info. *)
   let* delayed_hashes, remaining_cumulative_size =
-    take_delayed_transactions maximum_number_of_chunks
+    if with_delayed_transactions then
+      take_delayed_transactions maximum_number_of_chunks
+    else
+      return
+        ( [],
+          Sequencer_blueprint.maximum_usable_space_in_blueprint
+            maximum_number_of_chunks )
   in
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
 let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
-    ~maximum_number_of_chunks =
+    ~maximum_number_of_chunks ~with_delayed_transactions =
   let open Lwt_result_syntax in
   let* is_locked = Tx_pool.is_locked () in
   if is_locked then
@@ -233,7 +242,9 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     return 0
   else
     let* head_info, delayed_hashes, remaining_cumulative_size =
-      head_info_and_delayed_transactions maximum_number_of_chunks
+      head_info_and_delayed_transactions
+        ~with_delayed_transactions
+        maximum_number_of_chunks
     in
     let is_going_to_upgrade =
       match head_info.pending_upgrade with
@@ -274,7 +285,7 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Produce_block (timestamp, force) ->
+    | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
         protect @@ fun () ->
         let {
           cctxt;
@@ -291,6 +302,7 @@ module Handlers = struct
           ~force
           ~timestamp
           ~maximum_number_of_chunks
+          ~with_delayed_transactions
 
   type launch_error = error trace
 
@@ -348,10 +360,17 @@ let shutdown () =
       let* () = Block_producer_events.shutdown () in
       Worker.shutdown w
 
-let produce_block ~force ~timestamp =
+let produce_block ~with_delayed_transactions ~force ~timestamp =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     worker
-    (Request.Produce_block (timestamp, force))
+    (Request.Produce_block (with_delayed_transactions, timestamp, force))
   |> handle_request_error
+
+module Internal_for_tests = struct
+  let produce_block ~with_delayed_transactions =
+    produce_block ~with_delayed_transactions
+end
+
+let produce_block = produce_block ~with_delayed_transactions:true

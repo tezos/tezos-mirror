@@ -224,6 +224,8 @@ val wait_for_rollup_node_follower_connection_acquired :
 
 val wait_for_rollup_node_follower_disabled : ?timeout:float -> t -> unit Lwt.t
 
+val wait_for_processed_l1_level : ?level:int -> t -> unit Lwt.t
+
 module Config_file : sig
   (** Node configuration files. *)
 

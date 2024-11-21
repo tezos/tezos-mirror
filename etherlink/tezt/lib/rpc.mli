@@ -24,7 +24,11 @@ module Request : sig
   val eth_getBlockByNumber :
     block:string -> full_tx_objects:bool -> Evm_node.request
 
-  val produceBlock : ?timestamp:string -> unit -> Evm_node.request
+  val produceBlock :
+    ?with_delayed_transactions:bool ->
+    ?timestamp:string ->
+    unit ->
+    Evm_node.request
 
   val produceProposal : ?timestamp:string -> unit -> Evm_node.request
 
@@ -94,9 +98,14 @@ module Syntax : sig
     ('a option, error) result Lwt.t -> ('a -> 'c Lwt.t) -> 'c Lwt.t
 end
 
-(** [produce_block ?timestamp evm_node] calls the private RPC [produceBlock]. If
-    provided the block will have timestamp [timestamp] (in RFC3339) format. *)
-val produce_block : ?timestamp:string -> Evm_node.t -> (int, error) result Lwt.t
+(** [produce_block ?with_delayed_transactions ?timestamp evm_node]
+    calls the private RPC [produceBlock]. If provided the block will
+    have timestamp [timestamp] (in RFC3339) format. *)
+val produce_block :
+  ?with_delayed_transactions:bool ->
+  ?timestamp:string ->
+  Evm_node.t ->
+  (int, error) result Lwt.t
 
 (** [produce_proposal ?timestamp evm_node] calls the private RPC [produceProposal].
     If provided the block will have timestamp [timestamp] (in RFC3339) format. *)
