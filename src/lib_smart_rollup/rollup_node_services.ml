@@ -125,6 +125,38 @@ type injector_operation = {
   last_error : tztrace option;
 }
 
+type committed_status =
+  | Uncommitted of {
+      commitment_level : int32;
+          (** Level at which the following commitment will be produced. *)
+      estimated_commitment_time : Time.System.t;
+          (** Estimated time at which the commitment will be published. *)
+      estimated_cementation_time : Time.System.t;
+          (** Estimated time at which the commitment will be cemented. *)
+    }
+  | Committed_ of {
+      commitment_hash : Commitment.Hash.t;  (** Hash of following commitment. *)
+      commitment_level : int32;  (** Level of following commitment. *)
+      first_published_level : int32;
+          (** Level at which commitment was first published. *)
+      published_level : int32 option;
+          (** Level at which commitment was published by operator (may be None
+              if e.g. rollup node does not publish). *)
+      estimated_cementation_time : Time.System.t;
+          (** Estimated time at which the commitment will be cemented. *)
+    }
+  | Cemented of {
+      commitment_hash : Commitment.Hash.t;  (** Hash of following commitment. *)
+      commitment_level : int32;  (** Level of following commitment. *)
+      first_published_level : int32;
+          (** Level at which commitment was first published. *)
+      published_level : int32 option;
+          (** Level at which commitment was published by operator (may be None
+              if e.g. rollup node does not publish). *)
+      blocks_since_cemented : int32;
+          (** Number of blocks since commitment was cemented  *)
+    }
+
 module Encodings = struct
   open Data_encoding
 
@@ -600,6 +632,159 @@ module Encodings = struct
       (obj2
          (req "tags" (list Operation_kind.encoding))
          (req "queue" (list injector_operation)))
+
+  let committed_status =
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"uncommitted"
+          ~description:"L2 Block content is not yet committed on L1"
+          (obj1
+             (req
+                "uncommitted"
+                (obj3
+                   (req
+                      "commitment_level"
+                      int32
+                      ~description:
+                        "Level at which the following commitment will be \
+                         produced.")
+                   (req
+                      "estimated_commitment_time"
+                      Time.System.encoding
+                      ~description:
+                        "Estimated time at which the commitment will be \
+                         published.")
+                   (req
+                      "estimated_cementation_time"
+                      Time.System.encoding
+                      ~description:
+                        "Estimated time at which the commitment will be \
+                         cemented."))))
+          (function
+            | Uncommitted
+                {
+                  commitment_level = l;
+                  estimated_commitment_time = pt;
+                  estimated_cementation_time = ct;
+                } ->
+                Some (l, pt, ct)
+            | _ -> None)
+          (fun (l, pt, ct) ->
+            Uncommitted
+              {
+                commitment_level = l;
+                estimated_commitment_time = pt;
+                estimated_cementation_time = ct;
+              });
+        case
+          (Tag 1)
+          ~title:"committed"
+          ~description:
+            "L2 Block content is already committed on L1 but not yet cemented"
+          (obj1
+             (req
+                "committed"
+                (obj5
+                   (req
+                      "commitment_hash"
+                      Commitment.Hash.encoding
+                      ~description:"Hash of following commitment.")
+                   (req
+                      "commitment_level"
+                      int32
+                      ~description:"Level of following commitment.")
+                   (req
+                      "first_published_level"
+                      int32
+                      ~description:
+                        "Level at which commitment was first published.")
+                   (req
+                      "published_level"
+                      (option int32)
+                      ~description:
+                        "Level at which commitment was published by operator \
+                         (may be null if e.g. rollup node does not publish).")
+                   (req
+                      "estimated_cementation_time"
+                      Time.System.encoding
+                      ~description:
+                        "Estimated time at which the commitment will be \
+                         cemented."))))
+          (function
+            | Committed_
+                {
+                  commitment_hash = h;
+                  commitment_level = l;
+                  first_published_level = f;
+                  published_level = p;
+                  estimated_cementation_time = ct;
+                } ->
+                Some (h, l, f, p, ct)
+            | _ -> None)
+          (fun (h, l, f, p, ct) ->
+            Committed_
+              {
+                commitment_hash = h;
+                commitment_level = l;
+                first_published_level = f;
+                published_level = p;
+                estimated_cementation_time = ct;
+              });
+        case
+          (Tag 2)
+          ~title:"cemented"
+          ~description:"L2 Block content is already cemented"
+          (obj1
+             (req
+                "cemented"
+                (obj5
+                   (req
+                      "commitment_hash"
+                      Commitment.Hash.encoding
+                      ~description:"Hash of following commitment.")
+                   (req
+                      "commitment_level"
+                      int32
+                      ~description:"Level of following commitment.")
+                   (req
+                      "first_published_level"
+                      int32
+                      ~description:
+                        "Level at which commitment was first published.")
+                   (req
+                      "published_level"
+                      (option int32)
+                      ~description:
+                        "Level at which commitment was published by operator \
+                         (may be null if e.g. rollup node does not publish).")
+                   (req
+                      "blocks_since_cemented"
+                      int32
+                      ~description:
+                        "Number of blocks since commitment was cemented."))))
+          (function
+            | Cemented
+                {
+                  commitment_hash = h;
+                  commitment_level = l;
+                  first_published_level = f;
+                  published_level = p;
+                  blocks_since_cemented = b;
+                } ->
+                Some (h, l, f, p, b)
+            | _ -> None)
+          (fun (h, l, f, p, b) ->
+            Cemented
+              {
+                commitment_hash = h;
+                commitment_level = l;
+                first_published_level = f;
+                published_level = p;
+                blocks_since_cemented = b;
+              });
+      ]
 end
 
 module Arg = struct

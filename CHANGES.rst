@@ -148,6 +148,9 @@ Smart Rollup node
   ``/global/block/<block_id>/durable/wasm_2_0_0/values?key=<key>&offset=<offset>&length=<length>``.
   (MR :gl:`!15627`)
 
+- RPCs ``/global/block/<block_id>/committed_status`` and to retrieve commitment
+  and cementation status for a given block (or an estimated timestamp
+  otherwise). (MR :gl:`!15409`)
 
 Smart Rollup WASM Debugger
 --------------------------
