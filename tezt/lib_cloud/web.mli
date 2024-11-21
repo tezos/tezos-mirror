@@ -17,7 +17,13 @@ val shutdown : t -> unit Lwt.t
 (** [push_metric ?labels ~name value] push a metric into the page
   [/metrics.txt]. This page can be scrapped by Prometheus if activated. *)
 val push_metric :
-  t -> ?labels:(string * string) list -> name:string -> float -> unit
+  t ->
+  ?help:string ->
+  ?typ:[`Counter | `Gauge] ->
+  ?labels:(string * string) list ->
+  name:string ->
+  float ->
+  unit
 
 val write : t -> agents:Agent.t List.t -> unit Lwt.t
 

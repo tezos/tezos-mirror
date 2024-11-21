@@ -25,7 +25,13 @@ val agents : t -> Agent.t list
 val get_configuration : Agent.t -> Configuration.t
 
 val push_metric :
-  t -> ?labels:(string * string) list -> name:string -> float -> unit
+  t ->
+  ?help:string ->
+  ?typ:[`Counter | `Gauge] ->
+  ?labels:(string * string) list ->
+  name:string ->
+  float ->
+  unit
 
 val write_website : t -> unit Lwt.t
 

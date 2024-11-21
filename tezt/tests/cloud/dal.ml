@@ -1008,42 +1008,61 @@ let push_metrics t
          let labels = [("attester", public_key_hash)] @ alias @ version in
          Cloud.push_metric
            t.cloud
+           ~help:
+             "Ratio between the number of attested and expected commitments \
+              per baker"
+           ~typ:`Gauge
            ~labels
-           ~name:"tezt_attested_ratio_per_baker"
+           ~name:"tezt_dal_commitments_attested_ratio"
            value) ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments_ratio"
+    ~help:"Ratio between the number of published and expected commitments"
+    ~typ:`Gauge
+    ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "published")]
     ratio_published_commitments ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments_ratio"
+    ~help:"Ratio between the number of attested and expected commitments"
+    ~typ:`Gauge
+    ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "attested")]
     ratio_attested_commitments ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments_ratio"
+    ~help:
+      "Ratio between the number of attested and expected commitments per level"
+    ~typ:`Gauge
+    ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "published_last_level")]
     ratio_published_commitments_last_level ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments"
+    ~help:"Number of commitments expected to be published"
+    ~typ:`Counter
+    ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "expected")]
     (float_of_int expected_published_commitments) ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments"
+    ~help:"Number of published commitments "
+    ~typ:`Counter
+    ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "published")]
     (float_of_int total_published_commitments) ;
   Cloud.push_metric
     t.cloud
-    ~name:"tezt_commitments"
+    ~help:"Number of  attested commitments"
+    ~typ:`Counter
+    ~name:"tezt_dal_commitments_total"
     ~labels:[("kind", "attested")]
     (float_of_int total_attested_commitments) ;
   Cloud.push_metric
     t.cloud
-    ~name:"etherlink_operator_balance"
+    ~help:"Balance of the etherlink operator"
+    ~typ:`Gauge
+    ~name:"tezt_etherlink_operator_balance_total"
     (Tez.to_float etherlink_operator_balance)
 
 let published_level_of_attested_level t level =
@@ -1123,14 +1142,14 @@ let update_ratio_attested_commitments t per_level_info metrics =
            precedes the earliest available level (%d)."
           published_level
           t.first_level ;
-        0.)
+        metrics.ratio_attested_commitments)
       else
         match Hashtbl.find_opt t.infos published_level with
         | None ->
             Log.warn
               "Unexpected error: The level %d is missing in the infos table"
               published_level ;
-            0.
+            metrics.ratio_attested_commitments
         | Some old_per_level_info ->
             let n = Hashtbl.length old_per_level_info.published_commitments in
             let weight =

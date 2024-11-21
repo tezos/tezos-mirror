@@ -631,10 +631,10 @@ let set_agent_name t agent name =
   | None -> Lwt.return_unit
   | Some prometheus -> Prometheus.reload prometheus
 
-let push_metric t ?labels ~name value =
+let push_metric t ?help ?typ ?labels ~name value =
   match t.website with
   | None -> ()
-  | Some website -> Web.push_metric website ?labels ~name value
+  | Some website -> Web.push_metric website ?help ?typ ?labels ~name value
 
 type target = {agent : Agent.t; port : int; app_name : string}
 

@@ -168,7 +168,7 @@ let shutdown t =
 
 let push_metric =
   let table = Hashtbl.create 11 in
-  fun t ?(labels = []) ~name value ->
+  fun t ?help ?typ ?(labels = []) ~name value ->
     let i = Unix.gettimeofday () in
     let labels_str =
       let inner =
@@ -179,9 +179,22 @@ let push_metric =
       in
       match labels with [] -> "" | _ -> Format.asprintf "{ %s }" inner
     in
+    let help_str =
+      match help with
+      | Some help -> Format.asprintf "# HELP %s %s\n" name help
+      | None -> ""
+    in
+    let typ_str =
+      match typ with
+      | Some `Counter -> Format.asprintf "# TYPE %s counter\n" name
+      | Some `Gauge -> Format.asprintf "# TYPE %s gauge\n" name
+      | None -> ""
+    in
     let str =
       Format.asprintf
-        "%s %s %f %d"
+        "%s%s%s %s %f %d"
+        help_str
+        typ_str
         name
         labels_str
         value
