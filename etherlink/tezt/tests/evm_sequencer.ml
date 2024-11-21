@@ -3280,7 +3280,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 let test_delayed_inbox_flushing_event =
   register_all
     ~time_between_blocks:Nothing
-    ~delayed_inbox_timeout:3
+    ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"]
@@ -3301,6 +3301,7 @@ let test_delayed_inbox_flushing_event =
              _protocol ->
   let* () = Evm_node.terminate observer in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
   let* raw_transfer =
@@ -3314,6 +3315,7 @@ let test_delayed_inbox_flushing_event =
       ~address:Eth_account.bootstrap_accounts.(1).address
       ()
   in
+  (* Add a transaction to the delayed inbox. *)
   let* _hash =
     send_raw_transaction_to_delayed_inbox
       ~sc_rollup_node
@@ -3322,14 +3324,29 @@ let test_delayed_inbox_flushing_event =
       ~sc_rollup_address
       raw_transfer
   in
-  (* Bake a few blocks, should be enough for the tx to time out and be
-     forced *)
+  (* Bake a new L1 block to force the flush. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* l1_level = Client.level client in
+  (* Wait for the events and finalize the level. *)
+  let wait_for_processed_l1_level =
+    Evm_node.wait_for_processed_l1_level ~level:l1_level sequencer
+  in
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
-  let* _ =
-    repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  and* () = wait_for_flush in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Wait until the event is completely processed. Head of sequencer and proxy
+     should be in sync. *)
+  let* () = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
   unit
 
 let test_delayed_transfer_timeout =
