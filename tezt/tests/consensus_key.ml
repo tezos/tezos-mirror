@@ -34,7 +34,14 @@
 
 let team = Tag.layer1
 
-let hooks = Tezos_regression.hooks
+let hooks =
+  let replacements =
+    ("edsig\\w{94}", "[SIGNATURE]") :: Tezos_regression.replacements
+  in
+  Tezos_regression.hooks_custom
+    ~replace_variables:(fun s ->
+      Tezos_regression.replace_variables ~replacements s)
+    ()
 
 let blocks_per_cycle = 4
 
