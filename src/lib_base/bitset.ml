@@ -9,7 +9,7 @@ open Error_monad
 
 type t = Z.t
 
-let encoding = Data_encoding.n
+let encoding = Data_encoding.z
 
 type error += Invalid_position of int | Invalid_input of string
 
