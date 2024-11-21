@@ -941,6 +941,19 @@ types:
       type: private_pis_elt_field1
   proof:
     seq:
+    - id: signature__v1
+      size-eos: true
+  proof_0:
+    seq:
+    - id: len_proof
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: proof
+      type: proof
+      size: len_proof
+  proof_1:
+    seq:
     - id: pvm_step
       type: bytes_dyn_uint30
     - id: input_proof_tag
@@ -1344,7 +1357,7 @@ types:
       type: dissection_0
       if: (step_tag == step_tag::dissection)
     - id: proof
-      type: proof
+      type: proof_1
       if: (step_tag == step_tag::proof)
   transaction:
     seq:
@@ -1429,6 +1442,12 @@ types:
     - id: pk
       type: public_key
       doc: A Ed25519, Secp256k1, or P256 public key
+    - id: proof_tag
+      type: u1
+      enum: bool
+    - id: proof
+      type: proof_0
+      if: (proof_tag == bool::true)
   whitelist:
     seq:
     - id: whitelist_entries
