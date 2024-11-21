@@ -61,31 +61,20 @@ let jobs pipeline_type : tezos_job list =
   | Release -> [job_create_homebrew_formula]
   | Full -> [job_build_homebrew_formula; job_create_homebrew_formula]
 
-let child_pipeline_release =
-  let jobs : tezos_job list = jobs Release in
-  Pipeline.register_child
-    "homebrew_release"
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       homebrew packages."
-    ~jobs
-
 let jobs pipeline_type = job_datadog_pipeline_trace :: jobs pipeline_type
 
 let child_pipeline_full =
-  let jobs = jobs Full in
   Pipeline.register_child
     "homebrew"
     ~description:
       "A child pipeline of 'schedule_extended_test' testing the build of  \
        homebrew packages."
-    ~jobs
+    ~jobs:(jobs Full)
 
 let child_pipeline_full_auto =
-  let jobs = jobs Full in
   Pipeline.register_child
     "homebrew_auto"
     ~description:
-      "A child pipeline of 'schedule_extended_test' testing the build of all \
-       .deb packages. This pipelines starts automatically"
-    ~jobs
+      "A child pipeline of 'schedule_extended_test' testing the homebrew \
+       packaging. This pipelines starts automatically"
+    ~jobs:(jobs Full)
