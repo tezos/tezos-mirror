@@ -15,9 +15,14 @@
 
 ## Version 7386d0bc63f3589525bdfbd3cc0544076231b813
 
-This kernel has not been activated on Etherlink Testnet or Mainnet yet.
+This kernel has been activated on Etherlink Testnet on block
+[10,758,937][7386-activation-testnet], and on Etherlink Mainnet on
+block [4,162,673][7386-activation-mainnet].
 
 Its storage version is 22.
+
+[7386-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x4ecefba952e877f9bc159f30d12544358abcceaabb0f4a721ab1044cae8ee09d
+[7386-activation-mainnet]: https://explorer.etherlink.com/block/0xe29ef8db2227f495808fdc04d92b8ea7edcad32d1270fdddc9c5baed1542ccd9
 
 ### Features
 
