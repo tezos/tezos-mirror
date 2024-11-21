@@ -209,8 +209,6 @@ let readonly (node_ctxt : _ t) =
     private_info = Reference.readonly node_ctxt.private_info;
   }
 
-type 'a delayed_write = ('a, rw) Delayed_write_monad.t
-
 (** Abstraction over store  *)
 
 module Lwt_result_option_syntax = struct
