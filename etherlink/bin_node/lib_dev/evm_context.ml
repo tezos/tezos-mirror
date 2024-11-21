@@ -595,152 +595,9 @@ module State = struct
         in
         return (evm_state, on_success)
 
-  let apply_evm_event_unsafe on_success ctxt conn evm_state event =
-    let open Lwt_result_syntax in
-    let*! () = Evm_events_follower_events.new_event event in
-    match event with
-    | Evm_events.Upgrade_event upgrade ->
-        let on_success session =
-          session.pending_upgrade <-
-            Some
-              {
-                kernel_upgrade = upgrade;
-                injected_before = ctxt.session.next_blueprint_number;
-              } ;
-          background_preemptive_download ctxt upgrade ;
-          on_success session
-        in
-        let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.kernel_upgrade
-            ~value:payload
-            evm_state
-        in
-        let* () =
-          Evm_store.Kernel_upgrades.store
-            conn
-            ctxt.session.next_blueprint_number
-            upgrade
-        in
-        let*! () = Events.pending_upgrade upgrade in
-        return (evm_state, on_success)
-    | Sequencer_upgrade_event sequencer_upgrade ->
-        let payload =
-          Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
-          |> String.of_bytes
-        in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.sequencer_upgrade
-            ~value:payload
-            evm_state
-        in
-        return (evm_state, on_success)
-    | Blueprint_applied event ->
-        blueprint_applied_event ctxt conn evm_state on_success event
-    | New_delayed_transaction delayed_transaction ->
-        let* evm_state =
-          on_new_delayed_transaction ~delayed_transaction evm_state
-        in
-        return (evm_state, on_success)
-    | Flush_delayed_inbox flushed_blueprint ->
-        let*! () =
-          Evm_events_follower_events.flush_delayed_inbox
-            ~timestamp:flushed_blueprint.timestamp
-            flushed_blueprint.level
-        in
-        return (evm_state, on_success)
-
   let current_blueprint_number ctxt =
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
     Ethereum_types.Qty (Z.pred next_blueprint_number)
-
-  let apply_evm_events ?finalized_level conn (ctxt : t) events =
-    let open Lwt_result_syntax in
-    let* needs_process =
-      match finalized_level with
-      | None ->
-          (* We are not taking events from a rollup block, we don't need to check
-             if it's the last known l1 block successor. *)
-          return_true
-      | Some rollup_block_level -> (
-          let* last_known_l1_block =
-            let* level = Evm_store.L1_l2_levels_relationships.find conn in
-            match level with
-            | Some {l1_level; _} -> return_some l1_level
-            | None -> return_none
-          in
-          match last_known_l1_block with
-          | None -> return_true
-          | Some last_known_l1_block ->
-              let level_expected = Int32.succ last_known_l1_block in
-              if Int32.equal rollup_block_level level_expected then return_true
-              else if Compare.Int32.(rollup_block_level < level_expected) then
-                let*! () =
-                  Evm_context_events.unexpected_l1_block
-                    ~expected_level:level_expected
-                    ~provided_level:rollup_block_level
-                in
-                return false
-              else
-                tzfail
-                  (Node_error.Out_of_sync
-                     {level_received = rollup_block_level; level_expected}))
-    in
-    if needs_process then (
-      let* context, evm_state, on_success =
-        let* on_success, ctxt, evm_state, context =
-          match events with
-          | [] ->
-              (* Avoid an uncessary {!replace_current_commit} if the list is
-                 empty. *)
-              return (ignore, ctxt, ctxt.session.evm_state, ctxt.session.context)
-          | events ->
-              let* on_success, ctxt, evm_state =
-                List.fold_left_es
-                  (fun (on_success, ctxt, evm_state) event ->
-                    let* evm_state, on_success =
-                      apply_evm_event_unsafe
-                        on_success
-                        ctxt
-                        conn
-                        evm_state
-                        event
-                    in
-                    return (on_success, ctxt, evm_state))
-                  (ignore, ctxt, ctxt.session.evm_state)
-                  events
-              in
-              let* context = replace_current_commit ctxt conn evm_state in
-              return (on_success, ctxt, evm_state, context)
-        in
-        let* () =
-          Option.iter_es
-            (fun l1_level ->
-              let l2_level = current_blueprint_number ctxt in
-              Evm_store.L1_l2_levels_relationships.store
-                conn
-                ~latest_l2_level:l2_level
-                ~l1_level
-                ~finalized_l2_level:ctxt.session.finalized_number)
-            finalized_level
-        in
-        return (context, evm_state, on_success)
-      in
-      let*! () =
-        Option.iter_s
-          (fun l1_level ->
-            Metrics.set_l1_level ~level:l1_level ;
-            Evm_context_events.processed_l1_level l1_level)
-          finalized_level
-      in
-      on_success ctxt.session ;
-      on_modified_head ctxt evm_state context ;
-      let*! head_info in
-      head_info := session_to_head_info ctxt.session ;
-      return_unit)
-    else return_unit
 
   let () =
     register_error_kind
@@ -997,8 +854,15 @@ module State = struct
     Metrics.set_level ~level ;
     return_unit
 
-  let apply_blueprint ?(events = []) ctxt timestamp payload delayed_transactions
-      =
+  type error +=
+    | Invalid_rollup_node of {
+        smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+        rollup_node_smart_rollup_address :
+          Tezos_crypto.Hashed.Smart_rollup_address.t;
+      }
+
+  let rec apply_blueprint ?(events = []) ctxt timestamp payload
+      delayed_transactions =
     let open Lwt_result_syntax in
     let* ( evm_state,
            context,
@@ -1043,12 +907,148 @@ module State = struct
     in
     return_unit
 
-  type error +=
-    | Invalid_rollup_node of {
-        smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
-        rollup_node_smart_rollup_address :
-          Tezos_crypto.Hashed.Smart_rollup_address.t;
-      }
+  and apply_evm_event_unsafe on_success ctxt conn evm_state event =
+    let open Lwt_result_syntax in
+    let*! () = Evm_events_follower_events.new_event event in
+    match event with
+    | Evm_events.Upgrade_event upgrade ->
+        let on_success session =
+          session.pending_upgrade <-
+            Some
+              {
+                kernel_upgrade = upgrade;
+                injected_before = ctxt.session.next_blueprint_number;
+              } ;
+          background_preemptive_download ctxt upgrade ;
+          on_success session
+        in
+        let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
+        let*! evm_state =
+          Evm_state.modify
+            ~key:Durable_storage_path.kernel_upgrade
+            ~value:payload
+            evm_state
+        in
+        let* () =
+          Evm_store.Kernel_upgrades.store
+            conn
+            ctxt.session.next_blueprint_number
+            upgrade
+        in
+        let*! () = Events.pending_upgrade upgrade in
+        return (evm_state, on_success)
+    | Sequencer_upgrade_event sequencer_upgrade ->
+        let payload =
+          Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
+          |> String.of_bytes
+        in
+        let*! evm_state =
+          Evm_state.modify
+            ~key:Durable_storage_path.sequencer_upgrade
+            ~value:payload
+            evm_state
+        in
+        return (evm_state, on_success)
+    | Blueprint_applied event ->
+        blueprint_applied_event ctxt conn evm_state on_success event
+    | New_delayed_transaction delayed_transaction ->
+        let* evm_state =
+          on_new_delayed_transaction ~delayed_transaction evm_state
+        in
+        return (evm_state, on_success)
+    | Flush_delayed_inbox flushed_blueprint ->
+        let*! () =
+          Evm_events_follower_events.flush_delayed_inbox
+            ~timestamp:flushed_blueprint.timestamp
+            flushed_blueprint.level
+        in
+        return (evm_state, on_success)
+
+  and apply_evm_events ?finalized_level conn (ctxt : t) events =
+    let open Lwt_result_syntax in
+    let* needs_process =
+      match finalized_level with
+      | None ->
+          (* We are not taking events from a rollup block, we don't need to check
+             if it's the last known l1 block successor. *)
+          return_true
+      | Some rollup_block_level -> (
+          let* last_known_l1_block =
+            let* level = Evm_store.L1_l2_levels_relationships.find conn in
+            match level with
+            | Some {l1_level; _} -> return_some l1_level
+            | None -> return_none
+          in
+          match last_known_l1_block with
+          | None -> return_true
+          | Some last_known_l1_block ->
+              let level_expected = Int32.succ last_known_l1_block in
+              if Int32.equal rollup_block_level level_expected then return_true
+              else if Compare.Int32.(rollup_block_level < level_expected) then
+                let*! () =
+                  Evm_context_events.unexpected_l1_block
+                    ~expected_level:level_expected
+                    ~provided_level:rollup_block_level
+                in
+                return false
+              else
+                tzfail
+                  (Node_error.Out_of_sync
+                     {level_received = rollup_block_level; level_expected}))
+    in
+    if needs_process then (
+      let* context, evm_state, on_success =
+        let* on_success, ctxt, evm_state, context =
+          match events with
+          | [] ->
+              (* Avoid an uncessary {!replace_current_commit} if the list is
+                 empty. *)
+              return (ignore, ctxt, ctxt.session.evm_state, ctxt.session.context)
+          | events ->
+              let* on_success, ctxt, evm_state =
+                List.fold_left_es
+                  (fun (on_success, ctxt, evm_state) event ->
+                    let* evm_state, on_success =
+                      apply_evm_event_unsafe
+                        on_success
+                        ctxt
+                        conn
+                        evm_state
+                        event
+                    in
+                    return (on_success, ctxt, evm_state))
+                  (ignore, ctxt, ctxt.session.evm_state)
+                  events
+              in
+              let* context = replace_current_commit ctxt conn evm_state in
+              return (on_success, ctxt, evm_state, context)
+        in
+        let* () =
+          Option.iter_es
+            (fun l1_level ->
+              let l2_level = current_blueprint_number ctxt in
+              Evm_store.L1_l2_levels_relationships.store
+                conn
+                ~latest_l2_level:l2_level
+                ~l1_level
+                ~finalized_l2_level:ctxt.session.finalized_number)
+            finalized_level
+        in
+        return (context, evm_state, on_success)
+      in
+      let*! () =
+        Option.iter_s
+          (fun l1_level ->
+            Metrics.set_l1_level ~level:l1_level ;
+            Evm_context_events.processed_l1_level l1_level)
+          finalized_level
+      in
+      on_success ctxt.session ;
+      on_modified_head ctxt evm_state context ;
+      let*! head_info in
+      head_info := session_to_head_info ctxt.session ;
+      return_unit)
+    else return_unit
 
   let () =
     register_error_kind
