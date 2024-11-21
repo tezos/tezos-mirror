@@ -54,6 +54,20 @@ l1-deps.dot: manifest
 		--dep-graph-source src/proto_alpha/bin_accuser \
 		--dep-graph-without src/proto_0)
 
+rollup-deps.dot: manifest
+	(cd .. && manifest/manifest --dep-graph manifest/$@ \
+		--dep-graph-source src/bin_smart_rollup_node \
+		--dep-graph-without src/proto_0)
+
+evm-deps.dot: manifest
+	(cd .. && manifest/manifest --dep-graph manifest/$@ \
+		--dep-graph-source etherlink/bin_node)
+
+dal-deps.dot: manifest
+	(cd .. && manifest/manifest --dep-graph manifest/$@ \
+		--dep-graph-source src/bin_dal_node \
+		--dep-graph-without src/proto_0)
+
 %.svg: %.dot
 	dot -Tsvg $^ > $@
 
