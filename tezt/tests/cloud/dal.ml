@@ -1386,8 +1386,7 @@ let init_teztale (configuration : configuration) cloud agent =
   else Lwt.return_none
 
 let init_public_network cloud (configuration : configuration)
-    ?(etherlink_configuration : etherlink_configuration option) teztale agent
-    (network : Network.public_network) =
+    etherlink_configuration teztale agent (network : Network.public_network) =
   toplog "Init public network" ;
   let* bootstrap =
     match agent with
@@ -2281,9 +2280,8 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
       | [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
 
-let init ~(configuration : configuration)
-    ?(etherlink_configuration : etherlink_configuration option) cloud next_agent
-    =
+let init ~(configuration : configuration) etherlink_configuration cloud
+    next_agent =
   let () = toplog "Init" in
   let* bootstrap_agent =
     if configuration.bootstrap then
@@ -2334,7 +2332,7 @@ let init ~(configuration : configuration)
         init_public_network
           cloud
           configuration
-          ?etherlink_configuration
+          etherlink_configuration
           teztale
           bootstrap_agent
           network
@@ -2759,7 +2757,7 @@ let benchmark () =
           let* () = set_name agent name in
           Lwt.return agent
       in
-      let* t = init ~configuration cloud next_agent in
+      let* t = init ~configuration etherlink_configuration cloud next_agent in
       toplog "Starting main loop" ;
       let main_loop = loop t (t.first_level + 1) in
       let etherlink_loop =
