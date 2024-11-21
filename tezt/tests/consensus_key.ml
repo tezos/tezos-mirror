@@ -36,7 +36,9 @@ let team = Tag.layer1
 
 let hooks =
   let replacements =
-    ("edsig\\w{94}", "[SIGNATURE]") :: Tezos_regression.replacements
+    ("edsig\\w{94}", "[SIGNATURE]")
+    :: ("BLsig\\w{137}", "[BLS_SIGNATURE]")
+    :: Tezos_regression.replacements
   in
   Tezos_regression.hooks_custom
     ~replace_variables:(fun s ->
@@ -91,7 +93,7 @@ open Helpers
    tests succeeding for wrong reasons. *)
 
 let test_update_consensus_key =
-  Protocol.register_test
+  Protocol.register_regression_test
     ~__FILE__
     ~title:"update consensus key"
     ~tags:[team; "consensus_key"]
@@ -180,6 +182,7 @@ let test_update_consensus_key =
     if Protocol.(number protocol > number Quebec) then (
       Log.info "Valid update: changing the consensus key to a BLS key." ;
       Client.update_consensus_key
+        ~hooks
         ~expect_failure:false
         ~src:Constant.bootstrap5.alias
         ~pk:key_bls.alias
@@ -196,6 +199,7 @@ let test_update_consensus_key =
   Log.info "Trying a valid consensus key update." ;
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap1.alias
       ~pk:key_a.alias
       client
@@ -264,6 +268,7 @@ let test_update_consensus_key =
   Log.info "Switch back to the initial consensus key." ;
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap1.alias
       ~pk:Constant.bootstrap1.alias
       client
@@ -290,12 +295,14 @@ let test_update_consensus_key =
      `key_c`, respectively..." ;
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap3.alias
       ~pk:key_a.alias
       client
   in
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap4.alias
       ~pk:key_c.alias
       client
@@ -373,6 +380,7 @@ let test_update_consensus_key =
   Log.info "Inject a valid drain..." ;
   let* () =
     Client.drain_delegate
+      ~hooks
       ~delegate:Constant.bootstrap4.alias
       ~consensus_key:key_c.alias
       ~destination:destination.alias
@@ -417,6 +425,7 @@ let test_update_consensus_key =
   in
   let* () =
     Client.drain_delegate
+      ~hooks
       ~delegate:Constant.bootstrap3.alias
       ~consensus_key:key_a.alias
       ~destination:destination.alias
