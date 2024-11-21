@@ -76,6 +76,7 @@ fn unify_interpreter_error(
         (MutezOverflow(_, _), InterpretError::MutezOverflow) => true,
         (Overflow, InterpretError::Overflow) => true,
         (GeneralOverflow(_, _), _) => todo!("General overflow is unsupported on interpreter"),
+        (OutOfGas(_), InterpretError::OutOfGas(gas::OutOfGas)) => true,
         (_, _) => false, //Some error that we didn't expect happened.
     }
 }

@@ -17,7 +17,7 @@ pub struct Gas {
 
 /// Out of gas error.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-#[error("out of gas")]
+#[error("Gas_exhaustion")]
 pub struct OutOfGas;
 
 /// Default gas limit per transaction, according to
