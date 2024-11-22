@@ -315,6 +315,8 @@ let () =
         filename = ".gitlab/ci/pipelines/schedule_container_scanning_master.yml"
         || filename
            = ".gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml"
+        || filename
+           = ".gitlab/ci/pipelines/schedule_container_scanning_evm_node_releases.yml"
       in
       Tezos_ci.check_files
         ~remove_extra_files:Cli.config.remove_extra_files
