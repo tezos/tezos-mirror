@@ -2510,6 +2510,12 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
+  Cloud.add_alert
+    cloud
+    ~for_:"30s"
+    ~name:"dal-ghostnet-not-attesting"
+    ~promql_query:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
+    () ;
   Lwt.return
     {
       cloud;
