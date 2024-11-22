@@ -148,16 +148,26 @@ let fetch_events_at_once
   |> List.filter_map (fun (_, e) -> if filter_event e then Some e else None)
   |> return
 
-let fetch_events state rollup_block_lvl =
-  let open Lwt_result_syntax in
-  let*! res =
-    protect @@ fun () -> fetch_events_at_once state rollup_block_lvl
-  in
-  match res with
-  | Ok events -> return events
-  | Error _ ->
-      let*! () = Evm_events_follower_events.fallback () in
-      fetch_events_one_by_one state rollup_block_lvl
+let fetch_events =
+  let always_fallback = ref false in
+  fun state rollup_block_lvl ->
+    let open Lwt_result_syntax in
+    if !always_fallback then fetch_events_one_by_one state rollup_block_lvl
+    else
+      let*! res =
+        protect @@ fun () -> fetch_events_at_once state rollup_block_lvl
+      in
+      match res with
+      | Ok events -> return events
+      | Error e ->
+          (match e with
+          | Tezos_rpc.Context.Not_found _ :: _ ->
+              (* 404, Rollup node is too old to support fetching all at
+                 once. Always fallback in the future. *)
+              always_fallback := true
+          | _ -> ()) ;
+          let*! () = Evm_events_follower_events.fallback () in
+          fetch_events_one_by_one state rollup_block_lvl
 
 let on_new_head state rollup_block_lvl =
   let open Lwt_result_syntax in
