@@ -1,0 +1,10 @@
+groups:
+  - name: tezt
+  {% for alert in alerts %}
+    rules:
+      - alert: {{ alert.name }}
+        expr: {{ alert.expr }}
+        {% if alert.for_ %}
+        for: {{ alert.for_ }}
+        {% endif %}
+  {% endfor %}
