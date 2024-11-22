@@ -107,3 +107,6 @@ val open_telemetry : bool
 
 (** Alert manager configurations. *)
 val alert_manager : string list
+
+(** Check for file consistency. *)
+val check_file_consistency : bool
