@@ -158,7 +158,7 @@ let docker_run_command agent cmd args =
       *)
       Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
 
-let copy agent ~is_directory ~source ~destination =
+let copy agent ~consistency_check ~is_directory ~source ~destination =
   let* exists =
     let process = docker_run_command agent "ls" [destination] in
     let* status = process |> Process.wait in
@@ -168,7 +168,7 @@ let copy agent ~is_directory ~source ~destination =
           String.trim output |> String.split_on_char ' ' |> List.hd
         in
         (* If the file already exists on the remote machine, we compare the
-           hashes to be sure they are the same. *)
+           hashes to check whether they are the same. *)
         Lwt.catch
           (fun () ->
             let* destination_hash =
@@ -185,7 +185,16 @@ let copy agent ~is_directory ~source ~destination =
             | WEXITED 0 ->
                 let* output = Process.check_and_read_stdout process in
                 let source_hash = hash_of_md5_output output in
-                Lwt.return (destination_hash = source_hash)
+                let is_consistent = destination_hash = source_hash in
+                if consistency_check then Lwt.return is_consistent
+                else if is_consistent then Lwt.return_true
+                else (
+                  Log.warn
+                    "The file %s is already on agent %s but has a different \
+                     hash."
+                    source
+                    (name agent) ;
+                  Lwt.return_true)
             | _ -> Lwt.return_true)
           (fun _ -> Lwt.return_false)
     | _ -> Lwt.return_false
@@ -239,8 +248,15 @@ let copy =
      scenario. This optimisation ease the writing of scenario so that copy can
      always be called before using the file copied. *)
   let already_copied = Hashtbl.create 11 in
-  fun ?(refresh = false) ?(is_directory = false) ?destination agent ~source ->
-    Log.info "COPY %s" source ;
+  fun ?consistency_check
+      ?(refresh = false)
+      ?(is_directory = false)
+      ?destination
+      agent
+      ~source ->
+    let consistency_check =
+      Option.value consistency_check ~default:Env.check_file_consistency
+    in
     let destination =
       Option.value ~default:(path_of agent source) destination
     in
@@ -265,7 +281,9 @@ let copy =
                 ["-p"; Filename.dirname destination]
               |> Process.check
             in
-            let* () = copy agent ~is_directory ~source ~destination in
+            let* () =
+              copy agent ~consistency_check ~is_directory ~source ~destination
+            in
             Lwt.return destination
           in
           Hashtbl.replace already_copied (agent, destination) p ;
