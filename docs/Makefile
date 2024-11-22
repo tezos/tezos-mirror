@@ -215,7 +215,7 @@ docexes-gen: api/errors.rst shell/p2p_api.rst rpc
 .PHONY: sphinx
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
-	@$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/paris" || true
 
 # Syntax check RST files.
