@@ -340,7 +340,7 @@ let on_validation_request w
       return
         Already_committed
       [@profiler.mark
-        {verbosity = Notice}
+        {verbosity = Notice; metadata = [("prometheus", "already commited")]}
           (profiling_validation_prefix hash ["already commited"])]
   | false -> (
       (* This check might be redundant as operation paths are already
@@ -353,7 +353,10 @@ let on_validation_request w
            header
            operations
          [@profiler.span_f
-           {verbosity = Notice}
+           {
+             verbosity = Notice;
+             metadata = [("prometheus", "check_operations_merkle_root")];
+           }
              (profiling_validation_prefix hash ["check_operations_merkle_root"])])
       in
       match
@@ -374,7 +377,10 @@ let on_validation_request w
                    chain_store
                    header.shell.predecessor
                  [@profiler.span_s
-                   {verbosity = Notice}
+                   {
+                     verbosity = Notice;
+                     metadata = [("prometheus", "read predecessor")];
+                   }
                      (profiling_validation_prefix hash ["read predecessor"])])
               in
               let*! mempool = Store.Chain.mempool chain_store in
@@ -399,7 +405,10 @@ let on_validation_request w
                    operations
                    bv_operations
                  [@profiler.span_s
-                   {verbosity = Notice}
+                   {
+                     verbosity = Notice;
+                     metadata = [("prometheus", "validate_block")];
+                   }
                      (profiling_validation_prefix hash ["validate_block"])])
               in
               match r with
@@ -424,7 +433,10 @@ let on_validation_request w
                        hash
                        bv_operations
                      [@profiler.span_s
-                       {verbosity = Notice}
+                       {
+                         verbosity = Notice;
+                         metadata = [("prometheus", "apply_block")];
+                       }
                          (profiling_validation_prefix hash ["apply_block"])])
                   in
                   match r with
@@ -460,7 +472,10 @@ let on_validation_request w
                         operations
                         application_result
                       [@profiler.span_s
-                        {verbosity = Notice}
+                        {
+                          verbosity = Notice;
+                          metadata = [("prometheus", "commit_and_notify_block")];
+                        }
                           (profiling_validation_prefix
                              hash
                              ["commit_and_notify_block"])]))))
@@ -512,7 +527,10 @@ let on_request :
         w
         r
       [@profiler.span_s
-        {verbosity = Notice}
+        {
+          verbosity = Notice;
+          metadata = [("prometheus", "on_validation_request")];
+        }
           [
             Format.sprintf
               "on_validation_request : %s"
@@ -521,7 +539,13 @@ let on_request :
   | Request.Request_preapplication r ->
       on_preapplication_request
         w
-        r [@profiler.span_s {verbosity = Notice} ["on_preapplication_request"]]
+        r
+      [@profiler.span_s
+        {
+          verbosity = Notice;
+          metadata = [("prometheus", "on_preapplication_request")];
+        }
+          ["on_preapplication_request"]]
 
 type launch_error = |
 
@@ -717,7 +741,10 @@ let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
           (check_chain_liveness chain_db hash header
           |> Lwt_result.map_error (fun e -> Worker.Request_error e))
           [@profiler.span_s
-            {verbosity = Notice}
+            {
+              verbosity = Notice;
+              metadata = [("prometheus", "check_chain_liveness")];
+            }
               (profiling_validation_prefix hash ["check_chain_liveness"])]
         in
         Worker.Queue.push_request_and_wait
