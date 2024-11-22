@@ -9,6 +9,41 @@
 
 open Ethereum_types
 
+module Event = struct
+  open Internal_event.Simple
+
+  let section = ["evm_node"; "dev"]
+
+  let fail_decode_evm_event event =
+    declare_1
+      ~section
+      ~name:(Format.sprintf "fail_decode_%s" event)
+      ~msg:(Format.sprintf "Fail to decode %s {tag}" event)
+      ~level:Error
+      ("tag", Data_encoding.string)
+end
+
+let fail_decode_event tag =
+  match tag with
+  | "\x01" ->
+      let event = "kernel_upgrade" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x02" ->
+      let event = "sequencer_upgrade" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x03" ->
+      let event = "blueprint_applied" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x04" ->
+      let event = "new_delayed_transaction" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x05" ->
+      let event = "flush_delayed_inbox" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | _ ->
+      let event = "unknown" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+
 module Delayed_transaction = struct
   type kind = Transaction | Deposit | Fa_deposit
 
@@ -236,32 +271,42 @@ type t =
   | Flush_delayed_inbox of Flushed_blueprint.t
 
 let of_bytes bytes =
+  let open Lwt_syntax in
   match bytes |> Rlp.decode with
-  | Ok (Rlp.List [Value tag; rlp_content]) -> (
-      match Bytes.to_string tag with
-      | "\x01" ->
-          let upgrade = Upgrade.of_rlp rlp_content in
-          Option.map (fun u -> Upgrade_event u) upgrade
-      | "\x02" ->
-          let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
-          Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
-      | "\x03" ->
-          let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
-          Option.map (fun u -> Blueprint_applied u) blueprint_applied
-      | "\x04" -> (
-          match rlp_content with
-          | List [Value hash; transaction_content] ->
-              let hash = decode_hash hash in
-              let transaction =
-                Delayed_transaction.of_rlp_content hash transaction_content
-              in
-              Option.map (fun u -> New_delayed_transaction u) transaction
-          | _ -> None)
-      | "\x05" ->
-          let flushed_blueprint = Flushed_blueprint.of_rlp rlp_content in
-          Option.map (fun u -> Flush_delayed_inbox u) flushed_blueprint
-      | _ -> None)
-  | _ -> None
+  | Ok (Rlp.List [Value tag; rlp_content]) ->
+      let string_tag = Bytes.to_string tag in
+      let event =
+        match string_tag with
+        | "\x01" ->
+            let upgrade = Upgrade.of_rlp rlp_content in
+            Option.map (fun u -> Upgrade_event u) upgrade
+        | "\x02" ->
+            let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
+            Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
+        | "\x03" ->
+            let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
+            Option.map (fun u -> Blueprint_applied u) blueprint_applied
+        | "\x04" -> (
+            match rlp_content with
+            | List [Value hash; transaction_content] ->
+                let hash = decode_hash hash in
+                let transaction =
+                  Delayed_transaction.of_rlp_content hash transaction_content
+                in
+                Option.map (fun u -> New_delayed_transaction u) transaction
+            | _ -> None)
+        | "\x05" ->
+            let flushed_blueprint = Flushed_blueprint.of_rlp rlp_content in
+            Option.map (fun u -> Flush_delayed_inbox u) flushed_blueprint
+        | _ -> None
+      in
+
+      let* () =
+        if Option.is_none event then fail_decode_event string_tag
+        else return_unit
+      in
+      return event
+  | _ -> return_none
 
 let pp fmt = function
   | Upgrade_event {hash; timestamp} ->

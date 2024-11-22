@@ -145,8 +145,8 @@ module Event = struct
       ~section
       ~name:"flush_delayed_inbox"
       ~msg:
-        "The delayed inbox has been flushed in a blueprint at level {level} (timestamp: \
-         {timestamp})."
+        "The delayed inbox has been flushed in a blueprint at level {level} \
+         (timestamp: {timestamp})."
       ~level:Notice
       ("timestamp", Time.Protocol.encoding)
       ("level", Data_encoding.n)

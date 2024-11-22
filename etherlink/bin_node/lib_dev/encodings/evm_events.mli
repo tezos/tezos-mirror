@@ -69,4 +69,4 @@ val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t
 
-val of_bytes : bytes -> t option
+val of_bytes : bytes -> t option Lwt.t
