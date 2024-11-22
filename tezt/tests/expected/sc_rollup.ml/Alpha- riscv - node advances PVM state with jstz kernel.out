@@ -64,11 +64,11 @@ This sequence of operations was run:
 
 [src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
 [0][INFO] Welcome to Hermit 0.6.7
-[0][INFO] Kernel starts at 81400000
-[0][INFO] BSS starts at 0x81c98d18
+[0][INFO] Kernel starts at 1200000
+[0][INFO] BSS starts at 0x1a98d18
 [0][INFO] tls_info = Some(
     TlsInfo {
-        start: 0x81c1fff8,
+        start: 0x1a1fff8,
         filesz: 0x20,
         memsz: 0x239,
         align: 0x8,
@@ -76,19 +76,19 @@ This sequence of operations was run:
 )
 [0][INFO] Model: riscv-virtio
 [0][INFO] Total memory size: 100 MB
-[0][INFO] Kernel region: [81400000 - 81e00000]
+[0][INFO] Kernel region: [1200000 - 1c00000]
 [0][INFO] A pure Rust application is running on top of Hermit!
-[0][INFO] Heap: size 56 MB, start address c0000000
-[0][INFO] Heap is located at 0xc0000000..0xc3800000 (0 Bytes unmapped)
+[0][INFO] Heap: size 58 MB, start address 40000000
+[0][INFO] Heap is located at 0x40000000..0x43a00000 (0 Bytes unmapped)
 [0][INFO] 
 [0][INFO] ===================== PHYSICAL MEMORY FREE LIST ======================
-[0][INFO] 0x00000082001000 - 0x00000082200000
-[0][INFO] 0x00000085800000 - 0x00000086400000
+[0][INFO] 0x00000001E01000 - 0x00000002000000
+[0][INFO] 0x00000005800000 - 0x00000006400000
 [0][INFO] ======================================================================
 [0][INFO] 
 [0][INFO] 
 [0][INFO] ================== KERNEL VIRTUAL MEMORY FREE LIST ===================
-[0][INFO] 0x000000C3800000 - 0x00004000000000
+[0][INFO] 0x00000043A00000 - 0x00004000000000
 [0][INFO] ======================================================================
 [0][INFO] 
 [0][INFO] Initialized CPU with hart_id 0
@@ -150,7 +150,7 @@ External message: SignedOperation { public_key: Ed25519(PublicKeyEd25519("[PUBLI
 External operation: SignedOperation { public_key: Ed25519(PublicKeyEd25519("[PUBLIC_KEY]")), signature: Ed25519(Ed25519Signature("edsigtuJpBidwcMWRFQWycovvM1Jd6zZy9AT4pbh3awjvjRjmCgageqTkubijavnHq8jL28GHEdpE2WTGwo4btyWkAUQe9xfJgU")), inner: Operation { source: Tz1(ContractTz1Hash("[PUBLIC_KEY_HASH]")), nonce: Nonce(1), content: RunFunction(RunFunction { uri: tezos://[PUBLIC_KEY_HASH]/mint_new, method: POST, headers: {}, body: Some([91, 123, 34, 116, 111, 107, 101, 110, 95, 105, 100, 34, 58, 48, 44, 34, 111, 119, 110, 101, 114, 34, 58, 34, 116, 122, 49, 101, 65, 107, 83, 87, 121, 100, 120, 50, 70, 69, 66, 51, 68, 82, 99, 105, 101, 115, 103, 56, 82, 99, 75, 100, 89, 111, 120, 65, 114, 57, 53, 120, 34, 44, 34, 97, 109, 111, 117, 110, 116, 34, 58, 51, 125, 44, 123, 34, 116, 111, 107, 101, 110, 95, 105, 100, 34, 58, 49, 44, 34, 111, 119, 110, 101, 114, 34, 58, 34, 116, 122, 49, 104, 80, 121, 104, 54, 120, 107, 97, 106, 97, 76, 98, 84, 75, 106, 72, 118, 75, 115, 56, 51, 107, 101, 105, 76, 104, 97, 50, 76, 70, 56, 120, 81, 34, 44, 34, 97, 109, 111, 117, 110, 116, 34, 58, 51, 125, 93]), gas_limit: 100000 }) } }
 [JSTZ:SMART_FUNCTION:REQUEST_START] {"type":"Start","address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"33e43b05e7c1914e642319dbb6f5c5eb7f65686093258f21ddf6741801476fd5"}
 [JSTZ:SMART_FUNCTION:REQUEST_END] {"type":"End","address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"33e43b05e7c1914e642319dbb6f5c5eb7f65686093258f21ddf6741801476fd5"}
-🚀 Smart function executed successfully with value: Object((NativeObject) 0xC01F65A0) (in 504 instructions)
+🚀 Smart function executed successfully with value: Object((NativeObject) 0x401F65A0) (in 504 instructions)
 Receipt: Receipt { hash: Blake2b([51, 228, 59, 5, 231, 193, 145, 78, 100, 35, 25, 219, 182, 245, 197, 235, 127, 101, 104, 96, 147, 37, 143, 33, 221, 246, 116, 24, 1, 71, 111, 213]), inner: Ok(RunFunction(RunFunction { body: Some([83, 117, 99, 99, 101, 115, 115, 33]), status_code: 200, headers: {"content-type": "text/plain;charset=UTF-8"} })) }
 
 Internal message: end of level
@@ -197,7 +197,7 @@ External message: SignedOperation { public_key: Ed25519(PublicKeyEd25519("[PUBLI
 External operation: SignedOperation { public_key: Ed25519(PublicKeyEd25519("[PUBLIC_KEY]")), signature: Ed25519(Ed25519Signature("edsigtco6kQkLihrfcL3erwfRS1xd3eNeXyxEarURtnyAj4xMwDb6zxTTweTKBThCAaPcLMdAJGSZrynqndor5U1Eo1DWwMyeNr")), inner: Operation { source: Tz1(ContractTz1Hash("[PUBLIC_KEY_HASH]")), nonce: Nonce(2), content: RunFunction(RunFunction { uri: tezos://[PUBLIC_KEY_HASH]/transfer, method: POST, headers: {}, body: Some([91, 123, 34, 102, 114, 111, 109, 34, 58, 34, 116, 122, 49, 101, 65, 107, 83, 87, 121, 100, 120, 50, 70, 69, 66, 51, 68, 82, 99, 105, 101, 115, 103, 56, 82, 99, 75, 100, 89, 111, 120, 65, 114, 57, 53, 120, 34, 44, 34, 116, 114, 97, 110, 115, 102, 101, 114, 115, 34, 58, 91, 123, 34, 116, 111, 107, 101, 110, 95, 105, 100, 34, 58, 48, 44, 34, 97, 109, 111, 117, 110, 116, 34, 58, 49, 44, 34, 116, 111, 34, 58, 34, 116, 122, 49, 104, 80, 121, 104, 54, 120, 107, 97, 106, 97, 76, 98, 84, 75, 106, 72, 118, 75, 115, 56, 51, 107, 101, 105, 76, 104, 97, 50, 76, 70, 56, 120, 81, 34, 125, 93, 125, 93]), gas_limit: 100000 }) } }
 [JSTZ:SMART_FUNCTION:REQUEST_START] {"type":"Start","address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"09099c5db275b53d75d13641a6d2d2e125e56aeb95332ab199d38cc918ef2564"}
 [JSTZ:SMART_FUNCTION:REQUEST_END] {"type":"End","address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"09099c5db275b53d75d13641a6d2d2e125e56aeb95332ab199d38cc918ef2564"}
-🚀 Smart function executed successfully with value: Object((NativeObject) 0xC01F95E0) (in 496 instructions)
+🚀 Smart function executed successfully with value: Object((NativeObject) 0x401F95E0) (in 496 instructions)
 Receipt: Receipt { hash: Blake2b([9, 9, 156, 93, 178, 117, 181, 61, 117, 209, 54, 65, 166, 210, 210, 225, 37, 229, 106, 235, 149, 51, 42, 177, 153, 211, 140, 201, 24, 239, 37, 100]), inner: Ok(RunFunction(RunFunction { body: Some([83, 117, 99, 99, 101, 115, 115, 33]), status_code: 200, headers: {"content-type": "text/plain;charset=UTF-8"} })) }
 
 Internal message: end of level
@@ -246,7 +246,7 @@ External operation: SignedOperation { public_key: Ed25519(PublicKeyEd25519("[PUB
 [JSTZ:SMART_FUNCTION:LOG] {"address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"f33749261b116523cc4012644b452f842fe5241bfd85a03e38d86c6449de4347","level":"LOG","text":"[PUBLIC_KEY_HASH] has 2 of token 0"}
 [JSTZ:SMART_FUNCTION:LOG] {"address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"f33749261b116523cc4012644b452f842fe5241bfd85a03e38d86c6449de4347","level":"LOG","text":"[PUBLIC_KEY_HASH] has 0 of token 1"}
 [JSTZ:SMART_FUNCTION:REQUEST_END] {"type":"End","address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"f33749261b116523cc4012644b452f842fe5241bfd85a03e38d86c6449de4347"}
-🚀 Smart function executed successfully with value: Object((NativeObject) 0xC00FFE60) (in 381 instructions)
+🚀 Smart function executed successfully with value: Object((NativeObject) 0x400FFE60) (in 381 instructions)
 Receipt: Receipt { hash: Blake2b([243, 55, 73, 38, 27, 17, 101, 35, 204, 64, 18, 100, 75, 69, 47, 132, 47, 229, 36, 27, 253, 133, 160, 62, 56, 216, 108, 100, 73, 222, 67, 71]), inner: Ok(RunFunction(RunFunction { body: Some([91, 123, 34, 98, 97, 108, 97, 110, 99, 101, 34, 58, 50, 46, 48, 44, 34, 114, 101, 113, 117, 101, 115, 116, 34, 58, 123, 34, 111, 119, 110, 101, 114, 34, 58, 34, 116, 122, 49, 101, 65, 107, 83, 87, 121, 100, 120, 50, 70, 69, 66, 51, 68, 82, 99, 105, 101, 115, 103, 56, 82, 99, 75, 100, 89, 111, 120, 65, 114, 57, 53, 120, 34, 44, 34, 116, 111, 107, 101, 110, 95, 105, 100, 34, 58, 48, 125, 125, 44, 123, 34, 98, 97, 108, 97, 110, 99, 101, 34, 58, 48, 44, 34, 114, 101, 113, 117, 101, 115, 116, 34, 58, 123, 34, 111, 119, 110, 101, 114, 34, 58, 34, 116, 122, 49, 101, 65, 107, 83, 87, 121, 100, 120, 50, 70, 69, 66, 51, 68, 82, 99, 105, 101, 115, 103, 56, 82, 99, 75, 100, 89, 111, 120, 65, 114, 57, 53, 120, 34, 44, 34, 116, 111, 107, 101, 110, 95, 105, 100, 34, 58, 49, 125, 125, 93]), status_code: 200, headers: {"content-type": "application/json"} })) }
 
 Internal message: end of level
@@ -295,7 +295,7 @@ External operation: SignedOperation { public_key: Ed25519(PublicKeyEd25519("[PUB
 [JSTZ:SMART_FUNCTION:LOG] {"address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"1c169abe41308f67c9ecf93fabaf6fea8a9405e69140b4289a1f329f144cc0a6","level":"LOG","text":"[PUBLIC_KEY_HASH] has 1 of token 0"}
 [JSTZ:SMART_FUNCTION:LOG] {"address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"1c169abe41308f67c9ecf93fabaf6fea8a9405e69140b4289a1f329f144cc0a6","level":"LOG","text":"[PUBLIC_KEY_HASH] has 3 of token 1"}
 [JSTZ:SMART_FUNCTION:REQUEST_END] {"type":"End","address":{"Tz1":"[PUBLIC_KEY_HASH]"},"request_id":"1c169abe41308f67c9ecf93fabaf6fea8a9405e69140b4289a1f329f144cc0a6"}
-🚀 Smart function executed successfully with value: Object((NativeObject) 0xC00F86A0) (in 380 instructions)
+🚀 Smart function executed successfully with value: Object((NativeObject) 0x400F86A0) (in 380 instructions)
 Receipt: Receipt { hash: Blake2b([28, 22, 154, 190, 65, 48, 143, 103, 201, 236, 249, 63, 171, 175, 111, 234, 138, 148, 5, 230, 145, 64, 180, 40, 154, 31, 50, 159, 20, 76, 192, 166]), inner: Ok(RunFunction(RunFunction { body: Some([91, 123, 34, 98, 97, 108, 97, 110, 99, 101, 34, 58, 49, 44, 34, 114, 101, 113, 117, 101, 115, 116, 34, 58, 123, 34, 111, 119, 110, 101, 114, 34, 58, 34, 116, 122, 49, 104, 80, 121, 104, 54, 120, 107, 97, 106, 97, 76, 98, 84, 75, 106, 72, 118, 75, 115, 56, 51, 107, 101, 105, 76, 104, 97, 50, 76, 70, 56, 120, 81, 34, 44, 34, 116, 111, 107, 101, 110, 95, 105, 100, 34, 58, 48, 125, 125, 44, 123, 34, 98, 97, 108, 97, 110, 99, 101, 34, 58, 51, 44, 34, 114, 101, 113, 117, 101, 115, 116, 34, 58, 123, 34, 111, 119, 110, 101, 114, 34, 58, 34, 116, 122, 49, 104, 80, 121, 104, 54, 120, 107, 97, 106, 97, 76, 98, 84, 75, 106, 72, 118, 75, 115, 56, 51, 107, 101, 105, 76, 104, 97, 50, 76, 70, 56, 120, 81, 34, 44, 34, 116, 111, 107, 101, 110, 95, 105, 100, 34, 58, 49, 125, 125, 93]), status_code: 200, headers: {"content-type": "application/json"} })) }
 
 Internal message: end of level

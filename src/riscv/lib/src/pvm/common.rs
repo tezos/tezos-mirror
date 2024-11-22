@@ -262,7 +262,7 @@ mod tests {
     use super::*;
     use crate::{
         machine_state::{
-            bus::{main_memory::M1M, start_of_main_memory, AddressableRead},
+            bus::{main_memory::M1M, AddressableRead},
             registers::{a0, a1, a2, a3, a6, a7},
             TestCacheLayouts,
         },
@@ -284,7 +284,7 @@ mod tests {
         let mut pvm = Pvm::<ML, TestCacheLayouts, _>::bind(space);
         pvm.reset();
 
-        let level_addr = start_of_main_memory::<ML>();
+        let level_addr = main_memory::FIRST_ADDRESS;
         let counter_addr = level_addr + 4;
         let buffer_addr = counter_addr + 4;
 
@@ -344,13 +344,19 @@ mod tests {
             pvm.machine_state.core.hart.xregisters.read(a0) as usize,
             BUFFER_LEN
         );
-        assert_eq!(pvm.machine_state.core.bus.read(level_addr), Ok(level));
-        assert_eq!(pvm.machine_state.core.bus.read(counter_addr), Ok(counter));
+        assert_eq!(
+            pvm.machine_state.core.main_memory.read(level_addr),
+            Ok(level)
+        );
+        assert_eq!(
+            pvm.machine_state.core.main_memory.read(counter_addr),
+            Ok(counter)
+        );
 
         // Payload in memory should be as expected
         for (offset, &byte) in payload[..BUFFER_LEN].iter().enumerate() {
             let addr = buffer_addr + offset as u64;
-            let byte_written: u8 = pvm.machine_state.core.bus.read(addr).unwrap();
+            let byte_written: u8 = pvm.machine_state.core.main_memory.read(addr).unwrap();
             assert_eq!(
                 byte, byte_written,
                 "Byte at {addr:x} (offset {offset}) is not the same"
@@ -361,7 +367,7 @@ mod tests {
         assert!((BUFFER_LEN..4096)
             .map(|offset| {
                 let addr = buffer_addr + offset as u64;
-                pvm.machine_state.core.bus.read(addr).unwrap()
+                pvm.machine_state.core.main_memory.read(addr).unwrap()
             })
             .all(|b: u8| b == 0));
     }

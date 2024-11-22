@@ -747,12 +747,14 @@ mod tests {
         backend_test, create_state,
         machine_state::{
             address_translation::PAGE_SIZE,
-            bus,
+            bus::{main_memory, AddressableWrite},
             instruction::{Args, Instruction, OpCode},
             instruction_cache::cacheable_uncompressed,
             main_memory::tests::T1K,
+            mode::Mode,
             registers::{a0, a1, a2, t0, t1},
-            MachineCoreState, MachineCoreStateLayout,
+            MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
+            TestCacheLayouts,
         },
         state_backend::owned_backend::Owned,
     };
@@ -905,7 +907,7 @@ mod tests {
             },
         };
 
-        let block_addr = bus::start_of_main_memory::<T1K>();
+        let block_addr = main_memory::FIRST_ADDRESS;
 
         for offset in 0..10 {
             block_state.push_instr::<4>(ValidatedCacheEntry::from_raw(
@@ -1024,5 +1026,25 @@ mod tests {
             // The invalidated block cache should not return any blocks.
             check_block(&mut block);
         }
+    }
+
+    /// The initialised block cache has an entry for address 0. The block at address 0 happens to
+    /// be empty, which causes the step function to loop indefinitely when it runs the block.
+    #[test]
+    fn test_run_addr_zero() {
+        type StateLayout = MachineStateLayout<T1K, TestCacheLayouts>;
+
+        let mut state: MachineState<T1K, TestCacheLayouts, Owned> =
+            MachineState::bind(Owned::allocate::<StateLayout>());
+
+        // Encoding of ECALL instruction
+        const ECALL: u32 = 0b1110011;
+
+        state.core.hart.mode.write(Mode::Machine);
+        state.core.hart.pc.write(0);
+        state.core.main_memory.write(0, ECALL).unwrap();
+
+        let result = state.step();
+        assert_eq!(result, Err(EnvironException::EnvCallFromMMode));
     }
 }

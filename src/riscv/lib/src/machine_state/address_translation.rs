@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    bus::{main_memory, Address, AddressableRead, Bus, OutOfBounds},
+    bus::{main_memory, Address, AddressableRead, OutOfBounds},
     csregisters::{
         satp::{Satp, SvLength, TranslationAlgorithm},
         CSRRepr, CSRegister,
@@ -74,7 +74,7 @@ impl SvLength {
 
 /// Implementation of the virtual address translation as explained in section 5.3.2.
 fn sv_translate_impl<ML, M>(
-    bus: &Bus<ML, M>,
+    bus: &main_memory::MainMemory<ML, M>,
     v_addr: Address,
     satp: Satp,
     sv_length: SvLength,
@@ -261,7 +261,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
         };
 
         let satp = Satp::from_bits(satp);
-        sv_translate_impl(&self.bus, virt_addr, satp, sv_length, access_type)
+        sv_translate_impl(&self.main_memory, virt_addr, satp, sv_length, access_type)
             .map_err(|_e| access_type.exception(virt_addr))
     }
 

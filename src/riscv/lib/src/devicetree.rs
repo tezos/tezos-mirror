@@ -112,6 +112,5 @@ pub fn generate_custom(
 pub fn generate<ML: MainMemoryLayout>(
     initrd: Option<InitialRamDisk>,
 ) -> Result<Vec<u8>, vm_fdt::Error> {
-    let main_memory_start = bus::start_of_main_memory::<ML>();
-    generate_custom(main_memory_start, ML::BYTES as u64, initrd)
+    generate_custom(bus::main_memory::FIRST_ADDRESS, ML::BYTES as u64, initrd)
 }

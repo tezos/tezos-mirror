@@ -139,7 +139,7 @@ where
         let get_u16_at = |addr: Address| -> Option<(Address, u16)> {
             self.stepper
                 .machine_state()
-                .bus
+                .main_memory
                 .read(addr)
                 .ok()
                 .map(|bytes| (addr, bytes))

@@ -1,0 +1,27 @@
+diff --git a/env/encoding.h b/env/encoding.h
+index 01889d1..cb84001 100644
+--- a/env/encoding.h
++++ b/env/encoding.h
+@@ -300,7 +300,7 @@
+ #define CLINT_BASE         0x02000000
+ #define CLINT_SIZE         0x000c0000
+ #define EXT_IO_BASE        0x40000000
+-#define DRAM_BASE          0x80000000
++#define DRAM_BASE          0x0
+ 
+ /* page table entry (PTE) fields */
+ #define PTE_V     0x001 /* Valid */
+diff --git a/env/p/link.ld b/env/p/link.ld
+index b3e315e..c6efc56 100644
+--- a/env/p/link.ld
++++ b/env/p/link.ld
+@@ -3,7 +3,7 @@ ENTRY(_start)
+ 
+ SECTIONS
+ {
+-  . = 0x80000000;
++  . = 0x0;
+   .text.init : { *(.text.init) }
+   . = ALIGN(0x1000);
+   .tohost : { *(.tohost) }
+

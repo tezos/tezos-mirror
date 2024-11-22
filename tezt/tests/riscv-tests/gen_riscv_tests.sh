@@ -35,6 +35,8 @@ autoconf || {
   clean_up 1
 }
 
+git apply "$self/riscv-tests-entry-0.patch"
+
 ./configure || {
   echo "configure failed" >&2
   clean_up 1

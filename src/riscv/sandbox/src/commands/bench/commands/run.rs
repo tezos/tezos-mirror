@@ -42,7 +42,10 @@ where
         let pc = machine_state
             .translate_without_cache(raw_pc, AccessType::Instruction)
             .or(Err(InstrGetError::Translation))?;
-        machine_state.bus.read(pc).or(Err(InstrGetError::Parse))
+        machine_state
+            .main_memory
+            .read(pc)
+            .or(Err(InstrGetError::Parse))
     };
     let pc = machine_state.hart.pc.read();
     let first = get_half_instr(pc)?;

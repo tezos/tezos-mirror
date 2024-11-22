@@ -12,7 +12,10 @@ use octez_riscv::{
     bits::Bits64,
     kernel_loader::Error,
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, start_of_main_memory, Address},
+        bus::{
+            main_memory::{self, MainMemoryLayout},
+            Address,
+        },
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         mode::Mode,
         AccessType, CacheLayouts, MachineCoreState,
@@ -160,7 +163,7 @@ pub struct DebuggerApp<'a, S: Stepper> {
     max_steps: Option<usize>,
 }
 
-fn get_elf_symbols<ML: MainMemoryLayout>(
+fn get_elf_symbols(
     contents: &[u8],
     demangle_symbols: bool,
 ) -> Result<HashMap<u64, Cow<str>>, Error> {
@@ -170,7 +173,7 @@ fn get_elf_symbols<ML: MainMemoryLayout>(
     let offset = if elf.header.e_type == ET_DYN {
         // Symbol addresses in relocatable executables are relative addresses. We need to offset
         // them by the start address of the main memory where the executable is loaded.
-        start_of_main_memory::<ML>()
+        main_memory::FIRST_ADDRESS
     } else {
         0
     };
@@ -203,7 +206,7 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
     ) -> Result<()> {
         let (mut interpreter, prog) =
             TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode)?;
-        let symbols = get_elf_symbols::<ML>(program, demangle_sybols)?;
+        let symbols = get_elf_symbols(program, demangle_sybols)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
         DebuggerApp::new(&mut interpreter, fname, &prog, symbols, max_steps)
@@ -234,7 +237,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
             opts.common.inbox.origination_level,
         )?;
 
-        let symbols = get_elf_symbols::<ML>(program, opts.demangle)?;
+        let symbols = get_elf_symbols(program, opts.demangle)?;
         let program = Program::<ML>::from_elf(program)?.parsed();
 
         errors::install_hooks()?;
