@@ -10,9 +10,8 @@
   octez-libs.base.unix
   tezos-dal-node-services
   dal_node_migrations
-  octez-shell-libs.client-base
   octez-shell-libs.protocol-updater
-  octez-shell-libs.client-base-unix
+  octez-libs.rpc-http-client-unix
   octez-libs.stdlib-unix
   octez-libs.crypto-dal
   octez-shell-libs.p2p
@@ -21,9 +20,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_client_base
   -open Tezos_protocol_updater
-  -open Tezos_client_base_unix
   -open Tezos_stdlib_unix
   -open Tezos_crypto_dal
   -open Tezos_p2p

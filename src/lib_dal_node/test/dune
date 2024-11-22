@@ -8,7 +8,6 @@
   tezt.core
   bls12-381.archive
   octez-rustzcash-deps
-  octez-libs.tezos-sapling
   octez-libs.stdlib
   octez-libs.stdlib-unix
   octez-libs.base
