@@ -17,5 +17,6 @@ depends: [
   "utop" { >= "2.8" }
 ]
 build: []
+available: os-family != "windows"
 synopsis: "Virtual package depending on Octez dependencies (profile: octez-dev-deps)"
 description: "Install this package to install all dependencies needed to build the subset of Octez denoted by profile octez-dev-deps."

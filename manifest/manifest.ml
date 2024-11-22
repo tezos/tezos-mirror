@@ -842,7 +842,8 @@ module Opam = struct
             |> List.flatten
             |> deduplicate_list (fun s -> s)
       in
-      condition_of_available available
+      (* Packages should never be available for Windows OS. *)
+      "os-family != \"windows\"" :: condition_of_available available
     in
     let pp_condition fmt = function
       | [] -> ()

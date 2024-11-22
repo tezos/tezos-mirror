@@ -23,4 +23,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup"
