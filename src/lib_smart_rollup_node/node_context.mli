@@ -201,9 +201,6 @@ val dal_supported : _ t -> bool
     [node_ctxt].  *)
 val readonly : _ t -> ro
 
-(** Monad for values with delayed write effects in the node context. *)
-type 'a delayed_write = ('a, rw) Delayed_write_monad.t
-
 (** {2 Abstraction over store} *)
 
 (** [get_history_mode t] returns the current history mode for the rollup
