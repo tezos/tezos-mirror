@@ -20,7 +20,7 @@ type t = {
   content : content;
 }
 
-val get_level_of_detail : Ppxlib.Location.t -> t -> Ppxlib.expression
+val get_verbosity : Ppxlib.Location.t -> t -> Ppxlib.expression option
 
 val get_profiler_module : t -> Longident.t
 

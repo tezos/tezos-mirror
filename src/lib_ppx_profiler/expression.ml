@@ -17,21 +17,28 @@ let with_metadata ~loc e metadata =
   let metadata = Option.value ~default:[%expr []] metadata in
   Ppxlib.Ast_builder.Default.pexp_tuple ~loc [e; metadata]
 
+(** [get_verbosity _ key] will return the verbosity associated
+    to key or raise an error otherwise *)
+let get_verbosity loc key =
+  match Key.get_verbosity loc key with
+  | Some lod -> lod
+  | None -> Error.error loc (No_verbosity key)
+
 (** [add_wrapping_function expr name _ key] will create
       {[
         Profiler.name
-          ~verbosity:(Notice | Info | Debug)
+          (Notice | Info | Debug)
           (key, metadata)
           (fun () -> expr)
       ]}
-  *)
+*)
 let add_wrapping_function expr fun_name loc key =
   let key_expr =
     with_metadata ~loc [%expr [%e Key.to_expression loc key]] key.Key.metadata
   in
   [%expr
-    [%e fun_name] ~verbosity:[%e Key.get_level_of_detail loc key] [%e key_expr]
-    @@ fun () -> [%e expr]]
+    [%e fun_name] [%e get_verbosity loc key] [%e key_expr] @@ fun () ->
+    [%e expr]]
 
 (** [add_unit_function ~metadata ~verbosity expr name _ key] will create different
     code snippet depending on the options. The general shape is:
@@ -41,14 +48,13 @@ let add_wrapping_function expr fun_name loc key =
         expr
       ]}
 
-    [VERBOSITY] being present as [~verbosity:(Notice | Info | Debug)] only
-    if [~verbosity] has been set to true.
-    [KEY] being [(key, metadata)] if [~metadata] is set to true (which is
-    default) and just [key] otherwise.
+    [VERBOSITY] being present as [Notice | Info | Debug] only if [~verbosity] has
+    been set to [true].
+    [KEY] being [(key, metadata)] if [~metadata] is set to [true] (which is
+    default) or just [key] otherwise.
 
     Typically, [Profiler.stop ()] does not take metadata nor verbosity as argument,
-    while [Profiler.stamp ?verbosity ("key", [])] does need metadata and can take
-    an optional argument [verbosity]. *)
+    while [Profiler.stamp verbosity ("key", [])] does need [metadata] and [verbosity]. *)
 let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
   let key_expr =
     let e = [%expr [%e Key.to_expression loc key]] in
@@ -61,9 +67,7 @@ let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
         [%e expr]]
   | true ->
       [%expr
-        [%e fun_name]
-          ~verbosity:[%e Key.get_level_of_detail loc key]
-          [%e key_expr] ;
+        [%e fun_name] [%e get_verbosity loc key] [%e key_expr] ;
         [%e expr]]
 
 (** [add_custom_function_apply _ key] will create
