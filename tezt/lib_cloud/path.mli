@@ -42,3 +42,6 @@ val grafana_dashboards : string
 
 (** Path where is store the website index. *)
 val website_index : string
+
+(** CSS file for the website. *)
+val website_style : string

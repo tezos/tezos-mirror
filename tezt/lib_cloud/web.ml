@@ -101,7 +101,7 @@ let jingo_template t agents =
     ("services", Tlist (List.map service_jingo_template t.services));
   ]
 
-let index dir = dir // "index.md"
+let index dir = dir // "index.html"
 
 let write t ~agents =
   (* The content is formatted in markdown and will be rendered in html via
@@ -114,19 +114,8 @@ let write t ~agents =
   let dir = t.dir in
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
-  Process.run
-    "docker"
-    [
-      "run";
-      "--rm";
-      "--volume";
-      Format.asprintf "%s:/data" dir;
-      "pandoc/core";
-      "index.md";
-      "-o";
-      "index.html";
-      "-s";
-    ]
+  let website_style = Path.website_style in
+  Process.run "cp" [website_style; dir // "style.css"]
 
 let add_service t ~agents service =
   t.services <- service :: t.services ;
