@@ -5,7 +5,7 @@
 
 use std::collections::VecDeque;
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use ocaml::Error;
 
 use crate::{
@@ -88,6 +88,7 @@ impl Host {
     }
 
     pub fn request_kernel_reload(&mut self) {
+        trace!("kernel reload requested");
         self.needs_kernel_reload = true;
     }
 
