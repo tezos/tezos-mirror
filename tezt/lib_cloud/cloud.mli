@@ -40,6 +40,9 @@ val set_agent_name : t -> Agent.t -> string -> unit Lwt.t
 type target = {agent : Agent.t; port : int; app_name : string}
 
 val add_prometheus_source :
-  t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
+  t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
+
+val add_alert :
+  t -> ?for_:string -> name:string -> promql_query:string -> unit -> unit
 
 val add_service : t -> name:string -> url:string -> unit Lwt.t

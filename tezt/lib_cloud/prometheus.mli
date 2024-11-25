@@ -27,8 +27,14 @@ val run_with_snapshot : unit -> t Lwt.t
   to take into account a change such a different agent name or a new source. *)
 val reload : t -> unit Lwt.t
 
-(** [add_source prometheuse ?metric_path ~job_name targets] add a new job for
+(** [add_job prometheus ?metrics_path ~name targets] adds a new job for
     fetching new metrics from given targets. Automatically calls [reload] so
     that the source is taken account just after calling this function.  *)
-val add_source :
-  t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
+val add_job :
+  t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
+
+(** [add_alert prometheus ?for_ ~name ~expr] adds a new alert in the
+    Prometheus configuration. Similarly to [add_job], it implies a
+    call to [reload] so that the alert is taken into account just
+    after calling this function. *)
+val add_alert : t -> ?for_:string -> name:string -> expr:string -> unit -> unit

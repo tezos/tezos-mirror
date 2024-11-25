@@ -7,75 +7,59 @@
 
 type target = {address : string; port : int; app_name : string}
 
-type source = {job_name : string; metric_path : string; targets : target list}
+let target_jingoo_template target =
+  let open Jingoo.Jg_types in
+  Tobj
+    [
+      ("point", Tstr (Format.asprintf "%s:%d" target.address target.port));
+      ("app", Tstr target.app_name);
+    ]
+
+type job = {name : string; metrics_path : string; targets : target list}
+
+let job_jingoo_template job =
+  let open Jingoo.Jg_types in
+  Tobj
+    [
+      ("name", Tstr job.name);
+      ("metrics_path", Tstr job.metrics_path);
+      ("targets", Tlist (List.map target_jingoo_template job.targets));
+    ]
+
+type alert = {name : string; expr : string; for_ : string option}
+
+let alert_jingoo_template alert =
+  let open Jingoo.Jg_types in
+  Tobj
+    ([("name", Tstr alert.name); ("expr", Tstr alert.expr)]
+    @ match alert.for_ with None -> [] | Some for_ -> [("for_", Tstr for_)])
 
 type t = {
   configuration_file : string;
+  rules_file : string;
   alert_manager : bool;
-  mutable sources : source list;
+  mutable jobs : job list;
   scrape_interval : int;
   snapshot_filename : string option;
   port : int;
+  mutable alerts : alert list;
 }
 
 let netdata_source_of_agents agents =
-  let job_name = "netdata" in
-  let metric_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
+  let name = "netdata" in
+  let metrics_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
   let target agent =
     let app_name = Agent.name agent in
     let address = agent |> Agent.runner |> Runner.address in
     {address; port = 19999; app_name}
   in
   let targets = List.map target agents in
-  {job_name; metric_path; targets}
-
-let alert_manager_configuration () =
-  Format.asprintf
-    {|
-alerting:
-    alertmanagers:
-      - static_configs:
-          - targets: ['localhost:9093']
-|}
-
-let prefix ~scrape_interval () =
-  Format.asprintf
-    {|
-global:
-  scrape_interval: %ds
-scrape_configs:  
-|}
-    scrape_interval
-
-let str_of_target {address; port; app_name} =
-  Format.asprintf
-    {|
-    - targets: ['%s:%d']
-      labels:
-        app: '%s'
-    |}
-    address
-    port
-    app_name
-
-let str_of_source {job_name; metric_path; targets} =
-  Format.asprintf
-    {|
-  - job_name: %s
-    metrics_path: %s
-    params:
-      format: ['prometheus'] 
-    static_configs:      
-%s      
-|}
-    job_name
-    metric_path
-    (targets |> List.map str_of_target |> String.concat "")
+  {name; metrics_path; targets}
 
 let tezt_source =
   {
-    job_name = "tezt_metrics";
-    metric_path = "/metrics.txt";
+    name = "tezt_metrics";
+    metrics_path = "/metrics.txt";
     targets =
       [
         {
@@ -86,17 +70,38 @@ let tezt_source =
       ];
   }
 
-let config ~alert_manager ~scrape_interval sources =
-  let sources = List.map str_of_source sources |> String.concat "" in
-  prefix ~scrape_interval () ^ sources
-  ^ if alert_manager then alert_manager_configuration () else ""
+let jingoo_configuration_template t =
+  let open Jingoo.Jg_types in
+  [
+    ("scrape_interval", Tint t.scrape_interval);
+    ("jobs", Tlist (List.map job_jingoo_template t.jobs));
+    ("alert_manager", Tbool t.alert_manager);
+  ]
 
-let write_configuration_file
-    {scrape_interval; configuration_file; sources; alert_manager; _} =
-  let config = config ~alert_manager ~scrape_interval sources in
-  with_open_out configuration_file (fun oc ->
+let write_configuration_file t =
+  let content =
+    Jingoo.Jg_template.from_file
+      Path.prometheus_configuration
+      ~models:(jingoo_configuration_template t)
+  in
+  with_open_out t.configuration_file (fun oc ->
       Stdlib.seek_out oc 0 ;
-      output_string oc config)
+      output_string oc content)
+
+let jingoo_alert_template t =
+  let open Jingoo.Jg_types in
+  [("alerts", Tlist (List.map alert_jingoo_template t.alerts))]
+
+let write_rules_file t =
+  let content =
+    Jingoo.Jg_template.from_file
+      ~env:{Jingoo.Jg_types.std_env with autoescape = false}
+      Path.prometheus_rules_configuration
+      ~models:(jingoo_alert_template t)
+  in
+  with_open_out t.rules_file (fun oc ->
+      Stdlib.seek_out oc 0 ;
+      output_string oc content)
 
 (* Prometheus can reload its configuration by first sending the POST RPC and
    then the signal SIGHUP. *)
@@ -104,24 +109,35 @@ let reload _t =
   let* () = Process.run "curl" ["-XPOST"; "http://localhost:9090/-/reload"] in
   Process.run "docker" ["kill"; "--signal"; "SIGHUP"; "prometheus"]
 
-let add_source t ?(metric_path = "/metrics") ~job_name targets =
-  let source = {job_name; metric_path; targets} in
-  t.sources <- source :: t.sources ;
+let add_job t ?(metrics_path = "/metrics") ~name targets =
+  let source = {name; metrics_path; targets} in
+  t.jobs <- source :: t.jobs ;
   write_configuration_file t ;
   reload t
 
+let add_alert t ?for_ ~name ~expr () =
+  let alert = {name; expr; for_} in
+  t.alerts <- alert :: t.alerts ;
+  write_rules_file t ;
+  ()
+
 let start ~alert_manager agents =
-  let sources =
+  let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
   in
   let* () =
-    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "prometheus"]
+    Process.run
+      "mkdir"
+      ["-p"; Filename.get_temp_dir_name () // "prometheus" // "rules"]
   in
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let configuration_file =
     Filename.get_temp_dir_name () // "prometheus" // "prometheus.yml"
+  in
+  let rules_file =
+    Filename.get_temp_dir_name () // "prometheus" // "rules" // "tezt.rules"
   in
   let snapshot_filename = Env.prometheus_snapshot_filename in
   let port = Env.prometheus_port in
@@ -129,13 +145,16 @@ let start ~alert_manager agents =
   let t =
     {
       configuration_file;
-      sources;
+      rules_file;
+      jobs;
       scrape_interval;
       snapshot_filename;
       port;
       alert_manager;
+      alerts = [];
     }
   in
+  write_rules_file t ;
   write_configuration_file t ;
   let process =
     Process.spawn
@@ -151,7 +170,9 @@ let start ~alert_manager agents =
         (* We use the host mode so that in [localhost], prometheus can see the
            metrics endpoint run by other docker containers. *)
         "-v";
-        Format.asprintf "%s:/etc/prometheus/prometheus.yml" configuration_file;
+        Format.asprintf
+          "%s:/etc/prometheus"
+          (Filename.dirname configuration_file);
         "prom/prometheus";
         "--config.file=/etc/prometheus/prometheus.yml";
         "--web.enable-admin-api";
@@ -256,9 +277,11 @@ let run_with_snapshot () =
   Lwt.return
     {
       configuration_file;
+      rules_file = "";
       alert_manager = false;
-      sources = [];
+      jobs = [];
       scrape_interval = 0;
       snapshot_filename = Some snapshot_filename;
       port;
+      alerts = [];
     }

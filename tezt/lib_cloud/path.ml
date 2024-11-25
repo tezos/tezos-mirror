@@ -39,3 +39,9 @@ let grafana_dashboards = project // "grafana" // "dashboards"
 let website_index = project // "website" // "index.html.jingoo"
 
 let website_style = project // "website" // "style.css"
+
+let prometheus_configuration =
+  project // "prometheus" // "prometheus.yml.jingoo"
+
+let prometheus_rules_configuration =
+  project // "prometheus" // "rules" // "tezt.rules.jingoo"

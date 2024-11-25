@@ -1375,7 +1375,7 @@ let get_infos_per_level ~client ~endpoint ~level ~etherlink_operator =
       etherlink_operator_balance;
     }
 
-let add_source cloud agent ~job_name node dal_node =
+let add_source cloud agent ~name node dal_node =
   let agent_name = Agent.name agent in
   let node_metric_target =
     Cloud.
@@ -1395,10 +1395,10 @@ let add_source cloud agent ~job_name node dal_node =
   in
   Cloud.add_prometheus_source
     cloud
-    ~job_name
+    ~name
     [node_metric_target; dal_node_metric_target]
 
-let add_etherlink_source cloud agent ~job_name ?dal_node node sc_rollup_node
+let add_etherlink_source cloud agent ~name ?dal_node node sc_rollup_node
     evm_node =
   let agent_name = Agent.name agent in
   let node_metric_target =
@@ -1450,7 +1450,7 @@ let add_etherlink_source cloud agent ~job_name ?dal_node node sc_rollup_node
   in
   Cloud.add_prometheus_source
     cloud
-    ~job_name
+    ~name
     ([node_metric_target; sc_rollup_metric_target; evm_node_metric_target]
     @ dal_node_metric_target)
 
@@ -1515,7 +1515,7 @@ let init_public_network cloud (configuration : configuration)
             dal_node
         in
         let* () = Node.wait_for_ready node in
-        let* () = add_source cloud agent ~job_name:"bootstrap" node dal_node in
+        let* () = add_source cloud agent ~name:"bootstrap" node dal_node in
         let* () =
           Dal_node.Agent.run
             ~memtrace:configuration.memtrace
@@ -1739,12 +1739,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       dal_bootstrap_node
   in
   let* () =
-    add_source
-      cloud
-      agent
-      ~job_name:"bootstrap"
-      bootstrap_node
-      dal_bootstrap_node
+    add_source cloud agent ~name:"bootstrap" bootstrap_node dal_bootstrap_node
   in
   let node_rpc_endpoint =
     Endpoint.
@@ -1841,12 +1836,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
       agent
   in
   let* () =
-    add_source
-      cloud
-      agent
-      ~job_name:(Format.asprintf "baker-%d" i)
-      node
-      dal_node
+    add_source cloud agent ~name:(Format.asprintf "baker-%d" i) node dal_node
   in
   Lwt.return {node; dal_node; baker; account; stake}
 
@@ -1897,12 +1887,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   in
   let () = toplog "Init producer: add DAL node metrics" in
   let* () =
-    add_source
-      cloud
-      agent
-      ~job_name:(Format.asprintf "producer-%d" i)
-      node
-      dal_node
+    add_source cloud agent ~name:(Format.asprintf "producer-%d" i) node dal_node
   in
   let* () =
     match teztale with
@@ -1962,12 +1947,7 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
       dal_node
   in
   let* () =
-    add_source
-      cloud
-      agent
-      ~job_name:(Format.asprintf "observer-%d" i)
-      node
-      dal_node
+    add_source cloud agent ~name:(Format.asprintf "observer-%d" i) node dal_node
   in
   let* () =
     Dal_node.Agent.run
@@ -2231,7 +2211,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
     add_etherlink_source
       cloud
       agent
-      ~job_name:(Format.asprintf "etherlink-%s" name)
+      ~name:(Format.asprintf "etherlink-%s" name)
       ?dal_node
       node
       sc_rollup_node
@@ -2313,7 +2293,7 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
     add_etherlink_source
       cloud
       agent
-      ~job_name:(Format.asprintf "etherlink-%s" name)
+      ~name:(Format.asprintf "etherlink-%s" name)
       node
       sc_rollup_node
       evm_node
@@ -2530,6 +2510,12 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
+  Cloud.add_alert
+    cloud
+    ~for_:"30s"
+    ~name:"dal-ghostnet-not-attesting"
+    ~promql_query:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
+    () ;
   Lwt.return
     {
       cloud;

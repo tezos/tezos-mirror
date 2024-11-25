@@ -51,6 +51,18 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
       ~source:Path.website_style
       ~destination:("/root" // Path.website_style)
   in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.prometheus_configuration
+      ~destination:("/root" // Path.prometheus_configuration)
+  in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.prometheus_rules_configuration
+      ~destination:("/root" // Path.prometheus_rules_configuration)
+  in
   (* If the Proxy agent uses grafana, it needs some dashboards. We copy them to
      the proxy VM and then import them.
 
