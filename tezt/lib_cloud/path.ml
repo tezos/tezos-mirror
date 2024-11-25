@@ -36,4 +36,6 @@ let proxy_deployement ~tezt_cloud =
 
 let grafana_dashboards = project // "grafana" // "dashboards"
 
-let website_index = project // "website" // "index.md.jingoo"
+let website_index = project // "website" // "index.html.jingoo"
+
+let website_style = project // "website" // "style.css"
