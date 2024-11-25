@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Elem, Layout, ManagerAlloc, ManagerBase, ManagerClone, ManagerDeserialise,
-    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, StaticCopy,
+    AllocatedOf, Elem, EnrichedValue, EnrichedValueLinked, Layout, ManagerAlloc, ManagerBase,
+    ManagerClone, ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise,
+    ManagerWrite, StaticCopy,
 };
 use serde::ser::SerializeTuple;
 use std::{
@@ -28,6 +29,10 @@ impl ManagerBase for Owned {
     type Region<E: 'static, const LEN: usize> = [E; LEN];
 
     type DynRegion<const LEN: usize> = Box<[u8; LEN]>;
+
+    type EnrichedCell<V: EnrichedValue> = (V::E, V::D<Self>);
+
+    type ManagerRoot = Self;
 }
 
 impl ManagerAlloc for Owned {
@@ -46,6 +51,14 @@ impl ManagerAlloc for Owned {
             let alloc = std::alloc::alloc_zeroed(layout);
             Box::from_raw(alloc.cast())
         }
+    }
+
+    fn allocate_enriched_cell<V: EnrichedValueLinked<Self>>(
+        &mut self,
+        value: V::E,
+    ) -> Self::EnrichedCell<V> {
+        let derived = V::derive(&value);
+        (value, derived)
     }
 }
 
@@ -97,6 +110,26 @@ impl ManagerRead for Owned {
         for elem in values.iter_mut() {
             elem.from_stored_in_place();
         }
+    }
+
+    fn enriched_cell_read<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> (V::E, V::D<Self>)
+    where
+        V::E: Copy,
+        V::D<Self>: Copy,
+    {
+        *cell
+    }
+
+    fn enriched_cell_ref<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> (&V::E, &V::D<Self>) {
+        (&cell.0, &cell.1)
+    }
+
+    fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
+    where
+        V: EnrichedValue,
+        V::E: Copy,
+    {
+        cell.0
     }
 }
 
@@ -150,6 +183,16 @@ impl ManagerWrite for Owned {
             }
         }
     }
+
+    fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
+    where
+        V: EnrichedValueLinked<Self>,
+    {
+        let derived = V::derive(&value);
+
+        cell.0 = value;
+        cell.1 = derived;
+    }
 }
 
 impl ManagerReadWrite for Owned {
@@ -190,6 +233,17 @@ impl ManagerSerialise for Owned {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         serializer.serialize_bytes(region.as_slice())
+    }
+
+    fn serialise_enriched_cell<V: EnrichedValue, S: serde::Serializer>(
+        cell: &Self::EnrichedCell<V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        V::E: serde::Serialize,
+    {
+        use serde::Serialize;
+        cell.0.serialize(serializer)
     }
 }
 
@@ -261,6 +315,19 @@ impl ManagerDeserialise for Owned {
         vec.try_into()
             .map_err(|_err| serde::de::Error::custom("Dynamic region of mismatching length"))
     }
+
+    fn deserialise_enriched_cell<'de, V, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self::EnrichedCell<V>, D::Error>
+    where
+        V: EnrichedValueLinked<Self>,
+        V::E: serde::Deserialize<'de>,
+    {
+        use serde::Deserialize;
+        let value = V::E::deserialize(deserializer)?;
+        let derived = V::derive(&value);
+        Ok((value, derived))
+    }
 }
 
 impl ManagerClone for Owned {
@@ -274,12 +341,23 @@ impl ManagerClone for Owned {
     fn clone_dyn_region<const LEN: usize>(region: &Self::DynRegion<LEN>) -> Self::DynRegion<LEN> {
         region.clone()
     }
+
+    fn clone_enriched_cell<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> Self::EnrichedCell<V>
+    where
+        V::E: Copy,
+        V::D<Self>: Copy,
+    {
+        #[allow(clippy::clone_on_copy)]
+        cell.clone()
+    }
 }
 
 #[cfg(test)]
 pub mod test_helpers {
     use super::*;
-    use crate::state_backend::{test_helpers::TestBackendFactory, Cell, Cells, DynCells};
+    use crate::state_backend::{
+        test_helpers::TestBackendFactory, Cell, Cells, DynCells, EnrichedCell,
+    };
 
     /// Test backend factory for the owned state manager
     pub struct OwnedTestBackendFactory;
@@ -342,6 +420,45 @@ pub mod test_helpers {
 
             let bytes_after = bincode::serialize(&cells_after).unwrap();
             assert_eq!(bytes, bytes_after);
+        });
+    }
+
+    /// Ensure [`EnrichedCell`] can be serialised and deserialised in a consistent way.
+    #[test]
+    fn enriched_cell_serialise() {
+        pub struct Enriching;
+        pub struct Fun(Box<dyn Fn(u64) -> u64>);
+
+        impl EnrichedValue for Enriching {
+            type E = u64;
+            type D<M: ManagerBase + ?Sized> = Fun;
+        }
+
+        impl<'a> From<&'a u64> for Fun {
+            fn from(value: &'a u64) -> Self {
+                let value = *value;
+                Self(Box::new(move |x| value.wrapping_add(x)))
+            }
+        }
+
+        proptest::proptest!(|(value: u64)| {
+            let mut cell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind((0u64, Fun::from(&0)));
+            cell.write(value);
+
+            assert_eq!(value, *cell.read_ref().0);
+            let bytes = bincode::serialize(&cell).unwrap();
+
+            let cell_after: EnrichedCell<Enriching, Owned> = bincode::deserialize(&bytes).unwrap();
+
+            for i in 0..5 {
+                assert_eq!(cell.read_ref().0, cell_after.read_ref().0);
+
+                let fun = cell.read_ref().1;
+                let fun_after = cell_after.read_ref().1;
+
+                assert_eq!(value.wrapping_add(i), (fun.0)(i));
+                assert_eq!((fun.0)(i), (fun_after.0)(i));
+            }
         });
     }
 

@@ -68,6 +68,35 @@ pub use elems::*;
 pub use layout::*;
 pub use region::*;
 
+/// An enriched value may be stored in a [`ManagerBase::EnrichedCell`].
+///
+/// This allows a value to have an additional, derived, value attached - that may be expensive
+/// to derive lazily.
+///
+/// This derived value does not form part of any stored state/commitments.
+pub trait EnrichedValue: 'static {
+    type E: 'static;
+    type D<M: ManagerBase + ?Sized>: Sized;
+}
+
+/// Specifies that there exists a path to derive `V::D` from `&V::E`,
+/// for a given manager.
+pub trait EnrichedValueLinked<M: ManagerBase + ?Sized>: EnrichedValue {
+    /// Construct the derived value from the stored value, maps to
+    /// the `From` trait by default.
+    fn derive(v: &Self::E) -> Self::D<M>;
+}
+
+impl<Value, M: ManagerBase> EnrichedValueLinked<M> for Value
+where
+    Value: EnrichedValue,
+    Value::D<M>: for<'a> From<&'a Value::E>,
+{
+    fn derive(v: &Self::E) -> Self::D<M> {
+        v.into()
+    }
+}
+
 /// Manager of the state backend storage
 pub trait ManagerBase {
     /// Region that has been allocated in the state storage
@@ -75,6 +104,20 @@ pub trait ManagerBase {
 
     /// Dynamic region represents a fixed-sized byte vector that has been allocated in the state storage
     type DynRegion<const LEN: usize>;
+
+    /// An [enriched] value may have a derived value attached.
+    ///
+    /// [enriched]: EnrichedValue
+    type EnrichedCell<V: EnrichedValue>;
+
+    /// The root manager may either be itself, or occassionally the manager that this manager
+    /// wraps.
+    ///
+    /// For example, the [`Ref`] backend is often use to wrap the [`Owned`] backend to gain access
+    /// to its regions. In this case, the root manager would be the owned backend.
+    ///
+    /// [`Owned`]: owned_backend::Owned
+    type ManagerRoot: ManagerBase;
 }
 
 /// Manager with allocation capabilities
@@ -90,6 +133,11 @@ pub trait ManagerAlloc: 'static + ManagerReadWrite {
 
     /// Allocate a dynamic region in the state storage.
     fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN>;
+
+    /// Allocate an enriched cell.
+    fn allocate_enriched_cell<V>(&mut self, init_value: V::E) -> Self::EnrichedCell<V>
+    where
+        V: EnrichedValueLinked<Self>;
 }
 
 /// Manager with read capabilities
@@ -115,10 +163,28 @@ pub trait ManagerRead: ManagerBase {
         address: usize,
         values: &mut [E],
     );
+
+    /// Read the value, and derived value, contained in the enriched cell.
+    fn enriched_cell_read<V>(cell: &Self::EnrichedCell<V>) -> (V::E, V::D<Self::ManagerRoot>)
+    where
+        V: EnrichedValueLinked<Self::ManagerRoot>,
+        V::E: Copy,
+        V::D<Self::ManagerRoot>: Copy;
+
+    /// Obtain a refernce to the value, and derived value, contained in the enriched cell.
+    fn enriched_cell_ref<V>(cell: &Self::EnrichedCell<V>) -> (&V::E, &V::D<Self::ManagerRoot>)
+    where
+        V: EnrichedValueLinked<Self::ManagerRoot>;
+
+    /// Obtain a refernce to the value, and derived value, contained in the enriched cell.
+    fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
+    where
+        V: EnrichedValue,
+        V::E: Copy;
 }
 
 /// Manager with write capabilities
-pub trait ManagerWrite: ManagerBase {
+pub trait ManagerWrite: ManagerBase<ManagerRoot = Self> {
     /// Update an element in the region.
     fn region_write<E: 'static, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
@@ -142,6 +208,11 @@ pub trait ManagerWrite: ManagerBase {
         address: usize,
         values: &[E],
     );
+
+    /// Update the value contained in an enriched cell. The derived value will be recalculated.
+    fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
+    where
+        V: EnrichedValueLinked<Self>;
 }
 
 /// Manager with capabilities that require both read and write
@@ -167,6 +238,16 @@ pub trait ManagerSerialise: ManagerBase {
         region: &Self::DynRegion<LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>;
+
+    /// Serialise the contents of the enriched cell.
+    fn serialise_enriched_cell<V, S>(
+        cell: &Self::EnrichedCell<V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        V: EnrichedValue,
+        V::E: serde::Serialize,
+        S: serde::Serializer;
 }
 
 /// Manager with the ability to deserialise regions
@@ -185,6 +266,14 @@ pub trait ManagerDeserialise: ManagerBase {
     fn deserialise_dyn_region<'de, const LEN: usize, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Self::DynRegion<LEN>, D::Error>;
+
+    /// Deserialise an enriched cell.
+    fn deserialise_enriched_cell<'de, V, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self::EnrichedCell<V>, D::Error>
+    where
+        V: EnrichedValueLinked<Self>,
+        V::E: serde::Deserialize<'de>;
 }
 
 /// Manager with the ability to clone regions
@@ -196,15 +285,26 @@ pub trait ManagerClone: ManagerBase {
 
     /// Clone the dynamic region.
     fn clone_dyn_region<const LEN: usize>(region: &Self::DynRegion<LEN>) -> Self::DynRegion<LEN>;
+
+    /// Clone the enriched cell.
+    fn clone_enriched_cell<V>(cell: &Self::EnrichedCell<V>) -> Self::EnrichedCell<V>
+    where
+        V: EnrichedValue,
+        V::E: Copy,
+        V::D<Self>: Copy;
 }
 
 /// Manager wrapper around `M` whose regions are immutable references to regions of `M`
-pub struct Ref<'backend, M>(std::marker::PhantomData<&'backend M>);
+pub struct Ref<'backend, M>(std::marker::PhantomData<fn(&'backend M)>);
 
 impl<'backend, M: ManagerBase> ManagerBase for Ref<'backend, M> {
     type Region<E: 'static, const LEN: usize> = &'backend M::Region<E, LEN>;
 
     type DynRegion<const LEN: usize> = &'backend M::DynRegion<LEN>;
+
+    type EnrichedCell<V: EnrichedValue> = &'backend M::EnrichedCell<V>;
+
+    type ManagerRoot = M::ManagerRoot;
 }
 
 impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
@@ -220,6 +320,16 @@ impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         M::serialise_dyn_region(region, serializer)
+    }
+
+    fn serialise_enriched_cell<V: EnrichedValue, S: serde::Serializer>(
+        cell: &Self::EnrichedCell<V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        V::E: serde::Serialize,
+    {
+        M::serialise_enriched_cell(cell, serializer)
     }
 }
 
@@ -249,6 +359,31 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
         values: &mut [E],
     ) {
         M::dyn_region_read_all(region, address, values)
+    }
+
+    fn enriched_cell_read<V: EnrichedValueLinked<Self::ManagerRoot>>(
+        cell: &Self::EnrichedCell<V>,
+    ) -> (V::E, V::D<Self::ManagerRoot>)
+    where
+        V::D<Self::ManagerRoot>: Copy,
+        V::E: Copy,
+    {
+        M::enriched_cell_read(cell)
+    }
+
+    fn enriched_cell_ref<V: EnrichedValueLinked<Self::ManagerRoot>>(
+        cell: &Self::EnrichedCell<V>,
+    ) -> (&V::E, &V::D<Self::ManagerRoot>)
+where {
+        M::enriched_cell_ref(cell)
+    }
+
+    fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
+    where
+        V: EnrichedValue,
+        V::E: Copy,
+    {
+        M::enriched_cell_read_stored(cell)
     }
 }
 

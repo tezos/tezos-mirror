@@ -5,11 +5,98 @@
 
 use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
-    Elem, ManagerBase, ManagerClone, ManagerDeserialise, ManagerRead, ManagerReadWrite,
-    ManagerSerialise, ManagerWrite, Ref,
+    Elem, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerClone, ManagerDeserialise,
+    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
 use crate::storage::binary;
+use std::borrow::Borrow;
 use std::num::NonZeroUsize;
+
+/// Link a stored value directly with a derived value -
+/// that would either be expensive to compute each time, or cannot
+/// itself be stored.
+///
+/// Only the value of `V::E` forms part of the 'state' for the purposes of commitments etc.
+pub struct EnrichedCell<V: EnrichedValue, M: ManagerBase> {
+    cell: M::EnrichedCell<V>,
+}
+
+impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
+    /// Bind this state to the enriched cell.
+    pub fn bind(cell: M::EnrichedCell<V>) -> Self {
+        Self { cell }
+    }
+
+    /// Obtain a structure with references to the bound enriched cell of this type.
+    pub fn struct_ref(&self) -> EnrichedCell<V, Ref<'_, M>> {
+        EnrichedCell {
+            cell: self.cell.borrow(),
+        }
+    }
+
+    /// Write the value back to the enriched cell.
+    ///
+    /// Reading the new value will produce the new derived value also.
+    pub fn write(&mut self, value: V::E)
+    where
+        M: ManagerWrite,
+        V: EnrichedValueLinked<M>,
+    {
+        M::enriched_cell_write(&mut self.cell, value)
+    }
+
+    /// Read the value & derived value from the enriched cell.
+    pub fn read(&self) -> (V::E, V::D<M::ManagerRoot>)
+    where
+        M: ManagerRead,
+        V: EnrichedValueLinked<M::ManagerRoot>,
+        V::E: Copy,
+        V::D<M::ManagerRoot>: Copy,
+    {
+        M::enriched_cell_read(&self.cell)
+    }
+
+    /// Obtain references to the value & derived value contained
+    /// within the cell.
+    pub fn read_ref(&self) -> (&V::E, &V::D<M::ManagerRoot>)
+    where
+        M: ManagerRead,
+        V: EnrichedValueLinked<M::ManagerRoot>,
+    {
+        M::enriched_cell_ref(&self.cell)
+    }
+
+    /// Read only the stored value from the enriched cell.
+    pub fn read_stored(&self) -> V::E
+    where
+        M: ManagerRead,
+        V::E: Copy,
+    {
+        M::enriched_cell_read_stored(&self.cell)
+    }
+}
+
+impl<V: EnrichedValue, M: ManagerClone> Clone for EnrichedCell<V, M>
+where
+    V::E: Copy,
+    V::D<M>: Copy,
+{
+    fn clone(&self) -> Self {
+        Self {
+            cell: M::clone_enriched_cell(&self.cell),
+        }
+    }
+}
+
+impl<V, M: ManagerRead> PartialEq for EnrichedCell<V, M>
+where
+    V: EnrichedValueLinked<M::ManagerRoot>,
+    V::E: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        M::enriched_cell_ref(&self.cell).0 == M::enriched_cell_ref(&other.cell).0
+    }
+}
 
 /// Single element of type `E`
 #[repr(transparent)]
@@ -274,6 +361,27 @@ impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> serde::Serializ
     }
 }
 
+impl<V: EnrichedValue, M: ManagerSerialise> serde::Serialize for EnrichedCell<V, M>
+where
+    V::E: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        M::serialise_enriched_cell(&self.cell, serializer)
+    }
+}
+
+impl<V: EnrichedValue, M: ManagerSerialise> RootHashable for EnrichedCell<V, M>
+where
+    V::E: serde::Serialize,
+{
+    fn hash(&self) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(self)
+    }
+}
+
 impl<'de, E: serde::Deserialize<'de>, const LEN: usize, M: ManagerDeserialise>
     serde::Deserialize<'de> for Cells<E, LEN, M>
 {
@@ -283,6 +391,20 @@ impl<'de, E: serde::Deserialize<'de>, const LEN: usize, M: ManagerDeserialise>
     {
         let region = M::deserialise_region(deserializer)?;
         Ok(Self { region })
+    }
+}
+
+impl<'de, V, M: ManagerDeserialise> serde::Deserialize<'de> for EnrichedCell<V, M>
+where
+    V: EnrichedValueLinked<M>,
+    V::E: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let cell = M::deserialise_enriched_cell(deserializer)?;
+        Ok(Self { cell })
     }
 }
 
