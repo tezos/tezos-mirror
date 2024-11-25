@@ -1700,7 +1700,6 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~url:
         (sf "http://explorus.io?network=%s" (Node.rpc_endpoint bootstrap_node))
   in
-  let* () = Cloud.write_website cloud in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
   let* baker_accounts =
     Client.stresstest_gen_keys
