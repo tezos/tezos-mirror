@@ -80,9 +80,9 @@ use super::{bus::Address, ProgramCounterUpdate};
 use crate::cache_utils::FenceCounter;
 use crate::cache_utils::Sizes;
 use crate::default::ConstDefault;
-use crate::state_backend::{self, ManagerAlloc, ManagerClone};
 use crate::state_backend::{
-    AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+    self, AllocatedOf, Atom, Cell, ManagerAlloc, ManagerBase, ManagerClone, ManagerRead,
+    ManagerReadWrite, ManagerWrite, Ref,
 };
 use crate::traps::{EnvironException, Exception};
 use std::marker::PhantomData;

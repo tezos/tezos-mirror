@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Elem, EnrichedValue, Layout, ManagerAlloc, ManagerBase, ManagerClone,
-    ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, StaticCopy,
+    AllocatedOf, Elem, EnrichedValue, EnrichedValueLinked, Layout, ManagerAlloc, ManagerBase,
+    ManagerClone, ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise,
+    ManagerWrite, StaticCopy,
 };
 use serde::ser::SerializeTuple;
 use std::{
@@ -52,11 +53,11 @@ impl ManagerAlloc for Owned {
         }
     }
 
-    fn allocate_enriched_cell<V: EnrichedValue>(&mut self, value: V::E) -> Self::EnrichedCell<V>
-    where
-        V::D<Self>: for<'a> From<&'a V::E>,
-    {
-        let derived = V::D::<Self>::from(&value);
+    fn allocate_enriched_cell<V: EnrichedValueLinked<Self>>(
+        &mut self,
+        value: V::E,
+    ) -> Self::EnrichedCell<V> {
+        let derived = V::derive(&value);
         (value, derived)
     }
 }
@@ -122,6 +123,14 @@ impl ManagerRead for Owned {
     fn enriched_cell_ref<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> (&V::E, &V::D<Self>) {
         (&cell.0, &cell.1)
     }
+
+    fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
+    where
+        V: EnrichedValue,
+        V::E: Copy,
+    {
+        cell.0
+    }
 }
 
 impl ManagerWrite for Owned {
@@ -175,11 +184,11 @@ impl ManagerWrite for Owned {
         }
     }
 
-    fn enriched_cell_write<V: EnrichedValue>(cell: &mut Self::EnrichedCell<V>, value: V::E)
+    fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
     where
-        V::D<Self>: for<'a> From<&'a V::E>,
+        V: EnrichedValueLinked<Self>,
     {
-        let derived = V::D::from(&value);
+        let derived = V::derive(&value);
 
         cell.0 = value;
         cell.1 = derived;
@@ -307,16 +316,16 @@ impl ManagerDeserialise for Owned {
             .map_err(|_err| serde::de::Error::custom("Dynamic region of mismatching length"))
     }
 
-    fn deserialise_enriched_cell<'de, V: EnrichedValue, D: serde::Deserializer<'de>>(
+    fn deserialise_enriched_cell<'de, V, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Self::EnrichedCell<V>, D::Error>
     where
+        V: EnrichedValueLinked<Self>,
         V::E: serde::Deserialize<'de>,
-        V::D<Self>: for<'a> From<&'a V::E>,
     {
         use serde::Deserialize;
         let value = V::E::deserialize(deserializer)?;
-        let derived = V::D::<Self>::from(&value);
+        let derived = V::derive(&value);
         Ok((value, derived))
     }
 }
@@ -422,7 +431,7 @@ pub mod test_helpers {
 
         impl EnrichedValue for Enriching {
             type E = u64;
-            type D<M: ManagerBase> = Fun;
+            type D<M: ManagerBase + ?Sized> = Fun;
         }
 
         impl<'a> From<&'a u64> for Fun {

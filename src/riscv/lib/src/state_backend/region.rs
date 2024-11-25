@@ -5,8 +5,8 @@
 
 use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
-    Elem, EnrichedValue, ManagerBase, ManagerClone, ManagerDeserialise, ManagerRead,
-    ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
+    Elem, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerClone, ManagerDeserialise,
+    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
 use crate::storage::binary;
 use std::borrow::Borrow;
@@ -16,8 +16,7 @@ use std::num::NonZeroUsize;
 /// that would either be expensive to compute each time, or cannot
 /// itself be stored.
 ///
-/// Only the value of `E` forms part of the 'state' for the purposes of
-/// commitments etc.
+/// Only the value of `V::E` forms part of the 'state' for the purposes of commitments etc.
 pub struct EnrichedCell<V: EnrichedValue, M: ManagerBase> {
     cell: M::EnrichedCell<V>,
 }
@@ -41,7 +40,7 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     pub fn write(&mut self, value: V::E)
     where
         M: ManagerWrite,
-        V::D<M>: for<'a> From<&'a V::E>,
+        V: EnrichedValueLinked<M>,
     {
         M::enriched_cell_write(&mut self.cell, value)
     }
@@ -50,8 +49,9 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     pub fn read(&self) -> (V::E, V::D<M::ManagerRoot>)
     where
         M: ManagerRead,
+        V: EnrichedValueLinked<M::ManagerRoot>,
         V::E: Copy,
-        V::D<M::ManagerRoot>: for<'a> From<&'a V::E> + Copy,
+        V::D<M::ManagerRoot>: Copy,
     {
         M::enriched_cell_read(&self.cell)
     }
@@ -61,9 +61,18 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     pub fn read_ref(&self) -> (&V::E, &V::D<M::ManagerRoot>)
     where
         M: ManagerRead,
-        V::D<M::ManagerRoot>: for<'a> From<&'a V::E>,
+        V: EnrichedValueLinked<M::ManagerRoot>,
     {
         M::enriched_cell_ref(&self.cell)
+    }
+
+    /// Read only the stored value from the enriched cell.
+    pub fn read_stored(&self) -> V::E
+    where
+        M: ManagerRead,
+        V::E: Copy,
+    {
+        M::enriched_cell_read_stored(&self.cell)
     }
 }
 
@@ -79,10 +88,10 @@ where
     }
 }
 
-impl<V: EnrichedValue, M: ManagerRead> PartialEq for EnrichedCell<V, M>
+impl<V, M: ManagerRead> PartialEq for EnrichedCell<V, M>
 where
+    V: EnrichedValueLinked<M::ManagerRoot>,
     V::E: PartialEq,
-    V::D<M::ManagerRoot>: for<'a> From<&'a V::E>,
 {
     fn eq(&self, other: &Self) -> bool {
         M::enriched_cell_ref(&self.cell).0 == M::enriched_cell_ref(&other.cell).0
@@ -385,10 +394,10 @@ impl<'de, E: serde::Deserialize<'de>, const LEN: usize, M: ManagerDeserialise>
     }
 }
 
-impl<'de, V: EnrichedValue, M: ManagerDeserialise> serde::Deserialize<'de> for EnrichedCell<V, M>
+impl<'de, V, M: ManagerDeserialise> serde::Deserialize<'de> for EnrichedCell<V, M>
 where
+    V: EnrichedValueLinked<M>,
     V::E: serde::Deserialize<'de>,
-    V::D<M>: for<'a> From<&'a V::E>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
