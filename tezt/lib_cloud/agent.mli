@@ -38,10 +38,11 @@ val vm_name : t -> string
 (** [set_name agent name] sets the name of the agent to [name]. *)
 val set_name : t -> string -> unit
 
-(** [copy ?destination agent ~source] copies the file into the [agent] directory and
-    returned the directory where the file can be found. It is assumed
-    the [source] file does not exist on the agent machine. If the
-    parent directory does not exist, it will be created.
+(** [copy ?consistency_check ?refresh ?destination agent ~source]
+    copies the file into the [agent] directory and returned the
+    directory where the file can be found. It is assumed the [source]
+    file does not exist on the agent machine. If the parent directory
+    does not exist, it will be created.
 
     It returns the destination the files was copied at. If
     [destination] is not set, the destination is given by
@@ -55,6 +56,7 @@ val set_name : t -> string -> unit
     If [is_directory] is set, then the whole source is copied, including
     subdirectories. *)
 val copy :
+  ?consistency_check:bool ->
   ?refresh:bool ->
   ?is_directory:bool ->
   ?destination:string ->

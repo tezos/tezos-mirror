@@ -91,6 +91,8 @@ val uri_of_docker_image : docker_image -> string Lwt.t
 
 val zone : unit -> string Lwt.t
 
+val check_file_consistency : bool
+
 val wait_process :
   ?sleep:int ->
   is_ready:(string -> bool) ->

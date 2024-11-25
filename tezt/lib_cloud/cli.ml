@@ -254,3 +254,22 @@ let open_telemetry =
     ~set_long_synonyms:["otel"]
     ~description:"Run the Open Telemetry stack"
     false
+
+let macosx =
+  Clap.flag
+    ~section
+    ~set_long:"macosx"
+    ~description:"Use this flag if you run tezt-cloud from Mac OS/X"
+    false
+
+let check_file_consistency =
+  Clap.flag
+    ~section
+    ~set_long:"check-file-consistency"
+    ~unset_long:"no-check-file-consistency"
+    ~description:
+      "By default, `tezt-cloud` ensures that files copied from the host \
+       machine to a VM are consistent (i.e., they have the same hash). \
+       Although a scenario can opt in or opt out, this flag sets the default \
+       behavior. Its default value is [true] unless [--macosx] is used."
+    (not macosx)

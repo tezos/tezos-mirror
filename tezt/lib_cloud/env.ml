@@ -81,6 +81,8 @@ let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
 
 let dockerfile = Path.dockerfile ~alias:dockerfile_alias
 
+let check_file_consistency = Cli.check_file_consistency
+
 let project_id = Gcloud.project_id
 
 let init () =
