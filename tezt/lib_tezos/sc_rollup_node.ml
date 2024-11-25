@@ -477,7 +477,7 @@ let wait_for_ready sc_node =
       let promise, resolver = Lwt.task () in
       sc_node.persistent_state.pending_ready <-
         resolver :: sc_node.persistent_state.pending_ready ;
-      check_event sc_node "sc_rollup_node_is_ready.v0" promise
+      check_event sc_node "smart_rollup_node_is_ready.v0" promise
 
 let update_level sc_node current_level =
   (match sc_node.status with
@@ -510,7 +510,7 @@ let wait_for_level ?timeout sc_node level =
       check_event
         ?timeout
         sc_node
-        "smart_rollup_node_daemon_new_heads_processed.v0"
+        "smart_rollup_node_daemon_loop_process_finished.v0"
         ~where:("to >= " ^ string_of_int level)
         promise
 
@@ -553,7 +553,7 @@ let handle_event sc_node {name; value; timestamp = _} =
      makes some tests flaky when used to update the level here. *)
   match name with
   | "smart_rollup_node_is_ready.v0" -> set_ready sc_node
-  | "smart_rollup_node_daemon_new_heads_processed.v0" ->
+  | "smart_rollup_node_daemon_loop_process_finished.v0" ->
       let level = JSON.(value |-> "to" |> as_int) in
       update_level sc_node level
   | _ -> ()
