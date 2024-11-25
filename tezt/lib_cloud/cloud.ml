@@ -216,9 +216,7 @@ let orchestrator deployement f =
   in
   let* prometheus =
     if Env.prometheus then
-      let* prometheus =
-        Prometheus.start ~alert_manager:(Env.alert_manager <> []) agents
-      in
+      let* prometheus = Prometheus.start agents in
       Lwt.return_some prometheus
     else Lwt.return_none
   in
@@ -236,7 +234,7 @@ let orchestrator deployement f =
     else Lwt.return (None, None)
   in
   let* alert_manager =
-    match Env.alert_manager with
+    match Env.alert_handlers with
     | [] -> Lwt.return_none
     | configuration_files ->
         let* alert_manager = Alert_manager.run ~configuration_files in

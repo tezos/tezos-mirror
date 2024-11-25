@@ -121,7 +121,7 @@ let add_alert t ?for_ ~name ~expr () =
   write_rules_file t ;
   ()
 
-let start ~alert_manager agents =
+let start agents =
   let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
@@ -150,7 +150,7 @@ let start ~alert_manager agents =
       scrape_interval;
       snapshot_filename;
       port;
-      alert_manager;
+      alert_manager = Env.alert_handlers <> [];
       alerts = [];
     }
   in
