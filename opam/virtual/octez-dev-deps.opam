@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "merge-fmt"
-  "merlin" { >= "4.14" }
+  "merlin" { >= "4.14" & < "4.17" }
   "ocaml-lsp-server" { >= "1.18.0" }
   "ocp-indent"
   "odoc" { >= "2.4.2" }
