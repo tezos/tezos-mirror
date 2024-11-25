@@ -5,11 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Agent : sig
-  type t
-
-  val configuration : Agent.t -> Configuration.t
-end
+module Agent = Agent
 
 module Configuration : sig
   type docker_image =
