@@ -33,8 +33,16 @@ val reload : t -> unit Lwt.t
 val add_job :
   t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
 
-(** [add_alert prometheus ?for_ ~name ~expr] adds a new alert in the
-    Prometheus configuration. Similarly to [add_job], it implies a
-    call to [reload] so that the alert is taken into account just
-    after calling this function. *)
-val add_alert : t -> ?for_:string -> name:string -> expr:string -> unit -> unit
+(** [add_alert prometheus ~name ~severity ~expr ?for_ ?description
+    ?summary] adds a new alert in the Prometheus configuration.
+    Similarly to [add_job], it implies a call to [reload] so that the
+    alert is taken into account just after calling this function. *)
+val add_alert :
+  name:string ->
+  severity:[`Critical | `Info | `None | `Warning] ->
+  expr:string ->
+  ?for_:string ->
+  ?description:string ->
+  ?summary:string ->
+  t ->
+  unit

@@ -2550,10 +2550,10 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let* versions = Network.versions configuration.network in
   Cloud.add_alert
     cloud
-    ~for_:"30s"
     ~name:"dal-ghostnet-not-attesting"
-    ~promql_query:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
-    () ;
+    ~severity:`Warning
+    ~expr:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
+    ~for_:"30s" ;
   Lwt.return
     {
       cloud;
