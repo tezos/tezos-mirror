@@ -4690,9 +4690,8 @@ let octez_dal_node_lib =
         octez_base_unix;
         octez_dal_node_services;
         octez_dal_node_migrations;
-        octez_client_base |> open_;
         octez_protocol_updater |> open_;
-        octez_client_base_unix |> open_;
+        octez_rpc_http_client_unix;
         octez_stdlib_unix |> open_;
         octez_crypto_dal |> open_;
         octez_p2p |> open_;
@@ -4709,7 +4708,6 @@ let _octez_dal_node_lib_test =
     ~deps:
       [
         octez_rustzcash_deps;
-        octez_sapling;
         octez_stdlib |> open_;
         octez_stdlib_unix |> open_;
         octez_base |> open_ ~m:"TzPervasives";
@@ -8235,15 +8233,13 @@ let _octez_dal_node =
     ~with_macos_security_framework:true
     ~deps:
       ([
-         octez_rust_deps;
+         octez_rustzcash_deps;
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
          octez_version;
          cmdliner;
          octez_client_base |> open_;
-         octez_client_base_unix |> open_;
-         octez_client_commands |> open_;
          octez_rpc_http |> open_;
          octez_rpc_http_server;
          octez_protocol_updater;
