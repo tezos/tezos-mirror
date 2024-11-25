@@ -8,7 +8,7 @@
 (* Testing
    -------
    Component:    EVM Node’s WASM Runtime
-   Invocation:   dune exec -- etherlink/bin_node/test/main.exe wasm_runtime
+   Invocation:   cd etherlink/bin_node/test/ ; dune exec -- ./test_wasm_runtime.exe
 *)
 
 open Evm_node_lib_dev
@@ -21,22 +21,19 @@ let register ?(tags = []) =
     ~__FILE__
     ~tags:("wasm_runtime" :: tags)
 
-let context_hash_typ = Check.(convert Context_hash.to_b58check string)
-
 let z_typ = Check.(convert Z.to_int64 int64)
-
-let empty_tree = Irmin_context.PVMState.empty ()
 
 let expect_ok msg = function Ok x -> x | Error _err -> Test.fail msg
 
 let test_wasm_runtime_id () =
   register ~title:"test wasm_runtime_run" @@ fun () ->
+  Log.info "Initialize the tree" ;
   let* tree =
     Evm_state.init
-      ~kernel:
-        "etherlink/kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm"
+      ~kernel:"../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm"
   in
   let tree = expect_ok "Should be able to create an initial state" tree in
+  Log.info "Run kernel_run" ;
   let* tree =
     Wasm_runtime.run
       ~preimages_dir:Temp.(dir "wasm_2_0_0")
@@ -45,6 +42,7 @@ let test_wasm_runtime_id () =
       Tezos_crypto.Hashed.Smart_rollup_address.zero
       []
   in
+  Log.info "Check state consistency" ;
   let* quantity =
     Durable_storage.current_block_number (fun key ->
         let* candidate = Evm_state.inspect tree key in
@@ -58,3 +56,5 @@ let test_wasm_runtime_id () =
   unit
 
 let () = test_wasm_runtime_id ()
+
+let () = Test.run ()

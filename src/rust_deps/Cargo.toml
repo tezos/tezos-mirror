@@ -17,6 +17,3 @@ path = "../rustzcash_deps"
 [dependencies.octez-riscv]
 path = "../riscv/lib"
 features = ["ocaml-api"]
-
-[dependencies.octez-evm-node-wasm-runtime]
-path = "../../src/lib_wasm_runtime"

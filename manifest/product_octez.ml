@@ -571,9 +571,6 @@ let octez_rust_deps =
               [S "source_tree"; S "src"];
               [S "source_tree"; S "../riscv"];
               [S "source_tree"; S "../kernel_sdk"];
-              [S "file"; S "../../src/lib_wasm_runtime/Cargo.toml"];
-              [S "file"; S "../../src/lib_wasm_runtime/build.rs"];
-              [S "glob_files_rec"; S "../../src/lib_wasm_runtime/src/**.rs"];
             ];
             [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
           ];
