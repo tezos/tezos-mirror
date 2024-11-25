@@ -704,6 +704,16 @@ module Cli = struct
       slot_indices_typ
       []
 
+  let observer_pkhs =
+    Clap.list_string
+      ~section
+      ~long:"observer-pkh"
+      ~placeholder:"<pkh>"
+      ~description:
+        "Enable to run a DAL node following the same topics as the baker pkh \
+         given in input"
+      ()
+
   let protocol =
     let protocol_typ =
       let parse string =
@@ -796,6 +806,7 @@ type configuration = {
   stake_machine_type : string list option;
   dal_node_producers : int list; (* slot indices *)
   observer_slot_indices : int list;
+  observer_pkhs : string list;
   protocol : Protocol.t;
   producer_machine_type : string option;
   (* The first argument is the deconnection frequency, the second is the
@@ -836,7 +847,11 @@ type producer = {
   slot_index : int;
 }
 
-type observer = {node : Node.t; dal_node : Dal_node.t; slot_index : int}
+type observer = {
+  node : Node.t;
+  dal_node : Dal_node.t;
+  topic : [`Slot_index of int | `Pkh of string];
+}
 
 type etherlink_operator_setup = {
   node : Node.t;
@@ -1920,7 +1935,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   in
   Lwt.return {client; node; dal_node; account; is_ready; slot_index}
 
-let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
+let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   let name = Format.asprintf "observer-node-%i" i in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -1940,11 +1955,19 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
       agent
   in
   let* () =
-    Dal_node.init_config
-      ~expected_pow:(Network.expected_pow configuration.network)
-      ~observer_profiles:[slot_index]
-      ~peers:[bootstrap.dal_node_p2p_endpoint]
-      dal_node
+    match topic with
+    | `Slot_index slot_index ->
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow configuration.network)
+          ~observer_profiles:[slot_index]
+          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          dal_node
+    | `Pkh pkh ->
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow configuration.network)
+          ~attester_profiles:[pkh]
+          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          dal_node
   in
   let* () =
     add_source cloud agent ~name:(Format.asprintf "observer-%d" i) node dal_node
@@ -1965,7 +1988,7 @@ let init_observer cloud configuration ~bootstrap teztale ~slot_index i agent =
           ~node_name:(Node.name node)
           ~node_port:(Node.rpc_port node)
   in
-  Lwt.return {node; dal_node; slot_index}
+  Lwt.return {node; dal_node; topic}
 
 let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
     ~memtrace =
@@ -2380,12 +2403,22 @@ let init ~(configuration : configuration) etherlink_configuration cloud
            return (name, slot_index))
     |> Lwt.all
   in
-  let* observers_agents =
+  let* observers_slot_index_agents =
     List.map
       (fun i ->
         let name = Format.asprintf "observer-%d" i in
-        next_agent ~name)
+        let* agent = next_agent ~name in
+        return (`Slot_index i, agent))
       configuration.observer_slot_indices
+    |> Lwt.all
+  in
+  let* observers_bakers_agents =
+    List.map
+      (fun pkh ->
+        let name = Format.asprintf "observer-%s" pkh in
+        let* agent = next_agent ~name in
+        return (`Pkh pkh, agent))
+      configuration.observer_pkhs
     |> Lwt.all
   in
   let* teztale =
@@ -2439,9 +2472,9 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       (List.combine producers_agents producer_accounts)
   and* observers =
     Lwt_list.mapi_p
-      (fun i (agent, slot_index) ->
-        init_observer cloud configuration ~bootstrap teztale ~slot_index i agent)
-      (List.combine observers_agents configuration.observer_slot_indices)
+      (fun i (topic, agent) ->
+        init_observer cloud configuration ~bootstrap teztale ~topic i agent)
+      (observers_slot_index_agents @ observers_bakers_agents)
   in
   let () = toplog "Init: all producers and observers have been initialized" in
   let* etherlink =
@@ -2726,6 +2759,7 @@ let configuration, etherlink_configuration =
             index)
   in
   let observer_slot_indices = Cli.observer_slot_indices in
+  let observer_pkhs = Cli.observer_pkhs in
   let protocol = Cli.protocol in
   let producer_machine_type = Cli.producer_machine_type in
   let etherlink = Cli.etherlink in
@@ -2756,6 +2790,7 @@ let configuration, etherlink_configuration =
       stake_machine_type;
       dal_node_producers;
       observer_slot_indices;
+      observer_pkhs;
       protocol;
       producer_machine_type;
       disconnect;
@@ -2778,6 +2813,7 @@ let benchmark () =
       List.map (fun i -> `Baker i) configuration.stake;
       List.map (fun _ -> `Producer) configuration.dal_node_producers;
       List.map (fun _ -> `Observer) configuration.observer_slot_indices;
+      List.map (fun _ -> `Observer_pkh) configuration.observer_pkhs;
       (if etherlink_configuration <> None then [`Etherlink_operator] else []);
       (match etherlink_configuration with
       | None | Some {etherlink_dal_slots = []; _} -> []
@@ -2808,7 +2844,7 @@ let benchmark () =
                      let machine_type = List.nth list i in
                      Configuration.make ?docker_image ~machine_type ()
                    with _ -> default_vm_configuration))
-           | `Producer | `Observer | `Etherlink_dal_node -> (
+           | `Producer | `Observer | `Observer_pkh | `Etherlink_dal_node -> (
                match configuration.producer_machine_type with
                | None -> Configuration.make ?docker_image ()
                | Some machine_type ->
