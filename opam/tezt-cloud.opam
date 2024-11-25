@@ -10,16 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "tezt-tezos"
-  "tezt-cloud"
-  "ppx_import" {with-test}
-  "ppx_deriving" {with-test}
-  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
-  "octez-rust-deps" {with-test}
-  "bls12-381" {with-test}
-  "octez-evm-node-libs" { with-test & = version }
-  "tezos-protocol-alpha" {with-test}
+  "tezt" { >= "4.1.0" & < "5.0.0" }
+  "tezt-tezos" { = version }
+  "jingoo"
+  "octez-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
@@ -27,4 +21,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezt integration tests for Etherlink"
+synopsis: "Automatic of Cloud deployment for complex scenarios on top of Tezt"

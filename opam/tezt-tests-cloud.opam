@@ -13,6 +13,7 @@ depends: [
   "bls12-381"
   "octez-libs"
   "tezt-tezos"
+  "tezt-cloud"
   "tezt-etherlink" { = version }
 ]
 build: [

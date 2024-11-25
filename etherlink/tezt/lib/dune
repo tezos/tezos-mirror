@@ -9,7 +9,7 @@
   tezt-tezos.tezt-performance-regression
   octez-libs.crypto
   tezt-tezos
-  tezt-tezos.tezt-cloud
+  tezt-cloud
   octez-libs.test-helpers)
  (flags
   (:standard)
@@ -18,5 +18,5 @@
   -open Tezt_tezos_tezt_performance_regression
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_tezos_tezt_cloud
+  -open Tezt_cloud
   -open Tezos_test_helpers))
