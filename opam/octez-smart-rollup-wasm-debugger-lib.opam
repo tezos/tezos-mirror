@@ -22,4 +22,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: Library used for the Smart Rollups' WASM debugger"

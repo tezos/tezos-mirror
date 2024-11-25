@@ -139,5 +139,6 @@ conflicts: [
   "result" { < "1.5" }
 ]
 build: []
+available: os-family != "windows"
 synopsis: "Virtual package depending on Octez dependencies (profile: octez-deps)"
 description: "Install this package to install all dependencies needed to build the subset of Octez denoted by profile octez-deps."

@@ -43,4 +43,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: `octez-codec-kaitai` binary to generate kaitai descriptions"

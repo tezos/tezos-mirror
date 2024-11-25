@@ -34,4 +34,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Protocol specific (for 021-PsQuebec) library for smart rollup node"

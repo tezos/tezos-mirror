@@ -21,4 +21,5 @@ depends: [
   "bls12-381" { with-test & = version }
 ]
 build: [["rm" "-r" "vendors" "contrib"] ["dune" "build" "-p" name "-j" jobs]]
+available: os-family != "windows"
 synopsis: "Tezos: library for writing benchmarks and performing simple parameter inference"

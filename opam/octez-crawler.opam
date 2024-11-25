@@ -18,4 +18,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Octez: library to crawl blocks of the L1 chain"
