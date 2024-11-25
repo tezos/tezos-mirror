@@ -375,6 +375,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let* () = Batcher.produce_batches () in
   let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
   let*! () = Injector.inject ~header:head.header () in
+  let*! () = Daemon_event.new_heads_side_process_finished reorg.new_chain in
   Reference.set node_ctxt.degraded false ;
   return_unit
 
