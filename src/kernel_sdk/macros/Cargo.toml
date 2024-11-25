@@ -16,8 +16,9 @@ keywords = ["tezos", "smart", "rollup"]
 proc-macro = true
 
 [features]
-default = []
+default = ["runtime-options"]
 native-kernel = []
+runtime-options = []
 
 [dependencies]
 proc-macro-error2 = "2.0.1"
