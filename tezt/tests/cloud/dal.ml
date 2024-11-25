@@ -559,12 +559,12 @@ module Cli = struct
       100
 
   let fundraiser =
-    Clap.default_string
+    Clap.optional_string
       ~section
       ~long:"fundraiser"
       ~description:
-        "Fundraiser secret key that have enough money of test network"
-      "edsk3AWajGUgzzGi3UrQiNWeRZR1YMRYVxfe642AFSKBTFXaoJp5hu"
+        "Fundraiser secret key that have enough money on test network"
+      ()
 
   let network_typ =
     Clap.typ
@@ -806,7 +806,7 @@ type configuration = {
   teztale : bool;
   memtrace : bool;
   data_dir : string option;
-  fundraiser : string;
+  fundraiser : string option;
   blocks_history : int;
 }
 
@@ -1571,10 +1571,20 @@ let init_public_network cloud (configuration : configuration)
       bootstrap.client
   in
   let () = toplog "Funding the producer accounts" in
+  let fundraiser_key =
+    match configuration.fundraiser with
+    | None ->
+        Test.fail
+          "No fundraiser key was specified. Please use either `--fundraiser` \
+           or the variable environment `TEZT_CLOUD_FUNDRAISER` to specified an \
+           unencrypted secret key of an account having funds to run the \
+           scenario"
+    | Some key -> key
+  in
   let* () =
     Client.import_secret_key
       bootstrap.client
-      (Unencrypted configuration.fundraiser)
+      (Unencrypted fundraiser_key)
       ~alias:"fundraiser"
   in
   let () = toplog "Revealing the fundraiser public key" in
@@ -2742,7 +2752,12 @@ let configuration, etherlink_configuration =
   let teztale = Cli.teztale in
   let memtrace = Cli.memtrace in
   let data_dir = Cli.data_dir in
-  let fundraiser = Cli.fundraiser in
+  let fundraiser =
+    Option.fold
+      ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
+      ~some:Option.some
+      Cli.fundraiser
+  in
   let etherlink =
     if etherlink then
       Some {etherlink_sequencer; etherlink_producers; etherlink_dal_slots}
