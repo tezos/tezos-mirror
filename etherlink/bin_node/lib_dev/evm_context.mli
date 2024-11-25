@@ -65,11 +65,7 @@ val export_store :
     SQLite store or not.
 
     [garbage_collector] can be optionally provided to enable the garbage
-    collector of the node with a given configuration.
-
-    [wasm_runtime] can be set to true to enable the use of the (experimental)
-    WASM Runtime instead of relying on the general-purpose Fast Execution
-    exposed by the WASM debugger. *)
+    collector of the node with a given configuration. *)
 val start :
   ?kernel_path:string ->
   data_dir:string ->
@@ -80,7 +76,6 @@ val start :
   store_perm:[`Read_only | `Read_write] ->
   block_storage_sqlite3:bool ->
   ?garbage_collector:Configuration.garbage_collector ->
-  wasm_runtime:bool ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 

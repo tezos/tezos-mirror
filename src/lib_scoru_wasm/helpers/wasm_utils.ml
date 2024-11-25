@@ -101,12 +101,15 @@ let write_debug_on_stdout =
   Tezos_scoru_wasm.Builtins.Printer
     (fun msg -> Lwt.return @@ Format.printf "%s\n%!" msg)
 
-module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
+module Make_with_pvms
+    (Ctx : Tezos_tree_encoding.Encodings_util.S)
+    (Wasm : Wasm_pvm_sig.S with type tree = Ctx.Tree.tree)
+    (Wasm_fast : Wasm_pvm_sig.S with type tree = Ctx.Tree.tree) :
   Wasm_utils_intf.S with type t = Ctx.t and type tree = Ctx.Tree.tree = struct
   module Ctx = Ctx
   module Tree_encoding_runner = Ctx.Tree_encoding_runner
-  module Wasm = Wasm_pvm.Make (Ctx.Tree)
-  module Wasm_fast = Tezos_scoru_wasm_fast.Pvm.Make (Ctx.Tree)
+  module Wasm = Wasm
+  module Wasm_fast = Wasm_fast
 
   type t = Ctx.t
 
@@ -587,6 +590,11 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
       Lazy_vector.Int32Vector.get 0l memories
     else assert false
 end
+
+module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
+  Wasm_utils_intf.S with type t = Ctx.t and type tree = Ctx.Tree.tree =
+  Make_with_pvms (Ctx) (Wasm_pvm.Make (Ctx.Tree))
+    (Tezos_scoru_wasm_fast.Pvm.Make (Ctx.Tree))
 
 module In_memory_context =
   Tezos_tree_encoding.Encodings_util.Make (Tezos_context_memory.Context_binary)

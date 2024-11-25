@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type config = {config : Config.config; wasm_runtime : bool}
-
 type t = Irmin_context.PVMState.value
 
 (** Directory where the kernel logs are stored. The function {!execute} below
@@ -28,7 +26,7 @@ val execute :
   data_dir:string ->
   ?log_file:string ->
   ?wasm_entrypoint:string ->
-  config:config ->
+  config:Config.config ->
   t ->
   [< `Input of string] list ->
   t tzresult Lwt.t
@@ -63,7 +61,7 @@ val execute_and_inspect :
   ?wasm_pvm_fallback:bool ->
   data_dir:string ->
   ?wasm_entrypoint:string ->
-  config:config ->
+  config:Config.config ->
   input:Simulation.Encodings.simulate_input ->
   t ->
   bytes option list tzresult Lwt.t
@@ -92,7 +90,7 @@ val apply_blueprint :
   ?log_file:string ->
   ?profile:bool ->
   data_dir:string ->
-  config:config ->
+  config:Config.config ->
   t ->
   Blueprint_types.payload ->
   apply_result tzresult Lwt.t
@@ -111,11 +109,11 @@ val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
     expected to be located, relatively to the data directory. *)
 val irmin_store_path : data_dir:string -> string
 
-(** [preload_kernel ~wasm_runtime evm_state] ensures the kernel of [evm_state]
-    is added to the kernel cache of the execution runtime in use (the WASM
-    Runtime otherwise). This will speed-up the execution time for the first
-    call of this kernel (typically in the context of a RPC call). *)
-val preload_kernel : wasm_runtime:bool -> t -> unit Lwt.t
+(** [preload_kernel evm_state] ensures the kernel of [evm_state] is added to
+    the kernel cache of the execution runtime in use. This will speed-up the
+    execution time for the first call of this kernel (typically in the context
+    of a RPC call). *)
+val preload_kernel : t -> unit Lwt.t
 
 (** [get_delayed_inbox_item state hash] returns the delayed inbox content behind
     the hash [hash]. It fails if the hash does not exist or if the value

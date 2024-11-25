@@ -44,7 +44,6 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
-  next_wasm_runtime : bool;
   enable_websocket : bool;
 }
 
@@ -137,7 +136,6 @@ let default_experimental_features =
     block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
     garbage_collector = None;
-    next_wasm_runtime = false;
     enable_websocket = false;
   }
 
@@ -688,7 +686,6 @@ let experimental_features_encoding =
            block_storage_sqlite3;
            overwrite_simulation_tick_limit;
            garbage_collector;
-           next_wasm_runtime;
            enable_websocket;
          } ->
       ( drop_duplicate_on_injection,
@@ -697,7 +694,7 @@ let experimental_features_encoding =
         block_storage_sqlite3,
         overwrite_simulation_tick_limit,
         garbage_collector,
-        next_wasm_runtime,
+        None,
         enable_websocket ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
@@ -705,7 +702,7 @@ let experimental_features_encoding =
            block_storage_sqlite3,
            overwrite_simulation_tick_limit,
            garbage_collector,
-           next_wasm_runtime,
+           _next_wasm_runtime,
            enable_websocket ) ->
       {
         drop_duplicate_on_injection;
@@ -714,7 +711,6 @@ let experimental_features_encoding =
         block_storage_sqlite3;
         overwrite_simulation_tick_limit;
         garbage_collector;
-        next_wasm_runtime;
         enable_websocket;
       })
     (obj8
@@ -756,13 +752,13 @@ let experimental_features_encoding =
           "garbage_collector"
           ~description:"Enables garbage collector in the node."
           garbage_collector_encoding)
-       (dft
+       (opt
           "next_wasm_runtime"
           ~description:
             "Enable or disable the experimental WASM runtime that is expected \
-             to replace the Smart Rollup’s Fast Exec runtime"
-          bool
-          false)
+             to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You \
+             should remove this option from your configuration file."
+          bool)
        (dft
           "enable_websocket"
           ~description:"Enable or disable the experimental websocket server"
@@ -1095,6 +1091,18 @@ let precheck json =
             when_ (b <> b') @@ fun () ->
             failwith
               "`proxy.finalized_view` and `finalized_view` are inconsistent."
+        | _ -> return_unit
+      in
+      let next_wasm_runtime_conf =
+        json |-?> "experimental_features" |?-?> "next_wasm_runtime"
+        |?> as_bool_opt
+      in
+      let* () =
+        match next_wasm_runtime_conf with
+        | Some false ->
+            failwith
+              "`experimental_features.next_wasm_runtime` cannot be set to \
+               `false` anymore."
         | _ -> return_unit
       in
 

@@ -26,7 +26,6 @@ type parameters = {
   store_perm : [`Read_only | `Read_write];
   block_storage_sqlite3 : bool;
   garbage_collector : Configuration.garbage_collector option;
-  wasm_runtime : bool;
 }
 
 type session_state = {
@@ -57,7 +56,6 @@ type t = {
   fail_on_missing_blueprint : bool;
   block_storage_sqlite3 : bool;
   history : history;
-  wasm_runtime : bool;
 }
 
 type store_info = {
@@ -78,17 +76,12 @@ let session_to_head_info session =
   }
 
 let pvm_config ctxt =
-  Evm_state.
-    {
-      config =
-        Config.config
-          ~preimage_directory:ctxt.preimages
-          ?preimage_endpoint:ctxt.preimages_endpoint
-          ~kernel_debug:true
-          ~destination:ctxt.smart_rollup_address
-          ();
-      wasm_runtime = ctxt.wasm_runtime;
-    }
+  Config.config
+    ~preimage_directory:ctxt.preimages
+    ?preimage_endpoint:ctxt.preimages_endpoint
+    ~kernel_debug:true
+    ~destination:ctxt.smart_rollup_address
+    ()
 
 module Types = struct
   type state = t
@@ -1041,9 +1034,7 @@ module State = struct
     | Some hash ->
         let*! context = Irmin_context.checkout_exn ctxt.index hash in
         let*! evm_state = Irmin_context.PVMState.get context in
-        let*! () =
-          Evm_state.preload_kernel ~wasm_runtime:ctxt.wasm_runtime evm_state
-        in
+        let*! () = Evm_state.preload_kernel evm_state in
         return_unit
 
   let preload_known_kernels ctxt =
@@ -1061,7 +1052,7 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ?kernel_path ~wasm_runtime ~block_storage_sqlite3 ?garbage_collector
+  let init ?kernel_path ~block_storage_sqlite3 ?garbage_collector
       ~fail_on_missing_blueprint ~data_dir ~preimages ~preimages_endpoint
       ?smart_rollup_address ~store_perm () =
     let open Lwt_result_syntax in
@@ -1183,7 +1174,6 @@ module State = struct
         fail_on_missing_blueprint;
         block_storage_sqlite3;
         history;
-        wasm_runtime;
       }
     in
 
@@ -1456,7 +1446,6 @@ module Handlers = struct
         store_perm;
         block_storage_sqlite3;
         garbage_collector;
-        wasm_runtime;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -1470,7 +1459,6 @@ module Handlers = struct
         ~store_perm
         ~block_storage_sqlite3
         ?garbage_collector
-        ~wasm_runtime
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1623,7 +1611,7 @@ let export_store ~data_dir ~output_db_file =
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
-    ~block_storage_sqlite3 ?garbage_collector ~wasm_runtime () =
+    ~block_storage_sqlite3 ?garbage_collector () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1640,7 +1628,6 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         store_perm;
         block_storage_sqlite3;
         garbage_collector;
-        wasm_runtime;
       }
       (module Handlers)
   in
@@ -1831,7 +1818,6 @@ let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
       ~block_storage_sqlite3:false
-      ~wasm_runtime:false
       ()
   in
   worker_wait_for_request
@@ -1860,7 +1846,6 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
       ~block_storage_sqlite3:false
-      ~wasm_runtime:false
       ()
   in
   worker_wait_for_request

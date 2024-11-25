@@ -16,7 +16,6 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
-    "next_wasm_runtime": true,
     "enable_websocket": false
   },
   "proxy": {
@@ -66,7 +65,6 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
-    "next_wasm_runtime": true,
     "enable_websocket": false
   },
   "proxy": {
@@ -109,7 +107,6 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
-    "next_wasm_runtime": true,
     "enable_websocket": false
   },
   "proxy": {

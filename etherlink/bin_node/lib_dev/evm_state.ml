@@ -7,34 +7,7 @@
 
 open Ethereum_types
 
-type config = {config : Config.config; wasm_runtime : bool}
-
-module Bare_context = struct
-  module Tree = Irmin_context.Tree
-
-  type t = Irmin_context.rw
-
-  type index = Irmin_context.rw_index
-
-  type nonrec tree = Irmin_context.tree
-
-  let init ?patch_context:_ ?readonly:_ ?index_log_size:_ path =
-    let open Lwt_syntax in
-    let* res = Irmin_context.load ~cache_size:100_000 Read_write path in
-    match res with
-    | Ok res -> return res
-    | Error _ -> Lwt.fail_with "could not initialize the context"
-
-  let empty index = Irmin_context.empty index
-end
-
 type t = Irmin_context.PVMState.value
-
-module Wasm_utils =
-  Wasm_utils.Make (Tezos_tree_encoding.Encodings_util.Make (Bare_context))
-
-module Wasm =
-  Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.Make (Wasm_utils)
 
 let kernel_logs_directory ~data_dir = Filename.concat data_dir "kernel_logs"
 
@@ -77,35 +50,15 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
   let eval evm_state =
     if profile then
       let* evm_state, _, _ =
-        Wasm.Commands.profile
+        Wasm_debugger.profile
           ~migrate_to:Proto_alpha
           ~collapse:false
           ~with_time:true
           ~no_reboot:false
           0l
           inbox
-          {config.config with flamecharts_directory = data_dir}
+          {config with flamecharts_directory = data_dir}
           Custom_section.FuncMap.empty
-          evm_state
-      in
-      return evm_state
-    else if not config.wasm_runtime then
-      let hooks =
-        Tezos_scoru_wasm.Hooks.(
-          no_hooks
-          |> fast_exec_fallback wasm_pvm_fallback
-          |> disable_fast_exec_invalid_kernel_check)
-      in
-      let* evm_state, _, _, _ =
-        Wasm.Commands.eval
-          ~migrate_to:Proto_alpha
-          ~hooks
-          ~write_debug
-          ~wasm_entrypoint
-          0l
-          inbox
-          config.config
-          Inbox
           evm_state
       in
       return evm_state
@@ -117,15 +70,37 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
          As far as the EVM node is concerned, we only “emulate” one Tezos level
          at a time, so we only keep the first item ([inbox] is in parctise
          always a singleton). *)
-      let inbox = match Seq.uncons inbox with Some (x, _) -> x | _ -> [] in
       let*! evm_state =
-        Wasm_runtime.run
-          ~preimages_dir:config.config.preimage_directory
-          ?preimages_endpoint:config.config.preimage_endpoint
-          ~entrypoint:wasm_entrypoint
-          evm_state
-          config.config.destination
-          inbox
+        Lwt.catch
+          (fun () ->
+            let inbox =
+              match Seq.uncons inbox with Some (x, _) -> x | _ -> []
+            in
+            Wasm_runtime.run
+              ~preimages_dir:config.preimage_directory
+              ?preimages_endpoint:config.preimage_endpoint
+              ~entrypoint:wasm_entrypoint
+              evm_state
+              config.destination
+              inbox)
+          (fun exn ->
+            if wasm_pvm_fallback then
+              let*! () = Events.wasm_pvm_fallback () in
+              let*! res =
+                Wasm_debugger.eval
+                  ~migrate_to:Proto_alpha
+                  ~write_debug
+                  ~wasm_entrypoint
+                  0l
+                  inbox
+                  config
+                  Inbox
+                  evm_state
+              in
+              match res with
+              | Ok (evm_state, _, _, _) -> Lwt.return evm_state
+              | Error _err -> Stdlib.failwith "The WASM PVM raised an exception"
+            else Lwt.reraise exn)
       in
       return evm_state
   in
@@ -149,7 +124,7 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
   return evm_state
 
 let modify ?edit_readonly ~key ~value evm_state =
-  Wasm.set_durable_value ?edit_readonly evm_state key value
+  Wasm_debugger.set_durable_value ?edit_readonly evm_state key value
 
 let flag_local_exec evm_state =
   modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
@@ -172,7 +147,10 @@ let init ~kernel =
   let open Lwt_result_syntax in
   let evm_state = Irmin_context.PVMState.empty () in
   let* evm_state =
-    Wasm.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
+    Wasm_debugger.start
+      ~tree:evm_state
+      Tezos_scoru_wasm.Wasm_pvm_state.V3
+      kernel
   in
   (* The WASM Runtime completely ignores the reboot counter, but some versions
      of the Etherlink kernel will need it to exist. *)
@@ -183,20 +161,20 @@ let init ~kernel =
 let inspect evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* value = Wasm.Commands.find_key_in_durable evm_state key in
+  let* value = Wasm_debugger.find_key_in_durable evm_state key in
   Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
 
 let subkeys evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* durable = Wasm_utils.wrap_as_durable_storage evm_state in
+  let* durable = Wasm_debugger.wrap_as_durable_storage evm_state in
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.list durable key
 
 let exists evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* durable = Wasm_utils.wrap_as_durable_storage evm_state in
+  let* durable = Wasm_debugger.wrap_as_durable_storage evm_state in
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.exists durable key
 
@@ -331,40 +309,20 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
 let delete ~kind evm_state path =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn path in
-  let* pvm_state =
-    Wasm_utils.Ctx.Tree_encoding_runner.decode
-      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-      evm_state
-  in
+  let* pvm_state = Wasm_debugger.decode evm_state in
   let* durable = Tezos_scoru_wasm.Durable.delete ~kind pvm_state.durable key in
-  Wasm_utils.Ctx.Tree_encoding_runner.encode
-    Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-    {pvm_state with durable}
-    evm_state
+  Wasm_debugger.encode {pvm_state with durable} evm_state
 
 let clear_delayed_inbox evm_state =
   delete ~kind:Directory evm_state Durable_storage_path.delayed_inbox
 
-let wasm_pvm_version state = Wasm_utils.Wasm.get_wasm_version state
+let wasm_pvm_version state = Wasm_debugger.get_wasm_version state
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
-let preload_kernel ~wasm_runtime evm_state =
+let preload_kernel evm_state =
   let open Lwt_syntax in
-  let* () =
-    if wasm_runtime then Wasm_runtime.preload_kernel evm_state
-    else
-      let* pvm_state =
-        Wasm_utils.Ctx.Tree_encoding_runner.decode
-          Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-          evm_state
-      in
-      let hooks =
-        Tezos_scoru_wasm.Hooks.(
-          no_hooks |> disable_fast_exec_invalid_kernel_check)
-      in
-      Tezos_scoru_wasm_fast.Exec.preload_kernel ~hooks pvm_state.durable
-  in
+  let* () = Wasm_runtime.preload_kernel evm_state in
   let* version = kernel_version evm_state in
   Events.preload_kernel version
 
