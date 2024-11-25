@@ -1484,10 +1484,7 @@ let init_teztale (configuration : configuration) cloud agent =
     let* () = Teztale.wait_server teztale in
     let* () =
       let domain =
-        match Env.mode with
-        | `Host | `Cloud ->
-            Agent.point agent |> Option.fold ~none:"localhost" ~some:fst
-        | `Orchestrator | `Localhost -> "localhost"
+        Agent.point agent |> Option.fold ~none:"localhost" ~some:fst
       in
       let port = teztale.server.conf.interface.port in
       let url = sf "http://%s:%d" domain port in
