@@ -2837,7 +2837,7 @@ let benchmark () =
     |> List.concat
   in
   let docker_image =
-    Option.map (fun tag -> Env.Octez_release {tag}) Cli.octez_release
+    Option.map (fun tag -> Configuration.Octez_release {tag}) Cli.octez_release
   in
   let default_vm_configuration = Configuration.make ?docker_image () in
   let vms =
