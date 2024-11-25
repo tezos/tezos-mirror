@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Welcome message for ipc between main process and crypto process *)
 let welcome = Bytes.of_string "0 Ready"
 
 (* A Lwt worker maintening a queue of calculation jobs to send to the crypto process *)
@@ -469,7 +470,7 @@ let amplify node_store commitment (slot_id : Types.slot_id)
   in
   return_unit
 
-let try_amplification commitment (slot_id : Types.slot_id) amplificator =
+let try_amplification commitment slot_metrics slot_id amplificator =
   let open Lwt_result_syntax in
   let node_ctxt = amplificator.node_ctxt in
   let node_store = Node_context.get_store node_ctxt in
@@ -523,9 +524,12 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
     let* number_of_already_stored_shards =
       Store.Shards.count_values (Store.shards node_store) slot_id
     in
+    let t = Unix.gettimeofday () in
+    let duration = t -. slot_metrics.Dal_metrics.time_first_shard in
     (* If we have received all the shards while waiting the random
        delay, there is no point in reconstructing anymore *)
     if number_of_already_stored_shards = number_of_shards then (
+      Dal_metrics.update_amplification_abort_reconstruction_duration duration ;
       let*! () =
         Event.(
           emit
@@ -534,7 +538,8 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
       in
       Dal_metrics.reconstruction_aborted () ;
       return_unit)
-    else
+    else (
+      Dal_metrics.update_amplification_start_reconstruction_duration duration ;
       amplify
         node_store
         commitment
@@ -543,4 +548,4 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
         ~number_of_shards
         ~number_of_needed_shards
         proto_parameters
-        amplificator
+        amplificator)

@@ -51,6 +51,19 @@ val update_shards_verification_time : float -> unit
 (** Update the KVS shards metrics. *)
 val update_kvs_shards_metrics : opened_files:int -> ongoing_actions:int -> unit
 
+(** Update the DAL metrics timing value when enough of all the shards are
+    received. *)
+val update_amplification_enough_shards_received_duration : float -> unit
+
+(** Update the DAL metrics timing value when all the shards are received. *)
+val update_amplification_all_shards_received_duration : float -> unit
+
+(** Add a DAL metrics timing value when a reconstruction is started. *)
+val update_amplification_start_reconstruction_duration : float -> unit
+
+(** Add a the DAL metrics timing value when a reconstruction is aborted. *)
+val update_amplification_abort_reconstruction_duration : float -> unit
+
 (** [sample_time ~sampling_frequency ~to_sample ~metric_updater] samples
     execution time of function [to_sample] at frequency
     [sampling_frequency]. Execution time if any is then provided to
@@ -60,6 +73,16 @@ val sample_time :
   to_sample:(unit -> 'a) ->
   metric_updater:(float -> unit) ->
   'a
+
+(* Stores metrics about reception of shards for a slot *)
+type slot_metrics = {
+  time_first_shard : float;
+  duration_enough_shards : float option;
+  duration_all_shards : float option;
+}
+
+(* Stores the [slot_metric] for the slots *)
+module Slot_id_bounded_map : Vache.MAP with type key = Types.Slot_id.t
 
 (** [collect_gossipsub_metrics gs_worker] allows to periodically collect metrics
     from the given GS Worker state. *)
