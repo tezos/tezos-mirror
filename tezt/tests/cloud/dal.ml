@@ -786,6 +786,15 @@ module Cli = struct
       ~description:"Runs teztale"
       false
 
+  let octez_release =
+    Clap.optional_string
+      ~section
+      ~long:"octez-release"
+      ~placeholder:"<tag>"
+      ~description:
+        "Use the octez release <tag> instead of local octez binaries."
+      ()
+
   let memtrace =
     Clap.flag
       ~section

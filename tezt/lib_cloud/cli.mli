@@ -99,9 +99,6 @@ val no_dns : bool
 (** OS used by the VM. *)
 val os : string
 
-(** The tag of the octez release to be used. *)
-val octez_release : string option
-
 (** Activate the Open Telemetry collector. *)
 val open_telemetry : bool
 

@@ -238,14 +238,6 @@ let no_dns =
        cancel any effect of [--dns-domain]."
     false
 
-let octez_release =
-  Clap.optional_string
-    ~section
-    ~long:"octez-release"
-    ~placeholder:"<tag>"
-    ~description:"Use the octez release <tag> instead of local octez binaries."
-    ()
-
 let open_telemetry =
   Clap.flag
     ~section
