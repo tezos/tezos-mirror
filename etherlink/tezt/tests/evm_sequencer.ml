@@ -2937,6 +2937,62 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
   unit
 
+let test_delayed_inbox_flushing_event =
+  register_all
+    ~delayed_inbox_timeout:3
+    ~delayed_inbox_min_levels:1
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"]
+    ~title:"Flush delayed inbox event"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (* Kill the sequencer *)
+  let* () = Evm_node.terminate sequencer in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let _ = Rpc.block_number proxy in
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* Bake a few blocks, should be enough for the tx to time out and be
+     forced *)
+  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox observer in
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  and* () = wait_for_flush in
+  unit
+
 let test_delayed_transfer_timeout =
   register_all
     ~delayed_inbox_timeout:3
@@ -7009,6 +7065,7 @@ let () =
   test_delayed_transfer_timeout_fails_l1_levels protocols ;
   test_forced_blueprint_takes_pred_timestamp protocols ;
   test_forced_blueprint_takes_l1_timestamp protocols ;
+  test_delayed_inbox_flushing_event protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
   test_non_increasing_timestamp protocols ;

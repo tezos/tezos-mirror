@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -9,9 +10,11 @@ use crate::configuration::{
 };
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
+use crate::event::Event;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use anyhow::Ok;
+use primitive_types::H256;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::L2Block;
@@ -80,13 +83,22 @@ fn fetch_delayed_transactions<Host: Runtime>(
             }
         };
 
+        let hashes: Vec<H256> = timed_out.iter().map(|x| H256::from(x.tx_hash)).collect();
+
         // Create a new blueprint with the timed out transactions
         let blueprint = Blueprint {
             transactions: timed_out,
             timestamp,
         };
+        let level = base.add(offset);
+        Event::FlushDelayedInbox {
+            hashes,
+            timestamp,
+            level,
+        }
+        .store(host)?;
         // Store the blueprint.
-        store_immediate_blueprint(host, blueprint, base.add(offset))?;
+        store_immediate_blueprint(host, blueprint, level)?;
         offset += 1;
     }
 

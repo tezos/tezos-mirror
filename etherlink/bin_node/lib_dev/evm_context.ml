@@ -599,6 +599,13 @@ module State = struct
           on_new_delayed_transaction ~delayed_transaction evm_state
         in
         return (evm_state, on_success)
+    | Flush_delayed_inbox flushed_blueprint ->
+        let*! () =
+          Evm_events_follower_events.flush_delayed_inbox
+            ~timestamp:flushed_blueprint.timestamp
+            flushed_blueprint.level
+        in
+        return (evm_state, on_success)
 
   let current_blueprint_number ctxt =
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
