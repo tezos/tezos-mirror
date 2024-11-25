@@ -6,6 +6,8 @@
 
 ### Bug fixes
 
+- Default rollup node port is 8932, not 8937. (!15701)
+
 ### Internals
 
 - Use a single RPC (if the rollup node supports it) when fetching EVM events.

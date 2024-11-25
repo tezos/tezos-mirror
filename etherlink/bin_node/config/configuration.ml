@@ -153,7 +153,7 @@ let default_sequencer_sidecar_endpoint = Uri.of_string "127.0.0.1:5303"
 
 let default_keep_alive = false
 
-let default_rollup_node_endpoint = Uri.of_string "http://localhost:8937"
+let default_rollup_node_endpoint = Uri.of_string "http://localhost:8932"
 
 let default_rollup_node_tracking = true
 
