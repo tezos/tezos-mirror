@@ -189,6 +189,17 @@ let observer_reorg_cannot_find_divergence =
     ("level1", Data_encoding.n)
     ("level2", Data_encoding.n)
 
+let observer_reorg_cannot_find_state =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_reorg_cannot_find_state"
+    ~level:Warning
+    ~msg:
+      "[Warning] Reorganization needs state at level {level} but checkpoint is \
+       missing"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -236,3 +247,6 @@ let observer_reorg_cannot_decode_blueprint Ethereum_types.(Qty level) =
 
 let observer_reorg_cannot_find_divergence Ethereum_types.(Qty level) =
   emit observer_reorg_cannot_find_divergence (level, Z.pred level)
+
+let observer_reorg_cannot_find_state Ethereum_types.(Qty level) =
+  emit observer_reorg_cannot_find_state level

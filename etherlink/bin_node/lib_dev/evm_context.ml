@@ -404,6 +404,25 @@ module State = struct
         let root_hash = `Hex root_hash in
         Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
 
+  let reset_to_level ctxt conn l2_level checkpoint =
+    let open Lwt_result_syntax in
+    let*! () = Evm_context_events.reset_at_level l2_level in
+    (* Find the [l2_level] evm_state. *)
+    let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
+    let*! evm_state = Irmin_context.PVMState.get context in
+    (* Clear the store. *)
+    let* () = Evm_store.reset_after conn ~l2_level in
+    let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    (* Update mutable session values. *)
+    let next_blueprint_number = Ethereum_types.Qty.next l2_level in
+    let* current_block_hash = Evm_state.current_block_hash evm_state in
+    ctxt.session.next_blueprint_number <- next_blueprint_number ;
+    ctxt.session.evm_state <- evm_state ;
+    ctxt.session.current_block_hash <- current_block_hash ;
+    ctxt.session.context <- context ;
+    ctxt.session.pending_upgrade <- pending_upgrade ;
+    return evm_state
+
   let reset_to_finalized_level ?expected_finalized_number exit_error ctxt conn =
     let open Lwt_result_syntax in
     let* safe_checkpoint = Evm_store.Context_hashes.find_finalized conn in
@@ -421,27 +440,7 @@ module State = struct
                   in
                   tzfail exit_error)
         in
-        let*! () = Evm_context_events.reset_at_level finalized_number in
-        (* Find the "finalized" evm_state. *)
-        let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
-        let*! evm_state = Irmin_context.PVMState.get context in
-        (* Clear the store. *)
-        let* () = Evm_store.reset_after conn ~l2_level:finalized_number in
-        let* pending_upgrade =
-          Evm_store.Kernel_upgrades.find_latest_pending conn
-        in
-        (* Update mutable session values. *)
-        let next_blueprint_number =
-          let (Qty finalized_number) = finalized_number in
-          Ethereum_types.Qty (Z.succ finalized_number)
-        in
-        let* current_block_hash = Evm_state.current_block_hash evm_state in
-        ctxt.session.next_blueprint_number <- next_blueprint_number ;
-        ctxt.session.evm_state <- evm_state ;
-        ctxt.session.current_block_hash <- current_block_hash ;
-        ctxt.session.context <- context ;
-        ctxt.session.pending_upgrade <- pending_upgrade ;
-        return evm_state
+        reset_to_level ctxt conn finalized_number checkpoint
     | None ->
         let*! () =
           Evm_context_events.reset_impossible_missing_finalized_state ()
@@ -1474,6 +1473,38 @@ module State = struct
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
     return_unit
 
+  let observer_apply_reorg ctxt conn blueprint_with_events pred_number =
+    let open Lwt_result_syntax in
+    (* Checkout the state before the blueprint. *)
+    let* checkpoint = Evm_store.Context_hashes.find conn pred_number in
+    match checkpoint with
+    | None ->
+        let*! () =
+          Evm_context_events.observer_reorg_cannot_find_state pred_number
+        in
+        return_none
+    | Some checkpoint ->
+        let* _evm_state = reset_to_level ctxt conn pred_number checkpoint in
+        (* Apply the blueprint. *)
+        let events =
+          List.map
+            (fun delayed_transaction ->
+              Evm_events.New_delayed_transaction delayed_transaction)
+            blueprint_with_events.Blueprint_types.delayed_transactions
+        in
+        let* () =
+          apply_blueprint
+            ~events
+            ctxt
+            conn
+            blueprint_with_events.blueprint.timestamp
+            blueprint_with_events.blueprint.payload
+            blueprint_with_events.delayed_transactions
+        in
+
+        (* Ask the blueprint follower to restart at blueprint's successor. *)
+        return_some ctxt.session.next_blueprint_number
+
   let rec potential_observer_reorg ~evm_node_endpoint conn ctxt
       blueprint_with_events =
     let open Lwt_result_syntax in
@@ -1576,8 +1607,14 @@ module State = struct
                   conn
                   ctxt
                   blueprint_pred
-              else (* Next step is done in the next commit. *)
-                return_none)
+              else
+                (* We agree with the blueprint predecessor but not the blueprint,
+                   this is the divergence point. *)
+                observer_apply_reorg
+                  ctxt
+                  conn
+                  blueprint_with_events
+                  (Qty pred_number))
       | None ->
           let*! () =
             Evm_context_events.observer_reorg_cannot_decode_blueprint
