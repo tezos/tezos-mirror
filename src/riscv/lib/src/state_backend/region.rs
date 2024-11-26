@@ -188,7 +188,7 @@ impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<
     }
 }
 
-impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, ProofGen<'_, M>> {
+impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, ProofGen<M>> {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         let serialised = binary::serialise(&self)?;
         MerkleTree::make_merkle_leaf(serialised, self.region.region.get_access_info())
@@ -434,7 +434,7 @@ impl<A: PartialEq<B> + Copy, B: Copy, const LEN: usize, M: ManagerRead, N: Manag
 }
 
 impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> Merkleisable
-    for Cells<E, LEN, ProofGen<'_, M>>
+    for Cells<E, LEN, ProofGen<M>>
 {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         // RV-282: Break down into multiple leaves if the size of the `Cells`
@@ -581,7 +581,7 @@ impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
     }
 }
 
-impl<const LEN: usize, M: ManagerRead> Merkleisable for DynCells<LEN, ProofGen<'_, M>> {
+impl<const LEN: usize, M: ManagerRead> Merkleisable for DynCells<LEN, ProofGen<M>> {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         let mut writer = MerkleWriter::new(
             MERKLE_LEAF_SIZE,

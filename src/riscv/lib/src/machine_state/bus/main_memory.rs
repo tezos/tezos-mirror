@@ -107,7 +107,7 @@ pub trait MainMemoryLayout: backend::Layout {
     fn hash_data<M: ManagerRead>(data: &Self::Data<M>) -> Result<Hash, HashError>;
 
     fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Data<ProofGen<'_, M>>,
+        data: &Self::Data<ProofGen<M>>,
     ) -> Result<MerkleTree, HashError>;
 }
 
@@ -181,7 +181,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
     }
 
     fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Data<ProofGen<'_, M>>,
+        data: &Self::Data<ProofGen<M>>,
     ) -> Result<MerkleTree, HashError> {
         data.to_merkle_tree()
     }
@@ -303,7 +303,7 @@ impl<L: MainMemoryLayout, M: ManagerRead> RootHashable for MainMemory<L, M> {
     }
 }
 
-impl<L: MainMemoryLayout, M: backend::ManagerRead> Merkleisable for MainMemory<L, ProofGen<'_, M>> {
+impl<L: MainMemoryLayout, M: backend::ManagerRead> Merkleisable for MainMemory<L, ProofGen<M>> {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         L::to_merkle_tree(&self.data)
     }

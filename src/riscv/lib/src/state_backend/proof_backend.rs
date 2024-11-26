@@ -30,11 +30,11 @@ pub mod proof;
 mod tree;
 
 /// Proof-generating backend
-pub struct ProofGen<'a, M: ManagerBase> {
-    _pd: std::marker::PhantomData<&'a M>,
+pub struct ProofGen<M: ManagerBase> {
+    _pd: std::marker::PhantomData<M>,
 }
 
-impl<'a, M: ManagerBase> ManagerBase for ProofGen<'a, M> {
+impl<M: ManagerBase> ManagerBase for ProofGen<M> {
     type Region<E: 'static, const LEN: usize> = ProofRegion<E, LEN, M>;
 
     type DynRegion<const LEN: usize> = ProofDynRegion<LEN, M>;
@@ -46,7 +46,7 @@ impl<'a, M: ManagerBase> ManagerBase for ProofGen<'a, M> {
 
 /// Implementation of [`ManagerRead`] which wraps another manager and
 /// additionally records read locations.
-impl<'a, M: ManagerRead> ManagerRead for ProofGen<'a, M> {
+impl<M: ManagerRead> ManagerRead for ProofGen<M> {
     fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
         region.set_read();
         match region.writes.get(&index) {
@@ -143,7 +143,7 @@ impl<'a, M: ManagerRead> ManagerRead for ProofGen<'a, M> {
 
 /// Implementation of [`ManagerWrite`] which wraps another manager and
 /// records written locations but does not write to the wrapped region directly.
-impl<'a, M: ManagerWrite> ManagerWrite for ProofGen<'a, M> {
+impl<M: ManagerWrite> ManagerWrite for ProofGen<M> {
     fn region_write<E, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
@@ -206,7 +206,7 @@ impl<'a, M: ManagerWrite> ManagerWrite for ProofGen<'a, M> {
 
 /// Implementation of [`ManagerReadWrite`] which wraps another manager and
 /// additionally records read and written locations.
-impl<'a, M: ManagerReadWrite> ManagerReadWrite for ProofGen<'a, M> {
+impl<M: ManagerReadWrite> ManagerReadWrite for ProofGen<M> {
     fn region_replace<E: Copy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
@@ -219,7 +219,7 @@ impl<'a, M: ManagerReadWrite> ManagerReadWrite for ProofGen<'a, M> {
     }
 }
 
-impl<'a, M: ManagerSerialise> ManagerSerialise for ProofGen<'a, M> {
+impl<M: ManagerSerialise> ManagerSerialise for ProofGen<M> {
     fn serialise_region<E: serde::Serialize, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,
         serializer: S,
@@ -381,10 +381,10 @@ mod tests {
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
                 ProofRegion::from_source_region(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            let value = ProofGen::<'_, Owned>::region_read(&region, i);
+            let value = ProofGen::<Owned>::region_read(&region, i);
             prop_assert_eq!(value, value_before);
             prop_assert_eq!(region.get_access_info(), AccessInfo::Read);
-            ProofGen::<'_, Owned>::region_write(&mut region, i, value_after);
+            ProofGen::<Owned>::region_write(&mut region, i, value_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
 
             // A write followed by a read
@@ -392,9 +392,9 @@ mod tests {
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
                 ProofRegion::from_source_region(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            ProofGen::<'_, Owned>::region_write(&mut region, i, value_after);
+            ProofGen::<Owned>::region_write(&mut region, i, value_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::Write);
-            let value = ProofGen::<'_, Owned>::region_read(&region, i);
+            let value = ProofGen::<Owned>::region_read(&region, i);
             prop_assert_eq!(value, value_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
 
@@ -403,7 +403,7 @@ mod tests {
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
                 ProofRegion::from_source_region(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            let value = ProofGen::<'_, Owned>::region_replace(&mut region, i, value_after);
+            let value = ProofGen::<Owned>::region_replace(&mut region, i, value_after);
             prop_assert_eq!(value, value_before);
             prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
 
@@ -415,10 +415,10 @@ mod tests {
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
                 ProofRegion::from_source_region(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            let values = ProofGen::<'_, Owned>::region_read_all(&region);
+            let values = ProofGen::<Owned>::region_read_all(&region);
             prop_assert_eq!(values.as_slice(), data_before);
             prop_assert_eq!(region.get_access_info(), AccessInfo::Read);
-            ProofGen::<'_, Owned>::region_write_all(&mut region, &data_after);
+            ProofGen::<Owned>::region_write_all(&mut region, &data_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
 
             // A write_all followed by a read_all
@@ -426,16 +426,16 @@ mod tests {
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
                 ProofRegion::from_source_region(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            ProofGen::<'_, Owned>::region_write_all(&mut region, &data_after);
+            ProofGen::<Owned>::region_write_all(&mut region, &data_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::Write);
-            let values = ProofGen::<'_, Owned>::region_read_all(&region);
+            let values = ProofGen::<Owned>::region_read_all(&region);
             prop_assert_eq!(values.as_slice(), data_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
 
             // Check correct Merkleisation
             let cells = [value_before; CELLS_SIZE];
             let region: ProofRegion<u64, CELLS_SIZE, Owned> = ProofRegion::from_source_region(cells);
-            let mut cells: Cells<u64, CELLS_SIZE, ProofGen<'_, Owned>> = Cells::bind(region);
+            let mut cells: Cells<u64, CELLS_SIZE, ProofGen<Owned>> = Cells::bind(region);
             let initial_root_hash = cells.hash().unwrap();
             cells.write(i, value_after);
             prop_assert_eq!(cells.hash().unwrap(), initial_root_hash);
@@ -481,7 +481,7 @@ mod tests {
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
                 ProofDynRegion::from_source_region(cells);
-            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<'_, Owned>> =
+            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
             // Perform static memory accesses
@@ -497,7 +497,7 @@ mod tests {
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
                 ProofDynRegion::from_source_region(cells);
-            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<'_, Owned>> =
+            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
             // Perform dynamic memory accesses as `u16`
@@ -519,7 +519,7 @@ mod tests {
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
                 ProofDynRegion::from_source_region(cells);
-            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<'_, Owned>> =
+            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
             // Perform dynamic memory accesses as bytes
@@ -541,7 +541,7 @@ mod tests {
             let region = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
                 ProofDynRegion::from_source_region(region.clone());
-            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<'_, Owned>> =
+            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
             // Perform memory accesses
