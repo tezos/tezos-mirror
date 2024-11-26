@@ -5,19 +5,7 @@
 // The [__internal_store_get_hash] host function is not made available by the
 // SDK. We expose it through an [InternalRuntime] trait.
 
-use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError, Error};
-
-const STORE_HASH_SIZE: usize = 32;
-
-#[link(wasm_import_module = "smart_rollup_core")]
-extern "C" {
-    pub fn __internal_store_get_hash(
-        path: *const u8,
-        path_len: usize,
-        dst: *mut u8,
-        max_size: usize,
-    ) -> i32;
-}
+use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError};
 
 pub trait InternalRuntime {
     fn __internal_store_get_hash<T: Path>(
@@ -32,27 +20,4 @@ pub trait InternalRuntime {
 // of the root directory.
 pub trait ExtendedRuntime {
     fn store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError>;
-}
-
-pub struct InternalHost();
-
-impl InternalRuntime for InternalHost {
-    fn __internal_store_get_hash<T: Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        let mut buffer = [0u8; STORE_HASH_SIZE];
-        let result = unsafe {
-            __internal_store_get_hash(
-                path.as_ptr(),
-                path.size(),
-                buffer.as_mut_ptr(),
-                STORE_HASH_SIZE,
-            )
-        };
-        match Error::wrap(result) {
-            Ok(_i) => Ok(buffer.to_vec()),
-            Err(e) => Err(RuntimeError::HostErr(e)),
-        }
-    }
 }

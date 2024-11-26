@@ -20,3 +20,6 @@ log = "0.4"
 env_logger = "0.11"
 librustzcash = { path = "../../src/rustzcash_deps" }
 kernel-bifrost = { package = "evm_kernel", path = "../kernel_bifrost/kernel", default-features = false }
+runtime-bifrost = { package = "tezos-evm-runtime", path = "../kernel_bifrost/runtime", default-features = false }
+tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
+tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }

@@ -149,6 +149,15 @@ module Impl = struct
     let*! tree = Vector.add_in_tree tree key vector in
     return (tree, Bytes.length bytes)
 
+  let store_write_all (tree : Irmin_context.tree) key bytes =
+    Key_parser.with_key key @@ fun key ->
+    Lwt_preemptive.run_in_main @@ fun () ->
+    let open Lwt_result_syntax in
+    let*! vector = Vector.empty () in
+    let* vector = Vector.write_bytes vector 0 bytes in
+    let*! tree = Vector.add_in_tree tree key vector in
+    return tree
+
   let reboot_flag = Key_parser.key_of_string_exn "/durable/kernel/env/reboot"
 
   let check_reboot_flag tree =
@@ -194,7 +203,8 @@ let register () =
   Callback.register "layer2_store__store_list_size" store_list_size ;
   Callback.register "layer2_store__store_value_size" store_value_size ;
   Callback.register "layer2_store__store_read" store_read ;
-  Callback.register "layer2_store__store_write" store_write
+  Callback.register "layer2_store__store_write" store_write ;
+  Callback.register "layer2_store__store_write_all" store_write_all
 
 module Internal_for_tests = struct
   include Impl

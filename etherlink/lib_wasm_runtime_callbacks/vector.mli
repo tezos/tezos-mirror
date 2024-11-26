@@ -8,6 +8,8 @@
 (** A subtree extracted from an EVM state which contains a durable value. *)
 type t = private Irmin_context.tree
 
+val empty : unit -> t Lwt.t
+
 (** [get tree key] extracts a durable value from the durable storage of [tree].
     [create_if_absent] can be used to create said durable storage value if it
     does not already exist (defaults to [false]). *)

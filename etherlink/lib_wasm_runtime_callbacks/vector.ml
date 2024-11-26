@@ -66,6 +66,16 @@ let set_length vector new_len =
     ["length"]
     Data_encoding.(Binary.to_bytes_exn int64 (Int64.of_int new_len))
 
+let empty () =
+  let open Lwt_syntax in
+  let* tree =
+    Irmin_context.Tree.add
+      (Irmin_context.PVMState.empty ())
+      ["length"]
+      Data_encoding.(Binary.to_bytes_exn int64 0L)
+  in
+  return tree
+
 let get ?(create_if_absent = false) tree key : (t, Error_code.t) result Lwt.t =
   let open Lwt_result_syntax in
   let*! v = Irmin_context.Tree.find_tree tree (key @ ["@"]) in
@@ -73,12 +83,7 @@ let get ?(create_if_absent = false) tree key : (t, Error_code.t) result Lwt.t =
   | Some v -> return v
   | None ->
       if create_if_absent then
-        let*! tree =
-          Irmin_context.Tree.add
-            (Irmin_context.PVMState.empty ())
-            ["length"]
-            Data_encoding.(Binary.to_bytes_exn int64 0L)
-        in
+        let*! tree = empty () in
         return tree
       else fail Error_code.store_not_a_value
 

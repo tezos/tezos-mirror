@@ -8,7 +8,9 @@ mod host_funcs;
 pub use crate::host::{Host, InputsBuffer};
 use crate::{
     api::{Kernel, KernelsCache},
-    types::EvmTree,
+    bindings,
+    constants::KERNEL,
+    types::{ContextHash, EvmTree},
 };
 pub use env::Env;
 use log::trace;
@@ -101,14 +103,76 @@ impl Runtime for WasmRuntime {
     }
 }
 
+#[derive(Clone, Copy)]
+enum NativeKernel {
+    Bifrost,
+}
+
+const BIFROST_ROOT_HASH_HEX: &'static str =
+    "7ff257e4f6ddb11766ec2266857c8fc75bd00e73230a7b598fec2bd9a68b6908";
+
+impl NativeKernel {
+    fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
+        let root_hash_hex = hex::encode(root_hash.as_bytes());
+        trace!("kernel root hash {root_hash_hex}");
+
+        match root_hash_hex.as_str() {
+            BIFROST_ROOT_HASH_HEX => Some(NativeKernel::Bifrost),
+            _ => None,
+        }
+    }
+}
+
+pub struct NativeRuntime {
+    variant: NativeKernel,
+    entrypoint: String,
+    host: Host,
+}
+
+impl Runtime for NativeRuntime {
+    fn host(&self) -> &Host {
+        &self.host
+    }
+
+    fn mut_host(&mut self) -> &mut Host {
+        &mut self.host
+    }
+
+    fn call(&mut self) -> Result<(), Error> {
+        match (self.entrypoint.as_str(), self.variant) {
+            ("kernel_run", NativeKernel::Bifrost) => {
+                trace!("bifrost::kernel_loop");
+                kernel_bifrost::kernel_loop(self.mut_host());
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::Bifrost) => {
+                trace!("bifrost::populate_delayed_inbox");
+                kernel_bifrost::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
+                Ok(())
+            }
+            (missing_entrypoint, _) => todo!("entrypoint {missing_entrypoint} not covered yet"),
+        }
+    }
+}
 /// Returns an appropriate runtime that can be used to execute the current kernel.
 pub fn load_runtime(
     engine: &Engine,
     kernels_cache: &mut KernelsCache,
     host: Host,
     entrypoint: &str,
+    native_execution: bool,
 ) -> Result<Box<dyn Runtime>, Error> {
-    let kernel = kernels_cache.load(&engine, host.tree())?;
-    let runtime = WasmRuntime::new(&engine, host, kernel, entrypoint)?;
-    Ok(Box::new(runtime))
+    let root_hash = bindings::store_get_hash(host.tree(), KERNEL)?;
+    match NativeKernel::of_root_hash(&root_hash) {
+        Some(kernel) if native_execution => Ok(Box::new(NativeRuntime {
+            variant: kernel,
+            host,
+            entrypoint: entrypoint.to_owned(),
+        })),
+        Some(_) | None => {
+            let kernel = kernels_cache.load(&engine, host.tree())?;
+            let runtime = WasmRuntime::new(&engine, host, kernel, entrypoint)?;
+            Ok(Box::new(runtime))
+        }
+    }
 }
