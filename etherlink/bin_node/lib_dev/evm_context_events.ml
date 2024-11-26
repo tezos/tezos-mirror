@@ -165,6 +165,17 @@ let observer_reorg_old_blueprint =
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
+let observer_reorg_cannot_decode_blueprint =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_reorg_cannot_decode_blueprint"
+    ~level:Warning
+    ~msg:
+      "[Warning] EVM Endpoint provided a blueprint (level {level}) we cannot \
+       decode"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -206,3 +217,6 @@ let observer_potential_reorg Ethereum_types.(Qty level) =
 
 let observer_reorg_old_blueprint Ethereum_types.(Qty level) =
   emit observer_reorg_old_blueprint level
+
+let observer_reorg_cannot_decode_blueprint Ethereum_types.(Qty level) =
+  emit observer_reorg_cannot_decode_blueprint level

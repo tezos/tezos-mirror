@@ -1474,7 +1474,7 @@ module State = struct
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
     return_unit
 
-  let potential_observer_reorg ~evm_node_endpoint:_ conn _ctxt
+  let potential_observer_reorg ~evm_node_endpoint:_ conn ctxt
       blueprint_with_events =
     let open Lwt_result_syntax in
     (*
@@ -1515,8 +1515,35 @@ module State = struct
         Evm_context_events.observer_reorg_old_blueprint blueprint_number
       in
       return_none
-    else (* Next step is done in the next commit. *)
-      return_none
+    else
+      (* As we have a different blueprint we want to check if it was signed
+         by the sequencer, otherwise it is meaningless.
+
+         We also decode the blueprint to retrieve the parent hash to see
+         if we agree with it.
+      *)
+      let* sequencer =
+        let read path =
+          let*! res = Evm_state.inspect ctxt.session.evm_state path in
+          return res
+        in
+        Durable_storage.sequencer read
+      in
+      let blueprint_parent_hash =
+        Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload
+          sequencer
+          blueprint_with_events.blueprint.payload
+      in
+      match blueprint_parent_hash with
+      | Some _blueprint_parent_hash ->
+          (* Next step is done in the next commit. *)
+          return_none
+      | None ->
+          let*! () =
+            Evm_context_events.observer_reorg_cannot_decode_blueprint
+              blueprint_number
+          in
+          return_none
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
