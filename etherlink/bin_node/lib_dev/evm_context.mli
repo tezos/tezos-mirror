@@ -175,6 +175,17 @@ val patch_state :
   unit ->
   unit tzresult Lwt.t
 
+(** [potential_observer_reorg evm_node_endpoint blueprint_with_events] checks
+    with the [evm_node_endpoint] if a reorganization happened, and return the
+    reorganization level if it exists.
+
+    A reorganization can happen typically if the kernel flushed its delayed inbox
+    in a blueprint. *)
+val potential_observer_reorg :
+  Uri.t ->
+  Blueprint_types.with_events ->
+  Ethereum_types.quantity option tzresult Lwt.t
+
 module State : sig
   (** Path of EVM state store. *)
   val store_path : data_dir:string -> string

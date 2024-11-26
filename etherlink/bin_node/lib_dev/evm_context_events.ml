@@ -146,6 +146,15 @@ let worker_request_failed =
     ("errors", Error_monad.trace_encoding)
     ~pp2:Error_monad.pp_print_trace
 
+let observer_potential_reorg =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_potential_reorg"
+    ~level:Warning
+    ~msg:"[Warning] Potential reorganization happening at level {level}"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -181,3 +190,6 @@ let reset_at_level level = emit reset_at_level level
 
 let worker_request_failed request_view errs =
   emit worker_request_failed (request_view, errs)
+
+let observer_potential_reorg Ethereum_types.(Qty level) =
+  emit observer_potential_reorg level

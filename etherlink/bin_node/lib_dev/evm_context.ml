@@ -1473,6 +1473,24 @@ module State = struct
     in
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
     return_unit
+
+  let potential_observer_reorg ~evm_node_endpoint:_ _conn _ctxt
+      blueprint_with_events =
+    let open Lwt_result_syntax in
+    (*
+       1. Check if this blueprint was finalized on L1.
+       2. Check if the blueprint is different than the one
+          we already received.
+       3. Check if the sequencer signed this new blueprint.
+       4. Find the divergence point.
+       5. Apply the reorganized blueprint.
+       6. Restart blueprint follower after this level.
+    *)
+    let blueprint_number =
+      blueprint_with_events.Blueprint_types.blueprint.number
+    in
+    let*! () = Evm_context_events.observer_potential_reorg blueprint_number in
+    return_none
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -1581,6 +1599,15 @@ module Handlers = struct
         protect @@ fun () ->
         let ctxt = Worker.state self in
         State.wasm_pvm_version ctxt
+    | Potential_observer_reorg {evm_node_endpoint; blueprint_with_events} ->
+        protect @@ fun () ->
+        let ctxt = Worker.state self in
+        State.Transaction.run ctxt @@ fun ctxt conn ->
+        State.potential_observer_reorg
+          ~evm_node_endpoint
+          conn
+          ctxt
+          blueprint_with_events
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -1603,6 +1630,7 @@ module Handlers = struct
       | Reconstruct _ -> Eq
       | Patch_state _ -> Eq
       | Wasm_pvm_version -> Eq
+      | Potential_observer_reorg _ -> Eq
   end
 
   let on_error (type a b) _self _st (req : (a, b) Request.t) (errs : b) :
@@ -1996,6 +2024,10 @@ let patch_sequencer_key ?block_number pk =
 let patch_state ?block_number ~key ~value () =
   worker_wait_for_request
     (Patch_state {commit = true; key; value; block_number})
+
+let potential_observer_reorg evm_node_endpoint blueprint_with_events =
+  worker_wait_for_request
+    (Potential_observer_reorg {evm_node_endpoint; blueprint_with_events})
 
 let shutdown () =
   let open Lwt_result_syntax in

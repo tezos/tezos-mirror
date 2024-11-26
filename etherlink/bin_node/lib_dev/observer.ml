@@ -8,9 +8,22 @@
 
 open Ethereum_types
 
-let on_new_blueprint next_blueprint_number
-    ({delayed_transactions; kernel_upgrade; blueprint} :
-      Blueprint_types.with_events) =
+(** [on_new_blueprint evm_node_endpoint next_blueprint_number
+    blueprint] applies evm events found in the blueprint, then applies
+    the blueprint itself.
+
+    There are 3 possible outcomes for the blueprint's application:
+    1. Application succeeds, a block is produced.
+    2. Application fails (e.g. invalid signature).
+    3. Blueprint is correct, but is on a different branch.
+
+    The case (3.) can happen if the rollup node flushed its delayed inbox
+    into a forced blueprint. The sequencer has performed a reorganization and
+    starts submitting blocks from the new branch.
+*)
+let on_new_blueprint evm_node_endpoint next_blueprint_number
+    (({delayed_transactions; kernel_upgrade; blueprint} :
+       Blueprint_types.with_events) as blueprint_with_events) =
   let open Lwt_result_syntax in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
@@ -34,9 +47,34 @@ let on_new_blueprint next_blueprint_number
         delayed_transactions
     in
     match res with
-    | Error (Evm_context.Cannot_apply_blueprint _ :: _) | Ok () -> return_unit
+    | Error (Evm_context.Cannot_apply_blueprint _ :: _) -> (
+        (* Apply blueprint failed, it is potentially the sign of a reorg.
+           If it's not a reorg, the call to {!potential_observer_reorg} will
+           exit as soon as possible anyway.
+        *)
+        let* reorg =
+          Evm_context.potential_observer_reorg
+            evm_node_endpoint
+            blueprint_with_events
+        in
+        match reorg with
+        | Some level -> return (`Check_for_reorg level)
+        | None -> return `Continue)
+    | Ok () | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
+        return `Continue
     | Error err -> fail err
-  else failwith "Received a blueprint with an unexpected number."
+  else if Z.(lt level number) then
+    (* The endpoint's stream has provided a blueprint smaller than
+       expected. It could be the sign of a reorganization. *)
+    let* reorg =
+      Evm_context.potential_observer_reorg
+        evm_node_endpoint
+        blueprint_with_events
+    in
+    match reorg with
+    | Some level -> return (`Check_for_reorg level)
+    | None -> return `Continue
+  else return `Continue
 
 let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
     finalizer_private_server =
@@ -187,4 +225,4 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~time_between_blocks
       ~evm_node_endpoint
       ~next_blueprint_number
-      on_new_blueprint
+      (on_new_blueprint evm_node_endpoint)
