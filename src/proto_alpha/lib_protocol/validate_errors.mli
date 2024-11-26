@@ -155,6 +155,7 @@ module Anonymous : sig
         level : Raw_level.t;
         last_cycle : Cycle.t;
       }
+    | Conflicting_dal_entrapment of operation_conflict
     | Conflicting_nonce_revelation of operation_conflict
     | Conflicting_vdf_revelation of operation_conflict
     | Drain_delegate_on_unregistered_delegate of Signature.Public_key_hash.t

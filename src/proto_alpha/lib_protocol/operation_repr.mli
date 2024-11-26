@@ -622,6 +622,9 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    in the case of equality, they are compared by the hashes of their first
    denounced block_header.
 
+   Two {!Dal_entrapment_evidence} ops are compared by their level and the number
+   of slots they attest.
+
    Two {!Vdf_revelation} ops are compared by their [solution].
 
    Two {!Seed_nonce_relevation} ops are compared by their [level].

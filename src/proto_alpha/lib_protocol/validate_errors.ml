@@ -893,6 +893,29 @@ module Anonymous = struct
       (fun (kind, level, last_cycle) ->
         Outdated_denunciation {kind; level; last_cycle})
 
+  type error += Conflicting_dal_entrapment of operation_conflict
+
+  let () =
+    register_error_kind
+      `Branch
+      ~id:"validate.operation.conflicting_dal_entrapment"
+      ~title:"Conflicting DAL entrapment in the current validation state)."
+      ~description:
+        "A DAL entrapment evidence for the same level and a larger DAL \
+         attestation has already been validated for the current validation \
+         state."
+      ~pp:(fun ppf (Operation_conflict {existing; _}) ->
+        Format.fprintf
+          ppf
+          "This DAL entrapment evidence is conflicting with an existing \
+           entrapment evidence %a"
+          Operation_hash.pp
+          existing)
+      Data_encoding.(obj1 (req "conflict" operation_conflict_encoding))
+      (function
+        | Conflicting_dal_entrapment conflict -> Some conflict | _ -> None)
+      (fun conflict -> Conflicting_dal_entrapment conflict)
+
   type error += Conflicting_nonce_revelation of operation_conflict
 
   let () =

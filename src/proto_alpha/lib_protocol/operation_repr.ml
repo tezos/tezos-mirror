@@ -2100,6 +2100,8 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
   in
   {round; bh_hash}
 
+type dal_entrapment_info = {level : int32; number_of_attested_slots : int}
+
 (** The weight of an operation.
 
    Given an operation, its [weight] carries on static information that
@@ -2127,6 +2129,9 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    and [hash] of its first denounciated block_header. the [level] and
    [round] are wrapped in a {!double_baking_infos}.
 
+    The [weight] of a {!Dal_entrapment_evidence} is the level and the number of
+    DAL attested slots of the included attestation.
+
     The [weight] of an {!Activate_account} depends on its public key
    hash.
 
@@ -2150,8 +2155,7 @@ type _ weight =
   | Weight_double_attestation : round_infos -> anonymous_pass_type weight
   | Weight_double_baking : double_baking_infos -> anonymous_pass_type weight
   | Weight_dal_entrapment_evidence :
-      (* TODO: to be refined in the next commit *)
-      unit
+      dal_entrapment_info
       -> anonymous_pass_type weight
   | Weight_activate_account :
       Ed25519.Public_key_hash.t
@@ -2267,8 +2271,21 @@ let weight_of : packed_operation -> operation_weight =
         consensus_infos_and_hash_from_block_header bh1
       in
       W (Anonymous, Weight_double_baking double_baking_infos)
-  | Single (Dal_entrapment_evidence _) ->
-      W (Anonymous, Weight_dal_entrapment_evidence ())
+  | Single (Dal_entrapment_evidence {attestation; _}) -> (
+      match attestation.protocol_data.contents with
+      | Single (Attestation {consensus_content; dal_content}) ->
+          let info =
+            {
+              level = Raw_level_repr.to_int32 consensus_content.level;
+              number_of_attested_slots =
+                Option.fold
+                  ~none:0
+                  ~some:(fun d ->
+                    Dal_attestation_repr.number_of_attested_slots d.attestation)
+                  dal_content;
+            }
+          in
+          W (Anonymous, Weight_dal_entrapment_evidence info))
   | Single (Activate_account {id; _}) ->
       W (Anonymous, Weight_activate_account id)
   | Single (Drain_delegate {delegate; _}) ->
@@ -2355,6 +2372,13 @@ let compare_attestation_infos
     ((infos1, slot1), n1)
     ((infos2, slot2), n2)
 
+let compare_dal_entrapment_infos infos1 infos2 =
+  compare_pair_in_lexico_order
+    ~cmp_fst:Compare.Int32.compare
+    ~cmp_snd:Compare.Int.compare
+    (infos1.level, infos1.number_of_attested_slots)
+    (infos2.level, infos2.number_of_attested_slots)
+
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
@@ -2412,9 +2436,12 @@ let compare_vote_weight w1 w2 =
    is comparing their {!round_infos}, see {!compare_round_infos} for
    more details.
 
-    Comparing two {!Double_baking_evidence} is comparing as their
+   Comparing two {!Double_baking_evidence} is comparing as their
    {!double_baking_infos}, see {!compare_double_baking_infos} for more
    details.
+
+   Two {!Dal_entrapment_evidence} ops are compared by their level and the number of
+   slots they attest.
 
    Two {!Seed_nonce_revelation} are compared by their [level].
 
@@ -2460,12 +2487,14 @@ let compare_anonymous_weight w1 w2 =
       | Weight_vdf_revelation _ | Weight_activate_account _
       | Weight_drain_delegate _ ) ) ->
       1
-  | Weight_dal_entrapment_evidence (), Weight_dal_entrapment_evidence () -> 0
+  | Weight_dal_entrapment_evidence info1, Weight_dal_entrapment_evidence info2
+    ->
+      compare_dal_entrapment_infos info1 info2
   | ( ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
       | Weight_activate_account _ | Weight_drain_delegate _ ),
       Weight_dal_entrapment_evidence _ ) ->
       -1
-  | ( Weight_dal_entrapment_evidence (),
+  | ( Weight_dal_entrapment_evidence _,
       ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
       | Weight_activate_account _ | Weight_drain_delegate _ ) ) ->
       1

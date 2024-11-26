@@ -305,6 +305,9 @@ val check_operation :
 (** Check that the operation does not conflict with other operations
     already validated and recorded in the {!operation_conflict_state}.
 
+    Two {!Dal_entrapment_evidence} are in conflict if their consensus
+    attestations have the same level and the same slot.
+
     This function is intended for {!Mempool_validation} exclusively. *)
 val check_operation_conflict :
   operation_conflict_state ->
