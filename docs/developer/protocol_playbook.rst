@@ -175,7 +175,7 @@ The objectives of this phase are:
    -  Testnet configuration for ``proto-<proposal name>``
    -  Technical description of the Protocol Proposal features
 
-To plan the end of the stabilzation period, open a milestone (along the lines of another recent milestone titled "<X> Protocol Proposal is release-ready").
+To plan the end of the stabilization period, open a milestone (along the lines of another recent milestone titled "<X> Protocol Proposal is release-ready").
 
 As with ``proto-beta`` and ``octez-beta``, producing the final protocol
 snapshot and its associated release candidate are under the
