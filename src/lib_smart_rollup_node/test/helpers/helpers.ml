@@ -82,7 +82,16 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
     Layer1.{hash = Block_hash.zero; level = node_ctxt.genesis_info.level}
   in
   let* () = Node_context.save_level node_ctxt head in
-  let predecessor = head in
+  let predecessor =
+    Layer1.
+      {
+        hash =
+          Block_hash.of_hex_exn
+            (`Hex
+              "0000000000000000000000000000000000000000000000000000000000000001");
+        level = Int32.pred head.level;
+      }
+  in
   let predecessor_timestamp = Time.Protocol.epoch in
   let*? (module Plugin) =
     Protocol_plugins.proto_plugin_for_protocol
@@ -97,6 +106,9 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   in
   let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
   let inbox_witness = Inbox.current_witness inbox in
+  let* () =
+    Node_context.save_messages node_ctxt inbox_witness ~level:head.level []
+  in
   let ctxt = Context.empty node_ctxt.context in
   let num_ticks = 0L in
   let initial_tick = Z.zero in
@@ -134,18 +146,21 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let* () = Node_context.set_l2_head node_ctxt l2_block in
   return l2_block
 
-let initialize_node_context protocol ?(constants = default_constants) kind
-    ~boot_sector =
+let initialize_node_context ?data_dir protocol ?(constants = default_constants)
+    kind ~boot_sector =
   let open Lwt_result_syntax in
   incr uid ;
   (* To avoid any conflict with previous runs of this test. *)
   let data_dir =
-    Tezt.Temp.dir
-      (Format.asprintf
-         "sc-rollup-node-test-%a-%d"
-         Protocol_hash.pp_short
-         protocol
-         !uid)
+    match data_dir with
+    | Some d -> d
+    | None ->
+        Tezt.Temp.dir
+          (Format.asprintf
+             "sc-rollup-node-test-%a-%d"
+             Protocol_hash.pp_short
+             protocol
+             !uid)
   in
   let base_dir =
     Tezt.Temp.dir
@@ -176,10 +191,10 @@ let initialize_node_context protocol ?(constants = default_constants) kind
   in
   return (ctxt, genesis)
 
-let with_node_context ?constants kind protocol ~boot_sector f =
+let with_node_context ?data_dir ?constants kind protocol ~boot_sector f =
   let open Lwt_result_syntax in
   let* node_ctxt, genesis =
-    initialize_node_context protocol ?constants kind ~boot_sector
+    initialize_node_context ?data_dir protocol ?constants kind ~boot_sector
   in
   Lwt.finalize (fun () -> f node_ctxt ~genesis) @@ fun () ->
   let open Lwt_syntax in
@@ -234,7 +249,15 @@ let add_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
         level = predecessor_l2_block.header.level;
       }
   in
-  let* () = Node_context.set_l2_head node_ctxt predecessor_l2_block in
+  let* old_head = Node_context.last_processed_head_opt node_ctxt in
+  let* () =
+    match old_head with
+    | Some o
+      when Block_hash.(
+             o.header.block_hash = predecessor_l2_block.header.block_hash) ->
+        return_unit
+    | _ -> Node_context.set_l2_head node_ctxt predecessor_l2_block
+  in
   let pred_level = predecessor_l2_block.header.level in
   let head =
     make_header
@@ -258,6 +281,7 @@ let add_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
 let append_l2_block (node_ctxt : _ Node_context.t) ?(is_first_block = false)
     messages =
   let open Lwt_result_syntax in
+  let*! () = Lwt.pause () in
   let* predecessor_l2_block = Node_context.last_processed_head_opt node_ctxt in
   let* predecessor_l2_block =
     match predecessor_l2_block with
@@ -281,6 +305,117 @@ let append_dummy_l2_chain node_ctxt ~length =
         ["\001" (* External tag *) ^ Z.to_bits (Z.of_int (i + head_level + 1))])
   in
   append_l2_blocks node_ctxt batches
+
+module V4 = struct
+  open Octez_smart_rollup_node_store
+
+  let migrate_back_block (v4_store : Store_v4.rw) (node_ctxt : _ Node_context.t)
+      (block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let* () =
+      Store_v4.Levels_to_hashes.add
+        v4_store.levels_to_hashes
+        block.header.level
+        block.header.block_hash
+    in
+    let* () =
+      Option.iter_es
+        (fun commitment_hash ->
+          let* commitment =
+            Node_context.get_commitment node_ctxt commitment_hash
+          in
+          Store_v4.Commitments.append
+            v4_store.commitments
+            ~key:commitment_hash
+            ~value:commitment)
+        block.header.commitment_hash
+    in
+    let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
+    let* () =
+      Store_v4.Inboxes.append
+        v4_store.inboxes
+        ~key:block.header.inbox_hash
+        ~value:inbox
+    in
+    let* messages =
+      Node_context.find_messages node_ctxt block.header.inbox_witness
+    in
+    let* () =
+      Store_v4.Messages.append
+        v4_store.messages
+        ~key:block.header.inbox_witness
+        ~header:block.header.predecessor
+        ~value:(Option.value messages ~default:[])
+    in
+    let* () =
+      Store_v4.L2_blocks.append
+        v4_store.l2_blocks
+        ~key:block.header.block_hash
+        ~header:block.header
+        ~value:{block with header = ()}
+    in
+    let* () = Store_v4.L2_head.write v4_store.l2_head block in
+    return_unit
+
+  let migrate_back v4_store node_ctxt chain =
+    List.iter_es (migrate_back_block v4_store node_ctxt) chain
+
+  let with_store_migration_node_context ?constants kind protocol ~boot_sector
+      ~chain_size f =
+    let open Lwt_result_syntax in
+    let* data_dir, cctxt, current_protocol, genesis, chain =
+      with_node_context ?constants kind protocol ~boot_sector
+      @@ fun node_ctxt ~genesis ->
+      let* chain = append_dummy_l2_chain node_ctxt ~length:chain_size in
+      let* v4_store =
+        Store_v4.load
+          Read_write
+          ~index_buffer_size:1000
+          ~l2_blocks_cache_size:1
+          (Configuration.default_storage_dir node_ctxt.data_dir)
+      in
+      let chain = genesis :: chain in
+      let* () = migrate_back v4_store node_ctxt chain in
+      let* () = Store_v4.close v4_store in
+      return
+        ( node_ctxt.data_dir,
+          node_ctxt.cctxt,
+          Reference.get node_ctxt.current_protocol,
+          genesis,
+          chain )
+    in
+    (* Clean up V5 store *)
+    let*! () =
+      List.iter_s
+        (fun f ->
+          Lwt.catch
+            (fun () -> Lwt_unix.unlink (Filename.concat data_dir f))
+            (fun _ -> Lwt.return_unit))
+        Sql_store.(sqlite_file_name :: extra_sqlite_files)
+    in
+    let* () =
+      Store_version.write_version_file
+        ~dir:(Configuration.default_storage_dir data_dir)
+        Store_v4.version
+    in
+    let* ctxt =
+      Node_context_loader.Internal_for_tests.create_node_context
+        cctxt
+        current_protocol
+        ~data_dir
+        kind
+    in
+    let commitment_hash =
+      WithExceptions.Option.get ~loc:__LOC__ genesis.header.commitment_hash
+    in
+    let ctxt =
+      {ctxt with genesis_info = {ctxt.genesis_info with commitment_hash}}
+    in
+    Lwt.finalize (fun () -> f ctxt chain) @@ fun () ->
+    let open Lwt_syntax in
+    let* _ = Node_context_loader.close ctxt in
+    return_unit
+end
 
 module Assert = struct
   module Make_with_encoding (X : sig
@@ -320,6 +455,34 @@ let alcotest ?name speed ?constants kind protocol ~boot_sector f =
   Alcotest_lwt.test_case name speed @@ fun _lwt_switch () ->
   let open Lwt_result_syntax in
   let*! r = with_node_context ?constants kind protocol ~boot_sector f in
+  match r with
+  | Ok () -> Lwt.return_unit
+  | Error err ->
+      Format.printf "@\n%a@." pp_print_trace err ;
+      Lwt.fail Alcotest.Test_error
+
+let store_migration_alcotest ?name speed ?constants kind protocol ~boot_sector
+    ~chain_size f =
+  let name =
+    Format.asprintf
+      "%s%a %a"
+      (match name with None -> "" | Some n -> n ^ " - ")
+      Protocol_hash.pp_short
+      protocol
+      Kind.pp
+      kind
+  in
+  Alcotest_lwt.test_case name speed @@ fun _lwt_switch () ->
+  let open Lwt_result_syntax in
+  let*! r =
+    V4.with_store_migration_node_context
+      ?constants
+      kind
+      protocol
+      ~boot_sector
+      ~chain_size
+      f
+  in
   match r with
   | Ok () -> Lwt.return_unit
   | Error err ->
