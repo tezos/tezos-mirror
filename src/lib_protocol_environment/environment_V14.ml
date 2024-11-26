@@ -347,13 +347,14 @@ struct
          s
          bytes
        [@profiler.span_f
-         [
-           (match (pk : public_key) with
-           | Ed25519 _ -> "check_signature_ed25519"
-           | Secp256k1 _ -> "check_signature_secp256k1"
-           | P256 _ -> "check_signature_p256"
-           | Bls _ -> "check_signature_bls");
-         ]])
+         {verbosity = Debug}
+           [
+             (match (pk : public_key) with
+             | Ed25519 _ -> "check_signature_ed25519"
+             | Secp256k1 _ -> "check_signature_secp256k1"
+             | P256 _ -> "check_signature_p256"
+             | Bls _ -> "check_signature_bls");
+           ]])
   end
 
   module Timelock = Tezos_crypto.Timelock
@@ -1287,7 +1288,10 @@ struct
           (let*! r = f x in
            Lwt.return (wrap_tzresult r))
           [@profiler.record_s
-            Format.asprintf "load_key(%s)" (Context.Cache.identifier_of_key x)])
+            {verbosity = Debug}
+              (Format.asprintf
+                 "load_key(%s)"
+                 (Context.Cache.identifier_of_key x))])
 
     (** Ensure that the cache is correctly loaded in memory
         before running any operations. *)
@@ -1317,7 +1321,7 @@ struct
          predecessor_context
          cache
          value_of_key)
-      [@profiler.record_s "load_predecessor_cache"]
+      [@profiler.record_s {verbosity = Debug} "load_predecessor_cache"]
 
     let begin_validation ctxt chain_id mode ~predecessor ~cache =
       let open Lwt_result_syntax in
