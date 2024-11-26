@@ -170,9 +170,6 @@ pub struct HashWriter {
 
 impl HashWriter {
     /// Initialise a new writer with the given `size`.
-    ///
-    /// # Panics
-    /// Panics if `size == 0`.
     pub fn new(size: NonZeroUsize) -> Self {
         let size = size.get();
         Self {
@@ -193,9 +190,6 @@ impl HashWriter {
 
     /// Hash the contents of the buffer.
     fn flush_buffer(&mut self) -> Result<(), HashError> {
-        // TODO RV-250: Instead of building the whole input and hashing it,
-        // we should use incremental hashing, which isn't currently supported
-        // in `tezos_crypto_rs`.
         let hash = Hash::blake2b_hash_bytes(&self.buffer)?;
         self.hashes.push(hash);
         self.buffer.clear();

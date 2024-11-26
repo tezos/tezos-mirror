@@ -11,6 +11,7 @@ use crate::state_backend::hash::{Hash, HashError, RootHashable, DIGEST_SIZE};
 use itertools::Itertools;
 
 /// A variable-width Merkle tree with [`AccessInfo`] metadata for leaves.
+///
 /// Values of this type are produced by the proof-generating backend to capture
 /// a snapshot of the machine state along with access information for leaves
 /// which hold data that was used in a particular evaluation step.
@@ -18,49 +19,6 @@ use itertools::Itertools;
 pub enum MerkleTree {
     Leaf(Hash, AccessInfo, Vec<u8>),
     Node(Hash, Vec<Self>),
-}
-
-/// Type of access associated with leaves in a [`MerkleTree`].
-#[derive(Debug, Clone, PartialEq)]
-pub enum AccessInfo {
-    NoAccess,
-    Write,
-    Read,
-    ReadWrite,
-}
-
-/// Intermediary representation obtained when compressing a [`MerkleTree`].
-///
-/// For the compressed tree, we only care about the data in the non-blinded leaves.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum CompressedMerkleTree {
-    Leaf(Hash, CompressedAccessInfo),
-    Node(Hash, Vec<Self>),
-}
-
-/// Type of access associated with leaves in a [`CompressedMerkleTree`].
-///
-/// If a subtree is made up of only [`AccessInfo::NoAccess`] or of only [`AccessInfo::Read`]
-/// then the subtree can be compressed to a leaf of the corresponding access type.
-/// For the non-blinded variants, it holds the byte data associated with the access.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum CompressedAccessInfo {
-    NoAccess,
-    Write,
-    Read(Vec<u8>),
-    ReadWrite(Vec<u8>),
-}
-
-impl AccessInfo {
-    /// Convert an access info to a compressed access info, potentially with additional data.
-    pub(super) fn to_compressed(&self, data: Vec<u8>) -> CompressedAccessInfo {
-        match self {
-            Self::NoAccess => CompressedAccessInfo::NoAccess,
-            Self::Write => CompressedAccessInfo::Write,
-            Self::Read => CompressedAccessInfo::Read(data),
-            Self::ReadWrite => CompressedAccessInfo::ReadWrite(data),
-        }
-    }
 }
 
 impl MerkleTree {
@@ -159,6 +117,42 @@ impl MerkleTree {
     }
 }
 
+impl RootHashable for MerkleTree {
+    fn hash(&self) -> Result<Hash, HashError> {
+        Ok(self.root_hash())
+    }
+}
+
+/// Type of access associated with leaves in a [`MerkleTree`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AccessInfo {
+    NoAccess,
+    Write,
+    Read,
+    ReadWrite,
+}
+
+impl AccessInfo {
+    /// Convert an access info to a compressed access info, potentially with additional data.
+    pub(super) fn to_compressed(self, data: Vec<u8>) -> CompressedAccessInfo {
+        match self {
+            Self::NoAccess => CompressedAccessInfo::NoAccess,
+            Self::Write => CompressedAccessInfo::Write,
+            Self::Read => CompressedAccessInfo::Read(data),
+            Self::ReadWrite => CompressedAccessInfo::ReadWrite(data),
+        }
+    }
+}
+
+/// Intermediary representation obtained when compressing a [`MerkleTree`].
+///
+/// For the compressed tree, we only care about the data in the non-blinded leaves.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum CompressedMerkleTree {
+    Leaf(Hash, CompressedAccessInfo),
+    Node(Hash, Vec<Self>),
+}
+
 impl CompressedMerkleTree {
     /// Get the root hash of a compreessed Merkle tree
     fn root_hash(&self) -> Hash {
@@ -203,12 +197,69 @@ impl CompressedMerkleTree {
     }
 }
 
+/// Type of access associated with leaves in a [`CompressedMerkleTree`].
+///
+/// If a subtree is made up of only [`AccessInfo::NoAccess`] or of only [`AccessInfo::Read`]
+/// then the subtree can be compressed to a leaf of the corresponding access type.
+/// For the non-blinded variants, it holds the byte data associated with the access.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum CompressedAccessInfo {
+    NoAccess,
+    Write,
+    Read(Vec<u8>),
+    ReadWrite(Vec<u8>),
+}
+
 // TODO: RV-237 Ensure consistency between `RootHashable` and `Merkleisable`
 // implementations
 pub trait Merkleisable {
     /// Build the Merkle tree described by the layouat of the data.
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError>;
 }
+
+impl<T: Merkleisable> Merkleisable for [T] {
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        let children = self
+            .iter()
+            .map(|e| e.to_merkle_tree())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(MerkleTree::Node(children.hash()?, children))
+    }
+}
+
+impl<T: Merkleisable> Merkleisable for Vec<T> {
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        self.as_slice().to_merkle_tree()
+    }
+}
+
+impl<T: Merkleisable, const N: usize> Merkleisable for [T; N] {
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        self.as_ref().to_merkle_tree()
+    }
+}
+
+macro_rules! impl_merkleisable_for_tuple {
+    ($($name:ident),*) => {
+        impl<$($name: Merkleisable),*> Merkleisable for ($($name,)*) {
+            fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+                #[allow(non_snake_case)]
+                let ($($name,)*) = self;
+                let children: Result<Vec<MerkleTree>, HashError> = [$($name.to_merkle_tree(),)*].into_iter().collect();
+                let children = children?;
+                Ok(MerkleTree::Node(children.hash()?, children))
+
+            }
+        }
+    }
+}
+
+impl_merkleisable_for_tuple!(A, B);
+impl_merkleisable_for_tuple!(A, B, C);
+impl_merkleisable_for_tuple!(A, B, C, D);
+impl_merkleisable_for_tuple!(A, B, C, D, E);
+impl_merkleisable_for_tuple!(A, B, C, D, E, F);
 
 #[cfg(test)]
 mod tests {
@@ -230,18 +281,15 @@ mod tests {
         }
     }
 
-    impl<A: Merkleisable, B: Merkleisable> Merkleisable for (A, B) {
-        fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-            let left = self.0.to_merkle_tree()?;
-            let right = self.1.to_merkle_tree()?;
-            let hash = RootHashable::hash(&(left.root_hash(), right.root_hash()))?;
-            Ok(MerkleTree::Node(hash, vec![left, right]))
+    impl RootHashable for Vec<u8> {
+        fn hash(&self) -> Result<Hash, HashError> {
+            Hash::blake2b_hash_bytes(self)
         }
     }
 
     fn m_l(data: &[u8], access: AccessInfo) -> Result<MerkleTree, HashError> {
         let hash = Hash::blake2b_hash_bytes(data)?;
-        Ok(MerkleTree::Leaf(hash, access.clone(), data.to_vec()))
+        Ok(MerkleTree::Leaf(hash, access, data.to_vec()))
     }
 
     fn m_t(left: MerkleTree, right: MerkleTree) -> Result<MerkleTree, HashError> {
@@ -256,10 +304,12 @@ mod tests {
             prop::collection::vec(0u8..255, 0..100),
             6)
         )| {
-            let tree = ((&leaves[0], (&leaves[1], &leaves[2])), ((&leaves[3], &leaves[4]), &leaves[5]))
+            let state = ((&leaves[0], (&leaves[1], &leaves[2])), ((&leaves[3], &leaves[4]), &leaves[5]));
+            let tree = state
                 .to_merkle_tree()
                 .expect("Error building Merkle tree");
-            assert!(tree.check_root_hash())
+            assert!(tree.check_root_hash());
+            assert!(tree.root_hash() == state.hash()?);
         });
     }
 
@@ -273,7 +323,7 @@ mod tests {
                 m_t(m_l(&l[2], Read)?, m_l(&l[3], ReadWrite)?)?,
             )?;
             let no_access_t = m_t(
-                m_l(&l[4], NoAccess.clone())?,
+                m_l(&l[4], NoAccess)?,
                 m_t(m_l(&l[5], NoAccess)?, m_l(&l[6], NoAccess)?)?,
             )?;
             let write_t = m_t(
@@ -368,21 +418,21 @@ mod tests {
 
             let proof_read = MerkleProof::Node(vec![
                 MerkleProof::Node(vec![
-                    merkle_proof_leaf(&l[11], Read.clone())?,
-                    merkle_proof_leaf(&l[12], Read.clone())?,
+                    merkle_proof_leaf(&l[11], Read)?,
+                    merkle_proof_leaf(&l[12], Read)?,
                 ]),
                 MerkleProof::Node(vec![
-                    merkle_proof_leaf(&l[13], Read.clone())?,
-                    merkle_proof_leaf(&l[14], Read.clone())?,
+                    merkle_proof_leaf(&l[13], Read)?,
+                    merkle_proof_leaf(&l[14], Read)?,
                 ]),
             ]);
 
             let proof_read_write = MerkleProof::Node(vec![
                 MerkleProof::Node(vec![
-                    merkle_proof_leaf(&l[15], ReadWrite.clone())?,
-                    merkle_proof_leaf(&l[16], ReadWrite.clone())?,
+                    merkle_proof_leaf(&l[15], ReadWrite)?,
+                    merkle_proof_leaf(&l[16], ReadWrite)?,
                 ]),
-                merkle_proof_leaf(&l[17], ReadWrite.clone())?,
+                merkle_proof_leaf(&l[17], ReadWrite)?,
             ]);
 
             let proof_combine_isolated = MerkleProof::Node(vec![
@@ -392,9 +442,9 @@ mod tests {
 
             let proof_mix = MerkleProof::Node(vec![
                 MerkleProof::Node(vec![
-                    merkle_proof_leaf(&l[18], NoAccess.clone())?,
+                    merkle_proof_leaf(&l[18], NoAccess)?,
                     MerkleProof::Node(vec![
-                        merkle_proof_leaf(&l[19], NoAccess.clone())?,
+                        merkle_proof_leaf(&l[19], NoAccess)?,
                         MerkleProof::Leaf(MerkleProofLeaf::Blind(
                             [
                                 Hash::blake2b_hash_bytes(&l[20])?,
@@ -406,7 +456,7 @@ mod tests {
                 ]),
                 MerkleProof::Node(vec![
                     MerkleProof::Node(vec![
-                        merkle_proof_leaf(&l[22], ReadWrite.clone())?,
+                        merkle_proof_leaf(&l[22], ReadWrite)?,
                         MerkleProof::Leaf(MerkleProofLeaf::Blind(
                             [
                                 Hash::blake2b_hash_bytes(&l[23])?,
@@ -415,7 +465,7 @@ mod tests {
                             .hash()?,
                         )),
                     ]),
-                    merkle_proof_leaf(&l[25], Read.clone())?,
+                    merkle_proof_leaf(&l[25], Read)?,
                 ]),
             ]);
 
