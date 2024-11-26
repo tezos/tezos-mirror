@@ -7,7 +7,13 @@ use crate::{
     machine_state::{bus::main_memory::M100M, mode::Mode, TestCacheLayouts},
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
-    state_backend::{self, hash::RootHashable, owned_backend::Owned, AllocatedOf},
+    state_backend::{
+        self,
+        hash::RootHashable,
+        owned_backend::Owned,
+        proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
+        AllocatedOf, Ref,
+    },
     storage::{self, Hash, Repo},
 };
 use std::{fmt, ops::Bound, path::Path};
@@ -52,6 +58,35 @@ impl<M: state_backend::ManagerBase> State<M> {
             self.message_counter.struct_ref::<F>(),
             self.tick.struct_ref::<F>(),
         )
+    }
+
+    /// Generate a proof-generating version of this state.
+    pub fn start_proof(&self) -> State<ProofGen<Ref<'_, M>>> {
+        enum ProofWrapper {}
+
+        impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
+            type Output = ProofGen<M>;
+
+            fn map_region<E: 'static, const LEN: usize>(
+                input: <M as state_backend::ManagerBase>::Region<E, LEN>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::Region<E, LEN> {
+                ProofRegion::bind(input)
+            }
+
+            fn map_dyn_region<const LEN: usize>(
+                input: <M as state_backend::ManagerBase>::DynRegion<LEN>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::DynRegion<LEN> {
+                ProofDynRegion::bind(input)
+            }
+
+            fn map_enriched_cell<V: state_backend::EnrichedValue>(
+                input: <M as state_backend::ManagerBase>::EnrichedCell<V>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::EnrichedCell<V> {
+                ProofEnrichedCell::bind(input)
+            }
+        }
+
+        State::bind(self.struct_ref::<ProofWrapper>())
     }
 }
 
