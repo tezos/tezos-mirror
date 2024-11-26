@@ -679,12 +679,26 @@ module Get_logs = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+type produce_block_input = {
+  timestamp : Time.Protocol.t option;
+  with_delayed_transactions : bool;
+}
+
 module Produce_block = struct
-  type input = Time.Protocol.t
+  type input = produce_block_input
 
   type output = Ethereum_types.quantity
 
-  let input_encoding = Time.Protocol.encoding
+  let input_encoding =
+    let open Data_encoding in
+    conv
+      (fun {timestamp; with_delayed_transactions} ->
+        (timestamp, with_delayed_transactions))
+      (fun (timestamp, with_delayed_transactions) ->
+        {timestamp; with_delayed_transactions})
+      (obj2
+         (opt "timestamp" Time.Protocol.encoding)
+         (dft "with_delayed_transactions" bool true))
 
   let output_encoding = Ethereum_types.quantity_encoding
 

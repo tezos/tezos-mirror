@@ -565,6 +565,14 @@ let wait_for_gc_finished ?gc_level ?head_level evm_node =
       else None
   | None, None -> Some (event_gc_level, event_gc_level)
 
+let wait_for_processed_l1_level ?level evm_node =
+  wait_for_event evm_node ~event:"evm_context_processed_l1_level.v0"
+  @@ fun json ->
+  let event_level = JSON.(json |> as_int) in
+  match level with
+  | None -> Some ()
+  | Some level -> if level = event_level then Some () else None
+
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =

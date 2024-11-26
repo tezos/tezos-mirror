@@ -259,9 +259,14 @@ module Web3_sha3 :
 module Get_logs :
   METHOD with type input = Filter.t and type output = Filter.changes list
 
+type produce_block_input = {
+  timestamp : Time.Protocol.t option;
+  with_delayed_transactions : bool;
+}
+
 module Produce_block :
   METHOD
-    with type input = Time.Protocol.t
+    with type input = produce_block_input
      and type output = Ethereum_types.quantity
 
 module Produce_proposal :

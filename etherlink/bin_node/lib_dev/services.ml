@@ -770,11 +770,20 @@ let dispatch_private_request (rpc : Configuration.rpc)
     | Method (Produce_block.Method, _) when block_production <> `Single_node ->
         unsupported ()
     | Method (Produce_block.Method, module_) ->
-        let f (timestamp : Time.Protocol.t option) =
+        let f input =
           let open Lwt_result_syntax in
+          let timestamp, with_delayed_transactions =
+            match input with
+            | Some {timestamp; with_delayed_transactions} ->
+                (timestamp, with_delayed_transactions)
+            | None -> (None, true)
+          in
           let timestamp = Option.value timestamp ~default:(Misc.now ()) in
           let* nb_transactions =
-            Block_producer.produce_block ~force:true ~timestamp
+            Block_producer.Internal_for_tests.produce_block
+              ~with_delayed_transactions
+              ~force:true
+              ~timestamp
           in
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in

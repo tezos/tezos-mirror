@@ -7017,6 +7017,49 @@ let test_inconsistent_da_fees =
        timeout" ;
   unit
 
+let test_produce_block_with_no_delayed_transactions =
+  register_all
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "delayed_transaction"]
+    ~title:"Produce block with no delayed transactions"
+  @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+             _protocol ->
+  (* Send a random transaction in the delayed inbox. *)
+  let* tx1 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:21_000
+      ~gas:21_000
+      ~value:(Wei.of_string "10")
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
+  in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      tx1
+  in
+  (* Finalize the transaction so the sequencer sees the event. *)
+  let* l1_level = Client.level client in
+  let wait_for =
+    Evm_node.wait_for_processed_l1_level ~level:l1_level sequencer
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = wait_for in
+
+  let*@ n = Rpc.produce_block ~with_delayed_transactions:false sequencer in
+  Check.((n = 0) int) ~error_msg:"Block should be empty but got %L transactions" ;
+  let*@ n = Rpc.produce_block sequencer in
+  Check.((n = 1) int) ~error_msg:"Block should have one transaction but got %L" ;
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -7118,4 +7161,5 @@ let () =
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
   test_overwrite_simulation_tick_limit protocols ;
-  test_inconsistent_da_fees protocols
+  test_inconsistent_da_fees protocols ;
+  test_produce_block_with_no_delayed_transactions protocols
