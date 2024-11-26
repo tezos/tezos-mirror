@@ -164,6 +164,36 @@ let load_sampler_for_cycle ctxt cycle =
   in
   return ctxt
 
+(** [stake_info_for_cycle ctxt cycle] reads the stake info for [cycle] from
+    [ctxt] if it has been previously initialized. Otherwise it initializes
+    the sampler and caches it in [ctxt] with
+    [Raw_context.set_stake_info_for_cycle]. *)
+let stake_info_for_cycle ctxt cycle =
+  let open Lwt_result_syntax in
+  let read ctxt =
+    let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
+    let total_stake = Stake_repr.staking_weight total_stake in
+    let* stakes_pkh = Stake_storage.get_selected_distribution ctxt cycle in
+    let* stakes_pk =
+      List.rev_map_es
+        (fun (pkh, stake) ->
+          let+ pk =
+            Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
+          in
+          (pk, Stake_repr.staking_weight stake))
+        stakes_pkh
+    in
+    return (total_stake, stakes_pk)
+  in
+  Raw_context.stake_info_for_cycle ~read ctxt cycle
+
+let load_stake_info_for_cycle ctxt cycle =
+  let open Lwt_result_syntax in
+  let* ctxt, (_ : int64), (_ : (Raw_context.consensus_pk * int64) list) =
+    stake_info_for_cycle ctxt cycle
+  in
+  return ctxt
+
 let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
   let open Lwt_result_syntax in
   let* staking_parameters =
@@ -230,7 +260,12 @@ let select_distribution_for_cycle ctxt cycle =
   let state = Sampler.create stakes_pk in
   let* ctxt = Delegate_sampler_state.init ctxt cycle state in
   (* pre-allocate the sampler *)
-  Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
+  let*? ctxt = Raw_context.init_sampler_for_cycle ctxt cycle seed state in
+  (* pre-allocate the raw stake distribution info *)
+  let*? ctxt =
+    Raw_context.init_stake_info_for_cycle ctxt cycle total_stake stakes_pk
+  in
+  return ctxt
 
 let select_new_distribution_at_cycle_end ctxt ~new_cycle =
   let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in

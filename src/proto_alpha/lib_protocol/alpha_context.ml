@@ -631,6 +631,8 @@ module Stake_distribution = struct
 
   let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
 
+  let load_stake_info_for_cycle = Delegate_sampler.load_stake_info_for_cycle
+
   let get_total_frozen_stake ctxt cycle =
     let open Lwt_result_syntax in
     let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
