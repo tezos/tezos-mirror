@@ -15,12 +15,12 @@ class Octez < Formula
   version "%%VERSION%%"
   license "MIT"
 
-  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf rustup-init cmake]
+  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf cmake]
   build_dependencies.each do |dependency|
     depends_on dependency => :build
   end
 
-  dependencies = %w[gmp hidapi libev libffi]
+  dependencies = %w[gmp hidapi libev libffi libpq]
   dependencies.each do |dependency|
     depends_on dependency
   end
@@ -40,7 +40,9 @@ class Octez < Formula
       set +x
 
       . ./scripts/version.sh
-      rustup-init --profile minimal --default-toolchain $recommended_rust_version -y
+      wget https://sh.rustup.rs/rustup-init.sh
+      chmod +x rustup-init.sh
+      ./rustup-init.sh --profile minimal --default-toolchain $recommended_rust_version -y
       opam init --bare --disable-sandboxing
 
       . $CARGO_HOME/env

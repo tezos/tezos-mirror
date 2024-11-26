@@ -2146,6 +2146,41 @@ trigger:rpm_repository_partial_auto:
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
 
+trigger:homebrew_auto:
+  stage: test
+  rules:
+  - changes:
+    - scripts/ci/install-gsutil.sh
+    - scripts/packaging/Formula/*
+    - scripts/packaging/homebrew_install.sh
+    - scripts/packaging/homebrew_release.sh
+    - scripts/packaging/test_homebrew_install.sh
+    when: on_success
+  needs:
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet
+    optional: true
+  - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
+    optional: true
+  - job: nix
+    optional: true
+  - job: commit_titles
+    optional: true
+  trigger:
+    include: .gitlab/ci/pipelines/homebrew_auto.yml
+
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
@@ -4675,6 +4710,15 @@ documentation:linkcheck:
   - make -C docs redirectcheck
   - make -C docs linkcheck
 
+trigger:homebrew:
+  stage: manual
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/homebrew.yml
+
 trigger:rpm_repository_partial:
   stage: manual
   rules:
@@ -4799,33 +4843,6 @@ oc.build:rpm:amd64:
     - DISTRIBUTION:
       - fedora:39
       - rockylinux:9.3
-
-oc.build:homebrew:
-  image: debian:bookworm
-  stage: manual
-  tags:
-  - gcp
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - apt update && apt install -y curl git build-essential
-  - ./scripts/packaging/homebrew_install.sh
-  - eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-  - eval $(scripts/active_protocols.sh)
-  - sed "s|%%VERSION%%|0.0.0-dev| ; s|%%CI_MERGE_REQUEST_SOURCE_PROJECT_URL%%|$CI_MERGE_REQUEST_SOURCE_PROJECT_URL|;
-    s|%%CI_COMMIT_REF_NAME%%|$CI_COMMIT_REF_NAME|; s|%%CI_PROJECT_NAMESPACE%%|$CI_PROJECT_NAMESPACE|;
-    s|%%PROTO_CURRENT%%|$PROTO_CURRENT|; s|%%PROTO_NEXT%%|$PROTO_NEXT|" scripts/packaging/Formula/octez.rb.template
-    > scripts/packaging/Formula/octez.rb
-  script:
-  - apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev libprotobuf-dev
-    libsqlite3-dev postgresql-dev protobuf-compiler libhidapi-dev pkg-config zlib1g-dev
-  - brew install -v scripts/packaging/Formula/octez.rb
-  variables:
-    CARGO_NET_OFFLINE: "false"
 
 oc.script.docker_verify_image_arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0

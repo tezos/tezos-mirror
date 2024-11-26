@@ -524,6 +524,17 @@ let changeset_rpm_packages =
         "scripts/ci/create_rpm_repo.sh";
       ])
 
+let changeset_homebrew =
+  Changeset.(
+    make
+      [
+        "scripts/packaging/test_homebrew_install.sh";
+        "scripts/packaging/homebrew_release.sh";
+        "scripts/ci/install-gsutil.sh";
+        "scripts/packaging/homebrew_install.sh";
+        "scripts/packaging/Formula/*";
+      ])
+
 (** The set of [changes:] that select opam jobs.
 
     Note: unlike all other changesets, this one does not include {!changeset_base}.
@@ -1105,41 +1116,6 @@ let job_build_rpm_amd64 : unit -> tezos_job =
     ~group:A
     ~arch:Amd64
     ~dependencies:(Dependent [])
-
-let job_build_homebrew ?rules ~__POS__ ~name ?(stage = Stages.build)
-    ?dependencies () : tezos_job =
-  let image = Images.debian_bookworm in
-  job
-    ?rules
-    ~__POS__
-    ~name
-    ~arch:Amd64
-    ?dependencies
-    ~image
-    ~stage
-    ~before_script:
-      [
-        "apt update && apt install -y curl git build-essential";
-        "./scripts/packaging/homebrew_install.sh";
-        "eval \"$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"";
-        "eval $(scripts/active_protocols.sh)";
-        "sed \"s|%%VERSION%%|0.0.0-dev| ; \
-         s|%%CI_MERGE_REQUEST_SOURCE_PROJECT_URL%%|$CI_MERGE_REQUEST_SOURCE_PROJECT_URL|; \
-         s|%%CI_COMMIT_REF_NAME%%|$CI_COMMIT_REF_NAME|; \
-         s|%%CI_PROJECT_NAMESPACE%%|$CI_PROJECT_NAMESPACE|; \
-         s|%%PROTO_CURRENT%%|$PROTO_CURRENT|; s|%%PROTO_NEXT%%|$PROTO_NEXT|\" \
-         scripts/packaging/Formula/octez.rb.template > \
-         scripts/packaging/Formula/octez.rb";
-      ]
-    [
-      (* These packages are needed on Linux. For macOS, Homebrew will
-         make those available locally. *)
-      "apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev \
-       libprotobuf-dev libsqlite3-dev postgresql-dev protobuf-compiler \
-       libhidapi-dev pkg-config zlib1g-dev";
-      "brew install -v scripts/packaging/Formula/octez.rb";
-    ]
-  |> enable_networked_cargo
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     ?dependencies () =

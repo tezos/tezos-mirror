@@ -1505,6 +1505,13 @@ trigger:rpm_repository_full:
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_full.yml
 
+trigger:homebrew:
+  stage: test
+  rules:
+  - when: always
+  trigger:
+    include: .gitlab/ci/pipelines/homebrew.yml
+
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test

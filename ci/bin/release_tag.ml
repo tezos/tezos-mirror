@@ -93,6 +93,30 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~release:true
       ()
   in
+  let job_build_homebrew_release =
+    let artifacts =
+      Gitlab_ci.Util.artifacts
+        ~expire_in:(Duration (Days 1))
+        ~name:"build-$CI_COMMIT_REF_SLUG"
+        ~when_:On_success
+        ["public/homebrew/*"]
+    in
+    job
+      ~__POS__
+      ~name:"oc.install-release-homebrew"
+      ~arch:Amd64
+      ~dependencies:(Dependent [])
+      ~image:Images.debian_bookworm
+      ~stage:Stages.build
+      ~artifacts
+      [
+        "./scripts/ci/install-gsutil.sh";
+        "apt install -y git build-essential";
+        "./scripts/packaging/homebrew_install.sh";
+        "eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)";
+        "./scripts/packaging/homebrew_release.sh";
+      ]
+  in
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
       ~__POS__
@@ -144,6 +168,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
         [
           Artifacts job_static_x86_64_release;
           Artifacts job_static_arm64_release;
+          Artifacts job_build_homebrew_release;
           Artifacts job_build_rpm_amd64;
           Artifacts job_build_ubuntu_package_current_a;
           Artifacts job_build_debian_package_current_a;
@@ -180,6 +205,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_docker_amd64;
     job_docker_arm64;
     job_build_rpm_amd64;
+    job_build_homebrew_release;
     job_docker_merge;
     job_gitlab_release_or_publish;
   ]

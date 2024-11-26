@@ -216,7 +216,8 @@ apt_repo_debian_current:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - ./scripts/ci/prepare-apt-repo.sh
+  - ./scripts/ci/install-gsutil.sh
+  - apt install -y apt-utils debsigs
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
@@ -237,7 +238,8 @@ apt_repo_debian:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - ./scripts/ci/prepare-apt-repo.sh
+  - ./scripts/ci/install-gsutil.sh
+  - apt install -y apt-utils debsigs
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
