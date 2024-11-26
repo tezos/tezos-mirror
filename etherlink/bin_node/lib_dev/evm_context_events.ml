@@ -176,6 +176,19 @@ let observer_reorg_cannot_decode_blueprint =
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
+let observer_reorg_cannot_find_divergence =
+  declare_2
+    ~section
+    ~name:"evm_context_observer_reorg_cannot_find_divergence"
+    ~level:Warning
+    ~msg:
+      "[Warning] Potential blueprint of reorg is at level {level1}, cannot \
+       find block {level2} locally"
+    ~pp1:Z.pp_print
+    ~pp2:Z.pp_print
+    ("level1", Data_encoding.n)
+    ("level2", Data_encoding.n)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -220,3 +233,6 @@ let observer_reorg_old_blueprint Ethereum_types.(Qty level) =
 
 let observer_reorg_cannot_decode_blueprint Ethereum_types.(Qty level) =
   emit observer_reorg_cannot_decode_blueprint level
+
+let observer_reorg_cannot_find_divergence Ethereum_types.(Qty level) =
+  emit observer_reorg_cannot_find_divergence (level, Z.pred level)

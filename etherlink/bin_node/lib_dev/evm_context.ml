@@ -1474,7 +1474,7 @@ module State = struct
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
     return_unit
 
-  let potential_observer_reorg ~evm_node_endpoint:_ conn ctxt
+  let rec potential_observer_reorg ~evm_node_endpoint conn ctxt
       blueprint_with_events =
     let open Lwt_result_syntax in
     (*
@@ -1535,9 +1535,49 @@ module State = struct
           blueprint_with_events.blueprint.payload
       in
       match blueprint_parent_hash with
-      | Some _blueprint_parent_hash ->
-          (* Next step is done in the next commit. *)
-          return_none
+      | Some blueprint_parent_hash -> (
+          (* If the blueprint parent hash is not equal to whatever block hash
+             we have for its predecessor, that means this is not the first
+             block of the reorganization and we traverse backward the blueprints
+             until we find the blueprint.
+          *)
+          let (Qty pred_number) = Ethereum_types.Qty.pred blueprint_number in
+          let* local_parent_block_hash =
+            if ctxt.block_storage_sqlite3 then
+              Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
+            else
+              let*! bytes =
+                Evm_state.inspect
+                  ctxt.session.evm_state
+                  (Durable_storage_path.Indexes.block_by_number
+                     (Nth pred_number))
+              in
+              return (Option.map Ethereum_types.decode_block_hash bytes)
+          in
+          match local_parent_block_hash with
+          | None ->
+              let*! () =
+                Evm_context_events.observer_reorg_cannot_find_divergence
+                  blueprint_number
+              in
+              return_none
+          | Some local_parent_block_hash ->
+              if local_parent_block_hash <> blueprint_parent_hash then
+                (* Reorganization started on an older block, we
+                   traverse the chain backward. *)
+                let* blueprint_pred =
+                  Evm_services.get_blueprint
+                    ~keep_alive:true
+                    ~evm_node_endpoint
+                    (Qty pred_number)
+                in
+                potential_observer_reorg
+                  ~evm_node_endpoint
+                  conn
+                  ctxt
+                  blueprint_pred
+              else (* Next step is done in the next commit. *)
+                return_none)
       | None ->
           let*! () =
             Evm_context_events.observer_reorg_cannot_decode_blueprint
