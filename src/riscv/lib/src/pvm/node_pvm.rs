@@ -40,14 +40,17 @@ impl<M: state_backend::ManagerBase> State<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> state_backend::AllocatedOf<StateLayout, state_backend::Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: state_backend::FnManager<state_backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> state_backend::AllocatedOf<StateLayout, F::Output> {
         (
-            self.pvm.struct_ref(),
-            self.level_is_set.struct_ref(),
-            self.level.struct_ref(),
-            self.message_counter.struct_ref(),
-            self.tick.struct_ref(),
+            self.pvm.struct_ref::<F>(),
+            self.level_is_set.struct_ref::<F>(),
+            self.level.struct_ref::<F>(),
+            self.message_counter.struct_ref::<F>(),
+            self.tick.struct_ref::<F>(),
         )
     }
 }
@@ -66,7 +69,7 @@ impl<M: state_backend::ManagerClone> Clone for State<M> {
 
 impl<M: state_backend::ManagerSerialise> fmt::Debug for State<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let refs = self.struct_ref();
+        let refs = self.struct_ref::<state_backend::FnManagerIdent>();
         let rendered = if f.alternate() {
             serde_json::to_string_pretty(&refs)
         } else {
@@ -90,7 +93,8 @@ pub struct NodePvm {
 
 impl PartialEq for NodePvm {
     fn eq(&self, other: &Self) -> bool {
-        self.state.struct_ref() == other.state.struct_ref()
+        self.state.struct_ref::<state_backend::FnManagerIdent>()
+            == other.state.struct_ref::<state_backend::FnManagerIdent>()
     }
 }
 
@@ -169,7 +173,12 @@ impl NodePvm {
     }
 
     pub fn hash(&self) -> Hash {
-        self.with_backend(|state| state.struct_ref().hash().unwrap())
+        self.with_backend(|state| {
+            state
+                .struct_ref::<state_backend::FnManagerIdent>()
+                .hash()
+                .unwrap()
+        })
     }
 
     pub fn set_input_message(&mut self, level: u32, message_counter: u64, input: Vec<u8>) {
@@ -229,7 +238,7 @@ impl PvmStorage {
     /// Create a new commit for `state` and  return the commit id.
     pub fn commit(&mut self, state: &NodePvm) -> Result<Hash, PvmStorageError> {
         Ok(state.with_backend(|state| {
-            let struct_ref = state.struct_ref();
+            let struct_ref = state.struct_ref::<state_backend::FnManagerIdent>();
             self.repo.commit_serialised(&struct_ref)
         })?)
     }

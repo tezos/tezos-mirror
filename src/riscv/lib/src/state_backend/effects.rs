@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    AllocatedOf, Atom, Cell, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
+    AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
     ManagerWrite, Ref, StaticCopy,
 };
 use crate::default::ConstDefault;
@@ -33,9 +33,12 @@ impl<T: ConstDefault + StaticCopy, EG, M: ManagerBase> EffectCell<T, EG, M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<EffectCellLayout<T>, Ref<'_, M>> {
-        self.inner.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<EffectCellLayout<T>, F::Output> {
+        self.inner.struct_ref::<F>()
     }
 }
 

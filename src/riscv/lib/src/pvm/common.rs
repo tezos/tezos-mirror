@@ -122,14 +122,15 @@ impl<
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(
-        &self,
-    ) -> state_backend::AllocatedOf<PvmLayout<ML, CL>, state_backend::Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: state_backend::FnManager<state_backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> state_backend::AllocatedOf<PvmLayout<ML, CL>, F::Output> {
         (
-            self.version.struct_ref(),
-            self.machine_state.struct_ref(),
-            self.status.struct_ref(),
+            self.version.struct_ref::<F>(),
+            self.machine_state.struct_ref::<F>(),
+            self.status.struct_ref::<F>(),
         )
     }
 

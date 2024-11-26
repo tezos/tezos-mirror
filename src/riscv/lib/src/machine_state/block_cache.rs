@@ -83,7 +83,6 @@ use super::instruction::Instruction;
 use super::instruction_cache::ValidatedCacheEntry;
 use super::MachineCoreState;
 use super::{bus::main_memory::Address, ProgramCounterUpdate};
-use crate::cache_utils::FenceCounter;
 use crate::cache_utils::Sizes;
 use crate::default::ConstDefault;
 use crate::machine_state::instruction::Args;
@@ -92,6 +91,7 @@ use crate::state_backend::{
     ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
 };
 use crate::traps::{EnvironException, Exception};
+use crate::{cache_utils::FenceCounter, state_backend::FnManager};
 use std::marker::PhantomData;
 use std::u64;
 
@@ -238,12 +238,14 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
         }
     }
 
-    fn struct_ref(&self) -> AllocatedOf<CachedLayout<ML>, Ref<'_, M>> {
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<CachedLayout<ML>, F::Output> {
         (
-            self.address.struct_ref(),
-            self.fence_counter.struct_ref(),
-            self.len_instr.struct_ref(),
-            self.instr.each_ref().map(EnrichedCell::struct_ref),
+            self.address.struct_ref::<F>(),
+            self.fence_counter.struct_ref::<F>(),
+            self.len_instr.struct_ref::<F>(),
+            self.instr.each_ref().map(|entry| entry.struct_ref::<F>()),
         )
     }
 }
@@ -307,11 +309,13 @@ impl<M: ManagerBase> PartialBlock<M> {
         }
     }
 
-    fn struct_ref(&self) -> AllocatedOf<PartialBlockLayout, Ref<'_, M>> {
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<PartialBlockLayout, F::Output> {
         (
-            self.phys_addr.struct_ref(),
-            self.in_progress.struct_ref(),
-            self.progress.struct_ref(),
+            self.phys_addr.struct_ref::<F>(),
+            self.in_progress.struct_ref::<F>(),
+            self.progress.struct_ref::<F>(),
         )
     }
 
@@ -350,9 +354,9 @@ pub trait BlockCacheLayout: state_backend::Layout {
 
     fn entries_reset<M: ManagerReadWrite>(entries: &mut Self::Entries<M>);
 
-    fn struct_ref<M: ManagerBase>(
-        cache: &BlockCache<Self, Self::MainMemoryLayout, M>,
-    ) -> AllocatedOf<Self, Ref<'_, M>>
+    fn struct_ref<'a, M: ManagerBase, F: FnManager<Ref<'a, M>>>(
+        cache: &'a BlockCache<Self, Self::MainMemoryLayout, M>,
+    ) -> AllocatedOf<Self, F::Output>
     where
         Self: Sized;
 
@@ -411,15 +415,19 @@ impl<ML: MainMemoryLayout, const BITS: usize, const SIZE: usize> BlockCacheLayou
         entries.iter_mut().for_each(Cached::reset)
     }
 
-    fn struct_ref<M: ManagerBase>(
-        cache: &BlockCache<Self, ML, M>,
-    ) -> AllocatedOf<Self, Ref<'_, M>> {
+    fn struct_ref<'a, M: ManagerBase, F: FnManager<Ref<'a, M>>>(
+        cache: &'a BlockCache<Self, Self::MainMemoryLayout, M>,
+    ) -> AllocatedOf<Self, F::Output> {
         (
-            cache.current_block_addr.struct_ref(),
-            cache.next_instr_addr.struct_ref(),
-            cache.fence_counter.struct_ref(),
-            cache.partial_block.struct_ref(),
-            cache.entries.iter().map(Cached::struct_ref).collect(),
+            cache.current_block_addr.struct_ref::<F>(),
+            cache.next_instr_addr.struct_ref::<F>(),
+            cache.fence_counter.struct_ref::<F>(),
+            cache.partial_block.struct_ref::<F>(),
+            cache
+                .entries
+                .iter()
+                .map(|entry| entry.struct_ref::<F>())
+                .collect(),
         )
     }
 
@@ -477,9 +485,10 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
         self.partial_block.reset();
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<BCL, Ref<'_, M>> {
-        BCL::struct_ref(self)
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> AllocatedOf<BCL, F::Output> {
+        BCL::struct_ref::<_, F>(self)
     }
 
     /// Push an instruction to the block cache.

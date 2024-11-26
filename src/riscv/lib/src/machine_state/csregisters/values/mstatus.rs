@@ -10,7 +10,7 @@ use crate::{
         xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue, XLenValue},
     },
     state_backend::{
-        AllocatedOf, Atom, Cell, EffectCell, ManagerBase, ManagerClone, ManagerRead,
+        AllocatedOf, Atom, Cell, EffectCell, FnManager, ManagerBase, ManagerClone, ManagerRead,
         ManagerReadWrite, ManagerWrite, Ref,
     },
     struct_layout,
@@ -70,28 +70,31 @@ impl<M: ManagerBase> MStatusValue<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<MStatusLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<MStatusLayout, F::Output> {
         MStatusLayoutF {
-            sie: self.sie.struct_ref(),
-            mie: self.mie.struct_ref(),
-            spie: self.spie.struct_ref(),
-            ube: self.ube.struct_ref(),
-            mpie: self.mpie.struct_ref(),
-            spp: self.spp.struct_ref(),
-            mpp: self.mpp.struct_ref(),
-            fs: self.fs.struct_ref(),
-            xs: self.xs.struct_ref(),
-            mprv: self.mprv.struct_ref(),
-            sum: self.sum.struct_ref(),
-            mxr: self.mxr.struct_ref(),
-            tvm: self.tvm.struct_ref(),
-            tw: self.tw.struct_ref(),
-            tsr: self.tsr.struct_ref(),
-            uxl: self.uxl.struct_ref(),
-            sxl: self.sxl.struct_ref(),
-            sbe: self.sbe.struct_ref(),
-            mbe: self.mbe.struct_ref(),
+            sie: self.sie.struct_ref::<F>(),
+            mie: self.mie.struct_ref::<F>(),
+            spie: self.spie.struct_ref::<F>(),
+            ube: self.ube.struct_ref::<F>(),
+            mpie: self.mpie.struct_ref::<F>(),
+            spp: self.spp.struct_ref::<F>(),
+            mpp: self.mpp.struct_ref::<F>(),
+            fs: self.fs.struct_ref::<F>(),
+            xs: self.xs.struct_ref::<F>(),
+            mprv: self.mprv.struct_ref::<F>(),
+            sum: self.sum.struct_ref::<F>(),
+            mxr: self.mxr.struct_ref::<F>(),
+            tvm: self.tvm.struct_ref::<F>(),
+            tw: self.tw.struct_ref::<F>(),
+            tsr: self.tsr.struct_ref::<F>(),
+            uxl: self.uxl.struct_ref::<F>(),
+            sxl: self.sxl.struct_ref::<F>(),
+            sbe: self.sbe.struct_ref::<F>(),
+            mbe: self.mbe.struct_ref::<F>(),
         }
     }
 }

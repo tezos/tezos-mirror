@@ -22,11 +22,11 @@ use gdbstub::target::ext::breakpoints::{
 use gdbstub::target::ext::exec_file::ExecFile;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
-use octez_riscv::machine_state::bus::main_memory::OutOfBounds;
 use octez_riscv::machine_state::bus::main_memory::M1G;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::stepper::pvm::PvmStepper;
 use octez_riscv::stepper::{StepResult, Stepper, StepperStatus};
+use octez_riscv::{machine_state::bus::main_memory::OutOfBounds, state_backend::FnManagerIdent};
 use std::collections::HashSet;
 use std::error::Error;
 use std::marker::PhantomData;
@@ -169,7 +169,7 @@ impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
         let state = self.stepper.machine_state();
         regs.pc = state.hart.pc.read();
 
-        let array = state.hart.xregisters.struct_ref();
+        let array = state.hart.xregisters.struct_ref::<FnManagerIdent>();
         for i in 0..31 {
             // first is x0 == zero, only x1..=x31 are set
             regs.x[i + 1] = array.read(i);
