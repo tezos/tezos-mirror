@@ -2378,10 +2378,11 @@ let tezt_performance_regression =
 
 let tezt_cloud =
   public_lib
-    "tezt-tezos.tezt-cloud"
+    "tezt-cloud"
     ~path:"tezt/lib_cloud"
-    ~opam:"tezt-tezos"
     ~bisect_ppx:No
+    ~synopsis:
+      "Automatic of Cloud deployment for complex scenarios on top of Tezt"
     ~deps:
       [
         tezt_lib |> open_ |> open_ ~m:"Base";

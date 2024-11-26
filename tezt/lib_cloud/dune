@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezt_tezos_tezt_cloud)
- (public_name tezt-tezos.tezt-cloud)
+ (name tezt_cloud)
+ (public_name tezt-cloud)
  (libraries
   tezt
   tezt-tezos.tezt-performance-regression

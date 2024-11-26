@@ -786,6 +786,15 @@ module Cli = struct
       ~description:"Runs teztale"
       false
 
+  let octez_release =
+    Clap.optional_string
+      ~section
+      ~long:"octez-release"
+      ~placeholder:"<tag>"
+      ~description:
+        "Use the octez release <tag> instead of local octez binaries."
+      ()
+
   let memtrace =
     Clap.flag
       ~section
@@ -1475,10 +1484,7 @@ let init_teztale (configuration : configuration) cloud agent =
     let* () = Teztale.wait_server teztale in
     let* () =
       let domain =
-        match Env.mode with
-        | `Host | `Cloud ->
-            Agent.point agent |> Option.fold ~none:"localhost" ~some:fst
-        | `Orchestrator | `Localhost -> "localhost"
+        Agent.point agent |> Option.fold ~none:"localhost" ~some:fst
       in
       let port = teztale.server.conf.interface.port in
       let url = sf "http://%s:%d" domain port in
@@ -1691,7 +1697,6 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~url:
         (sf "http://explorus.io?network=%s" (Node.rpc_endpoint bootstrap_node))
   in
-  let* () = Cloud.write_website cloud in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
   let* baker_accounts =
     Client.stresstest_gen_keys
@@ -2829,7 +2834,7 @@ let benchmark () =
     |> List.concat
   in
   let docker_image =
-    Option.map (fun tag -> Env.Octez_release {tag}) Cli.octez_release
+    Option.map (fun tag -> Configuration.Octez_release {tag}) Cli.octez_release
   in
   let default_vm_configuration = Configuration.make ?docker_image () in
   let vms =
