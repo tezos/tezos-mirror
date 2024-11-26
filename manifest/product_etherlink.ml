@@ -99,8 +99,11 @@ let evm_node_rust_deps =
               [S "file"; S "Cargo.lock"];
               [S "file"; S "../../rust-toolchain"];
               [S "source_tree"; S ".cargo"];
+              [S "source_tree"; S "../sputnikvm"];
+              [S "source_tree"; S "../kernel_bifrost"];
               [S "source_tree"; S "../../src/rustzcash_deps"];
               [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
+              [S "source_tree"; S "../../src/kernel_sdk"];
               [S "source_tree"; S "src"];
             ];
             [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
