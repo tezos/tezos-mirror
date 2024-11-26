@@ -5196,6 +5196,11 @@ module Stake_distribution : sig
   val slot_owner :
     context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
 
+  val stake_info :
+    context ->
+    Level.t ->
+    (context * Int64.t * (Consensus_key.pk * Int64.t) list) tzresult Lwt.t
+
   (** See {!Delegate_sampler.load_sampler_for_cycle}. *)
   val load_sampler_for_cycle : context -> Cycle.t -> context tzresult Lwt.t
 

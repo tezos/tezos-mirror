@@ -101,7 +101,7 @@ val fold :
 (** List all registered delegates. *)
 val list : Raw_context.t -> Signature.Public_key_hash.t list Lwt.t
 
-(** Returns a delegate's initial frozen deposits at the beginning of cycle. *)
+(** Returns a delegate's initial frozen deposits at the beginning of the current cycle. *)
 val initial_frozen_deposits :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
 

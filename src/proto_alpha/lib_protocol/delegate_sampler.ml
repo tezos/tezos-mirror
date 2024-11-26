@@ -187,6 +187,10 @@ let stake_info_for_cycle ctxt cycle =
   in
   Raw_context.stake_info_for_cycle ~read ctxt cycle
 
+let stake_info ctxt level =
+  let cycle = level.Level_repr.cycle in
+  stake_info_for_cycle ctxt cycle
+
 let load_stake_info_for_cycle ctxt cycle =
   let open Lwt_result_syntax in
   let* ctxt, (_ : int64), (_ : (Raw_context.consensus_pk * int64) list) =
