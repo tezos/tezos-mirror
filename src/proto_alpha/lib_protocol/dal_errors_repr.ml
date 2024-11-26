@@ -25,6 +25,7 @@
 
 type error +=
   | Dal_feature_disabled
+  | Dal_incentives_disabled
   | Dal_slot_index_above_hard_limit of {given : int; limit : int}
   | Dal_publish_commitment_invalid_index of {
       given : Dal_slot_index_repr.t;
@@ -64,6 +65,17 @@ let () =
     Data_encoding.unit
     (function Dal_feature_disabled -> Some () | _ -> None)
     (fun () -> Dal_feature_disabled) ;
+
+  let description = "Incentives for the DAL are not yet enabled." in
+  register_error_kind
+    `Permanent
+    ~id:"operation.dal_incentives_disabled"
+    ~title:"DAL incentives are disabled"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.unit
+    (function Dal_incentives_disabled -> Some () | _ -> None)
+    (fun () -> Dal_incentives_disabled) ;
 
   let description = "Slot index above hard limit" in
   register_error_kind

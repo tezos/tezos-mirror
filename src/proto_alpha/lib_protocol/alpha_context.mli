@@ -2765,6 +2765,8 @@ module Dal : sig
 
   val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
+  val assert_incentives_enabled : t -> unit tzresult
+
   val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
@@ -3026,6 +3028,7 @@ module Dal_errors : sig
      from Dal_slot_repr or Dal_attestation_repr. *)
   type error +=
     | Dal_feature_disabled
+    | Dal_incentives_disabled
     | Dal_slot_index_above_hard_limit of {given : int; limit : int}
     | Dal_publish_commitment_invalid_index of {
         given : Dal.Slot_index.t;

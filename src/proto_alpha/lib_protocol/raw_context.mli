@@ -470,12 +470,17 @@ module Dal : sig
     Dal_slot_index_repr.t ->
     Dal_attestation_repr.Accountability.attestation_status
 
-  (* Check whether the DAL feature flag is set and return an error if not. *)
+  (* Check whether the DAL feature flag is set and return the error
+     {!Dal_feature_disabled} if not. *)
   val assert_feature_enabled : t -> unit tzresult
 
   (* [only_if_dal_feature_enabled ctxt ~default f] executes [f ctxt] if the DAL
      feature flag is enabled and otherwise [default ctxt]. *)
   val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  (* Check whether the DAL incentives flag is set and return the error
+     {!Dal_incentives_disabled} if not. *)
+  val assert_incentives_enabled : t -> unit tzresult
 
   (* [only_if_dal_incentives_enabled ctxt ~default f] executes [f ctxt] if the
      DAL incentives flag is enabled and otherwise [default ctxt]. *)
