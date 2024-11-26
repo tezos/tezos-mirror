@@ -49,9 +49,19 @@ module Cloud : sig
 
   (** A wrapper around [Test.register] that can be used to register new tests
       using VMs provided as a map indexed by name. Each VM is abstracted via
-      the [Agent] module. *)
+      the [Agent] module.
+
+      [proxy_files] should contains [file] that are needed by the
+      scenario to run (only used for proxy mode).
+
+      [proxy_args] should contains CLI arguments necessary for the
+      proxy mode. This can be used for example when an argument is
+      provided via an environment variable instead of a command-line
+      argument.
+ *)
   val register :
     ?proxy_files:string list ->
+    ?proxy_args:string list ->
     ?vms:Configuration.t list ->
     __FILE__:string ->
     title:string ->

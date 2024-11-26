@@ -427,7 +427,7 @@ let try_reattach () =
     else Lwt.return_false
   else Lwt.return_false
 
-let init_proxy ?(proxy_files = []) deployement =
+let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   let agents = Deployement.agents deployement in
   let proxy_agent =
     agents
@@ -476,7 +476,7 @@ let init_proxy ?(proxy_files = []) deployement =
     Agent.docker_run_command
       proxy_agent
       "screen"
-      (["-S"; "tezt-cloud"; "-X"; "exec"] @ (self :: args))
+      (["-S"; "tezt-cloud"; "-X"; "exec"] @ (self :: args) @ proxy_args)
   in
   let* () =
     Agent.docker_run_command
@@ -499,7 +499,7 @@ let init_proxy ?(proxy_files = []) deployement =
   in
   if Env.destroy then Deployement.terminate deployement else Lwt.return_unit
 
-let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
+let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let vms =
@@ -589,7 +589,7 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
               |> List.map wait_ssh_server_running
               |> Lwt.join
             in
-            init_proxy ?proxy_files deployement
+            init_proxy ?proxy_files ?proxy_args deployement
           else Lwt.return_unit)
 
 let agents t =
