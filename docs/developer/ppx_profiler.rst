@@ -64,7 +64,7 @@ can be obtained with ``module Profiler = (val Profiler.wrap my_profiler)``.
 
 Of course you can create any module with this signature but in case you didn't
 name it ``Profiler`` (let's say you name it ``My_profiler``) you'll have to
-declare your PPX attribute with a ``profiler_module`` field:
+declare your PPX attributes with a ``profiler_module`` field:
 
 .. code-block:: OCaml
 
@@ -94,14 +94,12 @@ document)
 - ``record : verbosity:verbosity -> string * metadata -> unit``
 - ``stamp : verbosity:verbosity -> string * metadata -> unit``
 - ``stop : unit -> unit``
-- ``reset_block_section: Block_hash.t -> unit`` (a utility function that calls
-  ``stop`` and ``record`` for each new block profiled)
 
 The PPX allows to replace
 
 .. code-block:: OCaml
 
-   Profiler.reset_block_section Block_repr.hash new_head;
+   Profiler.stop ();
    Profiler.record ~verbosity:Info ("merge store", []);
    ...
 
@@ -110,7 +108,7 @@ with
 .. code-block:: OCaml
 
    ()
-   [@profiler.reset_block_section Block_repr.hash new_head]
+   [@profiler.stop]
    [@profiler.record {verbosity = Info} "merge store"] ;
    ...
 
@@ -118,7 +116,7 @@ You can also decompose it to be sure of the evaluation order:
 
 .. code-block:: OCaml
 
-   () [@profiler.reset_block_section Block_repr.hash new_head] ;
+   () [@profiler.stop] ;
    () [@profiler.record {verbosity = Info} "merge store"] ;
    ...
 
