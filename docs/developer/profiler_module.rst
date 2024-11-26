@@ -90,7 +90,24 @@ Octez already provides two ``Drivers``:
 
 These ``Drivers`` are specifically crafted to write text or JSON files in a Unix
 filesystem. As you can see, they expect two 'arguments', a ``string`` (where to
-write) and a ``Profiler.verbosity`` (the level of detail expected from the profiler).
+write) and a ``Profiler.verbosity`` (the maximum level of detail/verbosity
+expected from the profiler).
+
+.. code-block:: OCaml
+
+   type verbosity = Notice | Info | Debug
+
+For this tutorial, we will use ``verbosity = Info``, but developers are
+encouraged to use their preferred option.
+
+To choose the verbosity of the profiler at runtime, the ``PROFILING``
+environment variable is used. It follows the same pattern as the ``TEZOS_LOG``
+environment variable (see :doc:`../user/logging`).
+
+Starting a node with
+``PROFILING='shell_profiling->Notice;mempool_profiling->Debug'`` will set the
+maximum verbosity for these two profilers and execute the rest of the profilers
+with no maximal verbosity.
 
 We can now easily create an instance for a ``Driver``:
 
@@ -138,10 +155,11 @@ code.
 
 .. code-block:: OCaml
 
-   module Read_profiler = (val Profiler.wrap read_profiler)
+   module Profiler = (val Profiler.wrap read_profiler)
 
-Since ``read_profiler`` is already plugged to ``read_instance``, calling
-``Read_profiler`` functions will work as expected.
+Since ``Profiler`` is already plugged to ``read_instance``, calling
+``Profiler`` functions will work as expected (and this allows to shadow the
+``Profiler`` module).
 
 We can now start monitoring our code. We can start with a simple change:
 
@@ -149,9 +167,14 @@ We can now start monitoring our code. We can start with a simple change:
 
    let () =
      Profiler.plug instance ;
-     (Profiler.record_f "read_test_line" @@ fun () -> read_test_line ()) ;
-     (Profiler.record_f "read_test_int" @@ fun () -> read_test_int ()) ;
-     Profiler.record_f "read_test_scanf" @@ fun () -> read_test_scanf ()
+     (Profiler.record_f ~verbosity:Info ("read_test_line", []) @@ fun () -> read_test_line ()) ;
+     (Profiler.record_f ~verbosity:Info ("read_test_int", []) @@ fun () -> read_test_int ()) ;
+     Profiler.record_f ~verbosity:Info ("read_test_scanf", []) @@ fun () -> read_test_scanf ()
+
+Note: the ``Profiler`` functions take a ``(id, metadata) : string * metadata`` as their
+first parameter:
+- ``id`` is used to create sections and represent the part being profiled by the function
+- ``metadata`` is used by backends that need specific informations (like Prometheus)
 
 Looking at the result gives us:
 
@@ -184,49 +207,49 @@ monitor our functions more precisely:
      aux 0
 
    let read_test_int () =
-     Profiler.record_f "read_test_int" @@ fun () ->
-     let ic = Profiler.aggregate_f "open_in" @@ fun () -> open_in sample in
+     Profiler.record_f  ~verbosity:Info ("read_test_int", []) @@ fun () ->
+     let ic = Profiler.aggregate_f ~verbosity:Info ("open_in", []) @@ fun () -> open_in sample in
      let max = ref 0 in
      try
        while true do
-         Profiler.aggregate_f "read_int" @@ fun () ->
+         Profiler.aggregate_f ~verbosity:Info ("read_int", []) @@ fun () ->
          read_int ic |> fun e -> if e > !max then max := e
        done
      with End_of_file ->
-       Profiler.aggregate_f "close_in" @@ fun () ->
+       Profiler.aggregate_f ~verbosity:Info ("close_in", []) @@ fun () ->
        close_in ic ;
        Format.eprintf "%d@." !max
 
    let read_test_line () =
-     Profiler.record_f "read_test_line" @@ fun () ->
-     let ic = Profiler.aggregate_f "open_in" @@ fun () -> open_in sample in
+     Profiler.record_f ~verbosity:Info ("read_test_line", []) @@ fun () ->
+     let ic = Profiler.aggregate_f ~verbosity:Info ("open_in", []) @@ fun () -> open_in sample in
      let max = ref 0 in
      try
        while true do
-         Profiler.span_f ["input_line"] @@ fun () ->
+         Profiler.span_f ~verbosity:Info (["input_line"], []) @@ fun () ->
          input_line ic |> String.split_on_char ' '
          |> List.iter (fun e ->
                 let e = int_of_string e in
                 if e > !max then max := e)
        done
      with End_of_file ->
-       Profiler.aggregate_f "close_in" @@ fun () ->
+       Profiler.aggregate_f ~verbosity:Info ("close_in", []) @@ fun () ->
        close_in ic ;
        Format.eprintf "%d@." !max
 
    let read_test_scanf () =
-     Profiler.record_f "read_test_scanf" @@ fun () ->
+     Profiler.record_f ~verbosity:Info ("read_test_scanf", []) @@ fun () ->
      let ic =
-       Profiler.aggregate_f "open_in" @@ fun () -> Scanf.Scanning.open_in sample
+       Profiler.aggregate_f ~verbosity:Info ("open_in", []) @@ fun () -> Scanf.Scanning.open_in sample
      in
      let max = ref 0 in
      try
        while true do
-         Profiler.mark ["Scanf.bscanf"] ;
+         Profiler.mark ~verbosity:Info (["Scanf.bscanf"], []) ;
          Scanf.bscanf ic "%d " (fun i -> i) |> fun e -> if e > !max then max := e
        done
      with End_of_file ->
-       Profiler.aggregate_f "close_in" @@ fun () ->
+       Profiler.aggregate_f ~verbosity:Info ("close_in", []) @@ fun () ->
        Scanf.Scanning.close_in ic ;
        Format.eprintf "%d@." !max
 
@@ -260,14 +283,14 @@ The execution time of ``read_int`` seems off. Replacing the following lines:
 
 .. code-block:: OCaml
 
-   Profiler.aggregate_f "read_int" @@ fun () ->
+   Profiler.aggregate_f ~verbosity:Info ("read_int", []) @@ fun () ->
    read_int ic |> fun e -> if e > !max then max := e
 
 By:
 
 .. code-block:: OCaml
 
-   Profiler.mark ["read_int"] ;
+   Profiler.mark ~verbosity:Info (["read_int"], []) ;
    read_int ic |> fun e -> if e > !max then max := e
 
 Gives a completely different result:

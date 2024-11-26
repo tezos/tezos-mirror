@@ -238,9 +238,9 @@ val span : profiler -> verbosity -> span -> ids -> unit
 (** Include a report in the current sequence. *)
 val inc : profiler -> report -> unit
 
-(** [record_f profiler ?verbosity label f] will call:
+(** [record_f profiler verbosity label f] will call:
     {[
-      record profiler ?verbosity name;
+      record profiler verbosity name;
       f ();
       stop ();
     ]} *)
@@ -249,9 +249,9 @@ val record_f : profiler -> verbosity -> id -> (unit -> 'a) -> 'a
 (** Same as {!record_f} but for Lwt function *)
 val record_s : profiler -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-(** [aggregate_f profiler ?verbosity label f] will call:
+(** [aggregate_f profiler verbosity label f] will call:
     {[
-      aggregate profiler ?verbosity name;
+      aggregate profiler verbosity name;
       f ();
       stop ();
     ]} *)
@@ -260,7 +260,7 @@ val aggregate_f : profiler -> verbosity -> id -> (unit -> 'a) -> 'a
 (** Same as {!aggregate_f} but for Lwt functions *)
 val aggregate_s : profiler -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-(** [span_f profiler ?verbosity label_list f] will compute [span] but
+(** [span_f profiler verbosity label_list f] will compute [span] but
     specifically around [f] *)
 val span_f : profiler -> verbosity -> ids -> (unit -> 'a) -> 'a
 
@@ -324,9 +324,9 @@ module type GLOBAL_PROFILER = sig
   (** Include a report in the current sequence. *)
   val inc : report -> unit
 
-  (** [record_f ?verbosity label f] will call:
+  (** [record_f verbosity label f] will call:
       {[
-        record ?verbosity name;
+        record verbosity name;
         f ();
         stop ();
       ]} *)
@@ -335,9 +335,9 @@ module type GLOBAL_PROFILER = sig
   (** Same as {!record_f} but for Lwt function *)
   val record_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  (** [aggregate_f ?verbosity label f] will call:
+  (** [aggregate_f verbosity label f] will call:
       {[
-        aggregate ?verbosity name;
+        aggregate verbosity name;
         f ();
         stop ();
       ]} *)
@@ -346,7 +346,7 @@ module type GLOBAL_PROFILER = sig
   (** Same as {!aggregate_f} but for Lwt functions *)
   val aggregate_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
-  (** [span_f ?verbosity label_list f] will compute [span] but specifically
+  (** [span_f verbosity label_list f] will compute [span] but specifically
       around [f] *)
   val span_f : verbosity -> ids -> (unit -> 'a) -> 'a
 

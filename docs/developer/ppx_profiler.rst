@@ -26,11 +26,11 @@ That can be used like this
 
 .. code-block:: OCaml
 
-   Profiler.aggregate_f "advertise mempool" @@ fun () ->
+   Profiler.aggregate_f ~verbosity:Info ("advertise mempool", []) @@ fun () ->
    advertise pv_shell advertisable_mempool;
 
    let* _res =
-     Profiler.aggregate_s "set mempool" @@ fun () ->
+     Profiler.aggregate_s ~verbosity:Info ("set mempool", []) @@ fun () ->
      set_mempool pv_shell our_mempool
    in ...
 
@@ -48,13 +48,13 @@ This will allow to preprocess
 
 .. code-block:: OCaml
 
-   () [@profiler.record "merge store"] ;
+   () [@profiler.record {verbosity = Info} "merge store"] ;
 
 into
 
 .. code-block:: OCaml
 
-   Profiler.record "merge store" ;
+   Profiler.record ~verbosity:Info ("merge store", []) ;
    () ;
 
 It should be noted that a ``Profiler`` module has to be available and has to
@@ -68,13 +68,13 @@ declare your PPX attribute with a ``profiler_module`` field:
 
 .. code-block:: OCaml
 
-   () [@profiler.record {profiler_module = My_profiler} "merge store"] ;
+   () [@profiler.record {verbosity = Info; profiler_module = My_profiler} "merge store"] ;
 
 This will be preprocessed into
 
 .. code-block:: OCaml
 
-   My_profiler.record "merge store" ;
+   My_profiler.record ~verbosity:Info ("merge store", []) ;
    () ;
 
 
@@ -89,10 +89,10 @@ There are three types of functions in the Profiler library.
 These functions are (for details about them, look at the :doc:`./profiler_module`
 document)
 
-- ``aggregate : ?verbosity:verbosity -> string -> unit``
-- ``mark : ?verbosity:verbosity -> string list -> unit``
-- ``record : ?verbosity:verbosity -> string -> unit``
-- ``stamp : ?verbosity:verbosity -> string -> unit``
+- ``aggregate : verbosity:verbosity -> string * metadata -> unit``
+- ``mark : verbosity:verbosity -> string list * metadata -> unit``
+- ``record : verbosity:verbosity -> string * metadata -> unit``
+- ``stamp : verbosity:verbosity -> string * metadata -> unit``
 - ``stop : unit -> unit``
 - ``reset_block_section: Block_hash.t -> unit`` (a utility function that calls
   ``stop`` and ``record`` for each new block profiled)
@@ -102,7 +102,7 @@ The PPX allows to replace
 .. code-block:: OCaml
 
    Profiler.reset_block_section Block_repr.hash new_head;
-   Profiler.record "merge store";
+   Profiler.record ~verbosity:Info ("merge store", []);
    ...
 
 with
@@ -111,7 +111,7 @@ with
 
    ()
    [@profiler.reset_block_section Block_repr.hash new_head]
-   [@profiler.record "merge store"] ;
+   [@profiler.record {verbosity = Info} "merge store"] ;
    ...
 
 You can also decompose it to be sure of the evaluation order:
@@ -119,7 +119,7 @@ You can also decompose it to be sure of the evaluation order:
 .. code-block:: OCaml
 
    () [@profiler.reset_block_section Block_repr.hash new_head] ;
-   () [@profiler.record "merge store"] ;
+   () [@profiler.record {verbosity = Info} "merge store"] ;
    ...
 
 2. Wrapping functions
@@ -127,25 +127,25 @@ You can also decompose it to be sure of the evaluation order:
 
 These functions are:
 
-- ``aggregate_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a``
-- ``aggregate_s : ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
-- ``record_f : ?verbosity:verbosity -> string -> (unit -> 'a) -> 'a``
-- ``record_s : ?verbosity:verbosity -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
-- ``span_f : ?verbosity:verbosity -> string list -> (unit -> 'a) -> 'a``
-- ``span_s : ?verbosity:verbosity -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
+- ``aggregate_f : verbosity:verbosity -> string * metadata -> (unit -> 'a) -> 'a``
+- ``aggregate_s : verbosity:verbosity -> string * metadata -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
+- ``record_f : verbosity:verbosity -> string * metadata -> (unit -> 'a) -> 'a``
+- ``record_s : verbosity:verbosity -> string * metadata -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
+- ``span_f : verbosity:verbosity -> string list * metadata -> (unit -> 'a) -> 'a``
+- ``span_s : verbosity:verbosity -> string list * metadata -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
 
 The PPX allows to replace
 
 .. code-block:: OCaml
 
-   (Profiler.record_f "read_test_line" @@ fun () -> read_test_line ())
+   (Profiler.record_f ~verbosity:Info ("read_test_line", []) @@ fun () -> read_test_line ())
    ...
 
 with
 
 .. code-block:: OCaml
 
-   (read_test_line () [@profiler.record_f "read_test_line"])
+   (read_test_line () [@profiler.record_f {verbosity = Info} "read_test_line"])
    ...
 
 3. Custom functions
@@ -214,6 +214,7 @@ The payload is made of two parts, the first one being optional:
    field ::=
      | verbosity = (Notice | Info | Debug)
      | profiler_module = module_ident
+     | metadata = <(string * string) list>
 
    args ::= <string> | <string list> | <function application> | ident | empty
 
@@ -230,7 +231,7 @@ will be preprocessed as
 .. code-block:: OCaml
 
    Profiler.aggregate_s ~verbosity:Info (g y z) @@ f x ;
-   Prof.span_f ~verbosity:Debug "label" @@ g x
+   Prof.span_f ~verbosity:Debug ("label", []) @@ g x
    ...
 
 Adding functionalities
