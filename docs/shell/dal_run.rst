@@ -69,7 +69,7 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
    .. code-block:: shell
 
-      octez-client rpc get /chains/main/blocks/head/helpers/attestation_rights?delegate="$MY_ADDRESS"
+      octez-client rpc get "/chains/main/blocks/head/helpers/attestation_rights?delegate=$MY_ADDRESS"
 
    If the previous command reports no attestation rights (``[]``), you may have to register as a delegate or re-activate your delegate and wait for a few cycles to get some rights (see :ref:`DelegateRegistration`).
 
