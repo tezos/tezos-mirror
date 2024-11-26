@@ -9,8 +9,8 @@
     -------
     Component:  Smart rollup node library
     Invocation: dune exec src/lib_smart_rollup_node/test/main.exe \
-                -- -f src/lib_smart_rollup_node/test/test_store_gc.ml
-    Subject:    Unit tests GC for rollup node store
+                -- -f src/lib_smart_rollup_node/test/test_store.ml
+    Subject:    Unit tests for rollup node store
 *)
 
 let build_chain node_ctxt ~genesis ~length =
