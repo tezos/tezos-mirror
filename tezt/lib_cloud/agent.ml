@@ -16,9 +16,7 @@ type t = {
   configuration : Configuration.t;
 }
 
-let ssh_id () =
-  if Env.mode = `Orchestrator then Env.ssh_private_key_filename ~home:"/root" ()
-  else Env.ssh_private_key_filename ()
+let ssh_id () = Env.ssh_private_key_filename ()
 
 let docker_image_encoding =
   let open Data_encoding in
@@ -124,7 +122,7 @@ let cmd_wrapper {zone; vm_name; _} =
   | Some zone ->
       let ssh_private_key_filename =
         if Env.mode = `Orchestrator then
-          Env.ssh_private_key_filename ~home:"/root" ()
+          Env.ssh_private_key_filename ~home:"$HOME" ()
         else Env.ssh_private_key_filename ()
       in
       Some (Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename)

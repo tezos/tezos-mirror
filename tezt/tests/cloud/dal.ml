@@ -2863,6 +2863,10 @@ let benchmark () =
           (Protocol.directory configuration.protocol);
         "evm_kernel.wasm";
       ]
+    ~proxy_args:
+      (match configuration.fundraiser with
+      | None -> []
+      | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
     ~tags:[Tag.cloud; "dal"; "benchmark"]

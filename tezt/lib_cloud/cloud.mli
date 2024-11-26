@@ -12,6 +12,7 @@ type t
     cloud. *)
 val register :
   ?proxy_files:string list ->
+  ?proxy_args:string list ->
   ?vms:Configuration.t list ->
   __FILE__:string ->
   title:string ->
