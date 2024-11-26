@@ -3370,6 +3370,12 @@ let test_flushed_blueprint_reorg =
          }
              _protocol ->
   let* () = Evm_node.terminate observer in
+  (* Observer does not track rollup node events, therefore it will blindly
+     follow the sequencer then reorganizes when the sequencer will push the
+     flushed blueprint. *)
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
 
   let craft_raw_transfer account =
@@ -3467,9 +3473,255 @@ let test_flushed_blueprint_reorg =
   in
   let*@ sequencer_head = Rpc.block_number sequencer in
 
-  (* As the observer was done during the reorganization, restarting it
+  (* As the observer was down during the reorganization, restarting it
      will be enough, it'll apply the new branch as expected. *)
-  let* () = Evm_node.run observer in
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+
+  unit
+
+let test_observer_reorg_on_blueprint_stream =
+  register_all
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
+    ~title:
+      "Observer tracking a rollup node reorganizes after blueprint on stream"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (*
+     This test focuses on the case where an observer is connected to a rollup
+     node.
+
+     The observer will start by detecting a divergence and reset to the state
+     prior to the delayed inbox flushing.
+
+     It will then reset itself (again) and start accepting the new blueprints
+     from the sequencer.
+  *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* Add a transaction to the delayed inbox. *)
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* We mark at which level the delayed inbox item was added. *)
+  let* add_delayed_inbox_level = Client.level client in
+  let wait_for_add_delayed_inbox =
+    Evm_node.wait_for_processed_l1_level
+      ~level:add_delayed_inbox_level
+      sequencer
+  in
+  (* We mark at which level the delayed inbox was flushed. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* flushed_delayed_inbox_level = Client.level client in
+  let wait_for_processed_l1_level =
+    Evm_node.wait_for_processed_l1_level
+      ~level:flushed_delayed_inbox_level
+      sequencer
+  in
+  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  let wait_for_observer_reset = Evm_node.wait_for_reset observer in
+  (* A new block will make the {!add_delayed_inbox_level} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = wait_for_add_delayed_inbox in
+
+  (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
+     item but refuses to include it. *)
+  let* () =
+    repeat 5 (fun _ ->
+        let*@ _ =
+          Rpc.produce_block ~with_delayed_transactions:false sequencer
+        in
+        unit)
+  in
+
+  (* A new block will make the {!flushed_delayed_inbox_level} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Wait until the event is completely processed. Head of sequencer and proxy
+     should be in sync. *)
+  let* () = wait_for_flush
+  and* () = wait_for_processed_l1_level
+  and* () = wait_for_observer_reset in
+
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  (* Sequencer resumes block production. *)
+  let* () =
+    repeat 5 (fun _ ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+  (* Observer accepts the new blocks. *)
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+
+  unit
+
+let test_observer_reorg_on_blueprint_catchup =
+  register_all
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
+    ~title:"Observer reorganizes after blueprint on catchup"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  (*
+     This test focuses on the case where an observer detects a divergence
+     and reset to the state prior to the delayed inbox flushing, when the
+     blueprint is seen during a catchup.
+  *)
+  let* () = Evm_node.terminate observer in
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* Add a transaction to the delayed inbox. *)
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* We mark at which level the delayed inbox item was added. *)
+  let* add_delayed_inbox_level = Client.level client in
+  let wait_for_add_delayed_inbox =
+    Evm_node.wait_for_processed_l1_level
+      ~level:add_delayed_inbox_level
+      sequencer
+  in
+  (* We mark at which level the delayed inbox was flushed. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* flushed_delayed_inbox_level = Client.level client in
+  let wait_for_processed_l1_level =
+    Evm_node.wait_for_processed_l1_level
+      ~level:flushed_delayed_inbox_level
+      sequencer
+  in
+  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  (* A new block will make the {!add_delayed_inbox_level} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = wait_for_add_delayed_inbox in
+
+  (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
+     item but refuses to include it. *)
+  let* () =
+    repeat 2 (fun _ ->
+        let*@ _ =
+          Rpc.produce_block ~with_delayed_transactions:false sequencer
+        in
+        unit)
+  in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+  (* Observer accepts these blocks and shutdowns. *)
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+  let* () = Evm_node.terminate observer in
+
+  (* A new block will make the {!flushed_delayed_inbox_level} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Wait until the event is completely processed. Head of sequencer and proxy
+     should be in sync. *)
+  let* () = wait_for_flush and* () = wait_for_processed_l1_level in
+
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  (* Sequencer resumes block production. *)
+  let* () =
+    repeat 5 (fun _ ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+
+  (* Restart the observer, observer will be at level N. The flushed delayed
+     blueprint happened before level N, therefore it will have to realize
+     something is wrong and traverse the chain backward. *)
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+
+  (* Observer accepts the new blocks. *)
   let* () =
     Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
   in
@@ -7636,6 +7888,8 @@ let () =
   test_forced_blueprint_takes_l1_timestamp protocols ;
   test_delayed_inbox_flushing_event protocols ;
   test_flushed_blueprint_reorg protocols ;
+  test_observer_reorg_on_blueprint_stream protocols ;
+  test_observer_reorg_on_blueprint_catchup protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
   test_non_increasing_timestamp protocols ;
