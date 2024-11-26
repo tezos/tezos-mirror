@@ -370,23 +370,23 @@ module State : sig
         (** Only the history necessary to play refutation games is kept
           (i.e. after the LCC only) *)
 
-  module Finalized_level : S with type value := Block_hash.t * int32
+  module Finalized_level : S with type value = Block_hash.t * int32
 
-  module LCC : S with type value := Commitment.Hash.t * int32
+  module LCC : S with type value = Commitment.Hash.t * int32
 
-  module LPC : S with type value := Commitment.Hash.t * int32
+  module LPC : S with type value = Commitment.Hash.t * int32
 
-  module Last_gc_target : S with type value := int32
+  module Last_gc_target : S with type value = int32
 
-  module Last_gc_triggered_at : S with type value := int32
+  module Last_gc_triggered_at : S with type value = int32
 
-  module Last_successful_gc_target : S with type value := int32
+  module Last_successful_gc_target : S with type value = int32
 
-  module Last_successful_gc_triggered_at : S with type value := int32
+  module Last_successful_gc_triggered_at : S with type value = int32
 
-  module Last_context_split : S with type value := int32
+  module Last_context_split : S with type value = int32
 
-  module History_mode : S with type value := history_mode
+  module History_mode : S with type value = history_mode
 
-  module L2_head : S with type value := Block_hash.t * int32
+  module L2_head : S with type value = Block_hash.t * int32
 end
