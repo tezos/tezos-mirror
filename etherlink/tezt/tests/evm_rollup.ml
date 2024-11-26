@@ -3315,16 +3315,6 @@ let test_latest_kernel_migration protocols =
       in
       let*@ block_result = latest_block evm_setup.evm_node in
       let* config_result = config_setup evm_setup in
-      let* indexes =
-        Sc_rollup_node.RPC.call
-          evm_setup.sc_rollup_node
-          ~rpc_hooks:Tezos_regression.rpc_hooks
-        @@ Sc_rollup_rpc.get_global_block_durable_state_value
-             ~pvm_kind
-             ~operation:Sc_rollup_rpc.Subkeys
-             ~key:Durable_storage_path.indexes
-             ()
-      in
       let* simple_storage_address, _ =
         deploy ~contract:simple_storage ~sender:deployer evm_setup
       in
@@ -3336,32 +3326,10 @@ let test_latest_kernel_migration protocols =
           ~error_prefix:"Prior migration"
           evm_setup
       in
-      let indexes = List.sort compare indexes in
-      Check.((indexes = ["accounts"; "blocks"; "transactions"]) (list string))
-        ~error_msg:"Expected indexes to be %R, got %L" ;
-      let*@ zero_address_nonce =
-        Rpc.get_transaction_count
-          ~address:"0x0000000000000000000000000000000000000000"
-          evm_setup.evm_node
-      in
-      Check.((zero_address_nonce = 0L) int64)
-        ~error_msg:"The nonce should be 0 before the upgrade, got %L" ;
       return
         {transfer_result; block_result; config_result; simple_storage_address}
     in
     let scenario_after ~evm_setup ~sanity_check =
-      let* indexes =
-        Sc_rollup_node.RPC.call
-          evm_setup.sc_rollup_node
-          ~rpc_hooks:Tezos_regression.rpc_hooks
-        @@ Sc_rollup_rpc.get_global_block_durable_state_value
-             ~pvm_kind
-             ~operation:Sc_rollup_rpc.Subkeys
-             ~key:Durable_storage_path.indexes
-             ()
-      in
-      Check.((indexes = ["blocks"]) (list string))
-        ~error_msg:"Expected indexes to be %R, got %L" ;
       let* () =
         ensure_transfer_result_integrity
           ~sender
@@ -3391,13 +3359,6 @@ let test_latest_kernel_migration protocols =
           ~error_prefix:"After migration"
           evm_setup
       in
-      let*@ zero_address_nonce =
-        Rpc.get_transaction_count
-          ~address:"0x0000000000000000000000000000000000000000"
-          evm_setup.evm_node
-      in
-      Check.((zero_address_nonce = 1L) int64)
-        ~error_msg:"The nonce should be 1 after the upgrade, got %L" ;
       ensure_config_setup_integrity
         ~config_result:sanity_check.config_result
         evm_setup
@@ -3722,73 +3683,6 @@ let test_transaction_storage_before_and_after_migration =
     ~scenario_after
     protocol
 
-(* TODO: remove me after Mainnet upgrade *)
-let test_fa_bridge_flag_after_migration_v22 ~kernel_from ~chain_id ~chain_id_hex
-    ~flag_expected =
-  let chain_name, kernel_wasm_const =
-    match kernel_from with
-    | Kernel.Mainnet -> ("mainnet", Constant.WASM.mainnet_evm_kernel)
-    | _ -> failwith "Unsupported chain"
-  in
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "migration"; "v22"; "fa_bridge"; "flag"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-        kernel_wasm_const;
-      ])
-    ~title:
-      (sf
-         "FA bridge flag before and after migration v22 [%s -> latest]"
-         chain_name)
-  @@ fun protocol ->
-  let assert_chain_id ~sc_rollup_node ~expected =
-    let* chain_id =
-      Sc_rollup_node.RPC.call sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/chain_id"
-           ()
-    in
-    assert (Option.get chain_id = expected) ;
-    unit
-  in
-  let assert_fa_bridge_flag ~sc_rollup_node ~expected =
-    let* flag =
-      Sc_rollup_node.RPC.call sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/feature_flags/enable_fa_bridge"
-           ()
-    in
-    assert (Option.is_some flag = expected) ;
-    unit
-  in
-  let scenario_prior ~evm_setup:{sc_rollup_node; _} =
-    let* () = assert_chain_id ~sc_rollup_node ~expected:chain_id_hex in
-    let* () = assert_fa_bridge_flag ~sc_rollup_node ~expected:false in
-    unit
-  in
-  let scenario_after ~evm_setup:{sc_rollup_node; _} ~(sanity_check : unit) =
-    let () = sanity_check in
-    let* () = assert_chain_id ~sc_rollup_node ~expected:chain_id_hex in
-    let* () = assert_fa_bridge_flag ~sc_rollup_node ~expected:flag_expected in
-    unit
-  in
-  gen_kernel_migration_test
-    ~from:kernel_from
-    ~to_:Latest
-    ~scenario_prior
-    ~scenario_after
-    ~chain_id
-    protocol
-
 let test_kernel_root_hash_originate_absent =
   Protocol.register_test
     ~__FILE__
@@ -3856,146 +3750,12 @@ let test_kernel_root_hash_after_upgrade =
     ~error_msg:"Found incorrect kernel root hash (expected %L, got %R)" ;
   unit
 
-let test_storage_migration_v18 protocols =
-  let storage_migration_v18 ~from ~number_blocks =
-    let from_tag, from_use = Kernel.to_uses_and_tags from in
-    Protocol.register_test
-      ~__FILE__
-      ~tags:
-        [
-          "evm";
-          "migration";
-          "upgrade";
-          from_tag;
-          "v18";
-          string_of_int number_blocks;
-        ]
-      ~uses:(fun _protocol ->
-        [
-          Constant.octez_smart_rollup_node;
-          Constant.octez_evm_node;
-          Constant.smart_rollup_installer;
-          Constant.WASM.evm_kernel;
-          from_use;
-        ])
-      ~title:
-        Format.(
-          sprintf
-            "Test migration V18 with %d blocks (%s -> latest)."
-            number_blocks
-            from_tag)
-    @@ fun protocol ->
-    let scenario_prior ~evm_setup:{sc_rollup_node; client; evm_node; _} =
-      let* () =
-        repeat number_blocks (fun () ->
-            let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-            unit)
-      in
-      let*@ head = Rpc.block_number evm_node in
-      Check.((head = Int32.of_int number_blocks) int32)
-        ~error_msg:"Expected head is %R, got %L" ;
-      return ()
-    in
-    let scenario_after ~evm_setup:{sc_rollup_node; _} ~sanity_check:_ =
-      let* blocks_subkeys =
-        Sc_rollup_node.RPC.call
-          sc_rollup_node
-          ~rpc_hooks:Tezos_regression.rpc_hooks
-        @@ Sc_rollup_rpc.get_global_block_durable_state_value
-             ~pvm_kind
-             ~operation:Sc_rollup_rpc.Subkeys
-             ~key:"/evm/world_state/blocks"
-             ()
-      in
-
-      List.iter
-        (fun key ->
-          if key = "current" || String.length key = 64 then ()
-          else
-            Test.fail
-              "Any key that is not current or a block hash should have been \
-               removed, but found %S"
-              key)
-        blocks_subkeys ;
-
-      unit
-    in
-    gen_kernel_migration_test
-      ~from
-      ~to_:Latest
-      ~scenario_prior
-      ~scenario_after
-      protocol
-  in
-  storage_migration_v18 ~from:Ghostnet ~number_blocks:5 protocols ;
-  storage_migration_v18 ~from:Ghostnet ~number_blocks:256 protocols ;
-  storage_migration_v18 ~from:Mainnet ~number_blocks:5 protocols ;
-  storage_migration_v18 ~from:Mainnet ~number_blocks:256 protocols
-
-let test_withdrawal_precompiled_balance_migration protocols =
-  let withdrawal_precompiled_balance_migration ~from =
-    let from_tag, from_use = Kernel.to_uses_and_tags from in
-    Protocol.register_test
-      ~__FILE__
-      ~tags:["evm"; "migration"; "upgrade"; from_tag; "v20"]
-      ~uses:(fun _protocol ->
-        [
-          Constant.octez_smart_rollup_node;
-          Constant.octez_evm_node;
-          Constant.smart_rollup_installer;
-          Constant.WASM.evm_kernel;
-          from_use;
-        ])
-      ~title:Format.(sprintf "Test migration V20 (%s -> latest)" from_tag)
-    @@ fun protocol ->
-    let value = Wei.of_eth_int 1 in
-    let withdraw_address = "0xff00000000000000000000000000000000000001" in
-    let scenario_prior ~evm_setup:{evm_node; endpoint; produce_block; _} =
-      let* _tx =
-        call_withdraw
-          ~sender:Eth_account.bootstrap_accounts.(0)
-          ~endpoint:(Evm_node.endpoint evm_node)
-          ~value
-          ~produce_block
-          ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
-          ()
-      in
-      let* () = check_balance ~receiver:withdraw_address ~endpoint Tez.one in
-      unit
-    in
-    let scenario_after ~evm_setup:{evm_node; endpoint; produce_block; _}
-        ~sanity_check:_ =
-      let* () = check_balance ~receiver:withdraw_address ~endpoint Tez.zero in
-      let* _tx =
-        call_withdraw
-          ~sender:Eth_account.bootstrap_accounts.(0)
-          ~endpoint:(Evm_node.endpoint evm_node)
-          ~value
-          ~produce_block
-          ~receiver:"tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
-          ()
-      in
-      let* () = check_balance ~receiver:withdraw_address ~endpoint Tez.zero in
-      unit
-    in
-    gen_kernel_migration_test
-      ~from
-      ~to_:Latest
-      ~scenario_prior
-      ~scenario_after
-      protocol
-  in
-  withdrawal_precompiled_balance_migration ~from:Ghostnet protocols ;
-  withdrawal_precompiled_balance_migration ~from:Mainnet protocols
-
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
   test_mainnet_ghostnet_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
-  test_transaction_storage_before_and_after_migration protocols ;
-  test_storage_migration_v18 protocols ;
-  test_withdrawal_precompiled_balance_migration protocols
+  test_transaction_storage_before_and_after_migration protocols
 
 let block_transaction_count_by ~by arg =
   let method_ = "eth_getBlockTransactionCountBy" ^ by_block_arg_string by in
@@ -6528,14 +6288,6 @@ let register_evm_node ~protocols =
   test_rpcs_can_be_disabled protocols ;
   test_simulation_out_of_funds protocols ;
   test_rpc_state_value_and_subkeys protocols ;
-  (* See https://docs.etherlink.com/get-started/network-information for chain constants *)
-  test_fa_bridge_flag_after_migration_v22
-    ~kernel_from:Mainnet
-    ~chain_id:42793
-    ~chain_id_hex:
-      "29a7000000000000000000000000000000000000000000000000000000000000"
-    ~flag_expected:true
-    protocols ;
   test_proxy_ignore_block_param protocols
 
 let protocols = Protocol.all
