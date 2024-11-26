@@ -1473,6 +1473,7 @@ module Handlers = struct
         let ctxt = Worker.state self in
         Evm_store.use ctxt.store @@ fun conn ->
         let l2_level = State.current_blueprint_number ctxt in
+        let*! () = Evm_context_events.processed_l1_level l1_level in
         Evm_store.L1_l2_levels_relationships.store
           conn
           ~latest_l2_level:l2_level
