@@ -709,13 +709,25 @@ module V5_sqlite_migrations = struct
   let migrate_rollup_node_state (v4_store : _ Store_v4.t)
       (v5_store : _ Store_v5.t) =
     let open Lwt_result_syntax in
+    let write_only_if_fresher (type a)
+        (module V5 : Sql_store.State.S with type value = a) proj value =
+      let* v5_value = V5.get v5_store in
+      match v5_value with
+      | Some v5_value when proj v5_value >= proj value ->
+          (* Data in V5 store is more up-to-date. *)
+          return_unit
+      | _ -> V5.set v5_store value
+    in
     (* migrate lcc *)
     let* lcc = Store_v4.Lcc.read v4_store.lcc in
     let* () =
       match lcc with
       | None -> return_unit
       | Some {commitment; level} ->
-          Store_v5.State.LCC.set v5_store (commitment, level)
+          write_only_if_fresher
+            (module Store_v5.State.LCC)
+            snd
+            (commitment, level)
     in
     (* migrate lpc *)
     let* lpc = Store_v4.Lpc.read v4_store.lpc in
@@ -724,7 +736,10 @@ module V5_sqlite_migrations = struct
       | None -> return_unit
       | Some commitment ->
           let hash = Commitment.hash commitment in
-          Store_v5.State.LPC.set v5_store (hash, commitment.inbox_level)
+          write_only_if_fresher
+            (module Store_v5.State.LPC)
+            snd
+            (hash, commitment.inbox_level)
     in
     (* migrate head *)
     let* head = Store_v4.L2_head.read v4_store.l2_head in
@@ -732,8 +747,9 @@ module V5_sqlite_migrations = struct
       match head with
       | None -> return_unit
       | Some head ->
-          Store_v5.State.L2_head.set
-            v5_store
+          write_only_if_fresher
+            (module Store_v5.State.L2_head)
+            snd
             (head.header.block_hash, head.header.level)
     in
     (* migrate finalized *)
@@ -750,8 +766,9 @@ module V5_sqlite_migrations = struct
           let finalized_hash =
             WithExceptions.Option.get ~loc:__LOC__ finalized_hash
           in
-          Store_v5.State.Finalized_level.set
-            v5_store
+          write_only_if_fresher
+            (module Store_v5.State.Finalized_level)
+            snd
             (finalized_hash, finalized_level)
     in
     (* migrate context split *)
@@ -761,7 +778,11 @@ module V5_sqlite_migrations = struct
     let* () =
       match split with
       | None -> return_unit
-      | Some l -> Store_v5.State.Last_context_split.set v5_store l
+      | Some l ->
+          write_only_if_fresher
+            (module Store_v5.State.Last_context_split)
+            Fun.id
+            l
     in
     (* migrate last GC *)
     let* gc = Store_v4.Gc_levels.read v4_store.gc_levels in
@@ -770,9 +791,15 @@ module V5_sqlite_migrations = struct
       | None -> return_unit
       | Some {last_gc_level; first_available_level} ->
           let* () =
-            Store_v5.State.Last_gc_target.set v5_store first_available_level
+            write_only_if_fresher
+              (module Store_v5.State.Last_gc_target)
+              Fun.id
+              first_available_level
           in
-          Store_v5.State.Last_gc_triggered_at.set v5_store last_gc_level
+          write_only_if_fresher
+            (module Store_v5.State.Last_gc_triggered_at)
+            Fun.id
+            last_gc_level
     in
     (* migrate last successful GC *)
     let* gc = Store_v4.Gc_levels.read v4_store.successful_gc_levels in
@@ -781,12 +808,14 @@ module V5_sqlite_migrations = struct
       | None -> return_unit
       | Some {last_gc_level; first_available_level} ->
           let* () =
-            Store_v5.State.Last_successful_gc_target.set
-              v5_store
+            write_only_if_fresher
+              (module Store_v5.State.Last_successful_gc_target)
+              Fun.id
               first_available_level
           in
-          Store_v5.State.Last_successful_gc_triggered_at.set
-            v5_store
+          write_only_if_fresher
+            (module Store_v5.State.Last_successful_gc_triggered_at)
+            Fun.id
             last_gc_level
     in
     (* migrate history mode *)
