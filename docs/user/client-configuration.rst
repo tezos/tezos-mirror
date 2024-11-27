@@ -5,7 +5,7 @@ The Octez client can be configured in flexible ways to control various
 aspects of its behavior, such as running in different running modes (:doc:`./sandbox`, :doc:`./mockup`, ...), connecting to a public Tezos node, selecting the directory for storing data, and so on.
 
 All these aspects
-can be customized by supplying **options** on the command line when running the client. Refer to :ref`the client manual <client_manual>` for details.
+can be customized by supplying **options** on the command line when running the client. Refer to :ref:`the client manual <client_manual>` for details.
 
 A subset of these aspects can be customized by specifying parameters in a **configuration file** for the client.
 These include, for example:
