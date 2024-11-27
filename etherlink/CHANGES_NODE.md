@@ -10,6 +10,7 @@
 
 ### Internals
 
+- Make the rollup node follower more resilient. (!15745)
 - Use a single RPC (if the rollup node supports it) when fetching EVM events.
   (!15629, !15703)
 - Private RPC `produceBlock` can produce a block without delayed transactions,

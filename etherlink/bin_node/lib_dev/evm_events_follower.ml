@@ -14,7 +14,12 @@ type parameters = {
 module StringSet = Set.Make (String)
 
 module Types = struct
-  type state = parameters
+  type state = {
+    rollup_node_endpoint : Uri.t;
+    filter_event : Evm_events.t -> bool;
+    keep_alive : bool;
+    mutable last_l1_level : int32 option;
+  }
 
   type nonrec parameters = parameters
 end
@@ -68,7 +73,7 @@ let fetch_event ({rollup_node_endpoint; keep_alive; _} : Types.state)
   return event_opt
 
 let fetch_events_one_by_one
-    ({rollup_node_endpoint; keep_alive; filter_event} as state : Types.state)
+    ({rollup_node_endpoint; keep_alive; filter_event; _} as state : Types.state)
     rollup_block_lvl =
   let open Lwt_result_syntax in
   let* nb_of_events_bytes =
@@ -100,7 +105,7 @@ let fetch_events_one_by_one
         events
 
 let fetch_events_at_once
-    ({rollup_node_endpoint; keep_alive; filter_event} : Types.state)
+    ({rollup_node_endpoint; keep_alive; filter_event; _} : Types.state)
     rollup_block_lvl =
   let open Lwt_result_syntax in
   let path = Durable_storage_path.Evm_events.events in
@@ -169,10 +174,79 @@ let fetch_events =
           let*! () = Evm_events_follower_events.fallback () in
           fetch_events_one_by_one state rollup_block_lvl
 
-let on_new_head state rollup_block_lvl =
+let apply_events state rollup_block_lvl =
   let open Lwt_result_syntax in
   let* events = fetch_events state rollup_block_lvl in
   Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
+
+type error += Evm_events_follower_is_closed
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_events_follower_is_closed"
+    ~title:"Evm_events_follower_is_closed"
+    ~description:
+      "Tried to process evm events from the rollup node but the worker is \
+       closed"
+    Data_encoding.unit
+    (function Evm_events_follower_is_closed -> Some () | _ -> None)
+    (fun () -> Evm_events_follower_is_closed)
+
+let new_rollup_block worker rollup_level =
+  let open Lwt_result_syntax in
+  let state = Worker.state worker in
+  let add_request level =
+    let*! (pushed : bool) =
+      Worker.Queue.push_request worker (Apply_evm_events level)
+    in
+    if not pushed then
+      (* this should not happen as we are called from within in the
+         worker *)
+      tzfail Evm_events_follower_is_closed
+    else return_unit
+  in
+  (* add request for fetching evm events for rollup node block going
+     from [from] to [to_] inclusive. *)
+  let[@tailrec] rec aux ~from ~to_ =
+    if from > to_ then
+      failwith
+        "Internal error: The catchup of evm_event went too far, it should be \
+         impossible. Catching up from %ld to %ld."
+        from
+        to_
+    else
+      let* () = add_request from in
+      if from = to_ then (* we are catching up *) return_unit
+      else aux ~from:(Int32.succ from) ~to_
+  in
+  match state.last_l1_level with
+  | Some last_l1_level
+    when rollup_level = last_l1_level || rollup_level = Int32.pred last_l1_level
+    ->
+      let*! () =
+        Evm_events_follower_events.rollup_level_is_already_processed
+          rollup_level
+      in
+      return_unit
+  | Some last_l1_level when rollup_level < last_l1_level ->
+      failwith
+        "Internal error: the received block from the rollup node is too old. \
+         Received level: %ld, last_l1_level: %ld"
+        rollup_level
+        last_l1_level
+  | None | Some _ ->
+      let* from =
+        match state.last_l1_level with
+        | Some last_l1_level -> return @@ Int32.succ last_l1_level
+        | None ->
+            let*! () = Evm_store_events.no_l1_latest_level_to_catch_up () in
+            return rollup_level
+      in
+      (* we apply all evm events from [current l1 + 1] to [rollup_head] *)
+      let* () = aux ~from ~to_:rollup_level in
+      state.last_l1_level <- Some rollup_level ;
+      return_unit
 
 module Handlers = struct
   open Evm_events_follower_types
@@ -184,18 +258,22 @@ module Handlers = struct
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun worker request ->
-    let open Lwt_result_syntax in
     match request with
-    | Request.New_rollup_node_block rollup_block_lvl ->
-        protect @@ fun () ->
-        let* () = on_new_head (Worker.state worker) rollup_block_lvl in
-        return_unit
+    | Request.New_rollup_node_block rollup_head ->
+        protect @@ fun () -> new_rollup_block worker rollup_head
+    | Apply_evm_events rollup_lvl ->
+        protect @@ fun () -> apply_events (Worker.state worker) rollup_lvl
 
   type launch_error = error trace
 
-  let on_launch _w () (parameters : Types.parameters) =
-    let state = parameters in
-    Lwt_result_syntax.return state
+  let on_launch _w ()
+      ({rollup_node_endpoint; filter_event; keep_alive} : Types.parameters) =
+    let open Lwt_result_syntax in
+    let* last_l1_level = Evm_context.last_known_l1_level () in
+    let state : Types.state =
+      {rollup_node_endpoint; filter_event; keep_alive; last_l1_level}
+    in
+    return state
 
   let on_error :
       type r request_error.
@@ -208,6 +286,13 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match req with
     | Request.New_rollup_node_block _ ->
+        let*! () =
+          Evm_events_follower_events.worker_request_failed
+            (Request.view req)
+            errs
+        in
+        return_unit
+    | Request.Apply_evm_events _ ->
         let*! () =
           Evm_events_follower_events.worker_request_failed
             (Request.view req)
@@ -258,11 +343,19 @@ let shutdown () =
   let*! () = Worker.shutdown w in
   return_unit
 
+let handle_request_error rq =
+  let open Lwt_syntax in
+  let* rq in
+  match rq with
+  | Ok res -> return_ok res
+  | Error (Worker.Request_error errs) -> Lwt.return_error errs
+  | Error (Closed None) -> Lwt.return_error [Evm_events_follower_is_closed]
+  | Error (Closed (Some errs)) -> Lwt.return_error errs
+  | Error (Any exn) -> Lwt.return_error [Exn exn]
+
 let worker_add_request ~request =
-  let open Lwt_result_syntax in
   bind_worker @@ fun w ->
-  let*! (_pushed : bool) = Worker.Queue.push_request w request in
-  return_unit
+  Worker.Queue.push_request_and_wait w request |> handle_request_error
 
 let new_rollup_block rollup_level =
   worker_add_request ~request:(New_rollup_node_block rollup_level)
