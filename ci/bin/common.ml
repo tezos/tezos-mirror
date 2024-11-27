@@ -702,6 +702,12 @@ let changeset_mir =
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
     @ make ["contrib/mir/**/*"])
 
+let changeset_mir_tzt =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["contrib/mir/**/*"; "tzt_reference_test_suite/**/*"])
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.

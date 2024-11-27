@@ -6302,7 +6302,9 @@ mod typecheck_tests {
     fn test_push_chain_id() {
         let bytes = "f3d48554";
         let exp = hex::decode(bytes).unwrap();
-        let exp = Ok(Push(TypedValue::ChainId(super::ChainId::try_from(exp).unwrap())));
+        let exp = Ok(Push(TypedValue::ChainId(
+            super::ChainId::try_from(exp).unwrap(),
+        )));
         let lit = "NetXynUjJNZm7wi";
         assert_eq!(
             &typecheck_instruction(

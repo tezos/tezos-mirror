@@ -1181,7 +1181,8 @@ mod multisig_tests {
     fn make_ctx<'a>() -> Ctx<'a> {
         let mut ctx = Ctx::default();
         ctx.self_address = "KT1BFATQpdP5xJGErJyk2vfL46dvFanWz87H".try_into().unwrap();
-        ctx.chain_id = tezos_crypto_rs::hash::ChainId::try_from(hex::decode("f3d48554").unwrap()).unwrap();
+        ctx.chain_id =
+            tezos_crypto_rs::hash::ChainId::try_from(hex::decode("f3d48554").unwrap()).unwrap();
         ctx
     }
 
