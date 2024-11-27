@@ -9,8 +9,8 @@ type t
 
 type target = {address : string; port : int; app_name : string}
 
-(** [start ~alert_manager agents] starts the prometheus server. *)
-val start : alert_manager:bool -> Agent.t List.t -> t Lwt.t
+(** [start agents] starts the prometheus server. *)
+val start : Agent.t List.t -> t Lwt.t
 
 (** [shutdown prometheus] shutdowns the prometheus server. *)
 val shutdown : t -> unit Lwt.t
@@ -33,8 +33,14 @@ val reload : t -> unit Lwt.t
 val add_job :
   t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
 
-(** [add_alert prometheus ?for_ ~name ~expr] adds a new alert in the
-    Prometheus configuration. Similarly to [add_job], it implies a
-    call to [reload] so that the alert is taken into account just
-    after calling this function. *)
-val add_alert : t -> ?for_:string -> name:string -> expr:string -> unit -> unit
+(** [add_alert alert prometheus] adds a new [alert] in the Prometheus
+    configuration. Similarly to [add_job], it implies a call to
+    [reload] so that the alert is taken into account just after
+    calling this function. *)
+val add_alert : Alert_manager.alert -> t -> unit Lwt.t
+
+(** [add_alerts alerts prometheus] adds new [alerts] in the Prometheus
+    configuration. Similarly to [add_job], it implies a call to
+    [reload] so that the alerts are taken into account just after
+    calling this function. *)
+val add_alerts : Alert_manager.alert list -> t -> unit Lwt.t

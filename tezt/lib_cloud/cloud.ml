@@ -164,10 +164,8 @@ let shutdown ?exn t =
         Lwt.return_unit)
   in
   let* () =
-    Option.fold
-      ~none:Lwt.return_unit
-      ~some:Alert_manager.shutdown
-      t.alert_manager
+    if Option.is_some t.alert_manager then Alert_manager.shutdown ()
+    else Lwt.return_unit
   in
   let* () =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
@@ -206,7 +204,7 @@ let wait_ssh_server_running agent =
         let* _ = Env.wait_process ~is_ready ~run () in
         Lwt.return_unit
 
-let orchestrator deployement f =
+let orchestrator ?alert_collection deployement f =
   let agents = Deployement.agents deployement in
   let* website =
     if Env.website then
@@ -214,13 +212,22 @@ let orchestrator deployement f =
       Lwt.return_some website
     else Lwt.return_none
   in
-  let* prometheus =
-    if Env.prometheus then
-      let* prometheus =
-        Prometheus.start ~alert_manager:(Env.alert_manager <> []) agents
-      in
-      Lwt.return_some prometheus
-    else Lwt.return_none
+  let* prometheus, alert_manager =
+    match (Env.prometheus, alert_collection) with
+    | false, _ ->
+        (* No prometheus implies no alert-manager. *)
+        Lwt.return (None, None)
+    | true, None ->
+        (* Prometheus enabled but no alert collection provided. *)
+        let* prometheus = Prometheus.start agents in
+        Lwt.return (Some prometheus, None)
+    | true, Some collection ->
+        (* Activation of prometheus and alert-manager. *)
+        let* prometheus = Prometheus.start agents in
+        let alerts = Alert_manager.Collection.alerts collection in
+        let* () = Prometheus.add_alerts alerts prometheus in
+        let* alert_manager = Alert_manager.run collection Env.alert_handlers in
+        Lwt.return (Some prometheus, Some alert_manager)
   in
   let* grafana =
     if Env.grafana then
@@ -235,14 +242,6 @@ let orchestrator deployement f =
       Lwt.return (Some otel, Some jaeger)
     else Lwt.return (None, None)
   in
-  let* alert_manager =
-    match Env.alert_manager with
-    | [] -> Lwt.return_none
-    | configuration_files ->
-        let* alert_manager = Alert_manager.run ~configuration_files in
-        Lwt.return_some alert_manager
-  in
-  Log.info "Post prometheus" ;
   let t =
     {
       website;
@@ -499,7 +498,8 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   in
   if Env.destroy then Deployement.terminate deployement else Lwt.return_unit
 
-let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed f =
+let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
+    ?alert_collection f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let vms =
@@ -555,7 +555,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed f =
             |> List.map wait_ssh_server_running
             |> Lwt.join
           in
-          orchestrator deployement f
+          orchestrator ?alert_collection deployement f
       | `Localhost ->
           (* The scenario is executed locally and the VM are on the host machine. *)
           let* () = Jobs.docker_build ~push:false () in
@@ -565,7 +565,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed f =
             |> List.map wait_ssh_server_running
             |> Lwt.join
           in
-          orchestrator deployement f
+          orchestrator ?alert_collection deployement f
       | `Cloud ->
           (* The scenario is executed locally and the VMs are on the cloud. *)
           let* () = Jobs.deploy_docker_registry () in
@@ -576,7 +576,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed f =
             |> List.map wait_ssh_server_running
             |> Lwt.join
           in
-          orchestrator deployement f
+          orchestrator ?alert_collection deployement f
       | `Host ->
           (* The scenario is executed remotely. *)
           let* proxy_running = try_reattach () in
@@ -648,12 +648,6 @@ let add_prometheus_source t ?metrics_path ~name targets =
       in
       let targets = List.map prometheus_target targets in
       Prometheus.add_job prometheus ?metrics_path ~name targets
-
-let add_alert t ?for_ ~name ~promql_query () =
-  match (t.alert_manager, t.prometheus) with
-  | None, _ | _, None -> ()
-  | Some _alert_manager, Some prometheus ->
-      Prometheus.add_alert prometheus ?for_ ~name ~expr:promql_query ()
 
 let add_service t ~name ~url =
   match t.website with

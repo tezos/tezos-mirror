@@ -801,6 +801,13 @@ module Cli = struct
       ~set_long:"memtrace"
       ~description:"Use memtrace on all the services"
       false
+
+  let slack_api_url =
+    Clap.optional_string
+      ~section
+      ~long:"slack-api-url"
+      ~description:"The slack webhook url to send the alerts on"
+      ()
 end
 
 type etherlink_configuration = {
@@ -2385,6 +2392,58 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
       | [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
 
+module Alert = struct
+  open Tezt_cloud.Alert_manager
+
+  let collection = Collection.init ()
+
+  let low_DAL_attested_commitments_ratio =
+    alert
+      "LowDALAttestedCommitmentsRatio"
+      ~for_:"30m"
+      ~severity:`Warning
+      ~expr:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
+      ~summary:"Low DAL attested commitments ratio detected"
+      ~description:"The attested DAL attested commitments ratio is below 50%"
+
+  let () =
+    Collection.register_alert low_DAL_attested_commitments_ratio collection
+
+  let dal_slack_receiver =
+    slack_receiver
+      ~name:"slack-notifications"
+      ~channel:"alerts-dal-ghostnet"
+      ~title:"Low DAL attested commitments ratio detected"
+      ~text:"The attested DAL attested commitments ratio has fallen below 50%"
+
+  let dal_group = group "dal" dal_slack_receiver
+
+  let low_DAL_attested_ratio_slack_handler =
+    Handler.make ~name:"low-DAL-attested-ratio-slack-handler" ~setup:(fun t ->
+        let slack_api_url_k = "slack_api_url" in
+        let slack_api_url_v =
+          match Cli.slack_api_url with
+          | Some v -> v
+          | None ->
+              failwith
+                (Format.sprintf
+                   "alert: the '%s' alert handler requires the '%s' CLI \
+                    parameter to be provided"
+                   "low-DAL-attested-ratio-slack-handler"
+                   "slack-api-url")
+        in
+        t
+        |> add_global ~k:slack_api_url_k ~v:slack_api_url_v
+        |> add_group dal_group
+        |> with_group
+             dal_group
+             (add_group_alert low_DAL_attested_commitments_ratio)
+        |> add_receiver dal_slack_receiver)
+
+  let () =
+    Collection.register_handler low_DAL_attested_ratio_slack_handler collection
+end
+
 let init ~(configuration : configuration) etherlink_configuration cloud
     next_agent =
   let () = toplog "Init" in
@@ -2548,12 +2607,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
-  Cloud.add_alert
-    cloud
-    ~for_:"30s"
-    ~name:"dal-ghostnet-not-attesting"
-    ~promql_query:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
-    () ;
   Lwt.return
     {
       cloud;
@@ -2875,6 +2928,7 @@ let benchmark () =
     ~__FILE__
     ~title:"DAL node benchmark"
     ~tags:[Tag.cloud; "dal"; "benchmark"]
+    ~alert_collection:Alert.collection
     (fun cloud ->
       toplog "Creating the agents" ;
       let agents = Cloud.agents cloud in

@@ -79,7 +79,7 @@ val os : string
 
 val open_telemetry : bool
 
-val alert_manager : string list
+val alert_handlers : string list
 
 val init : unit -> unit Lwt.t
 

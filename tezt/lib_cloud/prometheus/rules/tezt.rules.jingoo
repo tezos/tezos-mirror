@@ -7,4 +7,15 @@ groups:
         {% if alert.for_ %}
         for: {{ alert.for_ }}
         {% endif %}
+        labels:
+          severity:  {{ alert.severity }}
+        {% if (alert.summary or alert.description) %}
+        annotations:
+          {% if alert.summary %}
+          summary: {{ alert.summary }}
+          {% endif %}
+          {% if alert.description %}
+          description: {{ alert.description }}
+          {% endif %}
+        {% endif %}
   {% endfor %}

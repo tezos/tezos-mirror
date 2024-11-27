@@ -26,14 +26,6 @@ let job_jingoo_template job =
       ("targets", Tlist (List.map target_jingoo_template job.targets));
     ]
 
-type alert = {name : string; expr : string; for_ : string option}
-
-let alert_jingoo_template alert =
-  let open Jingoo.Jg_types in
-  Tobj
-    ([("name", Tstr alert.name); ("expr", Tstr alert.expr)]
-    @ match alert.for_ with None -> [] | Some for_ -> [("for_", Tstr for_)])
-
 type t = {
   configuration_file : string;
   rules_file : string;
@@ -42,7 +34,7 @@ type t = {
   scrape_interval : int;
   snapshot_filename : string option;
   port : int;
-  mutable alerts : alert list;
+  mutable alerts : Alert_manager.alert list;
 }
 
 let netdata_source_of_agents agents =
@@ -90,7 +82,7 @@ let write_configuration_file t =
 
 let jingoo_alert_template t =
   let open Jingoo.Jg_types in
-  [("alerts", Tlist (List.map alert_jingoo_template t.alerts))]
+  [("alerts", Tlist (List.map Alert_manager.alert_template t.alerts))]
 
 let write_rules_file t =
   let content =
@@ -115,13 +107,17 @@ let add_job t ?(metrics_path = "/metrics") ~name targets =
   write_configuration_file t ;
   reload t
 
-let add_alert t ?for_ ~name ~expr () =
-  let alert = {name; expr; for_} in
+let add_alert alert t =
   t.alerts <- alert :: t.alerts ;
   write_rules_file t ;
-  ()
+  reload t
 
-let start ~alert_manager agents =
+let add_alerts alerts t =
+  t.alerts <- alerts @ t.alerts ;
+  write_rules_file t ;
+  reload t
+
+let start agents =
   let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
@@ -150,7 +146,7 @@ let start ~alert_manager agents =
       scrape_interval;
       snapshot_filename;
       port;
-      alert_manager;
+      alert_manager = Env.alert_handlers <> [];
       alerts = [];
     }
   in

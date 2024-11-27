@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 module Agent = Agent
+module Alert_manager = Alert_manager
 
 module Configuration = struct
   include Env
