@@ -32,8 +32,36 @@ else
 fi
 
 # Perform the API request.
-curl --request POST \
-     --header 'Content-Type: application/json' \
-     --header "Private-Token: $GITLAB_PRIVATE_TOKEN" \
-     --data "$DATA" \
-     "https://gitlab.com/api/v4/projects/$PROJECT_ID/pipeline"
+RESPONSE="$(curl --silent --request POST \
+    --header 'Content-Type: application/json' \
+    --header "Private-Token: $GITLAB_PRIVATE_TOKEN" \
+    --data "$DATA" \
+    "https://gitlab.com/api/v4/projects/$PROJECT_ID/pipeline")"
+
+# Parse the response.
+if ! command -v jq >/dev/null 2>&1; then
+    cat <<EOF
+
+GitLab's response:
+
+$RESPONSE
+
+Tip: install jq to improve the readability of this result.
+EOF
+elif [ "$(echo "$RESPONSE" | jq 'has("web_url")')" != "true" ]; then
+    cat <<EOF
+
+GitLab's response:
+
+$RESPONSE
+
+Failed to find web_url in response; the pipeline was probably not created.
+EOF
+else
+    ID="$(echo "$RESPONSE" | jq -r ".id")"
+    URL="$(echo "$RESPONSE" | jq -r ".web_url")"
+    cat <<EOF
+
+Created pipeline $ID at: $URL
+EOF
+fi
