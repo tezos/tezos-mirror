@@ -12,6 +12,8 @@ type reveals = unit
 
 type write_debug = string -> unit Lwt.t
 
+type hash = Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
 type state = Api.state
 
 type status = Api.status
@@ -23,6 +25,9 @@ type input = Api.input
 type input_request = Octez_riscv_api.input_request
 
 type proof = Octez_riscv_api.proof
+
+let riscv_hash_to_state_hash (bytes : bytes) : hash =
+  Tezos_crypto.Hashed.Smart_rollup_state_hash.of_bytes_exn bytes
 
 (* The kernel debug logging function (`string -> unit Lwt.t`) passed by the node
  * to [compute_step] and [compute_step_many] cannot be passed directly
@@ -66,7 +71,8 @@ module Mutable_state = struct
 
   let get_current_level state = Lwt.return (Api.octez_riscv_mut_get_level state)
 
-  let state_hash state = Api.octez_riscv_mut_state_hash state
+  let state_hash state =
+    riscv_hash_to_state_hash @@ Api.octez_riscv_mut_state_hash state
 
   let set_input state input =
     Lwt.return (Api.octez_riscv_mut_set_input state input)
@@ -104,13 +110,16 @@ let install_boot_sector state boot_sector =
 
 let get_current_level state = Lwt.return (Api.octez_riscv_get_level state)
 
-let state_hash state = Api.octez_riscv_state_hash state
+let state_hash state =
+  riscv_hash_to_state_hash @@ Api.octez_riscv_state_hash state
 
 let set_input state input = Lwt.return (Api.octez_riscv_set_input state input)
 
-let proof_start_state proof = Api.octez_riscv_proof_start_state proof
+let proof_start_state proof =
+  riscv_hash_to_state_hash @@ Api.octez_riscv_proof_start_state proof
 
-let proof_stop_state proof = Api.octez_riscv_proof_stop_state proof
+let proof_stop_state proof =
+  riscv_hash_to_state_hash @@ Api.octez_riscv_proof_stop_state proof
 
 let verify_proof input proof = Api.octez_riscv_verify_proof input proof
 

@@ -54,22 +54,18 @@ end
 
 module Riscv_proto_env : Riscv_proto_env_sig
 
-type void = |
+type error += RISCV_proof_verification_failed
 
-type minimal_state = {
-  payload : string;
-  level : Raw_level_repr.t option;
-  message_counter : Z.t;
-  tick : Z.t;
-}
+type error += RISCV_proof_production_failed
 
-(* This encoding is used in the rollup node when embedding the state into an Irmin context. *)
-val minimal_state_encoding : minimal_state Data_encoding.t
+type state = Riscv_proto_env.state
 
-val make_empty_state : unit -> minimal_state
+type proof = Riscv_proto_env.proof
+
+val make_empty_state : unit -> state
 
 module Protocol_implementation :
   Sc_rollup_PVM_sig.PROTO_VERIFICATION
     with type context = unit
-     and type state = minimal_state
-     and type proof = void
+     and type state = Riscv_proto_env.state
+     and type proof = Riscv_proto_env.proof

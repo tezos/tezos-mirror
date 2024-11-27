@@ -12,6 +12,8 @@ type reveals
 
 type write_debug = string -> unit Lwt.t
 
+type hash = Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
 type state = Api.state
 
 type status = Octez_riscv_api.status
@@ -47,7 +49,7 @@ module Mutable_state : sig
 
   val get_current_level : t -> int32 option Lwt.t
 
-  val state_hash : t -> bytes
+  val state_hash : t -> hash
 
   val set_input : t -> input -> unit Lwt.t
 end
@@ -76,13 +78,13 @@ val install_boot_sector : state -> string -> state Lwt.t
 
 val get_current_level : state -> int32 option Lwt.t
 
-val state_hash : state -> bytes
+val state_hash : state -> hash
 
 val set_input : state -> input -> state Lwt.t
 
-val proof_start_state : proof -> bytes
+val proof_start_state : proof -> hash
 
-val proof_stop_state : proof -> bytes
+val proof_stop_state : proof -> hash
 
 val verify_proof : input option -> proof -> input_request option
 

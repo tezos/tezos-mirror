@@ -52,8 +52,7 @@ module PVM :
 
   let proof_stop_state = function (_ : proof) -> .
 
-  let state_hash state =
-    Lwt.return (Sc_rollup.State_hash.of_bytes_exn (Backend.state_hash state))
+  let state_hash state = Lwt.return (Backend.state_hash state)
 
   let initial_state ~empty:_ = Lwt.return (Storage.empty ())
 

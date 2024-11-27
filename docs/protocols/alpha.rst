@@ -93,3 +93,5 @@ Internal
 - Removed obsolete feature flags and code related to adaptive issuance
   activation, auto-staking, and old slashing. (MRs :gl:`!15215`,
   :gl:`!15223`, :gl:`!15211`)
+- Added a stub RISC-V module for the protocol environment 
+  and used it in the protocol implementation for the RISC-V PVM. (MRs :gl:`!15921`)
