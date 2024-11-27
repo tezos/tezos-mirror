@@ -224,6 +224,8 @@ let orchestrator ?alert_collection deployement f =
     | true, Some collection ->
         (* Activation of prometheus and alert-manager. *)
         let* prometheus = Prometheus.start agents in
+        let alerts = Alert_manager.Collection.alerts collection in
+        let* () = Prometheus.add_alerts alerts prometheus in
         let* alert_manager = Alert_manager.run collection Env.alert_handlers in
         Lwt.return (Some prometheus, Some alert_manager)
   in

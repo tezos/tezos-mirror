@@ -2405,6 +2405,43 @@ module Alert = struct
       ~expr:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
       ~summary:"Low DAL attested commitments ratio detected"
       ~description:"The attested DAL attested commitments ratio is below 50%"
+
+  let () =
+    Collection.register_alert low_DAL_attested_commitments_ratio collection
+
+  let dal_slack_receiver =
+    slack_receiver
+      ~name:"slack-notifications"
+      ~channel:"alerts-dal-ghostnet"
+      ~title:"Low DAL attested commitments ratio detected"
+      ~text:"The attested DAL attested commitments ratio has fallen below 50%"
+
+  let dal_group = group "dal" dal_slack_receiver
+
+  let low_DAL_attested_ratio_slack_handler =
+    Handler.make ~name:"low-DAL-attested-ratio-slack-handler" ~setup:(fun t ->
+        let slack_api_url_k = "slack_api_url" in
+        let slack_api_url_v =
+          match Cli.slack_api_url with
+          | Some v -> v
+          | None ->
+              failwith
+                (Format.sprintf
+                   "alert: the '%s' alert handler requires the '%s' CLI \
+                    parameter to be provided"
+                   "low-DAL-attested-ratio-slack-handler"
+                   "slack-api-url")
+        in
+        t
+        |> add_global ~k:slack_api_url_k ~v:slack_api_url_v
+        |> add_group dal_group
+        |> with_group
+             dal_group
+             (add_group_alert low_DAL_attested_commitments_ratio)
+        |> add_receiver dal_slack_receiver)
+
+  let () =
+    Collection.register_handler low_DAL_attested_ratio_slack_handler collection
 end
 
 let init ~(configuration : configuration) etherlink_configuration cloud
@@ -2570,7 +2607,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
-  Cloud.add_alert Alert.low_DAL_attested_commitments_ratio ;
   Lwt.return
     {
       cloud;
@@ -2892,6 +2928,7 @@ let benchmark () =
     ~__FILE__
     ~title:"DAL node benchmark"
     ~tags:[Tag.cloud; "dal"; "benchmark"]
+    ~alert_collection:Alert.collection
     (fun cloud ->
       toplog "Creating the agents" ;
       let agents = Cloud.agents cloud in
