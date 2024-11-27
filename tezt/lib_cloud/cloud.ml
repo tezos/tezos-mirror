@@ -164,10 +164,8 @@ let shutdown ?exn t =
         Lwt.return_unit)
   in
   let* () =
-    Option.fold
-      ~none:Lwt.return_unit
-      ~some:Alert_manager.shutdown
-      t.alert_manager
+    if Option.is_some t.alert_manager then Alert_manager.shutdown ()
+    else Lwt.return_unit
   in
   let* () =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
@@ -236,8 +234,11 @@ let orchestrator deployement f =
   let* alert_manager =
     match Env.alert_handlers with
     | [] -> Lwt.return_none
-    | configuration_files ->
-        let* alert_manager = Alert_manager.run ~configuration_files in
+    | _ ->
+        let* alert_manager =
+          let collection = Alert_manager.Collection.init () in
+          Alert_manager.run collection Env.alert_handlers
+        in
         Lwt.return_some alert_manager
   in
   Log.info "Post prometheus" ;

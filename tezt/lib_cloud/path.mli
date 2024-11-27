@@ -51,3 +51,6 @@ val prometheus_configuration : string
 
 (** Path where is stored the prometheus rules file. *)
 val prometheus_rules_configuration : string
+
+(** Path where is stored the alert manager configuration file. *)
+val alert_manager_configuration : string

@@ -45,3 +45,6 @@ let prometheus_configuration =
 
 let prometheus_rules_configuration =
   project // "prometheus" // "rules" // "tezt.rules.jingoo"
+
+let alert_manager_configuration =
+  project // "alert_manager" // "alert_manager.yml.jingoo"

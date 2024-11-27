@@ -148,6 +148,12 @@ module "gce-container" {
         mountPath = "/tmp/grafana"
         name      = "grafana"
         readOnly  = false
+      },
+      {
+        # Same for Alert manager
+        mountPath = "/tmp/alert_manager"
+        name      = "alert-manager"
+        readOnly  = false
       }
     ]
   }
@@ -169,6 +175,12 @@ module "gce-container" {
       name = "prometheus"
       hostPath = {
         path = "/tmp/prometheus"
+      }
+    },
+    {
+      name = "alert-manager"
+      hostPath = {
+        path = "/tmp/alert_manager"
       }
     },
     {
