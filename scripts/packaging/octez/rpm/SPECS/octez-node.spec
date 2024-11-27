@@ -26,12 +26,14 @@ install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-node.1 %{buildroot}%{_mand
 gzip %{buildroot}%{_mandir}/man1/octez-node.1
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-node.service %{buildroot}/usr/lib/systemd/system/octez-node.service
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-node.default %{buildroot}/etc/default/octez-node
+install -D -m 644  $HOME/rpmbuild/SPECS/scripts/snapshot_import.sh %{buildroot}/usr/share/octez-node/snapshot_import.sh
+install -D -m 644  $HOME/rpmbuild/SPECS/scripts/octez-node-prestart.sh %{buildroot}/usr/share/octez-node/octez-node-prestart.sh
 %files
 /usr/bin/octez-node
 %{_mandir}/man1/octez-node.1*
 /usr/lib/systemd/system/octez-node.service
-/etc/default/octez-node
 /usr/share/octez-node/*
+%config /etc/default/octez-node
 %postun
 
 . /etc/default/octez-node

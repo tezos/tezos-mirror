@@ -15,13 +15,25 @@ fi
 DATADIR=/var/tezos/.tezos-node
 
 # Function to get a Debconf value
-get_debconf_value() {
+get_value() {
+  VAR=$1
   PACKAGE=octez-node # Package name
-  TEMPLATE=$1
+  TEMPLATE="$PACKAGE/$VAR"
 
-  # Query the value using debconf-communicate
-  echo GET "$TEMPLATE" |
-    debconf-communicate "$PACKAGE" 2> /dev/null | awk '/^0/ {print $2}'
+  if command -v debconf-communicate > /dev/null; then
+    # Query the value using debconf-communicate
+    echo GET "$TEMPLATE" |
+      debconf-communicate "$PACKAGE" 2> /dev/null | awk '/^0/ {print $2}'
+  else
+    # if debconf is not available ( like on rpm systems ),
+    # we try our luck with the default env vars
+    if [ -e /etc/default/octez-node ]; then
+      #shellcheck disable=SC1091
+      . /etc/default/octez-node
+      UPPERVAR=$(echo "$VAR" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+      eval "echo \$$UPPERVAR"
+    fi
+  fi
 }
 
 # Either we upgrade the store if exists, or we import a snapshot
@@ -32,11 +44,11 @@ if [ -d "$DATADIR/store" ]; then
   rm -rf "$DATADIR/lmdb_store_to_remove"
 else
   # we import the snapshot automatically only if the user wants to do so.
-  if [ "$(get_debconf_value "octez-node/snapshot-import")" = "true" ]; then
-    network=$(get_debconf_value "octez-node/network")
-    history_mode=$(get_debconf_value "octez-node/history-mode")
+  if [ "$(get_value "snapshot-import")" = "true" ]; then
+    network=$(get_value "network")
+    history_mode=$(get_value "history-mode")
     no_check=
-    if [ "$(get_debconf_value "octez-node/snapshot-no-check")" = "true" ]; then
+    if [ "$(get_value "snapshot-no-check")" = "true" ]; then
       no_check="-s --no-check"
     fi
 
