@@ -19,6 +19,9 @@ pub enum HashError {
     #[error("Serialization error: {0}")]
     SerializationError(#[from] bincode::Error),
 
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
     #[error("The input buffer was expected to be non-empty")]
     NonEmptyBufferExpected,
 }

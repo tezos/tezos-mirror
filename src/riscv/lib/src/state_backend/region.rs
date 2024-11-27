@@ -6,8 +6,8 @@
 use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
     proof_backend::{
-        merkle::{MerkleTree, Merkleisable},
-        ProofGen,
+        merkle::{MerkleTree, MerkleWriter, Merkleisable},
+        ProofDynRegion, ProofGen,
     },
     Elem, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerClone, ManagerDeserialise,
     ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
@@ -534,14 +534,67 @@ pub const MERKLE_LEAF_SIZE: NonZeroUsize =
 /// Arity of the Merkle tree used for Merkleising [`DynCells`].
 const MERKLE_ARITY: usize = 3;
 
-impl<const LEN: usize, M: ManagerSerialise> RootHashable for DynCells<LEN, M> {
+/// Helper function which allows iterating over chunks of a dynamic region
+/// and writing them to a writer. The last chunk may be smaller than the
+/// Merkle leaf size. The implementations of `RootHashable` and `Merkleisable`
+/// for dynamic regions both use it, ensuring consistency between the two.
+fn chunks_to_writer<
+    const LEN: usize,
+    T: std::io::Write,
+    F: Fn(usize) -> [u8; MERKLE_LEAF_SIZE.get()],
+>(
+    writer: &mut T,
+    read: F,
+) -> Result<(), std::io::Error> {
+    let merkle_leaf_size = MERKLE_LEAF_SIZE.get();
+    assert!(LEN >= merkle_leaf_size);
+
+    let mut address = 0;
+
+    while address + merkle_leaf_size <= LEN {
+        writer.write_all(read(address).as_slice())?;
+        address += merkle_leaf_size;
+    }
+
+    // When the last chunk is smaller than `MERKLE_LEAF_SIZE`,
+    // read the last `MERKLE_LEAF_SIZE` bytes and pass a subslice containing
+    // only the bytes not previously read to the writer.
+    if address != LEN {
+        address += merkle_leaf_size;
+        let buffer = read(LEN.saturating_sub(merkle_leaf_size));
+        writer.write_all(&buffer[address.saturating_sub(LEN)..])?;
+    };
+
+    Ok(())
+}
+
+// TODO RV-305: Specialise implementation for `DynCells<LEN, ProofGen<'_, M>>`
+// when feature becomes stable.
+impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
     fn hash(&self) -> Result<Hash, HashError> {
-        let hashes = {
-            let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
-            binary::serialise_into(&self, &mut writer)?;
-            writer.finalise()?
-        };
+        let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
+        let read =
+            |address| -> [u8; MERKLE_LEAF_SIZE.get()] { M::dyn_region_read(&self.region, address) };
+        chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
+        let hashes = writer.finalise()?;
         hash::build_custom_merkle_hash(MERKLE_ARITY, hashes)
+    }
+}
+
+impl<const LEN: usize, M: ManagerRead> Merkleisable for DynCells<LEN, ProofGen<'_, M>> {
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        let mut writer = MerkleWriter::new(
+            MERKLE_LEAF_SIZE,
+            MERKLE_ARITY,
+            self.region.get_read(),
+            self.region.get_write(),
+            LEN.div_ceil(MERKLE_ARITY),
+        );
+        let read = |address| -> [u8; MERKLE_LEAF_SIZE.get()] {
+            ProofDynRegion::inner_dyn_region_read(&self.region, address)
+        };
+        chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
+        writer.finalise()
     }
 }
 
@@ -555,6 +608,7 @@ impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::{chunks_to_writer, MERKLE_LEAF_SIZE};
     use crate::{
         backend_test,
         default::ConstDefault,
@@ -563,7 +617,9 @@ pub(crate) mod tests {
             Array, DynCells, Elem, ManagerAlloc, ManagerBase,
         },
     };
+    use proptest::prelude::*;
     use serde::ser::SerializeTuple;
+    use std::io::Cursor;
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
     #[repr(packed)]
@@ -794,4 +850,43 @@ pub(crate) mod tests {
         let buffer = bincode::serialize(&region.struct_ref()).unwrap();
         assert_eq!(buffer[..8], [22, 11, 24, 13, 26, 15, 28, 17]);
     });
+
+    const LENS: [usize; 4] = [0, 1, 535, 4095];
+    const _: () = {
+        if MERKLE_LEAF_SIZE.get() != 4096 {
+            panic!(
+                "Test values in `LENS` assume a specific MERKLE_LEAF_SIZE, change them accordingly"
+            );
+        }
+    };
+
+    // Test `chunks_to_writer` with a variety of lengths
+    macro_rules! generate_test_chunks_to_writer {
+        ( $( $name:ident, $i:expr ),* ) => {
+            $(
+                proptest! {
+                    #[test]
+                    fn $name(
+                        data in proptest::collection::vec(any::<u8>(), 4 * MERKLE_LEAF_SIZE.get() + LENS[$i])
+                    ) {
+                        const LEN: usize = 4 * MERKLE_LEAF_SIZE.get() + LENS[$i];
+
+                        let read = |pos: usize| {
+                            assert!(pos + MERKLE_LEAF_SIZE.get() <= LEN);
+                            data[pos..pos + MERKLE_LEAF_SIZE.get()].try_into().unwrap()
+                        };
+
+                        let mut writer = Cursor::new(Vec::new());
+                        chunks_to_writer::<LEN, _, _>(&mut writer, read).unwrap();
+                        assert_eq!(writer.into_inner(), data);
+                    }
+                }
+            )*
+        }
+    }
+
+    generate_test_chunks_to_writer!(test_chunks_to_writer_0, 0);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_1, 1);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_2, 2);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_3, 3);
 }
