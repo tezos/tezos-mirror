@@ -801,6 +801,13 @@ module Cli = struct
       ~set_long:"memtrace"
       ~description:"Use memtrace on all the services"
       false
+
+  let slack_api_url =
+    Clap.optional_string
+      ~section
+      ~long:"slack-api-url"
+      ~description:"The slack webhook url to send the alerts on"
+      ()
 end
 
 type etherlink_configuration = {
