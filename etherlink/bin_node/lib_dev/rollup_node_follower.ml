@@ -14,6 +14,26 @@ let process_new_block ~proxy ~finalized_level () =
 
 type error += Connection_lost | Connection_timeout
 
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"rollup_node_follower_connection_lost"
+    ~title:"Rollup_node_follower_connection_lost"
+    ~description:"Connection to the rollup node was lost"
+    Data_encoding.unit
+    (function Connection_lost -> Some () | _ -> None)
+    (fun () -> Connection_lost) ;
+  register_error_kind
+    `Temporary
+    ~id:"rollup_node_follower_connection_timeout"
+    ~title:"Rollup_node_follower_connection_timeout"
+    ~description:
+      "Connection to the rollup node was timeouted, e.g. the rollup node \
+       stream was staling"
+    Data_encoding.unit
+    (function Connection_timeout -> Some () | _ -> None)
+    (fun () -> Connection_timeout)
+
 (** [process_finalized_level ~oldest_rollup_node_known_l1_level
     ~finalized_level ~rollup_node_endpoint] process the rollup node
     block level [finalized_level] iff it's known by the rollup node
