@@ -434,6 +434,7 @@ module Pipeline = struct
     (* Write top-level configuration. *)
     let workflow, includes = workflow_includes () in
     (* temporary manual addition *)
+    (* ci docker *)
     let ci_docker_branch = "ci-docker-latest-release" in
     let ci_docker_if_expr =
       Gitlab_ci.If.(
@@ -441,62 +442,79 @@ module Pipeline = struct
         && var "CI_PIPELINE_SOURCE" == str "push"
         && var "CI_COMMIT_BRANCH" == str ci_docker_branch)
     in
-    let schedule_container_scanning_master_if_expr =
+    let ci_docker_workflow_rule : Gitlab_ci.Types.workflow_rule =
+      {
+        changes = None;
+        if_ = Some ci_docker_if_expr;
+        variables = Some [("PIPELINE_TYPE", "ci_docker_release")];
+        when_ = Always;
+        auto_cancel = None;
+      }
+    in
+    let ci_docker_include_rule : Gitlab_ci.Types.include_ =
+      {
+        local = "images_base/ci-docker/.gitlab-ci.yml";
+        rules = [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
+      }
+    in
+    (* scheduled pipelines *)
+    let scheduled_pipeline_if_expr tz_schedule_kind =
       Gitlab_ci.If.(
         var "CI_PIPELINE_SOURCE" == str "schedule"
-        && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_MASTER")
+        && var "TZ_SCHEDULE_KIND" == str tz_schedule_kind)
+    in
+    let scheduled_pipeline_worflow_rule tz_schedule_kind pipeline_type :
+        Gitlab_ci.Types.workflow_rule =
+      {
+        changes = None;
+        if_ = Some (scheduled_pipeline_if_expr tz_schedule_kind);
+        variables = Some [("PIPELINE_TYPE", pipeline_type)];
+        when_ = Always;
+        auto_cancel = None;
+      }
+    in
+    let scheduled_pipeline_include_rule local tz_schedule_kind :
+        Gitlab_ci.Types.include_ =
+      {
+        local;
+        rules =
+          [
+            {
+              changes = None;
+              if_ = Some (scheduled_pipeline_if_expr tz_schedule_kind);
+              when_ = Always;
+            };
+          ];
+      }
     in
     let workflow =
-      let ci_docker_workflow_rule : Gitlab_ci.Types.workflow_rule =
-        {
-          changes = None;
-          if_ = Some ci_docker_if_expr;
-          variables = Some [("PIPELINE_TYPE", "ci_docker_release")];
-          when_ = Always;
-          auto_cancel = None;
-        }
-      in
-      let schedule_container_scanning_master_workflow_rule :
-          Gitlab_ci.Types.workflow_rule =
-        {
-          changes = None;
-          if_ = Some schedule_container_scanning_master_if_expr;
-          variables =
-            Some [("PIPELINE_TYPE", "schedule_container_scanning_master")];
-          when_ = Always;
-          auto_cancel = None;
-        }
-      in
       {
         workflow with
         rules =
           ci_docker_workflow_rule
-          :: schedule_container_scanning_master_workflow_rule :: workflow.rules;
+          :: scheduled_pipeline_worflow_rule
+               "CONTAINER_SCANNING_MASTER"
+               "schedule_container_scanning_master"
+          :: scheduled_pipeline_worflow_rule
+               "CONTAINER_SCANNING_OCTEZ_RELEASES"
+               "schedule_container_scanning_octez_releases"
+          :: scheduled_pipeline_worflow_rule
+               "CONTAINER_SCANNING_EVM_NODE_RELEASES"
+               "schedule_container_scanning_evm_node_releases"
+          :: workflow.rules;
       }
     in
     let includes =
-      let ci_docker_include_rule : Gitlab_ci.Types.include_ =
-        {
-          local = "images_base/ci-docker/.gitlab-ci.yml";
-          rules =
-            [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
-        }
-      in
-      let schedule_container_scanning_master_include_rule :
-          Gitlab_ci.Types.include_ =
-        {
-          local = ".gitlab/ci/pipelines/schedule_container_scanning_master.yml";
-          rules =
-            [
-              {
-                changes = None;
-                if_ = Some schedule_container_scanning_master_if_expr;
-                when_ = Always;
-              };
-            ];
-        }
-      in
-      ci_docker_include_rule :: schedule_container_scanning_master_include_rule
+      ci_docker_include_rule
+      :: scheduled_pipeline_include_rule
+           ".gitlab/ci/pipelines/schedule_container_scanning_master.yml"
+           "CONTAINER_SCANNING_MASTER"
+      :: scheduled_pipeline_include_rule
+           ".gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml"
+           "CONTAINER_SCANNING_OCTEZ_RELEASES"
+      :: scheduled_pipeline_include_rule
+           ".gitlab/ci/pipelines/schedule_container_scanning_evm_node_releases.yml"
+           "CONTAINER_SCANNING_EVM_NODE_RELEASES"
       :: includes
     in
     (* end of temporary manual addition *)
