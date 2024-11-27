@@ -1149,7 +1149,8 @@ function update_tezt_tests() {
   commit "tezt: reset runtime dependencies regressions"
 
   if [[ ${is_snapshot} != true ]]; then
-    dune exec tezt/tests/main.exe -- --file tezt/tests/protocol_migration.ml --title 'Alpha: weeklynet regression test' --reset-regressions
+    cp tezt/tests/weeklynet_configs/alpha.json tezt/tests/weeklynet_configs/last_snapshotted_protocol.json
+    dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
     commit_if_changes "tezt: reset weeklynet regression test"
   fi
 
