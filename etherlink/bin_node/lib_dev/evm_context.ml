@@ -649,18 +649,33 @@ module State = struct
     if needs_process then (
       let* context, evm_state, on_success =
         with_store_transaction ctxt @@ fun conn ->
-        let* on_success, ctxt, evm_state =
-          List.fold_left_es
-            (fun (on_success, ctxt, evm_state) event ->
-              let* evm_state, on_success =
-                apply_evm_event_unsafe on_success ctxt conn evm_state event
+        let* on_success, ctxt, evm_state, context =
+          match events with
+          | [] ->
+              (* Avoid an uncessary {!replace_current_commit} if the list is
+                 empty. *)
+              return (ignore, ctxt, ctxt.session.evm_state, ctxt.session.context)
+          | events ->
+              let* on_success, ctxt, evm_state =
+                List.fold_left_es
+                  (fun (on_success, ctxt, evm_state) event ->
+                    let* evm_state, on_success =
+                      apply_evm_event_unsafe
+                        on_success
+                        ctxt
+                        conn
+                        evm_state
+                        event
+                    in
+                    return (on_success, ctxt, evm_state))
+                  (ignore, ctxt, ctxt.session.evm_state)
+                  events
               in
-              return (on_success, ctxt, evm_state))
-            (ignore, ctxt, ctxt.session.evm_state)
-            events
+              let* context = replace_current_commit ctxt conn evm_state in
+              return (on_success, ctxt, evm_state, context)
         in
-        let* _ =
-          Option.map_es
+        let* () =
+          Option.iter_es
             (fun l1_level ->
               let l2_level = current_blueprint_number ctxt in
               Evm_store.L1_l2_levels_relationships.store
@@ -670,8 +685,7 @@ module State = struct
                 ~finalized_l2_level:ctxt.session.finalized_number)
             finalized_level
         in
-        let* ctxt = replace_current_commit ctxt conn evm_state in
-        return (ctxt, evm_state, on_success)
+        return (context, evm_state, on_success)
       in
       let*! () =
         Option.iter_s
