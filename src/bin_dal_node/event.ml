@@ -678,7 +678,7 @@ let get_attestable_slots_ok_notice =
 let get_attestable_slots_not_ok_warning =
   declare_4
     ~section
-    ~name:"get_attestable_slots_warning"
+    ~name:"get_attestable_slots_missing_shards_warning"
     ~msg:
       "For slots {slots_indices} published at level {published_level}, \
        {attester} missed shards:\n\
@@ -700,6 +700,18 @@ let get_attestable_slots_not_ok_warning =
              slot_index
              stored_shards
              expected_shards))
+
+let get_attestable_slots_future_level_warning =
+  declare_2
+    ~section
+    ~name:"get_attestable_slots_future_level_warning"
+    ~msg:
+      "It looks like the DAL node is lagging (its current level is \
+       {current_level}, while the Layer1 node's level is \
+       {current_baker_level})."
+    ~level:Warning
+    ("current_level", Data_encoding.int32)
+    ("current_baker_level", Data_encoding.int32)
 
 let warn_attester_not_dal_attesting =
   declare_2
