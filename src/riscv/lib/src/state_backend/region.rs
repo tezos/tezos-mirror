@@ -5,6 +5,10 @@
 
 use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
+    proof_backend::{
+        merkle::{MerkleTree, Merkleisable},
+        ProofGen,
+    },
     Elem, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerClone, ManagerDeserialise,
     ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
@@ -181,6 +185,13 @@ impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<
 {
     fn eq(&self, other: &Cell<B, N>) -> bool {
         self.read() == other.read()
+    }
+}
+
+impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, ProofGen<'_, M>> {
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        let serialised = binary::serialise(&self)?;
+        MerkleTree::make_merkle_leaf(serialised, self.region.region.get_access_info())
     }
 }
 
@@ -419,6 +430,17 @@ impl<A: PartialEq<B> + Copy, B: Copy, const LEN: usize, M: ManagerRead, N: Manag
 {
     fn eq(&self, other: &Cells<B, LEN, N>) -> bool {
         (0..LEN).all(|i| self.read(i) == other.read(i))
+    }
+}
+
+impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> Merkleisable
+    for Cells<E, LEN, ProofGen<'_, M>>
+{
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        // RV-282: Break down into multiple leaves if the size of the `Cells`
+        // is too large for a proof.
+        let serialised = binary::serialise(&self)?;
+        MerkleTree::make_merkle_leaf(serialised, self.region.get_access_info())
     }
 }
 
