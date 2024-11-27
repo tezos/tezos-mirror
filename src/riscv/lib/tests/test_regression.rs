@@ -22,7 +22,7 @@ fn capture_debug_log(mint: &mut goldenfile::Mint) -> PvmHooks<'_> {
 fn test_jstz_regression() {
     let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
 
-    let (result, hash) = {
+    let (result, initial_hash, final_hash) = {
         let boot_program = fs::read("../assets/hermit-loader").unwrap();
         let main_program = fs::read("../assets/jstz").unwrap();
 
@@ -49,17 +49,22 @@ fn test_jstz_regression() {
         )
         .unwrap();
 
-        let result = stepper.step_max(Bound::Unbounded);
-        let hash = stepper.hash();
+        let initial_hash = stepper.hash();
 
-        (result, hash)
+        let result = stepper.step_max(Bound::Unbounded);
+        let final_hash = stepper.hash();
+
+        (result, initial_hash, final_hash)
     };
 
     assert!(matches!(result, StepperStatus::Exited { .. }));
 
+    let mut initial_hash_capture = mint.new_goldenfile("state_hash_initial").unwrap();
+    writeln!(initial_hash_capture, "{initial_hash:?}").unwrap();
+
     let mut result_capture = mint.new_goldenfile("result").unwrap();
     writeln!(result_capture, "{result:#?}").unwrap();
 
-    let mut hash_capture = mint.new_goldenfile("state_hash").unwrap();
-    writeln!(hash_capture, "{hash:?}").unwrap();
+    let mut final_hash_capture = mint.new_goldenfile("state_hash_final").unwrap();
+    writeln!(final_hash_capture, "{final_hash:?}").unwrap();
 }
