@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 module Agent = Agent
+module Alert_manager = Alert_manager
 
 module Configuration : sig
   type docker_image =
@@ -63,6 +64,7 @@ module Cloud : sig
     title:string ->
     tags:string list ->
     ?seed:Test.seed ->
+    ?alert_collection:Alert_manager.Collection.t ->
     (t -> unit Lwt.t) ->
     unit
 

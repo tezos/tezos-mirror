@@ -7,9 +7,9 @@
 
 type t
 
-(** [register ?docker_push ?vms] is a wrapper around [Test.register]. It
-    enables to run a test that can use machines deployed onto the
-    cloud. *)
+(** [register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f] is a
+    wrapper around [Test.register]. It enables to run a test that can
+    use machines deployed onto the cloud. *)
 val register :
   ?proxy_files:string list ->
   ?proxy_args:string list ->
@@ -18,6 +18,7 @@ val register :
   title:string ->
   tags:string list ->
   ?seed:Test.seed ->
+  ?alert_collection:Alert_manager.Collection.t ->
   (t -> unit Lwt.t) ->
   unit
 
