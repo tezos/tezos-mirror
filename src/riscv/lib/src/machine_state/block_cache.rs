@@ -80,12 +80,13 @@
 use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::bus::main_memory::MainMemoryLayout;
 use super::instruction::Instruction;
-use super::instruction_cache::ValidatedCacheEntry;
 use super::MachineCoreState;
 use super::{bus::main_memory::Address, ProgramCounterUpdate};
 use crate::cache_utils::Sizes;
 use crate::default::ConstDefault;
+use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::instruction::Args;
+use crate::parser::instruction::InstrWidth;
 use crate::state_backend::{
     self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
     ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
@@ -491,14 +492,12 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
         BCL::struct_ref::<_, F>(self)
     }
 
-    /// Push an instruction to the block cache.
-    ///
-    /// By virtue of [`ValidatedCacheEntry`], this is safe to place in the cache.
-    pub fn push_instr<const WIDTH: u64>(&mut self, entry: ValidatedCacheEntry)
+    /// Push a compressed instruction to the block cache.
+    pub fn push_instr_compressed(&mut self, phys_addr: Address, instr: Instruction)
     where
         M: ManagerReadWrite,
     {
-        let (phys_addr, instr) = entry.to_inner();
+        debug_assert_eq!(instr.width(), InstrWidth::Compressed);
 
         let next_addr = self.next_instr_addr.read();
 
@@ -508,7 +507,31 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
             self.reset_to(phys_addr);
         }
 
-        self.cache_inner::<WIDTH>(phys_addr, instr);
+        self.cache_inner::<{ InstrWidth::Compressed as u64 }>(phys_addr, instr);
+    }
+
+    /// Push an uncompressed instruction to the block cache.
+    pub fn push_instr_uncompressed(&mut self, phys_addr: Address, instr: Instruction)
+    where
+        M: ManagerReadWrite,
+    {
+        debug_assert_eq!(instr.width(), InstrWidth::Uncompressed);
+
+        // ensure uncompressed does not cross page boundaries
+        const END_OF_PAGE: Address = PAGE_SIZE - 2;
+        if phys_addr % PAGE_SIZE == END_OF_PAGE {
+            return;
+        }
+
+        let next_addr = self.next_instr_addr.read();
+
+        // If the instruction is at the start of the page, we _must_ start a new block,
+        // as we cannot allow blocks to cross page boundaries.
+        if phys_addr & PAGE_OFFSET_MASK as u64 == 0 || phys_addr != next_addr {
+            self.reset_to(phys_addr);
+        }
+
+        self.cache_inner::<{ InstrWidth::Uncompressed as u64 }>(phys_addr, instr);
     }
 
     fn reset_to(&mut self, phys_addr: Address)
@@ -839,7 +862,6 @@ mod tests {
             address_translation::PAGE_SIZE,
             bus::main_memory,
             instruction::{Args, Instruction, OpCode},
-            instruction_cache::cacheable_uncompressed,
             main_memory::tests::T1K,
             mode::Mode,
             registers::{a0, a1, a2, t0, t1},
@@ -868,8 +890,7 @@ mod tests {
         let phys_addr = 10;
 
         for offset in 0..(CACHE_INSTR as u64) {
-            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 4), uncompressed);
-            state.push_instr::<4>(entry);
+            state.push_instr_uncompressed(phys_addr + offset * 4, uncompressed);
         }
 
         let block = state.get_block(phys_addr);
@@ -892,8 +913,7 @@ mod tests {
         let phys_addr = 10;
 
         for offset in 0..(CACHE_INSTR as u64) {
-            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
-            state.push_instr::<2>(entry);
+            state.push_instr_compressed(phys_addr + offset * 2, compressed);
         }
 
         let block = state.get_block(phys_addr);
@@ -917,8 +937,7 @@ mod tests {
         let phys_addr = 10;
 
         for offset in 0..((CACHE_INSTR / 2) as u64) {
-            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
-            state.push_instr::<2>(entry);
+            state.push_instr_compressed(phys_addr + offset * 2, compressed);
         }
 
         let block = state.get_block(phys_addr);
@@ -941,8 +960,7 @@ mod tests {
         let phys_addr = 10;
 
         for offset in 0..((CACHE_INSTR * 2) as u64) {
-            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
-            state.push_instr::<2>(entry);
+            state.push_instr_compressed(phys_addr + offset * 2, compressed);
         }
 
         let block = state.get_block(phys_addr);
@@ -970,8 +988,7 @@ mod tests {
         let phys_addr = PAGE_SIZE - 10;
 
         for offset in 0..10 {
-            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 2), compressed);
-            state.push_instr::<2>(entry);
+            state.push_instr_compressed(phys_addr + offset * 2, compressed);
         }
 
         let block = state.get_block(phys_addr);
@@ -1000,10 +1017,7 @@ mod tests {
         let block_addr = main_memory::FIRST_ADDRESS;
 
         for offset in 0..10 {
-            block_state.push_instr::<4>(ValidatedCacheEntry::from_raw(
-                block_addr + offset * 4,
-                addiw,
-            ));
+            block_state.push_instr_uncompressed(block_addr + offset * 4, addiw);
         }
 
         core_state.hart.pc.write(block_addr);
@@ -1074,16 +1088,14 @@ mod tests {
         let preceding_num_instr: u64 = 5;
 
         for offset in 0..(CACHE_INSTR as u64 - preceding_num_instr) {
-            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 4), uncompressed);
-            state.push_instr::<4>(entry);
+            state.push_instr_uncompressed(phys_addr + offset * 4, uncompressed);
         }
 
         for offset in 0..preceding_num_instr {
-            let entry = ValidatedCacheEntry::from_raw(
-                phys_addr - (preceding_num_instr * 4) + (offset * 4),
+            state.push_instr_uncompressed(
+                phys_addr - preceding_num_instr * 4 + offset * 4,
                 uncompressed,
             );
-            state.push_instr::<4>(entry);
         }
 
         let block = state.get_block(phys_addr - 20);
@@ -1112,16 +1124,14 @@ mod tests {
         let preceding_num_instr: u64 = 5;
 
         for offset in 0..(CACHE_INSTR as u64 - preceding_num_instr + 1) {
-            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 4), uncompressed);
-            state.push_instr::<4>(entry);
+            state.push_instr_uncompressed(phys_addr + offset * 4, uncompressed);
         }
 
         for offset in 0..preceding_num_instr {
-            let entry = ValidatedCacheEntry::from_raw(
-                phys_addr - (preceding_num_instr * 4) + (offset * 4),
+            state.push_instr_uncompressed(
+                phys_addr - preceding_num_instr * 4 + offset * 4,
                 uncompressed,
             );
-            state.push_instr::<4>(entry);
         }
 
         let first_block = state.get_block(phys_addr - preceding_num_instr * 4);
@@ -1155,11 +1165,7 @@ mod tests {
 
         let populate_block = |block: &mut BlockCache<Layout, T1K, Owned>| {
             for i in 0..TEST_CACHE_SIZE {
-                if !cacheable_uncompressed(i as Address) {
-                    continue;
-                }
-
-                block.push_instr::<4>(ValidatedCacheEntry::from_raw(
+                block.push_instr_uncompressed(
                     i as Address,
                     Instruction {
                         opcode: OpCode::Add,
@@ -1170,7 +1176,7 @@ mod tests {
                             ..Args::DEFAULT
                         },
                     },
-                ));
+                );
             }
         };
 
