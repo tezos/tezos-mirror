@@ -99,22 +99,6 @@ module Cloud : sig
   val add_prometheus_source :
     t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
 
-  (** [add_alert t ~name ~expr ?for_ ?description ?summary] allows to
-      add an alert when Prometheus and Alert manager are enabled.
-      [name] is the name of the alert, [expr] is the query
-      triggering the alert. [for_] is an optional argument which if it
-      is set, is the number of seconds for which the [promql_query]
-      must be satisfied before triggering an actual alert. *)
-  val add_alert :
-    name:string ->
-    severity:[`Critical | `Info | `None | `Warning] ->
-    expr:string ->
-    ?for_:string ->
-    ?description:string ->
-    ?summary:string ->
-    t ->
-    unit
-
   val add_service : t -> name:string -> url:string -> unit Lwt.t
 end
 

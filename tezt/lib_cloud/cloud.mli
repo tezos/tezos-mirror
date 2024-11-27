@@ -44,14 +44,4 @@ type target = {agent : Agent.t; port : int; app_name : string}
 val add_prometheus_source :
   t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
 
-val add_alert :
-  name:string ->
-  severity:[`Critical | `Info | `None | `Warning] ->
-  expr:string ->
-  ?for_:string ->
-  ?description:string ->
-  ?summary:string ->
-  t ->
-  unit
-
 val add_service : t -> name:string -> url:string -> unit Lwt.t

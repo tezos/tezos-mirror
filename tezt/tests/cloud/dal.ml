@@ -2385,6 +2385,21 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
       | [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
 
+module Alert = struct
+  open Tezt_cloud.Alert_manager
+
+  let collection = Collection.init ()
+
+  let low_DAL_attested_commitments_ratio =
+    alert
+      "LowDALAttestedCommitmentsRatio"
+      ~for_:"30m"
+      ~severity:`Warning
+      ~expr:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
+      ~summary:"Low DAL attested commitments ratio detected"
+      ~description:"The attested DAL attested commitments ratio is below 50%"
+end
+
 let init ~(configuration : configuration) etherlink_configuration cloud
     next_agent =
   let () = toplog "Init" in
@@ -2548,12 +2563,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
-  Cloud.add_alert
-    cloud
-    ~name:"dal-ghostnet-not-attesting"
-    ~severity:`Warning
-    ~expr:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
-    ~for_:"30s" ;
+  Cloud.add_alert Alert.low_DAL_attested_commitments_ratio ;
   Lwt.return
     {
       cloud;

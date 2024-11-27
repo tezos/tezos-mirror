@@ -107,13 +107,15 @@ let add_job t ?(metrics_path = "/metrics") ~name targets =
   write_configuration_file t ;
   reload t
 
-let add_alert ~name ~severity ~expr ?for_ ?description ?summary t =
-  let alert =
-    Alert_manager.alert name ~expr ~severity ?for_ ?description ?summary
-  in
+let add_alert alert t =
   t.alerts <- alert :: t.alerts ;
   write_rules_file t ;
-  ()
+  reload t
+
+let add_alerts alerts t =
+  t.alerts <- alerts @ t.alerts ;
+  write_rules_file t ;
+  reload t
 
 let start agents =
   let jobs =
