@@ -76,7 +76,7 @@ use super::bus::main_memory::MainMemoryLayout;
 use super::instruction::Instruction;
 use super::instruction_cache::ValidatedCacheEntry;
 use super::MachineCoreState;
-use super::{bus::Address, ProgramCounterUpdate};
+use super::{bus::main_memory::Address, ProgramCounterUpdate};
 use crate::cache_utils::FenceCounter;
 use crate::cache_utils::Sizes;
 use crate::default::ConstDefault;
@@ -747,7 +747,7 @@ mod tests {
         backend_test, create_state,
         machine_state::{
             address_translation::PAGE_SIZE,
-            bus::{main_memory, AddressableWrite},
+            bus::main_memory,
             instruction::{Args, Instruction, OpCode},
             instruction_cache::cacheable_uncompressed,
             main_memory::tests::T1K,

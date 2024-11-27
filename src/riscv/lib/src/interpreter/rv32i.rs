@@ -8,7 +8,7 @@
 
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Address},
+        bus::main_memory::{Address, MainMemoryLayout},
         hart_state::HartState,
         mode::Mode,
         registers::{XRegister, XRegisters},
@@ -377,7 +377,7 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
-            bus::{main_memory::tests::T1K, Address},
+            bus::main_memory::{tests::T1K, Address},
             csregisters::{
                 xstatus::{MPPValue, MStatus, SPPValue},
                 CSRRepr, CSRegister,

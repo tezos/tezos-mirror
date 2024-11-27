@@ -3,18 +3,35 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Address, AddressableRead, AddressableWrite};
-use crate::state_backend::{
-    self as backend,
-    hash::{Hash, HashError, RootHashable},
-    proof_backend::{
-        merkle::{MerkleTree, Merkleisable},
-        ProofGen,
+use crate::{
+    machine_state::registers::XValue,
+    state_backend::{
+        self as backend,
+        hash::{Hash, HashError, RootHashable},
+        proof_backend::{
+            merkle::{MerkleTree, Merkleisable},
+            ProofGen,
+        },
+        ManagerDeserialise, ManagerRead, ManagerSerialise,
     },
-    ManagerDeserialise, ManagerRead, ManagerSerialise,
 };
 use serde::{Deserialize, Serialize};
 use std::mem;
+use tezos_smart_rollup_constants::riscv::SbiError;
+use thiserror::Error;
+
+/// Bus address
+pub type Address = XValue;
+
+/// An address is out of bounds.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Error, derive_more::Display)]
+pub struct OutOfBounds;
+
+impl From<OutOfBounds> for SbiError {
+    fn from(_value: OutOfBounds) -> Self {
+        SbiError::InvalidAddress
+    }
+}
 
 /// The first valid memory address.
 pub const FIRST_ADDRESS: Address = 0;
@@ -222,38 +239,46 @@ impl<L: MainMemoryLayout, M: backend::ManagerBase> MainMemory<L, M> {
             L::data_write(&mut self.data, i, 0u8);
         }
     }
-}
 
-impl<E: backend::Elem, L: MainMemoryLayout, M: backend::ManagerRead> AddressableRead<E>
-    for MainMemory<L, M>
-{
+    /// Read a value from memory.
     #[inline(always)]
-    fn read(&self, addr: super::Address) -> Result<E, super::OutOfBounds> {
+    pub fn read<E: backend::Elem>(&self, addr: Address) -> Result<E, OutOfBounds>
+    where
+        M: backend::ManagerRead,
+    {
         if addr as usize + mem::size_of::<E>() > L::BYTES {
-            return Err(super::OutOfBounds);
+            return Err(OutOfBounds);
         }
 
         Ok(L::data_read(&self.data, addr as usize))
     }
 
+    /// Read multiple values from memory.
     #[inline(always)]
-    fn read_all(&self, addr: super::Address, values: &mut [E]) -> Result<(), super::OutOfBounds> {
+    pub fn read_all<E: backend::Elem>(
+        &self,
+        addr: Address,
+        values: &mut [E],
+    ) -> Result<(), OutOfBounds>
+    where
+        M: backend::ManagerRead,
+    {
         if addr as usize + mem::size_of_val(values) > L::BYTES {
-            return Err(super::OutOfBounds);
+            return Err(OutOfBounds);
         }
 
         L::data_read_all(&self.data, addr as usize, values);
 
         Ok(())
     }
-}
 
-impl<E: backend::Elem, L: MainMemoryLayout, M: backend::ManagerWrite> AddressableWrite<E>
-    for MainMemory<L, M>
-{
-    fn write(&mut self, addr: super::Address, value: E) -> Result<(), super::OutOfBounds> {
+    /// Write a value to memory.
+    pub fn write<E: backend::Elem>(&mut self, addr: Address, value: E) -> Result<(), OutOfBounds>
+    where
+        M: backend::ManagerWrite,
+    {
         if addr as usize + mem::size_of::<E>() > L::BYTES {
-            return Err(super::OutOfBounds);
+            return Err(OutOfBounds);
         }
 
         L::data_write(&mut self.data, addr as usize, value);
@@ -261,11 +286,19 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::ManagerWrite> Addressabl
         Ok(())
     }
 
-    fn write_all(&mut self, addr: Address, values: &[E]) -> Result<(), super::OutOfBounds> {
+    /// Write multiple values to memory.
+    pub fn write_all<E: backend::Elem>(
+        &mut self,
+        addr: Address,
+        values: &[E],
+    ) -> Result<(), OutOfBounds>
+    where
+        M: backend::ManagerWrite,
+    {
         let addr = addr as usize;
 
         if addr + mem::size_of_val(values) > L::BYTES {
-            return Err(super::OutOfBounds);
+            return Err(OutOfBounds);
         }
 
         L::data_write_all(&mut self.data, addr, values);
@@ -328,7 +361,7 @@ impl<L: MainMemoryLayout, M: backend::ManagerRead, N: backend::ManagerRead>
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{backend_test, machine_state::bus::AddressableWrite};
+    use crate::backend_test;
 
     gen_memory_layout!(T1K = 1 KiB);
 
@@ -339,10 +372,7 @@ pub mod tests {
 
         macro_rules! check_address {
             ($ty:ty, $addr:expr, $value:expr) => {
-                assert_eq!(
-                    $crate::machine_state::bus::AddressableRead::<$ty>::read(&memory, $addr),
-                    Ok($value)
-                );
+                assert_eq!(memory.read::<$ty>($addr), Ok($value));
             };
         }
 

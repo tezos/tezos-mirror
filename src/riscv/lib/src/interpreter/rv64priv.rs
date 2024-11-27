@@ -4,7 +4,7 @@
 
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Address},
+        bus::main_memory::{Address, MainMemoryLayout},
         csregisters::{
             effects::handle_csr_effect,
             xstatus::{MPPValue, SPPValue},

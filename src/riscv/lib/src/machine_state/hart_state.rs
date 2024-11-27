@@ -8,7 +8,7 @@ use crate::{
     bits::u64,
     default::ConstDefault,
     machine_state::{
-        bus::Address,
+        bus::main_memory::Address,
         csregisters::{self, xstatus, CSRegister},
         mode::{Mode, TrapMode},
         registers,

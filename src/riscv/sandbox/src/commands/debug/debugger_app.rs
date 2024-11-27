@@ -12,10 +12,7 @@ use octez_riscv::{
     bits::Bits64,
     kernel_loader::Error,
     machine_state::{
-        bus::{
-            main_memory::{self, MainMemoryLayout},
-            Address,
-        },
+        bus::main_memory::{self, Address, MainMemoryLayout},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         mode::Mode,
         AccessType, CacheLayouts, MachineCoreState,

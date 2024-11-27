@@ -21,7 +21,7 @@
 //! A trap which causes the execution environment to halt the machine.
 //!
 
-use crate::machine_state::{bus::Address, csregisters::CSRRepr};
+use crate::machine_state::{bus::main_memory::Address, csregisters::CSRRepr};
 use std::fmt::Formatter;
 use tezos_smart_rollup_constants::riscv::SbiError;
 

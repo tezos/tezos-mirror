@@ -4,7 +4,10 @@
 
 use crate::{
     kernel_loader,
-    machine_state::bus::{self, main_memory::MainMemoryLayout, Address},
+    machine_state::bus::{
+        self,
+        main_memory::{Address, MainMemoryLayout},
+    },
     parser::parse_block,
 };
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
