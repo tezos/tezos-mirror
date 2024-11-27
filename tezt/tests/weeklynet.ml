@@ -139,4 +139,42 @@ let test_weeklynet_migration_parameters =
 
   unit
 
-let register () = test_weeklynet_migration_parameters Protocol.all
+(** Test that the activation of the alpha protocol is successful using weeklynet
+    parameters. *)
+let test_weeklynet_alpha_activation () =
+  Test.register
+    ~__FILE__
+    ~title:"activate alpha from weeklynet parameters"
+    ~tags:
+      [team; "protocol"; "activation"; "sandbox"; "parameter_file"; "weeklynet"]
+  @@ fun () ->
+  let base_path = "tezt" // "tests" // "weeklynet_configs" in
+  let alpha_parameters_path = base_path // "alpha.json" in
+
+  Log.info "Node starting" ;
+  let* node = Node.init [Node.Synchronisation_threshold 0; Private_mode] in
+  let* client = Client.(init ~endpoint:(Node node) ()) in
+
+  Log.info "Node %s initialized" (Node.name node) ;
+  let activate_protocol =
+    Client.spawn_activate_protocol
+      ~protocol:Protocol.Alpha
+      client
+      ~parameter_file:alpha_parameters_path
+  in
+  let* activation_result = Process.wait activate_protocol in
+  let () =
+    match activation_result with
+    | Unix.WEXITED 0 -> ()
+    | _ ->
+        Test.fail
+          "Failed to activate protocol %s, inconsistent parameter file in %s"
+          (Protocol.hash Alpha)
+          alpha_parameters_path
+  in
+  Log.info "Protocol %s activated" (Protocol.hash Alpha) ;
+  Lwt.return_unit
+
+let register () =
+  test_weeklynet_migration_parameters Protocol.all ;
+  test_weeklynet_alpha_activation ()
