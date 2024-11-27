@@ -156,12 +156,16 @@ can be found here: https://chrispinnock.com/tezos/packages/
 New set of Debian packages
 """"""""""""""""""""""""""
 
-There is also a new generation of Debian packages that are available for testing.
-These packages will replace the currently available packages mentioned above.
+
+We are developing a new set of Octez Debian packages. They are distributed with latest Octez releases for testing purposes only, and should be considered experimental.
+
+You can use them to test new packaging features, compatibility and integration with other software and :doc:`share your feedback with us <../developer/contributing>`.
+
+These will eventually replace the Debian packages mentioned above.
 
 The new set of packages can be installed by adding the following apt repository::
 
-  export distribution=debian
+  export distribution=next/debian
   export release=bookworm
 
 .. literalinclude:: install-bin-deb.sh

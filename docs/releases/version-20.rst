@@ -32,9 +32,10 @@ Octez v20.2 fixes an implementation bug in the baker binary. We found that, unde
 
 **Even though this scenario is highly unlikely, we still recommend Tezos bakers to upgrade to at least v20.2.**
 
-Octez v20.3 includes a new version (``3.2``) of the node's storage. The upgrade to this new version must be done manually, using ``octez-node upgrade storage``, before running a node with a data directory with an earlier storage version. 
+Octez v20.3 includes a new version (``3.2``) of the node's storage. The upgrade to this new version must be done manually, using ``octez-node upgrade storage``, before starting a node with a data directory with an earlier storage version.
+If you are using Docker images, see the storage upgrade procedure at :ref:`using_docker_images`.
 
-Upgrading the storage is irreversible and not backwards compatible: v20.3 nodes do not support data directories with an earlier storage version and earlier versions of Octez do not support the new version neither. 
+Upgrading the storage is irreversible and not backwards compatible: v20.3 nodes do not support data directories with an earlier storage version and earlier versions of Octez do not support the new version either.
 
 This operation should only take up to 10s in nodes operating in Rolling history mode, which is the recommended setup for bakers. However, it may require around 10 minutes for nodes operating on Full and Archive modes, depending on the performance of the machine. Users must be aware of the downtime during the upgrade that may impact their services.
 
