@@ -86,7 +86,7 @@ will run a docker image. This docker image must follow some conditions
 use your own dockerfile.
 
 To help you write such an image, a default one based on debian is
-provided in `tezt/lib_cloud/debian.Dockerfile`.
+provided in `tezt/lib_cloud/dockerfiles/debian.Dockerfile`.
 
 The library takes care for you to push this image on a dedicated GCP
 registry. A docker image such as the one generated from
@@ -98,7 +98,7 @@ Finally, do note that with Tezt cloud you can specify for each VM
 individually the docker image to be used. The one provided by the
 dockerfile as discussed above will be the one by default. It is also
 possible to use docker images published by the Octez CI. At the
-moment, the docker image from the latest released of Octez is
+moment, the docker image from the latest release of Octez is
 supported.
 
 ## Write your own dockerfile
@@ -271,7 +271,7 @@ Grafana can be used to visualize prometheus metrics (activated by
 default). This can be accessed on `http://localhost:3000`. Tezt cloud
 comes with a set of dashboards so that it is ready to use. Feel free
 to update/add new dashboards in
-`tezt/lib_cloud/grafana/dasboards.json`.
+`tezt/lib_cloud/grafana/dashboards`.
 
 ## Proxy mode
 
@@ -361,7 +361,7 @@ You should see the name servers you just added.
    3. The runner that will be used (this can be given to the agent).
 
 3. Whenever it is possible, write your test without depending
-   specifically on a fixed number of machines. Whenver you want to
+   specifically on a fixed number of machines. Whenever you want to
    increase or decrease the number of machines, you can just run your
    test again and it will just work. This can be done by using a
    dispenser (via the OCaml module `Seq` for example).
