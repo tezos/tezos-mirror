@@ -156,9 +156,12 @@ can be found here: https://chrispinnock.com/tezos/packages/
 New set of Debian packages
 """"""""""""""""""""""""""
 
-For testing purposes only, we provide an experimental (or "next") version of the Debian packages for the latest release. You can use them to test new packaging features, compatibility and integration with other softwares and :doc:`share your feedback with us <../developer/contributing>`.
 
-These packages will replace the currently available packages mentioned above.
+We are developing a new set of Octez Debian packages. They are distributed with latest Octez releases for testing purposes only, and should be considered experimental.
+
+You can use them to test new packaging features, compatibility and integration with other software and :doc:`share your feedback with us <../developer/contributing>`.
+
+These will eventually replace the Debian packages mentioned above.
 
 The new set of packages can be installed by adding the following apt repository::
 

@@ -26,6 +26,8 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
       octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles="$MY_ADDRESS"
 
+   where ``$MY_ADDRESS`` is the baking key address (not the alias registered with ``octez-client``).
+
    You can specify a custom directory to store the DAL node data in by using the ``--data-dir`` argument:
 
    .. code-block:: shell
@@ -65,13 +67,13 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
    The baker daemon connects to the DAL node and attests to the availability of DAL data as well as its usual layer 1 baking function.
 
-#. In a new terminal window, verify that your baking daemon has attestation rights allocated, by running this command, where ``MY_ADDRESS`` is your account's address (not its ``octez-client`` alias):
+#. In a new terminal window, verify that your baking daemon has attestation rights allocated, by running this command:
 
    .. code-block:: shell
 
       octez-client rpc get "/chains/main/blocks/head/helpers/attestation_rights?delegate=$MY_ADDRESS"
 
-   If the previous command reports no attestation rights (``[]``), you may have to register as a delegate or re-activate your delegate and wait for a few cycles to get some rights (see :ref:`DelegateRegistration`).
+   If the previous command reports no attestation rights (``[]``), first check that you do have attestation rights during the current cycle (by adding the ``"&cycle=<current_cycle>"`` argument). If that is not the case, you may have to register as a delegate or re-activate your delegate and wait for a few cycles to get some rights (see :ref:`DelegateRegistration`).
 
 #. Verify that the DAL node is running properly:
 

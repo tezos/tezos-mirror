@@ -1,4 +1,4 @@
-# These file redirect pages on the S3 bucket using a CloudFront server.
+# This file redirects pages on the S3 bucket using a CloudFront server.
 # All redirections are relative to the docs/ folder.
 
 # this one is temporary, just for testing:
