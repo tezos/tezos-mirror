@@ -1610,4 +1610,70 @@ struct
     module Merkelized_payload_hashes_hash =
       Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash
   end
+
+  module Riscv = struct
+    module Backend = Octez_riscv_pvm.Backend
+    module Storage = Octez_riscv_pvm.Storage
+
+    type state = Backend.state
+
+    type proof = Backend.proof
+
+    type output_info = Backend.output_info = {
+      message_index : Z.t;
+      outbox_level : Bounded.Non_negative_int32.t;
+    }
+
+    type output = Backend.output = {
+      info : output_info;
+      encoded_message : string;
+    }
+
+    type output_proof = Backend.output_proof
+
+    type hash = Backend.hash
+
+    type input = Backend.input =
+      | Inbox_message of int32 * int64 * string
+      | Reveal of string
+
+    type input_request = Backend.input_request =
+      | No_input_required
+      | Initial
+      | First_after of int32 * int64
+      | Needs_reveal of string
+
+    let state_hash state = Backend.state_hash state
+
+    let empty_state () = Storage.empty ()
+
+    let proof_start_state proof = Backend.proof_start_state proof
+
+    let proof_stop_state proof = Backend.proof_stop_state proof
+
+    let proof_to_bytes proof = Backend.serialise_proof proof
+
+    let bytes_to_proof bytes = Backend.deserialise_proof bytes
+
+    let install_boot_sector state boot_sector =
+      Backend.install_boot_sector state boot_sector
+
+    let verify_proof input proof = Backend.verify_proof input proof
+
+    let output_info_of_output_proof output_proof =
+      Backend.output_info_of_output_proof output_proof
+
+    let state_of_output_proof output_proof =
+      Backend.state_of_output_proof output_proof
+
+    let verify_output_proof output_proof =
+      Backend.verify_output_proof output_proof
+
+    let output_proof_to_bytes output_proof =
+      Backend.serialise_output_proof output_proof
+
+    let bytes_to_output_proof bytes = Backend.deserialise_output_proof bytes
+
+    let get_current_level state = Backend.get_current_level state
+  end
 end
