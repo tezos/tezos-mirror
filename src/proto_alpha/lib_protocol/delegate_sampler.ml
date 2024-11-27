@@ -151,8 +151,10 @@ let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
 let baking_rights_owner c (level : Level_repr.t) ~round =
   let open Lwt_result_syntax in
   let committee_size = Constants_storage.consensus_committee_size c in
+  (* We use [Round.to_slot] to have a limited number of unique rounds
+     (it should loop after some time) *)
   let*? slot = Round_repr.to_slot ~committee_size round in
-  let* ctxt, pk = slot_owner c level slot in
+  let* ctxt, pk = Random.owner c level (Slot_repr.to_int slot) in
   return (ctxt, slot, pk)
 
 let load_sampler_for_cycle ctxt cycle =
