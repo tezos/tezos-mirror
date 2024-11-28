@@ -335,16 +335,8 @@ seq:
   type: u1
 - id: edge_of_staking_over_delegation
   type: u1
-- id: adaptive_issuance_launch_ema_threshold
-  type: s4be
 - id: adaptive_rewards_params
   type: adaptive_rewards_params
-- id: adaptive_issuance_activation_vote_enable
-  type: u1
-  enum: bool
-- id: adaptive_issuance_force_activation
-  type: u1
-  enum: bool
 - id: direct_ticket_spending_enable
   type: u1
   enum: bool
