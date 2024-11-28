@@ -279,17 +279,8 @@ let adaptive_issuance_global_limit_of_staking_over_baking c =
 let adaptive_issuance_edge_of_staking_over_delegation c =
   (adaptive_issuance c).edge_of_staking_over_delegation
 
-let adaptive_issuance_launch_ema_threshold c =
-  (adaptive_issuance c).launch_ema_threshold
-
 let adaptive_issuance_rewards_params c =
   (adaptive_issuance c).adaptive_rewards_params
-
-let adaptive_issuance_activation_vote_enable c =
-  (adaptive_issuance c).activation_vote_enable
-
-let adaptive_issuance_force_activation c =
-  (adaptive_issuance c).force_activation
 
 let direct_ticket_spending_enable c =
   (Raw_context.constants c).direct_ticket_spending_enable

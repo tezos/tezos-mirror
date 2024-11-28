@@ -130,15 +130,6 @@ module Set = struct
   let adaptive_issuance adaptive_issuance (c : t) = {c with adaptive_issuance}
 
   module Adaptive_issuance = struct
-    let activation_vote_enable activation_vote_enable (c : t) =
-      adaptive_issuance {c.adaptive_issuance with activation_vote_enable} c
-
-    let force_activation force_activation (c : t) =
-      adaptive_issuance {c.adaptive_issuance with force_activation} c
-
-    let launch_ema_threshold launch_ema_threshold (c : t) =
-      adaptive_issuance {c.adaptive_issuance with launch_ema_threshold} c
-
     let adaptive_rewards_params adaptive_rewards_params (c : t) =
       adaptive_issuance {c.adaptive_issuance with adaptive_rewards_params} c
 

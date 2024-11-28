@@ -39,7 +39,6 @@ let raw_context ~max_slashing_threshold ~max_slashing_per_block () =
   let open Constants_helpers in
   let constants =
     Default_parameters.constants_test
-    |> Set.Adaptive_issuance.force_activation true
     |> Set.max_slashing_threshold max_slashing_threshold
     |> Set.max_slashing_per_block max_slashing_per_block
   in

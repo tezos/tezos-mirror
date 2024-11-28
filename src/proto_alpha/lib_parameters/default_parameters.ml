@@ -304,7 +304,6 @@ let constants_mainnet : Constants.Parametric.t =
       {
         global_limit_of_staking_over_baking = 9;
         edge_of_staking_over_delegation = 3;
-        launch_ema_threshold = 0l;
         adaptive_rewards_params =
           {
             issuance_ratio_final_min = Q.(0_25 // 100_00);
@@ -321,8 +320,6 @@ let constants_mainnet : Constants.Parametric.t =
             center_dz = Q.(1 // 2);
             radius_dz = Q.(1 // 50);
           };
-        activation_vote_enable = true;
-        force_activation = false;
       };
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6668
        Enable once at least the following is done:
