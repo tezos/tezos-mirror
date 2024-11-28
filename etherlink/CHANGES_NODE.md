@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## Version 0.9 (2024-11-28)
 
-### Features
+This is a bug fixes release, notably improving the tracking of rollup node
+events.
+
+This release will apply one migration to the node’s store (version 14), meaning
+it is not possible to downgrade to the previous version.
 
 ### Bug fixes
 
 - Default rollup node port is 8932, not 8937. (!15701)
+- Make the rollup node follower more resilient. (!15745)
 
 ### Internals
 
-- Make the rollup node follower more resilient. (!15745)
 - Use a single RPC (if the rollup node supports it) when fetching EVM events.
   (!15629, !15703)
 - Private RPC `produceBlock` can produce a block without delayed transactions,
