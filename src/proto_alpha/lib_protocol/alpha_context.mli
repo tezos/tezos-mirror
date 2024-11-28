@@ -948,7 +948,7 @@ module Constants : sig
       direct_ticket_spending_enable : bool;
       aggregate_attestation : bool;
       allow_tz4_delegate_enable : bool;
-      all_bakers_attest_enable : bool;
+      all_bakers_attest_activation_level : Raw_level_repr.t option;
     }
 
     val encoding : t Data_encoding.t
@@ -1088,7 +1088,7 @@ module Constants : sig
 
   val allow_tz4_delegate_enable : context -> bool
 
-  val all_bakers_attest_enable : context -> bool
+  val all_bakers_attest_activation_level : context -> Raw_level_repr.t option
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
