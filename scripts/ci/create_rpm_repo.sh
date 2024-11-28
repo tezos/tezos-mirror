@@ -79,7 +79,7 @@ if [ "$CI_PROJECT_NAMESPACE" = "tezos" ] && [ "$CI_COMMIT_REF_PROTECTED" = "true
   # the keys used for official releases only
   # These env vars are only available on tezos/tezos
   # and in protected branches
-  #  GPG_KEY_ID="5DC80C4ED0B7C4FE"
+  GPG_KEY_ID="5DC80C4ED0B7C4FE"
   GPG_PRIVATE_KEY="$GPG_LINUX_PACKAGES_PRIVATE_KEY"
   GPG_PASSPHRASE="$GPG_LINUX_PACKAGES_PASSPHRASE"
   echo "$GPG_LINUX_PACKAGES_PUBLIC_KEY" > \
