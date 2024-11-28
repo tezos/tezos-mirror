@@ -183,6 +183,23 @@ module GC : sig
     conn -> Ethereum_types.quantity -> Time.Protocol.t -> unit tzresult Lwt.t
 end
 
+module Pending_confirmations : sig
+  val insert :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block_hash ->
+    unit tzresult Lwt.t
+
+  val find_with_level :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block_hash option tzresult Lwt.t
+
+  val delete_with_level : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  val is_empty : conn -> bool tzresult Lwt.t
+end
+
 module L1_l2_levels_relationships : sig
   type t = {
     l1_level : int32;

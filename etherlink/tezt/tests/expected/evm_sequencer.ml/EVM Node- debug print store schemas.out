@@ -63,4 +63,9 @@ CREATE TABLE gc (
   last_split_timestamp TIMESTAMP
 );
 
-CREATE UNIQUE INDEX block_hash_index ON blocks (hash)
+CREATE UNIQUE INDEX block_hash_index ON blocks (hash);
+
+CREATE TABLE pending_confirmations (
+    level serial PRIMARY KEY,
+    hash VARCHAR(32) NOT NULL
+)

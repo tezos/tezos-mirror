@@ -14,6 +14,9 @@
   (!15629, !15703)
 - Private RPC `produceBlock` can produce a block without delayed transactions,
   useful for testing purposes. (!15681)
+- Keep a buffer of finalized states if the rollup node is in advance. When
+  observer catches up, it checks provided blueprint against these finalized
+  states. (!15748)
 
 ## Version 0.8 (2024-11-15)
 
