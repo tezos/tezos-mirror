@@ -48,6 +48,30 @@ module Full_denunciation : sig
       same multiplicity in both lists. *)
   val check_same_lists_any_order :
     loc:string -> t list -> t list -> unit tzresult Lwt.t
+
+  (** [slashing_percentage all_denunciations_to_apply
+      ~block_before_slash misbehaviour] returns the slashing percentage
+      to apply for [misbehaviour] considering the denunciations in
+      [all_denunciations_to_apply].
+
+      Preconditions:
+
+      - [all_denunciations_to_apply] contains at least all the
+        denunciations for [misbehaviour] known to the chain (it may
+        additionally contain denunciations for other misbehaviours: this
+        function will ignore them).
+
+      - [block_before_slash] is any block from cycle
+        [misbehaviour_cycle - consensus_rights_delay] up to the last
+        block **before** the slashing gets applied. Indeed, the block
+        that applies the slashing also moves on to the next cycle and
+        discards the seed for the misbehaviour level rights from the
+        context. *)
+  val slashing_percentage :
+    block_before_slash:Block.t ->
+    Protocol.Misbehaviour_repr.t ->
+    t list ->
+    Protocol.Percentage.t tzresult Lwt.t
 end
 
 (** Applies all slashes at cycle end in the state *)
