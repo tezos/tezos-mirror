@@ -473,7 +473,7 @@ pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<()
     host.store_delete(&path).map_err(Error::from)
 }
 
-pub fn clear_all_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+pub fn clear_all_blueprints<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     if host.store_has(&EVM_BLUEPRINTS)?.is_some() {
         Ok(host.store_delete(&EVM_BLUEPRINTS)?)
     } else {

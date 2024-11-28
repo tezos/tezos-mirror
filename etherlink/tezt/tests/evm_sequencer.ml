@@ -2790,9 +2790,8 @@ let test_upgrade_kernel_auto_sync =
      node and the sequencer will upgrade to debug kernel and
      therefore not produce the block. *)
   let* _ =
-    repeat 2 (fun () ->
-        let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer in
-        unit)
+    let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer in
+    unit
   and* _upgrade = Evm_node.wait_for_successful_upgrade sequencer in
 
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
@@ -2819,7 +2818,7 @@ let test_upgrade_kernel_auto_sync =
   let* () = Evm_node.run observer in
   let* _upgrade = Evm_node.wait_for_successful_upgrade observer in
 
-  let* () = Evm_node.wait_for_blueprint_applied observer 4 in
+  let* () = Evm_node.wait_for_blueprint_applied observer 3 in
 
   let* () =
     check_head_consistency

@@ -5,6 +5,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_storage;
+use crate::blueprint_storage::{
+    blueprint_path, clear_all_blueprints, read_next_blueprint_number,
+};
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
@@ -62,6 +65,9 @@ fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeErro
         Err(err) => Err(err),
     }
 }
+
+const TMP_NEXT_BLUEPRINT_PATH: RefPath =
+    RefPath::assert_from(b"/__tmp_next_blueprint_path");
 
 fn migrate_to<Host: Runtime>(
     host: &mut Host,
@@ -183,6 +189,27 @@ fn migrate_to<Host: Runtime>(
                 // Not applicable for other networks
                 Ok(MigrationStatus::None)
             }
+        }
+        StorageVersion::V23 => {
+            // Clear all the blueprints, we accumulated a lot of old
+            // blueprints without cleaning them.
+            //
+            // As we remove everything that means the sequencer will
+            // have to republish some.
+            //
+            // However we need to keep the next blueprint as it
+            // trigerred the upgrade.
+
+            let next_blueprint_number = read_next_blueprint_number(host)?;
+            let blueprint_path = blueprint_path(next_blueprint_number)?;
+            allow_path_not_found(
+                host.store_move(&blueprint_path, &TMP_NEXT_BLUEPRINT_PATH),
+            )?;
+            clear_all_blueprints(host)?;
+            allow_path_not_found(
+                host.store_move(&TMP_NEXT_BLUEPRINT_PATH, &blueprint_path),
+            )?;
+            Ok(MigrationStatus::Done)
         }
     }
 }
