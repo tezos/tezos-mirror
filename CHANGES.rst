@@ -197,6 +197,8 @@ Protocol
   :gl:`!15677`)
 - Set the message validation function at node startup, fixing
   https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
+- A warning has been introduced in case it is observed that the DAL node lags
+  behind the L1 node. (MR :gl:`!15756`)
 
 Miscellaneous
 -------------
