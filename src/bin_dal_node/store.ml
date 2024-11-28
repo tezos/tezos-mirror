@@ -731,10 +731,10 @@ let upgrade_from_v1_to_v2 ~base_dir =
           ~force:true
       in
       (* Remove the Stores_dirs.skip_list_cells directory. *)
-      let*! () =
-        Lwt_utils_unix.remove_dir
-          Filename.Infix.(base_dir // Stores_dirs.skip_list_cells)
-      in
+      let open Filename.Infix in
+      let store_dir = base_dir // Stores_dirs.skip_list_cells in
+      let*! () = Lwt_utils_unix.remove_dir (store_dir // "hashes") in
+      let*! () = Lwt_utils_unix.remove_dir (store_dir // "cells") in
       (* The storage upgrade has been done. *)
       let*! () = Event.(emit store_upgraded (Version.make 1, Version.make 2)) in
       return_unit
