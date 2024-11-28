@@ -347,6 +347,8 @@ module Term = struct
        $ history_mode $ service_name $ service_namespace $ sqlite3_backend))
 end
 
+type t = Run | Config_init | Config_update | Debug_print_store_schemas
+
 module Run = struct
   let description =
     [`S "DESCRIPTION"; `P "This command runs an Octez DAL node."]
@@ -357,7 +359,7 @@ module Run = struct
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"Run the Octez DAL node" ~man ~version "run"
 
-  let cmd run = Cmdliner.Cmd.v info (Term.term run)
+  let cmd run = Cmdliner.Cmd.v info (Term.term (run Run))
 end
 
 module Config = struct
@@ -376,7 +378,7 @@ module Config = struct
       [
         `S "DESCRIPTION";
         `P
-          "This commands creates a configuration file with the parameters \
+          "This command creates a configuration file with the parameters \
            provided on the command-line, if no configuration file exists \
            already in the specified or default location. Otherwise, the \
            command-line parameters override the existing ones, and old \
@@ -388,7 +390,24 @@ module Config = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Configuration initialisation" ~man ~version "init"
 
-    let cmd run = Cmdliner.Cmd.v info (Term.term run)
+    let cmd run = Cmdliner.Cmd.v info (Term.term (run Config_init))
+  end
+
+  module Update = struct
+    let man =
+      [
+        `S "DESCRIPTION";
+        `P
+          "This command updates the configuration file with the parameters \
+           provided on the command-line. If no configuration file exists \
+           already, the command will fail.";
+      ]
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~doc:"Configuration update" ~man ~version "update"
+
+    let cmd run = Cmdliner.Cmd.v info (Term.term (run Config_update))
   end
 
   let cmd run =
@@ -401,7 +420,7 @@ module Config = struct
         ~version
         "config"
     in
-    Cmdliner.Cmd.group ~default info [Init.cmd run]
+    Cmdliner.Cmd.group ~default info [Init.cmd run; Update.cmd run]
 end
 
 module Debug = struct
@@ -463,7 +482,7 @@ module Debug = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Debug commands" ~man ~version "debug"
     in
-    Cmdliner.Cmd.group ~default info [Print.cmd run]
+    Cmdliner.Cmd.group ~default info [Print.cmd (run Debug_print_store_schemas)]
 end
 
 type experimental_features = {sqlite3_backend : bool}
@@ -483,8 +502,6 @@ type options = {
   service_namespace : string option;
   experimental_features : experimental_features;
 }
-
-type t = Run | Config_init | Debug_print_store_schemas
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
@@ -532,11 +549,4 @@ let make ~run =
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
-  Cmdliner.Cmd.group
-    ~default
-    info
-    [
-      Run.cmd (run Run);
-      Config.cmd (run Config_init);
-      Debug.cmd (run Debug_print_store_schemas);
-    ]
+  Cmdliner.Cmd.group ~default info [Run.cmd run; Config.cmd run; Debug.cmd run]
