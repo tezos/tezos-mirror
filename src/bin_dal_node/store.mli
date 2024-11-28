@@ -160,13 +160,8 @@ val last_processed_level : t -> Last_processed_level.t
 val shards : t -> Shards.t
 
 (** [skip_list_cells t] returns the skip list cells store associated
-    with the store [t]. The function either returns [`KVS store] or
-    [`SQLite3 store] depending on the current storage backend used by
-    the store [t]. *)
-val skip_list_cells :
-  t ->
-  [> `KVS of Kvs_skip_list_cells_store.t
-  | `SQLite3 of Dal_store_sqlite3.Skip_list_cells.t ]
+    with the store [t]. *)
+val skip_list_cells : t -> Dal_store_sqlite3.Skip_list_cells.t
 
 (** [slot_header_statuses t] returns the statuses store  associated with the store
     [t]. *)
@@ -205,31 +200,35 @@ val add_slot_headers :
   t ->
   unit tzresult Lwt.t
 
-(** [Skip_list_cells] manages the storage of [Skip_list_cell.t] and is
-    responsible for calling the appropriate function based on the
-    current storage backend:
-    - For [Legacy] backend, it uses [Kvs_skip_list_cells_store].
-    - For [SQLite3] backend, it uses [Dal_store_sqlite3.Skip_list_cells].
- *)
+(** [Skip_list_cells] manages the storage of [Skip_list_cell.t] *)
 module Skip_list_cells : sig
   open Dal_proto_types
 
-  (** [find store hash] returns the cell associated to [hash] in the [store], if
+  (** [find ?conn store hash] returns the cell associated to [hash] in the [store], if
       any. *)
-  val find : t -> Skip_list_hash.t -> Skip_list_cell.t tzresult Lwt.t
+  val find :
+    ?conn:Dal_store_sqlite3.conn ->
+    t ->
+    Skip_list_hash.t ->
+    Skip_list_cell.t tzresult Lwt.t
 
-  (** [insert store ~attested_level values] inserts the given list of [values]
+  (** [insert ?conn store ~attested_level values] inserts the given list of [values]
       associated to the given [attested_level] in the [store]. Any existing value
       is overridden. *)
   val insert :
+    ?conn:Dal_store_sqlite3.conn ->
     t ->
     attested_level:int32 ->
     (Skip_list_hash.t * Skip_list_cell.t) list ->
     unit tzresult Lwt.t
 
-  (** [remove store ~attested_level] removes any data related to [attested_level]
+  (** [remove ?conn store ~attested_level] removes any data related to [attested_level]
       from the [store]. *)
-  val remove : t -> attested_level:int32 -> unit tzresult Lwt.t
+  val remove :
+    ?conn:Dal_store_sqlite3.conn ->
+    t ->
+    attested_level:int32 ->
+    unit tzresult Lwt.t
 
   (** [schemas data_dir] returns the list of SQL statements allowing
       to recreate the tables of the DAL skip list cells store. *)
