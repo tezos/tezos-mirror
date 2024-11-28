@@ -953,9 +953,9 @@ type t = {
   disconnection_state : Disconnect.t option;
   first_level : int;
   teztale : Teztale.t option;
-  aliases : (string, string) Hashtbl.t;
+  mutable aliases : (string, string) Hashtbl.t;
       (* mapping from baker addresses to their Tzkt aliases (if known)*)
-  versions : (string, string) Hashtbl.t;
+  mutable versions : (string, string) Hashtbl.t;
       (* mapping from baker addresses to their octez versions (if known) *)
 }
 
@@ -2646,10 +2646,23 @@ let clean_up t level =
   Hashtbl.remove t.infos level ;
   Hashtbl.remove t.metrics level
 
+let update_bakers_infos t =
+  let* aliases =
+    let accounts = List.map (fun ({account; _} : baker) -> account) t.bakers in
+    Network.aliases ~accounts t.configuration.network
+  in
+  let* versions = Network.versions t.configuration.network in
+  t.aliases <- aliases ;
+  t.versions <- versions ;
+  Lwt.return_unit
+
 let on_new_level t ?etherlink level =
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
   clean_up t (level - t.configuration.blocks_history) ;
+  let* () =
+    if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
+  in
   let etherlink_operator =
     Option.map
       (fun etherlink -> etherlink.operator.account.public_key_hash)
