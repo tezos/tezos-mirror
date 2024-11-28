@@ -372,6 +372,12 @@ let init_skip_list_cells_store node_store_dir =
     ~padded_encoded_cell_size
     ~encoded_hash_size
 
+let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
+  Dal_store_sqlite3.Skip_list_cells.init
+    ~data_dir:(Filename.concat data_dir "skip_list_store")
+    ~perm
+    ()
+
 (* Required by the KVS store. *)
 let () = Value_size_hooks.set_number_of_slots number_of_slots
 
@@ -386,9 +392,7 @@ let consistency_test =
       (* Initialize the KVS and the SQLite stores. *)
       let data_dir = Tezt.Temp.dir "data-dir" in
       let* kvs_store = init_skip_list_cells_store data_dir in
-      let* sql_store =
-        Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
-      in
+      let* sql_store = init_sqlite_skip_list_cells_store data_dir in
       (* Run the actions both for the KVS and the SQL backends. *)
       let* () = run_kvs kvs_store actions in
       let* () = run_sqlite3 sql_store actions in
@@ -428,9 +432,7 @@ let migration_skip_list_test {state; actions} =
   let data_dir = Tezt.Temp.dir "data-dir" in
   let* kvs_store = init_skip_list_cells_store data_dir in
   let* () = run_kvs kvs_store actions in
-  let* sql_store =
-    Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
-  in
+  let* sql_store = init_sqlite_skip_list_cells_store data_dir in
   let* () = Store_migrations.migrate_skip_list_store kvs_store sql_store in
   let* () = handshake state kvs_store sql_store in
   Kvs_skip_list_cells_store.close kvs_store

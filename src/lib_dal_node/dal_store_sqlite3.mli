@@ -61,6 +61,10 @@ module Skip_list_cells : sig
       (defaults to [None]). *)
   val remove : ?conn:conn -> t -> attested_level:int32 -> unit tzresult Lwt.t
 
+  (** [schemas t] returns the list of SQL statements
+      allowing to recreate the tables of the store [t]. *)
+  val schemas : t -> string list tzresult Lwt.t
+
   (** Internal functions for testing purpose.  *)
   module Internal_for_tests : sig
     val skip_list_hash_exists :

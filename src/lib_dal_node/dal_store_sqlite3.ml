@@ -275,6 +275,8 @@ module Skip_list_cells = struct
     in
     Sqlite.init ~path ~perm migration
 
+  let schemas t = use t Schemas.get_all
+
   module Internal_for_tests = struct
     module Q = struct
       open Dal_proto_types

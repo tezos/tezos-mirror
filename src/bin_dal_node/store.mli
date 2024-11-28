@@ -228,4 +228,8 @@ module Skip_list_cells : sig
   (** [remove store ~attested_level] removes any data related to [attested_level]
       from the [store]. *)
   val remove : t -> attested_level:int32 -> unit tzresult Lwt.t
+
+  (** [schemas data_dir] returns the list of SQL statements allowing
+      to recreate the tables of the DAL skip list cells store. *)
+  val schemas : string -> string list tzresult Lwt.t
 end
