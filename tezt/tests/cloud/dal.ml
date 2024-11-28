@@ -2722,6 +2722,7 @@ let on_new_level t ?etherlink level =
       ~level
       ~etherlink_operator
   in
+  toplog "Level info processed" ;
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
     get_metrics t infos_per_level (Hashtbl.find t.metrics (level - 1))
@@ -2729,27 +2730,31 @@ let on_new_level t ?etherlink level =
   pp_metrics t metrics ;
   push_metrics t metrics ;
   Hashtbl.replace t.metrics level metrics ;
-  match t.disconnection_state with
-  | None -> Lwt.return t
-  | Some disconnection_state ->
-      let nb_bakers = List.length t.bakers in
-      let* disconnection_state =
-        Disconnect.disconnect disconnection_state level (fun b ->
-            let baker_to_disconnect =
-              (List.nth t.bakers (b mod nb_bakers)).dal_node
-            in
-            Dal_node.terminate baker_to_disconnect)
-      in
-      let* disconnection_state =
-        Disconnect.reconnect disconnection_state level (fun b ->
-            let baker_to_reconnect =
-              (List.nth t.bakers (b mod nb_bakers)).dal_node
-            in
-            Dal_node.Agent.run
-              ~memtrace:t.configuration.memtrace
-              baker_to_reconnect)
-      in
-      Lwt.return {t with disconnection_state = Some disconnection_state}
+  let* t =
+    match t.disconnection_state with
+    | None -> Lwt.return t
+    | Some disconnection_state ->
+        let nb_bakers = List.length t.bakers in
+        let* disconnection_state =
+          Disconnect.disconnect disconnection_state level (fun b ->
+              let baker_to_disconnect =
+                (List.nth t.bakers (b mod nb_bakers)).dal_node
+              in
+              Dal_node.terminate baker_to_disconnect)
+        in
+        let* disconnection_state =
+          Disconnect.reconnect disconnection_state level (fun b ->
+              let baker_to_reconnect =
+                (List.nth t.bakers (b mod nb_bakers)).dal_node
+              in
+              Dal_node.Agent.run
+                ~memtrace:t.configuration.memtrace
+                baker_to_reconnect)
+        in
+        Lwt.return {t with disconnection_state = Some disconnection_state}
+  in
+  toplog "Level processed" ;
+  Lwt.return t
 
 let ensure_enough_funds t i =
   let producer = List.nth t.producers i in
