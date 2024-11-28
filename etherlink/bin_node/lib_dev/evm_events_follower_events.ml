@@ -130,6 +130,16 @@ module Event = struct
       ("expected", Data_encoding.int31)
       ("fetched", Data_encoding.int31)
 
+  let rollup_level_already_processed =
+    declare_1
+      ~section
+      ~name:"evm_events_follower_rollup_level_already_processed"
+      ~msg:
+        "The rollup level {level} given to the evm events follower was already \
+         seen, skipping it."
+      ~level:Info
+      ("level", Data_encoding.int32)
+
   let fallback =
     declare_0
       ~section
@@ -184,6 +194,9 @@ let unexpected_number_of_events ~expected ~fetched =
   Internal_event.Simple.emit
     Event.unexpected_number_of_events
     (expected, fetched)
+
+let rollup_level_is_already_processed rollup_level =
+  Internal_event.Simple.emit Event.rollup_level_already_processed rollup_level
 
 let fallback () = Internal_event.Simple.emit Event.fallback ()
 
