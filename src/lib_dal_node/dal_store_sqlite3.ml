@@ -11,6 +11,8 @@ include Sqlite
 open Caqti_request.Infix
 open Caqti_type.Std
 
+let sqlite_file_name = "store.sqlite"
+
 module Q = struct
   let table_exists =
     (string ->! bool)
@@ -250,8 +252,6 @@ module Skip_list_cells = struct
       Sqlite.Db.find conn Q.skip_list_hash_exists skip_list_hash
   end
 end
-
-let sqlite_file_name = "store.sqlite"
 
 let init ~data_dir ~perm () =
   let open Lwt_result_syntax in

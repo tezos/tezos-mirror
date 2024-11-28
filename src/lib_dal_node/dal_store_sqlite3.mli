@@ -6,6 +6,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Name of the SQLite3 file. *)
+val sqlite_file_name : string
+
 (** A handler to the DAL node's SQLite3 database. *)
 type t = Sqlite.t
 
@@ -24,8 +27,6 @@ val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 val init :
   data_dir:string -> perm:[`Read_only | `Read_write] -> unit -> t tzresult Lwt.t
 
-(** Name of the SQLite3 file. *)
-val sqlite_file_name : string
 
 module Schemas : sig
   (** [get_all conn] returns the list of SQL statements allowing to recreate
