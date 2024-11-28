@@ -164,7 +164,8 @@ module type T = sig
   module RPC : sig
     (** RPCs directory of the protocol-related part of the DAL node. *)
     val directory :
-      [< `KVS of Kvs_skip_list_cells_store.t | `SQLite3 of Dal_store_sqlite3.t] ->
+      [< `KVS of Kvs_skip_list_cells_store.t
+      | `SQLite3 of Dal_store_sqlite3.Skip_list_cells.t ] ->
       unit Tezos_rpc.Directory.t
   end
 end

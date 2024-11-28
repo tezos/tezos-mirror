@@ -164,7 +164,9 @@ val shards : t -> Shards.t
     [`SQLite3 store] depending on the current storage backend used by
     the store [t]. *)
 val skip_list_cells :
-  t -> [> `KVS of Kvs_skip_list_cells_store.t | `SQLite3 of Dal_store_sqlite3.t]
+  t ->
+  [> `KVS of Kvs_skip_list_cells_store.t
+  | `SQLite3 of Dal_store_sqlite3.Skip_list_cells.t ]
 
 (** [slot_header_statuses t] returns the statuses store  associated with the store
     [t]. *)

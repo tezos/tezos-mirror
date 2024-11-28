@@ -551,7 +551,7 @@ type t = {
   last_processed_level : Last_processed_level.t;
   first_seen_level : First_seen_level.t;
   storage_backend : Storage_backend.kind;
-  sqlite3 : Dal_store_sqlite3.t;
+  sqlite3 : Dal_store_sqlite3.Skip_list_cells.t;
 }
 
 let cache {cache; _} = cache

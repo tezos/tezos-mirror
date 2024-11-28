@@ -153,6 +153,8 @@ let with_connection store conn =
       fun k -> Sqlite.use store @@ fun conn -> Sqlite.with_connection conn k
 
 module Skip_list_cells = struct
+  type nonrec t = t
+
   open Types
 
   module Q = struct

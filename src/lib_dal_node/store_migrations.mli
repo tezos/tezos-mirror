@@ -10,4 +10,6 @@
     [kvs_store] and inserting the corresponding payload in the
     [sql_store]. *)
 val migrate_skip_list_store :
-  Kvs_skip_list_cells_store.t -> Dal_store_sqlite3.t -> unit tzresult Lwt.t
+  Kvs_skip_list_cells_store.t ->
+  Dal_store_sqlite3.Skip_list_cells.t ->
+  unit tzresult Lwt.t

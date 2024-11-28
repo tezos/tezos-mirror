@@ -27,6 +27,9 @@ end
 module Skip_list_cells : sig
   open Dal_proto_types
 
+  (** A handler to the DAL node's skip list cells SQLite3 database. *)
+  type t
+
   (** [init ~data_dir ~perm ()] returns a handler to the DAL node store
     located under [data_dir]. If no store is located in [data_dir], an
     empty store is created.

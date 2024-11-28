@@ -109,7 +109,7 @@ let run subcommand cli_options =
       Lwt_main.run @@ wrap_with_error
       @@ Lwt_utils_unix.with_tempdir "store"
       @@ fun data_dir ->
-      let* schemas = Store.Skip_list_cells.sql_schemas data_dir in
+      let* schemas = Store.Skip_list_cells.schemas data_dir in
       let output = String.concat ";\n\n" schemas in
       Format.printf "%s\n" output ;
       return_unit
