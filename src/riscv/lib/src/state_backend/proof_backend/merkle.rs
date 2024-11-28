@@ -92,6 +92,12 @@ impl MerkleTree {
             }
         }
     }
+
+    /// Produce a minimal Merkle proof on the compressed representation of the
+    /// given tree.
+    pub fn to_merkle_proof(self) -> Result<MerkleProof, HashError> {
+        Ok(self.compress()?.into())
+    }
 }
 
 impl RootHashable for MerkleTree {
@@ -623,13 +629,14 @@ mod tests {
 
             let merkle_tree_root_hash = merkle_tree.root_hash();
 
-            let compressed_merkle_tree = merkle_tree.compress()?;
+            let compressed_merkle_tree = merkle_tree.clone().compress()?;
             assert!(compressed_merkle_tree.check_root_hash());
             assert_eq!(compressed_merkle_tree.root_hash(), merkle_tree_root_hash);
 
             let compressed_merkle_proof: MerkleProof = compressed_merkle_tree.into();
-
             assert_eq!(compressed_merkle_proof, proof);
+
+            assert_eq!(merkle_tree.to_merkle_proof().unwrap(), proof);
 
             Ok(())
         };
