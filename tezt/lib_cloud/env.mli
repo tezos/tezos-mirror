@@ -96,11 +96,11 @@ val open_telemetry : bool
 (** Equivalent to [Cli.alert_handlers]. *)
 val alert_handlers : string list
 
-(** Use [tezt_cloud] image if [Cli.dockerfile_alias] is not provided, otherwise use it. *)
-val docker_image : docker_image
-
 (** If [Cli.dockerfile_alias] is provided, use it, otherwise default to [tezt_cloud]. *)
 val dockerfile_alias : string
+
+(** Use [tezt_cloud] image if [Cli.dockerfile_alias] is not provided, otherwise use it. *)
+val docker_image : docker_image
 
 (** Docker path associated to [dockerfile_alias]. *)
 val dockerfile : string

@@ -68,14 +68,12 @@ let open_telemetry = Cli.open_telemetry
 
 let alert_handlers = Cli.alert_handlers
 
+let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
+
 let docker_image =
   (* In localhost mode, we don't want to interact with GCP. The image is taken
      locally. *)
-  match Cli.dockerfile_alias with
-  | None -> Gcp {alias = tezt_cloud}
-  | Some alias -> Gcp {alias}
-
-let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
+  Gcp {alias = dockerfile_alias}
 
 let dockerfile = Path.dockerfile ~alias:dockerfile_alias
 
@@ -93,7 +91,6 @@ let init () =
   match mode with
   | `Localhost | `Orchestrator -> Lwt.return_unit
   | `Host | `Cloud ->
-      let tezt_cloud = tezt_cloud in
       let* project_id = project_id () in
       Log.info "Initializing docker registry..." ;
       let* () = Terraform.Docker_registry.init () in
