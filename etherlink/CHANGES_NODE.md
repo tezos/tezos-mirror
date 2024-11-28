@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internals
+
 ## Version 0.9 (2024-11-28)
 
 This is a bug fixes release, notably improving the tracking of rollup node
