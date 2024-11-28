@@ -45,12 +45,12 @@ let configuration_encoding =
     (fun {machine_type; binaries_path; docker_image; max_run_duration = _; os} ->
       (machine_type, binaries_path, docker_image, os))
     (fun (machine_type, binaries_path, docker_image, os) ->
-      Configuration.make ~os ~machine_type ~binaries_path ~docker_image ())
+      make ~os ~machine_type ~binaries_path ~docker_image ())
     (obj4
-       (req "machine_type" Data_encoding.string)
-       (req "binaries_path" Data_encoding.string)
+       (req "machine_type" string)
+       (req "binaries_path" string)
        (req "docker_image" docker_image_encoding)
-       (req "os" Data_encoding.string))
+       (req "os" string))
 
 let encoding =
   let open Data_encoding in
@@ -82,14 +82,11 @@ let encoding =
       in
       {name; vm_name; zone; point; runner; next_available_port; configuration})
     (obj6
-       (req "name" Data_encoding.string)
-       (req "vm_name" Data_encoding.string)
-       (req "zone" (Data_encoding.option Data_encoding.string))
-       (req
-          "point"
-          (Data_encoding.option
-             (Data_encoding.tup2 Data_encoding.string Data_encoding.int31)))
-       (req "next_available_port" Data_encoding.int31)
+       (req "name" string)
+       (req "vm_name" string)
+       (req "zone" (option string))
+       (req "point" (option (tup2 string int31)))
+       (req "next_available_port" int31)
        (req "configuration" configuration_encoding))
 
 (* Getters *)
@@ -246,8 +243,12 @@ let copy agent ~consistency_check ~is_directory ~source ~destination =
         in
         Lwt.return_unit
 
+(** [is_binary file] checks using the `file` Linux command if the [file] is
+    binary. The command returns an output of the form `file: <file_type> ...`;
+    the file is binary if <file_type> is "ELF". *)
 let is_binary file =
   let* output = Process.run_and_read_stdout "file" [file] in
+  (* output is of the form "file: type_of_file ..." *)
   String.split_on_char ' ' output
   |> List.tl |> List.hd |> String.trim
   |> String.starts_with ~prefix:"ELF"
@@ -255,7 +256,7 @@ let is_binary file =
 
 let copy =
   (* We memoize the copy so that it is done at most once per destination per
-     scenario. This optimisation ease the writing of scenario so that copy can
+     scenario. This optimisation eases the writing of scenario so that copy can
      always be called before using the file copied. *)
   let already_copied = Hashtbl.create 11 in
   fun ?consistency_check

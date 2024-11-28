@@ -10,12 +10,11 @@
 (** Datatype for an agent *)
 type t
 
-(** [make ?binaries_path ~ssh_id ~point ~next_available_port ~name]
-    creates an [agent] from the given parameters. [point] is the point on
-    which the VM is reachabled. [next_available_port] should always provide
-    an available port or raise [Not_found] otherwise. [name] is the name of
-    the agent. [ssh_id] is a path to the private key that will be used for
-    the ssh connection. *)
+(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name ()]
+    creates an [agent] from the given parameters. [~next_available_port] should
+    always provide an available port or raise [Not_found] otherwise. 
+    [~name] is the name of the agent. [?ssh_id] and [?point] are used to potentially
+    create a [runner] for the [agent]. *)
 val make :
   ?zone:string ->
   ?ssh_id:string ->
@@ -69,22 +68,25 @@ val host_run_command : t -> string -> string list -> Process.t
  *)
 val docker_run_command : t -> string -> string list -> Process.t
 
-(** [copy ?consistency_check ?refresh ?destination agent ~source]
-    copies the file into the [agent] directory and returned the
-    directory where the file can be found. It is assumed the [source]
-    file does not exist on the agent machine. If the parent directory
-    does not exist, it will be created.
+(** [copy ?refresh ?is_directory ?destination agent ~source] copies the file 
+    into the [agent] directory and returns the directory where the file
+    can be found if [?refresh] is set to [true]. It is assumed the [~source]
+    file does not exist on the agent machine. If the parent directory does
+    not exist, it will be created.
+
+    If [?refresh] is [false], then the function returns the promise associated
+    to the scenario given by [agent] and [?destination] and does not copy anything.
 
     It returns the destination the files was copied at. If
-    [destination] is not set, the destination is given by
+    [?destination] is not set, the destination is given by
     [configuration.default_binaries_path] concatenated to the
-    [source]. Otherwise, [destination] is returned.
+    [~source]. Otherwise, [?destination] is returned.
 
-    If [configuration.docker_image] is [Octezt_latest_release], binary
+    If [configuration.docker_image] is an [Octez_release], binary
     files won't be copied and the destination will be the same as if
-    [destination] was not provided.
+    [?destination] was not provided.
 
-    If [is_directory] is set, then the whole source is copied, including
+    If [?is_directory] is set, then the whole source is copied, including
     subdirectories. *)
 val copy :
   ?consistency_check:bool ->
