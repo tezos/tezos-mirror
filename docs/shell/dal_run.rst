@@ -8,12 +8,22 @@ Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DA
 Before you begin, make sure that you have an instance of the ``octez-node`` binary running in operator mode.
 For instructions on setting up the ``octez-node`` binary, see :doc:`Running Octez <../introduction/howtorun>`.
 
-.. warning::
+Connecting to other nodes
+-------------------------
 
-   For the most secure setup, run the DAL node and layer 1 node on different IP addresses; for more information, see :doc:`Bakers & the DAL <./dal_bakers>`.
+The DAL node needs the address of at least one already running DAL node to connect to.
+
+If the ``octez-node`` binary was started with the ``--network <network>`` argument, the DAL node can get the addresses of bootstrap nodes on the specified network from the node's configuration via the ``/config/network/dal`` RPC endpoint.
+These bootstrap nodes do not propagate DAL data, but instead provide entry points for other DAL nodes to become part of the network.
+
+If the ``octez-node`` binary was not started with the ``--network <network>`` argument, the bootstrap nodes are not running, or you are setting up a closed network, you may need to run your own DAL node in the ``bootstrap`` profile or manually connect the new DAL node to an existing DAL node via the ``--peers`` argument before you can run a DAL node in the ``attester`` profile with an active baker.
 
 Running the DAL node
 --------------------
+
+.. warning::
+
+   For the most secure setup, run the DAL node and layer 1 node on different IP addresses; for more information, see :doc:`Bakers & the DAL <./dal_bakers>`.
 
 Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
@@ -38,6 +48,10 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
    These commands have the same parameters. For information about them, run ``octez-dal-node config init --help`` or see :ref:`DAL node commands <dal-node-commands>`.
 
    At minimum, you must specify with the ``--endpoint`` parameter the URL of an RPC node that the DAL node can use.
+
+   Check the section above on connecting to other nodes to make sure that your new DAL node can connect to other peers on the DAL P2P network.
+   If you need to explicitly connect your node to running DAL nodes, pass the ``--peers`` argument with a comma-separated list of DAL node host names and ports.
+   The default P2P port is 11732, so the argument might look like this: ``--peers=host1.example.com:11732,host2.example.com:11732``.
 
 #. Recommended: Ensure that the P2P port that the DAL node runs on is accessible from outside its system.
 
