@@ -1139,10 +1139,9 @@ let update_level_first_commitment_published _t per_level_info metrics =
 let update_level_first_commitment_attested t per_level_info metrics =
   match metrics.level_first_commitment_attested with
   | None ->
-      if Z.popcount per_level_info.attested_commitments > 0 then
-        Some per_level_info.level
-      else if
-        per_level_info.level > t.first_level + t.parameters.attestation_lag
+      if
+        Z.popcount per_level_info.attested_commitments > 0
+        && per_level_info.level >= t.first_level + t.parameters.attestation_lag
       then Some per_level_info.level
       else None
   | Some l -> Some l
