@@ -285,7 +285,7 @@ type t = {
   limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
   max_slashing_per_block : Percentage.t;
-  max_slashing_threshold : int;
+  max_slashing_threshold : Ratio_repr.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
@@ -738,7 +738,7 @@ let encoding =
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
                       Percentage.encoding)
                    (req "max_slashing_per_block" Percentage.encoding)
-                   (req "max_slashing_threshold" int31)
+                   (req "max_slashing_threshold" Ratio_repr.encoding)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs

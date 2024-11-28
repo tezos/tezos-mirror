@@ -19,8 +19,13 @@ let for_double_attestation ctxt rights denounced =
       0
       denounced
   in
-  let threshold_max = (Raw_context.constants ctxt).max_slashing_threshold in
-  let max_slashing = (Raw_context.constants ctxt).max_slashing_per_block in
+  let committee_size = Constants_storage.consensus_committee_size ctxt in
+  let Ratio_repr.{numerator; denominator} =
+    Constants_storage.max_slashing_threshold ctxt
+  in
+  (* Set the threshold to ⌈committee_size * threshold_ratio⌉ *)
+  let threshold_max = 1 + (((committee_size * numerator) - 1) / denominator) in
+  let max_slashing = Constants_storage.max_slashing_per_block ctxt in
   if Compare.Int.(total_rights_denounced >= threshold_max) then max_slashing
   else
     let num_z = Z.(pow (of_int total_rights_denounced) 2) in

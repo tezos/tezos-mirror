@@ -187,7 +187,6 @@ let constants_mainnet : Constants.Parametric.t =
               vdf_revelation_tip_weight;
               dal_rewards_weight;
             };
-          max_slashing_threshold;
         } =
     Constants.Generated.generate
       ~consensus_committee_size
@@ -340,7 +339,12 @@ let constants_mainnet : Constants.Parametric.t =
     percentage_of_frozen_deposits_slashed_per_double_baking =
       Protocol.Percentage.p5;
     max_slashing_per_block = Protocol.Percentage.p100;
-    max_slashing_threshold;
+    (* When slashing happens, if the power of the misbehaving consensus
+       exceeds this threshold (as a ratio of the total power), then the maximum value
+       for slashing (defined in the previous line) is applied.
+       It corresponds to 2334 slots on mainnet.
+       It must correspond to (1 - minimal_participation_ratio) *)
+    max_slashing_threshold = {numerator = 1; denominator = 3};
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
     initial_seed = None;
@@ -401,8 +405,7 @@ let constants_mainnet : Constants.Parametric.t =
 let constants_sandbox =
   let consensus_committee_size = 301 in
   let block_time = 1 in
-  let Constants.Generated.
-        {max_slashing_threshold; consensus_threshold = _; issuance_weights} =
+  let Constants.Generated.{consensus_threshold = _; issuance_weights} =
     Constants.Generated.generate
       ~consensus_committee_size
       ~dal_rewards_ratio:default_dal.rewards_ratio
@@ -431,7 +434,6 @@ let constants_sandbox =
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
     consensus_threshold = 0;
-    max_slashing_threshold;
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
     allow_tz4_delegate_enable = true;
@@ -439,8 +441,7 @@ let constants_sandbox =
 
 let constants_test =
   let consensus_committee_size = 67 in
-  let Constants.Generated.
-        {max_slashing_threshold = _; consensus_threshold; issuance_weights} =
+  let Constants.Generated.{consensus_threshold; issuance_weights} =
     Constants.Generated.generate
       ~consensus_committee_size
       ~dal_rewards_ratio:default_dal.rewards_ratio

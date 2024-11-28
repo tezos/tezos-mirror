@@ -282,6 +282,10 @@ let adaptive_issuance_edge_of_staking_over_delegation c =
 let adaptive_issuance_rewards_params c =
   (adaptive_issuance c).adaptive_rewards_params
 
+let max_slashing_threshold c = (Raw_context.constants c).max_slashing_threshold
+
+let max_slashing_per_block c = (Raw_context.constants c).max_slashing_per_block
+
 let direct_ticket_spending_enable c =
   (Raw_context.constants c).direct_ticket_spending_enable
 

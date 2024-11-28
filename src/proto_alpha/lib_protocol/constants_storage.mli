@@ -149,6 +149,10 @@ val adaptive_issuance_edge_of_staking_over_delegation : Raw_context.t -> int
 val adaptive_issuance_rewards_params :
   Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params
 
+val max_slashing_threshold : Raw_context.t -> Ratio_repr.t
+
+val max_slashing_per_block : Raw_context.t -> Percentage.t
+
 val direct_ticket_spending_enable : Raw_context.t -> bool
 
 val allow_tz4_delegate_enable : Raw_context.t -> bool
