@@ -106,10 +106,9 @@ let slots_info constants node_ctxt (Layer1.{hash; _} as head) =
              published_slots_indexes)
       in
       let*? confirmed_slots_indexes =
-        Environment.wrap_tzresult
-          (confirmed_slots_indexes_list
-          |> List.map Dal.Slot_index.to_int
-          |> Bitset.from_list)
+        confirmed_slots_indexes_list
+        |> List.map Dal.Slot_index.to_int
+        |> Bitset.from_list
       in
       return @@ Some {published_block_hash; confirmed_slots_indexes}
 
@@ -129,17 +128,12 @@ let download_and_save_slots constants (node_context : _ Node_context.t)
   let open Lwt_result_syntax in
   let*? all_slots =
     Bitset.fill ~length:constants.Rollup_constants.dal.number_of_slots
-    |> Environment.wrap_tzresult
   in
   let*? not_confirmed =
-    Environment.wrap_tzresult
-    @@ to_slot_index_list constants
+    to_slot_index_list constants
     @@ Bitset.diff all_slots confirmed_slots_indexes
   in
-  let*? confirmed =
-    Environment.wrap_tzresult
-    @@ to_slot_index_list constants confirmed_slots_indexes
-  in
+  let*? confirmed = to_slot_index_list constants confirmed_slots_indexes in
   (* The contents of each slot index are written to a different location on
      disk, therefore calls to store contents for different slot indexes can
      be parallelized. *)

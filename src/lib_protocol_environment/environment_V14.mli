@@ -92,6 +92,7 @@ module type T = sig
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type Q.t = Q.t
+       and type Bitset.t = Tezos_base.Bitset.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
        and type ('a, 'b) RPC_path.t = ('a, 'b) Tezos_rpc.Path.t

@@ -499,7 +499,9 @@ let process_dal_rpc_result state delegate level round =
               slots
           in
           let*! () =
-            let bitset_int = Bitset.to_z (dal_attestation :> Bitset.t) in
+            let bitset_int =
+              Environment.Bitset.to_z (dal_attestation :> Environment.Bitset.t)
+            in
             Events.(
               emit
                 attach_dal_attestation

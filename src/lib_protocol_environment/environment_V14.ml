@@ -92,6 +92,7 @@ module type T = sig
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type Q.t = Q.t
+       and type Bitset.t = Tezos_base.Bitset.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
        and type ('a, 'b) RPC_path.t = ('a, 'b) Tezos_rpc.Path.t
@@ -786,6 +787,56 @@ struct
   let wrap_tztrace t = List.map wrap_tzerror t
 
   let wrap_tzresult r = Result.map_error wrap_tztrace r
+
+  module Bitset = struct
+    include Tezos_base.Bitset
+
+    (* Redefine the shell errors as a protocol errors. *)
+    type Error_core.error +=
+      | Bitset_invalid_position of int
+      | Bitset_invalid_input of string
+
+    let () =
+      let open Data_encoding in
+      Error_core.register_error_kind
+        `Permanent
+        ~id:"env.bitfield_invalid_position"
+        ~title:"Invalid bitfield’s position"
+        ~description:"Bitfields do not accept negative positions"
+        (obj1 (req "position" int31))
+        (function Bitset_invalid_position i -> Some i | _ -> None)
+        (fun i -> Bitset_invalid_position i) ;
+      Error_core.register_error_kind
+        `Permanent
+        ~id:"bitfield_invalid_input"
+        ~title:"Invalid argument"
+        ~description:"A bitset function was provided an invalid input"
+        ~pp:(fun ppf name ->
+          Format.fprintf ppf "Invalid input for function %s" name)
+        (obj1 (req "function_name" (string Plain)))
+        (function Bitset_invalid_input f -> Some f | _ -> None)
+        (fun f -> Bitset_invalid_input f)
+
+    let wrap_error = function
+      | Ok v -> Ok v
+      | Error (Tezos_base.Bitset.Invalid_position i :: _) ->
+          Error [Bitset_invalid_position i]
+      | Error (Tezos_base.Bitset.Invalid_input f :: _) ->
+          Error [Bitset_invalid_input f]
+      | _ -> (* unreachable *) assert false
+
+    let mem t i = wrap_error @@ mem t i
+
+    let add t i = wrap_error @@ add t i
+
+    let remove t i = wrap_error @@ remove t i
+
+    let from_list l = wrap_error @@ from_list l
+
+    let fill ~length = wrap_error @@ fill ~length
+
+    let from_z z = wrap_error @@ from_z z
+  end
 
   module Chain_id = Chain_id
   module Block_hash = Block_hash

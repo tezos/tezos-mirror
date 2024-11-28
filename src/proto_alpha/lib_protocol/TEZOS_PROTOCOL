@@ -15,7 +15,6 @@
         "Block_payload_hash",
         "Sc_rollup_reveal_hash",
         "Merkle_list",
-        "Bitset",
         "Bounded_history_repr",
         "Context_binary_proof",
         "Ratio_repr",

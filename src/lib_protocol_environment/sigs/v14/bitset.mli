@@ -10,7 +10,7 @@ open Error_monad
 (** A bitset is a compact structure to store a set of integers. *)
 type t
 
-type error += Invalid_position of int | Invalid_input of string
+type error += Bitset_invalid_position of int | Bitset_invalid_input of string
 
 val encoding : t Data_encoding.t
 

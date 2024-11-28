@@ -1907,6 +1907,7 @@ let _octez_base_tests =
       "test_p2p_addr";
       "test_sized";
       "test_skip_list";
+      "test_bitset";
     ]
     ~path:"src/lib_base/test"
     ~opam:"octez-libs"
@@ -5630,7 +5631,6 @@ end = struct
             ("test_script_comparison", true);
             ("test_script_roundtrip", N.(number >= 019));
             ("test_tez_repr", true);
-            ("test_bitset", N.(number >= 013));
             ("test_sc_rollup_tick_repr", N.(number >= 016));
             ("test_sc_rollup_encoding", N.(number >= 016));
             ("test_sc_rollup_inbox", N.(number >= 017));

@@ -78,7 +78,7 @@ let expected_size_in_bits ~max_index =
   | Error _ -> (* Happens if max_index < 1 *) 0
   | Ok t -> occupied_size_in_bits t
 
-let number_of_attested_slots = Bitset.hamming_weight
+let number_of_attested_slots = Bitset.cardinal
 
 let intersection = Bitset.inter
 
