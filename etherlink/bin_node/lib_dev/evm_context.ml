@@ -492,9 +492,65 @@ module State = struct
         let root_hash = `Hex root_hash in
         Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
 
+  let blueprint_applied_event ctxt conn evm_state on_success
+      ({number = Qty number; hash = expected_block_hash} :
+        Evm_events.Blueprint_applied.t) =
+    let open Lwt_result_syntax in
+    let on_success session =
+      let (Qty finalized) = session.finalized_number in
+      (* We use [max] to not rely on the order of the EVM events (because
+         it is possible to see several blueprints applied during on L1
+         level). *)
+      let new_finalized = Z.(max number finalized) in
+      session.finalized_number <- Qty new_finalized ;
+      Metrics.set_confirmed_level ~level:new_finalized ;
+      on_success session
+    in
+    let* block_hash_opt =
+      if ctxt.block_storage_sqlite3 then
+        Evm_store.Blocks.find_hash_of_number conn (Qty number)
+      else
+        let*! bytes =
+          Evm_state.inspect
+            evm_state
+            (Durable_storage_path.Indexes.block_by_number (Nth number))
+        in
+        return (Option.map Ethereum_types.decode_block_hash bytes)
+    in
+    match block_hash_opt with
+    | Some found_block_hash ->
+        if found_block_hash = expected_block_hash then
+          let*! () =
+            Evm_events_follower_events.upstream_blueprint_applied
+              (number, expected_block_hash)
+          in
+          return (evm_state, on_success)
+        else
+          let*! () =
+            Evm_events_follower_events.diverged
+              (number, expected_block_hash, found_block_hash)
+          in
+          tzfail
+            (Node_error.Diverged
+               (number, expected_block_hash, Some found_block_hash))
+    | None when ctxt.fail_on_missing_blueprint ->
+        let*! () =
+          Evm_events_follower_events.missing_blueprint
+            (number, expected_block_hash)
+        in
+        tzfail (Node_error.Diverged (number, expected_block_hash, None))
+    | None ->
+        let*! () = Evm_events_follower_events.rollup_node_ahead (Qty number) in
+        let* () =
+          Evm_store.Pending_confirmations.insert
+            conn
+            (Qty number)
+            expected_block_hash
+        in
+        return (evm_state, on_success)
+
   let apply_evm_event_unsafe on_success ctxt conn evm_state event =
     let open Lwt_result_syntax in
-    let open Ethereum_types in
     let*! () = Evm_events_follower_events.new_event event in
     match event with
     | Evm_events.Upgrade_event upgrade ->
@@ -535,55 +591,8 @@ module State = struct
             evm_state
         in
         return (evm_state, on_success)
-    | Blueprint_applied {number = Qty number; hash = expected_block_hash} -> (
-        let on_success session =
-          let (Qty finalized) = session.finalized_number in
-          (* We use [max] to not rely on the order of the EVM events (because
-             it is possible to see several blueprints applied during on L1
-             level). *)
-          let new_finalized = Z.(max number finalized) in
-          session.finalized_number <- Qty new_finalized ;
-          Metrics.set_confirmed_level ~level:new_finalized ;
-          on_success session
-        in
-        let* block_hash_opt =
-          if ctxt.block_storage_sqlite3 then
-            Evm_store.Blocks.find_hash_of_number conn (Qty number)
-          else
-            let*! bytes =
-              Evm_state.inspect
-                evm_state
-                (Durable_storage_path.Indexes.block_by_number (Nth number))
-            in
-            return (Option.map decode_block_hash bytes)
-        in
-        match block_hash_opt with
-        | Some found_block_hash ->
-            if found_block_hash = expected_block_hash then
-              let*! () =
-                Evm_events_follower_events.upstream_blueprint_applied
-                  (number, expected_block_hash)
-              in
-              return (evm_state, on_success)
-            else
-              let*! () =
-                Evm_events_follower_events.diverged
-                  (number, expected_block_hash, found_block_hash)
-              in
-              tzfail
-                (Node_error.Diverged
-                   (number, expected_block_hash, Some found_block_hash))
-        | None when ctxt.fail_on_missing_blueprint ->
-            let*! () =
-              Evm_events_follower_events.missing_blueprint
-                (number, expected_block_hash)
-            in
-            tzfail (Node_error.Diverged (number, expected_block_hash, None))
-        | None ->
-            let*! () =
-              Evm_events_follower_events.rollup_node_ahead (Qty number)
-            in
-            return (evm_state, on_success))
+    | Blueprint_applied event ->
+        blueprint_applied_event ctxt conn evm_state on_success event
     | New_delayed_transaction delayed_transaction ->
         let* evm_state =
           on_new_delayed_transaction ~delayed_transaction evm_state
@@ -841,6 +850,30 @@ module State = struct
 
     match try_apply with
     | Apply_success {evm_state; block} ->
+        let* () =
+          (* A dirty way to avoid doing this in sequencer mode, to refine. *)
+          if ctxt.fail_on_missing_blueprint then return_unit
+          else
+            let* finalized_hash =
+              Evm_store.Pending_confirmations.find_with_level conn block.number
+            in
+            match finalized_hash with
+            | None -> return_unit
+            | Some expected_block_hash ->
+                if expected_block_hash = block.hash then
+                  Evm_store.Pending_confirmations.delete_with_level
+                    conn
+                    block.number
+                else
+                  let Ethereum_types.(Qty number) = block.number in
+                  let*! () =
+                    Evm_events_follower_events.diverged
+                      (number, expected_block_hash, block.hash)
+                  in
+                  tzfail
+                    (Node_error.Diverged
+                       (number, expected_block_hash, Some block.hash))
+        in
         let number_of_transactions =
           match block.transactions with
           | TxHash l -> List.length l
@@ -1047,6 +1080,11 @@ module State = struct
       load ~data_dir ~store_perm index
     in
     Evm_store.use store @@ fun conn ->
+    let* () =
+      let* is_empty = Evm_store.Pending_confirmations.is_empty conn in
+      when_ (fail_on_missing_blueprint && not is_empty) (fun () ->
+          failwith "Store has pending confirmation, state is not final")
+    in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
     let* latest_relationship = Evm_store.L1_l2_levels_relationships.find conn in
     let finalized_number, l1_level =
@@ -1506,7 +1544,8 @@ module Handlers = struct
       unit tzresult Lwt.t =
     let open Lwt_result_syntax in
     match (req, errs) with
-    | Apply_evm_events _, [Node_error.Diverged _divergence] ->
+    | Apply_evm_events _, [Node_error.Diverged _divergence]
+    | Apply_blueprint _, [Node_error.Diverged _divergence] ->
         Lwt_exit.exit_and_raise Node_error.exit_code_when_diverge
     | ( Apply_evm_events _,
         [Node_error.Out_of_sync {level_expected; level_received}] ) ->

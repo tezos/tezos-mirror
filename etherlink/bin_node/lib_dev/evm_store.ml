@@ -220,7 +220,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 13
+    let version = 14
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -271,15 +271,6 @@ module Q = struct
 
     let clear_before =
       (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id < ?|}
-
-    let get_finalized =
-      (unit ->? t2 level context_hash)
-      @@ {|SELECT id, context_hash FROM context_hashes
-           WHERE id = (
-             SELECT finalized_l2_level FROM l1_l2_levels_relationships
-             ORDER BY latest_l2_level DESC LIMIT 1
-           )|}
-    (* Using [latest_l2_level] because it is an index *)
   end
 
   module Kernel_upgrades = struct
@@ -352,7 +343,7 @@ module Q = struct
 
     let get =
       (unit ->! levels)
-      @@ {|SELECT latest_l2_level, l1_level, finalized_l2_level  FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
+      @@ {|SELECT latest_l2_level, l1_level, finalized_l2_level FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
 
     let clear_after =
       (level ->. unit)
@@ -508,6 +499,24 @@ module Q = struct
       (t2 level timestamp ->. unit)
       @@ {eos|INSERT INTO gc (id, last_split_level, last_split_timestamp) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET last_split_level = excluded.last_split_level, last_split_timestamp = excluded.last_split_timestamp|eos}
   end
+
+  module Pending_confirmations = struct
+    let insert =
+      (t2 level block_hash ->. unit)
+      @@ {|INSERT INTO pending_confirmations (level, hash) VALUES (?, ?)|}
+
+    let select_with_level =
+      (level ->? block_hash)
+      @@ {|SELECT hash FROM pending_confirmations WHERE level = ?|}
+
+    let delete_with_level =
+      (level ->. unit) @@ {|DELETE FROM pending_confirmations WHERE level = ?|}
+
+    let clear = (unit ->. unit) @@ {|DELETE FROM pending_confirmations|}
+
+    let count =
+      (unit ->! level) @@ {|SELECT COUNT(*) FROM pending_confirmations|}
+  end
 end
 
 module Schemas = struct
@@ -621,8 +630,16 @@ module Context_hashes = struct
     Db.find_opt conn Q.Context_hashes.get_earliest ()
 
   let find_finalized store =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Context_hashes.get_finalized ()
+    let* l1_l2_levels = Db.find_opt conn Q.L1_l2_levels_relationships.get () in
+    match l1_l2_levels with
+    | None -> return_none
+    | Some {current_number = Qty current_number; finalized = Qty finalized; _}
+      ->
+        let min = Ethereum_types.Qty (Z.min current_number finalized) in
+        let+ hash = Db.find_opt conn Q.Context_hashes.select min in
+        Option.map (fun hash -> (min, hash)) hash
 
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
@@ -1026,6 +1043,30 @@ module Blocks = struct
     Db.exec conn Q.Blocks.clear_before level
 end
 
+module Pending_confirmations = struct
+  let insert store level hash =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.insert (level, hash)
+
+  let find_with_level store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Pending_confirmations.select_with_level level
+
+  let delete_with_level store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.delete_with_level level
+
+  let clear store =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.clear ()
+
+  let is_empty store =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* (Qty count) = Db.find conn Q.Pending_confirmations.count () in
+    return Z.(equal zero count)
+end
+
 let context_hash_of_block_hash store hash =
   with_connection store @@ fun conn ->
   Db.find_opt conn Q.context_hash_of_block_hash hash
@@ -1039,6 +1080,8 @@ let reset_after store ~l2_level =
   let* () = Delayed_transactions.clear_after store l2_level in
   let* () = Blocks.clear_after store l2_level in
   let* () = Transactions.clear_after store l2_level in
+  (* Blocks in [Pending_confirmations] are always after the current head. *)
+  let* () = Pending_confirmations.clear store in
   return_unit
 
 let reset_before store ~l2_level =
