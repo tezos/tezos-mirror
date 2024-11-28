@@ -486,7 +486,7 @@ let test_mega_slash =
   --> set
         S.max_slashing_per_block
         (Protocol.Percentage.of_q_bounded ~round:`Down Q.(99 // 100))
-  --> set S.max_slashing_threshold 0
+  --> set S.max_slashing_threshold {numerator = 0; denominator = 1}
   --> set S.blocks_per_cycle 8l
   -->
   let delegates = ["delegate"; "baker"; "faucet"; "big_spender"] in
