@@ -558,6 +558,33 @@ module Cli = struct
       ~description:"Number of blocks history kept in memory. Default value: 100"
       100
 
+  let metrics_retention =
+    let parse str =
+      try
+        let suffix = String.get str (String.length str - 1) in
+        let factor =
+          match suffix with
+          | 's' -> 1
+          | 'm' -> 60
+          | 'h' -> 60 * 60
+          | 'd' -> 24 * 60 * 60
+          | _ -> raise Not_found
+        in
+        String.sub str 0 (String.length str - 1)
+        |> int_of_string |> ( * ) factor |> Option.some
+      with _ -> None
+    in
+    let show d = string_of_int d in
+    let typ = Clap.typ ~name:"time" ~dummy:0 ~parse ~show in
+    Clap.default
+      typ
+      ~section
+      ~long:"metrics-retention"
+      ~placeholder:"<integer>s OR <integer>m OR <integer>h OR <integer>d ..."
+      ~description:"Define the retention of the metrics. Default value: 12h."
+      (* retention is half of a day. *)
+      (12 * 60 * 60)
+
   let fundraiser =
     Clap.optional_string
       ~section
@@ -835,6 +862,7 @@ type configuration = {
   data_dir : string option;
   fundraiser : string option;
   blocks_history : int;
+  metrics_retention : int;
 }
 
 type bootstrap = {
@@ -947,6 +975,7 @@ type t = {
   producers : producer list;
   observers : observer list;
   etherlink : etherlink option;
+  time_between_blocks : int;
   parameters : Dal_common.Parameters.t;
   infos : (int, per_level_info) Hashtbl.t;
   metrics : (int, metrics) Hashtbl.t;
@@ -1183,8 +1212,13 @@ let update_ratio_attested_commitments t per_level_info metrics =
             metrics.ratio_attested_commitments
         | Some old_per_level_info ->
             let n = Hashtbl.length old_per_level_info.published_commitments in
+            let maximum_number_of_blocks =
+              t.configuration.metrics_retention / t.time_between_blocks
+            in
             let weight =
-              per_level_info.level - level_first_commitment_attested
+              min
+                maximum_number_of_blocks
+                (per_level_info.level - level_first_commitment_attested)
               |> float_of_int
             in
             if n = 0 then metrics.ratio_attested_commitments
@@ -1227,8 +1261,13 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
             default ()
         | Some old_per_level_info ->
             let n = Hashtbl.length old_per_level_info.published_commitments in
+            let maximum_number_of_blocks =
+              t.configuration.metrics_retention / t.time_between_blocks
+            in
             let weight =
-              per_level_info.level - level_first_commitment_attested
+              min
+                maximum_number_of_blocks
+                (per_level_info.level - level_first_commitment_attested)
               |> float_of_int
             in
             let table =
@@ -2517,6 +2556,14 @@ let init ~(configuration : configuration) etherlink_configuration cloud
         init_baker cloud configuration ~bootstrap teztale account i agent)
       (List.combine attesters_agents baker_accounts)
   in
+  let* constants =
+    RPC_core.call
+      bootstrap.node_rpc_endpoint
+      (RPC.get_chain_block_context_constants_parametric ())
+  in
+  let time_between_blocks =
+    JSON.(constants |-> "minimal_block_delay" |> as_int)
+  in
   let* parameters =
     Dal_common.Parameters.from_endpoint bootstrap.node_rpc_endpoint
   in
@@ -2617,6 +2664,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       producers;
       observers;
       etherlink;
+      time_between_blocks;
       parameters;
       infos;
       metrics;
@@ -2855,6 +2903,7 @@ let configuration, etherlink_configuration =
     else None
   in
   let blocks_history = Cli.blocks_history in
+  let metrics_retention = Cli.metrics_retention in
   let t =
     {
       stake;
@@ -2872,6 +2921,7 @@ let configuration, etherlink_configuration =
       data_dir;
       fundraiser;
       blocks_history;
+      metrics_retention;
     }
   in
   (t, etherlink)
