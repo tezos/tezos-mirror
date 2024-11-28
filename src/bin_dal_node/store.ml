@@ -584,6 +584,20 @@ let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
       Lwt_utils_unix.create_dir (data_dir // Stores_dirs.skip_list_cells)
     else Lwt.return_unit
   in
+  let*! () =
+    (* If a previous sqlite database has been created using the
+       `--sqlite3-backend` experimental flag. We simply move it to the
+       new destination path. *)
+    let previous_path = data_dir // Dal_store_sqlite3.sqlite_file_name in
+    if Sys.file_exists previous_path then (
+      let new_path =
+        skip_list_cells_data_dir // Dal_store_sqlite3.sqlite_file_name
+      in
+      let*! () = Lwt_utils_unix.copy_file ~src:previous_path ~dst:new_path () in
+      Sys.remove previous_path ;
+      Lwt.return_unit)
+    else Lwt.return_unit
+  in
   let*! () = Event.(emit dal_node_sqlite3_store_init ()) in
   Dal_store_sqlite3.Skip_list_cells.init
     ~data_dir:skip_list_cells_data_dir
