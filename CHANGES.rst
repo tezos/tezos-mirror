@@ -199,6 +199,12 @@ Protocol
   https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
 - A warning has been introduced in case it is observed that the DAL node lags
   behind the L1 node. (MR :gl:`!15756`)
+- **Change** The DAL node store version has been upgraded from 1 to 2.
+  The DAL node store will automatically upgrade without requiring any
+  user action. For users running the DAL node with the
+  ``--operator-profile`` flag enabled, the node now uses SQLite
+  specifically for managing skip list cells (MR :gl:`!15780`),
+  preventing inode exhaustion. All other stores remain unchanged.
 
 Miscellaneous
 -------------
