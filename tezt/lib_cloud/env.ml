@@ -21,8 +21,6 @@ let ssh_public_key_filename ?home () =
   let ssh_key = ssh_private_key_filename ?home () in
   Format.asprintf "%s.pub" ssh_key
 
-let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
-
 let mode =
   match (Cli.localhost, Cli.proxy) with
   | true, true -> `Orchestrator
@@ -81,6 +79,8 @@ let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
 
 let dockerfile = Path.dockerfile ~alias:dockerfile_alias
 
+let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
+
 let check_file_consistency = Cli.check_file_consistency
 
 let project_id = Gcloud.project_id
@@ -102,7 +102,7 @@ let init () =
       Lwt.return_unit
 
 (* Even though we could get this information locally, it is interesting to fetch
-   it through terraform to get the correct value if a scenario was launch with
+   it through terraform to get the correct value if a scenario was launched with
    different parameters. *)
 let hostname =
   let hostname = ref "" in
@@ -173,7 +173,7 @@ let dns_domains () =
   (* When we use the proxy mode, by default a domain name is
      registered for the `tezt-cloud` zone. *)
   let* domains =
-    if Cli.no_dns then Lwt.return []
+    if Cli.no_dns then Lwt.return_nil
     else
       match mode with
       | `Host -> (
