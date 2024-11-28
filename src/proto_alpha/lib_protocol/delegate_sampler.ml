@@ -141,6 +141,11 @@ module Random = struct
     return (c, pk)
 end
 
+let check_all_bakers_attest_at_level ctxt level =
+  match Constants_storage.all_bakers_attest_activation_level ctxt with
+  | None -> false
+  | Some act_level -> Raw_level_repr.(level.Level_repr.level >= act_level)
+
 let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
 
 let baking_rights_owner c (level : Level_repr.t) ~round =
