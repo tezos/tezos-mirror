@@ -9,14 +9,8 @@
 (** Name of the SQLite3 file. *)
 val sqlite_file_name : string
 
-(** A handler to the DAL node's SQLite3 database. *)
-type t = Sqlite.t
-
 (** A direct connection to the database, allowing to interact with it. *)
 type conn = Sqlite.conn
-
-(** [use db k] executes [k] with a fresh connection to [db]. *)
-val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
 module Schemas : sig
   (** [get_all conn] returns the list of SQL statements allowing to recreate

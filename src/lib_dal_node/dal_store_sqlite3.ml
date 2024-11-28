@@ -7,11 +7,13 @@
 (*****************************************************************************)
 
 open Filename.Infix
-include Sqlite
+open Sqlite
 open Caqti_request.Infix
 open Caqti_type.Std
 
 let sqlite_file_name = "store.sqlite"
+
+type conn = Sqlite.conn
 
 module Q = struct
   let table_exists =
