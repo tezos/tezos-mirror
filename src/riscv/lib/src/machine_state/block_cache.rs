@@ -603,12 +603,6 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
                 Ok(ProgramCounterUpdate::Set(instr_pc)) => {
                     // Setting the instr_pc implies execution continuing
                     // elsewhere - and no longer within the current block.
-                    //
-                    // TODO RV-245
-                    // We should make branching instructions return `Add`
-                    // variant, in the case that the jump condition is
-                    // not met - to allow further instructions in the
-                    // block to be executed directly.
                     core.hart.pc.write(instr_pc);
                     *steps += 1;
                     self.partial_block.reset();
@@ -709,12 +703,6 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
                 Ok(ProgramCounterUpdate::Set(instr_pc)) => {
                     // Setting the instr_pc implies execution continuing
                     // elsewhere - and no longer within the current block.
-                    //
-                    // TODO RV-245
-                    // We should make branching instructions return `Add`
-                    // variant, in the case that the jump condition is
-                    // not met - to allow further instructions in the
-                    // block to be executed directly.
                     core.hart.pc.write(instr_pc);
                     *steps += 1;
                     break;
