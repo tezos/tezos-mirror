@@ -13,6 +13,7 @@ depends: [
   "aches-lwt" { >= "1.1.0" }
   "alcotest" { >= "1.5.0" }
   "alcotest-lwt" { >= "1.5.0" }
+  "ambient-context-lwt" { = "0.1.0" }
   "asetmap" { >= "0.8.1" }
   "astring"
   "bam-ppx" { >= "0.3" }

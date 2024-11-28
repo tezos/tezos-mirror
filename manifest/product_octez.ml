@@ -3789,6 +3789,23 @@ let octez_requester_tests =
         qcheck_tezt;
       ]
 
+let octez_profiler_backend =
+  octez_lib
+    "octez-profiler-backend"
+    ~internal_name:"tezos_profiler_backend"
+    ~path:"src/lib_profiler_backend"
+    ~synopsis:"Backends for the Octez Profiler"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_stdlib |> open_;
+        octez_stdlib_unix;
+        opentelemetry;
+        ambient_context_lwt;
+        opentelemetry_client_cohttp_lwt;
+      ]
+
 let octez_shell =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
@@ -3811,6 +3828,7 @@ let octez_shell =
         lwt_watcher;
         lwt_canceler;
         prometheus;
+        octez_profiler_backend |> open_;
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix |> open_;
         octez_rpc;
@@ -7907,6 +7925,7 @@ let _octez_node =
          octez_rpc_http_server |> open_;
          octez_rpc_process |> open_;
          octez_p2p |> open_;
+         octez_profiler_backend |> open_;
          octez_shell |> open_;
          octez_store |> open_;
          octez_store_unix_reconstruction |> open_;
