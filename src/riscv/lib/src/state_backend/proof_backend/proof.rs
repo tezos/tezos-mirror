@@ -13,9 +13,6 @@
 //!
 //! - Convert [`MerkleTree`] to [`MerkleProof`]
 
-// TODO: RV-271 Allow unused code until functionality is exposed to the OCaml bindings.
-#![allow(dead_code)]
-
 use super::tree::{ModifyResult, Tree};
 use crate::{state_backend::hash::Hash, storage::DIGEST_SIZE};
 use itertools::Itertools;
@@ -142,12 +139,6 @@ impl From<Tag> for u8 {
 impl From<LeafTag> for Tag {
     fn from(value: LeafTag) -> Self {
         Tag::Leaf(value)
-    }
-}
-
-impl Tag {
-    fn is_leaf(&self) -> bool {
-        *self != Tag::Node
     }
 }
 

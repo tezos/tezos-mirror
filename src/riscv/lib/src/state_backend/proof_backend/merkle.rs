@@ -4,14 +4,11 @@
 
 //! Merkle trees used for proof generation by the PVM
 
-// TODO: RV-271 Allow unused code until functionality is exposed to the OCaml bindings.
-#![allow(dead_code)]
-
 use super::{
     proof::{MerkleProof, MerkleProofLeaf},
     DynAccess,
 };
-use crate::state_backend::hash::{Hash, HashError, RootHashable, DIGEST_SIZE};
+use crate::state_backend::hash::{Hash, HashError, RootHashable};
 use itertools::Itertools;
 
 /// A variable-width Merkle tree with [`AccessInfo`] metadata for leaves.
@@ -32,37 +29,6 @@ impl MerkleTree {
             Self::Node(hash, _) => *hash,
             Self::Leaf(hash, _, _) => *hash,
         }
-    }
-
-    /// Check the validity of the Merkle root by recomputing all hashes
-    fn check_root_hash(&self) -> bool {
-        let mut deque = std::collections::VecDeque::new();
-        deque.push_back(self);
-
-        while let Some(node) = deque.pop_front() {
-            let is_valid_hash = match node {
-                Self::Leaf(hash, _, data) => {
-                    Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
-                }
-                Self::Node(hash, children) => {
-                    // TODO RV-250: Instead of building the whole input and
-                    // hashing it, we should use incremental hashing, which
-                    // isn't currently supported in `tezos_crypto_rs`.
-                    //
-                    // Check the hash of this node and push children to deque to be checked
-                    let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * children.len());
-                    children.iter().for_each(|child| {
-                        deque.push_back(child);
-                        hashes.extend_from_slice(child.root_hash().as_ref())
-                    });
-                    Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
-                }
-            };
-            if !is_valid_hash {
-                return false;
-            }
-        }
-        true
     }
 
     /// Make a Merkle tree consisting of a single leaf; representing
@@ -172,50 +138,6 @@ impl AccessInfo {
 enum CompressedMerkleTree {
     Leaf(Hash, CompressedAccessInfo),
     Node(Hash, Vec<Self>),
-}
-
-impl CompressedMerkleTree {
-    /// Get the root hash of a compreessed Merkle tree
-    fn root_hash(&self) -> Hash {
-        match self {
-            Self::Node(hash, _) => *hash,
-            Self::Leaf(hash, _) => *hash,
-        }
-    }
-
-    /// Check the validity of the Merkle root by recomputing all hashes
-    fn check_root_hash(&self) -> bool {
-        let mut deque = std::collections::VecDeque::new();
-        deque.push_back(self);
-
-        while let Some(node) = deque.pop_front() {
-            let is_valid_hash = match node {
-                Self::Leaf(hash, access_info) => match access_info {
-                    CompressedAccessInfo::NoAccess | CompressedAccessInfo::Write => true,
-                    CompressedAccessInfo::Read(data) | CompressedAccessInfo::ReadWrite(data) => {
-                        Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
-                    }
-                },
-                Self::Node(hash, children) => {
-                    // TODO RV-250: Instead of building the whole input and
-                    // hashing it, we should use incremental hashing, which
-                    // isn't currently supported in `tezos_crypto_rs`.
-                    //
-                    // Check the hash of this node and push children to deque to be checked
-                    let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * children.len());
-                    children.iter().for_each(|child| {
-                        deque.push_back(child);
-                        hashes.extend_from_slice(child.root_hash().as_ref())
-                    });
-                    Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
-                }
-            };
-            if !is_valid_hash {
-                return false;
-            }
-        }
-        true
-    }
 }
 
 impl From<CompressedMerkleTree> for MerkleProof {
@@ -412,10 +334,88 @@ impl std::io::Write for MerkleWriter {
 mod tests {
     use super::{AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree, Merkleisable};
     use crate::state_backend::{
-        hash::{Hash, HashError, RootHashable},
+        hash::{Hash, HashError, RootHashable, DIGEST_SIZE},
         proof_backend::proof::{MerkleProof, MerkleProofLeaf},
     };
     use proptest::prelude::*;
+
+    impl MerkleTree {
+        /// Check the validity of the Merkle root by recomputing all hashes
+        fn check_root_hash(&self) -> bool {
+            let mut deque = std::collections::VecDeque::new();
+            deque.push_back(self);
+
+            while let Some(node) = deque.pop_front() {
+                let is_valid_hash = match node {
+                    Self::Leaf(hash, _, data) => {
+                        Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
+                    }
+                    Self::Node(hash, children) => {
+                        // TODO RV-250: Instead of building the whole input and
+                        // hashing it, we should use incremental hashing, which
+                        // isn't currently supported in `tezos_crypto_rs`.
+                        //
+                        // Check the hash of this node and push children to deque to be checked
+                        let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * children.len());
+                        children.iter().for_each(|child| {
+                            deque.push_back(child);
+                            hashes.extend_from_slice(child.root_hash().as_ref())
+                        });
+                        Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
+                    }
+                };
+                if !is_valid_hash {
+                    return false;
+                }
+            }
+            true
+        }
+    }
+
+    impl CompressedMerkleTree {
+        /// Get the root hash of a compreessed Merkle tree
+        fn root_hash(&self) -> Hash {
+            match self {
+                Self::Node(hash, _) => *hash,
+                Self::Leaf(hash, _) => *hash,
+            }
+        }
+
+        /// Check the validity of the Merkle root by recomputing all hashes
+        fn check_root_hash(&self) -> bool {
+            let mut deque = std::collections::VecDeque::new();
+            deque.push_back(self);
+
+            while let Some(node) = deque.pop_front() {
+                let is_valid_hash = match node {
+                    Self::Leaf(hash, access_info) => match access_info {
+                        CompressedAccessInfo::NoAccess | CompressedAccessInfo::Write => true,
+                        CompressedAccessInfo::Read(data)
+                        | CompressedAccessInfo::ReadWrite(data) => {
+                            Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
+                        }
+                    },
+                    Self::Node(hash, children) => {
+                        // TODO RV-250: Instead of building the whole input and
+                        // hashing it, we should use incremental hashing, which
+                        // isn't currently supported in `tezos_crypto_rs`.
+                        //
+                        // Check the hash of this node and push children to deque to be checked
+                        let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * children.len());
+                        children.iter().for_each(|child| {
+                            deque.push_back(child);
+                            hashes.extend_from_slice(child.root_hash().as_ref())
+                        });
+                        Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
+                    }
+                };
+                if !is_valid_hash {
+                    return false;
+                }
+            }
+            true
+        }
+    }
 
     impl Merkleisable for &Vec<u8> {
         fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
