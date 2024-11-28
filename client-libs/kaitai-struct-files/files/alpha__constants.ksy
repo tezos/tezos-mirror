@@ -116,6 +116,12 @@ types:
       type: int31
     - id: dal_rewards_weight
       type: int31
+  max_slashing_threshold:
+    seq:
+    - id: numerator
+      type: u2be
+    - id: denominator
+      type: u2be
   minimal_participation_ratio:
     seq:
     - id: numerator
@@ -303,7 +309,7 @@ seq:
 - id: max_slashing_per_block
   type: u2be
 - id: max_slashing_threshold
-  type: int31
+  type: max_slashing_threshold
 - id: testnet_dictator_tag
   type: u1
   enum: bool
