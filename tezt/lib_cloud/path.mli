@@ -25,7 +25,7 @@ val dockerfile : alias:string -> string
 val zcash_params : string
 
 (** Path to the DAL trusted setup directory that can be used for the
-  dockerfiles.*)
+    dockerfiles. *)
 val dal_trusted_setup : string
 
 (** Default path where images can be found on the docker container. *)
@@ -37,20 +37,20 @@ val self : string
 (** Path where to find the encoding of tezt cloud deployement. *)
 val proxy_deployement : tezt_cloud:string -> string
 
-(** Path where are stored grafana dashboards. *)
+(** Path where grafana dashboards are stored. *)
 val grafana_dashboards : string
 
-(** Path where is stored the website index. *)
+(** Path where the website index is stored. *)
 val website_index : string
 
 (** CSS file for the website. *)
 val website_style : string
 
-(** Path where is stored the prometheus configuration file. *)
+(** Path where the prometheus configuration file is stored. *)
 val prometheus_configuration : string
 
-(** Path where is stored the prometheus rules file. *)
+(** Path where the prometheus rules file is stored. *)
 val prometheus_rules_configuration : string
 
-(** Path where is stored the alert manager configuration file. *)
+(** Path where the alert manager configuration file is stored. *)
 val alert_manager_configuration : string
