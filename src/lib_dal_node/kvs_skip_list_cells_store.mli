@@ -113,5 +113,5 @@ module Internal_for_migrations : sig
     t ->
     attested_level:int32 ->
     slot_index:int ->
-    Dal_proto_types.Skip_list_hash.t Error_monad.tzresult Lwt.t
+    Dal_proto_types.Skip_list_hash.t tzresult Lwt.t
 end
