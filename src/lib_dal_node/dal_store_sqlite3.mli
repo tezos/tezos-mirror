@@ -18,16 +18,6 @@ type conn = Sqlite.conn
 (** [use db k] executes [k] with a fresh connection to [db]. *)
 val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
-(** [init ~data_dir ~perm ()] returns a handler to the DAL node store
-    located under [data_dir]. If no store is located in [data_dir], an
-    empty store is created.
-
-    If [perm] is [`Read_only], then SQL requests requiring write access will
-    fail. With [`Read_write], they will succeed as expected. *)
-val init :
-  data_dir:string -> perm:[`Read_only | `Read_write] -> unit -> t tzresult Lwt.t
-
-
 module Schemas : sig
   (** [get_all conn] returns the list of SQL statements allowing to recreate
       the tables in the current store. *)
@@ -36,6 +26,18 @@ end
 
 module Skip_list_cells : sig
   open Dal_proto_types
+
+  (** [init ~data_dir ~perm ()] returns a handler to the DAL node store
+    located under [data_dir]. If no store is located in [data_dir], an
+    empty store is created.
+
+    If [perm] is [`Read_only], then SQL requests requiring write access will
+    fail. With [`Read_write], they will succeed as expected. *)
+  val init :
+    data_dir:string ->
+    perm:[`Read_only | `Read_write] ->
+    unit ->
+    t tzresult Lwt.t
 
   (** [find ?conn store hash] returns the cell associated to [hash] in
       the [store], if any. Uses the [conn] if provided (defaults to

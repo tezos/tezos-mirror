@@ -696,7 +696,10 @@ let upgrade_from_v1_to_v2 ~base_dir =
   (* Initialize both stores and migrate. *)
   let* kvs_store = init_skip_list_cells_store base_dir in
   let* sql_store =
-    Dal_store_sqlite3.init ~data_dir:base_dir ~perm:`Read_write ()
+    Dal_store_sqlite3.Skip_list_cells.init
+      ~data_dir:base_dir
+      ~perm:`Read_write
+      ()
   in
   let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
   let*! res = Store_migrations.migrate_skip_list_store kvs_store sql_store in
@@ -800,7 +803,10 @@ let init config =
   in
   let* sqlite3 =
     let*! () = Event.(emit dal_node_sqlite3_store_init ()) in
-    Dal_store_sqlite3.init ~data_dir:base_dir ~perm:`Read_write ()
+    Dal_store_sqlite3.Skip_list_cells.init
+      ~data_dir:base_dir
+      ~perm:`Read_write
+      ()
   in
   let*! () = Event.(emit store_is_ready ()) in
   return

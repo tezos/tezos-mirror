@@ -386,7 +386,9 @@ let consistency_test =
       (* Initialize the KVS and the SQLite stores. *)
       let data_dir = Tezt.Temp.dir "data-dir" in
       let* kvs_store = init_skip_list_cells_store data_dir in
-      let* sql_store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+      let* sql_store =
+        Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
+      in
       (* Run the actions both for the KVS and the SQL backends. *)
       let* () = run_kvs kvs_store actions in
       let* () = run_sqlite3 sql_store actions in
@@ -426,7 +428,9 @@ let migration_skip_list_test {state; actions} =
   let data_dir = Tezt.Temp.dir "data-dir" in
   let* kvs_store = init_skip_list_cells_store data_dir in
   let* () = run_kvs kvs_store actions in
-  let* sql_store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+  let* sql_store =
+    Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
+  in
   let* () = Store_migrations.migrate_skip_list_store kvs_store sql_store in
   let* () = handshake state kvs_store sql_store in
   Kvs_skip_list_cells_store.close kvs_store

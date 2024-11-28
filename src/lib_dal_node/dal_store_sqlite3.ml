@@ -230,9 +230,52 @@ module Skip_list_cells = struct
         Sqlite.Db.exec conn Q.insert_skip_list_cell (cell_hash, cell))
       items
 
-  module Internal_for_tests = struct
-    open Types
+  let init ~data_dir ~perm () =
+    let open Lwt_result_syntax in
+    let path = data_dir // sqlite_file_name in
+    let*! exists = Lwt_unix.file_exists path in
+    let migration conn =
+      Sqlite.assert_in_transaction conn ;
+      let* () =
+        if not exists then
+          let* () = Migrations.create_table conn in
+          return_unit
+        else
+          let* table_exists = Migrations.table_exists conn in
+          let* () =
+            when_ (not table_exists) (fun () ->
+                failwith "A store already exists, but its content is incorrect.")
+          in
+          return_unit
+      in
+      let* migrations = Migrations.missing_migrations conn in
+      let*? () =
+        match (perm, migrations) with
+        | `Read_only, _ :: _ ->
+            error_with
+              "The store has %d missing migrations but was opened in read-only \
+               mode."
+              (List.length migrations)
+        | _, _ -> Ok ()
+      in
+      let* () =
+        List.iter_es
+          (fun (i, ((module M : Dal_node_migrations.S) as mig)) ->
+            let start_time = Unix.gettimeofday () in
+            let* () = Migrations.apply_migration conn i mig in
+            let end_time = Unix.gettimeofday () in
+            let duration = end_time -. start_time in
+            let*! () =
+              Dal_store_sqlite3_events.applied_migration ~name:M.name ~duration
+            in
+            return_unit)
+          migrations
+      in
+      return_unit
+    in
+    Sqlite.init ~path ~perm migration
 
+  module Internal_for_tests = struct
     module Q = struct
       open Dal_proto_types
 
@@ -252,48 +295,3 @@ module Skip_list_cells = struct
       Sqlite.Db.find conn Q.skip_list_hash_exists skip_list_hash
   end
 end
-
-let init ~data_dir ~perm () =
-  let open Lwt_result_syntax in
-  let path = data_dir // sqlite_file_name in
-  let*! exists = Lwt_unix.file_exists path in
-  let migration conn =
-    Sqlite.assert_in_transaction conn ;
-    let* () =
-      if not exists then
-        let* () = Migrations.create_table conn in
-        return_unit
-      else
-        let* table_exists = Migrations.table_exists conn in
-        let* () =
-          when_ (not table_exists) (fun () ->
-              failwith "A store already exists, but its content is incorrect.")
-        in
-        return_unit
-    in
-    let* migrations = Migrations.missing_migrations conn in
-    let*? () =
-      match (perm, migrations) with
-      | `Read_only, _ :: _ ->
-          error_with
-            "The store has %d missing migrations but was opened in read-only \
-             mode."
-            (List.length migrations)
-      | _, _ -> Ok ()
-    in
-    let* () =
-      List.iter_es
-        (fun (i, ((module M : Dal_node_migrations.S) as mig)) ->
-          let start_time = Unix.gettimeofday () in
-          let* () = Migrations.apply_migration conn i mig in
-          let end_time = Unix.gettimeofday () in
-          let duration = end_time -. start_time in
-          let*! () =
-            Dal_store_sqlite3_events.applied_migration ~name:M.name ~duration
-          in
-          return_unit)
-        migrations
-    in
-    return_unit
-  in
-  Sqlite.init ~path ~perm migration

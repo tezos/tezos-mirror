@@ -109,7 +109,9 @@ let run subcommand cli_options =
       Lwt_main.run @@ wrap_with_error
       @@ Lwt_utils_unix.with_tempdir "store"
       @@ fun data_dir ->
-      let* store = Dal_store_sqlite3.init ~data_dir ~perm:`Read_write () in
+      let* store =
+        Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
+      in
       let* schemas = Dal_store_sqlite3.(use store Schemas.get_all) in
       let output = String.concat ";\n\n" schemas in
       Format.printf "%s\n" output ;
