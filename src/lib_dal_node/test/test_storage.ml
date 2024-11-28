@@ -163,7 +163,7 @@ module Helpers = struct
       return @@ fun state ->
       let* attested_level = Level.gen in
       let* payload =
-        Bam.Std.list
+        list
           ~size:(return number_of_slots)
           (pair Skip_list_hash.gen Skip_list_cell.gen)
       in
@@ -449,6 +449,76 @@ let () =
   let state = snd (Bam.Gen.Random.split state) in
   let tree = Gen.run (gen 10 ~find_dist:0 ~remove_dist:0) state in
   let*! res = migration_skip_list_test (Tree.root tree) in
+  match res with
+  | Ok () -> Lwt.return_unit
+  | Error err ->
+      Test.fail
+        "Test fails with the following errors: %a"
+        Error_monad.pp_print_trace
+        err
+
+(** Test skip list storage migrations.
+
+    This test validates the migration from the key-value store to
+    sqlite with a 10 000 levels. *)
+
+let populate n kvs_store =
+  let open Lwt_result_syntax in
+  let seed = Tezt.Test.current_test_seed () in
+  let state = Bam.Gen.Random.make [|seed|] in
+  let tree = Tezt_bam.Gen.run Skip_list_cell.gen state in
+  let cells = Bam.Std.return @@ Tezt_bam.Tree.root tree in
+  let gen =
+    let open Bam.Std in
+    let open Bam.Std.Syntax in
+    let* payload =
+      list ~size:(return number_of_slots) (pair Skip_list_hash.gen cells)
+    in
+    return payload
+  in
+  let rec loop state n =
+    if n = 0 then return_unit
+    else
+      let state = snd (Bam.Gen.Random.split state) in
+      let tree = Tezt_bam.Gen.run gen state in
+      let payload = Tezt_bam.Tree.root tree in
+      let open Kvs_skip_list_cells_store in
+      let* () = insert kvs_store ~attested_level:(Int32.of_int n) payload in
+      loop state (pred n)
+  in
+  loop state n
+
+let migration_skip_list_test () =
+  let open Lwt_result_syntax in
+  let data_dir = Tezt.Temp.dir "data-dir" in
+  let* kvs_store = init_skip_list_cells_store data_dir in
+  let n = 10_000 in
+  let t1 = Unix.gettimeofday () in
+  let* () = populate n kvs_store in
+  let t2 = Unix.gettimeofday () in
+  Log.info "Execution time for generating %d elements: %f seconds" n (t2 -. t1) ;
+  let* sql_store =
+    Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
+  in
+  let t1 = Unix.gettimeofday () in
+  let* () = Store_migrations.migrate_skip_list_store kvs_store sql_store in
+  let t2 = Unix.gettimeofday () in
+  Log.info "Execution time for migrating %d elements: %f seconds" n (t2 -. t1) ;
+  let* () = Kvs_skip_list_cells_store.close kvs_store in
+  let*! () = Dal_store_sqlite3.Skip_list_cells.close sql_store in
+  return_unit
+
+let () =
+  let open Tezt_bam in
+  let open Lwt_result_syntax in
+  let title = "skip list storage migration with large data" in
+  Test.register
+    ~seed:Random
+    ~__FILE__
+    ~title
+    ~tags:["kvs"; "sqlite"; Tag.ci_disabled]
+  @@ fun () ->
+  let*! res = migration_skip_list_test () in
   match res with
   | Ok () -> Lwt.return_unit
   | Error err ->
