@@ -81,13 +81,15 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
    The baker daemon connects to the DAL node and attests to the availability of DAL data as well as its usual layer 1 baking function.
 
-#. In a new terminal window, verify that your baking daemon has attestation rights allocated, by running this command:
+#. In a new terminal window, verify that your baking daemon has attestation rights allocated for the current cycle, by running:
 
    .. code-block:: shell
 
-      octez-client rpc get "/chains/main/blocks/head/helpers/attestation_rights?delegate=$MY_ADDRESS"
+      octez-client rpc get "/chains/main/blocks/head" | jq '.metadata.level_info.cycle'
+      octez-client rpc get "/chains/main/blocks/head/helpers/attestation_rights?delegate=$MY_ADDRESS&cycle=<current-cycle>"
 
-   If the previous command reports no attestation rights (``[]``), first check that you do have attestation rights during the current cycle (by adding the ``"&cycle=<current_cycle>"`` argument). If that is not the case, you may have to register as a delegate or re-activate your delegate and wait for a few cycles to get some rights (see :ref:`DelegateRegistration`).
+   Be aware that the last command may take several minutes to execute if it returns a long list of rights.
+   In turn, if the previous command reports no attestation rights (``[]``), you may have to register as a delegate or re-activate your delegate and wait for a few cycles to get some rights (see :ref:`DelegateRegistration`).
 
 #. Verify that the DAL node is running properly:
 
