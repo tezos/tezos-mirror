@@ -18,6 +18,8 @@ type t = {
 
 let ssh_id () = Env.ssh_private_key_filename ()
 
+(* Encodings *)
+
 let docker_image_encoding =
   let open Data_encoding in
   union
@@ -90,6 +92,24 @@ let encoding =
        (req "next_available_port" Data_encoding.int31)
        (req "configuration" configuration_encoding))
 
+(* Getters *)
+
+let name {name; _} = name
+
+let vm_name {vm_name; _} = vm_name
+
+let point {point; _} = point
+
+let next_available_port t = t.next_available_port ()
+
+let runner {runner; _} = runner
+
+let configuration {configuration; _} = configuration
+
+(* Setters *)
+
+let set_name agent name = agent.name <- name
+
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in
   let runner =
@@ -110,12 +130,6 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
     zone;
   }
 
-let name {name; _} = name
-
-let vm_name {vm_name; _} = vm_name
-
-let point {point; _} = point
-
 let cmd_wrapper {zone; vm_name; _} =
   match zone with
   | None -> None
@@ -126,8 +140,6 @@ let cmd_wrapper {zone; vm_name; _} =
         else Env.ssh_private_key_filename ()
       in
       Some (Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename)
-
-let set_name agent name = agent.name <- name
 
 let path_of agent binary = agent.configuration.binaries_path // binary
 
@@ -286,9 +298,3 @@ let copy =
           in
           Hashtbl.replace already_copied (agent, destination) p ;
           p
-
-let next_available_port t = t.next_available_port ()
-
-let runner {runner; _} = runner
-
-let configuration {configuration; _} = configuration

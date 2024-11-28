@@ -35,8 +35,39 @@ val name : t -> string
 (** [vm_name agent] returns the vm name of the agent. *)
 val vm_name : t -> string
 
+(** [point agent] returns the point asociated with the agent. *)
+val point : t -> (string * int) option
+
+(** [next_available_port agent] returns the next available port for
+    this agent. Raises [Not_found] if no port is available. *)
+val next_available_port : t -> int
+
+(** [runner agent] returns the runner associated with the agent. *)
+val runner : t -> Runner.t option
+
+(** [configuration t] the configuration of the agent. *)
+val configuration : t -> Configuration.t
+
 (** [set_name agent name] sets the name of the agent to [name]. *)
 val set_name : t -> string -> unit
+
+(** A wrapper to run a command on the VM of the agent. *)
+val cmd_wrapper : t -> Gcloud.cmd_wrapper option
+
+(** Run a command on the host machine of the VM. *)
+val host_run_command : t -> string -> string list -> Process.t
+
+(** Run a command on the docker image run by the agent.
+
+    This command should not be used outside of the [tezt-cloud]
+    library. It does not behave well when the scenario is interrupted
+    and the process is still running. Instead, [Process.spawn
+    ~runner:(Agent.runner agent)] should be used.
+
+    The library uses it to ensure there won't be any check of the host
+    when issuing for the first time an ssh connection.
+ *)
+val docker_run_command : t -> string -> string list -> Process.t
 
 (** [copy ?consistency_check ?refresh ?destination agent ~source]
     copies the file into the [agent] directory and returned the
@@ -63,34 +94,3 @@ val copy :
   t ->
   source:string ->
   string Lwt.t
-
-(** [next_available_port agent] returns the next available port for
-    this agent. Raises [Not_found] if no port is available. *)
-val next_available_port : t -> int
-
-(** [runner agent] returns the runner associated with the agent. *)
-val runner : t -> Runner.t option
-
-(** [point agent] returns the point asociated with the agent. *)
-val point : t -> (string * int) option
-
-(** [configuration t] the configuration of the agent. *)
-val configuration : t -> Configuration.t
-
-(** A wrapper to run a command on the VM of the agent. *)
-val cmd_wrapper : t -> Gcloud.cmd_wrapper option
-
-(** Run a command on the host machine of the VM. *)
-val host_run_command : t -> string -> string list -> Process.t
-
-(** Run a command on the docker image run by the agent.
-
-    This command should not be used outside of the [tezt-cloud]
-    library. It does not behave well when the scenario is interrupted
-    and the process is still running. Instead, [Process.spawn
-    ~runner:(Agent.runner agent)] should be used.
-
-    The library uses it to ensure there won't be any check of the host
-    when issuing for the first time an ssh connection.
- *)
-val docker_run_command : t -> string -> string list -> Process.t
