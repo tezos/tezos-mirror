@@ -68,7 +68,7 @@ gen_memory_layout!(M4G = 4 GiB);
 // XXX: We can't associate these region types directly with [Sizes] because
 // inherent associated types are unstable. Hence we must go through a dummy
 // trait.
-pub trait MainMemoryLayout: backend::Layout {
+pub trait MainMemoryLayout: backend::Layout + 'static {
     type Data<M: backend::ManagerBase>;
 
     const BYTES: usize;

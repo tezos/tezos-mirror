@@ -462,6 +462,42 @@ pub mod test_helpers {
         });
     }
 
+    /// Ensure [`EnrichedCell`] is serialized identically to [`Cell`].
+    #[test]
+    fn enriched_cell_serialise_match_cell() {
+        use crate::state_backend::hash::RootHashable;
+
+        pub struct Enriching;
+        pub struct Fun;
+
+        impl EnrichedValue for Enriching {
+            type E = u64;
+            type D<M: ManagerBase + ?Sized> = Fun;
+        }
+
+        impl<'a> From<&'a u64> for Fun {
+            fn from(_value: &'a u64) -> Self {
+                Self
+            }
+        }
+
+        proptest::proptest!(|(value: u64)| {
+            let mut ecell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind((0u64, Fun::from(&0)));
+            let mut cell: Cell<u64, Owned> = Cell::bind([0; 1]);
+            ecell.write(value);
+            cell.write(value);
+
+            assert_eq!(value, ecell.read_stored());
+            assert_eq!(value, cell.read());
+
+            let ebytes = bincode::serialize(&ecell).unwrap();
+            let cbytes = bincode::serialize(&cell).unwrap();
+
+            assert_eq!(ebytes, cbytes, "Serializing EnrichedCell and Cell should match");
+            assert_eq!(ecell.hash().unwrap(), cell.hash().unwrap(), "RootHashable for EnrichedCell and Cell should match");
+        });
+    }
+
     /// Ensure that [`Cell`] serialises in a way that represents the underlying element
     /// directly instead of wrapping it into an array (as it is an array under the hood).
     #[test]

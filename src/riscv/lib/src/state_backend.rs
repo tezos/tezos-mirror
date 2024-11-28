@@ -76,12 +76,12 @@ pub use region::*;
 /// This derived value does not form part of any stored state/commitments.
 pub trait EnrichedValue: 'static {
     type E: 'static;
-    type D<M: ManagerBase + ?Sized>: Sized;
+    type D<M: ManagerBase>;
 }
 
 /// Specifies that there exists a path to derive `V::D` from `&V::E`,
 /// for a given manager.
-pub trait EnrichedValueLinked<M: ManagerBase + ?Sized>: EnrichedValue {
+pub trait EnrichedValueLinked<M: ManagerBase>: EnrichedValue {
     /// Construct the derived value from the stored value, maps to
     /// the `From` trait by default.
     fn derive(v: &Self::E) -> Self::D<M>;
@@ -98,7 +98,7 @@ where
 }
 
 /// Manager of the state backend storage
-pub trait ManagerBase {
+pub trait ManagerBase: Sized {
     /// Region that has been allocated in the state storage
     type Region<E: 'static, const LEN: usize>;
 

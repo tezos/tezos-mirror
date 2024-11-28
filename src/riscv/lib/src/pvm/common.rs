@@ -136,7 +136,7 @@ impl<
     /// Reset the PVM state.
     pub fn reset(&mut self)
     where
-        M: state_backend::ManagerWrite,
+        M: state_backend::ManagerReadWrite,
     {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
