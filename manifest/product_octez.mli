@@ -59,7 +59,7 @@ val octez_scoru_wasm_debugger_lib : Manifest.target
 
 val octez_scoru_wasm_debugger_plugin : Manifest.target
 
-val octez_scoru_wasm_helpers : Manifest.target
+val octez_scoru_wasm_helpers_functor : Manifest.target
 
 val octez_scoru_wasm : Manifest.target
 

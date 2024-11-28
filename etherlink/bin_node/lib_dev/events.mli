@@ -94,3 +94,7 @@ val invalid_node_da_fees :
   unit Lwt.t
 
 val deprecation_note : string -> unit Lwt.t
+
+(** [wasm_pvm_fallback ()] advertises that the node has to fallback to the PVM
+    to execute a block, which is slow. *)
+val wasm_pvm_fallback : unit -> unit Lwt.t

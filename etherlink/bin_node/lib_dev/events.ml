@@ -224,6 +224,14 @@ let invalid_node_da_fees =
     ("block_number", Data_encoding.option Ethereum_types.quantity_encoding)
     ("call", Data_encoding.Json.encoding)
 
+let wasm_pvm_fallback =
+  Internal_event.Simple.declare_0
+    ~level:Warning
+    ~section
+    ~name:"wasm_pvm_fallback"
+    ~msg:"The node needs to fallback to the WASM PVM to execute a block"
+    ()
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -280,3 +288,5 @@ let invalid_node_da_fees ~node_da_fees ~kernel_da_fees ~block_number ~call =
   emit invalid_node_da_fees (node_da_fees, kernel_da_fees, block_number, call)
 
 let deprecation_note msg = emit event_deprecation_note msg
+
+let wasm_pvm_fallback () = emit wasm_pvm_fallback ()

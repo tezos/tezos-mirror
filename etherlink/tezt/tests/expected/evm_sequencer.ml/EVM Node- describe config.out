@@ -146,7 +146,8 @@
       "next_wasm_runtime"?:
         boolean
         /* Enable or disable the experimental WASM runtime that is expected
-           to replace the Smart Rollup’s Fast Exec runtime */,
+           to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You
+           should remove this option from your configuration file. */,
       "enable_websocket"?:
         boolean
         /* Enable or disable the experimental websocket server */ },

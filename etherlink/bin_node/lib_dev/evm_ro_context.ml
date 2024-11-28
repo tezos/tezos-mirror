@@ -14,7 +14,6 @@ type t = {
   index : Irmin_context.ro_index;
   finalized_view : bool;
   block_storage_sqlite3 : bool;
-  wasm_runtime : bool;
 }
 
 let load ?smart_rollup_address ~data_dir configuration =
@@ -39,7 +38,6 @@ let load ?smart_rollup_address ~data_dir configuration =
     block_storage_sqlite3 =
       configuration.experimental_features.block_storage_sqlite3;
     finalized_view = configuration.finalized_view;
-    wasm_runtime = configuration.experimental_features.next_wasm_runtime;
   }
 
 let get_evm_state ctxt hash =
@@ -234,17 +232,12 @@ struct
     let simulate_and_read ?state_override simulate_state ~input =
       let open Lwt_result_syntax in
       let config =
-        Evm_state.
-          {
-            config =
-              Config.config
-                ~preimage_directory:Ctxt.ctxt.preimages
-                ?preimage_endpoint:Ctxt.ctxt.preimages_endpoint
-                ~kernel_debug:false
-                ~destination:Ctxt.ctxt.smart_rollup_address
-                ();
-            wasm_runtime = Ctxt.ctxt.wasm_runtime;
-          }
+        Config.config
+          ~preimage_directory:Ctxt.ctxt.preimages
+          ?preimage_endpoint:Ctxt.ctxt.preimages_endpoint
+          ~kernel_debug:false
+          ~destination:Ctxt.ctxt.smart_rollup_address
+          ()
       in
       let* simulate_state =
         State_override.update_accounts state_override simulate_state
@@ -323,17 +316,12 @@ end) =
   Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
 
 let pvm_config ctxt =
-  Evm_state.
-    {
-      config =
-        Config.config
-          ~preimage_directory:ctxt.preimages
-          ?preimage_endpoint:ctxt.preimages_endpoint
-          ~kernel_debug:true
-          ~destination:ctxt.smart_rollup_address
-          ();
-      wasm_runtime = ctxt.wasm_runtime;
-    }
+  Config.config
+    ~preimage_directory:ctxt.preimages
+    ?preimage_endpoint:ctxt.preimages_endpoint
+    ~kernel_debug:true
+    ~destination:ctxt.smart_rollup_address
+    ()
 
 let replay ctxt ?(log_file = "replay") ?profile
     ?(alter_evm_state = Lwt_result_syntax.return) (Ethereum_types.Qty number) =
@@ -468,9 +456,7 @@ let preload_kernel_from_level ctxt level =
   let open Lwt_result_syntax in
   let* hash = find_irmin_hash_from_number ctxt level in
   let* evm_state = get_evm_state ctxt hash in
-  let*! () =
-    Evm_state.preload_kernel ~wasm_runtime:ctxt.wasm_runtime evm_state
-  in
+  let*! () = Evm_state.preload_kernel evm_state in
   return_unit
 
 let preload_known_kernels ctxt =

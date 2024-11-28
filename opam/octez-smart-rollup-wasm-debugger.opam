@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-rust-deps" { = version }
   "bls12-381" { = version }
+  "octez-l2-libs" { = version }
   "octez-smart-rollup-wasm-debugger-lib" { = version }
 ]
 build: [

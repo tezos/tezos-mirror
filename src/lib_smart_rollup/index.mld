@@ -14,6 +14,8 @@ It contains the following libraries:
 - {{!module-Tezos_scoru_wasm_durable_snapshot}Tezos_scoru_wasm_durable_snapshot}: Durable storage reference implementation
 - {{!module-Tezos_scoru_wasm_fast}Tezos_scoru_wasm_fast}: WASM functionality for SCORU Fast Execution
 - {{!module-Tezos_scoru_wasm_helpers}Tezos_scoru_wasm_helpers}: Helpers for the smart rollup wasm functionality and debugger
+- {{!module-Tezos_scoru_wasm_helpers_functor}Tezos_scoru_wasm_helpers_functor}: Helpers for the smart rollup wasm functionality and debugger (functor)
+- {{!module-Tezos_scoru_wasm_helpers_intf}Tezos_scoru_wasm_helpers_intf}: Helpers for the smart rollup wasm functionality and debugger (signatures)
 - {{!module-Tezos_scoru_wasm_test_helpers}Tezos_scoru_wasm_test_helpers}: Helpers for test of the smart rollup wasm functionality
 - {{!module-Tezos_wasmer}Tezos_wasmer}: Wasmer bindings for SCORU WASM
 - {{!module-Tezos_webassembly_interpreter_extra}Tezos_webassembly_interpreter_extra}: Additional modules from the WebAssembly REPL used in testing

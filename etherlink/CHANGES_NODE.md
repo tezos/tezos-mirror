@@ -4,6 +4,10 @@
 
 ### Features
 
+- Improves performances for blocks application and RPC requests by switching to
+  a dedicated WASM runtime, instead of using the one developed for the rollup
+  node. (!15389)
+
 ### Bug fixes
 
 ### Internals
