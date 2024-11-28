@@ -86,6 +86,7 @@ use crate::state_backend::{
 };
 use crate::traps::{EnvironException, Exception};
 use std::marker::PhantomData;
+use std::u64;
 
 /// Mask for getting the offset within a page
 const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
@@ -462,6 +463,12 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     /// Add the instruction into a block.
     ///
     /// If the block is full, a new block will be started.
+    ///
+    /// If there is a block at the next address, we will
+    /// merge it into the current block if possible. We
+    /// ensure it is valid (it is part of the same fence,
+    /// on the same page and that the combined block will
+    /// not exceed the maximum number of instructions).
     fn cache_inner<const WIDTH: u64>(&mut self, phys_addr: Address, instr: Instruction)
     where
         M: ManagerReadWrite,
@@ -474,7 +481,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
 
         let mut len_instr = entry.len_instr.read();
 
-        if start != block_addr || entry.address.read() == phys_addr {
+        if start != block_addr || start == phys_addr {
             entry.start_block(block_addr, fence_counter);
             len_instr = 0;
         } else if len_instr == CACHE_INSTR as u8 {
@@ -493,7 +500,32 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
         let new_len = len_instr + 1;
         entry.len_instr.write(new_len);
 
-        self.next_instr_addr.write(phys_addr + WIDTH);
+        let next_phys_addr = phys_addr + WIDTH;
+        self.next_instr_addr.write(next_phys_addr);
+
+        let possible_block = BCL::entry(&self.entries, next_phys_addr);
+        let adjacent_block_found = possible_block.address.read() == next_phys_addr
+            && possible_block.fence_counter.read() == fence_counter
+            && next_phys_addr & PAGE_OFFSET_MASK as u64 != 0
+            && possible_block.len_instr.read() + new_len <= CACHE_INSTR as u8;
+
+        if adjacent_block_found {
+            let num_instr = possible_block.len_instr.read();
+            for i in 0..num_instr as usize {
+                // Need to resolve the adjacent block again because we may only keep one reference at a time
+                // to `self.entries`.
+                let new_block = BCL::entry(&self.entries, next_phys_addr);
+                let new_instr = new_block.instr[i].read();
+                // Need to resolve the target block again because we may only keep one reference at a time
+                // to `self.entries`.
+                let current_entry = BCL::entry_mut(&mut self.entries, block_addr);
+                current_entry.instr[new_len as usize + i].write(new_instr);
+            }
+            let current_entry = BCL::entry_mut(&mut self.entries, block_addr);
+            current_entry.len_instr.write(new_len + num_instr);
+            self.next_instr_addr.write(!0);
+            self.current_block_addr.write(!0);
+        }
     }
 
     /// Lookup a block by a physical address.
@@ -603,12 +635,6 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
                 Ok(ProgramCounterUpdate::Set(instr_pc)) => {
                     // Setting the instr_pc implies execution continuing
                     // elsewhere - and no longer within the current block.
-                    //
-                    // TODO RV-245
-                    // We should make branching instructions return `Add`
-                    // variant, in the case that the jump condition is
-                    // not met - to allow further instructions in the
-                    // block to be executed directly.
                     core.hart.pc.write(instr_pc);
                     *steps += 1;
                     self.partial_block.reset();
@@ -709,12 +735,6 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
                 Ok(ProgramCounterUpdate::Set(instr_pc)) => {
                     // Setting the instr_pc implies execution continuing
                     // elsewhere - and no longer within the current block.
-                    //
-                    // TODO RV-245
-                    // We should make branching instructions return `Add`
-                    // variant, in the case that the jump condition is
-                    // not met - to allow further instructions in the
-                    // block to be executed directly.
                     core.hart.pc.write(instr_pc);
                     *steps += 1;
                     break;
@@ -965,6 +985,85 @@ mod tests {
         assert_eq!(0, block_state.partial_block.progress.read());
         assert_eq!(0, block_state.partial_block.phys_addr.read());
         assert_eq!(block_addr + 10 * 4, core_state.hart.pc.read());
+    });
+
+    backend_test!(test_concat_blocks_suitable, F, {
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
+
+        let uncompressed = Instruction {
+            opcode: OpCode::Sd,
+            args: Args {
+                rs1: t1,
+                rs2: t0,
+                imm: 8,
+                ..Args::DEFAULT
+            },
+        };
+
+        let phys_addr = 30;
+        let preceding_num_instr: u64 = 5;
+
+        for offset in 0..(CACHE_INSTR as u64 - preceding_num_instr) {
+            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 4), uncompressed);
+            state.push_instr::<4>(entry);
+        }
+
+        for offset in 0..preceding_num_instr {
+            let entry = ValidatedCacheEntry::from_raw(
+                phys_addr - (preceding_num_instr * 4) + (offset * 4),
+                uncompressed,
+            );
+            state.push_instr::<4>(entry);
+        }
+
+        let block = state.get_block(phys_addr - 20);
+        assert!(block.is_some());
+        assert_eq!(CACHE_INSTR, block.unwrap().num_instr());
+
+        let old_block = state.get_block(phys_addr);
+        assert!(old_block.is_some());
+        assert_eq!(15, old_block.unwrap().num_instr());
+    });
+
+    backend_test!(test_concat_blocks_too_big, F, {
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
+
+        let uncompressed = Instruction {
+            opcode: OpCode::Sd,
+            args: Args {
+                rs1: t1,
+                rs2: t0,
+                imm: 8,
+                ..Args::DEFAULT
+            },
+        };
+
+        let phys_addr = 30;
+        let preceding_num_instr: u64 = 5;
+
+        for offset in 0..(CACHE_INSTR as u64 - preceding_num_instr + 1) {
+            let entry = ValidatedCacheEntry::from_raw(phys_addr + (offset * 4), uncompressed);
+            state.push_instr::<4>(entry);
+        }
+
+        for offset in 0..preceding_num_instr {
+            let entry = ValidatedCacheEntry::from_raw(
+                phys_addr - (preceding_num_instr * 4) + (offset * 4),
+                uncompressed,
+            );
+            state.push_instr::<4>(entry);
+        }
+
+        let first_block = state.get_block(phys_addr - preceding_num_instr * 4);
+        assert!(first_block.is_some());
+        assert_eq!(preceding_num_instr, first_block.unwrap().num_instr() as u64);
+
+        let second_block = state.get_block(phys_addr);
+        assert!(second_block.is_some());
+        assert_eq!(
+            CACHE_INSTR - preceding_num_instr as usize + 1,
+            second_block.unwrap().num_instr()
+        );
     });
 
     /// The initialised block cache must not return any blocks. This is especially important for
