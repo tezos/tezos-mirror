@@ -162,9 +162,7 @@ let fetch_events state rollup_block_lvl =
 let on_new_head state rollup_block_lvl =
   let open Lwt_result_syntax in
   let* events = fetch_events state rollup_block_lvl in
-  match events with
-  | [] -> Evm_context.new_last_known_l1_level rollup_block_lvl
-  | _ -> Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
+  Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
 
 module Handlers = struct
   open Evm_events_follower_types

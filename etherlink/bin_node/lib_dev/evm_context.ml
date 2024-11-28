@@ -131,7 +131,6 @@ module Request = struct
       }
         -> ((Ethereum_types.quantity * Blueprint_types.payload) list, tztrace) t
     | Last_known_L1_level : (int32 option, tztrace) t
-    | New_last_known_L1_level : int32 -> (unit, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
     | Reconstruct : {
         rollup_node_store : [`Read] Octez_smart_rollup_node_store.Store.t;
@@ -213,21 +212,12 @@ module Request = struct
           (fun () -> View Last_known_L1_level);
         case
           (Tag 5)
-          ~title:"New_last_known_L1_level"
-          (obj2
-             (req "request" (constant "new_last_known_l1_level"))
-             (req "value" int32))
-          (function
-            | View (New_last_known_L1_level l) -> Some ((), l) | _ -> None)
-          (fun ((), l) -> View (New_last_known_L1_level l));
-        case
-          (Tag 6)
           ~title:"Delayed_inbox_hashes"
           (obj1 (req "request" (constant "Delayed_inbox_hashes")))
           (function View Delayed_inbox_hashes -> Some () | _ -> None)
           (fun () -> View Delayed_inbox_hashes);
         case
-          (Tag 7)
+          (Tag 6)
           ~title:"Reconstruct"
           (obj3
              (req "request" (constant "reconstruct"))
@@ -242,7 +232,7 @@ module Request = struct
             (* This case cannot be used to decode, which is acceptable because
                the only use case for the encoding is logging (so encoding). *));
         case
-          (Tag 8)
+          (Tag 7)
           ~title:"Patch_state"
           (obj5
              (req "request" (constant "patch_state"))
@@ -257,7 +247,7 @@ module Request = struct
           (fun ((), commit, key, value, block_number) ->
             View (Patch_state {commit; key; value; block_number}));
         case
-          (Tag 9)
+          (Tag 8)
           ~title:"Wasm_pvm_version"
           (obj1 (req "request" (constant "wasm_pvm_version")))
           (function View Wasm_pvm_version -> Some () | _ -> None)
@@ -649,18 +639,33 @@ module State = struct
     if needs_process then (
       let* context, evm_state, on_success =
         with_store_transaction ctxt @@ fun conn ->
-        let* on_success, ctxt, evm_state =
-          List.fold_left_es
-            (fun (on_success, ctxt, evm_state) event ->
-              let* evm_state, on_success =
-                apply_evm_event_unsafe on_success ctxt conn evm_state event
+        let* on_success, ctxt, evm_state, context =
+          match events with
+          | [] ->
+              (* Avoid an uncessary {!replace_current_commit} if the list is
+                 empty. *)
+              return (ignore, ctxt, ctxt.session.evm_state, ctxt.session.context)
+          | events ->
+              let* on_success, ctxt, evm_state =
+                List.fold_left_es
+                  (fun (on_success, ctxt, evm_state) event ->
+                    let* evm_state, on_success =
+                      apply_evm_event_unsafe
+                        on_success
+                        ctxt
+                        conn
+                        evm_state
+                        event
+                    in
+                    return (on_success, ctxt, evm_state))
+                  (ignore, ctxt, ctxt.session.evm_state)
+                  events
               in
-              return (on_success, ctxt, evm_state))
-            (ignore, ctxt, ctxt.session.evm_state)
-            events
+              let* context = replace_current_commit ctxt conn evm_state in
+              return (on_success, ctxt, evm_state, context)
         in
-        let* _ =
-          Option.map_es
+        let* () =
+          Option.iter_es
             (fun l1_level ->
               let l2_level = current_blueprint_number ctxt in
               Evm_store.L1_l2_levels_relationships.store
@@ -670,8 +675,7 @@ module State = struct
                 ~finalized_l2_level:ctxt.session.finalized_number)
             finalized_level
         in
-        let* ctxt = replace_current_commit ctxt conn evm_state in
-        return (ctxt, evm_state, on_success)
+        return (context, evm_state, on_success)
       in
       let*! () =
         Option.iter_s
@@ -1468,17 +1472,6 @@ module Handlers = struct
         Evm_store.use ctxt.store @@ fun conn ->
         let+ level = Evm_store.L1_l2_levels_relationships.find conn in
         match level with Some {l1_level; _} -> Some l1_level | None -> None)
-    | New_last_known_L1_level l1_level ->
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        Evm_store.use ctxt.store @@ fun conn ->
-        let l2_level = State.current_blueprint_number ctxt in
-        let*! () = Evm_context_events.processed_l1_level l1_level in
-        Evm_store.L1_l2_levels_relationships.store
-          conn
-          ~latest_l2_level:l2_level
-          ~l1_level
-          ~finalized_l2_level:ctxt.session.finalized_number
     | Delayed_inbox_hashes ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1855,9 +1848,6 @@ let blueprints_range from to_ =
   worker_wait_for_request (Blueprints_range {from; to_})
 
 let last_known_l1_level () = worker_wait_for_request Last_known_L1_level
-
-let new_last_known_l1_level l =
-  worker_add_request ~request:(New_last_known_L1_level l)
 
 let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
 
