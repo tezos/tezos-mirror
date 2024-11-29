@@ -83,6 +83,8 @@ let pvm_config ctxt =
     ~destination:ctxt.smart_rollup_address
     ()
 
+type error += Cannot_apply_blueprint of {local_state_level : Z.t}
+
 module Types = struct
   type state = t
 
@@ -739,8 +741,6 @@ module State = struct
       head_info := session_to_head_info ctxt.session ;
       return_unit)
     else return_unit
-
-  type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
   let () =
     register_error_kind

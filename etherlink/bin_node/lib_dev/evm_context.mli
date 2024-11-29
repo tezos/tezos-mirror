@@ -16,6 +16,8 @@ type head = {
   pending_upgrade : Evm_events.Upgrade.t option;
 }
 
+type error += Cannot_apply_blueprint of {local_state_level : Z.t}
+
 (** [lock_data_dir ~data_dir] takes an exclusive lock on [data_dir] for the
     duration of the process. It fails if there is already another evm node with
     a lock. *)

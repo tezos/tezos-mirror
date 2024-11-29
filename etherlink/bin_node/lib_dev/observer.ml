@@ -25,11 +25,17 @@ let on_new_blueprint next_blueprint_number
       | Some kernel_upgrade -> [Evm_events.Upgrade_event kernel_upgrade]
       | None -> []
     in
-    Evm_context.apply_blueprint
-      ~events
-      blueprint.timestamp
-      blueprint.payload
-      delayed_transactions
+    (* Apply blueprint is allowed to fail. *)
+    let*! res =
+      Evm_context.apply_blueprint
+        ~events
+        blueprint.timestamp
+        blueprint.payload
+        delayed_transactions
+    in
+    match res with
+    | Error (Evm_context.Cannot_apply_blueprint _ :: _) | Ok () -> return_unit
+    | Error err -> fail err
   else failwith "Received a blueprint with an unexpected number."
 
 let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
