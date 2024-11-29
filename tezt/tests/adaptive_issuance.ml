@@ -220,7 +220,9 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
 let test_AI_activation =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number ParisC))
+      (* In protocols R+, AI is always immediately active; there is no
+         feature vote. *)
+    ~supports:Protocol.(Until_protocol (number Quebec))
     ~title:"AI Activation - test AI activation after feature vote"
     ~tags:["adaptive_issuance"; "staking"]
   @@ fun protocol ->
@@ -275,22 +277,17 @@ let test_AI_activation =
   in
 
   assert (limit_after = 5000000 && edge_after = 500000000) ;
-  log_step
-    3
-    "Check staking is not allowed before AI activation (only for protocols up \
-     to Q)" ;
+  log_step 3 "Check staking is not allowed before AI activation" ;
   let* () =
-    if Protocol.(number protocol <= 021) then
-      let stake =
-        Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client
-      in
-      Process.check_error
-        ~msg:
-          (rex
-             "Manual staking operations are forbidden because staking is \
-              currently automated.")
-        stake
-    else unit
+    let stake =
+      Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client
+    in
+    Process.check_error
+      ~msg:
+        (rex
+           "Manual staking operations are forbidden because staking is \
+            currently automated.")
+      stake
   in
 
   log_step 4 "Activate AI" ;
@@ -314,7 +311,9 @@ let test_AI_activation =
 let test_AI_activation_bypass_vote =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number ParisC))
+      (* The "adaptive_issuance_force_activation" feature flag no longer
+         exists in protocols R+ *)
+    ~supports:Protocol.(Until_protocol (number Quebec))
     ~title:
       "AI Activation - test AI activation with feature flag force_activation \
        set"
