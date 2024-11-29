@@ -18,3 +18,5 @@ let make_persistent_signature ~filename ~cmi =
 let compunit_name compunit =
   let (Cmo_format.Compunit cuname) = compunit.Cmo_format.cu_name in
   cuname
+
+let mark_attribute_used _ = ()

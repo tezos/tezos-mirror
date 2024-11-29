@@ -28,4 +28,9 @@
 (rule
  (target compiler_libs.ml)
  (action (copy compat_files/compiler_libs_ocaml5.ml %{target}))
- (enabled_if (>= %{ocaml_version} 5)))
+ (enabled_if (and (>= %{ocaml_version} 5) (< %{ocaml_version} 5.2))))
+
+(rule
+ (target compiler_libs.ml)
+ (action (copy compat_files/compiler_libs_ocaml5_2.ml %{target}))
+ (enabled_if (>= %{ocaml_version} 5.2)))

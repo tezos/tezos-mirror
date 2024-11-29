@@ -6,17 +6,21 @@
 (*****************************************************************************)
 
 let default_persistent_signature_loader =
-  let load = !Persistent_env.Persistent_signature.load in
-  fun ~allow_hidden:_ -> load
+  !Persistent_env.Persistent_signature.load
 
 let override_persistent_signature_loader f =
-  Persistent_env.Persistent_signature.load := f ~allow_hidden:true
-(* [allow_hidden] will be ignored in the case of OCaml 4 compiler, as the
-   visibility parameter doesn't exist.*)
+  Persistent_env.Persistent_signature.load := f
 
 let make_persistent_signature ~filename ~cmi =
-  Persistent_env.Persistent_signature.{filename; cmi}
+  Persistent_env.Persistent_signature.
+    {filename; cmi; visibility = Load_path.Visible}
 
-let compunit_name compunit = compunit.Cmo_format.cu_name
+let compunit_name compunit =
+  let (Cmo_format.Compunit cuname) = compunit.Cmo_format.cu_name in
+  cuname
 
-let mark_attribute_used _ = ()
+let mark_attribute_used attribute =
+  Builtin_attributes.select_attributes
+    [(attribute.Parsetree.attr_name.txt, Mark_used_only)]
+    [attribute]
+  |> ignore
