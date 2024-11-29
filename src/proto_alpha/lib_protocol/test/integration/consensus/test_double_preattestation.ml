@@ -365,8 +365,8 @@ end = struct
     let* blk_a = Block.bake blk_1 in
     let* blk_b = Block.bake blk_2 in
     let* delegate, _ = Context.get_attester (B blk_a) in
-    let* preattestation_a = Op.raw_preattestation blk_a in
-    let* preattestation_b = Op.raw_preattestation blk_b in
+    let* preattestation_a = Op.raw_preattestation ~delegate blk_a in
+    let* preattestation_b = Op.raw_preattestation ~delegate blk_b in
     let operation =
       double_preattestation (B genesis) preattestation_a preattestation_b
     in
