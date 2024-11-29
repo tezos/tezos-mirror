@@ -915,7 +915,11 @@ module State = struct
             split_info,
             gc_info )
     | Apply_failure (* Did not produce a block *) ->
-        let*! () = Blueprint_events.invalid_blueprint_produced next in
+        let*! () =
+          if ctxt.fail_on_missing_blueprint then
+            Blueprint_events.invalid_blueprint_produced next
+          else Blueprint_events.invalid_blueprint_applied next
+        in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
   let on_new_head ?split_info ?gc_info ctxt ~applied_upgrade evm_state context
