@@ -278,20 +278,12 @@ impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
 
     /// Set the access log to `Read` or, if previously `Write`, to `ReadWrite`.
     pub fn set_read(&self) {
-        match self.access.get() {
-            AccessInfo::NoAccess => self.access.set(AccessInfo::Read),
-            AccessInfo::Write => self.access.set(AccessInfo::ReadWrite),
-            _ => (),
-        }
+        self.access.set(AccessInfo::and_read(self.access.get()))
     }
 
     /// Set the access log to `Write` or, if previously `Read`, to `ReadWrite`.
     pub fn set_write(&self) {
-        match self.access.get() {
-            AccessInfo::NoAccess => self.access.set(AccessInfo::Write),
-            AccessInfo::Read => self.access.set(AccessInfo::ReadWrite),
-            _ => (),
-        }
+        self.access.set(AccessInfo::and_write(self.access.get()))
     }
 
     /// Set the access log to `ReadWrite`.
