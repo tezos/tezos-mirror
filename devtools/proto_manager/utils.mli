@@ -10,6 +10,9 @@ module Infix : sig
   val ( // ) : string -> string -> string
 end
 
+(** [str_of_fmt fmt] converts [fmt] into a [Re.t] value. *)
+val str_of_fmt : ('a, Format.formatter, unit, Re.t) format4 -> 'a
+
 module Process : sig
   (** [exec ~error ~dir ~bin ~args] runs the program [bin] found in [dir] with
       arguments [args], waits its termination, calls [error ()] if the process

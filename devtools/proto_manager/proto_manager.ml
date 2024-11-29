@@ -594,10 +594,9 @@ let link =
                             str "let";
                             rep1 (str " ");
                             str (State.Source.get_name state);
-                            str
-                              (Format.asprintf
-                                 {| = active (Name.dev "%s")|}
-                                 (State.Source.get_name state));
+                            Utils.str_of_fmt
+                              {| = active (Name.dev "%s")|}
+                              (State.Source.get_name state);
                           ])))
               in
               let f gp =
