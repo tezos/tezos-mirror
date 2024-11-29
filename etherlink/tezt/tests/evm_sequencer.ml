@@ -4032,8 +4032,7 @@ let test_sequencer_diverge =
   let diverged_and_shutdown sequencer observer =
     let* _ = Evm_node.wait_for_diverged sequencer
     and* _ = Evm_node.wait_for_shutdown_event ~can_terminate:true sequencer
-    and* _ = Evm_node.wait_for_diverged observer
-    and* _ = Evm_node.wait_for_shutdown_event ~can_terminate:true observer in
+    and* _ = Evm_node.wait_for_reset observer in
     unit
   in
   let* () =
@@ -4051,6 +4050,13 @@ let test_sequencer_diverge =
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
+
+  (* The observer has dropped the invalid branch and remembers only
+     the finalized state. *)
+  let*@ latest = Rpc.get_block_by_number ~block:"latest" observer in
+  let*@ block = Rpc.get_block_by_number ~block:"finalized" observer in
+  Check.((latest.hash = block.hash) string)
+    ~error_msg:"Latest and finalized are different" ;
   unit
 
 (** This test that the sequencer evm node can catchup event from the

@@ -524,6 +524,9 @@ let wait_for_diverged evm_node =
   let found_hash = json |-> "found_hash" |> as_string in
   Some (level, expected_hash, found_hash)
 
+let wait_for_reset evm_node =
+  wait_for evm_node "evm_context_reset_at_level.v0" @@ fun _json -> Some ()
+
 let wait_for_missing_blueprint evm_node =
   wait_for evm_node "evm_events_follower_missing_blueprint.v0" @@ fun json ->
   let open JSON in

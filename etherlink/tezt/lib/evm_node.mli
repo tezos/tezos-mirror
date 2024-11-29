@@ -324,6 +324,10 @@ val wait_for_evm_event :
     diverging blueprint level expected hash, and found hash. *)
 val wait_for_diverged : t -> (int * string * string) Lwt.t
 
+(** [wait_for_reset evm_node] waits for the event [evm_context_reset_at_level]
+    using {!wait_for}. It does not wait for a specific level. *)
+val wait_for_reset : t -> unit Lwt.t
+
 (** [wait_for_missing_blueprint evm_node] waits for the
     event [evm_events_follower_missing_blueprint.v0] using
     {!wait_for} and return the missing blueprint level and
