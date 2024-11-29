@@ -4,6 +4,11 @@
 
 ### Features
 
+- If an observer detects a divergence it will reset to the latest finalized
+  block instead of exiting immediately. The node will also no longer exit
+  on invalid blueprint provided by its upstream EVM Node endpoint but will keep
+  waiting for a valid blueprint. (!15751)
+
 ### Bug fixes
 
 ### Internals
