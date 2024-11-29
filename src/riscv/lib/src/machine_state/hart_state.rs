@@ -62,15 +62,18 @@ impl<M: backend::ManagerBase> HartState<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<HartStateLayout, backend::Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<HartStateLayout, F::Output> {
         (
-            self.xregisters.struct_ref(),
-            self.fregisters.struct_ref(),
-            self.csregisters.struct_ref(),
-            self.mode.struct_ref(),
-            self.pc.struct_ref(),
-            self.reservation_set.struct_ref(),
+            self.xregisters.struct_ref::<F>(),
+            self.fregisters.struct_ref::<F>(),
+            self.csregisters.struct_ref::<F>(),
+            self.mode.struct_ref::<F>(),
+            self.pc.struct_ref::<F>(),
+            self.reservation_set.struct_ref::<F>(),
         )
     }
 

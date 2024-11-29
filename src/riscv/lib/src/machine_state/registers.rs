@@ -167,9 +167,12 @@ impl<M: backend::ManagerBase> XRegisters<M> {
         XRegisters { registers: space }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<XRegistersLayout, backend::Ref<'_, M>> {
-        self.registers.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<XRegistersLayout, F::Output> {
+        self.registers.struct_ref::<F>()
     }
 
     /// Read an integer from the registers.
@@ -408,9 +411,12 @@ impl<M: backend::ManagerBase> FRegisters<M> {
         FRegisters { registers: space }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<FRegistersLayout, backend::Ref<'_, M>> {
-        self.registers.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<FRegistersLayout, F::Output> {
+        self.registers.struct_ref::<F>()
     }
 
     /// Reset the floating-point registers.

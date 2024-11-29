@@ -9,8 +9,8 @@ use super::{
         merkle::{MerkleTree, MerkleWriter, Merkleisable},
         ProofDynRegion, ProofGen,
     },
-    Elem, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerClone, ManagerDeserialise,
-    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
+    Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
+    ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
 use crate::storage::binary;
 use std::borrow::Borrow;
@@ -31,10 +31,11 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
         Self { cell }
     }
 
-    /// Obtain a structure with references to the bound enriched cell of this type.
-    pub fn struct_ref(&self) -> EnrichedCell<V, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> EnrichedCell<V, F::Output> {
         EnrichedCell {
-            cell: self.cell.borrow(),
+            cell: F::map_enriched_cell(self.cell.borrow()),
         }
     }
 
@@ -116,10 +117,11 @@ impl<E: 'static, M: ManagerBase> Cell<E, M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> Cell<E, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> Cell<E, F::Output> {
         Cell {
-            region: self.region.struct_ref(),
+            region: self.region.struct_ref::<F>(),
         }
     }
 }
@@ -308,9 +310,12 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         Self { region }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> Cells<E, LEN, Ref<'_, M>> {
-        Cells::bind(&self.region)
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> Cells<E, LEN, F::Output> {
+        Cells {
+            region: F::map_region(&self.region),
+        }
     }
 }
 
@@ -463,9 +468,12 @@ impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
         Self { region }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> DynCells<LEN, Ref<'_, M>> {
-        DynCells::bind(&self.region)
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> DynCells<LEN, F::Output> {
+        DynCells {
+            region: F::map_dyn_region(&self.region),
+        }
     }
 
     /// Read an element in the region. `address` is in bytes.
@@ -614,7 +622,7 @@ pub(crate) mod tests {
         default::ConstDefault,
         state_backend::{
             layout::{Atom, Layout},
-            Array, DynCells, Elem, ManagerAlloc, ManagerBase,
+            Array, DynCells, Elem, FnManagerIdent, ManagerAlloc, ManagerBase,
         },
     };
     use proptest::prelude::*;
@@ -819,14 +827,14 @@ pub(crate) mod tests {
         region.write(0, Flipper { a: 13, b: 37 });
         assert_eq!(region.read(0), Flipper { a: 13, b: 37 });
 
-        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
+        let buffer = bincode::serialize(&region.struct_ref::<FnManagerIdent>()).unwrap();
         assert_eq!(buffer[..2], [37, 13]);
 
         // Replacing a value in the region must convert to and from stored format.
         let old = region.replace(0, Flipper { a: 26, b: 74 });
         assert_eq!(old, Flipper { a: 13, b: 37 });
 
-        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
+        let buffer = bincode::serialize(&region.struct_ref::<FnManagerIdent>()).unwrap();
         assert_eq!(buffer[..2], [74, 26]);
 
         // Writing to the entire region must convert properly to stored format.
@@ -847,7 +855,7 @@ pub(crate) mod tests {
             ]
         );
 
-        let buffer = bincode::serialize(&region.struct_ref()).unwrap();
+        let buffer = bincode::serialize(&region.struct_ref::<FnManagerIdent>()).unwrap();
         assert_eq!(buffer[..8], [22, 11, 24, 13, 26, 15, 28, 17]);
     });
 

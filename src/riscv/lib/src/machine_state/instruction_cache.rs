@@ -34,7 +34,6 @@
 //! to the same relative physical address.
 
 use super::instruction::{Args, Instruction, OpCode};
-use crate::cache_utils::{FenceCounter, Sizes};
 use crate::default::ConstDefault;
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::bus::main_memory::Address;
@@ -43,6 +42,10 @@ use crate::parser::{parse_compressed_instruction, parse_uncompressed_instruction
 use crate::state_backend::{
     self, AllocatedOf, Atom, Cell, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
     ManagerWrite, Ref,
+};
+use crate::{
+    cache_utils::{FenceCounter, Sizes},
+    state_backend::FnManager,
 };
 
 /// A wrapper for a cacheable instruction entry.
@@ -109,12 +112,15 @@ impl<M: ManagerBase> Cached<M> {
         });
     }
 
-    /// Obatin a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<CachedLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<CachedLayout, F::Output> {
         (
-            self.fence_counter.struct_ref(),
-            self.phys_addr.struct_ref(),
-            self.instr.struct_ref(),
+            self.fence_counter.struct_ref::<F>(),
+            self.phys_addr.struct_ref::<F>(),
+            self.instr.struct_ref::<F>(),
         )
     }
 
@@ -171,9 +177,9 @@ pub trait InstructionCacheLayout: state_backend::Layout {
 
     fn entries_reset<M: ManagerWrite>(entries: &mut Self::Entries<M>);
 
-    fn struct_ref<M: ManagerBase>(
-        cache: &InstructionCache<Self, M>,
-    ) -> AllocatedOf<Self, Ref<'_, M>>
+    fn struct_ref<'a, M: ManagerBase, F: FnManager<Ref<'a, M>>>(
+        cache: &'a InstructionCache<Self, M>,
+    ) -> AllocatedOf<Self, F::Output>
     where
         Self: Sized;
 
@@ -218,12 +224,16 @@ impl<const BITS: usize, const SIZE: usize> InstructionCacheLayout for Layout<BIT
         entries.iter_mut().for_each(Cached::reset)
     }
 
-    fn struct_ref<M: ManagerBase>(
-        cache: &InstructionCache<Self, M>,
-    ) -> AllocatedOf<Self, Ref<'_, M>> {
+    fn struct_ref<'a, M: ManagerBase, F: FnManager<Ref<'a, M>>>(
+        cache: &'a InstructionCache<Self, M>,
+    ) -> AllocatedOf<Self, F::Output> {
         (
-            cache.fence_counter.struct_ref(),
-            cache.entries.iter().map(Cached::struct_ref).collect(),
+            cache.fence_counter.struct_ref::<F>(),
+            cache
+                .entries
+                .iter()
+                .map(|entry| entry.struct_ref::<F>())
+                .collect(),
         )
     }
 
@@ -277,9 +287,10 @@ impl<ICL: InstructionCacheLayout, M: ManagerBase> InstructionCache<ICL, M> {
         ICL::entry_mut(&mut self.entries, counter.0 as Address).invalidate();
     }
 
-    /// Obatin a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<ICL, Ref<'_, M>> {
-        ICL::struct_ref(self)
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> AllocatedOf<ICL, F::Output> {
+        ICL::struct_ref::<_, F>(self)
     }
 
     /// Fetch the cached instruction at the given address, if an entry exists.
@@ -389,7 +400,7 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::registers::{a0, t0, t1},
-        state_backend::test_helpers::copy_via_serde,
+        state_backend::{test_helpers::copy_via_serde, FnManagerIdent},
     };
 
     pub type TestInstructionCacheLayout = Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
@@ -500,7 +511,9 @@ mod tests {
                 state.fetch_instr(phys_addr_uncompressed)
             );
 
-            copy_via_serde::<TestInstructionCacheLayout, _, _>(&state.struct_ref())
+            copy_via_serde::<TestInstructionCacheLayout, _, _>(
+                &state.struct_ref::<FnManagerIdent>(),
+            )
         };
 
         // Rebind state

@@ -261,6 +261,17 @@ pub struct ProofRegion<E: 'static, const LEN: usize, M: ManagerBase> {
 }
 
 impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
+    /// Bind a pre-existing region.
+    pub fn bind(source: M::Region<E, LEN>) -> Self {
+        Self {
+            source,
+            writes: BTreeMap::new(),
+            access: Cell::new(AccessInfo::NoAccess),
+        }
+    }
+}
+
+impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
     /// Get a copy of the access log.
     pub fn get_access_info(&self) -> AccessInfo {
         self.access.get()
@@ -303,6 +314,17 @@ pub struct ProofDynRegion<const LEN: usize, M: ManagerBase> {
 }
 
 impl<M: ManagerBase, const LEN: usize> ProofDynRegion<LEN, M> {
+    /// Bind a pre-existing dynamic region.
+    pub fn bind(source: M::DynRegion<LEN>) -> Self {
+        Self {
+            source,
+            reads: RefCell::default(),
+            writes: BTreeMap::new(),
+        }
+    }
+}
+
+impl<M: ManagerBase, const LEN: usize> ProofDynRegion<LEN, M> {
     /// Get the set of addresses of the region that were read from.
     /// This function is meant to be called once when Merkleising the region.
     pub fn get_read(&self) -> DynAccess {
@@ -328,6 +350,13 @@ impl<M: ManagerRead, const LEN: usize> ProofDynRegion<LEN, M> {
 #[allow(dead_code)]
 pub struct ProofEnrichedCell<V: EnrichedValue, M: ManagerBase> {
     source: M::EnrichedCell<V>,
+}
+
+impl<V: EnrichedValue, M: ManagerBase> ProofEnrichedCell<V, M> {
+    /// Bind a pre-existing enriched cell.
+    pub fn bind(source: M::EnrichedCell<V>) -> Self {
+        Self { source }
+    }
 }
 
 /// A record of accessed addresses in a dynamic region
@@ -361,16 +390,6 @@ mod tests {
     use std::collections::VecDeque;
     use tests::merkle::MerkleTree;
 
-    impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
-        pub fn from_source_region(source: M::Region<E, LEN>) -> Self {
-            Self {
-                source,
-                writes: BTreeMap::new(),
-                access: Cell::new(AccessInfo::NoAccess),
-            }
-        }
-    }
-
     const CELLS_SIZE: usize = 255;
 
     #[test]
@@ -379,7 +398,7 @@ mod tests {
             // A read followed by a write
             let cells = [value_before; CELLS_SIZE];
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::from_source_region(cells);
+                ProofRegion::bind(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
             let value = ProofGen::<Owned>::region_read(&region, i);
             prop_assert_eq!(value, value_before);
@@ -390,7 +409,7 @@ mod tests {
             // A write followed by a read
             let cells = [value_before; CELLS_SIZE];
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::from_source_region(cells);
+                ProofRegion::bind(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
             ProofGen::<Owned>::region_write(&mut region, i, value_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::Write);
@@ -401,7 +420,7 @@ mod tests {
             // Replace
             let cells = [value_before; CELLS_SIZE];
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::from_source_region(cells);
+                ProofRegion::bind(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
             let value = ProofGen::<Owned>::region_replace(&mut region, i, value_after);
             prop_assert_eq!(value, value_before);
@@ -413,7 +432,7 @@ mod tests {
             // A read_all followed by a write_all
             let cells = data_before;
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::from_source_region(cells);
+                ProofRegion::bind(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
             let values = ProofGen::<Owned>::region_read_all(&region);
             prop_assert_eq!(values.as_slice(), data_before);
@@ -424,7 +443,7 @@ mod tests {
             // A write_all followed by a read_all
             let cells = data_before;
             let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::from_source_region(cells);
+                ProofRegion::bind(cells);
             prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
             ProofGen::<Owned>::region_write_all(&mut region, &data_after);
             prop_assert_eq!(region.get_access_info(), AccessInfo::Write);
@@ -434,7 +453,7 @@ mod tests {
 
             // Check correct Merkleisation
             let cells = [value_before; CELLS_SIZE];
-            let region: ProofRegion<u64, CELLS_SIZE, Owned> = ProofRegion::from_source_region(cells);
+            let region: ProofRegion<u64, CELLS_SIZE, Owned> = ProofRegion::bind(cells);
             let mut cells: Cells<u64, CELLS_SIZE, ProofGen<Owned>> = Cells::bind(region);
             let initial_root_hash = cells.hash().unwrap();
             cells.write(i, value_after);
@@ -448,16 +467,6 @@ mod tests {
                 _ => panic!("Expected Merkle tree to contain a single written leaf"),
             }
         });
-    }
-
-    impl<M: ManagerBase, const LEN: usize> ProofDynRegion<LEN, M> {
-        pub fn from_source_region(source: M::DynRegion<LEN>) -> Self {
-            Self {
-                source,
-                reads: RefCell::default(),
-                writes: BTreeMap::new(),
-            }
-        }
     }
 
     const LEAVES: usize = 8;
@@ -480,7 +489,7 @@ mod tests {
                     write_address in &address_range)| {
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::from_source_region(cells);
+                ProofDynRegion::bind(cells);
             let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
@@ -496,7 +505,7 @@ mod tests {
 
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::from_source_region(cells);
+                ProofDynRegion::bind(cells);
             let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
@@ -518,7 +527,7 @@ mod tests {
 
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::from_source_region(cells);
+                ProofDynRegion::bind(cells);
             let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
@@ -540,7 +549,7 @@ mod tests {
                     writes in array::uniform2(&address_range))| {
             let region = Box::new([byte_before; DYN_REGION_SIZE]);
             let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::from_source_region(region.clone());
+                ProofDynRegion::bind(region.clone());
             let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 

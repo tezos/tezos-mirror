@@ -75,10 +75,15 @@ pub trait MainMemoryLayout: backend::Layout + 'static {
 
     fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
 
-    /// Obtain a reference to the region(s) used for main memory.
-    fn data_struct_ref<M: backend::ManagerBase>(
-        data: &Self::Data<M>,
-    ) -> backend::AllocatedOf<Self, backend::Ref<'_, M>>;
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    fn data_struct_ref<
+        'a,
+        M: backend::ManagerBase + 'a,
+        F: backend::FnManager<backend::Ref<'a, M>>,
+    >(
+        data: &'a Self::Data<M>,
+    ) -> backend::AllocatedOf<Self, F::Output>;
 
     /// Read an element in the region. `address` is in bytes.
     fn data_read<E: backend::Elem, M: backend::ManagerRead>(
@@ -137,11 +142,11 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         space
     }
 
-    fn data_struct_ref<M: backend::ManagerBase>(
-        data: &Self::Data<M>,
-    ) -> backend::AllocatedOf<Self, backend::Ref<'_, M>> {
+    fn data_struct_ref<'a, M: backend::ManagerBase, F: backend::FnManager<backend::Ref<'a, M>>>(
+        data: &'a Self::Data<M>,
+    ) -> backend::AllocatedOf<Self, F::Output> {
         MainMemory {
-            data: data.struct_ref(),
+            data: data.struct_ref::<F>(),
         }
     }
 
@@ -225,9 +230,15 @@ impl<L: MainMemoryLayout, M: backend::ManagerBase> MainMemory<L, M> {
         L::refl(space)
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<L, backend::Ref<'_, M>> {
-        L::data_struct_ref(&self.data)
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<L, F::Output>
+    where
+        M: 'a,
+    {
+        L::data_struct_ref::<_, F>(&self.data)
     }
 
     /// Reset to the initial state.

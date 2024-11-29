@@ -39,8 +39,8 @@ use crate::{
     cache_utils::FenceCounter,
     machine_state::{bus::main_memory::Address, csregisters::CSRRepr, mode::Mode},
     state_backend::{
-        AllocatedOf, Atom, Cell, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
-        ManagerWrite, Many, Ref,
+        AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead,
+        ManagerReadWrite, ManagerWrite, Many, Ref,
     },
 };
 use strum::EnumCount;
@@ -96,14 +96,17 @@ impl<M: ManagerBase> Cached<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<CachedLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<CachedLayout, F::Output> {
         (
-            self.mode.struct_ref(),
-            self.fence_counter.struct_ref(),
-            self.satp.struct_ref(),
-            self.virt_page.struct_ref(),
-            self.phys_page.struct_ref(),
+            self.mode.struct_ref::<F>(),
+            self.fence_counter.struct_ref::<F>(),
+            self.satp.struct_ref::<F>(),
+            self.virt_page.struct_ref::<F>(),
+            self.phys_page.struct_ref::<F>(),
         )
     }
 
@@ -214,11 +217,17 @@ impl<M: ManagerBase> AccessCache<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<AccessCacheLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<AccessCacheLayout, F::Output> {
         (
-            self.fence_counter.struct_ref(),
-            self.entries.iter().map(Cached::struct_ref).collect(),
+            self.fence_counter.struct_ref::<F>(),
+            self.entries
+                .iter()
+                .map(|entry| entry.struct_ref::<F>())
+                .collect(),
         )
     }
 
@@ -341,12 +350,15 @@ impl<M: ManagerBase> TranslationCache<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<TranslationCacheLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<TranslationCacheLayout, F::Output> {
         [
-            self.entries[0].struct_ref(),
-            self.entries[1].struct_ref(),
-            self.entries[2].struct_ref(),
+            self.entries[0].struct_ref::<F>(),
+            self.entries[1].struct_ref::<F>(),
+            self.entries[2].struct_ref::<F>(),
         ]
     }
 

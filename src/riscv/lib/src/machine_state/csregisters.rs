@@ -1632,9 +1632,12 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<CSRegistersLayout, backend::Ref<'_, M>> {
-        self.registers.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<CSRegistersLayout, F::Output> {
+        self.registers.struct_ref::<F>()
     }
 
     /// Reset the control and state registers.

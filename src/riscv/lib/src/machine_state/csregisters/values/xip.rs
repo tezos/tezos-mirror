@@ -20,7 +20,7 @@ impl XipCell {
         XipCell
     }
 
-    /// Obtain the reference structure.
+    /// Does nothing.
     pub fn struct_ref(&self) {}
 
     /// Always returns 0.

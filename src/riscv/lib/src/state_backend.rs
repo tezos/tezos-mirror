@@ -62,11 +62,13 @@ mod layout;
 pub mod owned_backend;
 pub mod proof_backend;
 mod region;
+mod trans;
 
 pub use effects::*;
 pub use elems::*;
 pub use layout::*;
 pub use region::*;
+pub use trans::*;
 
 /// An enriched value may be stored in a [`ManagerBase::EnrichedCell`].
 ///
@@ -524,7 +526,7 @@ pub mod tests {
         assert_eq!(instance.second.read_all(), second_value);
 
         let first_value_read = u64::from_le_bytes(
-            bincode::serialize(&instance.first.struct_ref())
+            bincode::serialize(&instance.first.struct_ref::<FnManagerIdent>())
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -532,7 +534,7 @@ pub mod tests {
         assert_eq!(first_value_read, first_value);
 
         let second_value_read = unsafe {
-            let data = bincode::serialize(&instance.second.struct_ref()).unwrap();
+            let data = bincode::serialize(&instance.second.struct_ref::<FnManagerIdent>()).unwrap();
             data.as_ptr().cast::<[u32; 4]>().read().map(u32::from_le)
         };
         assert_eq!(second_value_read, second_value);

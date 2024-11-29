@@ -209,14 +209,15 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(
-        &self,
-    ) -> backend::AllocatedOf<MachineCoreStateLayout<ML>, backend::Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<MachineCoreStateLayout<ML>, F::Output> {
         (
-            self.hart.struct_ref(),
-            self.main_memory.struct_ref(),
-            self.translation_cache.struct_ref(),
+            self.hart.struct_ref::<F>(),
+            self.main_memory.struct_ref::<F>(),
+            self.translation_cache.struct_ref::<F>(),
         )
     }
 
@@ -254,14 +255,15 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(
-        &self,
-    ) -> backend::AllocatedOf<MachineStateLayout<ML, CL>, backend::Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<MachineStateLayout<ML, CL>, F::Output> {
         (
-            self.core.struct_ref(),
-            self.instruction_cache.struct_ref(),
-            self.block_cache.struct_ref(),
+            self.core.struct_ref::<F>(),
+            self.instruction_cache.struct_ref::<F>(),
+            self.block_cache.struct_ref::<F>(),
         )
     }
 
@@ -701,7 +703,10 @@ mod tests {
             instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
             parse_block,
         },
-        state_backend::test_helpers::{assert_eq_struct, copy_via_serde, TestBackendFactory},
+        state_backend::{
+            test_helpers::{assert_eq_struct, copy_via_serde, TestBackendFactory},
+            FnManagerIdent,
+        },
         traps::{EnvironException, Exception, TrapContext},
     };
     use crate::{bits::u64, machine_state::bus::main_memory::M1K};
@@ -952,7 +957,7 @@ mod tests {
         // Perform 2 steps consecutively in one backend.
         let state = {
             let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
-                &base_state.struct_ref(),
+                &base_state.struct_ref::<FnManagerIdent>(),
             ));
 
             state.step().unwrap();
@@ -965,7 +970,7 @@ mod tests {
         let alt_state = {
             let alt_state = {
                 let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
-                    &base_state.struct_ref(),
+                    &base_state.struct_ref::<FnManagerIdent>(),
                 ));
                 state.step().unwrap();
                 state
@@ -973,7 +978,7 @@ mod tests {
 
             {
                 let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
-                    &alt_state.struct_ref(),
+                    &alt_state.struct_ref::<FnManagerIdent>(),
                 ));
                 state.step().unwrap();
                 state
@@ -986,7 +991,10 @@ mod tests {
             alt_state.core.hart.xregisters.read(t2)
         );
 
-        assert_eq_struct(&state.struct_ref(), &alt_state.struct_ref());
+        assert_eq_struct(
+            &state.struct_ref::<FnManagerIdent>(),
+            &alt_state.struct_ref::<FnManagerIdent>(),
+        );
     });
 
     // Test that the machine state does not behave differently when potential ephermeral state is
@@ -1189,7 +1197,7 @@ mod tests {
         let state = {
             let mut state: LocalMachineState<F> =
                 MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
-                    &base_state.struct_ref(),
+                    &base_state.struct_ref::<FnManagerIdent>(),
                 ));
 
             state.step().unwrap();
@@ -1203,7 +1211,7 @@ mod tests {
             let alt_state = {
                 let mut state: LocalMachineState<F> =
                     MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
-                        &base_state.struct_ref(),
+                        &base_state.struct_ref::<FnManagerIdent>(),
                     ));
                 state.step().unwrap();
                 state
@@ -1211,7 +1219,7 @@ mod tests {
             {
                 let mut state: LocalMachineState<F> =
                     MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
-                        &alt_state.struct_ref(),
+                        &alt_state.struct_ref::<FnManagerIdent>(),
                     ));
                 state.step().unwrap();
                 state
@@ -1224,7 +1232,10 @@ mod tests {
             state.core.hart.xregisters.read(a0),
             alt_state.core.hart.xregisters.read(a0)
         );
-        assert_eq_struct(&state.struct_ref(), &alt_state.struct_ref());
+        assert_eq_struct(
+            &state.struct_ref::<FnManagerIdent>(),
+            &alt_state.struct_ref::<FnManagerIdent>(),
+        );
     });
 
     // Ensure that cloning the machine state does not result in a stack overflow
@@ -1233,7 +1244,10 @@ mod tests {
 
         let second = state.clone();
 
-        assert_eq_struct(&state.struct_ref(), &second.struct_ref());
+        assert_eq_struct(
+            &state.struct_ref::<FnManagerIdent>(),
+            &second.struct_ref::<FnManagerIdent>(),
+        );
     });
 
     backend_test!(test_block_cache_crossing_pages_creates_new_block, F, {
@@ -1455,6 +1469,9 @@ mod tests {
             assert_eq!(result.steps, 1);
         }
 
-        assert_eq_struct(&state.struct_ref(), &state_step.struct_ref());
+        assert_eq_struct(
+            &state.struct_ref::<FnManagerIdent>(),
+            &state_step.struct_ref::<FnManagerIdent>(),
+        );
     });
 }

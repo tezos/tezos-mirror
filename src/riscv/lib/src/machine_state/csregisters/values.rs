@@ -14,8 +14,8 @@ use crate::{
     bits::Bits64,
     state_backend::{
         hash::{Hash, HashError, RootHashable},
-        AllocatedOf, EffectCell, EffectCellLayout, Layout, ManagerAlloc, ManagerBase, ManagerRead,
-        ManagerReadWrite, ManagerWrite, Ref,
+        AllocatedOf, EffectCell, EffectCellLayout, FnManager, Layout, ManagerAlloc, ManagerBase,
+        ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
     },
 };
 use mstatus::MStatusLayout;
@@ -71,12 +71,15 @@ impl<M: ManagerBase> CSRValues<M> {
         space.map(MStatusValue::bind, XipCell::bind::<M>, EffectCell::bind)
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<CSRValuesLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<CSRValuesLayout, F::Output> {
         self.as_ref().map(
-            |mstatus| mstatus.struct_ref(),
+            |mstatus| mstatus.struct_ref::<F>(),
             |xip| xip.struct_ref(),
-            |raw| raw.struct_ref(),
+            |raw| raw.struct_ref::<F>(),
         )
     }
 }

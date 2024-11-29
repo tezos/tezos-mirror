@@ -13,7 +13,7 @@ use crate::{
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
-    state_backend::{hash::RootHashable, owned_backend::Owned, AllocatedOf, Ref},
+    state_backend::{hash::RootHashable, owned_backend::Owned, AllocatedOf, FnManagerIdent, Ref},
     storage::binary,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -121,17 +121,18 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     }
 
     /// Obtain the root hash for the PVM state.
-    pub fn hash(&self) -> crate::state_backend::hash::Hash
+    pub fn hash<'a>(&'a self) -> crate::state_backend::hash::Hash
     where
-        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: RootHashable,
+        AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: RootHashable,
     {
-        let refs = self.pvm.struct_ref();
+        let refs = self.pvm.struct_ref::<FnManagerIdent>();
         RootHashable::hash(&refs).unwrap()
     }
 
-    /// Obtain a structure with references to the bound regions of the PVM.
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
     pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<ML, CL>, Ref<'_, Owned>> {
-        self.pvm.struct_ref()
+        self.pvm.struct_ref::<FnManagerIdent>()
     }
 
     /// Re-bind the PVM type by serialising and deserialising its state in order to eliminate
@@ -142,7 +143,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
         AllocatedOf<PvmLayout<ML, CL>, Owned>: DeserializeOwned,
     {
         let space = {
-            let refs = self.pvm.struct_ref();
+            let refs = self.pvm.struct_ref::<FnManagerIdent>();
             let data = binary::serialise(&refs).unwrap();
             binary::deserialise(&data).unwrap()
         };
