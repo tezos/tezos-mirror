@@ -74,6 +74,10 @@ module Prometheus = struct
       let namespace = "profiling" in
       match Stdlib.List.assoc_opt "prometheus" metadata with
       | None -> false
+      | Some "__ENABLE_CHILDREN_ONLY__" ->
+          (* We don't record the metric but pretend we did so that children of
+             the node will be processed *)
+          true
       | Some id' ->
           let id = if id' = "" then id else id' in
           if d.wall = 0. then
