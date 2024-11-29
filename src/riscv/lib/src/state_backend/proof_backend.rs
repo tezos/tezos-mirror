@@ -113,30 +113,35 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
         }
     }
 
-    fn enriched_cell_read_stored<V>(_cell: &Self::EnrichedCell<V>) -> V::E
+    fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
     where
         V: EnrichedValue,
         V::E: Copy,
     {
-        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-        todo!()
+        cell.set_read();
+        match &cell.written {
+            None => M::enriched_cell_read_stored(&cell.source),
+            Some(value) => *value,
+        }
     }
 
-    fn enriched_cell_read_derived<V>(_cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
     where
         V: EnrichedValueLinked<Self::ManagerRoot>,
         V::D<Self::ManagerRoot>: Copy,
     {
-        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-        todo!()
+        V::derive(Self::enriched_cell_ref_stored(cell))
     }
 
-    fn enriched_cell_ref_stored<V>(_cell: &Self::EnrichedCell<V>) -> &V::E
+    fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
     where
         V: EnrichedValue,
     {
-        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-        todo!()
+        cell.set_read();
+        match &cell.written {
+            None => M::enriched_cell_ref_stored(&cell.source),
+            Some(value) => value,
+        }
     }
 }
 
@@ -194,12 +199,12 @@ impl<M: ManagerWrite> ManagerWrite for ProofGen<M> {
         }
     }
 
-    fn enriched_cell_write<V>(_cell: &mut Self::EnrichedCell<V>, _value: V::E)
+    fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
     where
         V: EnrichedValueLinked<Self>,
     {
-        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-        todo!()
+        cell.set_write();
+        cell.written = Some(value);
     }
 }
 
@@ -223,6 +228,7 @@ impl<M: ManagerSerialise> ManagerSerialise for ProofGen<M> {
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
+        // TODO RV-310: Serialise all the data in the region
         M::serialise_region(&region.source, serializer)
     }
 
@@ -230,20 +236,21 @@ impl<M: ManagerSerialise> ManagerSerialise for ProofGen<M> {
         region: &Self::DynRegion<LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
+        // TODO RV-310: Serialise all the data in the dynamic region
         M::serialise_dyn_region(&region.source, serializer)
     }
 
     fn serialise_enriched_cell<V, S>(
-        _cell: &Self::EnrichedCell<V>,
-        _serializer: S,
+        cell: &Self::EnrichedCell<V>,
+        serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
         V: EnrichedValue,
         V::E: serde::Serialize,
         S: serde::Serializer,
     {
-        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-        todo!()
+        // TODO RV-310: Serialise all the data in the enriched cell
+        M::serialise_enriched_cell(&cell.source, serializer)
     }
 }
 
@@ -278,12 +285,12 @@ impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
 
     /// Set the access log to `Read` or, if previously `Write`, to `ReadWrite`.
     pub fn set_read(&self) {
-        self.access.set(AccessInfo::and_read(self.access.get()))
+        self.access.set(self.access.get().and_read())
     }
 
     /// Set the access log to `Write` or, if previously `Read`, to `ReadWrite`.
     pub fn set_write(&self) {
-        self.access.set(AccessInfo::and_write(self.access.get()))
+        self.access.set(self.access.get().and_write())
     }
 
     /// Set the access log to `ReadWrite`.
@@ -337,16 +344,46 @@ impl<M: ManagerRead, const LEN: usize> ProofDynRegion<LEN, M> {
     }
 }
 
-// TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-#[allow(dead_code)]
+/// Proof enriched cell which wraps an enriched cell managed by another manager.
+///
+/// Similar to [`ManagerBase::Region`], a [`ManagerBase::EnrichedCell`] is never
+/// split across multiple leaves when Merkleised.
+/// The underlying cell is never mutated, but written values are recorded
+/// in order to preserve the integrity of subsequent reads.
 pub struct ProofEnrichedCell<V: EnrichedValue, M: ManagerBase> {
     source: M::EnrichedCell<V>,
+    written: Option<V::E>,
+    access: Cell<AccessInfo>,
 }
 
 impl<V: EnrichedValue, M: ManagerBase> ProofEnrichedCell<V, M> {
     /// Bind a pre-existing enriched cell.
     pub fn bind(source: M::EnrichedCell<V>) -> Self {
-        Self { source }
+        Self {
+            source,
+            written: None,
+            access: Cell::new(AccessInfo::NoAccess),
+        }
+    }
+
+    /// Get a copy of the access log.
+    pub fn get_access_info(&self) -> AccessInfo {
+        self.access.get()
+    }
+
+    /// Set the access log to `Read` or, if previously `Write`, to `ReadWrite`.
+    pub fn set_read(&self) {
+        self.access.set(AccessInfo::and_read(self.access.get()))
+    }
+
+    /// Set the access log to `Write` or, if previously `Read`, to `ReadWrite`.
+    pub fn set_write(&mut self) {
+        self.access.set(AccessInfo::and_write(self.access.get()))
+    }
+
+    /// Set the access log to `ReadWrite`.
+    pub fn set_read_write(&self) {
+        self.access.set(AccessInfo::ReadWrite)
     }
 }
 
@@ -594,6 +631,51 @@ mod tests {
                     }
                 }
             }
+        });
+    }
+
+    #[test]
+    fn test_proof_gen_enriched_cell() {
+        pub struct Enriching;
+
+        impl EnrichedValue for Enriching {
+            type E = u64;
+            type D<M: ManagerBase + ?Sized> = T;
+        }
+
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        pub struct T(u64);
+
+        impl<'a> From<&'a u64> for T {
+            fn from(value: &'a u64) -> Self {
+                T(value.wrapping_add(1))
+            }
+        }
+
+        proptest!(|(value_before: u64, value_after: u64)| {
+            // A read followed by a write
+            let cell = (value_before, T::from(&value_before));
+            let mut proof_cell: ProofEnrichedCell<Enriching, Owned> = ProofEnrichedCell::bind(cell);
+            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
+            let value = ProofGen::<Owned>::enriched_cell_read_stored(&proof_cell);
+            prop_assert_eq!(value, value_before);
+            let derived = ProofGen::<Owned>::enriched_cell_read_derived(&proof_cell);
+            prop_assert_eq!(derived, T::from(&value_before));
+            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::Read);
+            ProofGen::<Owned>::enriched_cell_write(&mut proof_cell, value_after);
+            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
+
+            // A write followed by a read
+            let cell = (value_before, T::from(&value_before));
+            let mut proof_cell: ProofEnrichedCell<Enriching, Owned> = ProofEnrichedCell::bind(cell);
+            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
+            ProofGen::<Owned>::enriched_cell_write(&mut proof_cell, value_after);
+            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::Write);
+            let value = ProofGen::<Owned>::enriched_cell_read_stored(&proof_cell);
+            prop_assert_eq!(value, value_after);
+            let derived = ProofGen::<Owned>::enriched_cell_read_derived(&proof_cell);
+            prop_assert_eq!(derived, T::from(&value_after));
+            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
         });
     }
 }
