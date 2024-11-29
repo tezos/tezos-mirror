@@ -927,11 +927,11 @@ type etherlink = {
 
 type public_key_hash = string
 
-type commitment = string
+type commitment_info = {commitment : string; publisher_pkh : string}
 
 type per_level_info = {
   level : int;
-  published_commitments : (int, commitment) Hashtbl.t;
+  published_commitments : (int, commitment_info) Hashtbl.t;
   attestations : (public_key_hash, Z.t option) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance : Tez.t;
@@ -1398,6 +1398,12 @@ let get_infos_per_level ~client ~endpoint ~level ~etherlink_operator =
   let get_commitment operation =
     JSON.(operation |-> "slot_header" |-> "commitment" |> as_string)
   in
+  let get_publisher operation = JSON.(operation |-> "source" |> as_string) in
+  let commitment_info operation =
+    let commitment = get_commitment operation in
+    let publisher_pkh = get_publisher operation in
+    {commitment; publisher_pkh}
+  in
   let get_slot_index operation =
     JSON.(operation |-> "slot_header" |-> "slot_index" |> as_int)
   in
@@ -1407,7 +1413,7 @@ let get_infos_per_level ~client ~endpoint ~level ~etherlink_operator =
            JSON.(batch |-> "contents" |> as_list |> List.to_seq))
     |> Seq.filter is_published_commitment
     |> Seq.map (fun operation ->
-           (get_slot_index operation, get_commitment operation))
+           (get_slot_index operation, commitment_info operation))
     |> Hashtbl.of_seq
   in
   let consensus_operations = JSON.(operations |=> 0 |> as_list) in
