@@ -326,6 +326,249 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
+(* The test uses a very specific setup, so it doesn't use general helpers. *)
+let test_observer_reset =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Observer resets on finalized state"
+    ~tags:["observer"; "reset"; "divergence"]
+    ~uses_admin_client:true
+    ~uses_client:true
+    ~uses_node:true
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ])
+  @@ fun protocol ->
+  (* The setup is a bit verbose but hang in there, it's not that complicated.
+
+     It creates 2 evm-node sequencer, one that has the correct key and one
+     that has an invalid one.
+
+     If an observer follows the invalid sequencer (and agrees with the invalid
+     key) it can accept blocks on an invalid branch.
+
+     If the valid sequencer starts to publish blueprints with the valid key,
+     they will see a divergence.
+  *)
+  let kernel = Constant.WASM.evm_kernel in
+  let valid_sequencer = Constant.bootstrap1 in
+  let invalid_sequencer = Constant.bootstrap2 in
+  let* node, client = setup_l1 protocol in
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~default_operator:Constant.bootstrap1.public_key_hash
+      Batcher
+      node
+      ~base_dir:(Client.base_dir client)
+  in
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let valid_config = Temp.file "valid_config.yaml" in
+  let invalid_config = Temp.file "invalid_config.yaml" in
+  let*! () =
+    Evm_node.make_kernel_installer_config
+      ~sequencer:valid_sequencer.public_key
+      ~output:valid_config
+      ()
+  in
+  let*! () =
+    Evm_node.make_kernel_installer_config
+      ~sequencer:invalid_sequencer.public_key
+      ~output:invalid_config
+      ()
+  in
+  let* {output = valid_kernel; _} =
+    prepare_installer_kernel
+      ~output:(Temp.file "valid_kernel.hex")
+      ~preimages_dir
+      ~config:(`Path valid_config)
+      kernel
+  in
+  let* {output = invalid_kernel; _} =
+    prepare_installer_kernel
+      ~output:(Temp.file "invalid_kernel.hex")
+      ~preimages_dir
+      ~config:(`Path invalid_config)
+      kernel
+  in
+  let* sc_rollup_address =
+    originate_sc_rollup
+      ~keys:[]
+      ~kind:"wasm_2_0_0"
+      ~boot_sector:("file:" ^ valid_kernel)
+      ~parameters_ty:Helpers.evm_type
+      client
+  in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
+  in
+  (* Run a proxy. *)
+  let* proxy =
+    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  (* Run a valid sequencer. *)
+  let* valid_sequencer =
+    Evm_node.init
+      ~name:"valid_sequencer"
+      ~rpc_port:(Port.fresh ())
+      ~mode:
+        (Evm_node.Sequencer
+           {
+             initial_kernel = valid_kernel;
+             preimage_dir = Some preimages_dir;
+             private_rpc_port = Some (Port.fresh ());
+             time_between_blocks = Some Nothing;
+             sequencer = valid_sequencer.alias;
+             genesis_timestamp = None;
+             max_blueprints_lag = None;
+             max_blueprints_ahead = None;
+             max_blueprints_catchup = None;
+             catchup_cooldown = None;
+             max_number_of_chunks = None;
+             wallet_dir = Some (Client.base_dir client);
+             tx_pool_timeout_limit = None;
+             tx_pool_addr_limit = None;
+             tx_pool_tx_per_addr_limit = None;
+             dal_slots = None;
+           })
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  (* We start a sequencer with an invalid key, but from its perspective the
+     key is valid.
+
+     We connect it to a temporary rollup node, which is is terminated right after
+     so the sequencer doesn't detect the divergence and keep producing blocks.
+  *)
+  let temp_sc_rollup_node =
+    Sc_rollup_node.create
+      ~name:"temp_sc_rollup_node"
+      ~default_operator:Constant.bootstrap1.public_key_hash
+      Batcher
+      node
+      ~base_dir:(Client.base_dir client)
+  in
+  let* () =
+    Sc_rollup_node.run temp_sc_rollup_node sc_rollup_address [Log_kernel_debug]
+  in
+  let* invalid_sequencer =
+    Evm_node.init
+      ~name:"invalid_sequencer"
+      ~rpc_port:(Port.fresh ())
+      ~mode:
+        (Evm_node.Sequencer
+           {
+             initial_kernel = invalid_kernel;
+             preimage_dir = Some preimages_dir;
+             private_rpc_port = Some (Port.fresh ());
+             time_between_blocks = Some Nothing;
+             sequencer = invalid_sequencer.alias;
+             genesis_timestamp = None;
+             max_blueprints_lag = None;
+             max_blueprints_ahead = None;
+             max_blueprints_catchup = None;
+             catchup_cooldown = None;
+             max_number_of_chunks = None;
+             wallet_dir = Some (Client.base_dir client);
+             tx_pool_timeout_limit = None;
+             tx_pool_addr_limit = None;
+             tx_pool_tx_per_addr_limit = None;
+             dal_slots = None;
+           })
+      (Sc_rollup_node.endpoint temp_sc_rollup_node)
+  in
+  (* Preparing two observers, they will be the victim of our tests in 2 different
+     scenarios.
+
+     The first observer will detect the divergence after the fact. The second
+     observer will detect the divergence when it applies blueprints after
+     getting the confirmations from the rollup node.
+  *)
+  let* observer_victim1 =
+    Evm_node.init
+      ~name:"observer_victim1"
+      ~rpc_port:(Port.fresh ())
+      ~mode:
+        (Evm_node.Observer
+           {
+             initial_kernel = invalid_kernel;
+             preimages_dir = Some preimages_dir;
+             private_rpc_port = Some (Port.fresh ());
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           })
+      (Evm_node.endpoint invalid_sequencer)
+  in
+  let* observer_victim2 =
+    Evm_node.init
+      ~name:"observer_victim2"
+      ~rpc_port:(Port.fresh ())
+      ~mode:
+        (Evm_node.Observer
+           {
+             initial_kernel = invalid_kernel;
+             preimages_dir = Some preimages_dir;
+             private_rpc_port = Some (Port.fresh ());
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           })
+      (Evm_node.endpoint invalid_sequencer)
+  in
+  (* We want this observer to detect the divergence after seeing the L1 events,
+     so it does not track blueprints for now. *)
+  let* () = Evm_node.terminate observer_victim2 in
+  let* () = Evm_node.run ~extra_arguments:["--no-sync"] observer_victim2 in
+
+  (* Initialization is complete, let us now start the test. *)
+
+  (* Produce 5 blocks with the invalid sequencer. *)
+  let* _ =
+    repeat 5 (fun () ->
+        let*@ _ = Rpc.produce_block invalid_sequencer in
+        unit)
+  and* () = Evm_node.wait_for_blueprint_applied invalid_sequencer 5
+  and* () = Evm_node.wait_for_blueprint_applied observer_victim1 5 in
+
+  (* Produce 1 block with the valid sequencer, {!observer_victim1} will detect
+     a divergence.
+     We terminate the invalid sequencer rollup node so it doesn't see the event.
+  *)
+  let* () = Sc_rollup_node.terminate temp_sc_rollup_node in
+  let*@ _ = Rpc.produce_block valid_sequencer in
+  let* () =
+    let* () =
+      bake_until_sync
+        ~sc_rollup_node
+        ~proxy
+        ~sequencer:valid_sequencer
+        ~client
+        ()
+    in
+    (* Make the published blueprint final. *)
+    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+    unit
+  and* () = Evm_node.wait_for_reset observer_victim1 in
+  (* The observer has reset because of the divergence. Let's see how it
+     refuses blocks now. *)
+  let* _ =
+    let*@ _ = Rpc.produce_block invalid_sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_invalid_applied observer_victim1 in
+
+  (* Now let's test the second observer that will detect the divergence
+     when synchronizing. *)
+  let* () = Evm_node.terminate observer_victim2 in
+  let* () = Evm_node.run observer_victim2
+  and* () = Evm_node.wait_for_reset observer_victim2 in
+  (* It will also refuse blocks. *)
+  let* _ =
+    let*@ _ = Rpc.produce_block invalid_sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_invalid_applied observer_victim2 in
+
+  unit
+
 module Protocol = struct
   include Protocol
 
@@ -7250,4 +7493,5 @@ let () =
   test_configuration_service [Protocol.Alpha] ;
   test_overwrite_simulation_tick_limit protocols ;
   test_inconsistent_da_fees protocols ;
-  test_produce_block_with_no_delayed_transactions protocols
+  test_produce_block_with_no_delayed_transactions protocols ;
+  test_observer_reset [Protocol.Alpha]

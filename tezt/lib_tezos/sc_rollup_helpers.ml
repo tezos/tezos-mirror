@@ -127,15 +127,19 @@ type installer_result = {
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
-    ?runner ?(boot_sector = `Content) ~preimages_dir ?config installee =
+let prepare_installer_kernel_with_arbitrary_file ?output
+    ?smart_rollup_installer_path ?runner ?(boot_sector = `Content)
+    ~preimages_dir ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
-  let installer =
-    installee |> Filename.basename |> Filename.remove_extension |> fun base ->
-    base ^ "-installer.hex"
+  let output =
+    match output with
+    | None ->
+        Temp.file
+          ( installee |> Filename.basename |> Filename.remove_extension
+          |> fun base -> base ^ "-installer.hex" )
+    | Some v -> v
   in
-  let output = Temp.file installer in
   let setup_file_args =
     match config with
     | Some config ->
@@ -172,7 +176,7 @@ let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
     in
     Process.spawn
       ?runner
-      ~name:installer
+      ~name:output
       smart_rollup_installer_path
       ([
          "get-reveal-installer";
@@ -205,8 +209,9 @@ let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
     root_hash;
   }
 
-let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
+let prepare_installer_kernel ?output ?runner ~preimages_dir ?config installee =
   prepare_installer_kernel_with_arbitrary_file
+    ?output
     ?runner
     ~preimages_dir
     ?config
