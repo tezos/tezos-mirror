@@ -18,7 +18,7 @@ val register :
   title:string ->
   tags:string list ->
   ?seed:Test.seed ->
-  ?alert_collection:Alert_manager.Collection.t ->
+  ?alerts:Alert_manager.alert list ->
   (t -> unit Lwt.t) ->
   unit
 

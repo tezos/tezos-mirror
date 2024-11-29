@@ -26,15 +26,40 @@ let job_jingoo_template job =
       ("targets", Tlist (List.map target_jingoo_template job.targets));
     ]
 
+type record = {name : string; query : string}
+
+type severity = Critical | Warning | Info
+
+let string_of_severity = function
+  | Critical -> "critical"
+  | Warning -> "warning"
+  | Info -> "info"
+
+type alert = {
+  name : string;
+  expr : string;
+  group_name : string option;
+  interval : string option;
+  severity : severity option;
+  for_ : string option;
+  description : string option;
+  summary : string option;
+}
+
+type rule = Record of record | Alert of alert
+
+type group = {name : string; interval : string option; rules : rule list}
+
+type groups = (string, group) Hashtbl.t
+
 type t = {
   configuration_file : string;
   rules_file : string;
-  alert_manager : bool;
   mutable jobs : job list;
   scrape_interval : int;
   snapshot_filename : string option;
   port : int;
-  mutable alerts : Alert_manager.alert list;
+  groups : groups;
 }
 
 let netdata_source_of_agents agents =
@@ -63,11 +88,22 @@ let tezt_source =
   }
 
 let jingoo_configuration_template t =
+  let is_alert = function Alert _ -> true | _ -> false in
+  let exists_in_hashtbl f table =
+    let exception Found in
+    try
+      Hashtbl.iter (fun x y -> if f x y then raise Found) table ;
+      false
+    with Found -> true
+  in
+  let alert_on =
+    exists_in_hashtbl (fun _ group -> List.exists is_alert group.rules) t.groups
+  in
   let open Jingoo.Jg_types in
   [
     ("scrape_interval", Tint t.scrape_interval);
     ("jobs", Tlist (List.map job_jingoo_template t.jobs));
-    ("alert_manager", Tbool t.alert_manager);
+    ("alert_manager", Tbool alert_on);
   ]
 
 let write_configuration_file t =
@@ -80,16 +116,64 @@ let write_configuration_file t =
       Stdlib.seek_out oc 0 ;
       output_string oc content)
 
-let jingoo_alert_template t =
+let record_template (record : record) =
   let open Jingoo.Jg_types in
-  [("alerts", Tlist (List.map Alert_manager.alert_template t.alerts))]
+  let payload = [("record", Tstr record.name); ("query", Tstr record.query)] in
+  Tobj payload
+
+let alert_template (alert : alert) =
+  let open Jingoo.Jg_types in
+  let payload =
+    [
+      ("name", Tstr alert.name);
+      ("expr", Tstr alert.expr);
+      ( "severity",
+        Tstr (Option.fold ~none:"none" ~some:string_of_severity alert.severity)
+      );
+    ]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun v -> [("description", Tstr v)])
+        alert.description
+    @ Option.fold ~none:[] ~some:(fun v -> [("for", Tstr v)]) alert.for_
+    @ Option.fold ~none:[] ~some:(fun v -> [("summary", Tstr v)]) alert.summary
+  in
+  Tobj payload
+
+let rule_template rule =
+  let open Jingoo.Jg_types in
+  let payload =
+    match rule with
+    | Alert alert -> [("alert", alert_template alert)]
+    | Record record -> [("record", record_template record)]
+  in
+  Tobj payload
+
+let group_template group =
+  let open Jingoo.Jg_types in
+  let payload =
+    [
+      ("name", Tstr group.name);
+      ("rules", Tlist (List.map rule_template group.rules));
+    ]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun time -> [("interval", Tstr time)])
+        group.interval
+  in
+  Tobj payload
+
+let groups_template t =
+  let open Jingoo.Jg_types in
+  let groups = t.groups |> Hashtbl.to_seq_values |> List.of_seq in
+  [("groups", Tlist (List.map group_template groups))]
 
 let write_rules_file t =
   let content =
     Jingoo.Jg_template.from_file
       ~env:{Jingoo.Jg_types.std_env with autoescape = false}
       Path.prometheus_rules_configuration
-      ~models:(jingoo_alert_template t)
+      ~models:(groups_template t)
   in
   with_open_out t.rules_file (fun oc ->
       Stdlib.seek_out oc 0 ;
@@ -111,20 +195,66 @@ let add_job t ?(metrics_path = "/metrics") ~name targets =
   write_configuration_file t ;
   reload t
 
-let add_alert alert t =
-  t.alerts <- alert :: t.alerts ;
+let update_groups t group =
+  match Hashtbl.find_opt t.groups group.name with
+  | None -> Hashtbl.replace t.groups group.name group
+  | Some _group' ->
+      Test.fail "There is already a group registered with that name"
+
+let make_alert ?for_ ?description ?summary ?severity ?group_name ?interval ~name
+    ~expr () =
+  {name; expr; severity; for_; description; summary; group_name; interval}
+
+let make_record ~name ~query = {name; query}
+
+let rule_of_alert x = Alert x
+
+let rule_of_record x = Record x
+
+let name_of_alert ({name; _} : alert) = name
+
+let default_group_name = "tezt"
+
+let register_rules ?(group_name = default_group_name) ?interval rules t =
+  let group = {name = group_name; interval; rules} in
+  update_groups t group ;
   write_rules_file t ;
   reload t
 
-let add_alerts alerts t =
-  t.alerts <- alerts @ t.alerts ;
-  write_rules_file t ;
-  reload t
-
-let start agents =
+let start ~alerts agents =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let dir = Filename.get_temp_dir_name () // "prometheus" in
+  (* Group alerts by group name. *)
+  let groups =
+    let groups = Hashtbl.create 10 in
+    let add_rule alert =
+      let name = Option.value ~default:default_group_name alert.group_name in
+      let interval = alert.interval in
+      match Hashtbl.find_opt groups name with
+      | None -> Hashtbl.add groups name {name; interval; rules = [Alert alert]}
+      | Some group ->
+          let min_of left right =
+            match (left, right) with
+            | None, right -> right
+            | left, None -> left
+            | Some left, Some right ->
+                if Duration.(compare (of_string left) (of_string right)) > 0
+                then Some right
+                else Some left
+          in
+          Hashtbl.replace
+            groups
+            name
+            {
+              name;
+              interval = min_of interval group.interval;
+              rules = Alert alert :: group.rules;
+            }
+    in
+    List.iter add_rule alerts ;
+    groups
+  in
   let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
@@ -143,8 +273,7 @@ let start agents =
       scrape_interval;
       snapshot_filename;
       port;
-      alert_manager = Env.alert_handlers <> [];
-      alerts = [];
+      groups;
     }
   in
   write_rules_file t ;
@@ -272,10 +401,9 @@ let run_with_snapshot () =
     {
       configuration_file;
       rules_file = "";
-      alert_manager = false;
       jobs = [];
       scrape_interval = 0;
       snapshot_filename = Some snapshot_filename;
       port;
-      alerts = [];
+      groups = Hashtbl.create 0;
     }

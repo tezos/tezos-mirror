@@ -2013,51 +2013,34 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
   | _ -> bootstrap.node_rpc_endpoint
 
 module Alert = struct
-  open Tezt_cloud.Alert_manager
+  open Tezt_cloud
 
-  let collection = Collection.init ()
+  let receiver =
+    match Cli.Alerts.dal_slack_webhook with
+    | None -> Alert.null_receiver
+    | Some api_url ->
+        Alert.slack_receiver ~name:"slack-notifications" ~api_url ()
 
-  let low_DAL_attested_commitments_ratio =
-    alert
-      "LowDALAttestedCommitmentsRatio"
+  let alert =
+    Alert.make
+      ~route:
+        (Alert.route
+           ~group_wait:"10s"
+           ~group_interval:"10s"
+           ~repeat_interval:"12h"
+             (* In the future, probably we should make this value equals to Cli.metrics_retention *)
+           receiver)
+      ~group_name:"tezt"
+      ~name:"LowDALAttestedCommitmentsRatio"
       ~for_:"5m"
-      ~severity:`Info
+      ~severity:Info
       ~expr:{|vector(1)|}
       ~summary:"DAL attested commitments ratio over the last 12 hours"
       ~description:
         {|'DAL attested commitments ratio over the last 12 hours: {{ with query "avg_over_time(tezt_dal_commitments_ratio{kind=\"attested\"}[12h])" }}{{ . | first | value | printf "%.2f%%" }}{{ end }}'|}
+      ()
 
-  let () =
-    Collection.register_alert low_DAL_attested_commitments_ratio collection
-
-  let dal_slack_receiver = slack_webhook_receiver ~name:"slack-notifications"
-
-  let dal_group = group ~repeat_interval:"12h" "dal" dal_slack_receiver
-
-  let low_DAL_attested_ratio_slack_handler =
-    Handler.make ~name:"low-DAL-attested-ratio-slack-handler" ~setup:(fun t ->
-        let slack_api_url_k = "slack_api_url" in
-        let slack_api_url_v =
-          match Cli.slack_api_url with
-          | Some v -> v
-          | None ->
-              failwith
-                (Format.sprintf
-                   "alert: the '%s' alert handler requires the '%s' CLI \
-                    parameter to be provided"
-                   "low-DAL-attested-ratio-slack-handler"
-                   "slack-api-url")
-        in
-        t
-        |> add_global ~k:slack_api_url_k ~v:slack_api_url_v
-        |> add_group dal_group
-        |> with_group
-             dal_group
-             (add_group_alert low_DAL_attested_commitments_ratio)
-        |> add_receiver dal_slack_receiver)
-
-  let () =
-    Collection.register_handler low_DAL_attested_ratio_slack_handler collection
+  let alerts = [alert]
 end
 
 let init ~(configuration : configuration) etherlink_configuration cloud
@@ -2587,7 +2570,7 @@ let benchmark () =
     ~__FILE__
     ~title:"DAL node benchmark"
     ~tags:[Tag.cloud; "dal"; "benchmark"]
-    ~alert_collection:Alert.collection
+    ~alerts:Alert.alerts
     (fun cloud ->
       toplog "Creating the agents" ;
       let agents = Cloud.agents cloud in

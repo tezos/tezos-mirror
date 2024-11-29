@@ -9,8 +9,32 @@ type t
 
 type target = {address : string; port : int; app_name : string}
 
+type alert
+
+type severity = Critical | Warning | Info
+
+(** [make_alert name ?for_ ?description ?summary ?severity ~name ~expr ()]
+    creates an alert with:
+   - [name]: alert identifier.
+   - [expr]: promQL expression that triggers the alert.
+   - [severity]: alert level.
+   - [for_]: optional duration before firing.
+   - [description]: optional detailed explanation.
+   - [summary]: optional brief overview. *)
+val make_alert :
+  ?for_:string ->
+  ?description:string ->
+  ?summary:string ->
+  ?severity:severity ->
+  ?group_name:string ->
+  ?interval:string ->
+  name:string ->
+  expr:string ->
+  unit ->
+  alert
+
 (** [start agents] starts the prometheus server. *)
-val start : Agent.t List.t -> t Lwt.t
+val start : alerts:alert list -> Agent.t List.t -> t Lwt.t
 
 (** [shutdown prometheus] shutdowns the prometheus server. *)
 val shutdown : t -> unit Lwt.t
@@ -33,14 +57,17 @@ val reload : t -> unit Lwt.t
 val add_job :
   t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
 
-(** [add_alert alert prometheus] adds a new [alert] in the Prometheus
-    configuration. Similarly to [add_job], it implies a call to
-    [reload] so that the alert is taken into account just after
-    calling this function. *)
-val add_alert : Alert_manager.alert -> t -> unit Lwt.t
+type record
 
-(** [add_alerts alerts prometheus] adds new [alerts] in the Prometheus
-    configuration. Similarly to [add_job], it implies a call to
-    [reload] so that the alerts are taken into account just after
-    calling this function. *)
-val add_alerts : Alert_manager.alert list -> t -> unit Lwt.t
+type rule
+
+val make_record : name:string -> query:string -> record
+
+val rule_of_alert : alert -> rule
+
+val rule_of_record : record -> rule
+
+val name_of_alert : alert -> string
+
+val register_rules :
+  ?group_name:string -> ?interval:string -> rule list -> t -> unit Lwt.t
