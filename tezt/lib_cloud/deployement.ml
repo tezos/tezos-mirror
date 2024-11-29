@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Infrastructure to deploy on Google Cloud *)
 module Remote = struct
   type point_info = {workspace_name : string; gcp_name : string}
 
@@ -43,7 +44,7 @@ module Remote = struct
              Env.wait_process ~is_ready ~run:(run image_name) ())
       |> Lwt.all
     in
-    unit
+    Lwt.return_unit
 
   let workspace_deploy ~workspace_name ~number_of_vms ~configuration =
     let* () = Terraform.VM.Workspace.select workspace_name in
@@ -250,6 +251,7 @@ module Remote = struct
       Lwt.return_unit)
 end
 
+(* Infrastructure to deploy locally using Docker *)
 module Localhost = struct
   type t = {
     number_of_vms : int;

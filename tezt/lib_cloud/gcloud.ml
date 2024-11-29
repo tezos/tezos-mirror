@@ -12,6 +12,7 @@ let color = Log.Color.FG.gray
 let auth_configure_docker ~hostname =
   Process.run ~name ~color "gcloud" ["auth"; "configure-docker"; hostname]
 
+(** Retrieves the current Gcloud project ID from local environment. *)
 let config_get_value_project () =
   Process.run_and_read_stdout
     ~name
@@ -127,6 +128,8 @@ module DNS = struct
       "gcloud"
       ["dns"; "record-sets"; "list"; "--zone"; zone]
 
+  (** [list_entries ?name ~zone] lists all DNS entries from specified [~zone]
+      optionally filtering them by [?name_filter]. *)
   let list_entries ?name_filter ~zone () =
     let name_filter =
       match name_filter with
@@ -138,11 +141,14 @@ module DNS = struct
       (["dns"; "record-sets"; "list"; "--zone"; zone] @ name_filter)
 
   module Transaction = struct
+    (** [start ~zone ()] starts a DNS transaction in the specified [~zone]. *)
     let start ~zone () =
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "start"; "--zone"; zone]
 
+    (** [add ?ttl ?typ ~zone ~name ~value ()] adds a DNS record to the transaction.
+        The record has an optional time-to-live [?ttl], type [?typ]. *)
     let add ?(ttl = 300) ?(typ = "A") ~zone ~name ~value () =
       let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
       let typ = ["--type"; Format.asprintf "%s" typ] in
@@ -153,6 +159,8 @@ module DNS = struct
         (["dns"; "record-sets"; "transaction"; "add"]
         @ zone @ ttl @ typ @ name @ [value])
 
+    (** [remove ?ttl ?typ ~zone ~name ~value ()] removes a DNS record from the transaction.
+        The record has an optional time-to-live [?ttl], type [?typ]. *)
     let remove ?(ttl = 300) ?(typ = "A") ~zone ~name ~value () =
       let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
       let typ = ["--type"; Format.asprintf "%s" typ] in
@@ -163,16 +171,21 @@ module DNS = struct
         (["dns"; "record-sets"; "transaction"; "remove"]
         @ zone @ ttl @ typ @ name @ [value])
 
+    (** [execute ~zone ()] executes the current DNS transaction in the specified [~zone]. *)
     let execute ~zone () =
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "execute"; "--zone"; zone]
 
+    (** [abort ~zone ()] aborts the current DNS transaction in the specified [~zone]. *)
     let abort ~zone () =
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "abort"; "--zone"; zone]
 
+    (** [try_update ~zone fn args] tries to perform a DNS update transaction. It starts a
+        transaction, applies the changes using the provided function [fn] with arguments
+        [args], and executes the transaction. If an error occurs, it aborts the transaction. *)
     let try_update ~zone fn args =
       Lwt.catch
         (fun () ->

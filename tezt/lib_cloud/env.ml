@@ -21,8 +21,6 @@ let ssh_public_key_filename ?home () =
   let ssh_key = ssh_private_key_filename ?home () in
   Format.asprintf "%s.pub" ssh_key
 
-let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
-
 let mode =
   match (Cli.localhost, Cli.proxy) with
   | true, true -> `Orchestrator
@@ -70,16 +68,16 @@ let open_telemetry = Cli.open_telemetry
 
 let alert_handlers = Cli.alert_handlers
 
+let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
+
 let docker_image =
   (* In localhost mode, we don't want to interact with GCP. The image is taken
      locally. *)
-  match Cli.dockerfile_alias with
-  | None -> Gcp {alias = tezt_cloud}
-  | Some alias -> Gcp {alias}
-
-let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
+  Gcp {alias = dockerfile_alias}
 
 let dockerfile = Path.dockerfile ~alias:dockerfile_alias
+
+let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
 
 let check_file_consistency = Cli.check_file_consistency
 
@@ -93,7 +91,6 @@ let init () =
   match mode with
   | `Localhost | `Orchestrator -> Lwt.return_unit
   | `Host | `Cloud ->
-      let tezt_cloud = tezt_cloud in
       let* project_id = project_id () in
       Log.info "Initializing docker registry..." ;
       let* () = Terraform.Docker_registry.init () in
@@ -102,7 +99,7 @@ let init () =
       Lwt.return_unit
 
 (* Even though we could get this information locally, it is interesting to fetch
-   it through terraform to get the correct value if a scenario was launch with
+   it through terraform to get the correct value if a scenario was launched with
    different parameters. *)
 let hostname =
   let hostname = ref "" in
@@ -173,7 +170,7 @@ let dns_domains () =
   (* When we use the proxy mode, by default a domain name is
      registered for the `tezt-cloud` zone. *)
   let* domains =
-    if Cli.no_dns then Lwt.return []
+    if Cli.no_dns then Lwt.return_nil
     else
       match mode with
       | `Host -> (

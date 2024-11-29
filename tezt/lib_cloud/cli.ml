@@ -75,7 +75,7 @@ let ports_per_vm =
   Clap.default_int
     ~section
     ~long:"ports-per-vm"
-    ~description:"Number of opened port per VM (default is 50)"
+    ~description:"Number of opened ports per VM (default is 50)"
     50
 
 let proxy =
@@ -192,7 +192,7 @@ let max_run_duration =
     ~section
     ~long:"max-run-duration"
     ~description:
-      "Specify the maximum time (in second) of a VM (from the first time it \
+      "Specify the maximum time (in seconds) of a VM (from the first time it \
        was created)."
     7200
 
