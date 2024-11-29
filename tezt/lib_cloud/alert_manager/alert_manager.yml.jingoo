@@ -1,0 +1,44 @@
+# Global configurations applied to all alerts
+global:
+{%- for global in globals %}
+  {{ global.k }}: '{{ global.v }}'
+{% endfor %}
+
+route:
+  # Default receiver if no specific route matches
+  receiver: 'default'
+  group_wait: {{ default_group.group_wait }}
+  group_interval: {{ default_group.group_interval }}
+  repeat_interval: {{ default_group.repeat_interval }}
+  routes:
+    {%- for group in groups %}
+    - match_re:
+        alertname: '{{ group.alertname }}'
+      {%- if group.group_wait %}
+      group_wait: {{ group.group_wait }}
+      {% endif -%}
+      {%- if group.group_interval %}
+      group_interval: {{ group.group_interval }}
+      {% endif -%}
+      {%- if group.repeat_interval %}
+      group_wait: {{ group.group_wait }}
+      {% endif %}
+      receiver: '{{ group.receiver }}'
+    {% endfor %}
+
+receivers:
+# Default receiver that does nothing
+  - name: 'default'
+{%- for receiver in receivers %}
+  - name: '{{ receiver.name }}'
+  {%- if receiver.config.type == 'slack' %}
+    slack_configs:
+    - channel: '{{ receiver.config.data.channel }}'
+      title: '{{ receiver.config.data.title }}'
+      text: '{{ receiver.config.data.text }}'
+  {% endif -%}
+{% endfor %}
+
+# Rules to prevent certain alerts from firing when others are active
+inhibit_rules:
+  []
