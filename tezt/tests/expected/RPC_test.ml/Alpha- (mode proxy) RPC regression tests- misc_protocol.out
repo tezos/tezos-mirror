@@ -66,7 +66,6 @@
   "zk_rollup_max_ticket_payload_size": 2048,
   "global_limit_of_staking_over_baking": 9,
   "edge_of_staking_over_delegation": 3,
-  "adaptive_issuance_launch_ema_threshold": 0,
   "adaptive_rewards_params":
     { "issuance_ratio_final_min": { "numerator": "1", "denominator": "400" },
       "issuance_ratio_final_max": { "numerator": "1", "denominator": "10" },
@@ -78,8 +77,6 @@
       "growth_rate": { "numerator": "1", "denominator": "100" },
       "center_dz": { "numerator": "1", "denominator": "2" },
       "radius_dz": { "numerator": "1", "denominator": "50" } },
-  "adaptive_issuance_activation_vote_enable": true,
-  "adaptive_issuance_force_activation": false,
   "direct_ticket_spending_enable": false, "aggregate_attestation": false,
   "allow_tz4_delegate_enable": true, "all_bakers_attest_enable": false }
 
