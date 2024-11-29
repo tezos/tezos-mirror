@@ -2,37 +2,42 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name etherlink_tezt_tests_tezt_lib)
+ (name etherlink_lib_wasm_runtime_callbacks_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   bls12-381.archive
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.base-test-helpers
   octez-libs.test-helpers
+  qcheck-alcotest
+  octez-alcotezt
   octez-libs.tezt-wrapper
   tezt-tezos
-  tezt_etherlink
-  octez-evm-node-libs.evm_node_lib_dev_encoding
-  octez-rustzcash-deps
-  tezos-protocol-alpha.protocol)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
+  octez-l2-libs.irmin_context
+  octez-evm-node-libs.wasm_runtime_callbacks)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_test_helpers
   -open Tezos_test_helpers
+  -open Octez_alcotezt
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_etherlink)
- (modules evm_rollup evm_sequencer validate dal_sequencer eth_call gc))
+  -open Tezos_layer2_irmin_context)
+ (modules test_vector test_store))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  etherlink_tezt_tests_tezt_lib
+  etherlink_lib_wasm_runtime_callbacks_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -41,12 +46,7 @@
 
 (rule
  (alias runtest)
- (package tezt-etherlink)
- (deps
-  (glob_files evm_kernel_inputs/*)
-  (glob_files ../../tezos_contracts/*)
-  (glob_files ../../config/*)
-  (glob_files_rec ../../kernel_evm/*))
+ (package octez-evm-wasm-runtime-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

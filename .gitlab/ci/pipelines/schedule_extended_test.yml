@@ -545,7 +545,7 @@ wasm-runtime-check:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
-  - src/lib_wasm_runtime/lint.sh
+  - etherlink/lib_wasm_runtime/lint.sh
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -2140,6 +2140,67 @@ oc.unit:non-proto-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-nonproto-unit
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 1 day
+    paths:
+    - test_results
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
+    reports:
+      junit: test_results/*.xml
+    when: always
+  retry: 2
+
+oc.unit:etherlink-x86_64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull
+  interruptible: false
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make $MAKE_TARGETS
+  - ./scripts/ci/merge_coverage.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    ARCH: x86_64
+    MAKE_TARGETS: test-etherlink-unit
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G

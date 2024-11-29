@@ -2,24 +2,22 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_rust_deps)
- (public_name octez-rust-deps)
+ (name evm_node_rust_deps)
+ (public_name octez-evm-node-libs.evm_node_rust_deps)
  (instrumentation (backend bisect_ppx))
- (foreign_archives octez_rust_deps))
+ (foreign_archives octez_evm_node_rust_deps))
 
 (dirs :standard .cargo (not target))
 
 (rule
- (targets liboctez_rust_deps.a dlloctez_rust_deps.so wasmer.h wasm.h)
+ (targets liboctez_evm_node_rust_deps.a dlloctez_evm_node_rust_deps.so)
  (deps
   (file build.sh)
   (file Cargo.toml)
   (file Cargo.lock)
   (file ../../rust-toolchain)
   (source_tree .cargo)
-  (source_tree ../rustzcash_deps)
-  (source_tree wasmer-3.3.0)
-  (source_tree src)
-  (source_tree ../riscv)
-  (source_tree ../kernel_sdk))
+  (source_tree ../../src/rustzcash_deps)
+  (source_tree ../../src/rust_deps/wasmer-3.3.0)
+  (source_tree src))
  (action (no-infer (bash ./build.sh))))

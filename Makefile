@@ -293,7 +293,7 @@ test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
-NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" -not -path "etherlink/tezt" 2>/dev/null | LC_COLLATE=C sort)
+NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 ETHERLINK_DIRS := etherlink/bin_node/test
 
 OTHER_DIRS := $(shell find contrib/ ci/ client-libs/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
