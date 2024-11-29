@@ -485,6 +485,44 @@ module State = struct
         let root_hash = `Hex root_hash in
         Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
 
+  let reset_to_finalized_level exit_error ctxt conn =
+    let open Lwt_result_syntax in
+    let* safe_checkpoint = Evm_store.Context_hashes.find_finalized conn in
+    match safe_checkpoint with
+    | Some (finalized_number, checkpoint) ->
+        let*! () = Evm_context_events.reset_at_level finalized_number in
+        (* Find the "finalized" evm_state. *)
+        let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
+        let*! evm_state = Irmin_context.PVMState.get context in
+        (* Clear the store. *)
+        let* () = Evm_store.reset_after conn ~l2_level:finalized_number in
+        (* Update mutable session values. *)
+        let next_blueprint_number =
+          let (Qty finalized_number) = finalized_number in
+          Ethereum_types.Qty (Z.succ finalized_number)
+        in
+        let* current_block_hash = Evm_state.current_block_hash evm_state in
+        ctxt.session.next_blueprint_number <- next_blueprint_number ;
+        ctxt.session.evm_state <- evm_state ;
+        ctxt.session.current_block_hash <- current_block_hash ;
+        ctxt.session.context <- context ;
+        (* TODO: We need to fetch from the store (before it’s cleared) if there
+           is a pending upgrade at level [finalized_level]. It should be something
+           of the sort:
+
+           SELECT * FROM kernel_upgrades
+           WHERE injected_before <= {finalized_level}
+              && (applied_before >= {finalized_level} || applied_before IS NULL) *)
+        ctxt.session.pending_upgrade <- None ;
+        let*! head_info in
+        head_info := session_to_head_info ctxt.session ;
+        return evm_state
+    | None ->
+        let*! () =
+          Evm_context_events.reset_impossible_missing_finalized_state ()
+        in
+        tzfail exit_error
+
   let blueprint_applied_event ctxt conn evm_state on_success
       ({number = Qty number; hash = expected_block_hash} :
         Evm_events.Blueprint_applied.t) =
@@ -523,9 +561,17 @@ module State = struct
             Evm_events_follower_events.diverged
               (number, expected_block_hash, found_block_hash)
           in
-          tzfail
-            (Node_error.Diverged
-               (number, expected_block_hash, Some found_block_hash))
+          let exit_error =
+            Node_error.Diverged
+              (number, expected_block_hash, Some found_block_hash)
+          in
+          if ctxt.fail_on_missing_blueprint then
+            (* Sequencer must fail in case of divergence. *)
+            tzfail exit_error
+          else
+            (* Observers needs to reset at finalized level. *)
+            let* evm_state = reset_to_finalized_level exit_error ctxt conn in
+            return (evm_state, on_success)
     | None when ctxt.fail_on_missing_blueprint ->
         let*! () =
           Evm_events_follower_events.missing_blueprint
@@ -859,13 +905,19 @@ module State = struct
                     block.number
                 else
                   let Ethereum_types.(Qty number) = block.number in
+                  let exit_error =
+                    Node_error.Diverged
+                      (number, expected_block_hash, Some block.hash)
+                  in
                   let*! () =
                     Evm_events_follower_events.diverged
                       (number, expected_block_hash, block.hash)
                   in
+                  let* _evm_state =
+                    reset_to_finalized_level exit_error ctxt conn
+                  in
                   tzfail
-                    (Node_error.Diverged
-                       (number, expected_block_hash, Some block.hash))
+                    (Cannot_apply_blueprint {local_state_level = Z.pred next})
         in
         let number_of_transactions =
           match block.transactions with
