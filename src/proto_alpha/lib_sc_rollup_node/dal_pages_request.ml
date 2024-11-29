@@ -33,22 +33,10 @@ open Alpha_context
     - Add entries [None] for the slot's pages in the store, if the slot
       is not confirmed. *)
 
-type error +=
-  | Dal_slot_not_found_in_store of Dal.Slot.Header.id
-  | Dal_invalid_page_for_slot of Dal.Page.t
+type error += Dal_invalid_page_for_slot of Dal.Page.t
 
 let () =
-  Sc_rollup_node_errors.register_error_kind
-    `Permanent
-    ~id:"dal_pages_request.dal_slot_not_found_in_store"
-    ~title:"Dal slot not found in store"
-    ~description:"The Dal slot whose ID is given is not found in the store"
-    ~pp:(fun ppf ->
-      Format.fprintf ppf "Dal slot not found in store %a" Dal.Slot.Header.pp_id)
-    Data_encoding.(obj1 (req "slot_id" Dal.Slot.Header.id_encoding))
-    (function Dal_slot_not_found_in_store slot_id -> Some slot_id | _ -> None)
-    (fun slot_id -> Dal_slot_not_found_in_store slot_id) ;
-  Sc_rollup_node_errors.register_error_kind
+  register_error_kind
     `Permanent
     ~id:"dal_pages_request.dal_invalid_page_for_slot"
     ~title:"Invalid Dal page requested for slot"
@@ -94,12 +82,6 @@ module Event = struct
       ~pp5:pp_content_elipsis
 end
 
-let store_entry_from_published_level ~dal_attestation_lag ~published_level
-    node_ctxt =
-  Node_context.hash_of_level node_ctxt
-  @@ Int32.(
-       add (of_int dal_attestation_lag) (Raw_level.to_int32 published_level))
-
 module Slot_id = struct
   include Tezos_dal_node_services.Types.Slot_id
 
@@ -137,6 +119,101 @@ let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
   in
   get_slot_pages dal_cctxt slot_id
 
+module Slots_statuses_cache =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      type t = Dal.Slot.Header.id
+
+      let equal = Dal.Slot.Header.slot_id_equal
+
+      let hash id = Hashtbl.hash id
+    end)
+
+let download_skip_list_cells_of_level node_ctxt ~attested_level =
+  Plugin.RPC.Dal.skip_list_cells_of_level
+    (new Protocol_client_context.wrap_full node_ctxt.Node_context.cctxt)
+    (`Main, `Level attested_level)
+    ()
+
+(* We have currently 32 slots per level. We retain the information for 32 levels
+   (assuming no reorgs with different payload occur). *)
+let skip_list_cells_content_cache =
+  (* Attestation lag * number of slots * 32 retention levels, assuming no
+     reorgs. *)
+  let attestation_lag = 8 in
+  let number_of_slots = 32 in
+  let retention_levels = 32 in
+  Slots_statuses_cache.create
+    (attestation_lag * number_of_slots * retention_levels)
+
+let dal_skip_list_cell_content_of_slot_id node_ctxt
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants) slot_id
+    =
+  let open Lwt_result_syntax in
+  let attested_level =
+    Int32.add
+      (Raw_level.to_int32 slot_id.Dal.Slot.Header.published_level)
+      (Int32.of_int dal_constants.attestation_lag)
+  in
+  let* attested_level_hash =
+    Node_context.hash_of_level node_ctxt attested_level
+  in
+  match Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id with
+  | Some (cell_content, block_hash)
+    when Block_hash.equal attested_level_hash block_hash ->
+      return cell_content
+  | None | Some _ -> (
+      let* hash_with_cells =
+        download_skip_list_cells_of_level node_ctxt ~attested_level
+      in
+      List.iter
+        (fun (_hash, cell) ->
+          let content = Dal.Slots_history.content cell in
+          Slots_statuses_cache.replace
+            skip_list_cells_content_cache
+            (Dal.Slots_history.content_id content)
+            (content, attested_level_hash))
+        hash_with_cells ;
+      (* The [find] below validates the fact that we fetched the info of
+         commitments published at level [slot_id.published_level]. *)
+      match
+        Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id
+      with
+      | Some (cell_content, block_hash)
+        when Block_hash.equal attested_level_hash block_hash ->
+          return cell_content
+      | None ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Unreachable: We expect to find some data for slot %a, but got \
+                none"
+               Dal.Slot.Header.pp_id
+               slot_id)
+      | Some (_, got_hash) ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Unreachable: We expect to find some data for slot %a \
+                associated to block hash %a, but got data associated to block \
+                hash %a"
+               Dal.Slot.Header.pp_id
+               slot_id
+               Block_hash.pp_short
+               attested_level_hash
+               Block_hash.pp_short
+               got_hash))
+
+let slot_proto_attestation_status node_ctxt dal_constants slot_id =
+  let open Lwt_result_syntax in
+  let* res =
+    dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id
+  in
+  match res with
+  | Dal.Slots_history.Unpublished _
+  | Dal.Slots_history.Published {is_proto_attested = false; _} ->
+      return `Unattested
+  | Dal.Slots_history.Published {is_proto_attested = true; _} ->
+      return `Attested
+
 let get_page node_ctxt ~inbox_level page_id =
   let open Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
@@ -157,14 +234,6 @@ let get_page node_ctxt ~inbox_level page_id =
       in
       return @@ Some page
   | None -> tzfail @@ Dal_invalid_page_for_slot page_id
-
-let storage_invariant_broken published_level index =
-  failwith
-    "Internal error: [Node_context.find_slot_status] is supposed to have \
-     registered the status of the slot %d published at level %a in the store"
-    index
-    Raw_level.pp
-    published_level
 
 let slot_id_is_valid
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
@@ -226,31 +295,23 @@ let slot_pages
          slot_id
   then return_none
   else
-    let* confirmed_in_block_hash =
-      store_entry_from_published_level
-        ~dal_attestation_lag:dal_constants.attestation_lag
-        ~published_level
-        node_ctxt
+    let* status =
+      slot_proto_attestation_status node_ctxt dal_constants slot_id
     in
-    let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
-    let* processed =
-      Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
-    in
-    match processed with
-    | Some `Confirmed ->
+    match status with
+    | `Attested ->
+        let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
         let* pages =
           download_confirmed_slot_pages node_ctxt ~published_level ~index
         in
         return (Some pages)
-    | Some `Unconfirmed -> return_none
-    | None -> storage_invariant_broken published_level index
+    | `Unattested -> return_none
 
 let page_content
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt page_id
     ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
-  let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
   let Node_context.{genesis_info = {level = origination_level; _}; _} =
     node_ctxt
   in
@@ -265,17 +326,12 @@ let page_content
          page_id
   then return_none
   else
-    let* confirmed_in_block_hash =
-      store_entry_from_published_level
-        ~dal_attestation_lag:dal_constants.attestation_lag
-        ~published_level
+    let* status =
+      slot_proto_attestation_status
         node_ctxt
+        dal_constants
+        page_id.Dal.Page.slot_id
     in
-    let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
-    let* processed =
-      Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
-    in
-    match processed with
-    | Some `Confirmed -> get_page node_ctxt ~inbox_level page_id
-    | Some `Unconfirmed -> return_none
-    | None -> storage_invariant_broken published_level index
+    match status with
+    | `Attested -> get_page node_ctxt ~inbox_level page_id
+    | `Unattested -> return_none

@@ -259,6 +259,8 @@ module History : sig
   (** Returns the {!cell_content} of the given skip list cell. *)
   val content : t -> cell_content
 
+  val pp_content : Format.formatter -> cell_content -> unit
+
   (** Returns the slot id of the cell whose content is given. *)
   val content_id : cell_content -> Header.id
 

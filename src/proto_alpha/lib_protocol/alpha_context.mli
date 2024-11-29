@@ -2962,6 +2962,10 @@ module Dal : sig
 
     val content_id : cell_content -> Slot.Header.id
 
+    val pp : Format.formatter -> t -> unit
+
+    val pp_content : Format.formatter -> cell_content -> unit
+
     module Pointer_hash : S.HASH
 
     type hash = Pointer_hash.t
