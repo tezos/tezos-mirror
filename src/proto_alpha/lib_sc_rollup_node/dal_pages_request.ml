@@ -202,17 +202,19 @@ let dal_skip_list_cell_content_of_slot_id node_ctxt
                Block_hash.pp_short
                got_hash))
 
-let slot_proto_attestation_status node_ctxt dal_constants slot_id =
+let slot_attestation_status ?attestation_threshold_percent
+    ?restricted_commitments_publishers node_ctxt dal_constants slot_id =
   let open Lwt_result_syntax in
-  let* res =
+  let* cell_content =
     dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id
   in
-  match res with
-  | Dal.Slots_history.Unpublished _
-  | Dal.Slots_history.Published {is_proto_attested = false; _} ->
-      return `Unattested
-  | Dal.Slots_history.Published {is_proto_attested = true; _} ->
-      return `Attested
+  let commitment_opt =
+    Dal.Slots_history.is_commitment_attested
+      ~attestation_threshold_percent
+      ~restricted_commitments_publishers
+      cell_content
+  in
+  return @@ if Option.is_some commitment_opt then `Attested else `Unattested
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Lwt_result_syntax in
@@ -295,9 +297,7 @@ let slot_pages
          slot_id
   then return_none
   else
-    let* status =
-      slot_proto_attestation_status node_ctxt dal_constants slot_id
-    in
+    let* status = slot_attestation_status node_ctxt dal_constants slot_id in
     match status with
     | `Attested ->
         let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
@@ -309,9 +309,9 @@ let slot_pages
 
 let page_content
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~inbox_level node_ctxt
-    ~attestation_threshold_percent:_ ~restricted_commitments_publishers:_
-    page_id ~dal_attested_slots_validity_lag =
+    ~dal_activation_level ~inbox_level node_ctxt ~attestation_threshold_percent
+    ~restricted_commitments_publishers page_id ~dal_attested_slots_validity_lag
+    =
   let open Lwt_result_syntax in
   let Node_context.{genesis_info = {level = origination_level; _}; _} =
     node_ctxt
@@ -328,7 +328,9 @@ let page_content
   then return_none
   else
     let* status =
-      slot_proto_attestation_status
+      slot_attestation_status
+        ?attestation_threshold_percent
+        ?restricted_commitments_publishers
         node_ctxt
         dal_constants
         page_id.Dal.Page.slot_id
