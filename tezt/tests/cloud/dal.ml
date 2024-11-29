@@ -581,7 +581,9 @@ module Cli = struct
       ~section
       ~long:"metrics-retention"
       ~placeholder:"<integer>s OR <integer>m OR <integer>h OR <integer>d ..."
-      ~description:"Define the retention of the metrics. Default value: 12h."
+      ~description:
+        "Define the characteristic time of the exponential moving average. \
+         Default value: 12h."
       (* retention is half of a day. *)
       (12 * 60 * 60)
 
@@ -1214,6 +1216,10 @@ let update_ratio_attested_commitments t per_level_info metrics =
             let maximum_number_of_blocks =
               t.configuration.metrics_retention / t.time_between_blocks
             in
+            (* Until [t.configuration.metrics_retention] has been reached,
+               we use a simple arithmetic mean.
+               We then switch to an exponential moving average
+               of characteristic time [t.configuration.metrics_retention]. *)
             let weight =
               min
                 maximum_number_of_blocks
