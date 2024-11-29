@@ -13,13 +13,7 @@
 //!
 //! - Convert [`MerkleTree`] to [`MerkleProof`]
 
-// TODO: RV-271 Allow unused code until functionality is exposed to the OCaml bindings.
-#![allow(dead_code)]
-
-use super::{
-    merkle::{CompressedAccessInfo, CompressedMerkleTree},
-    tree::{ModifyResult, Tree},
-};
+use super::tree::{ModifyResult, Tree};
 use crate::{state_backend::hash::Hash, storage::DIGEST_SIZE};
 use itertools::Itertools;
 
@@ -84,22 +78,6 @@ pub enum MerkleProofLeaf {
     Read(Vec<u8>),
 }
 
-impl From<CompressedMerkleTree> for MerkleProof {
-    fn from(value: CompressedMerkleTree) -> Self {
-        // TODO: RV-290 iterative implementation to avoid overflowing the stack
-        use CompressedAccessInfo::*;
-        match value {
-            CompressedMerkleTree::Leaf(hash, access_info) => match access_info {
-                NoAccess | Write => MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
-                Read(data) | ReadWrite(data) => MerkleProof::Leaf(MerkleProofLeaf::Read(data)),
-            },
-            CompressedMerkleTree::Node(_, vec) => {
-                MerkleProof::Node(vec.into_iter().map(MerkleProof::from).collect())
-            }
-        }
-    }
-}
-
 impl MerkleProof {
     /// Return a 2-bit tag for the variant of the node in the proof.
     pub fn to_raw_tag(&self) -> Tag {
@@ -161,12 +139,6 @@ impl From<Tag> for u8 {
 impl From<LeafTag> for Tag {
     fn from(value: LeafTag) -> Self {
         Tag::Leaf(value)
-    }
-}
-
-impl Tag {
-    fn is_leaf(&self) -> bool {
-        *self != Tag::Node
     }
 }
 
@@ -344,11 +316,11 @@ pub fn deserialise_proof(
 #[cfg(test)]
 mod tests {
     use super::{
-        serialise_proof, CompressedAccessInfo, DeserialiseError, MerkleProof, MerkleProofLeaf,
-        Shape, TAG_BLIND, TAG_NODE, TAG_READ,
+        serialise_proof, DeserialiseError, MerkleProof, MerkleProofLeaf, Shape, TAG_BLIND,
+        TAG_NODE, TAG_READ,
     };
     use crate::{
-        state_backend::proof_backend::proof::{deserialise_proof, CompressedMerkleTree, Proof},
+        state_backend::proof_backend::proof::{deserialise_proof, Proof},
         storage::{Hash, DIGEST_SIZE},
     };
     use proptest::proptest;
@@ -577,68 +549,6 @@ mod tests {
             let (root, bound) = &nodes[0];
             check_bounds(root.clone(), bound);
         });
-    }
-
-    #[test]
-    fn transform_merkle_tree_to_proof() {
-        use CompressedAccessInfo::*;
-
-        let check = |merkle_tree, merkle_proof| {
-            let proof_from_merkle = MerkleProof::from(merkle_tree);
-            assert_eq!(proof_from_merkle, merkle_proof);
-        };
-
-        let gen_hash_data = || {
-            let data = rand::random::<[u8; 12]>().to_vec();
-            let hash = Hash::blake2b_hash_bytes(&data).unwrap();
-            (data, hash)
-        };
-
-        let (data, hash) = gen_hash_data();
-
-        // Check leafs
-        check(
-            CompressedMerkleTree::Leaf(hash, NoAccess),
-            MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
-        );
-        check(
-            CompressedMerkleTree::Leaf(hash, Write),
-            MerkleProof::Leaf(MerkleProofLeaf::Blind(hash)),
-        );
-        check(
-            CompressedMerkleTree::Leaf(hash, Read(data.clone())),
-            MerkleProof::Leaf(MerkleProofLeaf::Read(data.clone())),
-        );
-        check(
-            CompressedMerkleTree::Leaf(hash, ReadWrite(data.clone())),
-            MerkleProof::Leaf(MerkleProofLeaf::Read(data.clone())),
-        );
-
-        // Check nodes
-        let [d0, d1, d2, d3, d4, d5, d6, d7, d8] = [0; 9].map(|_| gen_hash_data());
-        let l0 = MerkleProof::Leaf(MerkleProofLeaf::Read(d0.0.clone()));
-        let l1 = MerkleProof::Leaf(MerkleProofLeaf::Read(d1.0.clone()));
-        let l2 = MerkleProof::Leaf(MerkleProofLeaf::Read(d2.0.clone()));
-        let l3 = MerkleProof::Leaf(MerkleProofLeaf::Blind(d3.1));
-        let l4 = MerkleProof::Leaf(MerkleProofLeaf::Blind(d4.1));
-        let l5 = MerkleProof::Leaf(MerkleProofLeaf::Blind(d5.1));
-
-        let n6 = MerkleProof::Node(vec![l0, l1, l3]);
-        let n7 = MerkleProof::Node(vec![l4, l2, l5]);
-        let root = MerkleProof::Node(vec![n6, n7]);
-
-        let t0 = CompressedMerkleTree::Leaf(d0.1, Read(d0.0));
-        let t1 = CompressedMerkleTree::Leaf(d1.1, ReadWrite(d1.0));
-        let t2 = CompressedMerkleTree::Leaf(d2.1, Read(d2.0));
-        let t3 = CompressedMerkleTree::Leaf(d3.1, Write);
-        let t4 = CompressedMerkleTree::Leaf(d4.1, NoAccess);
-        let t5 = CompressedMerkleTree::Leaf(d5.1, Write);
-
-        let t6 = CompressedMerkleTree::Node(d6.1, vec![t0, t1, t3]);
-        let t7 = CompressedMerkleTree::Node(d7.1, vec![t4, t2, t5]);
-        let t_root = CompressedMerkleTree::Node(d8.1, vec![t6, t7]);
-
-        check(t_root, root);
     }
 
     fn check_deserialisation(raw_bytes: &[u8], full_shape: Shape, expected_proof: Proof) {
