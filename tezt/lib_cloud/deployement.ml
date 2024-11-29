@@ -285,11 +285,15 @@ module Localhost = struct
              let* docker_image =
                Env.uri_of_docker_image configuration.docker_image
              in
+             (* FIXME: The docker host networking feature is not supported on macOS.
+                We want to remove it in the future for all distributions, but it
+                requires more testing. *)
+             let network = if Env.macosx then None else Some "host" in
              let process =
                Docker.run
                  ~rm:true
                  ~name
-                 ~network:"host"
+                 ?network
                  ~publish_ports
                  docker_image
                  ["-D"; "-p"; start; "-e"]
