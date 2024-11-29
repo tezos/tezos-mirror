@@ -25,8 +25,8 @@ let on_new_blueprint next_blueprint_number
       | Some kernel_upgrade -> [Evm_events.Upgrade_event kernel_upgrade]
       | None -> []
     in
-    let* () = Evm_context.apply_evm_events events in
     Evm_context.apply_blueprint
+      ~events
       blueprint.timestamp
       blueprint.payload
       delayed_transactions

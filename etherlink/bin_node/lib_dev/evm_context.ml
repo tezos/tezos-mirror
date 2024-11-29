@@ -109,6 +109,7 @@ module Request = struct
       }
         -> (unit, tztrace) t
     | Apply_blueprint : {
+        events : Evm_events.t list option;
         timestamp : Time.Protocol.t;
         payload : Blueprint_types.payload;
         delayed_transactions : Evm_events.Delayed_transaction.t list;
@@ -164,20 +165,24 @@ module Request = struct
         case
           (Tag 1)
           ~title:"Apply_blueprint"
-          (obj4
+          (obj5
              (req "request" (constant "apply_blueprint"))
+             (opt "events" (list Evm_events.encoding))
              (req "timestamp" Time.Protocol.encoding)
              (req "payload" Blueprint_types.payload_encoding)
              (req
                 "delayed_transactions"
                 (list Evm_events.Delayed_transaction.encoding)))
           (function
-            | View (Apply_blueprint {timestamp; payload; delayed_transactions})
-              ->
-                Some ((), timestamp, payload, delayed_transactions)
+            | View
+                (Apply_blueprint
+                  {events; timestamp; payload; delayed_transactions}) ->
+                Some ((), events, timestamp, payload, delayed_transactions)
             | _ -> None)
-          (fun ((), timestamp, payload, delayed_transactions) ->
-            View (Apply_blueprint {timestamp; payload; delayed_transactions}));
+          (fun ((), events, timestamp, payload, delayed_transactions) ->
+            View
+              (Apply_blueprint
+                 {events; timestamp; payload; delayed_transactions}));
         case
           (Tag 2)
           ~title:"Blueprint"
@@ -649,7 +654,7 @@ module State = struct
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
     Ethereum_types.Qty (Z.pred next_blueprint_number)
 
-  let apply_evm_events ?finalized_level (ctxt : t) events =
+  let apply_evm_events ?finalized_level conn (ctxt : t) events =
     let open Lwt_result_syntax in
     let* needs_process =
       match finalized_level with
@@ -659,10 +664,7 @@ module State = struct
           return_true
       | Some rollup_block_level -> (
           let* last_known_l1_block =
-            let* level =
-              Evm_store.use ctxt.store @@ fun conn ->
-              Evm_store.L1_l2_levels_relationships.find conn
-            in
+            let* level = Evm_store.L1_l2_levels_relationships.find conn in
             match level with
             | Some {l1_level; _} -> return_some l1_level
             | None -> return_none
@@ -686,7 +688,6 @@ module State = struct
     in
     if needs_process then (
       let* context, evm_state, on_success =
-        with_store_transaction ctxt @@ fun conn ->
         let* on_success, ctxt, evm_state, context =
           match events with
           | [] ->
@@ -996,7 +997,8 @@ module State = struct
     Metrics.set_level ~level ;
     return_unit
 
-  let apply_blueprint ctxt timestamp payload delayed_transactions =
+  let apply_blueprint ?(events = []) ctxt timestamp payload delayed_transactions
+      =
     let open Lwt_result_syntax in
     let* ( evm_state,
            context,
@@ -1005,6 +1007,7 @@ module State = struct
            split_info,
            gc_info ) =
       with_store_transaction ctxt @@ fun conn ->
+      let* () = apply_evm_events conn ctxt events in
       apply_blueprint_store_unsafe
         ctxt
         conn
@@ -1533,11 +1536,17 @@ module Handlers = struct
     | Apply_evm_events {finalized_level; events} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.apply_evm_events ?finalized_level ctxt events
-    | Apply_blueprint {timestamp; payload; delayed_transactions} ->
+        State.with_store_transaction ctxt @@ fun conn ->
+        State.apply_evm_events ?finalized_level conn ctxt events
+    | Apply_blueprint {events; timestamp; payload; delayed_transactions} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.apply_blueprint ctxt timestamp payload delayed_transactions
+        State.apply_blueprint
+          ?events
+          ctxt
+          timestamp
+          payload
+          delayed_transactions
     | Blueprint {level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1908,9 +1917,9 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
     (Apply_evm_events
        {finalized_level = Some finalized_level; events = evm_events})
 
-let apply_blueprint timestamp payload delayed_transactions =
+let apply_blueprint ?events timestamp payload delayed_transactions =
   worker_wait_for_request
-    (Apply_blueprint {timestamp; payload; delayed_transactions})
+    (Apply_blueprint {events; timestamp; payload; delayed_transactions})
 
 let head_info () =
   let open Lwt_syntax in

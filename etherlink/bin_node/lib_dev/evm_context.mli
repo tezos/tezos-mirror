@@ -115,11 +115,13 @@ val reset :
 val apply_evm_events :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
-(** [apply_blueprint timestamp payload delayed_transactions] applies
-    [payload] in the freshest EVM state stored under [ctxt] at
-    timestamp [timestamp], forwards the {!Blueprint_types.with_events}.
-    It commits the result if the blueprint produces the expected block. *)
+(** [apply_blueprint ?events timestamp payload delayed_transactions]
+    applies [payload] in the freshest EVM state stored under [ctxt] at
+    timestamp [timestamp], forwards the
+    {!Blueprint_types.with_events}.  It commits the result if the
+    blueprint produces the expected block. *)
 val apply_blueprint :
+  ?events:Evm_events.t list ->
   Time.Protocol.t ->
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->
