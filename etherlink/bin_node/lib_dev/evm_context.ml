@@ -933,7 +933,7 @@ module State = struct
     Option.iter
       (fun gc_info -> ctxt.session.last_gc_block <- Some gc_info)
       gc_info ;
-    Blueprints_watcher.notify blueprint_with_events ;
+    Broadcast.notify @@ Broadcast.Blueprint blueprint_with_events ;
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     let* head_info in
     head_info := session_to_head_info ctxt.session ;
