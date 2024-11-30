@@ -376,7 +376,7 @@ type etherlink_configuration = {
 }
 
 type configuration = {
-  dal : bool;
+  with_dal : bool;
   stake : int list;
   stake_machine_type : string list option;
   dal_node_producers : int list; (* slot indices *)
@@ -410,7 +410,7 @@ type bootstrap = {
 
 type baker = {
   node : Node.t;
-  dal_node : Dal_node.t;
+  dal_node : Dal_node.t option;
   baker : Baker.t;
   account : Account.key;
   stake : int;
@@ -1428,28 +1428,30 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
       agent
   in
   let* dal_node =
-    let* dal_node =
-      Dal_node.Agent.create
-        ~name:(Format.asprintf "baker-dal-node-%d" i)
-        ~node
-        agent
-    in
-    let* () =
-      Dal_node.init_config
-        ~expected_pow:(Network.expected_pow configuration.network)
-        ~attester_profiles:[account.Account.public_key_hash]
-        ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
-        dal_node
-    in
-    let otel = Cloud.open_telemetry_endpoint cloud in
-    let* () =
-      Dal_node.Agent.run
-        ?otel
-        ~memtrace:configuration.memtrace
-        ~event_level:`Notice
-        dal_node
-    in
-    Lwt.return dal_node
+    if not configuration.with_dal then Lwt.return_none
+    else
+      let* dal_node =
+        Dal_node.Agent.create
+          ~name:(Format.asprintf "baker-dal-node-%d" i)
+          ~node
+          agent
+      in
+      let* () =
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow configuration.network)
+          ~attester_profiles:[account.Account.public_key_hash]
+          ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
+          dal_node
+      in
+      let otel = Cloud.open_telemetry_endpoint cloud in
+      let* () =
+        Dal_node.Agent.run
+          ?otel
+          ~memtrace:configuration.memtrace
+          ~event_level:`Notice
+          dal_node
+      in
+      Lwt.return_some dal_node
   in
   let* () =
     match teztale with
@@ -1480,14 +1482,14 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
       ~delegates:[account.Account.alias]
       ~protocol:configuration.protocol
       ~client
-      ~dal_node
+      ?dal_node
       node
       agent
   in
   let* () =
     add_prometheus_source
       ~node
-      ~dal_node
+      ?dal_node
       cloud
       agent
       (Format.asprintf "baker-%d" i)
@@ -2319,27 +2321,27 @@ let on_new_level t ?etherlink level =
   Hashtbl.replace t.metrics level metrics ;
   let* t =
     match t.disconnection_state with
-    | None -> Lwt.return t
-    | Some disconnection_state ->
+    | Some disconnection_state when t.configuration.with_dal ->
         let nb_bakers = List.length t.bakers in
         let* disconnection_state =
           Disconnect.disconnect disconnection_state level (fun b ->
-              let baker_to_disconnect =
-                (List.nth t.bakers (b mod nb_bakers)).dal_node
-              in
-              Dal_node.terminate baker_to_disconnect)
+              let baker_to_disconnect = List.nth t.bakers (b mod nb_bakers) in
+              (* Invariant: Option.get don't fail because t.configuration.dal is true *)
+              let dal_node = baker_to_disconnect.dal_node |> Option.get in
+              Dal_node.terminate dal_node)
         in
         let* disconnection_state =
           Disconnect.reconnect disconnection_state level (fun b ->
-              let baker_to_reconnect =
-                (List.nth t.bakers (b mod nb_bakers)).dal_node
-              in
+              let baker_to_reconnect = List.nth t.bakers (b mod nb_bakers) in
+              (* Invariant: Option.get don't fail because t.configuration.dal is true *)
+              let dal_node = baker_to_reconnect.dal_node |> Option.get in
               Dal_node.Agent.run
                 ?otel:t.otel
                 ~memtrace:t.configuration.memtrace
-                baker_to_reconnect)
+                dal_node)
         in
         Lwt.return {t with disconnection_state = Some disconnection_state}
+    | _ -> Lwt.return t
   in
   toplog "Level processed" ;
   Lwt.return t
@@ -2504,10 +2506,10 @@ let configuration, etherlink_configuration =
   let metrics_retention = Cli.metrics_retention in
   let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
   let bootstrap_dal_node_identity_file = Cli.bootstrap_dal_node_identity_file in
-  let dal = Cli.dal in
+  let with_dal = Cli.with_dal in
   let t =
     {
-      dal;
+      with_dal;
       stake;
       stake_machine_type;
       dal_node_producers;
