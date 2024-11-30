@@ -268,9 +268,7 @@ let random_shell : Tezos_base.Operation.shell_header QCheck2.Gen.t =
 let gen_slot =
   let open QCheck2.Gen in
   let+ i = small_nat in
-  match Slot.Internal_for_tests.of_int i with
-  | Ok slot -> slot
-  | Error _ -> assert false
+  match Slot.of_int i with Ok slot -> slot | Error _ -> assert false
 
 let gen_level =
   let open QCheck2.Gen in

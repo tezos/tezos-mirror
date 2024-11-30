@@ -115,7 +115,3 @@ module Range = struct
     let* acc = f init hi in
     loop ~acc ~next:(hi - 1)
 end
-
-module Internal_for_tests = struct
-  let of_int = of_int
-end

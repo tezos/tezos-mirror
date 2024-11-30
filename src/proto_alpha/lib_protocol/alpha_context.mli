@@ -82,6 +82,8 @@ module Slot : sig
 
   val to_int : t -> int
 
+  val of_int : int -> t tzresult
+
   val of_int_do_not_use_except_for_parameters : int -> t
 
   val encoding : t Data_encoding.encoding
@@ -103,10 +105,6 @@ module Slot : sig
   module Map : Map.S with type key = t
 
   module Set : Set.S with type elt = t
-
-  module Internal_for_tests : sig
-    val of_int : int -> t tzresult
-  end
 end
 
 (** This module re-exports definitions from {!Tez_repr}. *)
