@@ -288,6 +288,18 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   |> append_before_script [". ./scripts/ci/sccache-start.sh"]
   |> append_after_script ["./scripts/ci/sccache-stop.sh"]
 
+let enable_octez_rust_deps_target_dir ?key job =
+  let key =
+    Option.value
+      ~default:
+        ("rust-deps-target-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+      key
+  in
+  let path = "$CI_PROJECT_DIR/_target" in
+  job
+  |> append_variables [("OCTEZ_RUST_DEPS_TARGET_DIR", path)]
+  |> append_cache (cache ~key [path])
+
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
     This function should only be applied to jobs that have a GitLab CI
@@ -948,7 +960,7 @@ let job_build_static_binaries ~__POS__ ~arch
       @ version_executable)
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
-  |> enable_cargo_cache |> enable_sccache
+  |> enable_cargo_cache |> enable_sccache |> enable_octez_rust_deps_target_dir
 
 (** Type of Docker build jobs.
 
@@ -1214,7 +1226,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache |> enable_sccache
+    |> enable_cargo_cache |> enable_sccache |> enable_octez_rust_deps_target_dir
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
