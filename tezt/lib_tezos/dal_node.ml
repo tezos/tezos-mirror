@@ -46,12 +46,6 @@ end
 
 type history_mode = Full | Auto | Custom of int
 
-type skip_list_storage_backend = Legacy | SQLite3
-
-let string_of_skip_list_storage_backend = function
-  | Legacy -> "legacy"
-  | SQLite3 -> "sqlite3"
-
 open Parameters
 include Daemon.Make (Parameters)
 
@@ -105,7 +99,7 @@ let spawn_command dal_node =
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
-    ?(skip_list_storage_backend = Legacy) dal_node =
+    dal_node =
   spawn_command dal_node @@ List.filter_map Fun.id
   @@ [
        Some "config";
@@ -142,9 +136,6 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          Some (String.concat "," (List.map string_of_int producer_profiles));
        ])
   @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
-  @ (match skip_list_storage_backend with
-    | Legacy -> []
-    | SQLite3 -> [Some "--sqlite3-backend"])
   @
   match history_mode with
   | None -> []
@@ -163,8 +154,7 @@ module Config_file = struct
 end
 
 let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
-    ?observer_profiles ?bootstrap_profile ?history_mode
-    ?skip_list_storage_backend dal_node =
+    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
   let process =
     spawn_config_init
       ?expected_pow
@@ -174,7 +164,6 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
       ?observer_profiles
       ?bootstrap_profile
       ?history_mode
-      ?skip_list_storage_backend
       dal_node
   in
   Process.check process
