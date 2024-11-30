@@ -164,7 +164,9 @@ val shards : t -> Shards.t
     [`SQLite3 store] depending on the current storage backend used by
     the store [t]. *)
 val skip_list_cells :
-  t -> [> `KVS of Kvs_skip_list_cells_store.t | `SQLite3 of Dal_store_sqlite3.t]
+  t ->
+  [> `KVS of Kvs_skip_list_cells_store.t
+  | `SQLite3 of Dal_store_sqlite3.Skip_list_cells.t ]
 
 (** [slot_header_statuses t] returns the statuses store  associated with the store
     [t]. *)
@@ -228,4 +230,8 @@ module Skip_list_cells : sig
   (** [remove store ~attested_level] removes any data related to [attested_level]
       from the [store]. *)
   val remove : t -> attested_level:int32 -> unit tzresult Lwt.t
+
+  (** [schemas data_dir] returns the list of SQL statements allowing
+      to recreate the tables of the DAL skip list cells store. *)
+  val schemas : string -> string list tzresult Lwt.t
 end

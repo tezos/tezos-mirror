@@ -6,26 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A handler to the DAL node's SQLite3 database. *)
-type t = Sqlite.t
+(** Name of the SQLite3 file. *)
+val sqlite_file_name : string
 
 (** A direct connection to the database, allowing to interact with it. *)
 type conn = Sqlite.conn
-
-(** [use db k] executes [k] with a fresh connection to [db]. *)
-val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
-
-(** [init ~data_dir ~perm ()] returns a handler to the DAL node store
-    located under [data_dir]. If no store is located in [data_dir], an
-    empty store is created.
-
-    If [perm] is [`Read_only], then SQL requests requiring write access will
-    fail. With [`Read_write], they will succeed as expected. *)
-val init :
-  data_dir:string -> perm:[`Read_only | `Read_write] -> unit -> t tzresult Lwt.t
-
-(** Name of the SQLite3 file. *)
-val sqlite_file_name : string
 
 module Schemas : sig
   (** [get_all conn] returns the list of SQL statements allowing to recreate
@@ -35,6 +20,21 @@ end
 
 module Skip_list_cells : sig
   open Dal_proto_types
+
+  (** A handler to the DAL node's skip list cells SQLite3 database. *)
+  type t
+
+  (** [init ~data_dir ~perm ()] returns a handler to the DAL node store
+    located under [data_dir]. If no store is located in [data_dir], an
+    empty store is created.
+
+    If [perm] is [`Read_only], then SQL requests requiring write access will
+    fail. With [`Read_write], they will succeed as expected. *)
+  val init :
+    data_dir:string ->
+    perm:[`Read_only | `Read_write] ->
+    unit ->
+    t tzresult Lwt.t
 
   (** [find ?conn store hash] returns the cell associated to [hash] in
       the [store], if any. Uses the [conn] if provided (defaults to
@@ -57,6 +57,10 @@ module Skip_list_cells : sig
       [attested_level] from the [store]. Uses the [conn] if provided
       (defaults to [None]). *)
   val remove : ?conn:conn -> t -> attested_level:int32 -> unit tzresult Lwt.t
+
+  (** [schemas t] returns the list of SQL statements
+      allowing to recreate the tables of the store [t]. *)
+  val schemas : t -> string list tzresult Lwt.t
 
   (** Internal functions for testing purpose.  *)
   module Internal_for_tests : sig

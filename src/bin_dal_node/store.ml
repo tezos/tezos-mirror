@@ -551,7 +551,7 @@ type t = {
   last_processed_level : Last_processed_level.t;
   first_seen_level : First_seen_level.t;
   storage_backend : Storage_backend.kind;
-  sqlite3 : Dal_store_sqlite3.t;
+  sqlite3 : Dal_store_sqlite3.Skip_list_cells.t;
 }
 
 let cache {cache; _} = cache
@@ -573,6 +573,37 @@ let slot_header_statuses {slot_header_statuses; _} = slot_header_statuses
 
 let slots {slots; _} = slots
 
+let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
+  let open Lwt_result_syntax in
+  let open Filename.Infix in
+  let skip_list_cells_data_dir = data_dir // Stores_dirs.skip_list_cells in
+  let*! () =
+    (* This occurs when running the command:
+       ./octez-dal-node debug print store schemas *)
+    if not (Sys.file_exists skip_list_cells_data_dir) then
+      Lwt_utils_unix.create_dir (data_dir // Stores_dirs.skip_list_cells)
+    else Lwt.return_unit
+  in
+  let*! () =
+    (* If a previous sqlite database has been created using the
+       `--sqlite3-backend` experimental flag. We simply move it to the
+       new destination path. *)
+    let previous_path = data_dir // Dal_store_sqlite3.sqlite_file_name in
+    if Sys.file_exists previous_path then (
+      let new_path =
+        skip_list_cells_data_dir // Dal_store_sqlite3.sqlite_file_name
+      in
+      let*! () = Lwt_utils_unix.copy_file ~src:previous_path ~dst:new_path () in
+      Sys.remove previous_path ;
+      Lwt.return_unit)
+    else Lwt.return_unit
+  in
+  let*! () = Event.(emit dal_node_sqlite3_store_init ()) in
+  Dal_store_sqlite3.Skip_list_cells.init
+    ~data_dir:skip_list_cells_data_dir
+    ~perm
+    ()
+
 module Skip_list_cells = struct
   let find t =
     match t.storage_backend with
@@ -588,6 +619,11 @@ module Skip_list_cells = struct
     match t.storage_backend with
     | Legacy -> Kvs_skip_list_cells_store.remove t.skip_list_cells
     | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.remove t.sqlite3
+
+  let schemas data_dir =
+    let open Lwt_result_syntax in
+    let* store = init_sqlite_skip_list_cells_store data_dir in
+    Dal_store_sqlite3.Skip_list_cells.schemas store
 end
 
 let init_skip_list_cells_store base_dir =
@@ -695,9 +731,7 @@ let upgrade_from_v1_to_v2 ~base_dir =
   in
   (* Initialize both stores and migrate. *)
   let* kvs_store = init_skip_list_cells_store base_dir in
-  let* sql_store =
-    Dal_store_sqlite3.init ~data_dir:base_dir ~perm:`Read_write ()
-  in
+  let* sql_store = init_sqlite_skip_list_cells_store base_dir in
   let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
   let*! res = Store_migrations.migrate_skip_list_store kvs_store sql_store in
   let* () = Kvs_skip_list_cells_store.close kvs_store in
@@ -711,10 +745,10 @@ let upgrade_from_v1_to_v2 ~base_dir =
           ~force:true
       in
       (* Remove the Stores_dirs.skip_list_cells directory. *)
-      let*! () =
-        Lwt_utils_unix.remove_dir
-          Filename.Infix.(base_dir // Stores_dirs.skip_list_cells)
-      in
+      let open Filename.Infix in
+      let store_dir = base_dir // Stores_dirs.skip_list_cells in
+      let*! () = Lwt_utils_unix.remove_dir (store_dir // "hashes") in
+      let*! () = Lwt_utils_unix.remove_dir (store_dir // "cells") in
       (* The storage upgrade has been done. *)
       let*! () = Event.(emit store_upgraded (Version.make 1, Version.make 2)) in
       return_unit
@@ -798,10 +832,7 @@ let init config =
     let sqlite3_backend = config.experimental_features.sqlite3_backend in
     Storage_backend.set store ~sqlite3_backend
   in
-  let* sqlite3 =
-    let*! () = Event.(emit dal_node_sqlite3_store_init ()) in
-    Dal_store_sqlite3.init ~data_dir:base_dir ~perm:`Read_write ()
-  in
+  let* sqlite3 = init_sqlite_skip_list_cells_store base_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
