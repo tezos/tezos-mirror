@@ -376,6 +376,7 @@ type etherlink_configuration = {
 }
 
 type configuration = {
+  dal : bool;
   stake : int list;
   stake_machine_type : string list option;
   dal_node_producers : int list; (* slot indices *)
@@ -2503,8 +2504,10 @@ let configuration, etherlink_configuration =
   let metrics_retention = Cli.metrics_retention in
   let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
   let bootstrap_dal_node_identity_file = Cli.bootstrap_dal_node_identity_file in
+  let dal = Cli.dal in
   let t =
     {
+      dal;
       stake;
       stake_machine_type;
       dal_node_producers;
