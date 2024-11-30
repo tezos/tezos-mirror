@@ -77,23 +77,59 @@ let read_dir dir =
   in
   read_files []
 
-(* This function checks that in the skip list store of the given [dal_node]
-   (1) the list of files in the 'hashes' sub-directory coincides with
-   [expected_levels] (up to ordering) and (2) as many files in the 'cells'
-   sub-directory as the [(List.length expected_levels) * number_of_slots]. *)
+(* This function checks that in the skip list store of the given
+   [dal_node]:
+   (1) the 'hashes' coincides with [expected_levels] (up to ordering)
+   and,
+   (2) as many 'cells' as the [(List.length expected_levels) *
+   number_of_slots]. *)
 let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
-  let store_dir = sf "%s/store/skip_list_store/" (Dal_node.data_dir dal_node) in
-  let* hashes = read_dir (store_dir ^ "hashes") in
+  let path =
+    sf "%s/store/skip_list_store/store.sqlite" (Dal_node.data_dir dal_node)
+  in
+  let db = Sqlite3.db_open path in
+  let attested_levels = ref [] in
+  let query = "SELECT attested_level FROM skip_list_slots;" in
+  let res =
+    Sqlite3.exec_not_null_no_headers
+      ~cb:(fun row ->
+        let attested_level = row.(0) in
+        attested_levels := attested_level :: !attested_levels)
+      db
+      query
+  in
+  let () =
+    match res with
+    | Sqlite3.Rc.OK -> ()
+    | err ->
+        Test.fail
+          "Failure fetching the attested levels from the sqlite db: %s"
+          (Sqlite3.Rc.to_string err)
+  in
   Check.(
-    List.sort String.compare hashes = List.sort String.compare expected_levels)
+    List.sort_uniq String.compare !attested_levels
+    = List.sort String.compare expected_levels)
     ~__LOC__
     Check.(list string)
     ~error_msg:"Expected hashes directory content: %R. Got: %L" ;
-  let* cells = read_dir (store_dir ^ "cells") in
-  Check.(List.length cells = number_of_slots * List.length expected_levels)
+  let count = ref 0 in
+  let query = "SELECT hash FROM skip_list_cells;" in
+  let res =
+    Sqlite3.exec_not_null_no_headers ~cb:(fun _ -> incr count) db query
+  in
+  let () =
+    match res with
+    | Sqlite3.Rc.OK -> ()
+    | err ->
+        Test.fail
+          "Failure fetching the number of cells from the sqlite db: %s"
+          (Sqlite3.Rc.to_string err)
+  in
+  Check.(!count = number_of_slots * List.length expected_levels)
     ~__LOC__
     Check.int
     ~error_msg:"Expected %R cells, got %L" ;
+  let _ = Sqlite3.db_close db in
   unit
 
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
