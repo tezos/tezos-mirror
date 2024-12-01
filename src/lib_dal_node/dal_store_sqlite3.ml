@@ -281,6 +281,8 @@ module Skip_list_cells = struct
 
   let close store = Sqlite.close store
 
+  let use t f = use t f
+
   let schemas t = use t Schemas.get_all
 
   module Internal_for_tests = struct
