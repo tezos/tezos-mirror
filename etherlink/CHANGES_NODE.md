@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internals
+
 ## Verson 0.10 (2024-12-02)
 
 This is a bug fixes release, fixing the memory leak of the node and improving
