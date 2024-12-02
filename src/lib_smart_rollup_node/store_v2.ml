@@ -602,7 +602,8 @@ let iter_l2_blocks ?progress metadata ({l2_blocks; l2_head; _} as store) f =
             let+ first_level = first_available_level metadata store in
             let progress_bar =
               let total =
-                Int32.sub head.header.level first_level |> Int32.to_int
+                Int32.sub head.header.level first_level
+                |> Int32.succ |> Int32.to_int
               in
               Progress_bar.progress_bar ~counter:`Int ~message total
             in

@@ -1168,7 +1168,9 @@ module State = struct
 
   module Make_level (N : sig
     val name : string
-  end) : S with type value := int32 = struct
+  end) : S with type value = int32 = struct
+    type value = int32
+
     module Q = Q (N)
 
     let set ?conn store level =
@@ -1186,7 +1188,9 @@ module State = struct
     val name : string
 
     val type_ : value Caqti_type.t
-  end) : S with type value := N.value = struct
+  end) : S with type value = N.value = struct
+    type value = N.value
+
     module Q = Q (N)
 
     let set = Q.set_value N.type_
@@ -1208,6 +1212,8 @@ module State = struct
     val type_ : value Caqti_type.t
   end) =
   struct
+    type value = N.value * int32
+
     module Q = Q (N)
 
     let set = Q.set_both N.type_

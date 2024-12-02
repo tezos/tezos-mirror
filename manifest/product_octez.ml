@@ -8407,7 +8407,7 @@ let _octez_smart_rollup_node_lib_tests =
         @ protocol_deps)
   in
   tezt
-    ["canary"; "test_context_gc"; "test_store_gc"]
+    ["canary"; "test_context_gc"; "test_store"]
     ~path:"src/lib_smart_rollup_node/test/"
     ~opam:"tezos-smart-rollup-node-lib-test"
     ~synopsis:"Tests for the smart rollup node library"
