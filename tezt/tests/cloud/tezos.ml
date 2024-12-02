@@ -114,16 +114,30 @@ module Dal_node = struct
         ~l1_node_endpoint:(Node.as_rpc_endpoint node)
         agent
 
-    let run ?(memtrace = false) ?event_level dal_node =
+    let run ?otel ?(memtrace = false) ?event_level dal_node =
       let name = name dal_node in
       let filename =
         Format.asprintf "%s/%s-trace.ctf" (Filename.get_temp_dir_name ()) name
       in
       let env =
-        if memtrace then Some (String_map.singleton "MEMTRACE" filename)
-        else None
+        let memtrace_env =
+          if memtrace then String_map.singleton "MEMTRACE" filename
+          else String_map.empty
+        in
+        let otel_env =
+          match otel with
+          | None -> String_map.empty
+          | Some endpoint ->
+              [
+                ("OTEL", "true");
+                ("OTEL_SERVICE_NAME", name);
+                ("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint);
+              ]
+              |> List.to_seq |> String_map.of_seq
+        in
+        String_map.union (fun _ _ _ -> None) otel_env memtrace_env
       in
-      run ?env ?event_level dal_node
+      run ~env ?event_level dal_node
   end
 end
 
