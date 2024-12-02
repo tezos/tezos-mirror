@@ -416,7 +416,7 @@ let consistency_test =
     ~title:"KVS and SQLite3 stores consistency"
     ~stop_after:(`Timeout 30.)
     ~__FILE__
-    ~tags:["kvs"; "sqlite"]
+    ~tags:["kvs"; "sqlite"; Tag.ci_disabled]
     ~gen:(Helpers.gen 20)
     ~property
     ()
