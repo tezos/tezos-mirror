@@ -12,7 +12,8 @@ local profiling = import './profiling.jsonnet';
 // Constants
 local panelWidth = 10;
 local panelHeight = 10;
-local startY = 1;
+local store_y = 1;
+local mempool_y = 41;
 
 // Create the dashboard
 dashboard.new('Octez Profiling Dashboard')
@@ -23,10 +24,18 @@ dashboard.new('Octez Profiling Dashboard')
 + dashboard.withVariables([base.nodeInstance])
 
 + dashboard.withPanels(
-  [
-    panel.row.new('Store Profiling'),
-    profiling.setHead(h=panelHeight, w=panelWidth, x=0, y=startY),
-    profiling.storeBlock(h=panelHeight, w=panelWidth, x=panelWidth, y=startY),
-    profiling.computeLiveBlocks(h=panelHeight, w=panelWidth, x=0, y=startY + panelHeight),
+  //#######
+  grafonnet.util.grid.wrapPanels(panels=[panel.row.new('Store Profiling')], panelWidth=20, panelHeight=20, startY=store_y)
+  + [
+    profiling.setHead(h=panelHeight, w=panelWidth, x=0, y=store_y),
+    profiling.storeBlock(h=panelHeight, w=panelWidth, x=panelWidth, y=store_y),
+    profiling.computeLiveBlocks(h=panelHeight, w=panelWidth, x=0, y=store_y + panelHeight),
+  ]
+
+  //#######
+  + grafonnet.util.grid.wrapPanels(panels=[panel.row.new('Mempool Profiling')], panelWidth=20, panelHeight=20, startY=mempool_y)
+  + [
+    profiling.onRequest(h=panelHeight, w=2 * panelWidth, x=0, y=mempool_y),
+    profiling.handleUnprocessed(h=panelHeight, w=panelWidth, x=0, y=mempool_y + panelHeight),
   ]
 )

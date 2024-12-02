@@ -16,6 +16,7 @@ local msConversion = '1000';  // From seconds to milliseconds
 
 // Profiling constants
 local store = 'profiling_store_time';
+local mempool = 'profiling_mempool_time';
 
 // Helper function to calculate rates for a profiling metric
 local profilingRate(profiling, metricId, metricType) =
@@ -29,20 +30,42 @@ local profilingQuery(profiling, metricId, legend) =
   + query.prometheus.withLegendFormat(legend);
 
 // Helper function to create a Grafana panel
-local profilingPanel(profiling, metricId, legend, color, h, w, x, y) =
+local profilingSinglePanel(profiling, metricId, legend, color, h, w, x, y) =
   local q = profilingQuery(profiling, metricId, legend);
   graph.new('Average Execution Time: ' + metricId, [q], h, w, x, y)
   + graph.withLegendBottom(calcs=['lastNotNull', 'mean', 'min', 'max'])
   + graph.withFixedColor(color)
   + timeSeries.standardOptions.withUnit('ms');
 
+// Helper function to create a Grafana panel with multile PromQL queries
+local profilingMultiplePanels(profiling, legend, metrics, h, w, x, y) =
+  local queries = std.map(function(metric) profilingQuery(profiling, metric.id, metric.legend), metrics);
+  graph.new('Average Execution Time: ' + legend, queries, h, w, x, y)
+  + graph.withLegendRight(calcs=['mean', 'lastNotNull', 'max', 'min'])
+  + timeSeries.standardOptions.withUnit('ms');
+
 {
+  // Store Profiling
   setHead(h, w, x, y):
-    profilingPanel(store, 'set_head', 'Set Head', 'light-blue', h, w, x, y),
+    profilingSinglePanel(store, 'set_head', 'Set Head', 'light-blue', h, w, x, y),
 
   storeBlock(h, w, x, y):
-    profilingPanel(store, 'store_block', 'Store Block', 'light-green', h, w, x, y),
+    profilingSinglePanel(store, 'store_block', 'Store Block', 'light-green', h, w, x, y),
 
   computeLiveBlocks(h, w, x, y):
-    profilingPanel(store, 'compute_live_blocks', 'Compute Live Blocks', 'light-red', h, w, x, y),
+    profilingSinglePanel(store, 'compute_live_blocks', 'Compute Live Blocks', 'light-red', h, w, x, y),
+
+  // Mempool Profiling
+
+  handleUnprocessed(h, w, x, y):
+    profilingSinglePanel(mempool, 'handle_unprocessed', 'Handle Unprocessed', 'light-blue', h, w, x, y),
+
+  onRequest(h, w, x, y):
+    profilingMultiplePanels(mempool, 'on_request', [
+      { id: 'on_advertise', legend: 'On Advertise' },
+      { id: 'on_arrived', legend: 'On Arrived' },
+      { id: 'on_flush', legend: 'On Flush' },
+      { id: 'on_inject', legend: 'On Inject' },
+      { id: 'on_notify', legend: 'On Notify' },
+    ], h, w, x, y),
 }
