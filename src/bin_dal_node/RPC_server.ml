@@ -187,7 +187,7 @@ module Slots_handlers = struct
               in
               let slot_size = proto_parameters.cryptobox_parameters.slot_size in
               let slot_length = String.length slot in
-              let*? slot =
+              let*? slot_bytes =
                 if slot_length > slot_size then
                   Error
                     (Errors.other
@@ -203,7 +203,7 @@ module Slots_handlers = struct
                   Ok (Bytes.of_string (slot ^ padding))
               in
               let*? polynomial =
-                Slot_manager.polynomial_from_slot cryptobox slot
+                Slot_manager.polynomial_from_slot cryptobox slot_bytes
               in
               let*? commitment = Slot_manager.commit cryptobox polynomial in
               let*? commitment_proof =
@@ -218,9 +218,13 @@ module Slots_handlers = struct
                   store
                   cryptobox
                   commitment
-                  slot
+                  slot_bytes
                   polynomial
               in
+              Injected_slots_cache.replace
+                slots_cache
+                slot
+                (commitment, commitment_proof) ;
               return (commitment, commitment_proof))
 
   let get_slot_commitment ctxt slot_level slot_index () () =
