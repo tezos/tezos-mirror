@@ -142,58 +142,93 @@ module Slots_handlers = struct
             in
             fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
 
-  let post_slot ctxt query slot =
-    call_handler1 (fun () ->
-        let open Lwt_result_syntax in
-        let store = Node_context.get_store ctxt in
-        let cryptobox = Node_context.get_cryptobox ctxt in
-        let proto_parameters = Node_context.get_proto_parameters ctxt in
-        let profile = Node_context.get_profile_ctxt ctxt in
-        let* () =
-          if not (Profile_manager.is_prover_profile profile) then
-            fail (Errors.other [No_prover_profile])
-          else return_unit
-        in
-        let* () =
-          match query#slot_index with
-          | Some slot_index
-            when not
-                   (Profile_manager.can_publish_on_slot_index
-                      slot_index
-                      profile) ->
-              fail (Errors.other [Cannot_publish_on_slot_index slot_index])
-          | None | Some _ -> return_unit
-        in
-        let slot_size = proto_parameters.cryptobox_parameters.slot_size in
-        let slot_length = String.length slot in
-        let*? slot =
-          if slot_length > slot_size then
-            Error
-              (Errors.other
-                 [Post_slot_too_large {expected = slot_size; got = slot_length}])
-          else if slot_length = slot_size then Ok (Bytes.of_string slot)
-          else
-            let padding = String.make (slot_size - slot_length) query#padding in
-            Ok (Bytes.of_string (slot ^ padding))
-        in
-        let*? polynomial = Slot_manager.polynomial_from_slot cryptobox slot in
-        let*? commitment = Slot_manager.commit cryptobox polynomial in
-        let*? commitment_proof =
-          commitment_proof_from_polynomial cryptobox polynomial
-        in
-        let shards_proofs_precomputation =
-          Node_context.get_shards_proofs_precomputation ctxt
-        in
-        let* () =
-          Slot_manager.add_commitment_shards
-            ~shards_proofs_precomputation
-            store
-            cryptobox
-            commitment
-            slot
-            polynomial
-        in
-        return (commitment, commitment_proof))
+  (* This module is used below to maintain a bounded cache of recently injected
+     slots to quickly return the commitment and commitment_proof of an already
+     known slot. *)
+  module Injected_slots_cache =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = string
+
+        let equal = String.equal
+
+        let hash = Hashtbl.hash
+      end)
+
+  let post_slot =
+    let slots_cache = Injected_slots_cache.create Constants.cache_size in
+    fun ctxt query slot ->
+      call_handler1 (fun () ->
+          let open Lwt_result_syntax in
+          let store = Node_context.get_store ctxt in
+          match Injected_slots_cache.find_opt slots_cache slot with
+          | Some (commitment, commitment_proof)
+            when Option.is_some
+                   (Store.Commitment_indexed_cache.find_opt
+                      (Store.cache store)
+                      commitment) ->
+              return (commitment, commitment_proof)
+          | _ ->
+              let cryptobox = Node_context.get_cryptobox ctxt in
+              let proto_parameters = Node_context.get_proto_parameters ctxt in
+              let profile = Node_context.get_profile_ctxt ctxt in
+              let* () =
+                if not (Profile_manager.is_prover_profile profile) then
+                  fail (Errors.other [No_prover_profile])
+                else return_unit
+              in
+              let* () =
+                match query#slot_index with
+                | Some slot_index
+                  when not
+                         (Profile_manager.can_publish_on_slot_index
+                            slot_index
+                            profile) ->
+                    fail
+                      (Errors.other [Cannot_publish_on_slot_index slot_index])
+                | None | Some _ -> return_unit
+              in
+              let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+              let slot_length = String.length slot in
+              let*? slot_bytes =
+                if slot_length > slot_size then
+                  Error
+                    (Errors.other
+                       [
+                         Post_slot_too_large
+                           {expected = slot_size; got = slot_length};
+                       ])
+                else if slot_length = slot_size then Ok (Bytes.of_string slot)
+                else
+                  let padding =
+                    String.make (slot_size - slot_length) query#padding
+                  in
+                  Ok (Bytes.of_string (slot ^ padding))
+              in
+              let*? polynomial =
+                Slot_manager.polynomial_from_slot cryptobox slot_bytes
+              in
+              let*? commitment = Slot_manager.commit cryptobox polynomial in
+              let*? commitment_proof =
+                commitment_proof_from_polynomial cryptobox polynomial
+              in
+              let shards_proofs_precomputation =
+                Node_context.get_shards_proofs_precomputation ctxt
+              in
+              let* () =
+                Slot_manager.add_commitment_shards
+                  ~shards_proofs_precomputation
+                  store
+                  cryptobox
+                  commitment
+                  slot_bytes
+                  polynomial
+              in
+              Injected_slots_cache.replace
+                slots_cache
+                slot
+                (commitment, commitment_proof) ;
+              return (commitment, commitment_proof))
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 (fun () ->
