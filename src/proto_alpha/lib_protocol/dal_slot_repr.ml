@@ -1120,6 +1120,44 @@ module History = struct
                  page_size = Bytes.length data;
                }
 
+    let is_attestation_threshold_reached ~attestation_threshold_percent
+        ~attested_shards ~total_shards =
+      Compare.Int.(
+        100 * attested_shards >= attestation_threshold_percent * total_shards)
+
+    let allowed_commitments_publisher publisher
+        restricted_commitments_publishers =
+      match restricted_commitments_publishers with
+      | None -> true
+      | Some whitelist -> List.exists (Contract_repr.equal publisher) whitelist
+
+    let is_commitment_attested ~attestation_threshold_percent
+        ~restricted_commitments_publishers cell_content =
+      let open Content_v2 in
+      match (cell_content, attestation_threshold_percent) with
+      | Unpublished _, _ -> None
+      | Published {header = {commitment; id = _}; is_proto_attested; _}, None ->
+          if is_proto_attested then Some commitment else None
+      | ( Published
+            {
+              header = {commitment; id = _};
+              attested_shards;
+              total_shards;
+              publisher;
+              _;
+            },
+          Some attestation_threshold_percent ) ->
+          if
+            is_attestation_threshold_reached
+              ~attestation_threshold_percent
+              ~attested_shards
+              ~total_shards
+            && allowed_commitments_publisher
+                 publisher
+                 restricted_commitments_publishers
+          then Some commitment
+          else None
+
     (** The [produce_proof_repr] function assumes that some invariants hold, such as:
         - The DAL has been activated,
         - The level of [page_id] is after the DAL activation level.
