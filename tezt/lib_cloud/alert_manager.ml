@@ -147,6 +147,12 @@ type receiver = {name : string; config : receiver_config}
 let slack_receiver ~name ~channel ~title ~text =
   {name; config = Slack {channel; title; text}}
 
+let slack_webhook_receiver ~name =
+  let channel =
+    {|'{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'|}
+  in
+  {name; config = Slack {channel; title = ""; text = ""}}
+
 let add_receiver receiver t =
   match SMap.find_opt receiver.name t.receivers with
   | Some v ->

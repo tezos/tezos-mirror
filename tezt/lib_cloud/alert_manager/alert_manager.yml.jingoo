@@ -33,9 +33,9 @@ receivers:
   - name: '{{ receiver.name }}'
   {%- if receiver.config.type == 'slack' %}
     slack_configs:
-    - channel: '{{ receiver.config.data.channel }}'
-      title: '{{ receiver.config.data.title }}'
-      text: '{{ receiver.config.data.text }}'
+    - channel: {{ receiver.config.data.channel }}
+      title: {{ receiver.config.data.title }}
+      text: {{ receiver.config.data.text }}
   {% endif -%}
 {% endfor %}
 

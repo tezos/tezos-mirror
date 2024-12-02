@@ -62,6 +62,15 @@ val add_receiver : receiver -> config -> config
 val slack_receiver :
   name:string -> channel:string -> title:string -> text:string -> receiver
 
+(** [slack_webhook_receiver ~name] creates a [receiver] named [name],
+    sending notifications on the channel configured on the slack side.
+    This is a hack implemented in order to use slack receivers with
+    modern slack webhooks in alert manager. More precisely the channel
+    field of the payload received by slack will be the description of
+    the alert such that it can be bound in the slack message sent by
+    the webhook. *)
+val slack_webhook_receiver : name:string -> receiver
+
 (** A group defines when and how alerts are processed, including
     timing parameters (group_wait, group_interval, repeat_interval),
     which alerts to match (alert_names), and where to send them
