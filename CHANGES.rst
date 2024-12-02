@@ -190,5 +190,12 @@ DAL node
 - **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
   argument has been removed. (MR :gl:`!15554`)
 
+Protocol
+~~~~~~~~
+
+- A new antonymous operation "DAL entrapment evidence" was added. This operation
+  is not valid when the feature flag for DAL incentives is turned off. (MR
+  :gl:`!15677`)
+
 Miscellaneous
 -------------
