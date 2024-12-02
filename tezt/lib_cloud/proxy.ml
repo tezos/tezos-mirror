@@ -6,9 +6,9 @@
 (*****************************************************************************)
 
 let find_agent agents =
+  let proxy_agent_prefix = Format.asprintf "%s-proxy" Env.tezt_cloud in
   agents
   |> List.find_opt (fun agent ->
-         let proxy_agent_prefix = Format.asprintf "%s-proxy" Env.tezt_cloud in
          String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
 
 let get_agent agents = find_agent agents |> Option.get
