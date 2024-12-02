@@ -166,23 +166,22 @@ pub trait ManagerRead: ManagerBase {
         values: &mut [E],
     );
 
-    /// Read the value, and derived value, contained in the enriched cell.
-    fn enriched_cell_read<V>(cell: &Self::EnrichedCell<V>) -> (V::E, V::D<Self::ManagerRoot>)
-    where
-        V: EnrichedValueLinked<Self::ManagerRoot>,
-        V::E: Copy,
-        V::D<Self::ManagerRoot>: Copy;
-
-    /// Obtain a refernce to the value, and derived value, contained in the enriched cell.
-    fn enriched_cell_ref<V>(cell: &Self::EnrichedCell<V>) -> (&V::E, &V::D<Self::ManagerRoot>)
-    where
-        V: EnrichedValueLinked<Self::ManagerRoot>;
-
-    /// Obtain a refernce to the value, and derived value, contained in the enriched cell.
+    /// Read the value contained in the enriched cell.
     fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
     where
         V: EnrichedValue,
         V::E: Copy;
+
+    /// Read the derived value of the enriched cell.
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
+    where
+        V: EnrichedValueLinked<Self::ManagerRoot>,
+        V::D<Self::ManagerRoot>: Copy;
+
+    /// Obtain a refernce to the value contained in the enriched cell.
+    fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
+    where
+        V: EnrichedValue;
 }
 
 /// Manager with write capabilities
@@ -363,29 +362,28 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
         M::dyn_region_read_all(region, address, values)
     }
 
-    fn enriched_cell_read<V: EnrichedValueLinked<Self::ManagerRoot>>(
-        cell: &Self::EnrichedCell<V>,
-    ) -> (V::E, V::D<Self::ManagerRoot>)
-    where
-        V::D<Self::ManagerRoot>: Copy,
-        V::E: Copy,
-    {
-        M::enriched_cell_read(cell)
-    }
-
-    fn enriched_cell_ref<V: EnrichedValueLinked<Self::ManagerRoot>>(
-        cell: &Self::EnrichedCell<V>,
-    ) -> (&V::E, &V::D<Self::ManagerRoot>)
-where {
-        M::enriched_cell_ref(cell)
-    }
-
     fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
     where
         V: EnrichedValue,
         V::E: Copy,
     {
         M::enriched_cell_read_stored(cell)
+    }
+
+    fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
+    where
+        V: EnrichedValue,
+    {
+        M::enriched_cell_ref_stored(cell)
+    }
+
+    fn enriched_cell_read_derived<V: EnrichedValueLinked<Self::ManagerRoot>>(
+        cell: &Self::EnrichedCell<V>,
+    ) -> V::D<Self::ManagerRoot>
+    where
+        V::D<Self::ManagerRoot>: Copy,
+    {
+        M::enriched_cell_read_derived(cell)
     }
 }
 

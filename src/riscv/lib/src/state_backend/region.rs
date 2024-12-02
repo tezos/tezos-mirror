@@ -50,34 +50,31 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
         M::enriched_cell_write(&mut self.cell, value)
     }
 
-    /// Read the value & derived value from the enriched cell.
-    pub fn read(&self) -> (V::E, V::D<M::ManagerRoot>)
-    where
-        M: ManagerRead,
-        V: EnrichedValueLinked<M::ManagerRoot>,
-        V::E: Copy,
-        V::D<M::ManagerRoot>: Copy,
-    {
-        M::enriched_cell_read(&self.cell)
-    }
-
-    /// Obtain references to the value & derived value contained
-    /// within the cell.
-    pub fn read_ref(&self) -> (&V::E, &V::D<M::ManagerRoot>)
-    where
-        M: ManagerRead,
-        V: EnrichedValueLinked<M::ManagerRoot>,
-    {
-        M::enriched_cell_ref(&self.cell)
-    }
-
-    /// Read only the stored value from the enriched cell.
+    /// Read the stored value from the enriched cell.
     pub fn read_stored(&self) -> V::E
     where
         M: ManagerRead,
         V::E: Copy,
     {
         M::enriched_cell_read_stored(&self.cell)
+    }
+
+    /// Read the derived value from the enriched cell.
+    pub fn read_derived(&self) -> V::D<M::ManagerRoot>
+    where
+        M: ManagerRead,
+        V: EnrichedValueLinked<M::ManagerRoot>,
+        V::D<M::ManagerRoot>: Copy,
+    {
+        M::enriched_cell_read_derived(&self.cell)
+    }
+
+    /// Obtain a reference to the value contained within the cell.
+    pub fn read_ref_stored(&self) -> &V::E
+    where
+        M: ManagerRead,
+    {
+        M::enriched_cell_ref_stored(&self.cell)
     }
 }
 
@@ -99,7 +96,7 @@ where
     V::E: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        M::enriched_cell_ref(&self.cell).0 == M::enriched_cell_ref(&other.cell).0
+        M::enriched_cell_ref_stored(&self.cell) == M::enriched_cell_ref_stored(&other.cell)
     }
 }
 

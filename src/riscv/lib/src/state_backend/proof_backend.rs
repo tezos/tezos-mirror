@@ -113,28 +113,27 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
         }
     }
 
-    fn enriched_cell_read<V>(_cell: &Self::EnrichedCell<V>) -> (V::E, V::D<Self::ManagerRoot>)
-    where
-        V: EnrichedValueLinked<Self::ManagerRoot>,
-        V::E: Copy,
-        V::D<Self>: Copy,
-    {
-        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-        todo!()
-    }
-
-    fn enriched_cell_ref<V>(_cell: &Self::EnrichedCell<V>) -> (&V::E, &V::D<Self::ManagerRoot>)
-    where
-        V: EnrichedValueLinked<Self::ManagerRoot>,
-    {
-        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
-        todo!()
-    }
-
     fn enriched_cell_read_stored<V>(_cell: &Self::EnrichedCell<V>) -> V::E
     where
         V: EnrichedValue,
         V::E: Copy,
+    {
+        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
+        todo!()
+    }
+
+    fn enriched_cell_read_derived<V>(_cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
+    where
+        V: EnrichedValueLinked<Self::ManagerRoot>,
+        V::D<Self::ManagerRoot>: Copy,
+    {
+        // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
+        todo!()
+    }
+
+    fn enriched_cell_ref_stored<V>(_cell: &Self::EnrichedCell<V>) -> &V::E
+    where
+        V: EnrichedValue,
     {
         // TODO: RV-325 Support for `EnrichedCell` in the proof-generating backend
         todo!()
