@@ -394,3 +394,11 @@ let batcher () =
     ~label:"batcher"
     ~contract:"Batcher"
     ~evm_version:"shanghai"
+
+let reentrancy_test () =
+  compile_contract
+    ~source:
+      "etherlink/kernel_evm/evm_execution/tests/contracts/src/ReentrancyTester.sol"
+    ~label:"reentrancy_tester"
+    ~contract:"ReentrancyTester"
+    ~evm_version:"shanghai"

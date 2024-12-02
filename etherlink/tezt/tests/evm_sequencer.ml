@@ -154,12 +154,17 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-let send_fa_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
-    ~sc_rollup_node ~sc_rollup_address client =
+let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
+    ~depositor ~receiver ~sc_rollup_node ~sc_rollup_address client =
   let* () =
     Client.transfer
       ~entrypoint:"set"
-      ~arg:(sf "Pair %S (Pair (Right (Right %s)) 0)" sc_rollup_address receiver)
+      ~arg:
+        (sf
+           "Pair %S (Pair (Right (Right %s%s)) 0)"
+           sc_rollup_address
+           receiver
+           (Helpers.remove_0x proxy))
       ~amount:Tez.zero
       ~giver:depositor.Account.public_key_hash
       ~receiver:l1_contracts.ticket_router_tester
@@ -1746,6 +1751,100 @@ let test_fa_withdrawal_is_included =
 
   unit
 
+let test_fa_reentrant_deposit_reverts =
+  register_all
+    ~da_fee:Wei.one
+    ~tags:
+      [
+        "evm";
+        "sequencer";
+        "delayed_outbox";
+        "fa_deposit";
+        "enabled";
+        "reentrancy";
+      ]
+    ~title:"FA Deposit cannot do reentrancy"
+    ~enable_fa_bridge:true
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.octez_codec]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* reentrancy = Solidity_contracts.reentrancy_test () in
+  let* () = Eth_cli.add_abi ~label:reentrancy.label ~abi:reentrancy.abi () in
+
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* reentrancy, _create_tx =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~args:
+           (sf
+              {|["0xff00000000000000000000000000000000000001", "0x", 0, "0x00000000000000000000000000000000000000000000", "0x", 5]|})
+         ~source_private_key:sender.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:reentrancy.label
+         ~bin:reentrancy.bin)
+      sequencer
+  in
+
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let receiver = Eth_account.bootstrap_accounts.(0).address in
+
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~proxy:reentrancy
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  (* If the call to the proxy fails, the owner of the ticket is the receiver,
+     not the proxy.
+
+     As the proxy is doing reeantrancy, the inner call should revert, therefore
+     the receiver should be the owner.
+  *)
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+  let* receiver_balance =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((receiver_balance > 0) int)
+    ~error_msg:"As the deposit fails, the receiver should own the ticket" ;
+  let* proxy_balance =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:reentrancy
+      (Either.Right sequencer)
+  in
+  Check.((proxy_balance = 0) int)
+    ~error_msg:"As the deposit fails, the proxy must not own the ticket" ;
+
+  unit
+
 let test_delayed_deposit_from_init_rollup_node =
   register_all
     ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
@@ -2333,12 +2432,11 @@ let test_extended_block_param =
   (* Deploy the contract. *)
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:counter_resolved.abi
-          ~bin:counter_resolved.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:counter_resolved.abi
+         ~bin:counter_resolved.bin)
       sequencer
   in
   (* Takes the level where it was originated, the counter value will be 0. *)
@@ -4151,12 +4249,11 @@ let test_outbox_size_limit_resilience ~slow =
   in
   let* spammer_contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:receiver.private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:spammer_resolved.abi
-          ~bin:spammer_resolved.bin)
+      (Eth_cli.deploy
+         ~source_private_key:receiver.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:spammer_resolved.abi
+         ~bin:spammer_resolved.bin)
       sequencer
   in
   let* _ =
@@ -4922,12 +5019,11 @@ let test_overwrite_simulation_tick_limit =
   (* Deploy the contract. *)
   let* recursive_address, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:recursive.abi
-          ~bin:recursive.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:recursive.abi
+         ~bin:recursive.bin)
       sequencer
   in
 
@@ -5087,12 +5183,11 @@ let test_trace_transaction_call =
   in
   let* contract_address, _tx_deployment =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:simple_storage_resolved.label
-          ~bin:simple_storage_resolved.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:simple_storage_resolved.label
+         ~bin:simple_storage_resolved.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5181,12 +5276,11 @@ let test_trace_transaction_call_trace =
   in
   let* contract_address, _tx_deployment =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:simple_storage_resolved.label
-          ~bin:simple_storage_resolved.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:simple_storage_resolved.label
+         ~bin:simple_storage_resolved.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5280,12 +5374,11 @@ let test_trace_transaction_calltracer_failed_create =
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* _contract_address, create_tx =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:call_types.label
-          ~bin:call_types.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:call_types.label
+         ~bin:call_types.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5336,12 +5429,11 @@ let test_trace_transaction_calltracer_all_types =
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:call_types.label
-          ~bin:call_types.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:call_types.label
+         ~bin:call_types.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5428,12 +5520,11 @@ let test_trace_transaction_call_tracer_with_logs =
   in
   let* contract_address, _ =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:simple_logger.label
-          ~bin:simple_logger.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:simple_logger.label
+         ~bin:simple_logger.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5488,12 +5579,11 @@ let test_trace_transaction_call_trace_certain_depth =
   in
   let* contract_address, _ =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:call_tracer_depth.label
-          ~bin:call_tracer_depth.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:call_tracer_depth.label
+         ~bin:call_tracer_depth.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5565,12 +5655,11 @@ let test_trace_transaction_call_revert =
   let* () = Eth_cli.add_abi ~label:call_revert.label ~abi:call_revert.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:call_revert.label
-          ~bin:call_revert.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:call_revert.label
+         ~bin:call_revert.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5625,12 +5714,11 @@ let test_trace_transaction_call_trace_revert =
   in
   let* contract_address, _ =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:call_tracer_revert.label
-          ~bin:call_tracer_revert.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:call_tracer_revert.label
+         ~bin:call_tracer_revert.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -5718,12 +5806,11 @@ let test_trace_transaction_calltracer_multiple_txs =
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* address, _ =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender_0.Eth_account.private_key
-          ~endpoint
-          ~abi:call_types.label
-          ~bin:call_types.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender_0.Eth_account.private_key
+         ~endpoint
+         ~abi:call_types.label
+         ~bin:call_types.bin)
       sequencer
   in
   let* raw_tx_0 =
@@ -5822,12 +5909,11 @@ let test_trace_transaction_calltracer_precompiles =
   let* () = Eth_cli.add_abi ~label:precompiles.label ~abi:precompiles.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:precompiles.label
-          ~bin:precompiles.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:precompiles.label
+         ~bin:precompiles.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -6014,12 +6100,11 @@ let test_miner =
   in
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:coinbase_resolved.abi
-          ~bin:coinbase_resolved.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:coinbase_resolved.abi
+         ~bin:coinbase_resolved.bin)
       sequencer
   in
   let* storage_coinbase =
@@ -6100,12 +6185,11 @@ let test_trace_call =
   in
   let* contract_address, _tx_deployment =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:sender.Eth_account.private_key
-          ~endpoint
-          ~abi:simple_storage_resolved.label
-          ~bin:simple_storage_resolved.bin)
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:simple_storage_resolved.label
+         ~bin:simple_storage_resolved.bin)
       sequencer
   in
   let* () =
@@ -6509,12 +6593,11 @@ let test_regression_block_hash_gen =
   let* {abi; bin; _} = Solidity_contracts.block_hash_gen () in
   let* _contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi
-          ~bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi
+         ~bin)
       sequencer
   in
   unit
@@ -6961,12 +7044,11 @@ let test_inconsistent_da_fees =
   let* () = Eth_cli.add_abi ~label:batcher.label ~abi:batcher.abi () in
   let* batcher_contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:batcher.abi
-          ~bin:batcher.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:batcher.abi
+         ~bin:batcher.bin)
       sequencer
   in
   let* _tx =
@@ -7081,6 +7163,7 @@ let () =
   test_delayed_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_ignored_if_feature_disabled protocols ;
+  test_fa_reentrant_deposit_reverts protocols ;
   test_delayed_transaction_peeked protocols ;
   test_invalid_delayed_transaction protocols ;
   test_fa_withdrawal_is_included protocols ;

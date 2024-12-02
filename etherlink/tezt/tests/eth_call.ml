@@ -57,12 +57,11 @@ let test_call_state_override_balance =
   (* Deploy the contract. *)
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:constant.abi
-          ~bin:constant.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:constant.abi
+         ~bin:constant.bin)
       sequencer
   in
   let caller_address = "0x0123456789012345678901234567890123456789" in
@@ -123,12 +122,11 @@ let test_call_state_override_code =
   (* Deploy the contract. *)
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:constant.abi
-          ~bin:constant.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:constant.abi
+         ~bin:constant.bin)
       sequencer
   in
   let bytecode_accessor =
@@ -189,12 +187,11 @@ let test_call_state_override_nonce =
   (* Deploy the contract. *)
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:factory.abi
-          ~bin:factory.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:factory.abi
+         ~bin:factory.bin)
       sequencer
   in
 
@@ -254,12 +251,11 @@ let test_call_state_override_state_diff =
   (* Deploy the contract. *)
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:constant.abi
-          ~bin:constant.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:constant.abi
+         ~bin:constant.bin)
       sequencer
   in
 
@@ -356,12 +352,11 @@ let test_call_state_override_state =
   (* Deploy the contract. *)
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:constant.abi
-          ~bin:constant.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:constant.abi
+         ~bin:constant.bin)
       sequencer
   in
 
@@ -466,12 +461,11 @@ let test_call_state_override_state_empty =
   (* Deploy the contract. *)
   let* contract, _tx_hash =
     send_transaction_to_sequencer
-      (fun () ->
-        Eth_cli.deploy
-          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-          ~endpoint:(Evm_node.endpoint sequencer)
-          ~abi:constant.abi
-          ~bin:constant.bin)
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:constant.abi
+         ~bin:constant.bin)
       sequencer
   in
 
