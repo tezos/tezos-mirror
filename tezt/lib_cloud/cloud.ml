@@ -624,3 +624,19 @@ let add_service t ~name ~url =
   match t.website with
   | None -> Lwt.return_unit
   | Some web -> Web.add_service web ~agents:t.agents {name; url}
+
+let open_telemetry_endpoint t =
+  match t.otel with
+  | None -> None
+  | Some _otel -> (
+      match Env.mode with
+      | `Orchestrator ->
+          let agent = Proxy.get_agent t.agents in
+          let address = Agent.point agent |> Option.get |> fst in
+          let port = 55681 in
+          Some (Format.asprintf "http://%s:%d" address port)
+      | _ ->
+          (* It likely won't work in [Cloud] mode. *)
+          let address = "localhost" in
+          let port = 55681 in
+          Some (Format.asprintf "http://%s:%d" address port))

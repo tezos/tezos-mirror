@@ -45,3 +45,5 @@ val add_prometheus_source :
   t -> ?metrics_path:string -> name:string -> target list -> unit Lwt.t
 
 val add_service : t -> name:string -> url:string -> unit Lwt.t
+
+val open_telemetry_endpoint : t -> string option
