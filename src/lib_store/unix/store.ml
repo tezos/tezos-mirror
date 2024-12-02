@@ -510,13 +510,7 @@ module Block = struct
     let open Lwt_result_syntax in
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
-    ()
-    [@profiler.reset_block_section
-      {
-        verbosity = Notice;
-        metadata = [("prometheus", "__ENABLE_CHILDREN_ONLY__")];
-      }
-        hash] ;
+    () [@profiler.reset_block_section {verbosity = Notice} hash] ;
     (let {
        Block_validation.validation_store =
          {

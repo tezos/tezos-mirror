@@ -68,16 +68,11 @@ module Prometheus = struct
         "time"
 
     (** Because prometheus can't handle high cardinality in metrics names,
-        we treat only those who are specifically marked for the prometheus backend.
-        Returns a boolean that indicate if the entry has been registered or not. *)
+        we treat only those who are specifically marked for the prometheus backend. *)
     let output_entry subsystem (id, metadata) n d =
       let namespace = "profiling" in
       match Stdlib.List.assoc_opt "prometheus" metadata with
-      | None -> false
-      | Some "__ENABLE_CHILDREN_ONLY__" ->
-          (* We don't record the metric but pretend we did so that children of
-             the node will be processed *)
-          true
+      | None -> ()
       | Some id' ->
           let id = if id' = "" then id else id' in
           if d.wall = 0. then
@@ -88,8 +83,7 @@ module Prometheus = struct
             Prometheus.Summary.observe
               (summary ~namespace ~subsystem id)
               ~n:(Float.of_int n)
-              d.wall ;
-          true
+              d.wall
 
     let output_report =
       let output t r =
@@ -100,13 +94,15 @@ module Prometheus = struct
              only recorded if the parent is. *)
           IdMap.iter
             (fun id {count = n; total = Span d; node_verbosity = _; children} ->
-              if output_entry t.name id n d then
-                output {recorded = []; aggregated = children})
+              output_entry t.name id n d ;
+              output {recorded = []; aggregated = children})
             aggregated ;
           List.iter
             (fun ( id,
                    {start = _; duration = Span d; contents; item_verbosity = _}
-                 ) -> if output_entry t.name id 1 d then output contents)
+                 ) ->
+              output_entry t.name id 1 d ;
+              output contents)
             recorded
         in
         output r
