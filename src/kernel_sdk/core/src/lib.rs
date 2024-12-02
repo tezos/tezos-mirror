@@ -11,22 +11,19 @@
 pub mod rollup_host;
 pub mod smart_rollup_core;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(pvm_kind = "wasm")]
 #[path = "wasm_target.rs"]
 #[doc(hidden)]
 // The WebAssembly target implementation is exposed because the panic hook needs access to
 // `write_debug`.
 pub mod target_impl;
 
-#[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
+#[cfg(all(pvm_kind = "riscv", pvm_flavour = "hermit"))]
 #[path = "riscv_hermit_target.rs"]
 #[doc(hidden)]
 mod target_impl;
 
-#[cfg(not(any(
-    target_arch = "wasm32",
-    all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha")
-)))]
+#[cfg(pvm_kind = "none")]
 #[path = "fallback_target.rs"]
 #[doc(hidden)]
 mod target_impl;
