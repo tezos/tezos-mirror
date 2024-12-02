@@ -3412,11 +3412,9 @@ let test_flushed_blueprint_reorg =
   in
 
   (* We mark at which level the delayed inbox item was added. *)
-  let* add_delayed_inbox_level = Client.level client in
+  let* add_delayed_tx_level = Client.level client in
   let wait_for_add_delayed_inbox =
-    Evm_node.wait_for_processed_l1_level
-      ~level:add_delayed_inbox_level
-      sequencer
+    Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
   (* We mark at which level the delayed inbox was flushed. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
@@ -3427,7 +3425,7 @@ let test_flushed_blueprint_reorg =
       sequencer
   in
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
-  (* A new block will make the {!add_delayed_inbox_level} final. *)
+  (* A new block will make the {!add_delayed_tx_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let* () = wait_for_add_delayed_inbox in
 
@@ -3461,7 +3459,6 @@ let test_flushed_blueprint_reorg =
   let*@? (err : Rpc.error) =
     Rpc.get_block_by_hash ~block:speculative_head.hash sequencer
   in
-
   Check.(err.message =~ rex "Block .* not found")
     ~error_msg:"Expected error to match %R, got %L" ;
 
@@ -3724,6 +3721,287 @@ let test_observer_reorg_on_blueprint_catchup =
   (* Observer accepts the new blocks. *)
   let* () =
     Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+
+  unit
+
+(* Same test as reorg, but the delayed transaction event is applied at the same
+   L2 level as the flush event. *)
+let test_flushed_blueprint_reorg_late =
+  register_all
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:
+      ["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"; "late"]
+    ~title:"Flush delayed inbox event leads to reorg, including late delayed tx"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* Add a transaction to the delayed inbox. *)
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* We mark at which level the delayed inbox item was added. *)
+  let* add_delayed_tx_level = Client.level client in
+
+  (* the sequencer produces blocks before seeing the delayed transactions
+     (speculative execution). *)
+  let* () =
+    repeat 4 (fun _ ->
+        let*@ _ =
+          Rpc.produce_block ~with_delayed_transactions:false sequencer
+        in
+        unit)
+  in
+
+  (* We mark at which level the delayed inbox was flushed. *)
+  let* flushed_delayed_inbox_level =
+    next_rollup_node_level ~sc_rollup_node ~client
+  in
+
+  (* A new block will make the add delayed inbox event final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* () =
+    Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
+  in
+
+  (* Produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  let* () =
+    repeat 4 (fun _ ->
+        let*@ _ =
+          Rpc.produce_block ~with_delayed_transactions:false sequencer
+        in
+        unit)
+  in
+
+  let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
+
+  (* A new block will make the {!flushed_delayed_inbox_level} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* () =
+    (* Wait until the event is completely processed. Head of sequencer and proxy
+       should be in sync. *)
+    Evm_node.wait_for_processed_l1_level
+      ~level:flushed_delayed_inbox_level
+      sequencer
+  and* () = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  (* Speculative head has been removed as the sequencer was forced to
+     reorganize the blocks because of the flushed blueprint. *)
+  let*@? (err : Rpc.error) =
+    Rpc.get_block_by_hash ~block:speculative_head.hash sequencer
+  in
+
+  Check.(err.message =~ rex "Block .* not found")
+    ~error_msg:"Expected error to match %R, got %L" ;
+
+  (* Sequencer resumes block production. *)
+  let* () =
+    repeat 4 (fun _ ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+
+  (* As the observer was done during the reorganization, restarting it
+     will be enough, it'll apply the new branch as expected. *)
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+  let* () =
+    check_head_consistency
+      ~left:observer
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  unit
+
+(* Same test as reorg, but the delayed transaction event is applied at the same
+   L2 level as the flush event, and transactions were included but too late. *)
+let test_flushed_blueprint_reorg_done_late =
+  register_all
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:
+      [
+        "evm";
+        "sequencer";
+        "delayed_inbox";
+        "timeout";
+        "flush";
+        "reorg";
+        "late";
+        "reinject";
+      ]
+    ~title:
+      "Flush delayed inbox event leads to reorg, including delayed tx included \
+       too late"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* Add a transaction to the delayed inbox. *)
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* We mark at which level the delayed inbox item was added. *)
+  let* add_delayed_tx_level = Client.level client in
+
+  (* The sequencer produces blocks before seeing the delayed transactions
+     (speculative execution). *)
+  let* () =
+    repeat 4 (fun _ ->
+        let*@ _ =
+          Rpc.produce_block ~with_delayed_transactions:false sequencer
+        in
+        unit)
+  in
+
+  (* We mark at which level the delayed inbox was flushed. *)
+  let* flushed_delayed_inbox_level =
+    next_rollup_node_level ~sc_rollup_node ~client
+  in
+
+  (* A new block will make the add delayed event. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* () =
+    Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
+  in
+
+  (* Produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  let* () =
+    repeat 4 (fun _ ->
+        let*@ _ =
+          Rpc.produce_block ~with_delayed_transactions:false sequencer
+        in
+        unit)
+  in
+  (* Produce blocks **with** delayed transactions, but too late. *)
+  let* () =
+    repeat 4 (fun _ ->
+        let*@ _ = Rpc.produce_block ~with_delayed_transactions:true sequencer in
+        unit)
+  in
+  let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
+
+  (* A new block will make the {!flushed_delayed_inbox_level} final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* () =
+    (* Wait until the event is completely processed. Head of sequencer and proxy
+       should be in sync. *)
+    Evm_node.wait_for_processed_l1_level
+      ~level:flushed_delayed_inbox_level
+      sequencer
+  and* () = Evm_node.wait_for_flush_delayed_inbox sequencer in
+
+  (* Wait until the event is completely processed. Head of sequencer and proxy
+     should be in sync. *)
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  (* Speculative head has been removed as the sequencer was forced to
+     reorganize the blocks because of the flushed blueprint. *)
+  let*@? (err : Rpc.error) =
+    Rpc.get_block_by_hash ~block:speculative_head.hash sequencer
+  in
+
+  Check.(err.message =~ rex "Block .* not found")
+    ~error_msg:"Expected error to match %R, got %L" ;
+
+  (* Sequencer resumes block production. *)
+  let* () =
+    repeat 4 (fun _ ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+
+  (* As the observer was done during the reorganization, restarting it
+     will be enough, it'll apply the new branch as expected. *)
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+  let* () =
+    check_head_consistency
+      ~left:observer
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
   in
 
   unit
@@ -7890,6 +8168,8 @@ let () =
   test_flushed_blueprint_reorg protocols ;
   test_observer_reorg_on_blueprint_stream protocols ;
   test_observer_reorg_on_blueprint_catchup protocols ;
+  test_flushed_blueprint_reorg_late protocols ;
+  test_flushed_blueprint_reorg_done_late protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
   test_non_increasing_timestamp protocols ;
