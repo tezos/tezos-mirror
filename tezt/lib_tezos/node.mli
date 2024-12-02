@@ -667,8 +667,9 @@ val upgrade_storage : t -> unit Lwt.t
 (** Run [octez-node --version] and return the node's version. *)
 val get_version : t -> string Lwt.t
 
-(** Expose the RPC server address of this node as a foreign endpoint. *)
-val as_rpc_endpoint : t -> Endpoint.t
+(** Expose the RPC server address of this node as a foreign endpoint.
+    See [rpc_endpoint] for a description of the [local] argument. *)
+val as_rpc_endpoint : ?local:bool -> t -> Endpoint.t
 
 module RPC : sig
   include RPC_core.CALLERS with type uri_provider := t
