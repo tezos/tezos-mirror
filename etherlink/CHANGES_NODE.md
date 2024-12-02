@@ -4,13 +4,27 @@
 
 ### Features
 
-- Improves performances for blocks application and RPC requests by switching to
-  a dedicated WASM runtime, instead of using the one developed for the rollup
-  node. (!15389)
-
 ### Bug fixes
 
 ### Internals
+
+## Verson 0.10 (2024-12-02)
+
+This is a bug fixes release, fixing the memory leak of the node and improving
+the interoperability with MetaMask and other wallets setting arbitrary high gas
+limit on `eth_estimateGas` requests.
+
+This release will not apply any migration to the node’s store (version 14),
+meaning it is possible to downgrade to the previous version.
+
+### Bug fixes
+
+- Fix the memory leak observed in the EVM node, and improves performances for
+  blocks application and RPC requests requiring to execute the kernel. This is
+  achieved by switching to a dedicated WASM runtime, instead of using the one
+  developed for the rollup node. (!15389)
+- Do not fail on `eth_estimateGas` when the submitted gas is greater than 30M
+  gas, to support some wallets setting a very high gas limit to estimate gas.
 
 ## Version 0.9 (2024-11-28)
 
