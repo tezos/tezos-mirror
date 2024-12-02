@@ -2516,6 +2516,7 @@ version = "0.2.2"
 dependencies = [
  "cfg-if 1.0.0",
  "dlmalloc",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-host",
