@@ -15,7 +15,7 @@ type alert
    - [severity]: alert level (either [`Critical], [`Warning], [`Info]
      or [`None]).
    - [for_]: optional duration before firing.
-   - [description]: pptional detailed explanation.
+   - [description]: optional detailed explanation.
    - [summary]: optional brief overview. *)
 val alert :
   expr:string ->
