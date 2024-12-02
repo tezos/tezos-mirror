@@ -2460,12 +2460,7 @@ module Alert = struct
   let () =
     Collection.register_alert low_DAL_attested_commitments_ratio collection
 
-  let dal_slack_receiver =
-    slack_receiver
-      ~name:"slack-notifications"
-      ~channel:"alerts-dal-ghostnet"
-      ~title:"Low DAL attested commitments ratio detected"
-      ~text:"The attested DAL attested commitments ratio has fallen below 50%"
+  let dal_slack_receiver = slack_webhook_receiver ~name:"slack-notifications"
 
   let dal_group = group "dal" dal_slack_receiver
 
