@@ -2831,14 +2831,12 @@ let test_observer_timeout_when_necessary =
      request the new time between block, and will keep waiting for new blocks
      to arrive every 3s. *)
   let* () = Evm_node.terminate sequencer in
-  let* () =
-    Evm_node.run sequencer ~extra_arguments:["--time-between-blocks"; "none"]
-  in
-
   (* After enough time, the observer considers its connection with the
      sequencer is stalled and tries to reconnect. *)
-  let* () = Evm_node.wait_for_retrying_connect observer in
-
+  let* () = Evm_node.wait_for_retrying_connect ~timeout:5. observer
+  and* () =
+    Evm_node.run sequencer ~extra_arguments:["--time-between-blocks"; "none"]
+  in
   (* We produce a block, and verify that the observer nodes correctly applies
      it. *)
   let* _ = produce_block sequencer in
