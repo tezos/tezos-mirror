@@ -1580,6 +1580,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-smart-rollup-build-utils"
+version = "0.2.2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustc_version",
+]
+
+[[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
 

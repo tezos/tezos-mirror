@@ -3548,6 +3548,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23d434d3f8967a09480fb04132ebe0a3e088c173e6d0ee7897abbdf4eab0f8b9"
 
 [[package]]
+name = "tezos-smart-rollup-build-utils"
+version = "0.2.2"
+dependencies = [
+ "rustc_version",
+]
+
+[[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
 

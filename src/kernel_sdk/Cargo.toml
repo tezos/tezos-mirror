@@ -6,23 +6,24 @@
 [workspace]
 resolver = "2"
 members = [
-  # Kernel Dev
-  "constants",
-  "core",
-  "host",
-  "debug",
-  "mock",
-  "encoding",
-  "storage",
-  "panic-hook",
-  "entrypoint",
-  "macros",
-  "utils",
-  "sdk",
-  # UX
-  "installer-kernel",
-  "installer-client",
-  "installer-config",
+	# Kernel Dev
+	"constants",
+	"core",
+	"host",
+	"debug",
+	"mock",
+	"encoding",
+	"storage",
+	"panic-hook",
+	"entrypoint",
+	"macros",
+	"utils",
+	"build-utils",
+	"sdk",
+	# UX
+	"installer-kernel",
+	"installer-client",
+	"installer-config",
 ]
 
 [workspace.dependencies.tezos_crypto_rs]
