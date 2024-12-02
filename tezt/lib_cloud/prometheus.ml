@@ -73,6 +73,15 @@ let netdata_source_of_agents agents =
   let targets = List.map target agents in
   {name; metrics_path; targets}
 
+let opentelemetry_source =
+  let name = "open-telemetry" in
+  let metrics_path = "/metrics" in
+  let address = "localhost" in
+  let port = 8888 in
+  let app_name = "otel-collector" in
+  let targets = [{address; port; app_name}] in
+  {name; metrics_path; targets}
+
 let tezt_source =
   {
     name = "tezt_metrics";
@@ -258,6 +267,9 @@ let start ~alerts agents =
   let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
+  in
+  let jobs =
+    if Env.open_telemetry then opentelemetry_source :: jobs else jobs
   in
   let* () = Process.run "mkdir" ["-p"; dir // "rules"] in
   let configuration_file = dir // "prometheus.yml" in
