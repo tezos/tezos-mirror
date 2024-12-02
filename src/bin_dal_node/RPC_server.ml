@@ -142,17 +142,20 @@ module Slots_handlers = struct
             in
             fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
 
+  (* This module is used below to maintain a bounded cache of recently injected
+     slots to quickly return the commitment and commitment_proof of an already
+     known slot. *)
+  module Injected_slots_cache =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = string
+
+        let equal = String.equal
+
+        let hash = Hashtbl.hash
+      end)
+
   let post_slot =
-    let module Injected_slots_cache =
-      Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
-        (struct
-          type t = string
-
-          let equal = String.equal
-
-          let hash = Hashtbl.hash
-        end)
-    in
     let slots_cache = Injected_slots_cache.create Constants.cache_size in
     fun ctxt query slot ->
       call_handler1 (fun () ->
