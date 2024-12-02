@@ -186,7 +186,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
-    ?history_mode ~enable_dal ?dal_slots ?rpc_server protocol =
+    ?history_mode ~enable_dal ?dal_slots ?rpc_server ?websockets protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -326,6 +326,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?rpc_port:sequencer_rpc_port
       ~patch_config
       ~mode:sequencer_mode
+      ?websockets
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* observer =
@@ -364,8 +365,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fa_bridge ?commitment_period ?challenge_window
     ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
     ?history_mode ~enable_dal
-    ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None) body ~title
-    ~tags protocols =
+    ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None) ?rpc_server
+    ?websockets body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -383,9 +384,10 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
       block_storage_sqlite3
   in
   let rpc_server =
-    match kernel with
-    | Mainnet | Ghostnet -> None (* default *)
-    | Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
+    match (rpc_server, kernel) with
+    | Some _, _ -> rpc_server
+    | _, (Mainnet | Ghostnet) -> None (* default *)
+    | _, Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
   in
   let body protocol =
     let* sequencer_setup =
@@ -419,6 +421,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?enable_fa_bridge
         ~threshold_encryption
         ?history_mode
+        ?websockets
         ~enable_dal
         ?dal_slots
         ?rpc_server
@@ -463,7 +466,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
     ?commitment_period ?challenge_window ?additional_uses ~threshold_encryption
-    ~enable_dal ?dal_slots ~title ~tags body protocols =
+    ~enable_dal ?dal_slots ?rpc_server ?websockets ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -495,6 +498,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
         ?additional_uses
+        ?rpc_server
+        ?websockets
         ~threshold_encryption
         ?history_mode
         ~enable_dal

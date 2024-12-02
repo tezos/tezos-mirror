@@ -113,6 +113,7 @@ module Parameters = struct
     endpoint : string;
     runner : Runner.t option;
     restricted_rpcs : string option;
+    websockets : bool;
   }
 
   type session_state = {mutable ready : bool}
@@ -708,7 +709,8 @@ let mode_with_new_private_rpc (mode : mode) =
   | _ -> mode
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
+    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs
+    ?(websockets = false) endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -747,6 +749,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         endpoint;
         restricted_rpcs;
         runner;
+        websockets;
       }
   in
   on_event evm_node (handle_is_ready_event evm_node) ;
@@ -1183,7 +1186,8 @@ type rpc_server = Resto | Dream
 
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false) ?(block_storage_sqlite3 = true)
-    ?(next_wasm_runtime = true) ?garbage_collector ?rpc_server () =
+    ?(next_wasm_runtime = true) ?garbage_collector ?rpc_server
+    ?(enable_websocket = false) () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1231,9 +1235,10 @@ let patch_config_with_experimental_feature
   |> optional_json_put ~name:"rpc_server" rpc_server (function
          | Resto -> `String "resto"
          | Dream -> `String "dream")
+  |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs rollup_node =
+    ?restricted_rpcs ?websockets rollup_node =
   let evm_node =
     create
       ?name
@@ -1243,6 +1248,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       ?rpc_addr
       ?rpc_port
       ?restricted_rpcs
+      ?websockets
       rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
@@ -1250,6 +1256,15 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     match patch_config with
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
+  in
+  let* () =
+    match websockets with
+    | Some _ ->
+        Config_file.update evm_node
+        @@ patch_config_with_experimental_feature
+             ?enable_websocket:websockets
+             ()
+    | _ -> unit
   in
   let* () = run evm_node in
   return evm_node
@@ -1312,7 +1327,35 @@ let call_evm_rpc ?(private_ = false) evm_node request =
 
 let batch_evm_rpc ?(private_ = false) evm_node requests =
   let endpoint = endpoint ~private_ evm_node in
-  Curl.post endpoint (batch_requests requests) |> Runnable.run
+  let* json = Curl.post endpoint (batch_requests requests) |> Runnable.run in
+  return (JSON.as_list json)
+
+let open_websocket ?(private_ = false) evm_node =
+  let kind = if private_ then "private" else "public" in
+  Websocket.connect
+    ~name:(String.concat "_" ["ws"; kind; evm_node.name])
+    (endpoint ~private_ evm_node ^ "/ws")
+
+let call_evm_websocket websocket request =
+  Websocket.send_recv websocket (build_request request)
+
+let batch_evm_websocket websocket requests =
+  let* l =
+    Lwt_list.map_s
+      (fun r -> Websocket.send websocket (build_request r))
+      requests
+  in
+  Lwt_list.map_s (fun () -> Websocket.recv websocket) l
+
+let jsonrpc ?websocket ?private_ evm_node =
+  match websocket with
+  | None -> call_evm_rpc ?private_ evm_node
+  | Some ws -> call_evm_websocket ws
+
+let batch_jsonrpc ?websocket ?private_ evm_node =
+  match websocket with
+  | None -> batch_evm_rpc ?private_ evm_node
+  | Some ws -> batch_evm_websocket ws
 
 let extract_result json = JSON.(json |-> "result")
 

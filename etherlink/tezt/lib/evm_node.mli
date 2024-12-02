@@ -140,8 +140,9 @@ val supports_threshold_encryption : t -> bool
     rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
-    [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port is
-    chosen if [rpc_port] is not set.
+    [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
+    is chosen if [rpc_port] is not set. The EVM node starts a websocket server
+    for JSON-RPC communication if [websocket] is [true].
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node_endpoint].
@@ -157,6 +158,7 @@ val create :
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
+  ?websockets:bool ->
   string ->
   t
 
@@ -261,7 +263,7 @@ type rpc_server = Resto | Dream
 
 (** [patch_config_with_experimental_feature
     ?drop_duplicate_when_injection ?block_storage_sqlite3
-    ?next_wasm_runtime ?rpc_server json_config] patches a config to
+    ?next_wasm_runtime ?rpc_server ?enable_websocket json_config] patches a config to
     add experimental feature. Each optional argument add the
     correspondent experimental feature. *)
 val patch_config_with_experimental_feature :
@@ -270,6 +272,7 @@ val patch_config_with_experimental_feature :
   ?next_wasm_runtime:bool ->
   ?garbage_collector:garbage_collector ->
   ?rpc_server:rpc_server ->
+  ?enable_websocket:bool ->
   unit ->
   JSON.t ->
   JSON.t
@@ -287,6 +290,7 @@ val init :
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
+  ?websockets:bool ->
   string ->
   t Lwt.t
 
@@ -383,17 +387,44 @@ val endpoint : ?private_:bool -> t -> string
 (** JSON-RPC request. *)
 type request = {method_ : string; parameters : JSON.u}
 
-(** [call_evm_rpc ?private_ evm_node ~request] sends a JSON-RPC request to
+(** [call_evm_rpc ?private_ evm_node request] sends a JSON-RPC request to
     the [evm_node], for the given [request].
     If [private_] is true, the request is sent to the private RPC
     server. *)
 val call_evm_rpc : ?private_:bool -> t -> request -> JSON.t Lwt.t
 
-(** [batch_evm_rpc ?private_ evm_node ~requests] sends multiple JSON-RPC requests
+(** [batch_evm_rpc ?private_ evm_node requests] sends multiple JSON-RPC requests
     to the [evm_node], for the given [requests].
     If [private_] is true, the requests are sent to the private RPC
     server. *)
-val batch_evm_rpc : ?private_:bool -> t -> request list -> JSON.t Lwt.t
+val batch_evm_rpc : ?private_:bool -> t -> request list -> JSON.t list Lwt.t
+
+(** Open a websocket connection with the EVM node. If [private_] is true, a
+    connection is created with the private websocket endpoint of the node. *)
+val open_websocket : ?private_:bool -> t -> Websocket.t Lwt.t
+
+(** [call_evm_websocket ws request] sends a JSON-RPC request on the websocket
+    connection [ws] and waits for the response. *)
+val call_evm_websocket : Websocket.t -> request -> JSON.t Lwt.t
+
+(** [batch_evm_websocket ws requests] sends multiple JSON-RPC requests on the
+    websocket connection [ws] without waiting for the responses, then receive
+    all responses at the end. *)
+val batch_evm_websocket : Websocket.t -> request list -> JSON.t list Lwt.t
+
+(** [jsonrpc] uses the [websocket] to make a JSON-RPC call if provided or falls
+    back to using HTTP RPC request on the EVM node otherwise. *)
+val jsonrpc :
+  ?websocket:Websocket.t -> ?private_:bool -> t -> request -> JSON.t Lwt.t
+
+(** [batch_jsonrpc] uses the [websocket] to make a JSON-RPC calls if provided or
+    falls back to using an HTTP RPC batch request on the EVM node otherwise. *)
+val batch_jsonrpc :
+  ?websocket:Websocket.t ->
+  ?private_:bool ->
+  t ->
+  request list ->
+  JSON.t list Lwt.t
 
 (** [extract_result json] expects a JSON-RPC `result` and returns the value. *)
 val extract_result : JSON.t -> JSON.t

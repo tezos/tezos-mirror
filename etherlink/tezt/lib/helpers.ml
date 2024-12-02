@@ -250,12 +250,14 @@ let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]
     blocks have passed and the receipt is still not available. *)
-let wait_for_transaction_receipt ?(count = 3) ~evm_node ~transaction_hash () =
+let wait_for_transaction_receipt ?websocket ?(count = 3) ~evm_node
+    ~transaction_hash () =
   let rec loop count =
     let* () = Lwt_unix.sleep 5. in
     let* receipt =
       Evm_node.(
-        call_evm_rpc
+        jsonrpc
+          ?websocket
           evm_node
           {
             method_ = "eth_getTransactionReceipt";
@@ -290,7 +292,7 @@ let wait_for_application ~produce_block apply =
   in
   Lwt.pick [application_result; loop 0]
 
-let batch_n_transactions ~evm_node txs =
+let batch_n_transactions ?websocket ~evm_node txs =
   let requests =
     List.map
       (fun tx ->
@@ -298,16 +300,17 @@ let batch_n_transactions ~evm_node txs =
           {method_ = "eth_sendRawTransaction"; parameters = `A [`String tx]})
       txs
   in
-  let* hashes = Evm_node.batch_evm_rpc evm_node requests in
+  let* hashes = Evm_node.batch_jsonrpc ?websocket evm_node requests in
   let hashes =
-    hashes |> JSON.as_list
+    hashes
     |> List.map (fun json -> Evm_node.extract_result json |> JSON.as_string)
   in
   return (requests, hashes)
 
 (* sending more than ~300 tx could fail, because or curl *)
-let send_n_transactions ~produce_block ~evm_node ?wait_for_blocks txs =
-  let* requests, hashes = batch_n_transactions ~evm_node txs in
+let send_n_transactions ?websocket ~produce_block ~evm_node ?wait_for_blocks txs
+    =
+  let* requests, hashes = batch_n_transactions ?websocket ~evm_node txs in
   let first_hash = List.hd hashes in
   (* Let's wait until one of the transactions is injected into a block, and
       test this block contains the `n` transactions as expected. *)
@@ -315,6 +318,7 @@ let send_n_transactions ~produce_block ~evm_node ?wait_for_blocks txs =
     wait_for_application
       ~produce_block
       (wait_for_transaction_receipt
+         ?websocket
          ?count:wait_for_blocks
          ~evm_node
          ~transaction_hash:first_hash)

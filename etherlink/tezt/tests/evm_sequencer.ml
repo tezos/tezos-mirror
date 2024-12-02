@@ -246,7 +246,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?block_storage_sqlite3
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
-    ?additional_uses
+    ?additional_uses ?rpc_server ?websockets
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration) ~title ~tags body protocols =
   let dal_cases =
@@ -298,6 +298,8 @@ let register_all ?max_delayed_inbox_blueprint_length ?block_storage_sqlite3
             ?max_blueprint_lookahead_in_seconds
             ?enable_fa_bridge
             ?additional_uses
+            ?rpc_server
+            ?websockets
             ~threshold_encryption
             ?history_mode
             ~enable_dal
