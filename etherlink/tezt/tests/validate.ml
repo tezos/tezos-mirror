@@ -507,17 +507,6 @@ let test_validate_custom_gas_limit =
   let*@? err = Rpc.send_raw_transaction ~raw_tx:tx sequencer in
   Check.(err.message =~ rex "Gas limit for execution is too high")
     ~error_msg:"Gas limit too high for execution, it should fail" ;
-  (* Simulation as well. *)
-  let*@? err =
-    Rpc.estimate_gas
-      [
-        ("to", `String "0xA257edC8ad1D8f8f463aC0D947cc381000b3c863");
-        ("gas", `String (string_of_int gas));
-      ]
-      sequencer
-  in
-  Check.((err.message = "Maximum allowed gas per transaction is 10") string)
-    ~error_msg:"Expected error message %R got %L" ;
   unit
 
 let test_sender_is_not_contract =

@@ -10,6 +10,9 @@
 
 ### Bug fixes
 
+- Do not fail on `eth_estimateGas` when the submitted gas is greater than 30M
+  gas, to support some wallets setting a very high gas limit to estimate gas.
+
 ### Internals
 
 ## Version 0.9 (2024-11-28)

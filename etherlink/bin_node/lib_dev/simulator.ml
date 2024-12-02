@@ -274,42 +274,34 @@ module Make (SimulationBackend : SimulationBackend) = struct
       Durable_storage.maximum_gas_per_transaction
         (SimulationBackend.read simulation_state)
     in
-    match call.Ethereum_types.gas with
-    | Some (Qty gas) when gas >= maximum_gas_per_transaction ->
-        return
-          (Error
-             (Format.sprintf
-                "Maximum allowed gas per transaction is %s"
-                (Z.to_string maximum_gas_per_transaction)))
-    | _ -> (
-        let* simulation_version = simulation_version simulation_state in
-        let* res =
-          call_estimate_gas
-            (simulation_input ~simulation_version ~with_da_fees:false call)
+    let* simulation_version = simulation_version simulation_state in
+    let* res =
+      call_estimate_gas
+        (simulation_input ~simulation_version ~with_da_fees:false call)
+        simulation_state
+    in
+    match res with
+    | Ok (Ok {gas_used = Some (Qty gas); value}) ->
+        (* See EIP2200 for reference. But the tl;dr is: we cannot do the
+           opcode SSTORE if we have less than 2300 gas available, even
+           if we don't consume it. The simulated amount then gives an
+           amount of gas insufficient to execute the transaction.
+
+           The extra gas units, i.e. 2300, will be refunded.
+        *)
+        let safe_gas = Z.(add gas (of_int 2300)) in
+        (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
+        let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
+        let+ gas_used =
+          confirm_gas
+            ~maximum_gas_per_transaction
+            ~simulation_version
+            call
+            (Qty safe_gas)
             simulation_state
         in
-        match res with
-        | Ok (Ok {gas_used = Some (Qty gas); value}) ->
-            (* See EIP2200 for reference. But the tl;dr is: we cannot do the
-               opcode SSTORE if we have less than 2300 gas available, even
-               if we don't consume it. The simulated amount then gives an
-               amount of gas insufficient to execute the transaction.
-
-               The extra gas units, i.e. 2300, will be refunded.
-            *)
-            let safe_gas = Z.(add gas (of_int 2300)) in
-            (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
-            let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
-            let+ gas_used =
-              confirm_gas
-                ~maximum_gas_per_transaction
-                ~simulation_version
-                call
-                (Qty safe_gas)
-                simulation_state
-            in
-            Ok (Ok {Simulation.gas_used = Some gas_used; value})
-        | _ -> return res)
+        Ok (Ok {Simulation.gas_used = Some gas_used; value})
+    | _ -> return res
 
   let is_tx_valid tx_raw =
     let open Lwt_result_syntax in
