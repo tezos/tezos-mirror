@@ -518,6 +518,7 @@ type t = {
       (* mapping from baker addresses to their Tzkt aliases (if known)*)
   mutable versions : (string, string) Hashtbl.t;
       (* mapping from baker addresses to their octez versions (if known) *)
+  otel : string option;
 }
 
 let pp_metrics t
@@ -1138,8 +1139,10 @@ let init_public_network cloud (configuration : configuration)
         let* () =
           add_prometheus_source cloud agent "bootstrap" ~dal_node ~node
         in
+        let otel = Cloud.open_telemetry_endpoint cloud in
         let* () =
           Dal_node.Agent.run
+            ?otel
             ~memtrace:configuration.memtrace
             ~event_level:`Notice
             dal_node
@@ -1353,6 +1356,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~bootstrap_profile:true
       dal_bootstrap_node
   in
+  let otel = Cloud.open_telemetry_endpoint cloud in
   let* () =
     may_copy_dal_node_identity_file
       agent
@@ -1361,6 +1365,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
   let* () =
     Dal_node.Agent.run
+      ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
       dal_bootstrap_node
@@ -1426,8 +1431,10 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
         ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
         dal_node
     in
+    let otel = Cloud.open_telemetry_endpoint cloud in
     let* () =
       Dal_node.Agent.run
+        ?otel
         ~memtrace:configuration.memtrace
         ~event_level:`Notice
         dal_node
@@ -1543,8 +1550,10 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   (* We do not wait on the promise because loading the SRS takes some time.
      Instead we will publish commitments only once this promise is fulfilled. *)
   let () = toplog "Init producer: wait for DAL node to be ready" in
+  let otel = Cloud.open_telemetry_endpoint cloud in
   let is_ready =
     Dal_node.Agent.run
+      ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
       dal_node
@@ -1604,8 +1613,10 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       agent
       (Format.asprintf "observer-%d" i)
   in
+  let otel = Cloud.open_telemetry_endpoint cloud in
   let* () =
     Dal_node.Agent.run
+      ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
       dal_node
@@ -1623,7 +1634,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   Lwt.return {node; dal_node; topic}
 
 let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
-    ~memtrace =
+    ~otel ~memtrace =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -1651,7 +1662,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
           ~peers:[bootstrap.dal_node_p2p_endpoint]
           dal_node
       in
-      let* () = Dal_node.run dal_node in
+      let* () = Dal_node.Agent.run ?otel dal_node in
       some dal_node
   | _ :: _ :: _ ->
       (* On several slot indices, we launch one observer DAL node per
@@ -1684,7 +1695,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
           ~peers:[bootstrap.dal_node_p2p_endpoint]
           default_dal_node
       in
-      let* () = Dal_node.Agent.run ~memtrace default_dal_node in
+      let* () = Dal_node.Agent.run ?otel ~memtrace default_dal_node in
       let default_endpoint = Dal_node.rpc_endpoint default_dal_node in
 
       let* dal_slots_and_nodes =
@@ -1709,7 +1720,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
                    ~peers:[bootstrap.dal_node_p2p_endpoint]
                    dal_node
                in
-               let* () = Dal_node.Agent.run ~memtrace dal_node in
+               let* () = Dal_node.Agent.run ?otel ~memtrace dal_node in
                return (slot_index, Dal_node.rpc_endpoint dal_node))
       in
       let* reverse_proxy_dal_node =
@@ -1771,6 +1782,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ?dal_slots
       ()
   in
+  let otel = Cloud.open_telemetry_endpoint cloud in
   let* dal_node =
     init_etherlink_dal_node
       ~bootstrap
@@ -1778,6 +1790,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~name
       ~dal_slots:etherlink_configuration.etherlink_dal_slots
       ~network:configuration.network
+      ~otel
       ~memtrace:configuration.memtrace
   in
   let* sc_rollup_node =
@@ -2214,6 +2227,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
+  let otel = Cloud.open_telemetry_endpoint cloud in
   Lwt.return
     {
       cloud;
@@ -2233,6 +2247,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       teztale;
       aliases;
       versions;
+      otel;
     }
 
 let wait_for_level t level =
@@ -2309,6 +2324,7 @@ let on_new_level t ?etherlink level =
                 (List.nth t.bakers (b mod nb_bakers)).dal_node
               in
               Dal_node.Agent.run
+                ?otel:t.otel
                 ~memtrace:t.configuration.memtrace
                 baker_to_reconnect)
         in
@@ -2323,17 +2339,18 @@ let ensure_enough_funds t i =
   | `Sandbox -> (* Producer has enough money *) Lwt.return_unit
   | _ ->
       let* balance =
-        Node.RPC.call producer.node
+        RPC_core.call t.bootstrap.node_rpc_endpoint
         @@ RPC.get_chain_block_context_contract_balance
              ~id:producer.account.public_key_hash
              ()
       in
       (* This is to prevent having to refund two producers at the same time and ensure it can produce at least one slot. *)
       let random = Random.int 5_000_000 + 10_000 in
-      if balance < Tez.of_mutez_int random then
+      if balance < Tez.of_mutez_int random then (
         let* fundraiser =
           Client.show_address ~alias:"fundraiser" t.bootstrap.client
         in
+        toplog "### transfer" ;
         let* _op_hash =
           Operation.Manager.transfer
             ~amount:10_000_000
@@ -2345,11 +2362,13 @@ let ensure_enough_funds t i =
                (Operation.Manager.inject ~dont_wait:true)
                t.bootstrap.client
         in
-        Lwt.return_unit
+        Lwt.return_unit)
       else Lwt.return_unit
 
 let produce_slot t level i =
+  toplog "producing slots for level %d" level ;
   let* () = ensure_enough_funds t i in
+  toplog "ensured enough funds are available" ;
   let producer = List.nth t.producers i in
   let index = producer.slot_index in
   let content =
@@ -2369,6 +2388,7 @@ let produce_slot t level i =
       ~index
       content
   in
+  Log.info "publish slot" ;
   Lwt.return_unit
 
 let producers_not_ready t =
@@ -2385,7 +2405,9 @@ let producers_not_ready t =
 let rec loop t level =
   let p = on_new_level t level in
   let _p2 =
-    if producers_not_ready t then Lwt.return_unit
+    if producers_not_ready t then (
+      toplog "producers not ready for level %d" level ;
+      Lwt.return_unit)
     else
       Seq.ints 0
       |> Seq.take (List.length t.configuration.dal_node_producers)
