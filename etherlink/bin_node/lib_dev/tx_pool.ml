@@ -347,6 +347,12 @@ module Request = struct
           (fun () -> View Is_locked);
         case
           (Tag 6)
+          ~title:"Size_info"
+          (obj1 (req "request" (constant "size_info")))
+          (function View Size_info -> Some () | _ -> None)
+          (fun () -> View Size_info);
+        case
+          (Tag 7)
           ~title:"Find"
           (obj2
              (req "request" (constant "find"))
@@ -354,7 +360,7 @@ module Request = struct
           (function View (Find tx_hash) -> Some ((), tx_hash) | _ -> None)
           (fun ((), tx_hash) -> View (Find tx_hash));
         case
-          (Tag 7)
+          (Tag 8)
           ~title:"Clear_popped_transactions"
           (obj1 (req "request" (constant "clear_popped_transactions")))
           (function View Clear_popped_transactions -> Some () | _ -> None)
