@@ -2451,10 +2451,11 @@ module Alert = struct
     alert
       "LowDALAttestedCommitmentsRatio"
       ~for_:"30m"
-      ~severity:`Warning
-      ~expr:{|tezt_dal_commitments_ratio{kind="attested"} < 10|}
-      ~summary:"Low DAL attested commitments ratio detected"
-      ~description:"The attested DAL attested commitments ratio is below 50%"
+      ~severity:`Info
+      ~expr:{|vector(1)|}
+      ~summary:"DAL attested commitments ratio over the last 12 hours"
+      ~description:
+        {|'DAL attested commitments ratio over the last 12 hours: {{ with query "avg_over_time(tezt_dal_commitments_ratio{kind=\"attested\"}[12h])" }}{{ . | first | value | printf "%.2f%%" }}{{ end }}'|}
 
   let () =
     Collection.register_alert low_DAL_attested_commitments_ratio collection
