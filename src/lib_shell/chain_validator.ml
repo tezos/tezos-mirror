@@ -465,7 +465,7 @@ let may_synchronise_context synchronisation_state chain_store =
     Context_ops.sync context_index
   else Lwt.return_unit
 
-let[@warning "-32"] reset_profilers block =
+let[@warning "-32"] reset_profilers =
   let profilers =
     Shell_profiling.
       [
@@ -478,14 +478,14 @@ let[@warning "-32"] reset_profilers block =
         Tezos_protocol_environment.Environment_profiler.context_ops_profiler;
       ]
   in
-  List.iter
-    (fun profiler ->
-      (try Tezos_base.Profiler.stop profiler with _ -> ()) ;
-      Tezos_base.Profiler.record
-        profiler
-        Notice
-        (Block_hash.to_b58check (Store.Block.hash block), []))
-    profilers
+  let reset_sections =
+    let to_string b = Block_hash.to_b58check (Store.Block.hash b) in
+    List.map
+      (Tezos_base.Profiler.section_maker Store.Block.equal to_string)
+      profilers
+  in
+  fun block ->
+    List.iter (fun reset_section -> reset_section block) reset_sections
 
 let on_validation_request w peer start_testchain active_chains spawn_child block
     =
@@ -507,7 +507,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   if not accepted_head then return Ignored_head
   else
     let* previous = Store.Chain.set_head chain_store block in
-    () [@profiler.custom reset_profilers block] ;
+    () [@profiler.custom reset_profilers (block, [])] ;
     let () =
       if is_bootstrapped nv then
         Distributed_db.Advertise.current_head nv.chain_db block
