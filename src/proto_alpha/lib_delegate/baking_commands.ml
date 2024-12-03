@@ -358,18 +358,6 @@ let endpoint_arg =
     ~doc:"endpoint of the DAL node, e.g. 'http://localhost:8933'"
     (Tezos_clic.parameter (fun _ s -> return @@ Uri.of_string s))
 
-let dal_node_timeout_percentage_arg =
-  Tezos_clic.arg
-    ~long:"dal-node-timeout-percentage"
-    ~placeholder:"percentage"
-    ~doc:
-      "percentage of the time until the end of round, which determines the \
-       timeout to wait for the DAL node to provide shards' attestation status; \
-       the default value is 10%; use with care: too small a value may mean not \
-       being able to attest DAL slots, while too big a value may mean the \
-       baker's consensus attestations may be injected late and not included"
-  @@ Client_proto_args.positive_int_parameter ()
-
 let block_count_arg =
   Tezos_clic.default_arg
     ~long:"count"
@@ -378,6 +366,16 @@ let block_count_arg =
     ~doc:"number of blocks to bake"
     ~default:"1"
   @@ Client_proto_args.positive_int_parameter ()
+
+let create_dal_node_rpc_ctxt endpoint =
+  let open Tezos_rpc_http_client_unix in
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
+  in
+  let media_types =
+    Tezos_rpc_http.Media_type.Command_line.of_command_line rpc_config.media_type
+  in
+  new RPC_client_unix.http_ctxt rpc_config media_types
 
 let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     =
@@ -537,8 +535,12 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
            pkhs
            cctxt ->
         let* delegates = get_delegates cctxt pkhs in
+        let dal_node_rpc_ctxt =
+          Option.map create_dal_node_rpc_ctxt dal_node_endpoint
+        in
         Baking_lib.bake
           cctxt
+          ?dal_node_rpc_ctxt
           ~minimal_nanotez_per_gas_unit
           ~minimal_timestamp
           ~minimal_nanotez_per_byte
@@ -548,7 +550,6 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
           ?extra_operations
           ?context_path
-          ?dal_node_endpoint
           ~count:block_count
           ?votes:
             (Option.map
@@ -679,7 +680,7 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args16
+  Tezos_clic.args15
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -693,7 +694,6 @@ let baker_args =
     per_block_vote_file_arg
     operations_arg
     endpoint_arg
-    dal_node_timeout_percentage_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
 
@@ -711,7 +711,6 @@ let run_baker
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
-      dal_node_timeout_percentage,
       state_recorder,
       pre_emptive_forge_time ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
@@ -735,6 +734,9 @@ let run_baker
       ~default_adaptive_issuance_vote:adaptive_issuance_vote
       ~per_block_vote_file
   in
+  let dal_node_rpc_ctxt =
+    Option.map create_dal_node_rpc_ctxt dal_node_endpoint
+  in
   let* delegates = get_delegates cctxt sources in
   let context_path =
     match baking_mode with
@@ -744,13 +746,12 @@ let run_baker
   in
   Client_daemon.Baker.run
     cctxt
+    ?dal_node_rpc_ctxt
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
     ~votes
     ?extra_operations
-    ?dal_node_endpoint
-    ?dal_node_timeout_percentage
     ?pre_emptive_forge_time
     ?force_apply_from_round
     ~chain:cctxt#chain

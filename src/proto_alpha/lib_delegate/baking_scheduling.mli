@@ -74,6 +74,7 @@ val retry :
     - run the automaton loop, see {!automaton_loop} *)
 val run :
   Protocol_client_context.full ->
+  ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
   ?canceler:Lwt_canceler.t ->
   ?stop_on_event:(event -> bool) ->
   ?on_error:(tztrace -> unit tzresult Lwt.t) ->
@@ -139,6 +140,7 @@ val create_loop_state :
     [synchronize] is set to [true] (which is the default). *)
 val create_initial_state :
   Protocol_client_context.full ->
+  ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
   ?synchronize:bool ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->

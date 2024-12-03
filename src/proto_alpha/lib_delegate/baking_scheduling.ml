@@ -667,19 +667,9 @@ let create_round_durations constants =
   Environment.wrap_tzresult
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
-let create_dal_node_rpc_ctxt endpoint =
-  let open Tezos_rpc_http_client_unix in
-  let rpc_config =
-    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
-  in
-  let media_types =
-    Tezos_rpc_http.Media_type.Command_line.of_command_line rpc_config.media_type
-  in
-  new RPC_client_unix.http_ctxt rpc_config media_types
-
-let create_initial_state cctxt ?(synchronize = true) ~chain config
-    operation_worker ~(current_proposal : Baking_state.proposal) ?constants
-    delegates =
+let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
+    config operation_worker ~(current_proposal : Baking_state.proposal)
+    ?constants delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
@@ -719,10 +709,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       validation_mode;
       delegates;
       cache;
-      dal_node_rpc_ctxt =
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4674
-           Treat case when no endpoint was given and DAL is enabled *)
-        Option.map create_dal_node_rpc_ctxt config.dal_node_endpoint;
+      dal_node_rpc_ctxt;
     }
   in
   (* Trick to provide the global state to the forge worker without
@@ -759,9 +746,30 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       Some {proposal = current_proposal; attestation_qc = []}
     else None
   in
+  let current_level = current_proposal.block.shell.level in
+  let dal_attestable_slots =
+    Option.fold
+      ~none:[]
+      ~some:(fun dal_node_rpc_ctxt ->
+        Node_rpc.dal_attestable_slots
+          dal_node_rpc_ctxt
+          ~attestation_level:current_level
+          (Delegate_slots.own_delegates delegate_slots))
+      dal_node_rpc_ctxt
+  in
+  let next_level_dal_attestable_slots =
+    Option.fold
+      ~none:[]
+      ~some:(fun dal_node_rpc_ctxt ->
+        Node_rpc.dal_attestable_slots
+          dal_node_rpc_ctxt
+          ~attestation_level:(Int32.succ current_level)
+          (Delegate_slots.own_delegates next_level_delegate_slots))
+      dal_node_rpc_ctxt
+  in
   let level_state =
     {
-      current_level = current_proposal.block.shell.level;
+      current_level;
       latest_proposal = current_proposal;
       is_latest_proposal_applied =
         true (* this proposal is expected to be the current head *);
@@ -771,6 +779,8 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round = None;
+      dal_attestable_slots;
+      next_level_dal_attestable_slots;
     }
   in
   let* round_state =
@@ -942,7 +952,7 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
         ())
     dal_node_rpc_ctxt
 
-let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
+let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> Lwt_result_syntax.return_unit) ?constants ~chain
     config delegates =
   let open Lwt_result_syntax in
@@ -969,6 +979,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
   let* initial_state =
     create_initial_state
       cctxt
+      ?dal_node_rpc_ctxt
       ~chain
       config
       operation_worker

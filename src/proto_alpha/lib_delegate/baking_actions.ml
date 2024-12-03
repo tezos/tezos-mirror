@@ -145,6 +145,8 @@ and level_update = {
     current_round:Round.t ->
     delegate_slots:delegate_slots ->
     next_level_delegate_slots:delegate_slots ->
+    dal_attestable_slots:dal_attestable_slots ->
+    next_level_dal_attestable_slots:dal_attestable_slots ->
     (state * action) Lwt.t;
 }
 
@@ -400,7 +402,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
 let only_if_dal_feature_enabled =
   let no_dal_node_warning_counter = ref 0 in
   fun state ~default_value f ->
-    let open Lwt_result_syntax in
+    let open Lwt_syntax in
     let open Constants in
     let Parametric.{dal = {feature_enable; _}; _} =
       state.global_state.constants.parametric
@@ -409,110 +411,86 @@ let only_if_dal_feature_enabled =
       match state.global_state.dal_node_rpc_ctxt with
       | None ->
           incr no_dal_node_warning_counter ;
-          let*! () =
+          let* () =
             if !no_dal_node_warning_counter mod 10 = 1 then
               Events.(emit no_dal_node ())
-            else Lwt.return_unit
+            else return_unit
           in
           return default_value
       | Some ctxt -> f ctxt
     else return default_value
 
+let process_dal_rpc_result state delegate level round =
+  let open Lwt_result_syntax in
+  function
+  | `RPC_timeout ->
+      let*! () =
+        Events.(emit failed_to_get_dal_attestations_in_time delegate)
+      in
+      return_none
+  | `RPC_result (Error errs) ->
+      let*! () =
+        Events.(emit failed_to_get_dal_attestations (delegate, errs))
+      in
+      return_none
+  | `RPC_result (Ok res) -> (
+      match res with
+      | Tezos_dal_node_services.Types.Not_in_committee -> return_none
+      | Attestable_slots {slots; published_level} ->
+          let number_of_slots =
+            state.global_state.constants.parametric.dal.number_of_slots
+          in
+          let dal_attestation =
+            List.fold_left_i
+              (fun i acc flag ->
+                match Dal.Slot_index.of_int_opt ~number_of_slots i with
+                | Some index when flag -> Dal.Attestation.commit acc index
+                | None | Some _ -> acc)
+              Dal.Attestation.empty
+              slots
+          in
+          let*! () =
+            let bitset_int = Bitset.to_z (dal_attestation :> Bitset.t) in
+            Events.(
+              emit
+                attach_dal_attestation
+                (delegate, bitset_int, published_level, level, round))
+          in
+          return_some {attestation = dal_attestation})
+
 let may_get_dal_content state consensus_vote =
   let open Lwt_result_syntax in
-  let {delegate = (consensus_key, _) as delegate; vote_consensus_content; _} =
+  let {delegate = _consensus_key, pkh; vote_consensus_content; _} =
     consensus_vote
   in
   let level, round =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
-  let compute_dal_rpc_timeout state =
-    (* We set the timeout to a certain percent of the remaining time till the
-       end of the round. In the corner case (for instance, not having an end of
-       round time), we pick some small default value. *)
-    let corner_case_default = 0.2 in
-    match compute_next_round_time state with
-    | None -> Lwt.return corner_case_default
-    | Some (timestamp, _next_round) -> (
-        let ts = Time.System.of_protocol_opt timestamp in
-        match ts with
-        | None -> Lwt.return corner_case_default
-        | Some ts ->
-            let now = Time.System.now () in
-            let diff = Ptime.diff ts now |> Ptime.Span.to_float_s in
-            if diff < 0. then
-              let*! () = Events.(emit warning_dal_timeout_old_round) () in
-              Lwt.return corner_case_default
-            else
-              let factor =
-                float_of_int
-                  state.global_state.config.dal_node_timeout_percentage
-                /. 100.
-              in
-              Lwt.return (diff *. factor))
+  let promise_opt =
+    List.assoc_opt
+      ~equal:Signature.Public_key_hash.equal
+      pkh
+      state.level_state.dal_attestable_slots
   in
-  only_if_dal_feature_enabled
-    state
-    ~default_value:None
-    (fun dal_node_rpc_ctxt ->
-      let attested_level = Int32.succ level in
-      let lag = state.global_state.constants.parametric.dal.attestation_lag in
-      if Int32.sub attested_level (Int32.of_int lag) < 1l then return_none
-      else
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7459
-           Rather then getting this now, do it at the start of the level. *)
-        let*! timeout = compute_dal_rpc_timeout state in
-        let*! result =
-          Lwt.pick
-            [
-              (let*! () = Lwt_unix.sleep timeout in
-               Lwt.return `RPC_timeout);
-              (let*! tz_res =
-                 Node_rpc.get_attestable_slots
-                   dal_node_rpc_ctxt
-                   consensus_key.public_key_hash
-                   ~attested_level
-               in
-               Lwt.return (`RPC_result tz_res));
-            ]
-        in
-        match result with
-        | `RPC_timeout ->
-            let*! () =
-              Events.(
-                emit failed_to_get_dal_attestations_in_time (delegate, timeout))
-            in
-            return_none
-        | `RPC_result (Error errs) ->
-            let*! () =
-              Events.(emit failed_to_get_dal_attestations (delegate, errs))
-            in
-            return_none
-        | `RPC_result (Ok res) -> (
-            match res with
-            | Tezos_dal_node_services.Types.Not_in_committee -> return_none
-            | Attestable_slots {slots = attestation_flags; published_level} ->
-                let number_of_slots =
-                  state.global_state.constants.parametric.dal.number_of_slots
-                in
-                let dal_attestation =
-                  List.fold_left_i
-                    (fun i acc flag ->
-                      match Dal.Slot_index.of_int_opt ~number_of_slots i with
-                      | Some index when flag -> Dal.Attestation.commit acc index
-                      | None | Some _ -> acc)
-                    Dal.Attestation.empty
-                    attestation_flags
-                in
-                let*! () =
-                  let bitset_int = Bitset.to_z (dal_attestation :> Bitset.t) in
-                  Events.(
-                    emit
-                      attach_dal_attestation
-                      (delegate, bitset_int, published_level, level, round))
-                in
-                return_some {attestation = dal_attestation}))
+  match promise_opt with
+  | None -> return_none
+  | Some promise ->
+      let*! res =
+        (* Normally we'd just check the state of the promise and return the
+           resolved value or an error if the promise is still pending. However,
+           tests that bake in the past would fail, because there would not be
+           sufficient time to get the answer from the DAL node. Therefore, we
+           wait for a bit for the DAL node to provide an answer. *)
+        Lwt.pick
+          [
+            (let*! () = Lwt_unix.sleep 0.5 in
+             Lwt.return `RPC_timeout);
+            (let*! tz_res = promise in
+             Lwt.return (`RPC_result tz_res));
+          ]
+      in
+      process_dal_rpc_result state pkh level round res
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate = consensus_key, _; vote_consensus_content; _} =
@@ -909,8 +887,35 @@ let update_to_level state level_update =
   in
   let round_durations = state.global_state.round_durations in
   let*? current_round = compute_round new_level_proposal round_durations in
+  let*! dal_attestable_slots, next_level_dal_attestable_slots =
+    only_if_dal_feature_enabled
+      state
+      ~default_value:([], [])
+      (fun dal_node_rpc_ctxt ->
+        let dal_attestable_slots =
+          if Int32.(new_level = succ state.level_state.current_level) then
+            state.level_state.next_level_dal_attestable_slots
+          else
+            Node_rpc.dal_attestable_slots
+              dal_node_rpc_ctxt
+              ~attestation_level:new_level
+              (Delegate_slots.own_delegates delegate_slots)
+        in
+        let next_level_dal_attestable_slots =
+          Node_rpc.dal_attestable_slots
+            dal_node_rpc_ctxt
+            ~attestation_level:(Int32.succ new_level)
+            (Delegate_slots.own_delegates next_level_delegate_slots)
+        in
+        Lwt.return (dal_attestable_slots, next_level_dal_attestable_slots))
+  in
   let*! new_state =
-    compute_new_state ~current_round ~delegate_slots ~next_level_delegate_slots
+    compute_new_state
+      ~current_round
+      ~delegate_slots
+      ~next_level_delegate_slots
+      ~dal_attestable_slots
+      ~next_level_dal_attestable_slots
   in
   return new_state
 

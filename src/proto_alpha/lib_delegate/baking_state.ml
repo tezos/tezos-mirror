@@ -225,6 +225,11 @@ end
 
 type delegate_slots = Delegate_slots.t
 
+type dal_attestable_slots =
+  (Signature.Public_key_hash.t
+  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
+  list
+
 type proposal = {block : block_info; predecessor : block_info}
 
 let proposal_encoding =
@@ -275,8 +280,9 @@ type prepared_block = {
 }
 
 (* The fields {current_level}, {delegate_slots}, {next_level_delegate_slots},
-   {next_level_proposed_round} are updated only when we receive a block at a
-   different level than {current_level}.  Note that this means that there is
+   {next_level_proposed_round}, {dal_attestable_slots},
+   {next_level_dal_attestable_slots} are updated only when we receive a block at
+   a different level than {current_level}.  Note that this means that there is
    always a {latest_proposal}, which may be our own baked block. *)
 type level_state = {
   current_level : int32;
@@ -292,6 +298,8 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
+  dal_attestable_slots : dal_attestable_slots;
+  next_level_dal_attestable_slots : dal_attestable_slots;
 }
 
 type phase =
@@ -1266,6 +1274,8 @@ let pp_level_state fmt
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round;
+      dal_attestable_slots = _;
+      next_level_dal_attestable_slots = _;
     } =
   Format.fprintf
     fmt

@@ -74,11 +74,10 @@ let may_start_profiler baking_dir =
   | _ -> ()
 
 module Baker = struct
-  let run (cctxt : Protocol_client_context.full) ?minimal_fees
-      ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
-      ?extra_operations ?dal_node_endpoint ?dal_node_timeout_percentage
-      ?pre_emptive_forge_time ?force_apply_from_round ?context_path
-      ?state_recorder ~chain ~keep_alive delegates =
+  let run (cctxt : Protocol_client_context.full) ?dal_node_rpc_ctxt
+      ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+      ?votes ?extra_operations ?pre_emptive_forge_time ?force_apply_from_round
+      ?context_path ?state_recorder ~chain ~keep_alive delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades =
@@ -126,8 +125,6 @@ module Baker = struct
           ?minimal_nanotez_per_byte
           ?votes
           ?extra_operations
-          ?dal_node_endpoint
-          ?dal_node_timeout_percentage
           ~pre_emptive_forge_time
           ?force_apply_from_round
           ?context_path
@@ -154,7 +151,14 @@ module Baker = struct
       let () = may_start_profiler cctxt#get_base_dir in
       let consumer = Protocol_logging.make_log_message_consumer () in
       Lifted_protocol.set_log_message_consumer consumer ;
-      Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates
+      Baking_scheduling.run
+        cctxt
+        ?dal_node_rpc_ctxt
+        ~canceler
+        ~chain
+        ~constants
+        config
+        delegates
     in
     let* () =
       Client_confirmations.wait_for_bootstrapped

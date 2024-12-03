@@ -164,6 +164,14 @@ type prepared_block = {
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
+(* An association list between delegates and promises for their DAL attestations
+   at some level (as obtained through the [get_attestable_slots] RPC). See usage
+   in {!level_state}. *)
+type dal_attestable_slots =
+  (Signature.Public_key_hash.t
+  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
+  list
+
 type consensus_vote_kind = Attestation | Preattestation
 
 val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
@@ -236,6 +244,10 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
+  dal_attestable_slots : dal_attestable_slots;
+  next_level_dal_attestable_slots : dal_attestable_slots;
+      (** For each (own) delegate having a DAL slot at the current level, store
+          a promise to obtain the attestable slots for that level. *)
 }
 
 type phase =
