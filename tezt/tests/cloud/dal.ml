@@ -1584,6 +1584,15 @@ let init_teztale (configuration : configuration) cloud agent =
     Lwt.return_some teztale
   else Lwt.return_none
 
+let may_copy_dal_node_identity_file agent node = function
+  | None -> Lwt.return_unit
+  | Some source ->
+      toplog "Copying the DAL node identity file" ;
+      let* _ =
+        Agent.copy agent ~source ~destination:(Dal_node.identity_file node)
+      in
+      Lwt.return_unit
+
 let init_public_network cloud (configuration : configuration)
     etherlink_configuration teztale agent (network : Network.public_network) =
   toplog "Init public network" ;
