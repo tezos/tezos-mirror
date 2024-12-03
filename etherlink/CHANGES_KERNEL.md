@@ -10,6 +10,8 @@
   with previous version. This should sensibly reduces the disk
   consumption of full Rollup Node. The full history will remain
   available via Octez EVM Node deployments. (!15490)
+- The VM is now relying on cache to make r/w access to storage indexes
+  which improves time performances on the execution side. (!15812)
 
 ### Internal
 
