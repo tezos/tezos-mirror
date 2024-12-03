@@ -2202,6 +2202,7 @@ name = "tezos-smart-rollup-panic-hook"
 version = "0.2.2"
 dependencies = [
  "rustversion",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
 ]
 

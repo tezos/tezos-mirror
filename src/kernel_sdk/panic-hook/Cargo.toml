@@ -21,6 +21,9 @@ rustversion = "1.0"
 path = "../core"
 version = "0.2.2"
 
+[build-dependencies.tezos-smart-rollup-build-utils]
+path = "../build-utils"
+
 [features]
 default = ["abort", "debug", "std"]
 abort = ["std"]

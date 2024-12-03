@@ -16,7 +16,7 @@
 #![no_std]
 
 // If 'std' is on, pull in the standard library.
-#[cfg(any(feature = "std", all(target_arch = "riscv64", target_os = "hermit")))]
+#[cfg(any(feature = "std", pvm_kind = "riscv"))]
 extern crate std;
 
 extern crate alloc;
@@ -46,7 +46,7 @@ pub fn panic_handler(info: &PanicHookArg) {
             alloc::format!("Kernel panic {:?} at {:?}", message, info.location())
         };
 
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(pvm_kind = "wasm")]
         unsafe {
             tezos_smart_rollup_core::target_impl::write_debug(
                 message.as_ptr(),
@@ -54,15 +54,12 @@ pub fn panic_handler(info: &PanicHookArg) {
             );
         }
 
-        #[cfg(any(feature = "std", all(target_arch = "riscv64", target_os = "hermit")))]
+        #[cfg(any(feature = "std", pvm_kind = "riscv"))]
         std::eprintln!("{}", message);
     }
 
     // We don't want to abort when testing because that prevents the panic trace
     // from being printed.
-    #[cfg(all(
-        feature = "abort",
-        any(target_arch = "wasm32", target_arch = "riscv64")
-    ))]
+    #[cfg(all(feature = "abort", not(pvm_kind = "none")))]
     std::process::abort()
 }
