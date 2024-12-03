@@ -1567,6 +1567,7 @@ dependencies = [
  "hermit",
  "hex",
  "serde_json",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
