@@ -1700,6 +1700,7 @@ dependencies = [
  "shellexpand",
  "syn 2.0.65",
  "tezos-smart-rollup",
+ "tezos-smart-rollup-build-utils",
 ]
 
 [[package]]

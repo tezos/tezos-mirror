@@ -2418,6 +2418,8 @@ dependencies = [
 name = "tezos-smart-rollup-build-utils"
 version = "0.2.2"
 dependencies = [
+ "proc-macro2",
+ "quote",
  "rustc_version",
 ]
 
@@ -2491,6 +2493,7 @@ dependencies = [
  "quote",
  "shellexpand",
  "syn 2.0.65",
+ "tezos-smart-rollup-build-utils",
 ]
 
 [[package]]
