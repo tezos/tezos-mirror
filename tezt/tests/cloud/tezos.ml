@@ -47,6 +47,17 @@ module Node = struct
   end
 end
 
+module Yes_wallet = struct
+  include Tezt_tezos.Yes_wallet
+
+  module Agent = struct
+    let create ?(path = Uses.path Constant.yes_wallet) ?name agent =
+      let* path = Agent.copy agent ~source:path in
+      let runner = Agent.runner agent in
+      Lwt.return (create ?runner ~path ?name ())
+  end
+end
+
 module Dal_node = struct
   include Tezt_tezos.Dal_node
 

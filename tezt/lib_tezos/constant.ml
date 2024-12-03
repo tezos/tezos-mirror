@@ -85,6 +85,12 @@ let teztale_archiver =
 let teztale_server =
   Uses.make ~tag:"teztale_server" ~path:"./octez-teztale-server" ()
 
+let yes_wallet =
+  Uses.make
+    ~tag:"yes_wallet"
+    ~path:"./_build/default/devtools/yes_wallet/yes_wallet.exe"
+    ()
+
 module WASM = struct
   let dal_echo_kernel =
     Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm" ()
