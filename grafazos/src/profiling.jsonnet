@@ -18,6 +18,7 @@ local msConversion = '1000';  // From seconds to milliseconds
 local store = 'profiling_store_time';
 local mempool = 'profiling_mempool_time';
 local chain_validator = 'profiling_chain_validator_time';
+local peer_validator = 'profiling_peer_validator_time';
 
 // Helper function to calculate rates for a profiling metric
 local profilingRate(profiling, metricId, metricType) =
@@ -78,4 +79,9 @@ local profilingMultiplePanels(profiling, legend, metrics, h, w, x, y) =
       { id: 'on_notify_head', legend: 'On Notify Head' },
       { id: 'on_disconnection', legend: 'On Disconnection' },
     ], h, w, x, y),
+
+  // Peer Validator Profiling
+  onPeerValidatorRequest(h, w, x, y):
+    profilingSinglePanel(peer_validator, 'validate_new_head', 'Validate New Head', 'light-red', h, w, x, y),
+
 }

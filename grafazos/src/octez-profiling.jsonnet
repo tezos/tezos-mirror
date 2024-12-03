@@ -15,6 +15,7 @@ local panelHeight = 10;
 local store_y = 1;
 local mempool_y = 41;
 local chain_validator_y = 81;
+local peer_validator_y = 121;
 
 // Create the dashboard
 dashboard.new('Octez Profiling Dashboard')
@@ -44,5 +45,11 @@ dashboard.new('Octez Profiling Dashboard')
   + grafonnet.util.grid.wrapPanels(panels=[panel.row.new('Chain Validator Profiling')], panelWidth=20, panelHeight=20, startY=chain_validator_y)
   + [
     profiling.onChainValidatorRequest(h=panelHeight, w=2 * panelWidth, x=0, y=chain_validator_y),
+  ]
+
+  //#######
+  + grafonnet.util.grid.wrapPanels(panels=[panel.row.new('Peer Validator Profiling')], panelWidth=20, panelHeight=20, startY=peer_validator_y)
+  + [
+    profiling.onPeerValidatorRequest(h=panelHeight, w=2 * panelWidth, x=0, y=peer_validator_y),
   ]
 )
