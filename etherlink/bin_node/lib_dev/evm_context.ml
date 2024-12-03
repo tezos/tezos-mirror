@@ -816,7 +816,15 @@ module State = struct
              ctxt.smart_rollup_address)
         ~chunks:blueprint_chunks
     in
-    return (payload, transactions)
+    return payload
+
+  let clear_head_delayed_inbox ctxt =
+    let open Lwt_result_syntax in
+    let*! cleaned_evm_state =
+      Evm_state.clear_delayed_inbox ctxt.session.evm_state
+    in
+    ctxt.session.evm_state <- cleaned_evm_state ;
+    return_unit
 
   let rec apply_blueprint ?(events = []) ctxt conn timestamp payload
       delayed_transactions =
@@ -1006,8 +1014,9 @@ module State = struct
     else return_unit
 
   and flush_delayed_inbox ctxt conn
-      (Evm_events.Flushed_blueprint.{timestamp; level = flushed_level; _} as
-       flushed_blueprint) =
+      (Evm_events.Flushed_blueprint.
+         {transactions = delayed_transactions; timestamp; level = flushed_level}
+       as flushed_blueprint) =
     let open Lwt_result_syntax in
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
@@ -1018,14 +1027,21 @@ module State = struct
         ctxt
         conn
     in
-    let* parent_hash = Evm_state.current_block_hash ctxt.session.evm_state in
+    (* Reapply lost events on current head *)
+    let* () = clear_head_delayed_inbox ctxt in
+    let events =
+      List.map
+        (fun tx -> Evm_events.New_delayed_transaction tx)
+        delayed_transactions
+    in
     (* Prepare a blueprint payload signed by the sequencer to execute locally. *)
-    let* payload, delayed_transactions =
+    let* parent_hash = Evm_state.current_block_hash ctxt.session.evm_state in
+    let* payload =
       prepare_local_flushed_blueprint ctxt parent_hash flushed_blueprint
     in
     (* Apply the blueprint. *)
     let* () =
-      apply_blueprint ctxt conn timestamp payload delayed_transactions
+      apply_blueprint ~events ctxt conn timestamp payload delayed_transactions
     in
     return ctxt.session.evm_state
 
