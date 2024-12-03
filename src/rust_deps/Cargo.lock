@@ -3616,6 +3616,7 @@ dependencies = [
  "quanta 0.12.3",
  "serde",
  "serde_json",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-mock",
  "tezos_crypto_rs",
