@@ -21,7 +21,7 @@ let pp_pattern fmt {string; _} = Format.pp_print_string fmt string
 
 let protocol_pattern =
   let string = {|[a-z]+[0-9]*|} in
-  {string; regex = Re.Perl.(compile @@ re ("^" ^ string ^ "$"))}
+  {string; regex = Re.Perl.("^" ^ string ^ "$" |> re |> compile)}
 
 let check_proto_name proto_name pattern =
   if not (Re.execp pattern.regex proto_name) then (
@@ -171,17 +171,17 @@ let set_current_version =
                   // "lib_client" // "proxy.ml";
                 ]
               in
-              let re =
-                Re.(
-                  seq
-                    [
-                      str {|let version_value = "|};
-                      str (State.Source.get_version_value state);
-                      rep (compl [set {|"|}]);
-                      str {|"|};
-                    ])
+              let regex =
+                let open Re in
+                seq
+                  [
+                    str {|let version_value = "|};
+                    State.Source.get_version_value state |> str;
+                    [set {|"|}] |> compl |> rep;
+                    str {|"|};
+                  ]
+                |> compile
               in
-              let regex = Re.(compile re) in
               let replacements =
                 Utils.File.Content.replace_string_all
                   ~regex
@@ -230,16 +230,16 @@ let add_predecessor =
                   (State.Target.get_constructor state)
               in
               let regex =
-                Re.(
-                  compile
-                    (seq
-                       [
-                         rep notnl;
-                         str "return (";
-                         str (State.Source.get_constructor state);
-                         str ", ctxt)";
-                         rep notnl;
-                       ]))
+                let open Re in
+                seq
+                  [
+                    rep notnl;
+                    str "return (";
+                    State.Source.get_constructor state |> str;
+                    str ", ctxt)";
+                    rep notnl;
+                  ]
+                |> compile
               in
               let replacements =
                 Utils.File.Content.replace_string
@@ -256,7 +256,7 @@ let add_predecessor =
               state)
             (fun state ->
               let regex =
-                Re.(compile (str (State.Source.get_constructor state)))
+                Re.(State.Source.get_constructor state |> str |> compile)
               in
               let by = State.Target.get_constructor state in
               let replacements =
@@ -325,10 +325,9 @@ let compute_and_replace_hash =
               state)
             (fun state ->
               let regex =
-                Re.(
-                  compile
-                    (seq
-                       [str {|"hash": "|}; rep (compl [set {|"|}]); str {|",|}]))
+                let open Re in
+                seq [str {|"hash": "|}; [set {|"|}] |> compl |> rep; str {|",|}]
+                |> compile
               in
               let by =
                 Format.asprintf
@@ -382,9 +381,9 @@ let rename_binaries =
                   ~opts
               in
               let regex =
-                Re.(
-                  compile
-                    (str ("_" ^ State.Source.get_bin_suffix ~__LOC__ state)))
+                let open Re in
+                "_" ^ State.Source.get_bin_suffix ~__LOC__ state
+                |> str |> compile
               in
               let new_files =
                 List.map
@@ -437,25 +436,17 @@ let replace_protocol_occurences =
                   ~opts:"-type f"
               in
               let regex =
-                Re.(
-                  compile
-                    (alt
-                       [
-                         group
-                           ~name:"full"
-                           (str
-                              (State.Source.get_module_name_root ~__LOC__ state));
-                         group
-                           ~name:"dash"
-                           (str
-                              ("protocol-"
-                              ^ State.Source.get_dune_name ~__LOC__ state));
-                         group
-                           ~name:"functor"
-                           (str
-                              ("protocol-functor-"
-                              ^ State.Source.get_dune_name ~__LOC__ state));
-                       ]))
+                let open Re in
+                [
+                  State.Source.get_module_name_root ~__LOC__ state
+                  |> str |> group ~name:"full";
+                  "protocol-" ^ State.Source.get_dune_name ~__LOC__ state
+                  |> str |> group ~name:"dash";
+                  "protocol-functor-"
+                  ^ State.Source.get_dune_name ~__LOC__ state
+                  |> str |> group ~name:"functor";
+                ]
+                |> alt |> compile
               in
               let assoc =
                 [
@@ -549,7 +540,7 @@ let update_readme =
               Log.printfln "Update README.md" ;
               state)
             (fun state ->
-              let regex = Re.(compile (str (State.Source.get_name state))) in
+              let regex = Re.(State.Source.get_name state |> str |> compile) in
               let by = State.Target.get_name state in
               let replacements =
                 Utils.File.Content.replace_string
@@ -586,18 +577,17 @@ let link =
               state)
             (fun state ->
               let regex =
-                Re.(
-                  compile
-                    (group
-                       (seq
-                          [
-                            str "let";
-                            rep1 (str " ");
-                            str (State.Source.get_name state);
-                            Utils.str_of_fmt
-                              {| = active (Name.dev "%s")|}
-                              (State.Source.get_name state);
-                          ])))
+                let open Re in
+                seq
+                  [
+                    str "let";
+                    str " " |> rep1;
+                    State.Source.get_name state |> str;
+                    Utils.str_of_fmt
+                      {| = active (Name.dev "%s")|}
+                      (State.Source.get_name state);
+                  ]
+                |> group |> compile
               in
               let f gp =
                 match Re.Group.get_opt gp 1 with
@@ -748,7 +738,7 @@ end
 module Snapshot = struct
   let target_pattern =
     let string = {|[a-z]+_[0-9][0-9][0-9]|} in
-    {string; regex = Re.Perl.(compile @@ re ("^" ^ string ^ "$"))}
+    {string; regex = Re.Perl.("^" ^ string ^ "$" |> re |> compile)}
 
   let check_version_coherency : Command.t =
     Command.create
@@ -762,14 +752,14 @@ module Snapshot = struct
           {
             string = State.Source.get_constructor state ^ " -> [0-9]+";
             regex =
-              Re.(
-                compile
-                  (seq
-                     [
-                       str (State.Source.get_constructor state);
-                       str " -> ";
-                       group (rep1 digit);
-                     ]));
+              (let open Re in
+               seq
+                 [
+                   State.Source.get_constructor state |> str;
+                   str " -> ";
+                   digit |> rep1 |> group;
+                 ]
+               |> compile);
           }
         in
         let groups =
