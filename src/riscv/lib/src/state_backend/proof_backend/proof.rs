@@ -256,7 +256,7 @@ fn deserialise_merkle_proof_tags(
                 Tree::Leaf(size) => Ok(ModifyResult::LeafStop((size, leaf_tag))),
             },
             Tag::Node => match subtree {
-                Tree::Node(children) => Ok(ModifyResult::NodeContinue(children)),
+                Tree::Node(children) => Ok(ModifyResult::NodeContinue((), children)),
                 Tree::Leaf(_) => Err(DeserialiseError::ExpectedLeaf),
             },
         }

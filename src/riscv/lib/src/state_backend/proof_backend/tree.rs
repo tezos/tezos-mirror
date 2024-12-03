@@ -7,14 +7,19 @@
 //! All the traversals implemented in this module should be the same to maintain consistency,
 //! which is required for serialisation / deserialisation
 
-use itertools::Itertools;
-
 /// Generic tree structure used to model the [`super::proof::MerkleProof`],
 /// as well as the full & partial shapes of a [`super::merkle::MerkleTree`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum Tree<A> {
     Node(Vec<Self>),
     Leaf(A),
+}
+
+/// Used in [`impl_modify_map_collect`]
+impl<D> From<D> for Tree<D> {
+    fn from(value: D) -> Self {
+        Tree::Leaf(value)
+    }
 }
 
 impl<A> Tree<A> {
@@ -32,55 +37,123 @@ impl<A> Tree<A> {
             Some(subtree)
         })
     }
-}
 
-/// Intermediary either-like type for implementing [`Tree::modify_shape`]
-#[derive(Clone)]
-pub enum ModifyResult<T, L> {
-    /// Current subtree should be replaced with a node containing the given children.
-    /// and traversal should continue recursively.
-    NodeContinue(Vec<T>),
-    /// Current subtree is replaced by a leaf containing the given data.
-    LeafStop(L),
-}
-
-impl<A> Tree<A> {
     /// Modify the shape of a given [`Tree`].
     ///
     /// Provide a `modify` function which is called for every subtree in a pre-order DFS traversal.
     /// The function returns a [`ModifyResult::LeafStop`] if the subtree will become a leaf
     /// or a [`ModifyResult::NodeContinue`] if the subtree will become a non-leaf node
     /// and will be further traversed by this algorithm.
-    pub fn modify_shape<B, E, F: FnMut(Tree<A>) -> Result<ModifyResult<Tree<A>, B>, E>>(
+    pub fn modify_shape<B, E, F: FnMut(Tree<A>) -> Result<ModifyResult<(), Tree<A>, B>, E>>(
         self,
         modify: &mut F,
     ) -> Result<Tree<B>, E> {
-        match modify(self)? {
-            // TODO: RV-290 Replace with an iterative algorithm to not overflow the stack
-            ModifyResult::LeafStop(new_data) => Ok(Tree::Leaf(new_data)),
-            ModifyResult::NodeContinue(children) => Ok(Tree::Node(
-                children
-                    .into_iter()
-                    .map(|c| c.modify_shape(modify))
-                    .try_collect()?,
-            )),
-        }
+        // map & collect are "default"
+        impl_modify_map_collect(
+            self,
+            modify,
+            |data| Ok(data),
+            |(), children| Ok(Tree::Node(children)),
+        )
     }
 
     /// Perform a shape-preserving map operation over a [`Tree`].
     ///
     /// Note: The traversal order should correspond with the one in [`Tree::modify_shape`] and [`tree_iterator`]
     pub fn map<B, E, F: FnMut(A) -> Result<B, E>>(self, map: &mut F) -> Result<Tree<B>, E> {
-        // TODO: RV-290 Change to non-recursive implementation to avoid stackoverflow
-        let tree = match self {
-            Tree::Leaf(data) => Tree::Leaf(map(data)?),
-            Tree::Node(children) => Tree::Node(
-                children
-                    .into_iter()
-                    .map(|child| child.map(map))
-                    .try_collect()?,
-            ),
-        };
-        Ok(tree)
+        // modify & collect are "default"
+        impl_modify_map_collect(
+            self,
+            |subtree| match subtree {
+                Tree::Node(vec) => Ok(ModifyResult::NodeContinue((), vec)),
+                Tree::Leaf(data) => Ok(ModifyResult::LeafStop(data)),
+            },
+            map,
+            |(), children| Ok(Tree::Node(children)),
+        )
     }
+}
+
+/// Intermediary either-like type for implementing [`impl_modify_map_collect`]
+#[derive(Clone)]
+pub enum ModifyResult<D, N, L> {
+    /// Current subtree should be replaced with a node containing the given children,
+    /// and an auxiliary data for extra context if needed.
+    /// Traversal should continue recursively.
+    NodeContinue(D, Vec<N>),
+    /// Current subtree is replaced by a leaf containing the given data.
+    LeafStop(L),
+}
+
+/// Perform generic modify_map_collect
+///
+/// This is done in 3 steps while traversing the tree in a pre-order DFS traversal:
+/// 1. Apply `modify` on current subtree: This operation changes the structure of the current
+///    subtree before traversing it's children.
+/// 2. When encountering leaves, `map` is called to transform a leaf from `A` to `B` type.
+///    This is done on children of subtrees which have been traversed after `modify` was called.
+/// 3. After modifying & mapping the children of a node, the `collect` method gathers the newly
+///    modified & mapped subtrees to create the new subtree.
+pub fn impl_modify_map_collect<
+    InterimLeafData, // InterimLeafData -> FinalLeafData  when applying `map`
+    FinalLeafData,   // [FinalLeafData] -> FinalLeafData when applying `collect`
+    AuxTreeData,     // Type of auxiliary data held for a subtree
+    Err,             // Error type when applying `modify` / `map` / `collect`
+    InputTree,
+    OutputTree: From<FinalLeafData>,
+    TreeModifier: FnMut(InputTree) -> Result<ModifyResult<AuxTreeData, InputTree, InterimLeafData>, Err>,
+    LeafMapper: FnMut(InterimLeafData) -> Result<FinalLeafData, Err>,
+    Collector: FnMut(AuxTreeData, Vec<OutputTree>) -> Result<OutputTree, Err>,
+>(
+    root: InputTree,
+    mut modify: TreeModifier,
+    mut map: LeafMapper,
+    mut collect: Collector,
+) -> Result<OutputTree, Err> {
+    enum ProcessEvents<ProcessEvent, CollectAuxTreeData> {
+        Node(ProcessEvent),
+        Collect(CollectAuxTreeData, usize),
+    }
+
+    let mut process = vec![ProcessEvents::Node(root)];
+    let mut done: Vec<OutputTree> = vec![];
+
+    while let Some(event) = process.pop() {
+        match event {
+            ProcessEvents::Node(subtree) => match modify(subtree)? {
+                ModifyResult::LeafStop(data) => {
+                    // Instead of pushing a single leaf process on the Process-queue,
+                    // map the data and append it directly to the Done-queue
+                    done.push(OutputTree::from(map(data)?));
+                }
+                ModifyResult::NodeContinue(node_data, children) => {
+                    // the only case where we push further process events in the process queue
+                    // We have to first push a collect event to know how many children should be collected when forming back the current subtree
+                    process.push(ProcessEvents::Collect(node_data, children.len()));
+
+                    process.extend(
+                        children
+                            .into_iter()
+                            .rev()
+                            .map(|child| ProcessEvents::Node(child)),
+                    );
+                }
+            },
+            ProcessEvents::Collect(node_data, count) => {
+                // We need to reconstruct a subtree which is made of `count` children
+                // No panic: We are guaranted count < done.len() since every Collect(size)
+                // corresponds to size nodes pushed to Done-queue
+                let children = done.split_off(done.len() - count);
+                done.push(collect(node_data, children)?);
+            }
+        }
+    }
+
+    // No Panic: We only add a single node as root at the beginning of the algorithm
+    // which corresponds to this last node in the Done-queue
+    let new_root = done.pop().unwrap();
+
+    debug_assert!(done.is_empty());
+
+    Ok(new_root)
 }
