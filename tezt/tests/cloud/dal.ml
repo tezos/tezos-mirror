@@ -1605,7 +1605,11 @@ let init_public_network cloud (configuration : configuration)
         let () = toplog "Some agent given" in
         let () = toplog "Initializing the bootstrap node agent" in
         let* node =
-          Node.init ~name:"bootstrap-node" configuration.network agent
+          Node.init
+            ?identity_file:configuration.bootstrap_node_identity_file
+            ~name:"bootstrap-node"
+            configuration.network
+            agent
         in
         let* dal_node =
           Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node
@@ -1761,7 +1765,13 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let* bootstrap_node =
-    Node.init ?data_dir ~dal_config ~name configuration.network agent
+    Node.init
+      ?data_dir
+      ?identity_file:configuration.bootstrap_node_identity_file
+      ~dal_config
+      ~name
+      configuration.network
+      agent
   in
   let* dal_bootstrap_node =
     Dal_node.Agent.create
