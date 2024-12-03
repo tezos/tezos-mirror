@@ -196,15 +196,26 @@ end
 module Node = struct
   let runner_of_agent = Agent.runner
 
+  let may_copy_node_identity_file agent node = function
+    | None -> Lwt.return_unit
+    | Some source ->
+        toplog "Copying the node identity file" ;
+        let* _ =
+          Agent.copy agent ~source ~destination:(Node.identity_file node)
+        in
+        Lwt.return_unit
+
   include Node
 
-  let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
+  let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~name network
+      agent =
     toplog "Inititializing a L1 node" ;
     match network with
     | Network.Public network -> (
         match data_dir with
         | Some data_dir ->
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               Node.run node [Network (Network.to_octez_network_options network)]
             in
@@ -227,6 +238,7 @@ module Node = struct
                 ~name
                 agent
             in
+            let* () = may_copy_node_identity_file agent node identity_file in
             toplog "Downloading a rolling snapshot" ;
             let* () =
               Process.spawn
@@ -288,6 +300,7 @@ module Node = struct
                     (Node.Config_file.set_sandbox_network_with_dal_config
                        config)
             in
+            let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               Node.run
                 node
@@ -306,6 +319,7 @@ module Node = struct
               @ arguments
             in
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let* () = may_copy_node_identity_file agent node identity_file in
             let* () = Node.run node [] in
             let* () = Node.wait_for_ready node in
             Lwt.return node)
