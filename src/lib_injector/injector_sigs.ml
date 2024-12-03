@@ -94,6 +94,8 @@ module type PARAM_OPERATION = sig
       one operation [op]. Otherwise, it will allow duplicate such operations to
       appear in the queue. *)
   val unique : t -> bool
+
+  val compare : t -> t -> int
 end
 
 (** Internal representation of injector operations. *)
@@ -108,10 +110,16 @@ module type INJECTOR_OPERATION = sig
 
   (** The type of L1 operations that are injected on Tezos. These have an id
       attached to them that allows tracking and retrieving their status. *)
-  type t = private {id : id; operation : operation; mutable errors : errors}
+  type t = private {
+    id : id;
+    order : Z.t option;
+    counter : Z.t;
+    operation : operation;
+    mutable errors : errors;
+  }
 
   (** [make op] returns an L1 operation with the corresponding hash. *)
-  val make : operation -> t
+  val make : ?order:Z.t -> operation -> t
 
   (** Encoding for L1 operations *)
   val encoding : t Data_encoding.t
@@ -123,6 +131,10 @@ module type INJECTOR_OPERATION = sig
   (** Register an error as occurring during injection of an operation. Its
       internal error counter is incremented. *)
   val register_error : t -> tztrace -> unit
+
+  val id : t -> id
+
+  val compare : t -> t -> int
 end
 
 (** Module type for parameter of functor {!Injector_functor.Make}. *)

@@ -33,7 +33,13 @@ module Make (O : PARAM_OPERATION) :
 
   type errors = {count : int; last_error : tztrace option}
 
-  type t = {id : id; operation : O.t; mutable errors : errors}
+  type t = {
+    id : id;
+    order : Z.t option;
+    counter : Z.t;
+    operation : O.t;
+    mutable errors : errors;
+  }
 
   let hash_inner_operation nonce op =
     Id.hash_string
@@ -46,16 +52,14 @@ module Make (O : PARAM_OPERATION) :
 
   let no_errors = {count = 0; last_error = None}
 
-  let make operation =
-    let nonce =
-      if not @@ O.unique operation then (
-        let c = !counter in
-        counter := Z.succ !counter ;
-        Some c)
-      else None
+  let make ?order operation =
+    let nonce_for_hash_id =
+      if not @@ O.unique operation then Some !counter else None
     in
-    let id = hash_inner_operation nonce operation in
-    {id; operation; errors = no_errors}
+    let id = hash_inner_operation nonce_for_hash_id operation in
+    let op = {id; order; counter = !counter; operation; errors = no_errors} in
+    counter := Z.succ !counter ;
+    op
 
   let errors_encoding =
     let open Data_encoding in
@@ -67,20 +71,59 @@ module Make (O : PARAM_OPERATION) :
   let encoding =
     let open Data_encoding in
     conv
-      (fun {id; operation; errors} -> (id, operation, errors))
-      (fun (id, operation, errors) -> {id; operation; errors})
-    @@ obj3
+      (fun {id; order; counter; operation; errors} ->
+        (id, order, counter, operation, errors))
+      (fun (id, order, counter, operation, errors) ->
+        {id; order; counter; operation; errors})
+    @@ obj5
          (req "id" Id.encoding)
+         (opt "order" n)
+         (req "counter" n)
          (req "operation" O.encoding)
          (dft "errors" errors_encoding no_errors)
 
-  let pp ppf {id; operation; errors} =
+  let pp ppf {id; order; counter = _; operation; errors} =
     let pp_errors ppf errors =
       if errors.count = 0 then ()
       else Format.fprintf ppf " [%d errors]" errors.count
     in
-    Format.fprintf ppf "%a (%a)%a" O.pp operation Id.pp id pp_errors errors
+    let pp_order =
+      Format.pp_print_option @@ fun ppf ->
+      Format.fprintf ppf " [priority order %a]" Z.pp_print
+    in
+    Format.fprintf
+      ppf
+      "%a%a (%a)%a"
+      O.pp
+      operation
+      pp_order
+      order
+      Id.pp
+      id
+      pp_errors
+      errors
 
   let register_error op error_trace =
     op.errors <- {count = op.errors.count + 1; last_error = Some error_trace}
+
+  let id {id; _} = id
+
+  (* Compare operations with the following logic:
+
+       - Operations without an explicit `order` or lesser than operations with
+         one
+       - The value of `order` is used to compare two operations with `order` set;
+       - Otherwise, use the timestamp to compare *)
+  let compare op1 op2 =
+    let op_compare = O.compare op1.operation op2.operation in
+    if not (op_compare = 0) then op_compare
+    else
+      let counter_cmp () = Z.compare op1.counter op2.counter in
+      match (op1.order, op2.order) with
+      | Some o1, Some o2 ->
+          let cmp = Z.compare o1 o2 in
+          if cmp = 0 then counter_cmp () else cmp
+      | None, None -> counter_cmp ()
+      | Some _p, _ -> -1
+      | _, Some _p -> 1
 end
