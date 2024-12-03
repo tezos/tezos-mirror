@@ -39,6 +39,12 @@ let take_nth_smallest n l =
    *)
 let size = QCheck2.Gen.int_range 2 1000
 
+let check_invariant b =
+  B.Internal_for_tests.check_heap_invariant
+    ~pp_id:Format.pp_print_string
+    ~pp_elt:Format.pp_print_int
+    b
+
 let check_insert_heap ?(expect_heap_is_full = false) v b =
   let res = B.insert v b in
   let () =
@@ -47,7 +53,7 @@ let check_insert_heap ?(expect_heap_is_full = false) v b =
       Assert.equal ~msg:__LOC__ res (Error error)
     else Assert.equal ~msg:__LOC__ res (Ok ())
   in
-  B.Internal_for_tests.check_heap_invariant ~pp_elt:Format.pp_print_int b
+  check_invariant b
 
 let test_empty_works () =
   let b = B.create 0 in
@@ -63,7 +69,7 @@ let test_heap_works () =
   let check_pop ~__LOC__ =
     List.iter (fun v ->
         let extracted = B.pop b in
-        B.Internal_for_tests.check_heap_invariant ~pp_elt:Format.pp_print_int b ;
+        check_invariant b ;
         Assert.equal
           ~pp:Format.(pp_print_option pp_print_int)
           ~msg:__LOC__
@@ -109,6 +115,31 @@ let test_heap_works () =
     true ;
   Assert.equal ~msg:__LOC__ (B.find_opt (id 0) b) None ;
   Assert.equal ~msg:__LOC__ (B.find_opt (id 11) b) None ;
+  B.clear b ;
+  check_invariant b ;
+  Assert.equal ~msg:__LOC__ (B.elements b) [] ;
+  check_insert_list [1; 2; 3; 4; 4; 3; 2; 1] ;
+  Assert.equal ~msg:__LOC__ (B.elements b) [1; 2; 3; 4] ;
+  B.remove b (string_of_int 4) ;
+  check_invariant b ;
+  B.remove b (string_of_int 2) ;
+  check_invariant b ;
+  B.remove b (string_of_int 0) ;
+  check_invariant b ;
+  B.remove b (string_of_int 1) ;
+  check_invariant b ;
+  B.remove b (string_of_int 3) ;
+  check_invariant b ;
+  B.remove b (string_of_int 0) ;
+  check_invariant b ;
+  Assert.equal ~msg:__LOC__ (B.elements b) [] ;
+  check_insert_list [4; 3; 2; 1] ;
+  Assert.equal ~msg:__LOC__ (B.elements b) [1; 2; 3; 4] ;
+  let removed_ids = B.remove_predicate (fun i -> i <= 2) b in
+  Assert.equal ~msg:__LOC__ (List.sort String.compare removed_ids) ["1"; "2"] ;
+  Assert.equal ~msg:__LOC__ (B.elements b) [3; 4] ;
+  check_invariant b ;
+
   ()
 
 let () =
