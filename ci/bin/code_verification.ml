@@ -528,6 +528,9 @@ let jobs pipeline_type =
         ["make --silent -C docs sphinx-check"]
     in
     let job_commit_titles : tezos_job =
+      let allow_failure : allow_failure_job =
+        match pipeline_type with Merge_train -> No | _ -> With_exit_codes [65]
+      in
       job
         ~__POS__
         ~name:"commit_titles"
@@ -537,7 +540,7 @@ let jobs pipeline_type =
         (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
            invalid commits titles in situations where that is allowed. *)
         (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
-        ~allow_failure:(With_exit_codes [65])
+        ~allow_failure
     in
     let mr_only_jobs =
       match pipeline_type with
