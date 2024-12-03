@@ -116,7 +116,7 @@ let get_slot_content :
 let get_slot_pages :
     < meth : [`GET]
     ; input : unit
-    ; output : Tezos_crypto_dal.Cryptobox.page list
+    ; output : Cryptobox.page list
     ; prefix : unit
     ; params : (unit * Types.level) * Types.slot_index
     ; query : unit >
@@ -216,7 +216,7 @@ let get_assigned_shard_indices :
     ; input : unit
     ; output : shard_index list
     ; prefix : unit
-    ; params : (unit * Tezos_crypto.Signature.public_key_hash) * level
+    ; params : (unit * Signature.public_key_hash) * level
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
@@ -226,7 +226,7 @@ let get_assigned_shard_indices :
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.(list int16)
     Tezos_rpc.Path.(
-      open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
+      open_root / "profiles" /: Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "assigned_shard_indices")
 
 let get_attestable_slots :
@@ -234,7 +234,7 @@ let get_attestable_slots :
     ; input : unit
     ; output : attestable_slots
     ; prefix : unit
-    ; params : (unit * Tezos_crypto.Signature.public_key_hash) * level
+    ; params : (unit * Signature.public_key_hash) * level
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
@@ -247,13 +247,13 @@ let get_attestable_slots :
     ~query:Tezos_rpc.Query.empty
     ~output:attestable_slots_encoding
     Tezos_rpc.Path.(
-      open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
+      open_root / "profiles" /: Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")
 
 let get_slot_shard :
     < meth : [`GET]
     ; input : unit
-    ; output : Tezos_crypto_dal.Cryptobox.shard
+    ; output : Cryptobox.shard
     ; prefix : unit
     ; params : ((unit * Types.level) * Types.slot_index) * int
     ; query : unit >

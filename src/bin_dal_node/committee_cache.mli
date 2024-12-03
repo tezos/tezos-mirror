@@ -32,7 +32,7 @@ type shard_indexes = int list
 
 (** Represents the committee for a given level,
     as a mapping from an attester to its assigned shard indexes. *)
-type committee = shard_indexes Tezos_crypto.Signature.Public_key_hash.Map.t
+type committee = shard_indexes Signature.Public_key_hash.Map.t
 
 (** [create ~max_size] returns an empty cache. If the cache size exceeds [max_size],
     committees of old [level]s are removed in FIFO order. *)
