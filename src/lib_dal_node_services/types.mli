@@ -148,6 +148,9 @@ module Peer : sig
   module Set : Set.S with type elt = t
 
   module Map : Map.S with type key = t
+
+  (** Returns true iff the bootstrap flag of the given peer is set to [true]. *)
+  val is_bootstrap : t -> bool
 end
 
 (** A point is made of an IP address and a port. Only the worker knows about

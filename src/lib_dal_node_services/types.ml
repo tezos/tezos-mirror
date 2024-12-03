@@ -224,6 +224,8 @@ module Peer = struct
       P2p_point.Id.pp
       maybe_reachable_point
       bootstrap
+
+  let is_bootstrap t = t.bootstrap
 end
 
 module Point = struct
