@@ -787,12 +787,11 @@ module State = struct
       }
 
   let prepare_local_flushed_blueprint ctxt parent_hash
-      Evm_events.Flushed_blueprint.{hashes; timestamp; level = flushed_level} =
+      Evm_events.Flushed_blueprint.
+        {transactions; timestamp; level = flushed_level} =
     let open Lwt_result_syntax in
-    let* delayed_transactions =
-      List.map_es
-        (Evm_state.get_delayed_inbox_item ctxt.session.evm_state)
-        hashes
+    let hashes =
+      List.map (fun tx -> tx.Evm_events.Delayed_transaction.hash) transactions
     in
     let* sequencer_key, cctxt =
       match ctxt.sequencer_wallet with
@@ -817,7 +816,7 @@ module State = struct
              ctxt.smart_rollup_address)
         ~chunks:blueprint_chunks
     in
-    return (payload, delayed_transactions)
+    return (payload, transactions)
 
   let rec apply_blueprint ?(events = []) ctxt conn timestamp payload
       delayed_transactions =
