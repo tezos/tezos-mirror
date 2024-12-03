@@ -167,7 +167,7 @@ let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
     ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
     ()
 
-let run ?event_level ?event_sections_levels (baker : t) =
+let run ?env ?event_level ?event_sections_levels (baker : t) =
   (match baker.status with
   | Not_running -> ()
   | Running _ -> Test.fail "baker %s is already running" baker.name) ;
@@ -258,6 +258,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
     unit
   in
   run
+    ?env
     ?event_level
     ?event_sections_levels
     baker
@@ -282,12 +283,12 @@ let wait_for_ready baker =
         resolver :: baker.persistent_state.pending_ready ;
       check_event baker "Baker started." promise
 
-let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
-    ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
-    ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
-    ?operations_pool ?dal_node ?dal_node_timeout_percentage
-    ?minimal_nanotez_per_gas_unit ?state_recorder ?node_version_check_bypass
-    ?node_version_allowed node client =
+let init ?env ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol))
+    ?name ?color ?event_level ?event_pipe ?event_sections_levels
+    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote
+    ?force_apply_from_round ?remote_mode ?operations_pool ?dal_node
+    ?dal_node_timeout_percentage ?minimal_nanotez_per_gas_unit ?state_recorder
+    ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -312,7 +313,7 @@ let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
       node
       client
   in
-  let* () = run ?event_level ?event_sections_levels baker in
+  let* () = run ?env ?event_level ?event_sections_levels baker in
   let* () = wait_for_ready baker in
   return baker
 
