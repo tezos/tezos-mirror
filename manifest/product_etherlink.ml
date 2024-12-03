@@ -364,6 +364,10 @@ let _evm_node =
        rollup"
     ~release_status:Experimental
     ~with_macos_security_framework:true
+    ~link_flags:
+      (* Required to deal with larger stacks required to natively execute
+         kernels *)
+      [[S ":include"; S "%{workspace_root}/link-flags-evm-node.sexp"]]
     ~deps:
       [
         evm_node_rust_deps;
