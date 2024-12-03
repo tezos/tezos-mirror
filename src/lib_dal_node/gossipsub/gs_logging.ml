@@ -100,8 +100,8 @@ module Events = struct
       ~name:(prefix "disconnection")
       ~msg:"Process Disconnection of {peer}"
       ~level:Notice
-      ~pp1:P2p_peer.Id.pp
-      ("peer", P2p_peer.Id.encoding)
+      ~pp1:Types.Peer.pp
+      ("peer", Types.Peer.encoding)
 
   let message_with_header =
     declare_3
@@ -207,7 +207,7 @@ let event =
       match event with
       | New_connection {peer; direct; trusted; bootstrap = _} ->
           emit new_connection (peer, direct, trusted)
-      | Disconnection {peer} -> emit disconnection peer.peer_id
+      | Disconnection {peer} -> emit disconnection peer
       | In_message {from_peer; p2p_message} -> (
           match p2p_message with
           | Message_with_header {message = _; topic; message_id} ->
