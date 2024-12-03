@@ -1614,6 +1614,23 @@ let spawn_remember_script ~alias ~src client =
 let remember_script ~alias ~src client =
   spawn_remember_script ~alias ~src client |> Process.check
 
+let write_stresstest_sources_file ?runner ~sources filename =
+  let contents = JSON.encode_u sources in
+  match runner with
+  | None -> write_file filename ~contents
+  | Some runner -> (
+      let cmd =
+        Runner.Shell.(
+          redirect_stdout (cmd [] "echo" [contents]) filename |> or_echo_false)
+      in
+      let cmd, args = Runner.wrap_with_ssh runner cmd in
+      let args = Array.of_list (cmd :: args) in
+      let process_out = Unix.open_process_args_in cmd args in
+      let out = try input_line process_out with End_of_file -> "" in
+      match Unix.close_process_in process_out with
+      | Unix.WEXITED 0 when out <> "false" -> ()
+      | _ -> failwith @@ sf "Stresstest: could not create %s" filename)
+
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?fresh_probability ?smart_contract_parameters client =
@@ -1659,8 +1676,7 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   let sources_filename =
     Temp.file ?runner (Format.sprintf "sources-%s.json" client.name)
   in
-  with_open_out sources_filename (fun ch ->
-      output_string ch (JSON.encode_u sources)) ;
+  let () = write_stresstest_sources_file ?runner ~sources sources_filename in
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
