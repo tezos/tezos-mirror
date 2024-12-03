@@ -5,4 +5,5 @@ tezt-memory-3k
 tezt
 oc.unit:proto-x86_64
 oc.unit:other-x86_64
+oc.unit:etherlink-x86_64
 oc.unit:non-proto-x86_64

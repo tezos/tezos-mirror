@@ -55,6 +55,8 @@ val octez_rpc_http_server : Manifest.target
 
 val octez_rust_deps : Manifest.target
 
+val octez_rustzcash_deps : Manifest.target
+
 val octez_scoru_wasm_debugger_lib : Manifest.target
 
 val octez_scoru_wasm_debugger_plugin : Manifest.target

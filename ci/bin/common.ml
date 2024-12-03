@@ -437,6 +437,10 @@ let changeset_octez =
           "tzt_reference_test_suite/**/*";
         ])
 
+(* Only if Etherlink has changed *)
+let changeset_etherlink =
+  Changeset.(changeset_base @ make ["etherlink/**/*"; "Makefile"])
+
 (** Only if octez source code has changed, if the images has changed or
     if kernels.mk changed. *)
 let changeset_octez_or_kernels =

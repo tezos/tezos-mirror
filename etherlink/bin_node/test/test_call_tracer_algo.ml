@@ -9,7 +9,7 @@
 (** Testing
     -------
     Component:    bin_node
-    Invocation:   dune exec etherlink/bin_node/test/main.exe -- --file test_call_tracer_algo.ml
+    Invocation:   cd etherlink/bin_node/test; dune exec ./test_call_tracer_algo.exe
     Subject:      Tests for implementation of call tracer algorithm
     *)
 
@@ -285,7 +285,7 @@ let test_decoding_rlp =
                  (CallTracer.to_string call)) ;
           Lwt.return_unit)
 
-let test_decoding_rlp_min =
+let _test_decoding_rlp_min =
   register_unit_test
     ~title:"CallTracer: Test decoding call with few values"
     ~tags:["call_tracer"; "debug"; "encoding"; "rlp"]
@@ -451,3 +451,5 @@ let () =
   test_decoding_rlp protocols ;
   test_decoding_rlp_revert_reason protocols ;
   ()
+
+let () = Test.run ()

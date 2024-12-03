@@ -678,7 +678,7 @@ let jobs pipeline_type =
              ~source_version:true
              ~eval_opam:true
              [])
-        ["src/lib_wasm_runtime/lint.sh"]
+        ["etherlink/lib_wasm_runtime/lint.sh"]
       |> enable_cargo_cache |> enable_sccache
     in
     let job_ocaml_check : tezos_job =
@@ -953,7 +953,8 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_octez ~dependent:true ()
       in
       let job_unit_test ~__POS__ ?(image = Images.CI.build) ?timeout
-          ?parallel_vector ~arch ~name ~make_targets () : tezos_job =
+          ?parallel_vector ?(rules = rules) ~arch ~name ~make_targets () :
+          tezos_job =
         let arch_string = arch_to_string arch in
         let script = ["make $MAKE_TARGETS"] in
         let dependencies = build_dependencies arch in
@@ -1012,6 +1013,16 @@ let jobs pipeline_type =
           ~arch:Amd64 (* The [lib_benchmark] unit tests require Python *)
           ~image:Images.CI.test
           ~make_targets:["test-nonproto-unit"]
+          ()
+        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
+      in
+      let oc_unit_etherlink_x86_64 =
+        job_unit_test
+          ~__POS__
+          ~name:"oc.unit:etherlink-x86_64"
+          ~arch:Amd64
+          ~rules:(make_rules ~changes:changeset_etherlink ~dependent:true ())
+          ~make_targets:["test-etherlink-unit"]
           ()
         |> enable_coverage_instrumentation |> enable_coverage_output_artifact
       in
@@ -1116,6 +1127,7 @@ let jobs pipeline_type =
       in
       [
         oc_unit_non_proto_x86_64;
+        oc_unit_etherlink_x86_64;
         oc_unit_other_x86_64;
         oc_unit_proto_x86_64;
         oc_unit_non_proto_arm64;

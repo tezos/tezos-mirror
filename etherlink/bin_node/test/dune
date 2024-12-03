@@ -1,13 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(library
- (name etherlink_bin_node_test_tezt_lib)
- (instrumentation (backend bisect_ppx))
+(executables
+ (names test_rlp test_ethbloom test_call_tracer_algo test_wasm_runtime)
  (libraries
-  tezt.core
-  octez-rust-deps
   bls12-381.archive
+  octez-evm-node-libs.evm_node_rust_deps
   octez-libs.base
   octez-libs.base.unix
   octez-libs.base-test-helpers
@@ -15,43 +13,63 @@
   qcheck-alcotest
   octez-alcotezt
   octez-evm-node-libs.evm_node_lib_dev
+  tezt
   octez-libs.tezt-wrapper
   tezt-tezos
+  tezt_etherlink
   octez-l2-libs.irmin_context
   tezos-protocol-alpha.protocol)
- (library_flags (:standard -linkall))
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
  (flags
   (:standard)
-  -open Tezt_core
-  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
   -open Tezos_test_helpers
   -open Octez_alcotezt
+  -open Tezt
+  -open Tezt.Base
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezos_layer2_irmin_context)
- (modules test_rlp test_ethbloom test_call_tracer_algo test_wasm_runtime))
-
-(executable
- (name main)
- (instrumentation (backend bisect_ppx --bisect-sigterm))
- (libraries
-  etherlink_bin_node_test_tezt_lib
-  tezt)
- (link_flags
-  (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
- (modules main))
+  -open Tezt_etherlink
+  -open Tezos_layer2_irmin_context))
 
 (rule
  (alias runtest)
  (package octez-evm-node-tests)
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
- (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+ (action (run %{dep:./test_rlp.exe})))
 
 (rule
- (targets main.ml)
- (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+ (action (run %{dep:./test_ethbloom.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+ (action (run %{dep:./test_call_tracer_algo.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+ (action (run %{dep:./test_wasm_runtime.exe})))

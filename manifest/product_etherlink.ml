@@ -21,8 +21,6 @@ include Product (struct
   let source = ["etherlink"; "src"]
 end)
 
-let tezt ?(deps = []) = tezt ~deps:(octez_rust_deps :: bls12_381_archive :: deps)
-
 let tezt_etherlink =
   private_lib
     "tezt_etherlink"
@@ -69,6 +67,48 @@ let octez_evm_node_lib =
     ~container:registered_octez_evm_node_libs
     ~package:"octez-evm-node-libs"
 
+let evm_node_rust_deps =
+  octez_evm_node_lib
+    "evm_node_rust_deps"
+    ~path:"etherlink/lib_wasm_runtime"
+    ~synopsis:"WASM runtime foreign archive"
+    ~foreign_archives:["octez_evm_node_rust_deps"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "dirs";
+            S ":standard";
+            (* We need this stanza to ensure .cargo can be used as a
+               dependency via source_tree. *)
+            S ".cargo";
+            (* Do not track Cargo output directory. *)
+            [S "not"; S "target"];
+          ];
+          [
+            S "rule";
+            [
+              S "targets";
+              S "liboctez_evm_node_rust_deps.a";
+              S "dlloctez_evm_node_rust_deps.so";
+            ];
+            [
+              S "deps";
+              [S "file"; S "build.sh"];
+              [S "file"; S "Cargo.toml"];
+              [S "file"; S "Cargo.lock"];
+              [S "file"; S "../../rust-toolchain"];
+              [S "source_tree"; S ".cargo"];
+              [S "source_tree"; S "../../src/rustzcash_deps"];
+              [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
+              [S "source_tree"; S "src"];
+            ];
+            [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+          ];
+        ]
+
+let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
+
 let evm_node_config =
   octez_evm_node_lib
     "evm_node_config"
@@ -87,7 +127,7 @@ let evm_node_config =
 let wasm_runtime_callbacks =
   octez_evm_node_lib
     "wasm_runtime_callbacks"
-    ~path:"src/lib_wasm_runtime_callbacks"
+    ~path:"etherlink/lib_wasm_runtime_callbacks"
     ~synopsis:
       "Callbacks implementing the I/O functions required to implement the host \
        functions of the WASM runtime"
@@ -102,7 +142,7 @@ let wasm_runtime_callbacks =
 let _wasm_runtime_callbacks_tests =
   tezt
     ["test_vector"; "test_store"]
-    ~path:"src/lib_wasm_runtime_callbacks/test"
+    ~path:"etherlink/lib_wasm_runtime_callbacks/test"
     ~opam:"octez-evm-wasm-runtime-tests"
     ~synopsis:"Tests for the WASM Runtime"
     ~with_macos_security_framework:true
@@ -123,14 +163,9 @@ let _wasm_runtime_callbacks_tests =
 let wasm_runtime =
   octez_evm_node_lib
     "evm_node_wasm_runtime"
-    ~path:"src/lib_wasm_runtime/ocaml-api"
+    ~path:"etherlink/lib_wasm_runtime/ocaml-api"
     ~synopsis:"WASM runtime compatible with the WASM PVM"
-    ~deps:
-      [
-        octez_layer2_irmin_context |> open_;
-        octez_rust_deps;
-        wasm_runtime_callbacks;
-      ]
+    ~deps:[octez_layer2_irmin_context |> open_; wasm_runtime_callbacks]
     ~flags:
       (Flags.standard
          ~disable_warnings:[66]
@@ -253,14 +288,26 @@ let evm_node_lib_dev =
       ]
 
 let _octez_evm_node_tests =
-  tezt
+  tests
     ["test_rlp"; "test_ethbloom"; "test_call_tracer_algo"; "test_wasm_runtime"]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
     ~synopsis:"Tests for the EVM Node"
     ~with_macos_security_framework:true
+    ~linkall:
+      (* Necessary to get proper code coverage on Alpine working. Without this,
+         calling Rust FFI segfault. *)
+      true
+    ~dep_files:
+      [
+        "rlptest.json";
+        "invalidRLPTest.json";
+        "../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm";
+      ]
     ~deps:
       [
+        bls12_381_archive;
+        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_base_test_helpers |> open_;
@@ -268,8 +315,10 @@ let _octez_evm_node_tests =
         qcheck_alcotest;
         alcotezt;
         evm_node_lib_dev;
+        tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_etherlink |> open_;
         octez_layer2_irmin_context |> open_;
         Protocol.(main alpha);
       ]
@@ -294,6 +343,7 @@ let _tezt_etherlink =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
         evm_node_lib_dev_encoding;
+        octez_rustzcash_deps;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
@@ -315,7 +365,7 @@ let _evm_node =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_rust_deps;
+        evm_node_rust_deps;
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
