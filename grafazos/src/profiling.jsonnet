@@ -19,6 +19,7 @@ local store = 'profiling_store_time';
 local mempool = 'profiling_mempool_time';
 local chain_validator = 'profiling_chain_validator_time';
 local peer_validator = 'profiling_peer_validator_time';
+local block_validator = 'profiling_block_validator_time';
 
 // Helper function to calculate rates for a profiling metric
 local profilingRate(profiling, metricId, metricType) =
@@ -84,4 +85,28 @@ local profilingMultiplePanels(profiling, legend, metrics, h, w, x, y) =
   onPeerValidatorRequest(h, w, x, y):
     profilingSinglePanel(peer_validator, 'validate_new_head', 'Validate New Head', 'light-red', h, w, x, y),
 
+  // Block Validator Profiling
+  applyBlock(h, w, x, y):
+    profilingSinglePanel(block_validator, 'apply_block', 'Apply Block', 'light-blue', h, w, x, y),
+
+  applyOperations(h, w, x, y):
+    profilingSinglePanel(block_validator, 'apply_operations', 'Apply Operations', 'light-blue', h, w, x, y),
+
+  beginApplication(h, w, x, y):
+    profilingSinglePanel(block_validator, 'begin_application', 'Begin Application', 'light-red', h, w, x, y),
+
+  beginValidation(h, w, x, y):
+    profilingSinglePanel(block_validator, 'begin_validation', 'Begin Validation', 'light-red', h, w, x, y),
+
+  finalizeApplication(h, w, x, y):
+    profilingSinglePanel(block_validator, 'finalize_application', 'Finalize Application', 'light-green', h, w, x, y),
+
+  finalizeValidation(h, w, x, y):
+    profilingSinglePanel(block_validator, 'finalize_validation', 'Finalize Validation', 'light-green', h, w, x, y),
+
+  validateBlock(h, w, x, y):
+    profilingSinglePanel(block_validator, 'validate_block', 'Validate Block', 'yellow', h, w, x, y),
+
+  validateOperation(h, w, x, y):
+    profilingSinglePanel(block_validator, 'validate_operation', 'Validate Operation', 'yellow', h, w, x, y),
 }
