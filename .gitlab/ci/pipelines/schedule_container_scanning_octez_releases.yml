@@ -32,9 +32,6 @@ container_scanning:
       - IMAGE:
           - "tezos/tezos:octez-v21.0"
           - "tezos/tezos:octez-v20.3"
-          - "tezos/tezos:octez-v20.2"
-          - "tezos/tezos:octez-v20.1"
-          - "tezos/tezos:octez-v20.0"
   artifacts:
     paths:
       - scan.log
