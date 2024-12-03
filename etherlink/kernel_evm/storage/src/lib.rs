@@ -152,6 +152,29 @@ pub fn read_u64_le_default(
     }
 }
 
+/// Return an unsigned 2 bytes value from storage at the given `path`.
+/// If the path is not found, `default` is returned.
+///
+/// NB: The given bytes are interpreted in little endian order.
+pub fn read_u16_le_default(
+    host: &impl Runtime,
+    path: &impl Path,
+    default: u16,
+) -> Result<u16, Error> {
+    // This is exactly the same function as `read_u64_le_default`, but you know
+    // the rule, you start sharing code on the 3rd duplication ;-).
+    match host.store_read_all(path) {
+        Ok(bytes) if bytes.len() == std::mem::size_of::<u16>() => {
+            let bytes_array: [u8; std::mem::size_of::<u16>()] = bytes
+                .try_into()
+                .map_err(|_| Error::Runtime(RuntimeError::DecodingError))?;
+            Ok(u16::from_le_bytes(bytes_array))
+        }
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(err) => Err(err.into()),
+    }
+}
+
 /// Write an unsigned 8 bytes value into storage at the given `path`.
 ///
 /// NB: The value is stored in little endian order.
