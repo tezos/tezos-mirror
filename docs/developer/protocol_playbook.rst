@@ -340,7 +340,19 @@ Issues and mitigations
 Decision Tree in case of issues
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The following decision tree applies in case an issue has been found in a protocol proposal already submitted to on-chain governance, during any of the voting periods.
+The following decision tree applies in case an issue has been found in an active
+protocol or a protocol proposal already submitted to on-chain governance, during
+any of the voting periods.
+
+This decision tree is extended to the Tezos Layer 2 by a **Solidarity Principle**.
+This Solidarity Principle ensures that Layer 1 of the Tezos protocol extends its
+responsibility to enshrined Layer 2 components such as Etherlink. In practice,
+this means that if an issue arises in these components that can be resolved or
+mitigated by actions at the Layer 1 level, the protocol team will help the Layer 2 team with
+the same level of commitment as if the issue were within Layer 1 itself. This principle aims to strengthen trust
+in Layer 2 and other enshrined components by guaranteeing not only their
+security through Layer 1 but also the commitment of Layer 1 to support and
+safeguard their operation when necessary.
 
 .. image:: images/protocol_playbook_decision_tree.svg
    :alt: Decision Tree in case of issues
