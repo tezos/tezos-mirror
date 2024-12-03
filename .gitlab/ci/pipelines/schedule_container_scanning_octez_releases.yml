@@ -24,6 +24,8 @@ container_scanning:
   stage: octez_releases
   tags:
   - gcp
+  script:
+  - gtcs scan > scan.log
   needs: []
   parallel:
     matrix:
@@ -33,8 +35,9 @@ container_scanning:
           - "tezos/tezos:octez-v20.2"
           - "tezos/tezos:octez-v20.1"
           - "tezos/tezos:octez-v20.0"
-
-
+  artifacts:
+    paths:
+      - scan.log
   variables:
     CS_IMAGE: $IMAGE
     SECURE_LOG_LEVEL: "debug"
