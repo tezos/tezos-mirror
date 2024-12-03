@@ -2223,6 +2223,12 @@ module Dal = struct
     let constants = constants ctxt in
     if constants.dal.feature_enable then f ctxt else default ctxt
 
+  let assert_incentives_enabled ctxt =
+    let constants = constants ctxt in
+    error_unless
+      Compare.Bool.(constants.dal.incentives_enable = true)
+      Dal_errors_repr.Dal_incentives_disabled
+
   let only_if_incentives_enabled ctxt ~default f =
     let constants = constants ctxt in
     if constants.dal.incentives_enable then f ctxt else default ctxt

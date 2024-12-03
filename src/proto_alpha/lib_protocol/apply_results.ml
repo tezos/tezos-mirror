@@ -908,6 +908,10 @@ type 'kind contents_result =
       balance_updates : Receipt.balance_updates;
     }
       -> Kind.double_baking_evidence contents_result
+  | Dal_entrapment_evidence_result : {
+      balance_updates : Receipt.balance_updates;
+    }
+      -> Kind.dal_entrapment_evidence contents_result
   | Activate_account_result :
       Receipt.balance_updates
       -> Kind.activate_account contents_result
@@ -1378,6 +1382,7 @@ module Encoding = struct
           | Contents_result (Double_attestation_evidence_result _) -> None
           | Contents_result (Double_preattestation_evidence_result _) -> None
           | Contents_result (Double_baking_evidence_result _) -> None
+          | Contents_result (Dal_entrapment_evidence_result _) -> None
           | Contents_result (Activate_account_result _) -> None
           | Contents_result (Drain_delegate_result _) -> None
           | Contents_result Proposals_result -> None);
@@ -1839,6 +1844,8 @@ let kind_equal :
   | Double_attestation_evidence _, _ -> None
   | Double_baking_evidence _, Double_baking_evidence_result _ -> Some Eq
   | Double_baking_evidence _, _ -> None
+  | Dal_entrapment_evidence _, Dal_entrapment_evidence_result _ -> Some Eq
+  | Dal_entrapment_evidence _, _ -> None
   | Activate_account _, Activate_account_result _ -> Some Eq
   | Activate_account _, _ -> None
   | Proposals _, Proposals_result -> Some Eq

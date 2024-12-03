@@ -94,6 +94,10 @@ and 'kind contents_result =
       balance_updates : Receipt.balance_updates;
     }
       -> Kind.double_baking_evidence contents_result
+  | Dal_entrapment_evidence_result : {
+      balance_updates : Receipt.balance_updates;
+    }
+      -> Kind.dal_entrapment_evidence contents_result
   | Activate_account_result :
       Receipt.balance_updates
       -> Kind.activate_account contents_result

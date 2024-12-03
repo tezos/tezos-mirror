@@ -2204,7 +2204,8 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_attestation_evidence _
       | Double_preattestation_evidence _ | Double_baking_evidence _
-      | Activate_account _ | Drain_delegate _ | Manager_operation _ )
+      | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
+      | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
@@ -2479,6 +2480,12 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt ~operation_hash bh1 ~payload_producer
+  | Single (Dal_entrapment_evidence _) ->
+      (* This should be unreachable, because this operation is not yet valid. *)
+      return
+        ( ctxt,
+          Single_result (Dal_entrapment_evidence_result {balance_updates = []})
+        )
   | Single (Activate_account {id = pkh; activation_code}) ->
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh

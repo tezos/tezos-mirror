@@ -169,6 +169,22 @@ module Double_operation_evidence_map = struct
              elt_encoding))
 end
 
+module Dal_entrapment_map = struct
+  include Map.Make (struct
+    type t = Raw_level.t * Slot.t
+
+    let compare (l1, s1) (l2, s2) =
+      Compare.or_else (Raw_level.compare l1 l2) @@ fun () -> Slot.compare s1 s2
+  end)
+
+  let encoding elt_encoding =
+    Data_encoding.conv
+      (fun map -> bindings map)
+      (fun l -> List.fold_left (fun m (k, v) -> add k v m) empty l)
+      Data_encoding.(
+        list (tup2 (tup2 Raw_level.encoding Slot.encoding) elt_encoding))
+end
+
 (** State used and modified when validating anonymous operations.
     These fields are used to enforce that we do not validate the same
     operation multiple times.
@@ -186,6 +202,7 @@ type anonymous_state = {
   double_baking_evidences_seen : Operation_hash.t Double_baking_evidence_map.t;
   double_attesting_evidences_seen :
     Operation_hash.t Double_operation_evidence_map.t;
+  dal_entrapments_seen : Operation_hash.t Dal_entrapment_map.t;
   seed_nonce_levels_seen : Operation_hash.t Raw_level.Map.t;
   vdf_solution_seen : Operation_hash.t option;
 }
@@ -206,27 +223,31 @@ let anonymous_state_encoding =
               activation_pkhs_seen;
               double_baking_evidences_seen;
               double_attesting_evidences_seen;
+              dal_entrapments_seen;
               seed_nonce_levels_seen;
               vdf_solution_seen;
             } ->
          ( activation_pkhs_seen,
            double_baking_evidences_seen,
            double_attesting_evidences_seen,
+           dal_entrapments_seen,
            seed_nonce_levels_seen,
            vdf_solution_seen ))
        (fun ( activation_pkhs_seen,
               double_baking_evidences_seen,
               double_attesting_evidences_seen,
+              dal_entrapments_seen,
               seed_nonce_levels_seen,
               vdf_solution_seen ) ->
          {
            activation_pkhs_seen;
            double_baking_evidences_seen;
            double_attesting_evidences_seen;
+           dal_entrapments_seen;
            seed_nonce_levels_seen;
            vdf_solution_seen;
          })
-       (obj5
+       (obj6
           (req
              "activation_pkhs_seen"
              (Ed25519.Public_key_hash.Map.encoding Operation_hash.encoding))
@@ -237,6 +258,9 @@ let anonymous_state_encoding =
              "double_attesting_evidences_seen"
              (Double_operation_evidence_map.encoding Operation_hash.encoding))
           (req
+             "dal_entrapments_seen"
+             (Dal_entrapment_map.encoding Operation_hash.encoding))
+          (req
              "seed_nonce_levels_seen"
              (raw_level_map_encoding Operation_hash.encoding))
           (opt "vdf_solution_seen" Operation_hash.encoding))
@@ -246,6 +270,7 @@ let empty_anonymous_state =
     activation_pkhs_seen = Ed25519.Public_key_hash.Map.empty;
     double_baking_evidences_seen = Double_baking_evidence_map.empty;
     double_attesting_evidences_seen = Double_operation_evidence_map.empty;
+    dal_entrapments_seen = Dal_entrapment_map.empty;
     seed_nonce_levels_seen = Raw_level.Map.empty;
     vdf_solution_seen = None;
   }
@@ -1602,6 +1627,59 @@ module Anonymous = struct
     in
     {vs with anonymous_state}
 
+  let check_dal_entrapment_evidence vi
+      (_operation : Kind.dal_entrapment_evidence operation) =
+    Dal.assert_incentives_enabled vi.ctxt |> Lwt.return
+
+  let dal_entrapment_evidence_info
+      (operation : Kind.dal_entrapment_evidence operation) =
+    let (Single (Dal_entrapment_evidence {attestation; _})) =
+      operation.protocol_data.contents
+    in
+    let {level; slot; _} =
+      match attestation.protocol_data.contents with
+      | Single (Attestation {consensus_content; dal_content = _}) ->
+          consensus_content
+    in
+    (level, slot)
+
+  let check_dal_entrapment_evidence_conflict vs oph
+      (operation : Kind.dal_entrapment_evidence operation) =
+    let level, tb_slot = dal_entrapment_evidence_info operation in
+    match
+      Dal_entrapment_map.find
+        (level, tb_slot)
+        vs.anonymous_state.dal_entrapments_seen
+    with
+    | None -> ok_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
+
+  let wrap_dal_entrapment_evidence_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict -> result_error (Conflicting_dal_entrapment conflict)
+
+  let add_dal_entrapment_evidence vs oph
+      (operation : Kind.dal_entrapment_evidence operation) =
+    let level, tb_slot = dal_entrapment_evidence_info operation in
+    let dal_entrapments_seen =
+      Dal_entrapment_map.add
+        (level, tb_slot)
+        oph
+        vs.anonymous_state.dal_entrapments_seen
+    in
+    {vs with anonymous_state = {vs.anonymous_state with dal_entrapments_seen}}
+
+  let remove_dal_entrapment_evidence vs
+      (operation : Kind.dal_entrapment_evidence operation) =
+    let level, tb_slot = dal_entrapment_evidence_info operation in
+    let dal_entrapments_seen =
+      Dal_entrapment_map.remove
+        (level, tb_slot)
+        vs.anonymous_state.dal_entrapments_seen
+    in
+    {vs with anonymous_state = {vs.anonymous_state with dal_entrapments_seen}}
+
   let check_drain_delegate info ~check_signature
       (operation : Kind.drain_delegate Operation.t) =
     let open Lwt_result_syntax in
@@ -2504,6 +2582,8 @@ let check_operation ?(check_signature = true) info (type kind)
       Anonymous.check_double_attestation_evidence info operation
   | Single (Double_baking_evidence _) ->
       Anonymous.check_double_baking_evidence info operation
+  | Single (Dal_entrapment_evidence _) ->
+      Anonymous.check_dal_entrapment_evidence info operation
   | Single (Drain_delegate _) ->
       Anonymous.check_drain_delegate info ~check_signature operation
   | Single (Seed_nonce_revelation _) ->
@@ -2572,6 +2652,11 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
+  | Single (Dal_entrapment_evidence _) ->
+      Anonymous.check_dal_entrapment_evidence_conflict
+        operation_conflict_state
+        oph
+        operation
   | Single (Drain_delegate _) ->
       Anonymous.check_drain_delegate_conflict
         operation_conflict_state
@@ -2624,6 +2709,11 @@ let add_valid_operation operation_conflict_state oph (type kind)
         operation_conflict_state
         oph
         operation
+  | Single (Dal_entrapment_evidence _) ->
+      Anonymous.add_dal_entrapment_evidence
+        operation_conflict_state
+        oph
+        operation
   | Single (Drain_delegate _) ->
       Anonymous.add_drain_delegate operation_conflict_state oph operation
   | Single (Seed_nonce_revelation _) ->
@@ -2661,6 +2751,10 @@ let remove_operation operation_conflict_state (type kind)
         operation
   | Single (Double_baking_evidence _) ->
       Anonymous.remove_double_baking_evidence operation_conflict_state operation
+  | Single (Dal_entrapment_evidence _) ->
+      Anonymous.remove_dal_entrapment_evidence
+        operation_conflict_state
+        operation
   | Single (Drain_delegate _) ->
       Anonymous.remove_drain_delegate operation_conflict_state operation
   | Single (Seed_nonce_revelation _) ->
@@ -2808,6 +2902,17 @@ let validate_operation ?(check_signature = true)
           in
           let operation_state =
             add_double_baking_evidence operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Dal_entrapment_evidence _) ->
+          let open Anonymous in
+          let* () = check_dal_entrapment_evidence info operation in
+          let*? () =
+            check_dal_entrapment_evidence_conflict operation_state oph operation
+            |> wrap_dal_entrapment_evidence_conflict
+          in
+          let operation_state =
+            add_dal_entrapment_evidence operation_state oph operation
           in
           return {info; operation_state; block_state}
       | Single (Drain_delegate _) ->

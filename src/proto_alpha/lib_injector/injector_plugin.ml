@@ -159,6 +159,7 @@ module Proto_client = struct
     | Double_attestation_evidence_result _ -> Successful
     | Double_preattestation_evidence_result _ -> Successful
     | Double_baking_evidence_result _ -> Successful
+    | Dal_entrapment_evidence_result _ -> Successful
     | Activate_account_result _ -> Successful
     | Proposals_result -> Successful
     | Ballot_result -> Successful

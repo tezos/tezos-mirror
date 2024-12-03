@@ -33,6 +33,7 @@
     - double baking evidence
     - double preattestation evidence
     - double attestation evidence
+    - DAL entrapment evidence
     - seed nonce revelation
     - account activation
     - proposal (see: [Voting_repr])
@@ -88,6 +89,8 @@ module Kind : sig
     preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
+
+  type dal_entrapment_evidence = Dal_entrapment_evidence_kind
 
   type activate_account = Activate_account_kind
 
@@ -289,6 +292,14 @@ and _ contents =
       bh2 : Block_header_repr.t;
     }
       -> Kind.double_baking_evidence contents
+  (* The attester failed to correctly identify a trap when attesting DAL
+     slots. *)
+  | Dal_entrapment_evidence : {
+      attestation : Kind.attestation operation;
+      slot_index : Dal_slot_index_repr.t;
+      shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
+    }
+      -> Kind.dal_entrapment_evidence contents
   (* Activate_account: Account activation allows to register a public
      key hash on the blockchain. *)
   | Activate_account : {
@@ -587,11 +598,11 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Attestation} and {!Preattestation} >
-   {!Proposals} > {!Ballot} > {!Double_preattestation_evidence} >
-   {!Double_attestation_evidence} > {!Double_baking_evidence} >
-   {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
-   > {!Drain_delegate} > {!Manager_operation}.
+   {!Attestation} and {!Preattestation} > {!Proposals} > {!Ballot} >
+   {!Double_preattestation_evidence} > {!Double_attestation_evidence} >
+   {!Double_baking_evidence} > {!Dal_entrapment_evidence} > {!Vdf_revelation} >
+   {!Seed_nonce_revelation} > {!Activate_account} > {!Drain_delegate} >
+   {!Manager_operation}.
 
    {!Attestation} and {!Preattestation} are compared by the pair of their
    [level] and [round] such as the farther to the current state [level] and
@@ -610,6 +621,9 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    to the current state the better. For {!Double_baking_evidence}
    in the case of equality, they are compared by the hashes of their first
    denounced block_header.
+
+   Two {!Dal_entrapment_evidence} ops are compared by their level and the number
+   of slots they attest.
 
    Two {!Vdf_revelation} ops are compared by their [solution].
 

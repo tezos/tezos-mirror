@@ -131,6 +131,7 @@ type op_kind =
   | KActivate
   | KDbl_consensus
   | KDbl_baking
+  | KEntrapment
   | KDrain
   | KManager
 

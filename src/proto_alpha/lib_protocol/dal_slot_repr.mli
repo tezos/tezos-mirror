@@ -135,6 +135,19 @@ module Header : sig
     Dal.t -> Commitment.t -> Commitment_proof.t -> bool tzresult
 end
 
+module Shard_with_proof : sig
+  type t = {shard : Dal.shard; proof : Dal.shard_proof}
+
+  type error += Dal_shard_proof_error of string
+
+  val encoding : t Data_encoding.t
+
+  (* [verify cryptobox commitment t] verifies the shard proof from [t] against
+     the shard in [t] and the provided [commitment]. Returns
+     [Dal_shard_proof_error] if the verification fails. *)
+  val verify : Dal.t -> Commitment.t -> t -> unit tzresult
+end
+
 (** A DAL slot is decomposed to a successive list of pages with fixed content
    size. The size is chosen so that it's possible to inject a page in a Tezos
    L1 operation if needed during the proof phase of a refutation game.
@@ -453,7 +466,7 @@ module History : sig
   type error += Add_element_in_slots_skip_list_violates_ordering
 
   type error +=
-    | Dal_proof_error of string
+    | Dal_page_proof_error of string
     | Unexpected_page_size of {expected_size : int; page_size : int}
 
   module Internal_for_tests : sig

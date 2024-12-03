@@ -2765,6 +2765,8 @@ module Dal : sig
 
   val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
+  val assert_incentives_enabled : t -> unit tzresult
+
   val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
@@ -2924,6 +2926,12 @@ module Dal : sig
       context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
   end
 
+  module Shard_with_proof : sig
+    type t = {shard : Dal.shard; proof : Dal.shard_proof}
+
+    val verify : cryptobox -> Slot.Commitment.t -> t -> unit tzresult
+  end
+
   module Operations : sig
     module Publish_commitment : sig
       type t = {
@@ -3026,6 +3034,7 @@ module Dal_errors : sig
      from Dal_slot_repr or Dal_attestation_repr. *)
   type error +=
     | Dal_feature_disabled
+    | Dal_incentives_disabled
     | Dal_slot_index_above_hard_limit of {given : int; limit : int}
     | Dal_publish_commitment_invalid_index of {
         given : Dal.Slot_index.t;
@@ -4482,6 +4491,8 @@ module Kind : sig
 
   type double_baking_evidence = Double_baking_evidence_kind
 
+  type dal_entrapment_evidence = Dal_entrapment_evidence_kind
+
   type activate_account = Activate_account_kind
 
   type proposals = Proposals_kind
@@ -4632,6 +4643,12 @@ and _ contents =
       bh2 : Block_header.t;
     }
       -> Kind.double_baking_evidence contents
+  | Dal_entrapment_evidence : {
+      attestation : Kind.attestation operation;
+      slot_index : Dal.Slot_index.t;
+      shard_with_proof : Dal.Shard_with_proof.t;
+    }
+      -> Kind.dal_entrapment_evidence contents
   | Activate_account : {
       id : Ed25519.Public_key_hash.t;
       activation_code : Blinded_public_key_hash.activation_code;
