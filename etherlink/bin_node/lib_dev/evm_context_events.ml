@@ -135,6 +135,17 @@ let reset_at_level =
     ~pp1:Ethereum_types.pp_quantity
     ("level", Ethereum_types.quantity_encoding)
 
+let worker_request_failed =
+  declare_2
+    ~section
+    ~name:"evm_context_request_failed"
+    ~msg:"[Warning]: Request {view} failed: {errors}"
+    ~level:Error
+    ("view", Evm_context_types.Request.encoding)
+    ~pp1:Evm_context_types.Request.pp
+    ("errors", Error_monad.trace_encoding)
+    ~pp2:Error_monad.pp_print_trace
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -167,3 +178,6 @@ let reset_incoherent_finalized_state ~expected_finalized_number
     (expected_finalized_number, finalized_number)
 
 let reset_at_level level = emit reset_at_level level
+
+let worker_request_failed request_view errs =
+  emit worker_request_failed (request_view, errs)

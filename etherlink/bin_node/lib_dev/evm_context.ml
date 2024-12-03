@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Evm_context_types
+
 type init_status = Loaded | Created
 
 type head = {
@@ -103,161 +105,6 @@ module Name = struct
   let pp _fmt () = ()
 
   let equal () () = true
-end
-
-module Request = struct
-  type (_, _) t =
-    | Apply_evm_events : {
-        finalized_level : int32 option;
-        events : Evm_events.t list;
-      }
-        -> (unit, tztrace) t
-    | Apply_blueprint : {
-        events : Evm_events.t list option;
-        timestamp : Time.Protocol.t;
-        payload : Blueprint_types.payload;
-        delayed_transactions : Evm_events.Delayed_transaction.t list;
-      }
-        -> (unit, tztrace) t
-    | Blueprint : {
-        level : Ethereum_types.quantity;
-      }
-        -> (Blueprint_types.with_events option, tztrace) t
-    | Blueprints_range : {
-        from : Ethereum_types.quantity;
-        to_ : Ethereum_types.quantity;
-      }
-        -> ((Ethereum_types.quantity * Blueprint_types.payload) list, tztrace) t
-    | Last_known_L1_level : (int32 option, tztrace) t
-    | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
-    | Reconstruct : {
-        rollup_node_store : [`Read] Octez_smart_rollup_node_store.Store.t;
-        genesis_level : int32;
-        finalized_level : int32;
-      }
-        -> (unit, tztrace) t
-    | Patch_state : {
-        commit : bool;
-        key : string;
-        value : string;
-        block_number : Ethereum_types.quantity option;
-      }
-        -> (unit, tztrace) t
-    | Wasm_pvm_version : (Tezos_scoru_wasm.Wasm_pvm_state.version, tztrace) t
-
-  type view = View : _ t -> view
-
-  let view req = View req
-
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"Apply_evm_events"
-          (obj3
-             (req "request" (constant "apply_evm_events"))
-             (opt "finalized_level" int32)
-             (req "events" (list Evm_events.encoding)))
-          (function
-            | View (Apply_evm_events {finalized_level; events}) ->
-                Some ((), finalized_level, events)
-            | _ -> None)
-          (fun ((), finalized_level, events) ->
-            View (Apply_evm_events {finalized_level; events}));
-        case
-          (Tag 1)
-          ~title:"Apply_blueprint"
-          (obj5
-             (req "request" (constant "apply_blueprint"))
-             (opt "events" (list Evm_events.encoding))
-             (req "timestamp" Time.Protocol.encoding)
-             (req "payload" Blueprint_types.payload_encoding)
-             (req
-                "delayed_transactions"
-                (list Evm_events.Delayed_transaction.encoding)))
-          (function
-            | View
-                (Apply_blueprint
-                  {events; timestamp; payload; delayed_transactions}) ->
-                Some ((), events, timestamp, payload, delayed_transactions)
-            | _ -> None)
-          (fun ((), events, timestamp, payload, delayed_transactions) ->
-            View
-              (Apply_blueprint
-                 {events; timestamp; payload; delayed_transactions}));
-        case
-          (Tag 2)
-          ~title:"Blueprint"
-          (obj2
-             (req "request" (constant "blueprint"))
-             (req "level" Ethereum_types.quantity_encoding))
-          (function View (Blueprint {level}) -> Some ((), level) | _ -> None)
-          (fun ((), level) -> View (Blueprint {level}));
-        case
-          (Tag 3)
-          ~title:"Blueprints_range"
-          (obj3
-             (req "request" (constant "Blueprints_range"))
-             (req "from" Ethereum_types.quantity_encoding)
-             (req "to" Ethereum_types.quantity_encoding))
-          (function
-            | View (Blueprints_range {from; to_}) -> Some ((), from, to_)
-            | _ -> None)
-          (fun ((), from, to_) -> View (Blueprints_range {from; to_}));
-        case
-          (Tag 4)
-          ~title:"Last_known_L1_level"
-          (obj1 (req "request" (constant "last_known_l1_level")))
-          (function View Last_known_L1_level -> Some () | _ -> None)
-          (fun () -> View Last_known_L1_level);
-        case
-          (Tag 5)
-          ~title:"Delayed_inbox_hashes"
-          (obj1 (req "request" (constant "Delayed_inbox_hashes")))
-          (function View Delayed_inbox_hashes -> Some () | _ -> None)
-          (fun () -> View Delayed_inbox_hashes);
-        case
-          (Tag 6)
-          ~title:"Reconstruct"
-          (obj3
-             (req "request" (constant "reconstruct"))
-             (req "genesis_level" int32)
-             (req "finalized_level" int32))
-          (function
-            | View (Reconstruct {genesis_level; finalized_level; _}) ->
-                Some ((), genesis_level, finalized_level)
-            | _ -> None)
-          (fun _ ->
-            assert false
-            (* This case cannot be used to decode, which is acceptable because
-               the only use case for the encoding is logging (so encoding). *));
-        case
-          (Tag 7)
-          ~title:"Patch_state"
-          (obj5
-             (req "request" (constant "patch_state"))
-             (req "commit" bool)
-             (req "key" string)
-             (req "value" (string' Hex))
-             (opt "block_number" Ethereum_types.quantity_encoding))
-          (function
-            | View (Patch_state {commit; key; value; block_number}) ->
-                Some ((), commit, key, value, block_number)
-            | _ -> None)
-          (fun ((), commit, key, value, block_number) ->
-            View (Patch_state {commit; key; value; block_number}));
-        case
-          (Tag 8)
-          ~title:"Wasm_pvm_version"
-          (obj1 (req "request" (constant "wasm_pvm_version")))
-          (function View Wasm_pvm_version -> Some () | _ -> None)
-          (fun () -> View Wasm_pvm_version);
-      ]
-
-  let pp ppf view =
-    Data_encoding.Json.pp ppf @@ Data_encoding.Json.construct encoding view
 end
 
 let head_info, head_info_waker = Lwt.task ()
@@ -1711,7 +1558,8 @@ module Handlers = struct
         Lwt_exit.exit_and_raise Node_error.exit_code_when_out_of_sync
     | _ ->
         let Eq = Eq.request req in
-        let _ : tztrace = errs in
+        let request_view = Request.view req in
+        let*! () = Evm_context_events.worker_request_failed request_view errs in
         return_unit
 end
 

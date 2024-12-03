@@ -23,6 +23,8 @@
   was performed we would pick a new simulation timestamp, which could
   technically lead to a different execution. Changes the behavior to pick
   a single timestamp per simulation. (!15889)
+- Internal error in the EVM context emits an event instead of silently
+  failing. (!15824)
 
 ## Verson 0.10 (2024-12-02)
 
