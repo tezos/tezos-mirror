@@ -3021,6 +3021,14 @@ module Dal : sig
       (Slots_history.Pointer_hash.t * Slots_history.t) list option tzresult
       Lwt.t
   end
+
+  (* This would normally be a part of {!Delegate}, but it is not because
+     {!Dal.Slot_index} is defined after {!Delegate}. *)
+  module Delegate : sig
+    (** See {!Dal_already_denounced_storage.is_already_denounced}. *)
+    val is_already_denounced :
+      context -> public_key_hash -> Level.t -> Slot_index.t -> bool Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Dal_errors_repr}. *)

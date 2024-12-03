@@ -1185,6 +1185,24 @@ module Cycle = struct
                (req "for_double_baking" bool))
       end)
 
+  module Dal_already_denounced =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["dal_already_denounced"]
+         end))
+         (Pair
+            (Pair
+               (Make_index
+                  (Raw_level_repr.Index))
+                  (Make_index (Dal_slot_index_repr.Index)))
+               (Public_key_hash_index))
+      (struct
+        type t = unit
+
+        let encoding = Data_encoding.unit
+      end)
+
   module Selected_stake_distribution =
     Indexed_context.Make_map
       (Registered)
@@ -1326,6 +1344,7 @@ module Cycle = struct
 end
 
 module Already_denounced = Cycle.Already_denounced
+module Dal_already_denounced = Cycle.Dal_already_denounced
 module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 

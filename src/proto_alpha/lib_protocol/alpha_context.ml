@@ -168,6 +168,7 @@ module Dal = struct
 
   module Slots_history = Dal_slot_repr.History
   module Slots_storage = Dal_slot_storage
+  module Delegate = Dal_already_denounced_storage
 end
 
 module Dal_errors = Dal_errors_repr
