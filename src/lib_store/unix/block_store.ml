@@ -1490,11 +1490,7 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
      previous merge. *)
   ()
   [@profiler.reset_block_section
-    {
-      verbosity = Notice;
-      metadata = [("prometheus", "__ENABLE_CHILDREN_ONLY__")];
-    }
-      (Block_repr.hash new_head)] ;
+    {verbosity = Notice} (Block_repr.hash new_head)] ;
   let*! () = Lwt_mutex.lock block_store.merge_mutex in
   protect
     ~on_error:(fun err ->
