@@ -3059,12 +3059,20 @@ let benchmark () =
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
     ~vms
     ~proxy_files:
-      [
-        Format.asprintf
-          "src/%s/parameters/mainnet-parameters.json"
-          (Protocol.directory configuration.protocol);
-        "evm_kernel.wasm";
-      ]
+      ([
+         Format.asprintf
+           "src/%s/parameters/mainnet-parameters.json"
+           (Protocol.directory configuration.protocol);
+         "evm_kernel.wasm";
+       ]
+      @ Option.fold
+          ~none:[]
+          ~some:(fun x -> [x])
+          configuration.bootstrap_node_identity_file
+      @ Option.fold
+          ~none:[]
+          ~some:(fun x -> [x])
+          configuration.bootstrap_dal_node_identity_file)
     ~proxy_args:
       (match configuration.fundraiser with
       | None -> []
