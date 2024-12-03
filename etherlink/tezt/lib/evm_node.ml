@@ -1174,10 +1174,12 @@ type garbage_collector = {
   history_to_keep_in_seconds : int;
 }
 
+type rpc_server = Resto | Dream
+
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(node_transaction_validation = false) ?(block_storage_sqlite3 = true)
-    ?(next_wasm_runtime = true) ?garbage_collector () =
+    ?(next_wasm_runtime = true) ?garbage_collector ?rpc_server () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1227,6 +1229,9 @@ let patch_config_with_experimental_feature
              ( "history_to_keep_in_seconds",
                `Float (Int.to_float history_to_keep_in_seconds) );
            ])
+  |> optional_json_put ~name:"rpc_server" rpc_server (function
+         | Resto -> `String "resto"
+         | Dream -> `String "dream")
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     ?restricted_rpcs rollup_node =
