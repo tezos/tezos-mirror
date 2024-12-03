@@ -1679,6 +1679,21 @@ module Handlers = struct
 
   let on_close _self = Lwt.return_unit
 
+  module Eq = struct
+    type (_, _) eq = Eq : ('a, 'a) eq
+
+    let request : type a b. (a, b) Request.t -> (b, tztrace) eq = function
+      | Apply_evm_events _ -> Eq
+      | Apply_blueprint _ -> Eq
+      | Blueprint _ -> Eq
+      | Blueprints_range _ -> Eq
+      | Last_known_L1_level -> Eq
+      | Delayed_inbox_hashes -> Eq
+      | Reconstruct _ -> Eq
+      | Patch_state _ -> Eq
+      | Wasm_pvm_version -> Eq
+  end
+
   let on_error (type a b) _self _st (req : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -1694,7 +1709,10 @@ module Handlers = struct
             ~received:level_received
         in
         Lwt_exit.exit_and_raise Node_error.exit_code_when_out_of_sync
-    | _ -> return_unit
+    | _ ->
+        let Eq = Eq.request req in
+        let _ : tztrace = errs in
+        return_unit
 end
 
 let table = Worker.create_table Queue
