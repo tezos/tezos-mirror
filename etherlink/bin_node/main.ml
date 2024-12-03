@@ -37,6 +37,14 @@ module Event = struct
       ~msg:"starting the EVM node ({mode})"
       ~level:Notice
       ("mode", Data_encoding.string)
+
+  let sequencer_disabled_native_execution =
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:"sequencer_disabled_native_execution"
+      ~msg:"native execution is disabled in sequencer mode"
+      ~level:Warning
+      ()
 end
 
 module Params = struct
@@ -55,6 +63,16 @@ module Params = struct
 
   let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
+
+  let native_execution_policy =
+    Tezos_clic.parameter (fun _ policy ->
+        match
+          Data_encoding.Binary.of_string_opt
+            Configuration.native_execution_policy_encoding
+            policy
+        with
+        | Some policy -> Lwt.return_ok policy
+        | None -> failwith "'%s' is not a valid native execution policy" policy)
 
   let rollup_node_endpoint = endpoint
 
@@ -367,6 +385,16 @@ let preimages_endpoint_arg =
        Missing pre-images will be downloaded remotely if they are not already \
        present on disk."
     Params.endpoint
+
+let native_execution_policy_arg =
+  Tezos_clic.arg
+    ~long:"native-execution-policy"
+    ~short:'n'
+    ~placeholder:"policy"
+    ~doc:
+      "Policy regarding the use of native execution for supported kernels. Can \
+       be `never`, `rpcs_only` or `always`."
+    Params.native_execution_policy
 
 let rollup_node_endpoint_arg =
   Tezos_clic.arg
@@ -752,6 +780,20 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
+let sequencer_disable_native_execution configuration =
+  let open Lwt_syntax in
+  match configuration.kernel_execution.native_execution_policy with
+  | Always | Rpcs_only ->
+      let+ () =
+        Internal_event.Simple.emit Event.sequencer_disabled_native_execution ()
+      in
+      {
+        configuration with
+        kernel_execution =
+          {configuration.kernel_execution with native_execution_policy = Never};
+      }
+  | _ -> return configuration
+
 let make_event_config ~verbosity ~daily_logs_path
     ?(daily_logs_section_prefixes = []) () =
   let open Tezos_event_logging.Internal_event in
@@ -774,11 +816,11 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
     ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
-    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-    ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
-    ?dal_slots ?sandbox_key ~finalized_view () =
+    ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
+    ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
+    ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
+    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_key ~finalized_view () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -807,6 +849,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ~verbose
       ?preimages
       ?preimages_endpoint
+      ?native_execution_policy
       ?time_between_blocks
       ?max_number_of_chunks
       ?private_rpc_port
@@ -824,6 +867,13 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ()
   in
   fail_if_websocket_is_enabled ~config:configuration ;
+  let*! configuration =
+    match sandbox_key with
+    | None ->
+        (* We are running in sequencer mode (not in sandbox mode), we need to disable native execution *)
+        sequencer_disable_native_execution configuration
+    | _ -> Lwt.return configuration
+  in
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
@@ -906,6 +956,7 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ()
   in
   fail_if_websocket_is_enabled ~config:configuration ;
+  let*! configuration = sequencer_disable_native_execution configuration in
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
@@ -937,7 +988,11 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     ()
 
 let rpc_run_args =
-  Tezos_clic.args3 evm_node_endpoint_arg preimages_arg preimages_endpoint_arg
+  Tezos_clic.args4
+    evm_node_endpoint_arg
+    preimages_arg
+    preimages_endpoint_arg
+    native_execution_policy_arg
 
 let rpc_command =
   let open Lwt_result_syntax in
@@ -965,7 +1020,10 @@ let rpc_command =
              blacklisted_rpcs,
              whitelisted_rpcs,
              finalized_view ),
-           (evm_node_endpoint, preimages, preimages_endpoint) )
+           ( evm_node_endpoint,
+             preimages,
+             preimages_endpoint,
+             native_execution_policy ) )
          () ->
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
@@ -1023,6 +1081,7 @@ let rpc_command =
           ~verbose
           ?preimages
           ?preimages_endpoint
+          ?native_execution_policy
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
@@ -1062,11 +1121,12 @@ let rpc_command =
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?private_rpc_port ?cors_origins ?cors_headers ~verbose ?preimages
-    ?rollup_node_endpoint ~dont_track_rollup_node ?preimages_endpoint
-    ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-    ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
-    ?restricted_rpcs ?kernel ~no_sync ~finalized_view () =
+    ?preimages_endpoint ?native_execution_policy ?rollup_node_endpoint
+    ~dont_track_rollup_node ?evm_node_endpoint
+    ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
+    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
+    ~no_sync ~finalized_view () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1087,6 +1147,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ~verbose
       ?preimages
       ?preimages_endpoint
+      ?native_execution_policy
       ?evm_node_endpoint
       ?threshold_encryption_bundler_endpoint
       ?tx_pool_timeout_limit
@@ -1441,10 +1502,11 @@ let replay_command =
   let open Tezos_clic in
   command
     ~desc:"Replay a specific block level."
-    (args6
+    (args7
        data_dir_arg
        preimages_arg
        preimages_endpoint_arg
+       native_execution_policy_arg
        kernel_arg
        kernel_verbosity_arg
        profile_arg)
@@ -1459,6 +1521,7 @@ let replay_command =
     (fun ( data_dir,
            preimages,
            preimages_endpoint,
+           native_execution_policy,
            kernel_path,
            kernel_verbosity,
            profile )
@@ -1481,6 +1544,7 @@ let replay_command =
           ~verbose:false
           ?preimages
           ?preimages_endpoint
+          ?native_execution_policy
           ~finalized_view:false
           ()
       in
@@ -1529,6 +1593,7 @@ let patch_kernel_command =
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
             ~preimages_endpoint:None
+            ~native_execution_policy:Never
             ~fail_on_missing_blueprint:true
             ~block_storage_sqlite3:false
             ()
@@ -1566,10 +1631,11 @@ If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (merge_options
        common_config_args
-       (args17
+       (args18
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
+          native_execution_policy_arg
           time_between_blocks_arg
           max_number_of_chunks_arg
           private_rpc_port_arg
@@ -1612,6 +1678,7 @@ mode.|}
              finalized_view ),
            ( preimages,
              preimages_endpoint,
+             native_execution_policy,
              time_between_blocks,
              max_number_of_chunks,
              private_rpc_port,
@@ -1661,6 +1728,7 @@ mode.|}
           ?tx_pool_tx_per_addr_limit
           ?preimages
           ?preimages_endpoint
+          ?native_execution_policy
           ?time_between_blocks
           ?max_number_of_chunks
           ?private_rpc_port
@@ -1913,9 +1981,10 @@ let sequencer_config_args =
     dal_slots_arg
 
 let sandbox_config_args =
-  Tezos_clic.args9
+  Tezos_clic.args10
     preimages_arg
     preimages_endpoint_arg
+    native_execution_policy_arg
     time_between_blocks_arg
     max_number_of_chunks_arg
     private_rpc_port_arg
@@ -2034,6 +2103,7 @@ let sandbox_command =
              finalized_view ),
            ( preimages,
              preimages_endpoint,
+             native_execution_policy,
              time_between_blocks,
              max_number_of_chunks,
              private_rpc_port,
@@ -2069,6 +2139,7 @@ let sandbox_command =
         ~verbose
         ?preimages
         ?preimages_endpoint
+        ?native_execution_policy
         ?time_between_blocks
         ?max_number_of_chunks
         ?private_rpc_port
@@ -2190,11 +2261,12 @@ let threshold_encryption_sequencer_command =
         ())
 
 let observer_run_args =
-  Tezos_clic.args7
+  Tezos_clic.args8
     evm_node_endpoint_arg
     bundler_node_endpoint_arg
     preimages_arg
     preimages_endpoint_arg
+    native_execution_policy_arg
     initial_kernel_arg
     dont_track_rollup_node_arg
     no_sync_arg
@@ -2228,6 +2300,7 @@ let observer_command =
              threshold_encryption_bundler_endpoint,
              preimages,
              preimages_endpoint,
+             native_execution_policy,
              kernel,
              dont_track_rollup_node,
              no_sync ) )
@@ -2246,9 +2319,10 @@ let observer_command =
         ?cors_headers
         ~verbose
         ?preimages
+        ?preimages_endpoint
+        ?native_execution_policy
         ?rollup_node_endpoint
         ~dont_track_rollup_node
-        ?preimages_endpoint
         ?evm_node_endpoint
         ?threshold_encryption_bundler_endpoint
         ?tx_pool_timeout_limit
@@ -2369,6 +2443,7 @@ let patch_state_command =
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
             ~preimages_endpoint:None
+            ~native_execution_policy:Never
             ~fail_on_missing_blueprint:true
             ~block_storage_sqlite3:false
             ()

@@ -24,9 +24,12 @@ type blueprints_publisher_config = {
   dal_slots : int list option;
 }
 
+type native_execution_policy = Always | Rpcs_only | Never
+
 type kernel_execution_config = {
   preimages : string;
   preimages_endpoint : Uri.t option;
+  native_execution_policy : native_execution_policy;
 }
 
 type garbage_collector = {
@@ -306,10 +309,17 @@ let restricted_rpcs_encoding =
         (fun l -> Blacklist l);
     ]
 
-let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint () =
+let default_native_execution_policy = Never
+
+let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint
+    ?native_execution_policy () =
   {
     preimages = Option.value ~default:(default_preimages data_dir) preimages;
     preimages_endpoint;
+    native_execution_policy =
+      Option.value
+        ~default:default_native_execution_policy
+        native_execution_policy;
   }
 
 let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ~sequencer
@@ -812,12 +822,27 @@ let fee_history_encoding =
           "max_past"
           strictly_positive_encoding))
 
+let native_execution_policy_encoding =
+  Data_encoding.(
+    def
+      "native_execution_policy"
+      ~title:"native_execution_policy"
+      ~description:
+        "`never` means the native execution will never be used by the node. \
+         `rpcs_only` will restrict the usage of the native execution to RPC \
+         calls, leaving blueprint application to the WASM runtime. `always` \
+         will always use native execution for supported kernels."
+    @@ string_enum
+         [("never", Never); ("rpcs_only", Rpcs_only); ("always", Always)])
+
 let kernel_execution_encoding data_dir =
   Data_encoding.(
     conv
-      (fun {preimages; preimages_endpoint} -> (preimages, preimages_endpoint))
-      (fun (preimages, preimages_endpoint) -> {preimages; preimages_endpoint})
-      (obj2
+      (fun {preimages; preimages_endpoint; native_execution_policy} ->
+        (preimages, preimages_endpoint, native_execution_policy))
+      (fun (preimages, preimages_endpoint, native_execution_policy) ->
+        {preimages; preimages_endpoint; native_execution_policy})
+      (obj3
          (dft
             ~description:
               "Path to a directory containing the preimages the kernel can \
@@ -831,7 +856,18 @@ let kernel_execution_encoding data_dir =
                the preimages directory. These preimages are downloaded by the \
                node, stored in the preimages directory and fed to the kernel."
             "preimages_endpoint"
-            Tezos_rpc.Encoding.uri_encoding)))
+            Tezos_rpc.Encoding.uri_encoding)
+         (dft
+            ~description:
+              "Policy regarding when to use the native execution for supported \
+               kernels. Native execution provides better performance, but \
+               increases the complexity of the software stack of the node by \
+               adding an additional layer between what is executed by the EVM \
+               node and the Smart Rollup nodes. Can be `never`, `rpcs_only` or \
+               `always`. Default to `never`."
+            "native_execution_policy"
+            native_execution_policy_encoding
+            default_native_execution_policy)))
 
 let rpc_encoding =
   Data_encoding.(
@@ -1137,12 +1173,13 @@ module Cli = struct
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
-      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ~finalized_view ?proxy_ignore_block_param ?dal_slots () =
+      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
+      ?proxy_ignore_block_param ?dal_slots () =
     let public_rpc =
       default_rpc
         ?rpc_port
@@ -1215,7 +1252,12 @@ module Cli = struct
       Option.value ~default:default_rollup_node_endpoint rollup_node_endpoint
     in
     let kernel_execution =
-      kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint ()
+      kernel_execution_config_dft
+        ~data_dir
+        ?preimages
+        ?preimages_endpoint
+        ?native_execution_policy
+        ()
     in
     {
       public_rpc;
@@ -1245,14 +1287,19 @@ module Cli = struct
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
-      ?preimages_endpoint () =
+      ?preimages_endpoint ?native_execution_policy () =
     let preimages =
       Option.value preimages ~default:kernel_execution.preimages
     in
     let preimages_endpoint =
       Option.either preimages_endpoint kernel_execution.preimages_endpoint
     in
-    {preimages; preimages_endpoint}
+    let native_execution_policy =
+      Option.value
+        ~default:kernel_execution.native_execution_policy
+        native_execution_policy
+    in
+    {preimages; preimages_endpoint; native_execution_policy}
 
   let patch_rpc ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?batch_limit
       ?restricted_rpcs ?max_active_connections rpc =
@@ -1272,12 +1319,13 @@ module Cli = struct
       ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
-      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ~finalized_view ?proxy_ignore_block_param ~dal_slots configuration =
+      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
+      ?proxy_ignore_block_param ~dal_slots configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1488,6 +1536,7 @@ module Cli = struct
         configuration.kernel_execution
         ?preimages
         ?preimages_endpoint
+        ?native_execution_policy
         ()
     in
     let rollup_node_endpoint =
@@ -1529,12 +1578,13 @@ module Cli = struct
       ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
-      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-      ?log_filter_chunk_size ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ~finalized_view ?proxy_ignore_block_param ?dal_slots () =
+      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
+      ?proxy_ignore_block_param ?dal_slots () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1568,6 +1618,7 @@ module Cli = struct
           ?threshold_encryption_bundler_endpoint
           ?preimages
           ?preimages_endpoint
+          ?native_execution_policy
           ?time_between_blocks
           ?max_number_of_chunks
           ?private_rpc_port
@@ -1607,6 +1658,7 @@ module Cli = struct
           ?threshold_encryption_bundler_endpoint
           ?preimages
           ?preimages_endpoint
+          ?native_execution_policy
           ?time_between_blocks
           ?max_number_of_chunks
           ?private_rpc_port

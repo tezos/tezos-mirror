@@ -23,6 +23,7 @@ type parameters = {
   data_dir : string;
   preimages : string;
   preimages_endpoint : Uri.t option;
+  native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
@@ -53,6 +54,7 @@ type t = {
   index : Irmin_context.rw_index;
   preimages : string;
   preimages_endpoint : Uri.t option;
+  native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
@@ -293,7 +295,8 @@ module State = struct
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context
 
-  let on_new_delayed_transaction ~delayed_transaction evm_state =
+  let on_new_delayed_transaction ~native_execution ~delayed_transaction
+      evm_state =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
     let* storage_version =
@@ -307,6 +310,7 @@ module State = struct
       Evm_state.execute
         ~data_dir
         ~config
+        ~native_execution
         evm_state
         [
           `Input
@@ -324,6 +328,7 @@ module State = struct
           evm_state
       in
       Evm_state.execute
+        ~native_execution
         ~wasm_entrypoint:"populate_delayed_inbox"
         ~data_dir
         ~config
@@ -594,6 +599,7 @@ module State = struct
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
           Evm_state.apply_blueprint
+            ~native_execution_policy:ctxt.native_execution_policy
             ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
             ~data_dir
             ~config
@@ -847,7 +853,10 @@ module State = struct
           event
     | New_delayed_transaction delayed_transaction ->
         let* evm_state =
-          on_new_delayed_transaction ~delayed_transaction evm_state
+          on_new_delayed_transaction
+            ~native_execution:(ctxt.native_execution_policy = Always)
+            ~delayed_transaction
+            evm_state
         in
         return (evm_state, on_success, latest_finalized_level)
     | Flush_delayed_inbox flushed_blueprint ->
@@ -1061,7 +1070,8 @@ module State = struct
 
   let init ?kernel_path ~block_storage_sqlite3 ?garbage_collector
       ~fail_on_missing_blueprint ~data_dir ~preimages ~preimages_endpoint
-      ?smart_rollup_address ~store_perm ?sequencer_wallet () =
+      ~native_execution_policy ?smart_rollup_address ~store_perm
+      ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1165,6 +1175,7 @@ module State = struct
         data_dir;
         preimages;
         preimages_endpoint;
+        native_execution_policy;
         smart_rollup_address;
         session =
           {
@@ -1313,6 +1324,7 @@ module State = struct
         (* Execute the PVM to replay the tezos level. *)
         let* evm_state =
           Evm_state.execute
+            ~native_execution:(ctxt.native_execution_policy = Always)
             ~data_dir:ctxt.data_dir
             ~log_file:"reconstruct"
             ~config
@@ -1334,6 +1346,7 @@ module State = struct
               ctxt
               (fun evm_state ->
                 Evm_state.execute
+                  ~native_execution:(ctxt.native_execution_policy = Always)
                   ~data_dir:ctxt.data_dir
                   ~log_file:"reconstruct"
                   ~config
@@ -1353,6 +1366,7 @@ module State = struct
     (* We perform a first reboot to reveal the kernel. *)
     let* evm_state =
       Evm_state.execute
+        ~native_execution:(ctxt.native_execution_policy = Always)
         ~data_dir:ctxt.data_dir
         ~log_file:"reconstruct"
         ~config
@@ -1449,6 +1463,7 @@ module Handlers = struct
         data_dir : string;
         preimages : string;
         preimages_endpoint : Uri.t option;
+        native_execution_policy;
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
         store_perm;
@@ -1463,6 +1478,7 @@ module Handlers = struct
         ~data_dir
         ~preimages
         ~preimages_endpoint
+        ~native_execution_policy
         ?smart_rollup_address
         ~fail_on_missing_blueprint
         ~store_perm
@@ -1645,8 +1661,8 @@ let export_store ~data_dir ~output_db_file =
   return {rollup_address; current_number}
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
-    ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
+    ~native_execution_policy ?smart_rollup_address ~fail_on_missing_blueprint
+    ~store_perm ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1658,6 +1674,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         data_dir;
         preimages;
         preimages_endpoint;
+        native_execution_policy;
         smart_rollup_address;
         fail_on_missing_blueprint;
         store_perm;
@@ -1850,6 +1867,7 @@ let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
       ~data_dir
       ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
       ~preimages_endpoint:None
+      ~native_execution_policy:Never
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
@@ -1878,6 +1896,7 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
       ~data_dir
       ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
       ~preimages_endpoint:None
+      ~native_execution_policy:Never
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write

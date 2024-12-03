@@ -50,6 +50,10 @@ val export_store :
     [preimages_endponit] URI can be optionally provided to download missing
     preimages when they are requested by the current kernel (during upgrades).
 
+    [native_execution_policy] decides if native execution is used for supported
+    kernel. In the context of the [Evm_context] worker, the native execution
+    will only be used in [native_execution_policy = Always].
+
     [smart_rollup_address] can be provided either when starting from a
     non-existing data-dir, or when starting a sandbox.
 
@@ -73,6 +77,7 @@ val start :
   data_dir:string ->
   preimages:string ->
   preimages_endpoint:Uri.t option ->
+  native_execution_policy:Configuration.native_execution_policy ->
   ?smart_rollup_address:string ->
   fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->

@@ -68,6 +68,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ~preimages:configuration.kernel_execution.preimages
       ~preimages_endpoint:configuration.kernel_execution.preimages_endpoint
+      ~native_execution_policy:
+        configuration.kernel_execution.native_execution_policy
       ~fail_on_missing_blueprint:true
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write

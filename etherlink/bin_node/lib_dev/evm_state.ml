@@ -35,7 +35,7 @@ let event_kernel_log ~kind ~msg =
 let execute ?(wasm_pvm_fallback = false) ?(profile = false)
     ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
-    evm_state inbox =
+    ~native_execution evm_state inbox =
   let open Lwt_result_syntax in
   let path = Filename.concat (kernel_logs_directory ~data_dir) log_file in
   let inbox = List.map (function `Input s -> s) inbox in
@@ -79,6 +79,7 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
             Wasm_runtime.run
               ~preimages_dir:config.preimage_directory
               ?preimages_endpoint:config.preimage_endpoint
+              ~native_execution
               ~entrypoint:wasm_entrypoint
               evm_state
               config.destination
@@ -239,10 +240,16 @@ let add_callback_to_queue pool callback =
   callback ()
 
 let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
+    ~native_execution_policy
     ~input:
       Simulation.Encodings.
         {messages; insight_requests; log_kernel_debug_file; _} ctxt =
   let open Lwt_result_syntax in
+  let native_execution =
+    match native_execution_policy with
+    | Configuration.Always | Rpcs_only -> true
+    | Never -> false
+  in
   let keys =
     List.map
       (function
@@ -257,6 +264,7 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
   let* evm_state =
     add_callback_to_queue pool @@ fun () ->
     execute
+      ~native_execution
       ?wasm_pvm_fallback
       ~kind:Simulation
       ?log_file:log_kernel_debug_file
@@ -274,7 +282,7 @@ type apply_result =
   | Apply_failure
 
 let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
-    evm_state (blueprint : Blueprint_types.payload) =
+    ~native_execution_policy evm_state (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
     List.map
@@ -284,6 +292,7 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
   let*! (Qty before_height) = current_block_height evm_state in
   let* evm_state =
     execute
+      ~native_execution:(native_execution_policy = Configuration.Always)
       ?wasm_pvm_fallback
       ?profile
       ~data_dir

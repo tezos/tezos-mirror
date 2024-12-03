@@ -38,6 +38,7 @@ let test_wasm_runtime_id () =
     Wasm_runtime.run
       ~preimages_dir:Temp.(dir "wasm_2_0_0")
       ~entrypoint:"kernel_run"
+      ~native_execution:true
       tree
       Tezos_crypto.Hashed.Smart_rollup_address.zero
       []

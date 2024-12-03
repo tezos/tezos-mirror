@@ -23,7 +23,8 @@
   },
   "fee_history": {},
   "kernel_execution": {
-    "preimages": "hidden"
+    "preimages": "hidden",
+    "native_execution_policy": "never"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",
@@ -72,7 +73,8 @@
   },
   "fee_history": {},
   "kernel_execution": {
-    "preimages": "hidden"
+    "preimages": "hidden",
+    "native_execution_policy": "never"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",
@@ -115,7 +117,8 @@
   },
   "fee_history": {},
   "kernel_execution": {
-    "preimages": "hidden"
+    "preimages": "hidden",
+    "native_execution_policy": "never"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",

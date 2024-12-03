@@ -75,6 +75,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ?kernel_path
       ~preimages:config.kernel_execution.preimages
       ~preimages_endpoint:config.kernel_execution.preimages_endpoint
+      ~native_execution_policy:config.kernel_execution.native_execution_policy
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
