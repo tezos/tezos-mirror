@@ -1132,12 +1132,7 @@ module type WORKER = sig
       layer. *)
   type p2p_input =
     | In_message of {from_peer : GS.Peer.t; p2p_message : p2p_message}
-    | New_connection of {
-        peer : GS.Peer.t;
-        direct : bool;
-        trusted : bool;
-        bootstrap : bool;
-      }
+    | New_connection of {peer : GS.Peer.t; direct : bool; trusted : bool}
     | Disconnection of {peer : GS.Peer.t}
 
   (** The different kinds of input events that could be received from the

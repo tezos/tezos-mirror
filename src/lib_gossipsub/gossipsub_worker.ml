@@ -190,12 +190,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   type p2p_input =
     | In_message of {from_peer : Peer.t; p2p_message : p2p_message}
-    | New_connection of {
-        peer : Peer.t;
-        direct : bool;
-        trusted : bool;
-        bootstrap : bool;
-      }
+    | New_connection of {peer : Peer.t; direct : bool; trusted : bool}
     | Disconnection of {peer : Peer.t}
 
   type app_input =
@@ -431,12 +426,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** When a new peer is connected, the worker will send a [Subscribe] message
       to that peer for each topic the local peer tracks. *)
-  let handle_new_connection peer ~bootstrap ~trusted = function
+  let handle_new_connection peer ~trusted = function
     | state, GS.Peer_already_known -> state
     | state, Peer_added ->
         Introspection.update_count_connections state.stats `Incr ;
         let connected_bootstrap_peers =
-          if bootstrap then (
+          if Peer.is_bootstrap peer then (
             Introspection.update_count_bootstrap_connections state.stats `Incr ;
             Peer.Set.add peer state.connected_bootstrap_peers)
           else state.connected_bootstrap_peers
@@ -716,10 +711,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ({gossip_state; _} as state) = function
-    | New_connection {peer; direct; trusted; bootstrap} ->
+    | New_connection {peer; direct; trusted} ->
+        let bootstrap = Peer.is_bootstrap peer in
         GS.add_peer {direct; outbound = trusted; peer; bootstrap} gossip_state
         |> update_gossip_state state
-        |> handle_new_connection peer ~bootstrap ~trusted
+        |> handle_new_connection peer ~trusted
     | Disconnection {peer} ->
         GS.remove_peer {peer} gossip_state
         |> update_gossip_state state |> handle_disconnection peer
