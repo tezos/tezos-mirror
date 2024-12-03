@@ -108,6 +108,9 @@ val dockerfile : string
 (** Docker registry path associated to [tezt_cloud]. *)
 val docker_registry : string
 
+(** Equivalent to [Cli.macosx]. *)
+val macosx : bool
+
 (** Equivalent to [Cli.check_file_consistency]. *)
 val check_file_consistency : bool
 

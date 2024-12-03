@@ -79,6 +79,8 @@ let dockerfile = Path.dockerfile ~alias:dockerfile_alias
 
 let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
 
+let macosx = Cli.macosx
+
 let check_file_consistency = Cli.check_file_consistency
 
 let project_id = Gcloud.project_id
