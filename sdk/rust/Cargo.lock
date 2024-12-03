@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "tezos_crypto_rs"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "blst",
@@ -1024,7 +1024,7 @@ dependencies = [
 
 [[package]]
 name = "tezos_data_encoding"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "bit-vec",
  "bitvec",
@@ -1041,7 +1041,7 @@ dependencies = [
 
 [[package]]
 name = "tezos_data_encoding_derive"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "lazy_static",
  "once_cell",

@@ -662,6 +662,12 @@ let changeset_test_liquidity_baking_scripts =
           "scripts/check-liquidity-baking-scripts.sh";
         ])
 
+let changeset_test_sdk_rust =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["sdk/rust"])
+
 let changeset_test_kernels =
   Changeset.(
     changeset_base
