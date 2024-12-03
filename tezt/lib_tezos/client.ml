@@ -1620,7 +1620,7 @@ let write_stresstest_sources_file ?runner ~sources filename =
   | Some runner ->
       Helpers.write_file ~runner filename ~contents:(JSON.encode_u sources)
 
-let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
+let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?fresh_probability ?smart_contract_parameters client =
   let runner = client.runner in
@@ -1714,7 +1714,7 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
         ]
   in
   Lwt.return
-  @@ spawn_command ?endpoint client
+  @@ spawn_command ?env ?endpoint client
   @@ [
        "stresstest";
        "transfer";
@@ -1730,11 +1730,12 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   @ make_float_opt_arg "--fresh-probability" fresh_probability
   @ smart_contract_parameters_arg
 
-let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
-    ?fee ?gas_limit ?transfers ?tps ?fresh_probability
+let stresstest ?env ?endpoint ?source_aliases ?source_pkhs ?source_accounts
+    ?seed ?fee ?gas_limit ?transfers ?tps ?fresh_probability
     ?smart_contract_parameters client =
   Lwt.bind
     (spawn_stresstest
+       ?env
        ?endpoint
        ?source_aliases
        ?source_pkhs
