@@ -206,6 +206,23 @@ Follow these steps if the DAL node is running but not connected to the network:
    If not, run the command a few more times over a one-minute interval.
    If you still see no entries that say ``true``, restart the DAL node.
 
+#. Verify that the baker can get information about the slots that are available to attest by running this command, where ``$MY_ADDRESS`` is your baker's account address and ``<level>`` is a recent level:
+
+   .. code-block:: shell
+
+      curl -v "http://127.0.0.1:10732/profiles/$MY_ADDRESS/attested_levels/<level>/attestable_slots"
+
+   The baker uses this request to get a list of the attestable slots from the DAL node, that is, the slots for which the node has all the shards assigned to the baker.
+   If the response is an HTTP error, the error code may help you determine why the baker cannot get the necessary information from the DAL node.
+
+   For example, the following response shows that the DAL node is providing information about which slots are attestable, even though none of the slots at this particular level are attestable.
+
+   .. code-block:: json
+
+      {"kind":"attestable_slots_set","attestable_slots_set":[false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false],"published_level":9290818}
+
+   If the baker is not currently assigned any shards, the response may be ``{"kind":"not_in_committee"}``, which also means that the baker can get information from the DAL node.
+
 #. If the problem persists, contact Octez developers on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack or the Tezos `Discord <https://discord.gg/tezos>`_.
 
 Troubleshooting firewall/NAT issues
