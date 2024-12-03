@@ -1639,6 +1639,12 @@ let init_public_network cloud (configuration : configuration)
             ~bootstrap_profile:true
             dal_node
         in
+        let* () =
+          may_copy_dal_node_identity_file
+            agent
+            dal_node
+            configuration.bootstrap_dal_node_identity_file
+        in
         let* () = Node.wait_for_ready node in
         let* () = add_source cloud agent ~name:"bootstrap" node dal_node in
         let* () =
@@ -1861,6 +1867,12 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~expected_pow:0.
       ~bootstrap_profile:true
       dal_bootstrap_node
+  in
+  let* () =
+    may_copy_dal_node_identity_file
+      agent
+      dal_bootstrap_node
+      configuration.bootstrap_dal_node_identity_file
   in
   let* () =
     Dal_node.Agent.run
