@@ -181,7 +181,11 @@ module Message = struct
 end
 
 module Peer = struct
-  type t = {peer_id : P2p_peer.Id.t; maybe_reachable_point : P2p_point.Id.t}
+  type t = {
+    peer_id : P2p_peer.Id.t;
+    maybe_reachable_point : P2p_point.Id.t;
+    bootstrap : bool;
+  }
 
   module Cmp = struct
     type nonrec t = t
@@ -202,20 +206,24 @@ module Peer = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {peer_id; maybe_reachable_point} -> (peer_id, maybe_reachable_point))
-      (fun (peer_id, maybe_reachable_point) -> {peer_id; maybe_reachable_point})
-      (obj2
+      (fun {peer_id; maybe_reachable_point; bootstrap} ->
+        (peer_id, maybe_reachable_point, bootstrap))
+      (fun (peer_id, maybe_reachable_point, bootstrap) ->
+        {peer_id; maybe_reachable_point; bootstrap})
+      (obj3
          (req "peer_id" P2p_peer.Id.encoding)
-         (req "maybe_reachable_point" P2p_point.Id.encoding))
+         (req "maybe_reachable_point" P2p_point.Id.encoding)
+         (req "bootstrap" bool))
 
-  let pp fmt {peer_id; maybe_reachable_point} =
+  let pp fmt {peer_id; maybe_reachable_point; bootstrap} =
     Format.fprintf
       fmt
-      "{peer_id=%a;@,maybe_reachable_point=%a}"
+      "{peer_id=%a;@,maybe_reachable_point=%a;@,bootstrap=%b}"
       P2p_peer.Id.pp
       peer_id
       P2p_point.Id.pp
       maybe_reachable_point
+      bootstrap
 end
 
 module Point = struct

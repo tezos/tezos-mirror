@@ -102,8 +102,9 @@ let peer_of_connection p2p_layer conn =
   let port =
     Option.value remote_metadata.advertised_net_port ~default:default_port
   in
+  let bootstrap = remote_metadata.is_bootstrap_peer in
   let maybe_reachable_point = (addr, port) in
-  Types.Peer.{peer_id; maybe_reachable_point}
+  Types.Peer.{peer_id; maybe_reachable_point; bootstrap}
 
 (** This handler forwards information about connections established by the P2P
     layer to the Gossipsub worker.
@@ -242,7 +243,9 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
       | Connect {peer; origin = _} ->
-          let Types.Peer.{maybe_reachable_point; peer_id} = peer in
+          let Types.Peer.{maybe_reachable_point; peer_id; bootstrap = _} =
+            peer
+          in
           try_connect ~expected_peer_id:peer_id p2p_layer maybe_reachable_point
       | Connect_point {point} -> try_connect p2p_layer point
       | Forget _ -> return_unit

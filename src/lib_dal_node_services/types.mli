@@ -126,8 +126,15 @@ module Peer : sig
      <remote_socket_addr>:<default_dal_p2p_port> (at the time of
      writing 11732). However, the remote node's user can override both
      the address and the port if desired and in that case, the
-     specified values will be used. *)
-  type t = {peer_id : P2p_peer.Id.t; maybe_reachable_point : P2p_point.Id.t}
+     specified values will be used.
+
+      We also know if a peer is a bootstrap one or not from connections
+      metatada. *)
+  type t = {
+    peer_id : P2p_peer.Id.t;
+    maybe_reachable_point : P2p_point.Id.t;
+    bootstrap : bool;
+  }
 
   (** Comparison is not a structural one, instead only the [peer_id]
       is used. *)
