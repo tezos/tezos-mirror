@@ -36,8 +36,19 @@ module type ITERABLE = sig
   module Map : Map.S with type key = t
 end
 
+module type PEER = sig
+  include ITERABLE
+
+  (* Note: The [is_bootstrap] function is needed by the worker, but not by the
+     automaton. However, since the automaton is currently provided instantiated
+     to the GS worker, we cannot specialize interfaces. In the future, we might
+     want to refactor the code to enable the instantiation of the GS automaton
+     in the worker, which will allow refining this interface. *)
+  val is_bootstrap : t -> bool
+end
+
 module type AUTOMATON_SUBCONFIG = sig
-  module Peer : ITERABLE
+  module Peer : PEER
 
   module Topic : ITERABLE
 
@@ -434,7 +445,7 @@ module type SCORE = sig
 end
 
 module type MESSAGE_CACHE = sig
-  module Peer : ITERABLE
+  module Peer : PEER
 
   module Topic : ITERABLE
 
@@ -529,7 +540,7 @@ end
 
 module type AUTOMATON = sig
   (** Module for peer *)
-  module Peer : ITERABLE
+  module Peer : PEER
 
   (** Module for topic *)
   module Topic : ITERABLE
