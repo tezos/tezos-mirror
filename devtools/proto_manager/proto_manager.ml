@@ -182,17 +182,16 @@ let set_current_version =
                   ]
                 |> compile
               in
-              let replacements =
-                Utils.File.Content.replace_string_all
-                  ~regex
-                  ~by:
-                    (Format.asprintf
-                       {|let version_value = "%s"|}
-                       (State.Target.get_version_value state))
-                  files
-              in
-              if replacements = 0 then
-                Log.warning "No current version to set found." ;
+              Utils.File.Content.(
+                check_modif_count_all
+                  ~warn:(Msg "No version_value has been updated.")
+                  (replace_string_all
+                     ~regex
+                     ~by:
+                       (Format.asprintf
+                          {|let version_value = "%s"|}
+                          (State.Target.get_version_value state)))
+                  files) ;
               state))
     |> Command.register
          (Command.Git.commit ~__LOC__ ~no_verify:() (fun _state ->
@@ -259,10 +258,11 @@ let add_predecessor =
                 Re.(State.Source.get_constructor state |> str |> compile)
               in
               let by = State.Target.get_constructor state in
-              let replacements =
-                Utils.File.Content.replace_string_all ~regex ~by (files state)
-              in
-              if replacements = 0 then Log.warning "No Variant found" ;
+              Utils.File.Content.(
+                check_modif_count_all
+                  ~warn:(Msg "No constructor has been updated")
+                  (replace_string_all ~regex ~by)
+                  (files state)) ;
               state))
     |> Command.register
          (Command.File.ocamlformat ~__LOC__ (fun state -> files state))
@@ -458,15 +458,14 @@ let replace_protocol_occurences =
                     ^ State.Target.get_dune_name ~__LOC__ state );
                 ]
               in
-              let replacements =
-                Utils.File.Content.replace_assoc_all
-                  ~error:(error ~__LOC__ state)
-                  ~regex
-                  ~assoc
-                  files
-              in
-              if replacements = 0 then
-                Log.warning "No protocol occurrences found." ;
+              Utils.File.Content.(
+                check_modif_count_all
+                  ~warn:(Msg "No protocol referencies has been updated.")
+                  (replace_assoc_all
+                     ~error:(error ~__LOC__ state)
+                     ~regex
+                     ~assoc)
+                  files) ;
               state))
     |> Command.register
          (Command.create
@@ -542,14 +541,11 @@ let update_readme =
             (fun state ->
               let regex = Re.(State.Source.get_name state |> str |> compile) in
               let by = State.Target.get_name state in
-              let replacements =
-                Utils.File.Content.replace_string
-                  ~regex
-                  ~by
-                  (State.Target.Dir.Absolute.get_src_proto state // "README.md")
-              in
-              if replacements = 0 then
-                Log.warning "No protocol found in README.md" ;
+              Utils.File.Content.(
+                check_modif_count
+                  ~warn:(Msg "No modification in README.md has been done")
+                  (replace_string ~regex ~by)
+                  (State.Target.Dir.Absolute.get_src_proto state // "README.md")) ;
               state))
     |> Command.register
          (Command.Git.commit ~__LOC__ ~no_verify:() (fun _state ->
@@ -601,11 +597,11 @@ let link =
                       (State.Target.get_name state)
                       matched
               in
-              let replacements =
-                Utils.File.Content.replace_f ~regex ~f (file state)
-              in
-              if replacements = 0 then
-                Log.warning "No modifications in manifest has been done." ;
+              Utils.File.Content.(
+                check_modif_count
+                  ~warn:(Msg "No modifications in manifest has been done.")
+                  (replace_f ~regex ~f)
+                  (file state)) ;
               state))
     |> Command.register
          (Command.File.ocamlformat ~__LOC__ (fun state -> [file state]))

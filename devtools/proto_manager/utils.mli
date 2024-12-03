@@ -82,6 +82,19 @@ module File : sig
       string list ->
       int
 
+    (** Type to log a specific warning message on a generic message based on a
+        code line location. *)
+    type warn = Msg of string | Loc of string
+
+    (** [check_modif_count ~warn f file] applies [f file] then checks that
+        the count of matches returned by [f] is greater than 0, if its not the
+        case it logs a warning message based on [warn]. *)
+    val check_modif_count : warn:warn -> (string -> int) -> string -> unit
+
+    (** Same as [check_matches_count] but for a list of files. *)
+    val check_modif_count_all :
+      warn:warn -> (string list -> int) -> string list -> unit
+
     (** [ocamlformat ~error files] formats all [files]. Calls [error ()] if
         fails. *)
     val ocamlformat : error:(unit -> unit) -> string list -> unit
