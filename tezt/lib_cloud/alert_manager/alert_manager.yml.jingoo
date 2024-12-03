@@ -14,13 +14,13 @@ route:
     {%- for group in groups %}
     - match_re:
         alertname: '{{ group.alertname }}'
-      {%- if group.group_wait %}
-      group_wait: {{ group.group_wait }}
+      {%- if group.repeat_interval %}
+      repeat_interval: {{ group.repeat_interval }}
       {% endif -%}
       {%- if group.group_interval %}
       group_interval: {{ group.group_interval }}
       {% endif -%}
-      {%- if group.repeat_interval %}
+      {%- if group.group_wait %}
       group_wait: {{ group.group_wait }}
       {% endif %}
       receiver: '{{ group.receiver }}'
@@ -33,9 +33,9 @@ receivers:
   - name: '{{ receiver.name }}'
   {%- if receiver.config.type == 'slack' %}
     slack_configs:
-    - channel: '{{ receiver.config.data.channel }}'
-      title: '{{ receiver.config.data.title }}'
-      text: '{{ receiver.config.data.text }}'
+    - channel: {{ receiver.config.data.channel }}
+      title: {{ receiver.config.data.title }}
+      text: {{ receiver.config.data.text }}
   {% endif -%}
 {% endfor %}
 
