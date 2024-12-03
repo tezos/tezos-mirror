@@ -67,6 +67,7 @@ val on_event : t -> (event -> unit) -> unit
     The resulting promise is fulfilled as soon as the baker has been
     spawned. It continues running in the background. *)
 val run :
+  ?env:string String_map.t ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   t ->
@@ -251,6 +252,7 @@ val create_from_uris :
     in order to determine the attestations it sends to the L1 node. A
     [--dal_node] argument is passed to specify the DAL node's endpoint. *)
 val init :
+  ?env:string String_map.t ->
   ?runner:Runner.t ->
   protocol:Protocol.t ->
   ?path:string ->
