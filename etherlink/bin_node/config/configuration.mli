@@ -59,6 +59,11 @@ type garbage_collector = {
   history_to_keep_in_seconds : int;
 }
 
+(** RPC server implementation. *)
+type rpc_server =
+  | Resto  (** Resto/Cohttp (default) *)
+  | Dream  (** Dream/httpun *)
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -68,6 +73,7 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
+  rpc_server : rpc_server;
   enable_websocket : bool;
 }
 

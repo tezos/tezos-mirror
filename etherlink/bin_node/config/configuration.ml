@@ -40,6 +40,8 @@ type garbage_collector = {
   history_to_keep_in_seconds : int;
 }
 
+type rpc_server = Resto | Dream
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
@@ -47,6 +49,7 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
+  rpc_server : rpc_server;
   enable_websocket : bool;
 }
 
@@ -139,6 +142,7 @@ let default_experimental_features =
     block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
     garbage_collector = None;
+    rpc_server = Resto;
     enable_websocket = false;
   }
 
@@ -686,6 +690,10 @@ let garbage_collector_encoding =
              collected, e.g. 86_400 will keep 1 day of history."
           int31))
 
+let rpc_server_encoding =
+  let open Data_encoding in
+  string_enum [("resto", Resto); ("dream", Dream)]
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -696,6 +704,7 @@ let experimental_features_encoding =
            block_storage_sqlite3;
            overwrite_simulation_tick_limit;
            garbage_collector;
+           rpc_server;
            enable_websocket;
          } ->
       ( drop_duplicate_on_injection,
@@ -705,6 +714,7 @@ let experimental_features_encoding =
         overwrite_simulation_tick_limit,
         garbage_collector,
         None,
+        rpc_server,
         enable_websocket ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
@@ -713,6 +723,7 @@ let experimental_features_encoding =
            overwrite_simulation_tick_limit,
            garbage_collector,
            _next_wasm_runtime,
+           rpc_server,
            enable_websocket ) ->
       {
         drop_duplicate_on_injection;
@@ -721,9 +732,10 @@ let experimental_features_encoding =
         block_storage_sqlite3;
         overwrite_simulation_tick_limit;
         garbage_collector;
+        rpc_server;
         enable_websocket;
       })
-    (obj8
+    (obj9
        (dft
           ~description:
             "Request the rollup node to filter messages it has already \
@@ -769,6 +781,13 @@ let experimental_features_encoding =
              to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You \
              should remove this option from your configuration file."
           bool)
+       (dft
+          "rpc_server"
+          ~description:
+            "Choose the RPC server implementation, \'dream\' or \'resto\', the \
+             latter being the default one."
+          rpc_server_encoding
+          default_experimental_features.rpc_server)
        (dft
           "enable_websocket"
           ~description:"Enable or disable the experimental websocket server"
