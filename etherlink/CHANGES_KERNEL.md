@@ -11,6 +11,7 @@
 - Minimum base fee per gas is stored in the durable storage. (!15475)
 - Blueprints from the past are refused on parsing. (!15636)
 - Clear blueprints on migration (!15637)
+- Support for legacy untagged format for delayed transactions has been dropped. (!15366)
 
 ### Bug fixes
 
