@@ -1617,6 +1617,7 @@ let remember_script ~alias ~src client =
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?fresh_probability ?smart_contract_parameters client =
+  let runner = client.runner in
   let sources =
     (* [sources] is a string containing all the [source_aliases],
        [source_pkhs], and [source_accounts] in JSON format, as
@@ -1656,7 +1657,7 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   (* It is important to write the sources to a file because if we use a few
      thousands of sources the command line becomes too long. *)
   let sources_filename =
-    Temp.file (Format.sprintf "sources-%s.json" client.name)
+    Temp.file ?runner (Format.sprintf "sources-%s.json" client.name)
   in
   with_open_out sources_filename (fun ch ->
       output_string ch (JSON.encode_u sources)) ;
