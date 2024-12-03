@@ -11,6 +11,8 @@ module Infix = struct
   let ( // ) = Filename.concat
 end
 
+let str_of_fmt fmt = Format.kasprintf Re.str fmt
+
 open Infix
 
 module Process = struct
