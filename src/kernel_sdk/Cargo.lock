@@ -701,6 +701,7 @@ name = "installer-kernel"
 version = "0.2.2"
 dependencies = [
  "tezos-smart-rollup",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-installer-config",
 ]
 
