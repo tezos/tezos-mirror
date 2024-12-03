@@ -28,13 +28,21 @@ open Gossipsub_intf
 module Types = Tezos_dal_node_services.Types
 
 module Validate_message_hook = struct
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
+  let warn_validation_function_not_set =
+    Internal_event.Simple.declare_0
+      ~section:["dal"; "gs_interface"]
+      ~name:"message_validation_function_not_set"
+      ~msg:"The message validation function is not set"
+      ~level:Warning
 
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
      Refactor gossipsub integration to avoid this mutable hook in the lib. *)
   let check_message =
     ref (fun ?message:_ ~message_id:_ () ->
-        Format.eprintf
-          "Gs interface: messages validatation function is not set@." ;
+        Internal_event.Simple.(
+          emit__dont_wait__use_with_care
+            (warn_validation_function_not_set ())
+            ()) ;
         `Unknown)
 
   let set func = check_message := func

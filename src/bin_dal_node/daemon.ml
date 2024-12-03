@@ -1211,6 +1211,12 @@ let run ~data_dir ~configuration_override =
       transport_layer
       cctxt
   in
+  Gossipsub.Worker.Validate_message_hook.set
+    (Handler.gossipsub_app_messages_validation
+       ctxt
+       cryptobox
+       head_level
+       proto_parameters) ;
   let is_prover_profile = Profile_manager.is_prover_profile profile_ctxt in
   (* Initialize amplificator if in prover profile.
      This forks a process and should be kept early to avoid copying opened file
