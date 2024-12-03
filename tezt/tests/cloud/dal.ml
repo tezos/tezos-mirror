@@ -837,6 +837,15 @@ module Cli = struct
       ~long:"slack-api-url"
       ~description:"The slack webhook url to send the alerts on"
       ()
+
+  let bootstrap_node_identity_file =
+    Clap.optional_string
+      ~section
+      ~long:"bootstrap-node-identity"
+      ~description:
+        "The bootstrap node identity file. Warning: this argument may be \
+         removed in a future release."
+      ()
 end
 
 type etherlink_configuration = {
@@ -865,6 +874,7 @@ type configuration = {
   fundraiser : string option;
   blocks_history : int;
   metrics_retention : int;
+  bootstrap_node_identity_file : string option;
 }
 
 type bootstrap = {
@@ -2916,6 +2926,7 @@ let configuration, etherlink_configuration =
   in
   let blocks_history = Cli.blocks_history in
   let metrics_retention = Cli.metrics_retention in
+  let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
   let t =
     {
       stake;
@@ -2934,6 +2945,7 @@ let configuration, etherlink_configuration =
       fundraiser;
       blocks_history;
       metrics_retention;
+      bootstrap_node_identity_file;
     }
   in
   (t, etherlink)
