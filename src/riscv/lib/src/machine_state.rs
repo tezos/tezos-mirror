@@ -12,7 +12,6 @@ mod cache_layouts;
 pub mod csregisters;
 pub mod hart_state;
 pub mod instruction;
-pub mod instruction_cache;
 pub mod mode;
 pub mod registers;
 pub mod reservation_set;
@@ -25,7 +24,6 @@ use self::{
     block_cache::BlockCache,
     bus::main_memory::{Address, MainMemory, OutOfBounds},
     instruction::Instruction,
-    instruction_cache::InstructionCache,
 };
 use crate::{
     bits::u64,
@@ -37,7 +35,7 @@ use crate::{
     },
     parser::{
         instruction::{Instr, InstrCacheable, InstrUncacheable, InstrWidth},
-        is_compressed,
+        is_compressed, parse_compressed_instruction, parse_uncompressed_instruction,
     },
     program::Program,
     range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
@@ -85,7 +83,6 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerClone> Clone
 /// Layout for the machine state - everything required to fetch & run instructions.
 pub type MachineStateLayout<ML, CL> = (
     MachineCoreStateLayout<ML>,
-    <CL as CacheLayouts>::InstructionCacheLayout,
     <CL as CacheLayouts>::BlockCacheLayout<ML>,
 );
 
@@ -96,7 +93,6 @@ pub struct MachineState<
     M: backend::ManagerBase,
 > {
     pub core: MachineCoreState<ML, M>,
-    pub instruction_cache: InstructionCache<CL::InstructionCacheLayout, M>,
     pub block_cache: BlockCache<CL::BlockCacheLayout<ML>, ML, M>,
 }
 
@@ -106,7 +102,6 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClo
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
-            instruction_cache: self.instruction_cache.clone(),
             block_cache: self.block_cache.clone(),
         }
     }
@@ -250,8 +245,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML, CL>, M>) -> Self {
         Self {
             core: MachineCoreState::bind(space.0),
-            instruction_cache: InstructionCache::bind(space.1),
-            block_cache: BlockCache::bind(space.2),
+            block_cache: BlockCache::bind(space.1),
         }
     }
 
@@ -262,7 +256,6 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     ) -> backend::AllocatedOf<MachineStateLayout<ML, CL>, F::Output> {
         (
             self.core.struct_ref::<F>(),
-            self.instruction_cache.struct_ref::<F>(),
             self.block_cache.struct_ref::<F>(),
         )
     }
@@ -273,7 +266,6 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         M: backend::ManagerReadWrite,
     {
         self.core.reset();
-        self.instruction_cache.reset();
         self.block_cache.reset();
     }
 
@@ -355,14 +347,13 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read all 4 bytes eagerly.
         let instr = if is_compressed(first_halfword) {
-            self.instruction_cache.cache_compressed(
-                |cache_entry| {
-                    self.block_cache
-                        .push_instr::<{ InstrWidth::Compressed as u64 }>(cache_entry)
-                },
-                phys_addr,
-                first_halfword,
-            )
+            let instr = parse_compressed_instruction(first_halfword);
+            if let Instr::Cacheable(instr) = instr {
+                let instr = Instruction::from(&instr);
+                self.block_cache.push_instr_compressed(phys_addr, instr);
+            }
+
+            instr
         } else {
             let upper = {
                 let next_addr = phys_addr + 2;
@@ -380,14 +371,13 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
             };
 
             let combined = (upper as u32) << 16 | (first_halfword as u32);
-            self.instruction_cache.cache_uncompressed(
-                |cache_entry| {
-                    self.block_cache
-                        .push_instr::<{ InstrWidth::Uncompressed as u64 }>(cache_entry)
-                },
-                phys_addr,
-                combined,
-            )
+            let instr = parse_uncompressed_instruction(combined);
+            if let Instr::Cacheable(instr) = instr {
+                let instr = Instruction::from(&instr);
+                self.block_cache.push_instr_uncompressed(phys_addr, instr);
+            }
+
+            instr
         };
 
         Ok(instr)
@@ -458,12 +448,8 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
     where
         M: backend::ManagerReadWrite,
     {
-        match self.instruction_cache.fetch_instr(phys_addr).as_ref() {
-            Some(instr) => instr.run(&mut self.core),
-            None => self
-                .fetch_instr(current_mode, satp, instr_pc, phys_addr)
-                .and_then(|instr| self.run_instr(&instr)),
-        }
+        self.fetch_instr(current_mode, satp, instr_pc, phys_addr)
+            .and_then(|instr| self.run_instr(&instr))
     }
 
     /// Take an interrupt if available, and then
@@ -1313,7 +1299,7 @@ mod tests {
         //
         // Note that we are jumping 2 * CACHE_SIZE to achieve the wrap-around, as non u16-aligned
         // addresses cannot be cached, so CACHE_SIZE corresponds to 2*CACHE_SIZE addresses.
-        type CacheLayout = cache_layouts::Sizes<6, 64, 12, 4096>;
+        type CacheLayout = cache_layouts::Sizes<12, 4096>;
 
         let auipc_bytes: u32 = 0x517;
         let cj_bytes: u16 = 0xa8b5;
