@@ -1035,18 +1035,7 @@ let add_etherlink_source cloud agent ~name ?dal_node node sc_rollup_node
     @ dal_node_metric_target)
 
 let init_teztale (configuration : configuration) cloud agent =
-  if configuration.teztale then
-    let* teztale = Teztale.run_server agent in
-    let* () = Teztale.wait_server teztale in
-    let* () =
-      let domain =
-        Agent.point agent |> Option.fold ~none:"localhost" ~some:fst
-      in
-      let port = teztale.server.conf.interface.port in
-      let url = sf "http://%s:%d" domain port in
-      Cloud.add_service cloud ~name:"teztale" ~url
-    in
-    Lwt.return_some teztale
+  if configuration.teztale then init_teztale cloud agent |> Lwt.map Option.some
   else Lwt.return_none
 
 let may_copy_dal_node_identity_file agent node = function
