@@ -715,8 +715,17 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       pending_blueprint_applied ;
     unit
   in
+  let env =
+    match Sys.getenv_opt "RUST_LOG" with
+    | Some _ -> None
+    | None ->
+        Some
+          String_map.(
+            singleton "RUST_LOG" "octez_evm_node_wasm_runtime::write_debug=info")
+  in
   let* () =
     run
+      ?env
       ?runner:evm_node.persistent_state.runner
       ~event_level:`Debug
       evm_node
