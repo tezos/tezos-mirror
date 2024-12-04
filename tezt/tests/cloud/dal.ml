@@ -1973,7 +1973,7 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
       ~delegates:[account.Account.alias]
       ~protocol:configuration.protocol
       ~client
-      dal_node
+      ~dal_node
       node
       agent
   in
