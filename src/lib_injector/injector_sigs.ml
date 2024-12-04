@@ -332,7 +332,7 @@ module type S = sig
 
   (** Add an operation as pending injection in the injector. It returns the id
       of the operation in the injector queue. *)
-  val add_pending_operation : operation -> Id.t tzresult Lwt.t
+  val add_pending_operation : ?order:Z.t -> operation -> Id.t tzresult Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending

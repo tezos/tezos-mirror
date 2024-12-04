@@ -423,9 +423,13 @@ let wait_for_included_successful_operation node ~operation_kind =
 
 let wait_until_n_batches_are_injected rollup_node ~nb_batches =
   let nb_injected = ref 0 in
-  Sc_rollup_node.wait_for rollup_node "injected_ops.v0" @@ fun _json ->
-  nb_injected := !nb_injected + 1 ;
-  if !nb_injected >= nb_batches then Some () else None
+  Sc_rollup_node.wait_for rollup_node "injected_ops.v0" @@ fun json ->
+  JSON.(
+    json |-> "operations" |> as_list
+    |> List.iter (fun json ->
+           let kind = json |-> "kind" |> as_string in
+           if kind = "add_messages" then nb_injected := !nb_injected + 1)) ;
+  if !nb_injected = nb_batches then Some () else None
 
 let send_message_batcher_aux ?rpc_hooks client sc_node msgs =
   let batched =
@@ -5879,10 +5883,12 @@ let test_batcher_order_msgs ~kind =
     unit
   in
 
-  let bake_then_check_included_msgs ~__LOC__ ~nb_batches ~expected_messages =
+  let bake_then_check_included_msgs ~__LOC__ ~expected_messages =
     let* level = Node.get_level node in
     let wait_for_injected =
-      wait_until_n_batches_are_injected rollup_node ~nb_batches
+      wait_until_n_batches_are_injected
+        rollup_node
+        ~nb_batches:(List.length expected_messages)
     in
     let* () = Client.bake_for_and_wait client
     and* () = wait_for_injected
@@ -5938,7 +5944,6 @@ let test_batcher_order_msgs ~kind =
   let* () =
     bake_then_check_included_msgs
       ~__LOC__
-      ~nb_batches:1
       ~expected_messages:[expected_messages]
   in
 
@@ -5976,9 +5981,28 @@ let test_batcher_order_msgs ~kind =
       List.init min_batch_elements (fun i -> (max_batch_elements + i) * 10);
     ]
   in
-  let* () =
-    bake_then_check_included_msgs ~__LOC__ ~nb_batches:1 ~expected_messages
+  let* () = bake_then_check_included_msgs ~__LOC__ ~expected_messages in
+
+  Log.info
+    "Injecting multiple time the mimimal batches element in reverse order of \
+     priority to make sure the injector order them correctly" ;
+  (* [0; 1; ... 9] *)
+  let messages_no_order = List.init min_batch_elements Fun.id in
+  let* _hashes = inject_int_of_string messages_no_order in
+  (* [10; 11; ... 19] *)
+  let messages_order_2 =
+    List.init min_batch_elements (fun i -> min_batch_elements + i)
   in
+  let* _hashes = inject_int_of_string ~order:2 messages_order_2 in
+  (* [20; 21; ... 29] *)
+  let messages_order_1 =
+    List.init min_batch_elements (fun i -> (2 * min_batch_elements) + i)
+  in
+  let* _hashes = inject_int_of_string ~order:1 messages_order_1 in
+  let expected_messages =
+    [messages_order_1; messages_order_2; messages_no_order]
+  in
+  let* () = bake_then_check_included_msgs ~__LOC__ ~expected_messages in
   unit
 
 let test_injector_order_operations_by_kind ~kind =
