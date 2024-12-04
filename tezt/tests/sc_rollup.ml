@@ -6024,6 +6024,118 @@ let test_batcher_order_msgs ~kind =
   in
   unit
 
+let test_injector_order_operations_by_kind ~kind =
+  let commitment_period = 5 in
+  let challenge_window = 5 in
+  test_full_scenario
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6650
+
+     cf multiple_batcher_test comment. *)
+    ~rpc_external:false
+    ~kind
+    ~commitment_period
+    ~challenge_window
+    ~mode:Operator
+    {
+      variant = None;
+      tags = ["injector"; "operations"; "order"];
+      description = "Injector order operations by kind";
+    }
+  @@ fun _protocol rollup_node rollup_addr _node client ->
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
+  let* _ = Client.bake_for_and_wait client in
+  (* to be 1 block after the origination, otherwise it fails for
+     something we don't care *)
+  let check_sr_ops_are_ordered () =
+    let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+    let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+    let ops_kind =
+      let open JSON in
+      let filter_sr_op json =
+        let kind = json |-> "kind" |> as_string in
+        if String.starts_with ~prefix:"smart_rollup" kind then Some kind
+        else None
+      in
+      List.map
+        (fun op -> op |-> "contents" |> as_list |> List.filter_map filter_sr_op)
+        ops
+      |> List.flatten
+    in
+    let all =
+      [
+        ["smart_rollup_timeout"];
+        ["smart_rollup_refute"];
+        ["smart_rollup_publish"; "smart_rollup_cement"];
+        ["smart_rollup_recover"];
+        ["smart_rollup_add_messages"];
+        ["smart_rollup_execute_outbox_message"];
+      ]
+    in
+    let is_sorted =
+      let rec aux all l =
+        match (all, l) with
+        | _, hd :: rest when not (String.starts_with ~prefix:"smart_rollup" hd)
+          ->
+            (*skip op not smart rollup*)
+            aux all rest
+        | current :: all_rest, hd :: rest ->
+            if List.mem hd current then aux all rest else aux all_rest l
+        | _, [] -> (* all element of l appeared in all in the same order *) true
+        | [], _ ->
+            (* There is still at least an element of L but the
+               sorted list is empty. L was not correctly
+               ordered. *)
+            false
+      in
+      aux all
+    in
+    Check.is_true
+      ~__LOC__
+      ~error_msg:
+        (Format.asprintf
+           "injected operations are not sorted, [%a]"
+           Format.(
+             pp_print_list
+               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+               pp_print_string)
+           ops_kind)
+    @@ is_sorted ops_kind ;
+    unit
+  in
+
+  let hook i =
+    let* () =
+      (* check done at each block so we don't miss any *)
+      check_sr_ops_are_ordered ()
+    in
+    let* _ =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.post_local_batcher_injection
+           ~messages:[string_of_int i]
+           ()
+    in
+    unit
+  in
+  (* We only check add_messages, publish and cement operations
+     order. We could do more but test becomes more involved and I
+     think it's not necessary. *)
+  let* level =
+    bake_until_lpc_updated
+      ~at_least:(commitment_period + 2)
+      ~hook
+      client
+      rollup_node
+  in
+  let* _ =
+    bake_until_lcc_updated
+      ~at_least:(challenge_window + 2)
+      ~hook
+      client
+      rollup_node
+      ~level
+  in
+  unit
+
 (** Injector only uses key that have no operation in the mempool
    currently.
    1. Batcher setup:
@@ -6681,6 +6793,7 @@ let register_protocol_independent () =
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;
   test_injector_uses_available_keys protocols ~kind ;
+  test_injector_order_operations_by_kind protocols ~kind ;
   test_batcher_dont_reinject_already_injected_messages protocols ~kind ;
   test_private_rollup_node_publish_in_whitelist protocols ;
   test_private_rollup_node_publish_not_in_whitelist protocols ;

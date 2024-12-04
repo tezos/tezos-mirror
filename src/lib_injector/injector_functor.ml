@@ -110,10 +110,10 @@ module Make (Parameters : PARAMETERS) = struct
     | Injected of injected_info
     | Included of included_info
 
-  module Op_queue =
-    Disk_persistence.Make_queue
+  module Op_heap =
+    Disk_persistence.Make_heap
       (struct
-        let name = "operations_queue"
+        let name = "operations_heap"
       end)
       (Id)
       (struct
@@ -165,8 +165,7 @@ module Make (Parameters : PARAMETERS) = struct
     strategy : injection_strategy;
         (** The strategy of this worker for injecting the pending operations. *)
     save_dir : string;  (** Path to where save persistent state *)
-    queue : Op_queue.t;
-        (** The queue of pending operations for this injector. *)
+    heap : Op_heap.t;  (** The heap of pending operations for this injector. *)
     injected : injected_state;
         (** The information about injected operations. *)
     included : included_state;
@@ -265,14 +264,14 @@ module Make (Parameters : PARAMETERS) = struct
       Event.(emit loaded_from_disk)
         (List.map (fun s -> s.alias) signers, tags, nb, kind)
     in
-    let* queue =
-      Op_queue.load_from_disk
+    let* heap =
+      Op_heap.load_from_disk
         ~warn_unreadable
         ~capacity:50_000
         ~data_dir
         ~filter:(filter (fun op -> op.Inj_operation.operation))
     in
-    let*! () = emit_event_loaded "operations_queue" @@ Op_queue.length queue in
+    let*! () = emit_event_loaded "operations_queue" @@ Op_heap.length heap in
     (* Very coarse approximation for the number of operation we expect for each
        block *)
     let n =
@@ -313,7 +312,7 @@ module Make (Parameters : PARAMETERS) = struct
         tags;
         strategy;
         save_dir = data_dir;
-        queue;
+        heap;
         injected = {injected_operations; injected_ophs};
         included = {included_operations; included_in_blocks};
         state;
@@ -326,11 +325,11 @@ module Make (Parameters : PARAMETERS) = struct
       }
 
   (** We consider an operation to already exist in the injector if either:
-      - It is already in the queue
+      - It is already in the heap
       - It is injected but not included
       - It is included but not confirmed. *)
   let already_exists state op_hash =
-    Op_queue.find_opt state.queue op_hash <> None
+    Op_heap.find_opt state.heap op_hash <> None
     || Injected_operations.mem state.injected.injected_operations op_hash
     ||
     match
@@ -343,8 +342,8 @@ module Make (Parameters : PARAMETERS) = struct
         | Some {level = head_level; _} ->
             Int32.sub head_level l1_level < Int32.of_int confirmations)
 
-  (** Add an operation to the pending queue corresponding to the signer for this
-    operation.  *)
+  (** Add an operation to the pending heap corresponding to the signer for this
+    operation. *)
   let add_pending_operation ?(retry = false) state (op : Inj_operation.t) =
     let open Lwt_result_syntax in
     if already_exists state op.id then
@@ -356,7 +355,7 @@ module Make (Parameters : PARAMETERS) = struct
           state
           op.operation
       in
-      Op_queue.replace state.queue op.id op
+      Op_heap.insert state.heap op.id op
 
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state {pkh = signer_pkh; _} oph ~injection_level
@@ -557,12 +556,12 @@ module Make (Parameters : PARAMETERS) = struct
         let*! () =
           Event.(emit1 number_of_operations_in_queue)
             state
-            (Op_queue.length state.queue)
+            (Op_heap.length state.heap)
         in
         (* We perform a dichotomy by injecting the first half of the
            operations (we are not looking to maximize the number of operations
            injected because of the cost of simulation). Only the operations
-           which are actually injected will be removed from the queue so the
+           which are actually injected will be removed from the heap so the
            other half will be reconsidered later. *)
         match keep_half operations with
         | None ->
@@ -602,7 +601,7 @@ module Make (Parameters : PARAMETERS) = struct
           op.errors.count
           op.errors.last_error
       in
-      Op_queue.remove state.queue op.id
+      Op_heap.remove state.heap op.id
     else
       let*! () =
         Event.(emit3 ?signers error_simulation_operation)
@@ -696,46 +695,44 @@ module Make (Parameters : PARAMETERS) = struct
         in
         (oph, operations)
 
-  (** Retrieve as many batch of operations from the queue while batch
-      size remains below the size limit. *)
-  let get_n_ops_batch_from_queue ~size_limit state n =
-    let exception
-      Reached_limit of
-        (int * Inj_operation.t list * int * Inj_operation.t list list)
-    in
+  (** Retrieve as many batch of operations from the heap while batch
+          size remains below the size limit. *)
+  let get_n_ops_batch_from_queue ~size_limit state nb_signers =
+    let open Lwt_result_syntax in
     let module Proto_client = (val state.proto_client) in
     let min_size = Block_hash.size + Signature.size Signature.zero in
     let op_size op =
       Proto_client.operation_size op.Inj_operation.operation
       + Proto_client.operation_size_overhead
     in
-    let _current_size, rev_current_ops, nb_batch, rev_ops_batch =
-      try
-        Op_queue.fold
-          (fun _oph
-               op
-               ((current_size, rev_current_ops, nb_batch, rev_ops_batch) as acc) ->
-            if nb_batch = n then raise (Reached_limit acc) ;
-            let new_size = current_size + op_size op in
-            if new_size > size_limit then
-              let current_ops = List.rev rev_current_ops in
-              ( min_size + op_size op,
-                [op],
-                nb_batch + 1,
-                current_ops :: rev_ops_batch )
-            else (new_size, op :: rev_current_ops, nb_batch, rev_ops_batch))
-          state.queue
-          (min_size, [], 0, [])
-      with Reached_limit acc -> acc
+    let add_batch rev_batch rev_batches =
+      if List.is_empty rev_batch then rev_batches
+      else
+        let batch = List.rev rev_batch in
+        batch :: rev_batches
     in
-    let rev_ops_batch =
-      if nb_batch < n then
-        (* Add the last batch, even if it's not of full size, to ensure a larger number of batches. *)
-        let current_ops = List.rev rev_current_ops in
-        current_ops :: rev_ops_batch
-      else rev_ops_batch
+    let rec get_until_enough (batch_size, rev_ops) (nb_batches, rev_batches) =
+      let op_opt = Op_heap.peek_min state.heap in
+      match op_opt with
+      | None ->
+          (* Heap is empty, finalize current batch *)
+          return @@ add_batch rev_ops rev_batches
+      | Some op ->
+          let new_size = batch_size + op_size op in
+          if new_size <= size_limit then
+            (* pop the message as we only peeked it. *)
+            let* _op = Op_heap.pop state.heap in
+            get_until_enough (new_size, op :: rev_ops) (nb_batches, rev_batches)
+          else
+            (* we haven't pop the message, so we can safely call
+               continue_or_stop. *)
+            continue_or_stop (nb_batches + 1, add_batch rev_ops rev_batches)
+    and continue_or_stop (nb_batches, rev_batches) =
+      if nb_batches = nb_signers then return rev_batches
+      else get_until_enough (min_size, []) (nb_batches, rev_batches)
     in
-    List.rev rev_ops_batch
+    let* rev_batches = continue_or_stop (0, []) in
+    return @@ List.rev rev_batches
 
   (* Ignore operations that are allowed to fail. *)
   let ignore_ignorable_failing_operations state operations =
@@ -762,9 +759,9 @@ module Make (Parameters : PARAMETERS) = struct
         `Ignored operations_to_drop
 
   (** [inject_pending_operations_round state ?size_limit signer]
-      injects operations from the pending queue [state.pending], whose
+      injects operations from the pending heap [state.pending], whose
       total size does not exceed [size_limit] using [signer]. Upon
-      successful injection, the operations are removed from the queue
+      successful injection, the operations are removed from the heap
       and marked as injected. *)
   let inject_pending_operations_round state signer operations_to_inject =
     let open Lwt_result_syntax in
@@ -808,7 +805,7 @@ module Make (Parameters : PARAMETERS) = struct
             let* () =
               List.iter_es
                 (fun (_index, op) ->
-                  Op_queue.remove state.queue op.Inj_operation.id)
+                  Op_heap.remove state.heap op.Inj_operation.id)
                 injected_operations
             in
             let*! () =
@@ -843,7 +840,7 @@ module Make (Parameters : PARAMETERS) = struct
             in
             let* () =
               List.iter_es
-                (fun op -> Op_queue.remove state.queue op.Inj_operation.id)
+                (fun op -> Op_heap.remove state.heap op.Inj_operation.id)
                 operations_to_drop
             in
             return (`Continue 0))
@@ -854,7 +851,7 @@ module Make (Parameters : PARAMETERS) = struct
         Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
     let signers = available_signers state in
-    let ops_batch =
+    let* ops_batch =
       get_n_ops_batch_from_queue ~size_limit state (List.length signers)
     in
     let signers_and_ops = List.combine_drop signers ops_batch in
@@ -1007,7 +1004,7 @@ module Make (Parameters : PARAMETERS) = struct
   (** [revert_included_operations state block] marks the known (by this injector)
     manager operations contained in [block] as not being included any more,
     typically in the case of a reorganization where [block] is on an alternative
-    chain. The operations are put back in the pending queue. *)
+    chain. The operations are put back in the pending heap. *)
   let revert_included_operations state block =
     let open Lwt_result_syntax in
     when_ (has_included_operations state) @@ fun () ->
@@ -1018,7 +1015,7 @@ module Make (Parameters : PARAMETERS) = struct
         (List.map (fun o -> o.op.id) revert_infos)
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2814
-       maybe put at the front of the queue for re-injection. *)
+       maybe put at the front of the heap for re-injection. *)
     List.iter_es
       (fun {op; _} ->
         let*! requeue =
@@ -1122,7 +1119,7 @@ module Make (Parameters : PARAMETERS) = struct
   let set_metrics state =
     Metrics.wrap @@ fun () ->
     let tags = Tags.to_seq state.tags |> List.of_seq in
-    Metrics.set_queue_size tags (Op_queue.length state.queue) ;
+    Metrics.set_queue_size tags (Op_heap.length state.heap) ;
     Metrics.set_injected_operations_size
       tags
       (Injected_operations.length state.injected.injected_operations) ;
@@ -1196,7 +1193,7 @@ module Make (Parameters : PARAMETERS) = struct
     set_last_head state head
 
   (* The request {Request.Inject} triggers an injection of the operations
-     the pending queue. *)
+     the pending heap. *)
   let on_inject state =
     let open Lwt_result_syntax in
     let* total_nb_injected_op =
@@ -1206,7 +1203,7 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () =
       Event.(emit1 number_of_operations_in_queue)
         state
-        (Op_queue.length state.queue)
+        (Op_heap.length state.heap)
     in
     return ()
 
@@ -1215,18 +1212,13 @@ module Make (Parameters : PARAMETERS) = struct
     Injected_ophs.clear state.injected.injected_ophs ;
     Included_operations.clear state.included.included_operations ;
     Included_in_blocks.clear state.included.included_in_blocks ;
-    Op_queue.clear state.queue
+    Op_heap.clear state.heap
 
   let remove_operations_with_tag tag state =
-    let open Lwt_result_syntax in
-    Op_queue.fold
-      (fun id op acc ->
-        if Parameters.Tag.equal (Parameters.operation_tag op.operation) tag then
-          let* () = Op_queue.remove state.queue id in
-          acc
-        else acc)
-      state.queue
-      return_unit
+    Op_heap.remove_predicate
+      (fun op ->
+        Parameters.Tag.equal (Parameters.operation_tag op.operation) tag)
+      state.heap
 
   module Types = struct
     type nonrec state = state
@@ -1602,7 +1594,7 @@ module Make (Parameters : PARAMETERS) = struct
     |> List.map (fun (tags, _w) -> Tags.to_seq tags |> List.of_seq)
 
   let op_status_in_worker state l1_hash =
-    match Op_queue.find_opt state.queue l1_hash with
+    match Op_heap.find_opt state.heap l1_hash with
     | Some op -> Some (Pending op.operation)
     | None -> (
         match
@@ -1629,7 +1621,7 @@ module Make (Parameters : PARAMETERS) = struct
     List.fold_left
       (fun (acc, total) (tags, w) ->
         let state = Worker.state w in
-        let len = Op_queue.length state.queue in
+        let len = Op_heap.length state.heap in
         let tag_list = Tags.to_seq tags |> List.of_seq in
         ((tag_list, len) :: acc, total + len))
       ([], 0)
@@ -1645,9 +1637,9 @@ module Make (Parameters : PARAMETERS) = struct
         if not to_count then acc
         else
           let state = Worker.state w in
-          let queue = Op_queue.elements state.queue in
+          let heap = Op_heap.elements state.heap in
           let tag_list = Tags.to_seq tags |> List.of_seq in
-          (tag_list, queue) :: acc)
+          (tag_list, heap) :: acc)
       []
       workers
 
