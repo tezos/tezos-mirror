@@ -4,18 +4,18 @@ cargo-features = ["named-profiles"]
 resolver = "2"
 members = [
     "crypto",
-    "tezos-encoding",
-    "tezos-encoding-derive",
+    "encoding",
+    "encoding-derive",
 ]
 
 [workspace.dependencies.tezos_data_encoding]
 version = "0.6.0"
-path = "./tezos-encoding"
+path = "./encoding"
 default-features = false
 
 [workspace.dependencies.tezos_data_encoding_derive]
 version = "0.6.0"
-path = "./tezos-encoding-derive"
+path = "./encoding-derive"
 default-features = false
 
 [workspace.dependencies.tezos_crypto_rs]

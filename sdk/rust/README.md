@@ -5,7 +5,7 @@
 Utility crates, forked from [tezedge](github.com/tezedge/tezedge), used as part of the `Kernel SDK` for tezos smart rollups.
 
 Namely:
-- [tezos_crypto](./crypto/README.md) 
+- [tezos_crypto_rs](./crypto/README.md) 
 - [tezos_encoding](./tezos-encoding/README.md) 
 - [tezos_encoding_derive](./tezos-encoding-derive/README.md)
 
