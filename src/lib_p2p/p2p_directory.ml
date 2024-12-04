@@ -110,6 +110,23 @@ let build_rpc_directory net =
             in
             return_unit)
   in
+  let dir =
+    Tezos_rpc.Directory.register0
+      dir
+      P2p_services.Full_stat.S.full_stat
+      (fun () () ->
+        let* stat = get_stat () () in
+        let* connections = get_connections () () in
+        let* peers = get_peers_list () in
+        let* points = get_points_list () in
+        let incoming_connections, outgoing_connections =
+          List.partition (fun c -> c.P2p_connection.Info.incoming) connections
+        in
+        Lwt.return_ok
+          P2p_services.Full_stat.
+            {stat; incoming_connections; outgoing_connections; peers; points})
+  in
+
   (* Network : Connection *)
   let dir =
     Tezos_rpc.Directory.opt_register1
