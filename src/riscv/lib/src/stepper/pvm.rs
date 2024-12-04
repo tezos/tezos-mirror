@@ -13,7 +13,10 @@ use crate::{
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
-    state_backend::{hash::RootHashable, owned_backend::Owned, AllocatedOf, FnManagerIdent, Ref},
+    state_backend::{
+        hash::RootHashable, owned_backend::Owned, proof_backend::proof::MerkleProof, AllocatedOf,
+        FnManagerIdent, Ref,
+    },
     storage::binary,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -127,6 +130,17 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     {
         let refs = self.pvm.struct_ref::<FnManagerIdent>();
         RootHashable::hash(&refs).unwrap()
+    }
+
+    /// Produce the Merkle proof for evaluating one step on the given PVM state.
+    pub fn produce_proof(&mut self) -> MerkleProof {
+        // TODO RV-338 PVM stepper can produce a proof
+        todo!()
+    }
+
+    pub fn verify_proof(&mut self, _proof: MerkleProof) -> bool {
+        // TODO RV-337 PVM stepper can verify a proof
+        todo!()
     }
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing

@@ -103,6 +103,7 @@ pub enum Input<'a> {
     Reveal(RevealData<'a>),
 }
 
+// TODO RV-336 Implement `InputRequest` type
 /// A value of this type could only be returned as part of successfully verifying
 /// a proof, which is not yet implemented. It is therefore only mocked for now.
 #[ocaml::sig]
