@@ -1442,7 +1442,9 @@ module Make
         let* () =
           (handle_unprocessed
              pv
-           [@profiler.aggregate_s {verbosity = Notice} "handle_unprocessed"])
+           [@profiler.aggregate_s
+             {verbosity = Notice; metadata = [("prometheus", "")]}
+               "handle_unprocessed"])
         in
         r
       in
@@ -1453,7 +1455,10 @@ module Make
           ()
           [@profiler.stop]
           [@profiler.record
-            {verbosity = Notice}
+            {
+              verbosity = Notice;
+              metadata = [("prometheus", "__ENABLE_CHILDREN_ONLY__")];
+            }
               (Format.sprintf "%s" (Block_hash.to_b58check hash))] ;
           Requests.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
@@ -1473,35 +1478,48 @@ module Make
              block
              live_blocks
              live_operations
-           [@profiler.aggregate_s {verbosity = Notice} "on_flush"]))
+           [@profiler.aggregate_s
+             {verbosity = Notice; metadata = [("prometheus", "")]} "on_flush"]))
       | Request.Notify (peer, mempool) ->
           Requests.on_notify
             pv.shell
             peer
-            mempool [@profiler.aggregate_f {verbosity = Notice} "on_notify"] ;
+            mempool
+          [@profiler.aggregate_f
+            {verbosity = Notice; metadata = [("prometheus", "")]} "on_notify"] ;
           return_unit
       | Request.Leftover ->
-          () [@profiler.mark {verbosity = Notice} ["leftover"]] ;
+          ()
+          [@profiler.mark
+            {verbosity = Notice; metadata = [("prometheus", "")]} ["leftover"]] ;
           (* unprocessed ops are handled just below *)
           return_unit
       | Request.Inject {op; force} ->
           Requests.on_inject
             pv
             ~force
-            op [@profiler.aggregate_s {verbosity = Notice} "on_inject"]
+            op
+          [@profiler.aggregate_s
+            {verbosity = Notice; metadata = [("prometheus", "")]} "on_inject"]
       | Request.Arrived (oph, op) ->
           Requests.on_arrived
             pv
             oph
-            op [@profiler.aggregate_s {verbosity = Notice} "on_arrived"]
+            op
+          [@profiler.aggregate_s
+            {verbosity = Notice; metadata = [("prometheus", "")]} "on_arrived"]
       | Request.Advertise ->
           Requests.on_advertise
-            pv.shell [@profiler.aggregate_f {verbosity = Notice} "on_advertise"] ;
+            pv.shell
+          [@profiler.aggregate_f
+            {verbosity = Notice; metadata = [("prometheus", "")]} "on_advertise"] ;
           return_unit
       | Request.Ban oph ->
           Requests.on_ban
             pv
-            oph [@profiler.aggregate_s {verbosity = Notice} "on_ban"]
+            oph
+          [@profiler.aggregate_s
+            {verbosity = Notice; metadata = [("prometheus", "")]} "on_ban"]
 
     let on_close w =
       let pv = Worker.state w in
@@ -1525,7 +1543,10 @@ module Make
       let*! head = Store.Chain.current_head chain_store in
       ()
       [@profiler.record
-        {verbosity = Notice}
+        {
+          verbosity = Notice;
+          metadata = [("prometheus", "__ENABLE_CHILDREN_ONLY__")];
+        }
           (Format.sprintf "%s" (Block_hash.to_b58check (Store.Block.hash head)))] ;
 
       let*! mempool = Store.Chain.mempool chain_store in

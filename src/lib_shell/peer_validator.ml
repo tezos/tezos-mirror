@@ -244,7 +244,9 @@ let validate_new_head w hash (header : Block_header.t) =
        [@profiler.span_s
          {verbosity = Debug}
            (profiling_validate_new_head_prefix hash ["fitness increases"])]))
-  [@profiler.span_s {verbosity = Info} (profiling_new_head_prefix hash [])]
+  [@profiler.span_s
+    {verbosity = Info; metadata = [("prometheus", "validate_new_head")]}
+      (profiling_new_head_prefix hash [])]
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in

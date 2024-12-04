@@ -624,7 +624,9 @@ module Make (Proto : Protocol_plugin.T) = struct
             ~predecessor:predecessor_block_header.shell
             ~cache
           [@time.duration_lwt application_beginning]
-          [@profiler.record_s {verbosity = Notice} "begin_application"])
+          [@profiler.record_s
+            {verbosity = Notice; metadata = [("prometheus", "")]}
+              "begin_application"])
        in
        let* state, ops_metadata =
          (List.fold_left_i_es
@@ -638,7 +640,10 @@ module Make (Proto : Protocol_plugin.T) = struct
                           oph
                           op
                         [@profiler.record_s
-                          {verbosity = Info}
+                          {
+                            verbosity = Info;
+                            metadata = [("prometheus", "apply_operations")];
+                          }
                             ("operation : " ^ Operation_hash.to_b58check oph)])
                      in
                      return (state, op_metadata :: acc))
@@ -659,7 +664,9 @@ module Make (Proto : Protocol_plugin.T) = struct
             state
             (Some block_header.shell)
           [@time.duration_lwt block_finalization]
-          [@profiler.record_s {verbosity = Notice} "finalize_application"])
+          [@profiler.record_s
+            {verbosity = Notice; metadata = [("prometheus", "")]}
+              "finalize_application"])
        in
        return (validation_result, block_data, ops_metadata))
 
@@ -758,7 +765,9 @@ module Make (Proto : Protocol_plugin.T) = struct
              block_header
              predecessor_context
              predecessor_hash
-           [@profiler.record_s {verbosity = Notice} "prepare_context"])
+           [@profiler.record_s
+             {verbosity = Notice; metadata = [("prometheus", "")]}
+               "prepare_context"])
         in
         let* validation_result, block_metadata, ops_metadata =
           proto_apply_operations
@@ -887,7 +896,9 @@ module Make (Proto : Protocol_plugin.T) = struct
                };
              cache;
            })
-        [@profiler.record_s {verbosity = Notice} "post_validation"]
+        [@profiler.record_s
+          {verbosity = Notice; metadata = [("prometheus", "")]}
+            "post_validation"]
 
   let recompute_metadata chain_id ~cache
       ~(predecessor_block_header : Block_header.t)
@@ -1334,7 +1345,10 @@ module Make (Proto : Protocol_plugin.T) = struct
          chain_id
          (Application block_header)
          ~predecessor:predecessor_block_header.shell
-         ~cache [@profiler.record_s {verbosity = Notice} "begin_validation"])
+         ~cache
+       [@profiler.record_s
+         {verbosity = Notice; metadata = [("prometheus", "")]}
+           "begin_validation"])
     in
     let* state =
       (List.fold_left_i_es
@@ -1347,7 +1361,10 @@ module Make (Proto : Protocol_plugin.T) = struct
                    oph
                    op
                  [@profiler.record_s
-                   {verbosity = Info}
+                   {
+                     verbosity = Info;
+                     metadata = [("prometheus", "validate_operation")];
+                   }
                      ("operation : " ^ Operation_hash.to_b58check oph)]))
               state
               ops
@@ -1359,7 +1376,10 @@ module Make (Proto : Protocol_plugin.T) = struct
     in
     let* () =
       (Proto.finalize_validation
-         state [@profiler.record_s {verbosity = Notice} "finalize_validation"])
+         state
+       [@profiler.record_s
+         {verbosity = Notice; metadata = [("prometheus", "")]}
+           "finalize_validation"])
     in
     return_unit
 
