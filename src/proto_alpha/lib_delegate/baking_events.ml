@@ -875,16 +875,6 @@ module Actions = struct
       ("attestation_level", Data_encoding.int32)
       ("round", Round.encoding)
 
-  let warning_dal_timeout_old_round =
-    declare_0
-      ~section
-      ~name:"warning_dal_timeout_old_round"
-      ~level:Warning
-      ~msg:
-        "The DAL timeout computed was for an old round. Please report this \
-         issue."
-      ()
-
   let not_in_dal_committee =
     declare_2
       ~section
