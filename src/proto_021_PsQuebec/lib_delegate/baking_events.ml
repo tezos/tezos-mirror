@@ -885,6 +885,15 @@ module Actions = struct
          issue."
       ()
 
+  let not_in_dal_committee =
+    declare_2
+      ~section
+      ~name:"not_in_dal_committee"
+      ~level:Notice
+      ~msg:"{delegate} has no assigned DAL shards at level {attestation_level}"
+      ("delegate", Signature.Public_key_hash.encoding)
+      ("attestation_level", Data_encoding.int32)
+
   let synchronizing_round =
     declare_1
       ~section
