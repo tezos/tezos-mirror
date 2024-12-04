@@ -6,8 +6,8 @@ use crate::executor::stack::tagged_runtime::{RuntimeKind, TaggedRuntime};
 use crate::gasometer::{self, Gasometer, StorageTarget};
 use crate::maybe_borrowed::MaybeBorrowed;
 use crate::{
-	CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitReason, Handler, Opcode, Runtime, Stack,
-	Transfer,
+	CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitReason, Handler, Opcode,
+	Runtime, Stack, Transfer,
 };
 use alloc::{collections::BTreeSet, rc::Rc, vec::Vec};
 use core::{cmp::min, convert::Infallible};
@@ -802,7 +802,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet>
 		fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
-		
+
 		let is_static = call_scheme == CallScheme::StaticCall;
 
 		event!(Call {
@@ -1347,7 +1347,7 @@ impl<'inner, 'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Pr
 		{
 			return (ExitReason::Error(error), Vec::new());
 		}
-		
+
 		event!(PrecompileSubcall {
 			code_address,
 			transfer: &transfer,

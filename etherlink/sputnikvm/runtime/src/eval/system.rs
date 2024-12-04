@@ -387,14 +387,7 @@ pub fn call<H: Handler>(runtime: &mut Runtime, scheme: CallScheme, handler: &mut
 		None
 	};
 
-	match handler.call(
-		to.into(),
-		transfer,
-		input,
-		gas,
-		scheme,
-		context,
-	) {
+	match handler.call(to.into(), transfer, input, gas, scheme, context) {
 		Capture::Exit((reason, return_data)) => {
 			match super::finish_call(runtime, out_len, out_offset, reason, return_data) {
 				Ok(()) => Control::Continue,

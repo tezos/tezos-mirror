@@ -1,4 +1,6 @@
-use crate::{CallScheme, Capture, Context, CreateScheme, ExitError, ExitReason, Machine, Opcode, Stack};
+use crate::{
+	CallScheme, Capture, Context, CreateScheme, ExitError, ExitReason, Machine, Opcode, Stack,
+};
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
 
