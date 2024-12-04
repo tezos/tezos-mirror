@@ -157,6 +157,8 @@ Baker
   is, it has no assigned shards at the current level. (:gl:`!15846`)
 - A warning has been introduced in case it is observed that the DAL node lags
   behind the L1 node. (MR :gl:`!15756`)
+- Set the message validation function at node startup, fixing
+  https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
 
 Miscellaneous
 -------------
