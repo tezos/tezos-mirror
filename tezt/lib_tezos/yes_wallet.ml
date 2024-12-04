@@ -7,6 +7,8 @@
 
 type alias = {alias : string; address : string; public_key : string}
 
+type aliases = File of string | List of alias list
+
 type t = {path : string; runner : Runner.t option; name : string option}
 
 let dump_aliases ?runner aliases =
@@ -42,9 +44,13 @@ let dump_aliases ?runner aliases =
 let create ?runner ?(path = Uses.path Constant.yes_wallet) ?name () =
   {path; runner; name}
 
-let create_from_context ?(aliases = []) ~node ~client ~network t =
+let create_from_context ?(aliases = List []) ~node ~client ~network t =
   let {path; name; runner} = t in
-  let* aliases_filename = dump_aliases ?runner aliases in
+  let* aliases_filename =
+    match aliases with
+    | List aliases -> dump_aliases ?runner aliases
+    | File filename -> Lwt.return filename
+  in
   let* () =
     Process.spawn
       ?runner
