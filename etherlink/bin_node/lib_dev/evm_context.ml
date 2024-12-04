@@ -26,6 +26,7 @@ type parameters = {
   store_perm : [`Read_only | `Read_write];
   block_storage_sqlite3 : bool;
   garbage_collector : Configuration.garbage_collector option;
+  sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
 
 type session_state = {
@@ -56,6 +57,7 @@ type t = {
   fail_on_missing_blueprint : bool;
   block_storage_sqlite3 : bool;
   history : history;
+  sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
 
 type store_info = {
@@ -492,11 +494,23 @@ module State = struct
         let root_hash = `Hex root_hash in
         Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
 
-  let reset_to_finalized_level exit_error ctxt conn =
+  let reset_to_finalized_level ?expected_finalized_number exit_error ctxt conn =
     let open Lwt_result_syntax in
     let* safe_checkpoint = Evm_store.Context_hashes.find_finalized conn in
     match safe_checkpoint with
     | Some (finalized_number, checkpoint) ->
+        let* () =
+          match expected_finalized_number with
+          | None -> return_unit
+          | Some expected_finalized_number ->
+              when_ (finalized_number <> expected_finalized_number) (fun () ->
+                  let*! () =
+                    Evm_context_events.reset_incoherent_finalized_state
+                      ~expected_finalized_number
+                      ~finalized_number
+                  in
+                  tzfail exit_error)
+        in
         let*! () = Evm_context_events.reset_at_level finalized_number in
         (* Find the "finalized" evm_state. *)
         let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
@@ -595,152 +609,9 @@ module State = struct
         in
         return (evm_state, on_success)
 
-  let apply_evm_event_unsafe on_success ctxt conn evm_state event =
-    let open Lwt_result_syntax in
-    let*! () = Evm_events_follower_events.new_event event in
-    match event with
-    | Evm_events.Upgrade_event upgrade ->
-        let on_success session =
-          session.pending_upgrade <-
-            Some
-              {
-                kernel_upgrade = upgrade;
-                injected_before = ctxt.session.next_blueprint_number;
-              } ;
-          background_preemptive_download ctxt upgrade ;
-          on_success session
-        in
-        let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.kernel_upgrade
-            ~value:payload
-            evm_state
-        in
-        let* () =
-          Evm_store.Kernel_upgrades.store
-            conn
-            ctxt.session.next_blueprint_number
-            upgrade
-        in
-        let*! () = Events.pending_upgrade upgrade in
-        return (evm_state, on_success)
-    | Sequencer_upgrade_event sequencer_upgrade ->
-        let payload =
-          Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
-          |> String.of_bytes
-        in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.sequencer_upgrade
-            ~value:payload
-            evm_state
-        in
-        return (evm_state, on_success)
-    | Blueprint_applied event ->
-        blueprint_applied_event ctxt conn evm_state on_success event
-    | New_delayed_transaction delayed_transaction ->
-        let* evm_state =
-          on_new_delayed_transaction ~delayed_transaction evm_state
-        in
-        return (evm_state, on_success)
-    | Flush_delayed_inbox flushed_blueprint ->
-        let*! () =
-          Evm_events_follower_events.flush_delayed_inbox
-            ~timestamp:flushed_blueprint.timestamp
-            flushed_blueprint.level
-        in
-        return (evm_state, on_success)
-
   let current_blueprint_number ctxt =
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
     Ethereum_types.Qty (Z.pred next_blueprint_number)
-
-  let apply_evm_events ?finalized_level conn (ctxt : t) events =
-    let open Lwt_result_syntax in
-    let* needs_process =
-      match finalized_level with
-      | None ->
-          (* We are not taking events from a rollup block, we don't need to check
-             if it's the last known l1 block successor. *)
-          return_true
-      | Some rollup_block_level -> (
-          let* last_known_l1_block =
-            let* level = Evm_store.L1_l2_levels_relationships.find conn in
-            match level with
-            | Some {l1_level; _} -> return_some l1_level
-            | None -> return_none
-          in
-          match last_known_l1_block with
-          | None -> return_true
-          | Some last_known_l1_block ->
-              let level_expected = Int32.succ last_known_l1_block in
-              if Int32.equal rollup_block_level level_expected then return_true
-              else if Compare.Int32.(rollup_block_level < level_expected) then
-                let*! () =
-                  Evm_context_events.unexpected_l1_block
-                    ~expected_level:level_expected
-                    ~provided_level:rollup_block_level
-                in
-                return false
-              else
-                tzfail
-                  (Node_error.Out_of_sync
-                     {level_received = rollup_block_level; level_expected}))
-    in
-    if needs_process then (
-      let* context, evm_state, on_success =
-        let* on_success, ctxt, evm_state, context =
-          match events with
-          | [] ->
-              (* Avoid an uncessary {!replace_current_commit} if the list is
-                 empty. *)
-              return (ignore, ctxt, ctxt.session.evm_state, ctxt.session.context)
-          | events ->
-              let* on_success, ctxt, evm_state =
-                List.fold_left_es
-                  (fun (on_success, ctxt, evm_state) event ->
-                    let* evm_state, on_success =
-                      apply_evm_event_unsafe
-                        on_success
-                        ctxt
-                        conn
-                        evm_state
-                        event
-                    in
-                    return (on_success, ctxt, evm_state))
-                  (ignore, ctxt, ctxt.session.evm_state)
-                  events
-              in
-              let* context = replace_current_commit ctxt conn evm_state in
-              return (on_success, ctxt, evm_state, context)
-        in
-        let* () =
-          Option.iter_es
-            (fun l1_level ->
-              let l2_level = current_blueprint_number ctxt in
-              Evm_store.L1_l2_levels_relationships.store
-                conn
-                ~latest_l2_level:l2_level
-                ~l1_level
-                ~finalized_l2_level:ctxt.session.finalized_number)
-            finalized_level
-        in
-        return (context, evm_state, on_success)
-      in
-      let*! () =
-        Option.iter_s
-          (fun l1_level ->
-            Metrics.set_l1_level ~level:l1_level ;
-            Evm_context_events.processed_l1_level l1_level)
-          finalized_level
-      in
-      on_success ctxt.session ;
-      on_modified_head ctxt evm_state context ;
-      let*! head_info in
-      head_info := session_to_head_info ctxt.session ;
-      return_unit)
-    else return_unit
 
   let () =
     register_error_kind
@@ -997,8 +868,42 @@ module State = struct
     Metrics.set_level ~level ;
     return_unit
 
-  let apply_blueprint ?(events = []) ctxt timestamp payload delayed_transactions
-      =
+  type error +=
+    | Invalid_rollup_node of {
+        smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+        rollup_node_smart_rollup_address :
+          Tezos_crypto.Hashed.Smart_rollup_address.t;
+      }
+
+  let prepare_local_flushed_blueprint cctxt smart_rollup_address sequencer_key
+      evm_state parent_hash
+      Evm_events.Flushed_blueprint.
+        {hashes; timestamp; level = Qty flushed_level} =
+    let open Lwt_result_syntax in
+    let* delayed_transactions =
+      List.map_es (Evm_state.get_delayed_inbox_item evm_state) hashes
+    in
+    let* blueprint_chunks =
+      Sequencer_blueprint.prepare
+        ~sequencer_key
+        ~cctxt
+        ~timestamp
+        ~transactions:[]
+        ~delayed_transactions:hashes
+        ~parent_hash
+        ~number:(Qty flushed_level)
+    in
+    let payload =
+      Sequencer_blueprint.create_inbox_payload
+        ~smart_rollup_address:
+          (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+             smart_rollup_address)
+        ~chunks:blueprint_chunks
+    in
+    return (payload, delayed_transactions)
+
+  let rec apply_blueprint ?conn ?(events = []) ctxt timestamp payload
+      delayed_transactions =
     let open Lwt_result_syntax in
     let* ( evm_state,
            context,
@@ -1006,14 +911,18 @@ module State = struct
            applied_kernel_upgrade,
            split_info,
            gc_info ) =
-      with_store_transaction ctxt @@ fun conn ->
-      let* () = apply_evm_events conn ctxt events in
-      apply_blueprint_store_unsafe
-        ctxt
-        conn
-        timestamp
-        payload
-        delayed_transactions
+      let kont conn =
+        let* () = apply_evm_events conn ctxt events in
+        apply_blueprint_store_unsafe
+          ctxt
+          conn
+          timestamp
+          payload
+          delayed_transactions
+      in
+      match conn with
+      | None -> with_store_transaction ctxt @@ fun conn -> kont conn
+      | Some conn -> kont conn
     in
     let kernel_upgrade =
       match ctxt.session.pending_upgrade with
@@ -1043,12 +952,186 @@ module State = struct
     in
     return_unit
 
-  type error +=
-    | Invalid_rollup_node of {
-        smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
-        rollup_node_smart_rollup_address :
-          Tezos_crypto.Hashed.Smart_rollup_address.t;
-      }
+  and apply_evm_event_unsafe on_success ctxt conn evm_state event =
+    let open Lwt_result_syntax in
+    let*! () = Evm_events_follower_events.new_event event in
+    match event with
+    | Evm_events.Upgrade_event upgrade ->
+        let on_success session =
+          session.pending_upgrade <-
+            Some
+              {
+                kernel_upgrade = upgrade;
+                injected_before = ctxt.session.next_blueprint_number;
+              } ;
+          background_preemptive_download ctxt upgrade ;
+          on_success session
+        in
+        let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
+        let*! evm_state =
+          Evm_state.modify
+            ~key:Durable_storage_path.kernel_upgrade
+            ~value:payload
+            evm_state
+        in
+        let* () =
+          Evm_store.Kernel_upgrades.store
+            conn
+            ctxt.session.next_blueprint_number
+            upgrade
+        in
+        let*! () = Events.pending_upgrade upgrade in
+        return (evm_state, on_success)
+    | Sequencer_upgrade_event sequencer_upgrade ->
+        let payload =
+          Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
+          |> String.of_bytes
+        in
+        let*! evm_state =
+          Evm_state.modify
+            ~key:Durable_storage_path.sequencer_upgrade
+            ~value:payload
+            evm_state
+        in
+        return (evm_state, on_success)
+    | Blueprint_applied event ->
+        blueprint_applied_event ctxt conn evm_state on_success event
+    | New_delayed_transaction delayed_transaction ->
+        let* evm_state =
+          on_new_delayed_transaction ~delayed_transaction evm_state
+        in
+        return (evm_state, on_success)
+    | Flush_delayed_inbox flushed_blueprint ->
+        let*! () =
+          Evm_events_follower_events.flush_delayed_inbox
+            ~timestamp:flushed_blueprint.timestamp
+            flushed_blueprint.level
+        in
+        let* evm_state = flush_delayed_inbox ctxt conn flushed_blueprint in
+        return (evm_state, on_success)
+
+  and apply_evm_events ?finalized_level conn (ctxt : t) events =
+    let open Lwt_result_syntax in
+    let* needs_process =
+      match finalized_level with
+      | None ->
+          (* We are not taking events from a rollup block, we don't need to check
+             if it's the last known l1 block successor. *)
+          return_true
+      | Some rollup_block_level -> (
+          let* last_known_l1_block =
+            let* level = Evm_store.L1_l2_levels_relationships.find conn in
+            match level with
+            | Some {l1_level; _} -> return_some l1_level
+            | None -> return_none
+          in
+          match last_known_l1_block with
+          | None -> return_true
+          | Some last_known_l1_block ->
+              let level_expected = Int32.succ last_known_l1_block in
+              if Int32.equal rollup_block_level level_expected then return_true
+              else if Compare.Int32.(rollup_block_level < level_expected) then
+                let*! () =
+                  Evm_context_events.unexpected_l1_block
+                    ~expected_level:level_expected
+                    ~provided_level:rollup_block_level
+                in
+                return false
+              else
+                tzfail
+                  (Node_error.Out_of_sync
+                     {level_received = rollup_block_level; level_expected}))
+    in
+    if needs_process then (
+      let* context, evm_state, on_success =
+        let* on_success, ctxt, evm_state, context =
+          match events with
+          | [] ->
+              (* Avoid an uncessary {!replace_current_commit} if the list is
+                 empty. *)
+              return (ignore, ctxt, ctxt.session.evm_state, ctxt.session.context)
+          | events ->
+              let* on_success, ctxt, evm_state =
+                List.fold_left_es
+                  (fun (on_success, ctxt, evm_state) event ->
+                    let* evm_state, on_success =
+                      apply_evm_event_unsafe
+                        on_success
+                        ctxt
+                        conn
+                        evm_state
+                        event
+                    in
+                    return (on_success, ctxt, evm_state))
+                  (ignore, ctxt, ctxt.session.evm_state)
+                  events
+              in
+              let* context = replace_current_commit ctxt conn evm_state in
+              return (on_success, ctxt, evm_state, context)
+        in
+        let* () =
+          Option.iter_es
+            (fun l1_level ->
+              let l2_level = current_blueprint_number ctxt in
+              Evm_store.L1_l2_levels_relationships.store
+                conn
+                ~latest_l2_level:l2_level
+                ~l1_level
+                ~finalized_l2_level:ctxt.session.finalized_number)
+            finalized_level
+        in
+        return (context, evm_state, on_success)
+      in
+      let*! () =
+        Option.iter_s
+          (fun l1_level ->
+            Metrics.set_l1_level ~level:l1_level ;
+            Evm_context_events.processed_l1_level l1_level)
+          finalized_level
+      in
+      on_success ctxt.session ;
+      on_modified_head ctxt evm_state context ;
+      let*! head_info in
+      head_info := session_to_head_info ctxt.session ;
+      return_unit)
+    else return_unit
+
+  and flush_delayed_inbox ctxt conn flushed_blueprint =
+    let open Lwt_result_syntax in
+    let (Qty flushed_level) =
+      flushed_blueprint.Evm_events.Flushed_blueprint.level
+    in
+    let before_flushed_level = Ethereum_types.Qty (Z.pred flushed_level) in
+    (* The kernel has produced a block for level [flushed_level]. The first thing
+       to do is go back to an EVM state before this flushed blueprint. *)
+    let* evm_state =
+      reset_to_finalized_level
+        ~expected_finalized_number:before_flushed_level
+        (Node_error.Cannot_handle_flushed_blueprint (Qty flushed_level))
+        ctxt
+        conn
+    in
+    let* parent_hash = Evm_state.current_block_hash evm_state in
+    (* Prepare a blueprint payload signed by the sequencer to execute locally. *)
+    let* payload, delayed_transactions =
+      match ctxt.sequencer_wallet with
+      | None ->
+          failwith "Only sequencer is capable to handle the flushed blueprint"
+      | Some (sequencer_key, cctxt) ->
+          prepare_local_flushed_blueprint
+            cctxt
+            ctxt.smart_rollup_address
+            sequencer_key
+            evm_state
+            parent_hash
+            flushed_blueprint
+    in
+    (* Apply the blueprint. *)
+    let timestamp = flushed_blueprint.Evm_events.Flushed_blueprint.timestamp in
+    let* () =
+      apply_blueprint ~conn ctxt timestamp payload delayed_transactions
+    in
+    return ctxt.session.evm_state
 
   let () =
     register_error_kind
@@ -1113,7 +1196,7 @@ module State = struct
 
   let init ?kernel_path ~block_storage_sqlite3 ?garbage_collector
       ~fail_on_missing_blueprint ~data_dir ~preimages ~preimages_endpoint
-      ?smart_rollup_address ~store_perm () =
+      ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1233,6 +1316,7 @@ module State = struct
         fail_on_missing_blueprint;
         block_storage_sqlite3;
         history;
+        sequencer_wallet;
       }
     in
 
@@ -1505,6 +1589,7 @@ module Handlers = struct
         store_perm;
         block_storage_sqlite3;
         garbage_collector;
+        sequencer_wallet;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -1518,6 +1603,7 @@ module Handlers = struct
         ~store_perm
         ~block_storage_sqlite3
         ?garbage_collector
+        ?sequencer_wallet
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1676,7 +1762,7 @@ let export_store ~data_dir ~output_db_file =
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
-    ~block_storage_sqlite3 ?garbage_collector () =
+    ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1693,6 +1779,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         store_perm;
         block_storage_sqlite3;
         garbage_collector;
+        sequencer_wallet;
       }
       (module Handlers)
   in

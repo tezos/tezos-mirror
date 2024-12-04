@@ -78,6 +78,7 @@ val start :
   store_perm:[`Read_only | `Read_write] ->
   block_storage_sqlite3:bool ->
   ?garbage_collector:Configuration.garbage_collector ->
+  ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
