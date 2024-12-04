@@ -904,7 +904,7 @@ module type AUTOMATON = sig
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig
-    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
+    type connection = {topics : Topic.Set.t; outbound : bool}
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -920,11 +920,7 @@ module type AUTOMATON = sig
       val mem : Peer.t -> t -> bool
 
       val add_peer :
-        Peer.t ->
-        direct:bool ->
-        outbound:bool ->
-        t ->
-        [`added of t | `already_known]
+        Peer.t -> outbound:bool -> t -> [`added of t | `already_known]
 
       val subscribe :
         Peer.t -> Topic.t -> t -> [`unknown_peer | `subscribed of t]

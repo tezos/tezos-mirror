@@ -322,7 +322,7 @@ module P2P = struct
     let get_connections ?(ignore_bootstrap_topics = false) {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in
       Gossipsub.Worker.GS.Introspection.Connections.fold
-        (fun peer {topics; direct = _; outbound} acc ->
+        (fun peer {topics; outbound} acc ->
           let topics =
             if Types.Peer.is_bootstrap peer && ignore_bootstrap_topics then []
             else Gossipsub.Worker.GS.Topic.Set.elements topics
