@@ -1577,9 +1577,9 @@ module Make (Parameters : PARAMETERS) = struct
           tag
     | Some worker -> return worker
 
-  let add_pending_operation op =
+  let add_pending_operation ?order op =
     let open Lwt_result_syntax in
-    let operation = Inj_operation.make op in
+    let operation = Inj_operation.make ?order op in
     let*? w = worker_of_tag (Parameters.operation_tag op) in
     let* () = add_pending_operation (Worker.state w) operation in
     return operation.id
