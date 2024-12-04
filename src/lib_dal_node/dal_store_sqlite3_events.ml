@@ -14,7 +14,7 @@ let applied_migration =
     ~section
     ~name:"store_applied_migration"
     ~msg:"Applied migration {name} to the store in {duration} second(s)"
-    ~level:Notice
+    ~level:Info
     ("name", Data_encoding.string)
     ("duration", Data_encoding.float)
 

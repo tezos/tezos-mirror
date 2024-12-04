@@ -64,7 +64,7 @@ let dal_node_sqlite3_store_init =
     ~section
     ~name:"dal_node_sqlite3_store_init"
     ~msg:"initializing the SQLite3 store"
-    ~level:Notice
+    ~level:Info
     ()
 
 let store_is_ready =
