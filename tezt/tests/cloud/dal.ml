@@ -8,10 +8,8 @@
 module Cryptobox = Dal_common.Cryptobox
 module Helpers = Dal_common.Helpers
 module Cli = Scenarios_cli
+open Scenarios_helpers
 open Tezos
-
-let toplog (fmt : ('a, Format.formatter, unit, unit) format4) : 'a =
-  Log.info ~prefix:"TOP" ~color:Log.Color.FG.green fmt
 
 module Disconnect = struct
   module IMap = Map.Make (Int)
@@ -2339,7 +2337,7 @@ let produce_slot t level i =
   in
   let* _ = Node.wait_for_level producer.node level in
   let* _ =
-    Dal_common.Helpers.publish_and_store_slot
+    Helpers.publish_and_store_slot
       ~dont_wait:true
       producer.client
       producer.dal_node
