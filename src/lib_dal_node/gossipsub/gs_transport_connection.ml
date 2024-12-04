@@ -104,7 +104,11 @@ let peer_of_connection p2p_layer conn =
   in
   let bootstrap = remote_metadata.is_bootstrap_peer in
   let maybe_reachable_point = (addr, port) in
-  Types.Peer.{peer_id; maybe_reachable_point; bootstrap}
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
+
+     Add the ability to have direct peers. *)
+  let direct = false in
+  Types.Peer.{peer_id; maybe_reachable_point; bootstrap; direct}
 
 (** This handler forwards information about connections established by the P2P
     layer to the Gossipsub worker.
@@ -239,7 +243,8 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
       | Connect {peer; origin = _} ->
-          let Types.Peer.{maybe_reachable_point; peer_id; bootstrap = _} =
+          let Types.Peer.
+                {maybe_reachable_point; peer_id; bootstrap = _; direct = _} =
             peer
           in
           try_connect ~expected_peer_id:peer_id p2p_layer maybe_reachable_point
