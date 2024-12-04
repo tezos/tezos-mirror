@@ -116,8 +116,8 @@ let jobs pipeline_type =
       ~distribution:"ubuntu"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
-  let make_job_build_debian_packages ~__POS__ ~name ~matrix ~distribution
-      ~script ~dependencies =
+  let make_job_build_debian_packages ~__POS__ ?timeout ~name ~matrix
+      ~distribution ~script ~dependencies () =
     job
       ~__POS__
       ~name
@@ -126,6 +126,7 @@ let jobs pipeline_type =
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~dependencies
+      ?timeout
       ~tag:Dynamic
       ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
@@ -161,6 +162,8 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh A"
       ~matrix:(debian_package_release_matrix pipeline_type)
+      ~timeout:(Minutes 90)
+      ()
   in
   let job_build_ubuntu_package_current_a : tezos_job =
     make_job_build_debian_packages
@@ -170,6 +173,8 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh A"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
+      ~timeout:(Minutes 90)
+      ()
   in
 
   let job_build_debian_package_current_b : tezos_job =
@@ -180,6 +185,8 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh B"
       ~matrix:(debian_package_release_matrix pipeline_type)
+      ~timeout:(Minutes 90)
+      ()
   in
   let job_build_ubuntu_package_current_b : tezos_job =
     make_job_build_debian_packages
@@ -189,6 +196,8 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages_current.sh B"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
+      ~timeout:(Minutes 90)
+      ()
   in
 
   (* data packages. we build them once *)
@@ -221,6 +230,7 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(debian_package_release_matrix pipeline_type)
+      ()
   in
   let job_build_ubuntu_package : tezos_job =
     make_job_build_debian_packages
@@ -230,6 +240,7 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
+      ()
   in
 
   (* These jobs create the apt repository for the current packages *)

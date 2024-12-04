@@ -386,7 +386,7 @@ oc.build-debian-current_a:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
     key: sccache-$CI_JOB_NAME_SLUG
     paths:
@@ -430,7 +430,7 @@ oc.build-debian-current_b:
   needs:
   - oc.docker-build-debian-dependencies
   dependencies: []
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
     key: sccache-$CI_JOB_NAME_SLUG
     paths:
@@ -612,7 +612,7 @@ oc.build-ubuntu-current_a:
   needs:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
     key: sccache-$CI_JOB_NAME_SLUG
     paths:
@@ -656,7 +656,7 @@ oc.build-ubuntu-current_b:
   needs:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
     key: sccache-$CI_JOB_NAME_SLUG
     paths:
