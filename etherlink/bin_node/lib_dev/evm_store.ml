@@ -309,6 +309,10 @@ module Q = struct
       (level ->. unit)
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before > ?|}
 
+    let nullify_after =
+      (level ->. unit)
+      @@ {|UPDATE kernel_upgrades SET applied_before = NULL WHERE applied_before > ?|}
+
     let clear_before =
       (level ->. unit)
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before < ?|}
@@ -671,8 +675,10 @@ module Kernel_upgrades = struct
     Db.exec conn Q.Kernel_upgrades.record_apply level
 
   let clear_after store l2_level =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Kernel_upgrades.clear_after l2_level
+    let* () = Db.exec conn Q.Kernel_upgrades.clear_after l2_level in
+    Db.exec conn Q.Kernel_upgrades.nullify_after l2_level
 
   let clear_before store l2_level =
     with_connection store @@ fun conn ->
