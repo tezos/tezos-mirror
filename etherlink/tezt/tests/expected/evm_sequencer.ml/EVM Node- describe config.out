@@ -148,6 +148,7 @@
         /* Enable or disable the experimental WASM runtime that is expected
            to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You
            should remove this option from your configuration file. */,
+      "rpc_server"?: "dream" | "resto",
       "enable_websocket"?:
         boolean
         /* Enable or disable the experimental websocket server */ },
