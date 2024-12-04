@@ -2562,8 +2562,8 @@ oc.compile_sources_doc_bookworm:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
 
-oc.compile_sources_doc_mantic:
-  image: ocaml/opam:ubuntu-23.10
+oc.compile_sources_doc_noble:
+  image: ocaml/opam:ubuntu-24.04
   stage: test
   tags:
   - gcp

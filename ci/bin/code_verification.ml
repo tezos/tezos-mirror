@@ -1310,8 +1310,8 @@ let jobs pipeline_type =
               ~branch:"latest-release";
             job_compile_sources
               ~__POS__
-              ~name:"oc.compile_sources_doc_mantic"
-              ~image:Images.opam_ubuntu_mantic
+              ~name:"oc.compile_sources_doc_noble"
+              ~image:Images.opam_ubuntu_noble
               ~project:"tezos/tezos"
               ~branch:"latest-release";
           ]
