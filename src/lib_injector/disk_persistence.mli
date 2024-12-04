@@ -118,66 +118,6 @@ module Make_table (H : H) : sig
     t tzresult Lwt.t
 end
 
-(** Create an on-disk persistent version of the {!Hash_queue} data structure. *)
-module Make_queue
-    (N : sig
-      (** Name used to derive a path (relative to [data_dir] in [load_from_disk]) of where
-      to store the persistent information for this queue. *)
-      val name : string
-    end)
-    (K : Tezos_crypto.Intfs.HASH)
-    (V : sig
-      type t
-
-      val persist : t -> bool
-
-      val encoding : t Data_encoding.t
-    end) : sig
-  type t
-
-  (** [remove q k] removes the binding from [k] in [q]. If [k] is not bound in
-      [c], it does nothing. The removal is persisted on disk. *)
-  val remove : t -> K.t -> unit tzresult Lwt.t
-
-  (** [replace q k v] binds the key [k] to the value [v] in the queue [q]. This
-      may or may not cause another binding to be removed, depending on the
-      number of bindings already present in [q]. The addition (or replacement)
-      is persisted on disk. *)
-  val replace : t -> K.t -> V.t -> unit tzresult Lwt.t
-
-  (** [fold f q init] folds the function [f] over the bindings
-      of [q] (in memory). The elements are iterated from oldest to newest. *)
-  val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
-
-  (** [find_opt q k] is [Some v] if [k] is bound to [v] in [q]. It is [None]
-      otherwise. *)
-  val find_opt : t -> K.t -> V.t option
-
-  (** [elemets q] returns the elements of the queue [q] from oldest to
-      newest. *)
-  val elements : t -> V.t list
-
-  (** [length q] is the number of bindings held by [q]. *)
-  val length : t -> int
-
-  (** [clear q] empties the queue [q] and removes its persistent content on
-      disk. *)
-  val clear : t -> unit Lwt.t
-
-  (** [load_from_disk ~warn_unreadable ~capacity ~data_dir ~filter] creates a
-      bounded hash queue of capacity [capacity]. The queue is populated by
-      persistent elements present in [data_dir/N.name] which pass the [filter]
-      (the directory is created if it does not exist).  If [warn_unreadable] is
-      [Some warn], unreadable files are ignored but a warning is printed with
-      [warn], otherwise the loading fails on the first unreadable file.  *)
-  val load_from_disk :
-    warn_unreadable:(string -> error trace -> unit Lwt.t) option ->
-    capacity:int ->
-    data_dir:string ->
-    filter:(V.t -> bool) ->
-    t tzresult Lwt.t
-end
-
 (** Create an on-disk persistent version of the {!Bounded_min_heap}
     data structure. *)
 module Make_heap
