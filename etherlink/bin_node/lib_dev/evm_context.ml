@@ -83,6 +83,8 @@ let pvm_config ctxt =
     ~destination:ctxt.smart_rollup_address
     ()
 
+type error += Cannot_apply_blueprint of {local_state_level : Z.t}
+
 module Types = struct
   type state = t
 
@@ -109,6 +111,7 @@ module Request = struct
       }
         -> (unit, tztrace) t
     | Apply_blueprint : {
+        events : Evm_events.t list option;
         timestamp : Time.Protocol.t;
         payload : Blueprint_types.payload;
         delayed_transactions : Evm_events.Delayed_transaction.t list;
@@ -164,20 +167,24 @@ module Request = struct
         case
           (Tag 1)
           ~title:"Apply_blueprint"
-          (obj4
+          (obj5
              (req "request" (constant "apply_blueprint"))
+             (opt "events" (list Evm_events.encoding))
              (req "timestamp" Time.Protocol.encoding)
              (req "payload" Blueprint_types.payload_encoding)
              (req
                 "delayed_transactions"
                 (list Evm_events.Delayed_transaction.encoding)))
           (function
-            | View (Apply_blueprint {timestamp; payload; delayed_transactions})
-              ->
-                Some ((), timestamp, payload, delayed_transactions)
+            | View
+                (Apply_blueprint
+                  {events; timestamp; payload; delayed_transactions}) ->
+                Some ((), events, timestamp, payload, delayed_transactions)
             | _ -> None)
-          (fun ((), timestamp, payload, delayed_transactions) ->
-            View (Apply_blueprint {timestamp; payload; delayed_transactions}));
+          (fun ((), events, timestamp, payload, delayed_transactions) ->
+            View
+              (Apply_blueprint
+                 {events; timestamp; payload; delayed_transactions}));
         case
           (Tag 2)
           ~title:"Blueprint"
@@ -485,6 +492,44 @@ module State = struct
         let root_hash = `Hex root_hash in
         Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
 
+  let reset_to_finalized_level exit_error ctxt conn =
+    let open Lwt_result_syntax in
+    let* safe_checkpoint = Evm_store.Context_hashes.find_finalized conn in
+    match safe_checkpoint with
+    | Some (finalized_number, checkpoint) ->
+        let*! () = Evm_context_events.reset_at_level finalized_number in
+        (* Find the "finalized" evm_state. *)
+        let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
+        let*! evm_state = Irmin_context.PVMState.get context in
+        (* Clear the store. *)
+        let* () = Evm_store.reset_after conn ~l2_level:finalized_number in
+        (* Update mutable session values. *)
+        let next_blueprint_number =
+          let (Qty finalized_number) = finalized_number in
+          Ethereum_types.Qty (Z.succ finalized_number)
+        in
+        let* current_block_hash = Evm_state.current_block_hash evm_state in
+        ctxt.session.next_blueprint_number <- next_blueprint_number ;
+        ctxt.session.evm_state <- evm_state ;
+        ctxt.session.current_block_hash <- current_block_hash ;
+        ctxt.session.context <- context ;
+        (* TODO: We need to fetch from the store (before it’s cleared) if there
+           is a pending upgrade at level [finalized_level]. It should be something
+           of the sort:
+
+           SELECT * FROM kernel_upgrades
+           WHERE injected_before <= {finalized_level}
+              && (applied_before >= {finalized_level} || applied_before IS NULL) *)
+        ctxt.session.pending_upgrade <- None ;
+        let*! head_info in
+        head_info := session_to_head_info ctxt.session ;
+        return evm_state
+    | None ->
+        let*! () =
+          Evm_context_events.reset_impossible_missing_finalized_state ()
+        in
+        tzfail exit_error
+
   let blueprint_applied_event ctxt conn evm_state on_success
       ({number = Qty number; hash = expected_block_hash} :
         Evm_events.Blueprint_applied.t) =
@@ -523,9 +568,17 @@ module State = struct
             Evm_events_follower_events.diverged
               (number, expected_block_hash, found_block_hash)
           in
-          tzfail
-            (Node_error.Diverged
-               (number, expected_block_hash, Some found_block_hash))
+          let exit_error =
+            Node_error.Diverged
+              (number, expected_block_hash, Some found_block_hash)
+          in
+          if ctxt.fail_on_missing_blueprint then
+            (* Sequencer must fail in case of divergence. *)
+            tzfail exit_error
+          else
+            (* Observers needs to reset at finalized level. *)
+            let* evm_state = reset_to_finalized_level exit_error ctxt conn in
+            return (evm_state, on_success)
     | None when ctxt.fail_on_missing_blueprint ->
         let*! () =
           Evm_events_follower_events.missing_blueprint
@@ -603,7 +656,7 @@ module State = struct
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
     Ethereum_types.Qty (Z.pred next_blueprint_number)
 
-  let apply_evm_events ?finalized_level (ctxt : t) events =
+  let apply_evm_events ?finalized_level conn (ctxt : t) events =
     let open Lwt_result_syntax in
     let* needs_process =
       match finalized_level with
@@ -613,10 +666,7 @@ module State = struct
           return_true
       | Some rollup_block_level -> (
           let* last_known_l1_block =
-            let* level =
-              Evm_store.use ctxt.store @@ fun conn ->
-              Evm_store.L1_l2_levels_relationships.find conn
-            in
+            let* level = Evm_store.L1_l2_levels_relationships.find conn in
             match level with
             | Some {l1_level; _} -> return_some l1_level
             | None -> return_none
@@ -640,7 +690,6 @@ module State = struct
     in
     if needs_process then (
       let* context, evm_state, on_success =
-        with_store_transaction ctxt @@ fun conn ->
         let* on_success, ctxt, evm_state, context =
           match events with
           | [] ->
@@ -692,8 +741,6 @@ module State = struct
       head_info := session_to_head_info ctxt.session ;
       return_unit)
     else return_unit
-
-  type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
   let () =
     register_error_kind
@@ -859,13 +906,19 @@ module State = struct
                     block.number
                 else
                   let Ethereum_types.(Qty number) = block.number in
+                  let exit_error =
+                    Node_error.Diverged
+                      (number, expected_block_hash, Some block.hash)
+                  in
                   let*! () =
                     Evm_events_follower_events.diverged
                       (number, expected_block_hash, block.hash)
                   in
+                  let* _evm_state =
+                    reset_to_finalized_level exit_error ctxt conn
+                  in
                   tzfail
-                    (Node_error.Diverged
-                       (number, expected_block_hash, Some block.hash))
+                    (Cannot_apply_blueprint {local_state_level = Z.pred next})
         in
         let number_of_transactions =
           match block.transactions with
@@ -915,7 +968,11 @@ module State = struct
             split_info,
             gc_info )
     | Apply_failure (* Did not produce a block *) ->
-        let*! () = Blueprint_events.invalid_blueprint_produced next in
+        let*! () =
+          if ctxt.fail_on_missing_blueprint then
+            Blueprint_events.invalid_blueprint_produced next
+          else Blueprint_events.invalid_blueprint_applied next
+        in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
   let on_new_head ?split_info ?gc_info ctxt ~applied_upgrade evm_state context
@@ -940,7 +997,8 @@ module State = struct
     Metrics.set_level ~level ;
     return_unit
 
-  let apply_blueprint ctxt timestamp payload delayed_transactions =
+  let apply_blueprint ?(events = []) ctxt timestamp payload delayed_transactions
+      =
     let open Lwt_result_syntax in
     let* ( evm_state,
            context,
@@ -949,6 +1007,7 @@ module State = struct
            split_info,
            gc_info ) =
       with_store_transaction ctxt @@ fun conn ->
+      let* () = apply_evm_events conn ctxt events in
       apply_blueprint_store_unsafe
         ctxt
         conn
@@ -1477,11 +1536,17 @@ module Handlers = struct
     | Apply_evm_events {finalized_level; events} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.apply_evm_events ?finalized_level ctxt events
-    | Apply_blueprint {timestamp; payload; delayed_transactions} ->
+        State.with_store_transaction ctxt @@ fun conn ->
+        State.apply_evm_events ?finalized_level conn ctxt events
+    | Apply_blueprint {events; timestamp; payload; delayed_transactions} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.apply_blueprint ctxt timestamp payload delayed_transactions
+        State.apply_blueprint
+          ?events
+          ctxt
+          timestamp
+          payload
+          delayed_transactions
     | Blueprint {level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1852,9 +1917,9 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
     (Apply_evm_events
        {finalized_level = Some finalized_level; events = evm_events})
 
-let apply_blueprint timestamp payload delayed_transactions =
+let apply_blueprint ?events timestamp payload delayed_transactions =
   worker_wait_for_request
-    (Apply_blueprint {timestamp; payload; delayed_transactions})
+    (Apply_blueprint {events; timestamp; payload; delayed_transactions})
 
 let head_info () =
   let open Lwt_syntax in

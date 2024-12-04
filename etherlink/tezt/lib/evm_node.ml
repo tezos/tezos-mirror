@@ -348,6 +348,10 @@ let wait_for_blueprint_applied ?timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
+let wait_for_blueprint_invalid_applied evm_node =
+  wait_for_event evm_node ~event:"blueprint_invalid_applied.v0" @@ fun _ ->
+  Some ()
+
 let wait_for_blueprint_injected_on_dal ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"blueprint_injection_on_DAL.v0"
   @@ JSON.(
@@ -523,6 +527,9 @@ let wait_for_diverged evm_node =
   let expected_hash = json |-> "expected_hash" |> as_string in
   let found_hash = json |-> "found_hash" |> as_string in
   Some (level, expected_hash, found_hash)
+
+let wait_for_reset evm_node =
+  wait_for evm_node "evm_context_reset_at_level.v0" @@ fun _json -> Some ()
 
 let wait_for_missing_blueprint evm_node =
   wait_for evm_node "evm_events_follower_missing_blueprint.v0" @@ fun json ->

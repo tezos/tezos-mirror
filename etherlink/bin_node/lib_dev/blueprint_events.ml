@@ -108,11 +108,19 @@ let blueprint_production =
     ("level", Data_encoding.n)
     ("process_time", Time.System.Span.encoding)
 
-let invalid_blueprint =
+let invalid_blueprint_produced =
   declare_1
     ~section
     ~name:"blueprint_invalid"
     ~msg:"Produced an invalid blueprint at level {level}"
+    ~level:Error
+    ("level", Data_encoding.n)
+
+let invalid_blueprint_applied =
+  declare_1
+    ~section
+    ~name:"blueprint_invalid_applied"
+    ~msg:"[Warning] Failed to apply received blueprint for level {level}"
     ~level:Error
     ("level", Data_encoding.n)
 
@@ -166,7 +174,9 @@ let blueprint_applied block process_time =
       block.hash,
       process_time )
 
-let invalid_blueprint_produced level = emit invalid_blueprint level
+let invalid_blueprint_produced level = emit invalid_blueprint_produced level
+
+let invalid_blueprint_applied level = emit invalid_blueprint_applied level
 
 let catching_up min max = emit blueprint_catchup (min, max)
 

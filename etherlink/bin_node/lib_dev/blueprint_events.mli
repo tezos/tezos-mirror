@@ -45,6 +45,10 @@ val blueprint_injection_failed : Z.t -> tztrace -> unit Lwt.t
     Ethereum block. *)
 val invalid_blueprint_produced : Z.t -> unit Lwt.t
 
+(** [invalid_blueprint_applied level] advertizes that the observer received a blueprint
+    for level [level]. *)
+val invalid_blueprint_applied : Z.t -> unit Lwt.t
+
 (** [missing_blueprints count from to_] advertizes that a sequencer has detect
     it is missing [count] blueprints in the provided range. This means the
     sequencer store is inconsistent. *)

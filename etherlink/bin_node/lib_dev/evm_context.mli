@@ -16,6 +16,8 @@ type head = {
   pending_upgrade : Evm_events.Upgrade.t option;
 }
 
+type error += Cannot_apply_blueprint of {local_state_level : Z.t}
+
 (** [lock_data_dir ~data_dir] takes an exclusive lock on [data_dir] for the
     duration of the process. It fails if there is already another evm node with
     a lock. *)
@@ -115,11 +117,13 @@ val reset :
 val apply_evm_events :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
-(** [apply_blueprint timestamp payload delayed_transactions] applies
-    [payload] in the freshest EVM state stored under [ctxt] at
-    timestamp [timestamp], forwards the {!Blueprint_types.with_events}.
-    It commits the result if the blueprint produces the expected block. *)
+(** [apply_blueprint ?events timestamp payload delayed_transactions]
+    applies [payload] in the freshest EVM state stored under [ctxt] at
+    timestamp [timestamp], forwards the
+    {!Blueprint_types.with_events}.  It commits the result if the
+    blueprint produces the expected block. *)
 val apply_blueprint :
+  ?events:Evm_events.t list ->
   Time.Protocol.t ->
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->

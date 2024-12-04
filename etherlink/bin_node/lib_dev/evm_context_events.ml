@@ -105,6 +105,23 @@ let processed_l1_level =
     ~msg:"Processed L1 level {level}"
     ("level", Data_encoding.int32)
 
+let reset_impossible_missing_finalized_state =
+  declare_0
+    ~section
+    ~name:"evm_context_reset_impossible_missing_finalized_state"
+    ~level:Warning
+    ~msg:"[Warning] Cannot found finalized state we must exit on divergence"
+    ()
+
+let reset_at_level =
+  declare_1
+    ~section
+    ~name:"evm_context_reset_at_level"
+    ~level:Notice
+    ~msg:"[Warning] Resetting to finalized block {level}"
+    ~pp1:Ethereum_types.pp_quantity
+    ("level", Ethereum_types.quantity_encoding)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -126,3 +143,8 @@ let unexpected_l1_block ~expected_level ~provided_level =
   emit unexpected_l1_block (expected_level, provided_level)
 
 let processed_l1_level level = emit processed_l1_level level
+
+let reset_impossible_missing_finalized_state =
+  emit reset_impossible_missing_finalized_state
+
+let reset_at_level level = emit reset_at_level level
