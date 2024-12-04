@@ -24,8 +24,13 @@ container_scanning:
   stage: tezos-master
   tags:
   - gcp
+  script:
+  - gtcs scan > scan.log
   variables:
     CS_IMAGE: tezos/tezos:master
     SECURE_LOG_LEVEL: "debug"
     CS_DOCKERFILE_PATH: "build.Dockerfile"
     GIT_STRATEGY: fetch
+  artifacts:
+    paths:
+      - scan.log
