@@ -1810,72 +1810,84 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args25
-       mainnet_compat_arg
-       (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
-       (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
-       (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
-       (config_key_arg ~name:"delayed_bridge" ~placeholder:"KT1...")
-       (config_key_arg ~name:"ticketer" ~placeholder:"KT1...")
-       (config_key_arg ~name:"admin" ~placeholder:"KT1..")
-       (config_key_arg ~name:"sequencer_governance" ~placeholder:"KT1...")
-       (config_key_arg ~name:"kernel_governance" ~placeholder:"KT1...")
-       (config_key_arg ~name:"kernel_security_governance" ~placeholder:"KT1...")
-       (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
-       (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
-       (config_key_arg ~name:"delayed_inbox_timeout" ~placeholder:"111...")
-       (config_key_arg ~name:"delayed_inbox_min_levels" ~placeholder:"111...")
-       (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
-       (config_key_arg ~name:"maximum_allowed_ticks" ~placeholder:"11000...")
-       (config_key_arg
-          ~name:"maximum_gas_per_transaction"
-          ~placeholder:"30000...")
-       (config_key_arg
-          ~name:"max_blueprint_lookahead_in_seconds"
-          ~placeholder:"500")
-       (config_key_flag ~name:"remove_whitelist")
-       (Tezos_clic.default_arg
-          ~long:"bootstrap-balance"
-          ~doc:"balance of the bootstrap accounts"
-          ~default:"9999000000000000000000"
-          ~placeholder:"9999000000000000000000"
-       @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
-       bootstrap_account_arg
-       set_account_code
-       (config_key_flag ~name:"enable_fa_bridge")
-       (config_key_flag ~name:"enable_dal")
-       (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
+    (merge_options
+       (args25
+          mainnet_compat_arg
+          (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
+          (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
+          (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
+          (config_key_arg ~name:"delayed_bridge" ~placeholder:"KT1...")
+          (config_key_arg ~name:"ticketer" ~placeholder:"KT1...")
+          (config_key_arg ~name:"admin" ~placeholder:"KT1..")
+          (config_key_arg ~name:"sequencer_governance" ~placeholder:"KT1...")
+          (config_key_arg ~name:"kernel_governance" ~placeholder:"KT1...")
+          (config_key_arg
+             ~name:"kernel_security_governance"
+             ~placeholder:"KT1...")
+          (config_key_arg
+             ~name:"minimum_base_fee_per_gas"
+             ~placeholder:"111...")
+          (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
+          (config_key_arg ~name:"delayed_inbox_timeout" ~placeholder:"111...")
+          (config_key_arg
+             ~name:"delayed_inbox_min_levels"
+             ~placeholder:"111...")
+          (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
+          (config_key_arg ~name:"maximum_allowed_ticks" ~placeholder:"11000...")
+          (config_key_arg
+             ~name:"maximum_gas_per_transaction"
+             ~placeholder:"30000...")
+          (config_key_arg
+             ~name:"max_blueprint_lookahead_in_seconds"
+             ~placeholder:"500")
+          (config_key_flag ~name:"remove_whitelist")
+          (Tezos_clic.default_arg
+             ~long:"bootstrap-balance"
+             ~doc:"balance of the bootstrap accounts"
+             ~default:"9999000000000000000000"
+             ~placeholder:"9999000000000000000000"
+          @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
+          bootstrap_account_arg
+          set_account_code
+          (config_key_flag ~name:"enable_fa_bridge")
+          (config_key_flag ~name:"enable_dal")
+          (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
+       (args1
+          (config_key_arg
+             ~name:"max_delayed_inbox_blueprint_length"
+             ~placeholder:"1000")))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
          ~desc:"file path where the config will be written to"
          Params.string
     @@ stop)
-    (fun ( mainnet_compat,
-           kernel_root_hash,
-           chain_id,
-           sequencer,
-           delayed_bridge,
-           ticketer,
-           admin,
-           sequencer_governance,
-           kernel_governance,
-           kernel_security_governance,
-           minimum_base_fee_per_gas,
-           da_fee_per_byte,
-           delayed_inbox_timeout,
-           delayed_inbox_min_levels,
-           sequencer_pool_address,
-           maximum_allowed_ticks,
-           maximum_gas_per_transaction,
-           max_blueprint_lookahead_in_seconds,
-           remove_whitelist,
-           boostrap_balance,
-           bootstrap_accounts,
-           set_account_code,
-           enable_fa_bridge,
-           enable_dal,
-           dal_slots )
+    (fun ( ( mainnet_compat,
+             kernel_root_hash,
+             chain_id,
+             sequencer,
+             delayed_bridge,
+             ticketer,
+             admin,
+             sequencer_governance,
+             kernel_governance,
+             kernel_security_governance,
+             minimum_base_fee_per_gas,
+             da_fee_per_byte,
+             delayed_inbox_timeout,
+             delayed_inbox_min_levels,
+             sequencer_pool_address,
+             maximum_allowed_ticks,
+             maximum_gas_per_transaction,
+             max_blueprint_lookahead_in_seconds,
+             remove_whitelist,
+             boostrap_balance,
+             bootstrap_accounts,
+             set_account_code,
+             enable_fa_bridge,
+             enable_dal,
+             dal_slots ),
+           max_delayed_inbox_blueprint_length )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
@@ -1904,6 +1916,7 @@ let make_kernel_config_command =
         ?enable_dal
         ?dal_slots
         ?set_account_code
+        ?max_delayed_inbox_blueprint_length
         ~output
         ())
 
