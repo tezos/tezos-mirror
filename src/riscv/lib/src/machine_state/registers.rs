@@ -222,7 +222,7 @@ impl<M: backend::ManagerClone> Clone for XRegisters<M> {
 
 /// Floating-point number register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
-#[repr(usize)]
+#[repr(u8)]
 #[derive(
     Debug,
     Clone,
@@ -273,7 +273,7 @@ pub enum FRegister {
 
 #[inline(always)]
 pub const fn parse_fregister(r: u5) -> FRegister {
-    let r = r.value() as usize;
+    let r = r.value();
 
     // SAFETY: the possible values of u5 are known to correspond to
     // the possible values of the underlying representation of FRegister.
