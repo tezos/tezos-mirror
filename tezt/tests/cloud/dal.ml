@@ -1260,13 +1260,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~node:bootstrap_node
   in
   let* () = Node.wait_for_ready bootstrap_node in
-  let* () =
-    Cloud.add_service
-      cloud
-      ~name:"Explorus"
-      ~url:
-        (sf "http://explorus.io?network=%s" (Node.rpc_endpoint bootstrap_node))
-  in
+  let* () = init_explorus cloud bootstrap_node in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
   let* baker_accounts =
     Client.stresstest_gen_keys

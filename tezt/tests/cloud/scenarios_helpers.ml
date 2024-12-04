@@ -21,3 +21,10 @@ let init_teztale cloud agent =
     Cloud.add_service cloud ~name:"teztale" ~url
   in
   Lwt.return teztale
+
+(** [init_explorus cloud node] uses [node]'s rpc endpoint to register explorus as a service *)
+let init_explorus cloud node =
+  Cloud.add_service
+    cloud
+    ~name:"Explorus"
+    ~url:(sf "http://explorus.io?network=%s" (Node.rpc_endpoint node))
