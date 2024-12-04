@@ -1045,11 +1045,11 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 		self.state.code(address)
 	}
 
-	fn storage(&self, address: H160, index: H256) -> H256 {
+	fn storage(&mut self, address: H160, index: H256) -> H256 {
 		self.state.storage(address, index)
 	}
 
-	fn original_storage(&self, address: H160, index: H256) -> H256 {
+	fn original_storage(&mut self, address: H160, index: H256) -> H256 {
 		self.state
 			.original_storage(address, index)
 			.unwrap_or_default()
