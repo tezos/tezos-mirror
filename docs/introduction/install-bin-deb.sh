@@ -77,10 +77,10 @@ if [ -n "$PREFIX" ]; then
   # to make the `autopurge` pass and remove all the node data at the end of this
   # script.
   cat << EOF > preseed.cfg
-octez-node octez-node/configure string yes
+octez-node octez-node/configure boolean true
 octez-node octez-node/history-mode string full
 octez-node octez-node/network string mainnet
-octez-node octez-node/purge_warning string yes
+octez-node octez-node/purge_warning boolean true
 octez-node octez-node/snapshot-import boolean true
 octez-node octez-node/snapshot-no-check boolean true
 debconf debconf/frontend select Noninteractive

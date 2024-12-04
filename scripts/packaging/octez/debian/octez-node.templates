@@ -1,6 +1,6 @@
 Template: octez-node/history-mode
-Description: Select a mode for the node:
- The node can run in the following history modes:
+Description: Mode for the node
+ The node can operate in one of the following history modes:
  .
  Rolling: Store only a rolling fragment of blockchain data so the
  node can validate new blocks and stay in sync with the blockchain head. This
@@ -11,17 +11,18 @@ Description: Select a mode for the node:
  appropriate for most uses including bakers and dApp developers who need a
  private node.
  .
- Archive: Store the data from every block since genesis. This mode is
- appropriate to support tools that need historical data, such as indexers and
- block explorers. This mode requires the most disk space.
+ Archive: Stores data for every block since genesis. This mode is suitable for
+ supporting tools that require historical data, such as indexers and block
+ explorers. It requires the most disk space.
  .
- Documentation: https://tezos.gitlab.io/user/history_modes.html
+ More information is available at:
+ https://tezos.gitlab.io/user/history_modes.html
 Type: select
 Choices: rolling, full, archive
 Default: rolling
 
 Template: octez-node/network
-Description: Select a network:
+Description: Network configuration for the node
  The node can connect to the following networks:
  .
  Mainnet: The primary Tezos network where real transactions run and contracts run
@@ -40,31 +41,26 @@ Choices: mainnet, ghostnet
 Default: mainnet
 
 Template: octez-node/purge_warning
-Description: Do you really want to remove all data:
- This operation will remove all node data, the node
- configuration and all associated files. Otherwise,
- the node data will be left untouched, and only the
- packages will be removed.
- .
- Enter "yes" to confirm.
-Type: select
-Choices: no, yes
+Type: boolean
+Default: false
+Description: Remove all node data
+ This operation will remove all node data, including the configuration and
+ associated files. If you choose not to proceed, the node data will remain
+ intact, and only the packages will be removed.
 
 Template: octez-node/configure
-Description: Skipping node init:
- If you skip the node initialization, you will need to configure the node
+Type: boolean
+Default: false
+Description: Skip node initialization
+ If you choose to skip the node initialization, you must configure the node
  manually before starting the service. No default configuration will be
- performed.
+ applied.
  .
- For example using the command:
-    sudo su tezos -c "octez-node config init ..."
+ For example, you can initialize the configuration manually using the
+ following command:
+   sudo su tezos -c "octez-node config init ..."
  .
- This allows you to set the desired storage mode and network according
- to your requirements.
- .
- Skip if upgrading from Serokell packages.
-Type: select
-Choices: no, yes
+ And setting the desidered storage mode and network.
 
 Template: octez-node/upgrade_note_current
 Type: note
@@ -73,7 +69,7 @@ Description: Important upgrade information
  some changes have been made that may affect your usage of the
  package.
  .
- In particular this new version now use systemd to manage the octez-node
+ In particular this new version now uses systemd to manage the Octez Node
  life-cycle instead of a plain system V init script. Also the default values
  in /etc/default/octez-node have been revised and updated.
  .
