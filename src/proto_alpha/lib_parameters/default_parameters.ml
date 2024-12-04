@@ -218,13 +218,65 @@ let constants_mainnet : Constants.Parametric.t =
       block_time
   in
   {
+    (* [consensus_rights_delay] is the number of cycles between the
+       computation of consensus rights and their actual use for baking
+       and attesting. That is, at the end of cycle [n] (dawn of cycle
+       [n+1]), the consensus rights for cycle
+       [n+1+consensus_rights_delay] are sampled based on the current
+       baking power of bakers.
+
+       Last updated in protocol P. *)
     consensus_rights_delay = 2;
     blocks_preservation_cycles = 1;
+    (* [delegate_parameters_activation_delay] is the number of full
+       cycles after which submitted delegate parameters are actually
+       used. That is, parameters updated during cycle [n] take effect
+       at the end of cycle [n + delegate_parameters_activation_delay]
+       and beginning of cycle [n +
+       delegate_parameters_activation_delay + 1].
+
+       This should translate into a sufficient duration in days for
+       delegators to manually react to a notification that their
+       delegate's parameters are going to be modified. This should
+       also be longer than the delay for unstake requests to become
+       finalizable, to make possible for delegators to finish
+       unstaking before the new parameters take effect if they are
+       unhappy with the change. *)
     delegate_parameters_activation_delay = 5;
+    (* At the end of a cycle, a delegate gets deactivated if the chain
+       has witnessed no consensus activity (baking, attesting) from it
+       during the past [tolerated_inactivity_period] cycles, including
+       the currently ending cycle.
+
+       [tolerated_inactivity_period = 1] means that if a delegate does
+       not participate in consensus at all during a full cycle, then
+       it gets deactivated at the end of that cycle.
+
+       Note that there is an extra grace period of
+       [consensus_rights_delay] cycles when a delegate has just
+       registered or has just been reactivated. This accounts for the
+       fact that it will not receive consensus rights yet during the
+       first [consensus_rights_delay] cycles, so of course the chain
+       will not witness any activity from it then.
+
+       Last updated in protocol R. *)
     tolerated_inactivity_period = 1;
+    (* [blocks_per_cycle] is the duration of a cycle in number of
+       blocks. Multiply it by [minimal_block_delay] to get the minimal
+       duration of a cycle in seconds.
+
+       [blocks_per_cycle = 10800l] has been chosen so that cycles last
+       one day (24h) (plus drift from non-zero rounds) on mainnet
+       where [minimal_block_delay] is 8s, and half a day (12h) on
+       ghostnet where [minimal_block_delay] is 4s.
+
+       Last updated in protocol R. *)
     blocks_per_cycle = 10800l;
     blocks_per_commitment = 240l;
     nonce_revelation_threshold = 960l;
+    (* [cycles_per_voting_period] is the duration of any voting period.
+
+       Last updated in protocol R. *)
     cycles_per_voting_period = 14l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_386_666);
@@ -276,6 +328,7 @@ let constants_mainnet : Constants.Parametric.t =
        The unit for this value is a block.
     *)
     max_operations_time_to_live = 450;
+    (* Round [k] lasts [minimal_block_delay + k * delay_increment_per_round]. *)
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.of_seconds_exn 4L;
     consensus_committee_size;

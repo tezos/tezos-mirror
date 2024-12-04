@@ -205,14 +205,10 @@ type issuance_weights = {
 }
 
 type t = {
-  (* Number of cycles after which computed consensus rights are used to actually
-     participate in the consensus *)
   consensus_rights_delay : int;
   (* Number of past cycles about which the protocol hints the shell that it should
      keep them in its history. *)
   blocks_preservation_cycles : int;
-  (* Number of cycles after which submitted delegate parameters are being
-     used. *)
   delegate_parameters_activation_delay : int;
   tolerated_inactivity_period : int;
   blocks_per_cycle : int32;
