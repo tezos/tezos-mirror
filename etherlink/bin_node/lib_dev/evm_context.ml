@@ -423,23 +423,11 @@ module State = struct
     ctxt.session.pending_upgrade <- pending_upgrade ;
     return evm_state
 
-  let reset_to_finalized_level ?expected_finalized_number exit_error ctxt conn =
+  let reset_to_finalized_level exit_error ctxt conn =
     let open Lwt_result_syntax in
     let* safe_checkpoint = Evm_store.Context_hashes.find_finalized conn in
     match safe_checkpoint with
     | Some (finalized_number, checkpoint) ->
-        let* () =
-          match expected_finalized_number with
-          | None -> return_unit
-          | Some expected_finalized_number ->
-              when_ (finalized_number <> expected_finalized_number) (fun () ->
-                  let*! () =
-                    Evm_context_events.reset_incoherent_finalized_state
-                      ~expected_finalized_number
-                      ~finalized_number
-                  in
-                  tzfail exit_error)
-        in
         reset_to_level ctxt conn finalized_number checkpoint
     | None ->
         let*! () =
@@ -1021,11 +1009,19 @@ module State = struct
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
     let* (_ : Evm_state.t) =
-      reset_to_finalized_level
-        ~expected_finalized_number:(Ethereum_types.Qty.pred flushed_level)
-        (Node_error.Cannot_handle_flushed_blueprint flushed_level)
-        ctxt
-        conn
+      let before_flushed_level =
+        Ethereum_types.Qty.pred
+          flushed_blueprint.Evm_events.Flushed_blueprint.level
+      in
+      let* checkpoint =
+        Evm_store.Context_hashes.find conn before_flushed_level
+      in
+      match checkpoint with
+      | None ->
+          let*! () = Evm_context_events.missing_state before_flushed_level in
+          tzfail (Node_error.Cannot_handle_flushed_blueprint flushed_level)
+      | Some checkpoint ->
+          reset_to_level ctxt conn before_flushed_level checkpoint
     in
     (* Reapply lost events on current head *)
     let* () = clear_head_delayed_inbox ctxt in
