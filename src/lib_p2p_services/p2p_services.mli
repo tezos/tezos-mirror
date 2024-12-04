@@ -254,7 +254,7 @@ module Full_stat : sig
 
   val encoding : t Data_encoding.t
 
-  val to_string : t -> string
+  val to_string : colorize:bool -> t -> string
 
   module S : sig
     val full_stat :

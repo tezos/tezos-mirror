@@ -471,10 +471,12 @@ module Full_stat = struct
   let pp_connection_info ppf conn =
     P2p_connection.Info.pp (fun _ _ -> ()) ppf conn
 
-  let to_string
+  let to_string ~colorize
       {stat; incoming_connections; outgoing_connections; peers; points} =
     let reset =
-      Tezos_stdlib.Pretty_printing.add_ansi_marking Format.str_formatter
+      if colorize then
+        Tezos_stdlib.Pretty_printing.add_ansi_marking Format.str_formatter
+      else fun () -> ()
     in
     Format.fprintf
       Format.str_formatter

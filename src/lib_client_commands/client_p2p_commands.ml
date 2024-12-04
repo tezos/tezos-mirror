@@ -45,10 +45,16 @@ let p2p_peer_id_param ~name ~desc t =
          Lwt.return (P2p_peer.Id.of_b58check str)))
     t
 
-let p2p_stat () (cctxt : #Client_context.full) =
+let p2p_stat dont_colorize (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
   let* full_stats = P2p_services.Full_stat.full_stat cctxt in
-  let*! () = cctxt#message "%s" (P2p_services.Full_stat.to_string full_stats) in
+  let*! () =
+    cctxt#message
+      "%s"
+      (P2p_services.Full_stat.to_string
+         ~colorize:((not dont_colorize) && Unix.isatty Unix.stdout)
+         full_stats)
+  in
   return_unit
 
 let commands () =
@@ -58,7 +64,7 @@ let commands () =
     command
       ~group
       ~desc:"show global network status"
-      no_options
+      (args1 (Client_commands.dont_colorize ()))
       (prefixes ["p2p"; "stat"] stop)
       p2p_stat;
     command
