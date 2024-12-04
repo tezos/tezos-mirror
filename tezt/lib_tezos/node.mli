@@ -301,6 +301,9 @@ val rpc_endpoint : ?local:bool -> t -> string
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
 
+(** Get the identity file of a node. *)
+val identity_file : t -> string
+
 (** Get the runner associated to a node.
 
     Return [None] if the node runs on the local machine. *)

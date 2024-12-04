@@ -179,8 +179,10 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
   in
   Process.check process
 
+let identity_file dal_node = Filename.concat (data_dir dal_node) "identity.json"
+
 let read_identity dal_node =
-  let filename = sf "%s/identity.json" @@ data_dir dal_node in
+  let filename = identity_file dal_node in
   match dal_node.persistent_state.runner with
   | None -> Lwt.return JSON.(parse_file filename |-> "peer_id" |> as_string)
   | Some runner ->

@@ -196,15 +196,26 @@ end
 module Node = struct
   let runner_of_agent = Agent.runner
 
+  let may_copy_node_identity_file agent node = function
+    | None -> Lwt.return_unit
+    | Some source ->
+        toplog "Copying the node identity file" ;
+        let* _ =
+          Agent.copy agent ~source ~destination:(Node.identity_file node)
+        in
+        Lwt.return_unit
+
   include Node
 
-  let init ?(arguments = []) ?data_dir ?dal_config ~name network agent =
+  let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~name network
+      agent =
     toplog "Inititializing a L1 node" ;
     match network with
     | Network.Public network -> (
         match data_dir with
         | Some data_dir ->
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               Node.run node [Network (Network.to_octez_network_options network)]
             in
@@ -227,6 +238,7 @@ module Node = struct
                 ~name
                 agent
             in
+            let* () = may_copy_node_identity_file agent node identity_file in
             toplog "Downloading a rolling snapshot" ;
             let* () =
               Process.spawn
@@ -288,6 +300,7 @@ module Node = struct
                     (Node.Config_file.set_sandbox_network_with_dal_config
                        config)
             in
+            let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               Node.run
                 node
@@ -306,6 +319,7 @@ module Node = struct
               @ arguments
             in
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let* () = may_copy_node_identity_file agent node identity_file in
             let* () = Node.run node [] in
             let* () = Node.wait_for_ready node in
             Lwt.return node)
@@ -837,6 +851,24 @@ module Cli = struct
       ~long:"slack-api-url"
       ~description:"The slack webhook url to send the alerts on"
       ()
+
+  let bootstrap_node_identity_file =
+    Clap.optional_string
+      ~section
+      ~long:"bootstrap-node-identity"
+      ~description:
+        "The bootstrap node identity file. Warning: this argument may be \
+         removed in a future release."
+      ()
+
+  let bootstrap_dal_node_identity_file =
+    Clap.optional_string
+      ~section
+      ~long:"bootstrap-dal-node-identity"
+      ~description:
+        "The bootstrap DAL node identity file. Warning: this argument may be \
+         removed in a future release."
+      ()
 end
 
 type etherlink_configuration = {
@@ -865,6 +897,8 @@ type configuration = {
   fundraiser : string option;
   blocks_history : int;
   metrics_retention : int;
+  bootstrap_node_identity_file : string option;
+  bootstrap_dal_node_identity_file : string option;
 }
 
 type bootstrap = {
@@ -1550,6 +1584,15 @@ let init_teztale (configuration : configuration) cloud agent =
     Lwt.return_some teztale
   else Lwt.return_none
 
+let may_copy_dal_node_identity_file agent node = function
+  | None -> Lwt.return_unit
+  | Some source ->
+      toplog "Copying the DAL node identity file" ;
+      let* _ =
+        Agent.copy agent ~source ~destination:(Dal_node.identity_file node)
+      in
+      Lwt.return_unit
+
 let init_public_network cloud (configuration : configuration)
     etherlink_configuration teztale agent (network : Network.public_network) =
   toplog "Init public network" ;
@@ -1581,7 +1624,11 @@ let init_public_network cloud (configuration : configuration)
         let () = toplog "Some agent given" in
         let () = toplog "Initializing the bootstrap node agent" in
         let* node =
-          Node.init ~name:"bootstrap-node" configuration.network agent
+          Node.init
+            ?identity_file:configuration.bootstrap_node_identity_file
+            ~name:"bootstrap-node"
+            configuration.network
+            agent
         in
         let* dal_node =
           Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node
@@ -1591,6 +1638,12 @@ let init_public_network cloud (configuration : configuration)
             ~expected_pow:26.
             ~bootstrap_profile:true
             dal_node
+        in
+        let* () =
+          may_copy_dal_node_identity_file
+            agent
+            dal_node
+            configuration.bootstrap_dal_node_identity_file
         in
         let* () = Node.wait_for_ready node in
         let* () = add_source cloud agent ~name:"bootstrap" node dal_node in
@@ -1737,7 +1790,13 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let* bootstrap_node =
-    Node.init ?data_dir ~dal_config ~name configuration.network agent
+    Node.init
+      ?data_dir
+      ?identity_file:configuration.bootstrap_node_identity_file
+      ~dal_config
+      ~name
+      configuration.network
+      agent
   in
   let* dal_bootstrap_node =
     Dal_node.Agent.create
@@ -1808,6 +1867,12 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~expected_pow:0.
       ~bootstrap_profile:true
       dal_bootstrap_node
+  in
+  let* () =
+    may_copy_dal_node_identity_file
+      agent
+      dal_bootstrap_node
+      configuration.bootstrap_dal_node_identity_file
   in
   let* () =
     Dal_node.Agent.run
@@ -2916,6 +2981,8 @@ let configuration, etherlink_configuration =
   in
   let blocks_history = Cli.blocks_history in
   let metrics_retention = Cli.metrics_retention in
+  let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
+  let bootstrap_dal_node_identity_file = Cli.bootstrap_dal_node_identity_file in
   let t =
     {
       stake;
@@ -2934,6 +3001,8 @@ let configuration, etherlink_configuration =
       fundraiser;
       blocks_history;
       metrics_retention;
+      bootstrap_node_identity_file;
+      bootstrap_dal_node_identity_file;
     }
   in
   (t, etherlink)
@@ -2990,12 +3059,20 @@ let benchmark () =
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
     ~vms
     ~proxy_files:
-      [
-        Format.asprintf
-          "src/%s/parameters/mainnet-parameters.json"
-          (Protocol.directory configuration.protocol);
-        "evm_kernel.wasm";
-      ]
+      ([
+         Format.asprintf
+           "src/%s/parameters/mainnet-parameters.json"
+           (Protocol.directory configuration.protocol);
+         "evm_kernel.wasm";
+       ]
+      @ Option.fold
+          ~none:[]
+          ~some:(fun x -> [x])
+          configuration.bootstrap_node_identity_file
+      @ Option.fold
+          ~none:[]
+          ~some:(fun x -> [x])
+          configuration.bootstrap_dal_node_identity_file)
     ~proxy_args:
       (match configuration.fundraiser with
       | None -> []

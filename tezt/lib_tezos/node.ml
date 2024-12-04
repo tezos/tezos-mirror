@@ -234,6 +234,8 @@ let metrics_port node = node.persistent_state.metrics_port
 
 let data_dir node = node.persistent_state.data_dir
 
+let identity_file node = Filename.concat (data_dir node) "identity.json"
+
 let runner node = node.persistent_state.runner
 
 let spawn_command node =

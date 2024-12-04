@@ -110,6 +110,10 @@ val data_dir : t -> string
     [event_level] allows to determine the printed levels. By default,
     it is set to [`Debug] by default.
 *)
+
+(** Get the identity file of a dal node. *)
+val identity_file : t -> string
+
 val run :
   ?wait_ready:bool ->
   ?env:string String_map.t ->
