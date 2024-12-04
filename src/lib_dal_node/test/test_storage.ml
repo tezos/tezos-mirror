@@ -159,9 +159,9 @@ module Helpers = struct
       | Remove of {attested_level : Level.t}
     [@@deriving hash]
 
-    let gen_Insert =
+    let gen_Insert ?level () =
       return @@ fun state ->
-      let* attested_level = Level.gen in
+      let* attested_level = Option.fold ~none:Level.gen ~some:return level in
       let* payload =
         list
           ~size:(return number_of_slots)
@@ -270,21 +270,23 @@ module Helpers = struct
       state n =
     let open Bam.Std.Syntax in
     assert (n >= 0) ;
-    let rec loop acc state n =
+    let rec loop l acc state n =
       if n = 0 then return {state; actions = List.rev acc}
       else
         let choices =
-          (insert_dist, Action.gen_Insert)
+          (insert_dist, Action.gen_Insert ~level:l ())
           :: (find_dist, Action.gen_Find)
           :: [(remove_dist, Action.gen_Remove)]
         in
         let* choice = Bam.Std.oneof choices in
         let* res = choice state in
         match res with
-        | None -> loop acc state n
-        | Some (new_state, action) -> loop (action :: acc) new_state (pred n)
+        | None -> loop l acc state n
+        | Some (new_state, (Action.Insert _ as action)) ->
+            loop (Int32.succ l) (action :: acc) new_state (pred n)
+        | Some (new_state, action) -> loop l (action :: acc) new_state (pred n)
     in
-    loop [] state n
+    loop 0l [] state n
 
   let gen ?insert_dist ?find_dist ?remove_dist n =
     gen_with_state ?insert_dist ?find_dist ?remove_dist State.zero n
