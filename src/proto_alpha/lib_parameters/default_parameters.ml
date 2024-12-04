@@ -26,6 +26,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Individual constants should be documented here so that the
+   documentation is right next to its mainnet value. However, note
+   that some constants are currently documented in
+   {!Protocol.Constants_parametric_repr} instead.
+
+   See {!Protocol.Constants_parametric_repr} for documentation on
+   constant management in general, and instructions on how to
+   add/modify a constant.
+*)
+
 open Protocol.Alpha_context
 
 let seconds_in_a_day = 60 * 60 * 24

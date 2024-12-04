@@ -26,6 +26,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Protocol-specific constants.
+
+    When the protocol is activated via migration from its predecessor
+    (e.g. on mainnet, ghostnet, <proto-name>net), these constants are
+    fully controlled by {!Raw_context.prepare_first_block}, which
+    copies over the value from the previous protocol for most
+    constants, but may also modify some of them and/or initialize new
+    constants.
+
+    When the protocol is activated from Genesis, e.g. in most tests,
+    constant values must be provided through a parameter file (or
+    internal arguments, depending of the level of abstraction). Typical
+    default values for various situations are available in
+    [lib_parameters/default_parameters.ml].
+
+    Note that there are also "hard" constants (non-parametric: cannot
+    be adjusted in tests) which are defined in {!Constants_repr}.
+
+    Documentation on individual constants can be found either in this
+    file or in [lib_parameters/default_parameters.ml]. Eventually, we
+    would like to keep the constant's documentation mainly into
+    [lib_parameters/default_parameters.ml] as it allows it to be
+    rights next to each constant's current value, no matter whether the
+    constant has been updated in the current protocol or not (whereas
+    only the values of modified constants can be found in
+    {!Raw_context.prepare_first_block}, so it's not a good place to put
+    the documentation).
+
+    In order to add or modify a protocol constant, you should
+    therefore:
+
+    - Add/update its value in {!Raw_context.prepare_first_block}, in
+      the branch of the pattern matching corresponding to [alpha]'s
+      predecessor.
+
+    - Add/update the same value in [lib_parameters/default_parameters.ml].
+
+    - Add/update the documentation on the constant in
+      [lib_parameters/default_parameters.ml]. If the constant is already
+      documented elsewhere, please move the documentation there.
+
+    (The CI will fail if you don't update [default_parameters.ml] accordingly.)
+*)
+
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
