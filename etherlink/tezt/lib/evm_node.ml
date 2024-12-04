@@ -380,9 +380,14 @@ let wait_for_rollup_node_follower_disabled ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"rollup_node_follower_disabled.v0"
   @@ Fun.const (Some ())
 
-let wait_for_flush_delayed_inbox ?timeout evm_node =
+let wait_for_flush_delayed_inbox ?timeout ?level evm_node =
   wait_for_event ?timeout evm_node ~event:"flush_delayed_inbox.v0"
-  @@ Fun.const (Some ())
+  @@ fun json ->
+  let found_level = JSON.(json |-> "level" |> as_int) in
+  match level with
+  | Some level when level = found_level -> Some found_level
+  | None -> Some found_level
+  | Some _ -> None
 
 let wait_for_blueprint_invalid ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"blueprint_invalid.v0"
@@ -1512,13 +1517,14 @@ let wait_termination (evm_node : t) =
       let* _status = Process.wait process in
       unit
 
-let make_kernel_installer_config ?(mainnet_compat = false)
-    ?(remove_whitelist = false) ?kernel_root_hash ?chain_id ?bootstrap_balance
-    ?bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
-    ?sequencer_governance ?kernel_governance ?kernel_security_governance
-    ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
+    ?(mainnet_compat = false) ?(remove_whitelist = false) ?kernel_root_hash
+    ?chain_id ?bootstrap_balance ?bootstrap_accounts ?sequencer ?delayed_bridge
+    ?ticketer ?administrator ?sequencer_governance ?kernel_governance
+    ?kernel_security_governance ?minimum_base_fee_per_gas
+    ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = 157_680_000L)
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_dal = false)
     ?dal_slots ~output () =
@@ -1531,6 +1537,10 @@ let make_kernel_installer_config ?(mainnet_compat = false)
   in
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
+    @ Cli_arg.optional_arg
+        "max-delayed-inbox-blueprint-length"
+        Int.to_string
+        max_delayed_inbox_blueprint_length
     @ Cli_arg.optional_switch "mainnet-compat" mainnet_compat
     @ Cli_arg.optional_switch "remove-whitelist" remove_whitelist
     @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
