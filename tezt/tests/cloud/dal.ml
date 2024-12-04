@@ -2455,6 +2455,8 @@ let benchmark () =
            "src/%s/parameters/mainnet-parameters.json"
            (Protocol.directory configuration.protocol);
          "evm_kernel.wasm";
+         "octez-node";
+         "octez-dal-node";
        ]
       @ Option.fold
           ~none:[]
