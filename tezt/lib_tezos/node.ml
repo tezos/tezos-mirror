@@ -339,13 +339,10 @@ module Config_file = struct
     match node.persistent_state.runner with
     | None -> Lwt.return (JSON.encode_to_file (filename node) config)
     | Some runner ->
-        let content = JSON.encode config in
-        let cmd =
-          Runner.Shell.(
-            redirect_stdout (cmd [] "echo" [content]) (filename node))
-        in
-        let cmd, args = Runner.wrap_with_ssh runner cmd in
-        Process.run cmd args
+        Helpers.write_file
+          ~runner
+          ~contents:(JSON.encode config)
+          (filename node)
 
   let update node update =
     let* config = read node in

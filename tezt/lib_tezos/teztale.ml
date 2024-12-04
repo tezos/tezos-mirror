@@ -80,17 +80,7 @@ module Server = struct
         pp_public_directory
         conf.public_directory
     in
-    let* () =
-      match runner with
-      | None -> write_file conf_filename ~contents |> Lwt.return
-      | Some runner ->
-          let cmd =
-            Runner.Shell.(
-              redirect_stdout (cmd [] "echo" [contents]) conf_filename)
-          in
-          let cmd, args = Runner.wrap_with_ssh runner cmd in
-          Process.run cmd args
-    in
+    let* () = Helpers.write_file ?runner ~contents conf_filename in
     Lwt.return {conf_filename; db_filename}
 
   let make ?name ?(address = "0.0.0.0") ?port ?(users = [])
