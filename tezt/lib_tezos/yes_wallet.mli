@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type alias = {alias : string; address : string; public_key : string}
+
 type t
 
 val create : ?runner:Runner.t -> ?path:string -> ?name:string -> unit -> t
@@ -23,9 +25,9 @@ val create : ?runner:Runner.t -> ?path:string -> ?name:string -> unit -> t
     [<DATA_DIR>] is defined by [node] and [<BASE_DIR>] from [client]
 *)
 val create_from_context :
-  ?aliases:(string * string * string) list ->
+  ?aliases:alias list ->
   node:Node.t ->
   client:Client.t ->
   network:string ->
   t ->
-  unit Lwt.t
+  string Lwt.t

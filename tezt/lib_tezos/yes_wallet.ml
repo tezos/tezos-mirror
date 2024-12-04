@@ -5,11 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type alias = {alias : string; address : string; public_key : string}
+
 type t = {path : string; runner : Runner.t option; name : string option}
 
 let dump_aliases ?runner aliases =
   let filename = Temp.file ?runner "yes-wallet-aliases.json" in
-  let pp_alias fmt (alias, address, public_key) =
+  let pp_alias fmt {alias; address; public_key} =
     Format.fprintf
       fmt
       {|{
@@ -43,22 +45,25 @@ let create ?runner ?(path = Uses.path Constant.yes_wallet) ?name () =
 let create_from_context ?(aliases = []) ~node ~client ~network t =
   let {path; name; runner} = t in
   let* aliases_filename = dump_aliases ?runner aliases in
-  Process.spawn
-    ?runner
-    ?name
-    path
-    [
-      "create";
-      "from";
-      "context";
-      Node.data_dir node;
-      "in";
-      Client.base_dir client;
-      "--network";
-      network;
-      "--aliases";
-      aliases_filename;
-      "--force";
-      "--active-bakers-only";
-    ]
-  |> Process.check
+  let* () =
+    Process.spawn
+      ?runner
+      ?name
+      path
+      [
+        "create";
+        "from";
+        "context";
+        Node.data_dir node;
+        "in";
+        Client.base_dir client;
+        "--network";
+        network;
+        "--aliases";
+        aliases_filename;
+        "--force";
+        "--active-bakers-only";
+      ]
+    |> Process.check
+  in
+  Lwt.return aliases_filename
