@@ -206,5 +206,11 @@ Protocol
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
 
+Baker
+~~~~~
+
+- Emit event at Notice level when the delegate is not in the DAL committee, that
+  is, it has no assigned shards at the current level. (:gl:`!15846`)
+
 Miscellaneous
 -------------
