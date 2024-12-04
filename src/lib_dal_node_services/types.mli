@@ -157,6 +157,9 @@ module Peer : sig
 
   (** Returns true iff the bootstrap flag of the given peer is set to [true]. *)
   val is_bootstrap : t -> bool
+
+  (** Returns true iff the direct flag of the given peer is set to [true]. *)
+  val is_direct : t -> bool
 end
 
 (** A point is made of an IP address and a port. Only the worker knows about
