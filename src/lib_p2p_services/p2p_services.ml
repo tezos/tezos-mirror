@@ -417,7 +417,18 @@ module Full_stat = struct
       pi.stat
       (if pi.trusted then "★" else " ")
 
-  let pp_peers ppf peers = (pp_list pp_peer ppf) peers
+  let pp_peers ppf peers =
+    Format.fprintf
+      ppf
+      "@,@[<v 0>@{<bold; underline; fg_cyan>St Sc %a%a%a Tr@}%a@]"
+      (Tezos_stdlib.Pretty_printing.pp_centered 30)
+      "Peer Id"
+      (Tezos_stdlib.Pretty_printing.pp_centered 30)
+      "Upload"
+      (Tezos_stdlib.Pretty_printing.pp_centered 30)
+      "Download"
+      (pp_list pp_peer)
+      peers
 
   let pp_point ppf (p, pi) =
     match pi.P2p_point.Info.state with

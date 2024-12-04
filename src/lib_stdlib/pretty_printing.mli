@@ -36,3 +36,5 @@
     \]
 *)
 val add_ansi_marking : Format.formatter -> unit -> unit
+
+val pp_centered : int -> Format.formatter -> string -> unit

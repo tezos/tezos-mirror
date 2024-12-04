@@ -1230,7 +1230,7 @@ module P2p_stat = struct
     in
     let outgoing_connections =
       (* Example: *)
-      (* ↘ idscnVnp4ZgHbxBem9ZkaGtmVDdPt3 127.0.0.1:16392 (TEZOS.2 (p2p: 1))  *\) *)
+      (* ↗ idscnVnp4ZgHbxBem9ZkaGtmVDdPt3 127.0.0.1:16392 (TEZOS.2 (p2p: 1))  *\) *)
       List.map
         (fun line ->
           match line =~* rex "(id\\w+)" with
@@ -1248,7 +1248,10 @@ module P2p_stat = struct
           | Some (connection, peer_id) ->
               {id = Peer_id peer_id; connected = connection = "⚌"}
           | None -> fail ~__LOC__ "peers" line)
-        (List.tl known_peers)
+        (* Removing the lines:
+           - KNOWNPEERS
+           - St Sc Peer Id Upload Download Tr *)
+        (List.tl (List.tl known_peers))
     in
     let known_points =
       (* Example: *)

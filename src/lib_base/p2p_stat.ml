@@ -48,18 +48,15 @@ let print_size64 ppf sz =
   else if sz < shift_left 1L 40 then Format.fprintf ppf "%.2f GiB" (ratio 30)
   else Format.fprintf ppf "%.2f TiB" (ratio 40)
 
+let pp_flow total current =
+  Format.asprintf "%a (%a/s)" print_size64 total print_size current
+
 let pp ppf stat =
   Format.fprintf
     ppf
-    "↗ %a (%a/s) ↘ %a (%a/s)"
-    print_size64
-    stat.total_sent
-    print_size
-    stat.current_outflow
-    print_size64
-    stat.total_recv
-    print_size
-    stat.current_inflow
+    "@{<fg_blue>@{<bold>↗@} %27s@} @{<fg_green>@{<bold>↘@} %27s@} "
+    (pp_flow stat.total_sent stat.current_outflow)
+    (pp_flow stat.total_recv stat.current_inflow)
 
 let encoding =
   let open Data_encoding in
