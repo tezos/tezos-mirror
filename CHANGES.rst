@@ -186,7 +186,6 @@ DAL node
 - Fixed file descriptor leak in resto affecting connections to the L1 node.
   (MR :gl:`!15322`)
 
-
 - **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
   argument has been removed. (MR :gl:`!15554`)
 
@@ -196,6 +195,8 @@ Protocol
 - A new antonymous operation "DAL entrapment evidence" was added. This operation
   is not valid when the feature flag for DAL incentives is turned off. (MR
   :gl:`!15677`)
+- Set the message validation function at node startup, fixing
+  https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
 
 Miscellaneous
 -------------
