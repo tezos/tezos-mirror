@@ -36,6 +36,13 @@ module Skip_list_cells : sig
     unit ->
     t tzresult Lwt.t
 
+  (** [close t] closes the store by freeing all resources and closing
+    database connections. *)
+  val close : t -> unit Lwt.t
+
+  (** [use t k] executes [k] with a fresh connection to [t]. *)
+  val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+
   (** [find ?conn store hash] returns the cell associated to [hash] in
       the [store], if any. Uses the [conn] if provided (defaults to
       [None]). *)

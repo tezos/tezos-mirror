@@ -4726,6 +4726,7 @@ let _octez_dal_node_lib_test =
         octez_base |> open_ ~m:"TzPervasives";
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_dal_node_lib |> open_;
+        octez_test_helpers |> open_;
         tezt_bam;
       ]
 
