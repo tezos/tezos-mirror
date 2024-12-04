@@ -11,10 +11,10 @@
 mod kernel_entrypoint;
 mod panic_protection;
 
-#[cfg(all(feature = "experimental-host-in-memory-store", target_arch = "riscv64"))]
+#[cfg(feature = "experimental-host-in-memory-store")]
 pub(crate) mod host_in_memory_store;
 
-#[cfg(all(feature = "dlmalloc", not(target_arch = "riscv64")))]
+#[cfg(all(feature = "dlmalloc", target_arch = "wasm32"))]
 mod allocator {
     use dlmalloc::GlobalDlmalloc;
 
@@ -65,14 +65,11 @@ macro_rules! kernel_entry {
 }
 
 #[doc(hidden)]
-#[cfg(not(all(
-    feature = "experimental-host-in-memory-store",
-    target_arch = "riscv64"
-)))]
+#[cfg(not(feature = "experimental-host-in-memory-store"))]
 pub use tezos_smart_rollup_core::rollup_host::RollupHost;
 
 #[doc(hidden)]
-#[cfg(all(feature = "experimental-host-in-memory-store", target_arch = "riscv64"))]
+#[cfg(feature = "experimental-host-in-memory-store")]
 pub use host_in_memory_store::RollupHostWithInMemoryStorage as RollupHost;
 
 #[doc(hidden)]
