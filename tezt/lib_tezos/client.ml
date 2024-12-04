@@ -1615,21 +1615,10 @@ let remember_script ~alias ~src client =
   spawn_remember_script ~alias ~src client |> Process.check
 
 let write_stresstest_sources_file ?runner ~sources filename =
-  let contents = JSON.encode_u sources in
   match runner with
-  | None -> write_file filename ~contents
-  | Some runner -> (
-      let cmd =
-        Runner.Shell.(
-          redirect_stdout (cmd [] "echo" [contents]) filename |> or_echo_false)
-      in
-      let cmd, args = Runner.wrap_with_ssh runner cmd in
-      let args = Array.of_list (cmd :: args) in
-      let process_out = Unix.open_process_args_in cmd args in
-      let out = try input_line process_out with End_of_file -> "" in
-      match Unix.close_process_in process_out with
-      | Unix.WEXITED 0 when out <> "false" -> ()
-      | _ -> failwith @@ sf "Stresstest: could not create %s" filename)
+  | None -> JSON.encode_to_file_u filename sources |> Lwt.return
+  | Some runner ->
+      Helpers.write_file ~runner filename ~contents:(JSON.encode_u sources)
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
@@ -1676,7 +1665,7 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   let sources_filename =
     Temp.file ?runner (Format.sprintf "sources-%s.json" client.name)
   in
-  let () = write_stresstest_sources_file ?runner ~sources sources_filename in
+  let* () = write_stresstest_sources_file ?runner ~sources sources_filename in
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
@@ -1724,7 +1713,8 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
                  items));
         ]
   in
-  spawn_command ?endpoint client
+  Lwt.return
+  @@ spawn_command ?endpoint client
   @@ [
        "stresstest";
        "transfer";
@@ -1743,20 +1733,21 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
 let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     ?fee ?gas_limit ?transfers ?tps ?fresh_probability
     ?smart_contract_parameters client =
-  spawn_stresstest
-    ?endpoint
-    ?source_aliases
-    ?source_pkhs
-    ?source_accounts
-    ?seed
-    ?fee
-    ?gas_limit
-    ?transfers
-    ?tps
-    ?fresh_probability
-    ?smart_contract_parameters
-    client
-  |> Process.check
+  Lwt.bind
+    (spawn_stresstest
+       ?endpoint
+       ?source_aliases
+       ?source_pkhs
+       ?source_accounts
+       ?seed
+       ?fee
+       ?gas_limit
+       ?transfers
+       ?tps
+       ?fresh_probability
+       ?smart_contract_parameters
+       client)
+    Process.check
 
 let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
     ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ?now

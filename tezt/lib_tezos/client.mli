@@ -1318,7 +1318,7 @@ val spawn_stresstest :
   ?fresh_probability:float ->
   ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
   t ->
-  Process.t
+  Process.t Lwt.t
 
 (** Run [octez-client stresstest gen keys <nb_keys>].
 
