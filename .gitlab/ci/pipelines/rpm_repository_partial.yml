@@ -172,3 +172,16 @@ oc.install_bin_rockylinux_9.3:
   script:
   - ./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3
   variables: {}
+
+oc.install_bin_rockylinux_9.3.doc:
+  image: rockylinux:9.3
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - rpm_repo_rockylinux
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
+  variables: {}

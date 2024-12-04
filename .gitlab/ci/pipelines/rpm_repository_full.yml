@@ -300,7 +300,7 @@ rpm_repo_fedora:
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
 
-oc.install_bin_fedora_93:
+oc.install_bin_fedora_39:
   image: fedora:39
   stage: publishing_tests
   tags:
@@ -311,6 +311,19 @@ oc.install_bin_fedora_93:
   timeout: 60 minutes
   script:
   - ./scripts/packaging/tests/rpm/rpm-install.sh fedora 39
+  variables: {}
+
+oc.install_bin_fedora_39.doc:
+  image: fedora:39
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - rpm_repo_fedora
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./docs/introduction/install-bin-rpm.sh fedora 39
   variables: {}
 
 oc.install_bin_rockylinux_9.3:
@@ -324,4 +337,17 @@ oc.install_bin_rockylinux_9.3:
   timeout: 60 minutes
   script:
   - ./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3
+  variables: {}
+
+oc.install_bin_rockylinux_9.3.doc:
+  image: rockylinux:9.3
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - rpm_repo_rockylinux
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
   variables: {}
