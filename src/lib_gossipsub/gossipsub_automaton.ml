@@ -39,7 +39,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type nonrec parameters = (Peer.t, Message_id.t) parameters
 
-  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+  type add_peer = {outbound : bool; peer : Peer.t}
 
   type remove_peer = {peer : Peer.t}
 
@@ -1977,11 +1977,12 @@ module Make (C : AUTOMATON_CONFIG) :
   let heartbeat : [`Heartbeat] output Monad.t = Heartbeat.handle
 
   module Add_peer = struct
-    let handle ~direct ~outbound peer : [`Add_peer] output Monad.t =
+    let handle ~outbound peer : [`Add_peer] output Monad.t =
       let open Monad.Syntax in
       let*! connections in
       let*! scores in
       let*! score_limits in
+      let direct = Peer.is_direct peer in
       match Connections.add_peer peer ~direct ~outbound connections with
       | `added connections ->
           let scores =
@@ -1999,7 +2000,7 @@ module Make (C : AUTOMATON_CONFIG) :
   end
 
   let add_peer : add_peer -> [`Add_peer] output Monad.t =
-   fun {direct; outbound; peer} -> Add_peer.handle ~direct ~outbound peer
+   fun {outbound; peer} -> Add_peer.handle ~outbound peer
 
   module Remove_peer = struct
     let handle peer : [`Remove_peer] output Monad.t =
@@ -2188,15 +2189,9 @@ module Make (C : AUTOMATON_CONFIG) :
 
   (* Helpers. *)
 
-  let pp_add_peer fmtr ({direct; outbound; peer} : add_peer) =
+  let pp_add_peer fmtr ({outbound; peer} : add_peer) =
     let open Format in
-    fprintf
-      fmtr
-      "{ direct=%b; outbound=%b; peer=%a }"
-      direct
-      outbound
-      Peer.pp
-      peer
+    fprintf fmtr "{ outbound=%b; peer=%a }" outbound Peer.pp peer
 
   let pp_remove_peer fmtr ({peer} : remove_peer) =
     let open Format in
