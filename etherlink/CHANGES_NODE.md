@@ -11,6 +11,9 @@
 - If the delayed inbox is flushed by the rollup node, the sequencer
   reorganizes its history. It clears all blocks produced on the
   invalid branch if any and start processing new ones. (!15676)
+- The sequencer can now uses the experimental features
+  `drop_duplicate_in_injection` if activated when publishing
+  blueprints. (!15867)
 
 ### Bug fixes
 
