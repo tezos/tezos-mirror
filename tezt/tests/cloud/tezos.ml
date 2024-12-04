@@ -211,11 +211,11 @@ module Client = struct
   include Client
 
   module Agent = struct
-    let create ?(path = Uses.path Constant.octez_client) ?node agent =
+    let create ?(path = Uses.path Constant.octez_client) ?name ?node agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let endpoint = Option.map (fun x -> Node x) node in
-      create ?runner ~path ?endpoint () |> Lwt.return
+      create ?runner ?name ~path ?endpoint () |> Lwt.return
   end
 end
 
