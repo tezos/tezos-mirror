@@ -15,7 +15,7 @@ use crate::{
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
-    machine_state::{bus::main_memory::Address, AccessType},
+    machine_state::{main_memory::Address, AccessType},
     parser::{instruction::Instr, parse},
     state_backend::ManagerRead,
     stepper::{StepResult, Stepper, StepperStatus},

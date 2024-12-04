@@ -8,7 +8,7 @@ use crate::{
     posix_exit_mode,
 };
 use octez_riscv::{
-    machine_state::{bus::main_memory::M1G, DefaultCacheLayouts},
+    machine_state::{main_memory::M1G, DefaultCacheLayouts},
     pvm::PvmHooks,
     stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
 };

@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{bus::main_memory::M100M, mode::Mode, TestCacheLayouts},
+    machine_state::{main_memory::M100M, mode::Mode, TestCacheLayouts},
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{

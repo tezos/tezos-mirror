@@ -6,7 +6,7 @@ use super::{Stepper, StepperStatus};
 use crate::{
     kernel_loader,
     machine_state::{
-        bus::main_memory::{MainMemoryLayout, M1G},
+        main_memory::{MainMemoryLayout, M1G},
         mode::Mode,
         CacheLayouts, DefaultCacheLayouts, MachineCoreState, MachineError,
     },

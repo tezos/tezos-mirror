@@ -2,14 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    kernel_loader,
-    machine_state::bus::{
-        self,
-        main_memory::{Address, MainMemoryLayout},
-    },
-    parser::parse_block,
-};
+use crate::{kernel_loader, machine_state::main_memory, parser::parse_block};
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
 /// RISC-V program
@@ -17,7 +10,7 @@ pub struct Program<'a, ML> {
     _pd: PhantomData<ML>,
 
     /// Address of the program's entrypoint
-    pub entrypoint: Address,
+    pub entrypoint: main_memory::Address,
 
     /// Segments to be written to the main memory
     // Note: `[u8]` owned is `Vec<u8>`. The segment is either re-using an
@@ -26,7 +19,7 @@ pub struct Program<'a, ML> {
     // Invariant: `segments[index]` corresponds to an array
     // representing bytes at `index..index+length` and
     // all the arrays are non-overlapping
-    pub segments: BTreeMap<Address, Cow<'a, [u8]>>,
+    pub segments: BTreeMap<main_memory::Address, Cow<'a, [u8]>>,
 }
 
 impl<'a, ML> kernel_loader::Memory for Program<'a, ML> {
@@ -97,12 +90,12 @@ impl<'a, ML> kernel_loader::Memory for Program<'a, ML> {
     }
 }
 
-impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
+impl<'a, ML: main_memory::MainMemoryLayout> Program<'a, ML> {
     /// Parse the given ELF executable and convert it into our program
     /// representation. The main memory layout `ML` is used to compute the
     /// correct addresses
     pub fn from_elf(elf: &'a [u8]) -> Result<Self, kernel_loader::Error> {
-        let start_if_reloc = bus::main_memory::FIRST_ADDRESS;
+        let start_if_reloc = main_memory::FIRST_ADDRESS;
 
         let mut myself = Self {
             _pd: PhantomData,
@@ -117,7 +110,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 
     /// Construct a program from raw RISC-V machine code.
     pub fn from_raw(code: &'a [u8]) -> Self {
-        let entrypoint = bus::main_memory::FIRST_ADDRESS;
+        let entrypoint = main_memory::FIRST_ADDRESS;
         Self {
             _pd: PhantomData,
             entrypoint,
@@ -143,7 +136,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 mod tests {
     use crate::{
         kernel_loader::{self, Memory},
-        machine_state::bus::main_memory::{self, M1M},
+        machine_state::main_memory::{self, M1M},
         program::Program,
     };
     use std::{cell::RefCell, collections::BTreeMap, fs, io::Cursor, marker::PhantomData};

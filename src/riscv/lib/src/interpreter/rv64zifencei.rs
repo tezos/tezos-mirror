@@ -5,7 +5,7 @@
 //! Implementation of Zifencei extension for RISC-V
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, AccessType, CacheLayouts, MachineState},
+    machine_state::{main_memory::MainMemoryLayout, AccessType, CacheLayouts, MachineState},
     state_backend,
 };
 

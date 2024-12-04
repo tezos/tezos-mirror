@@ -4,7 +4,7 @@
 
 use crate::{
     default::ConstDefault,
-    machine_state::bus::main_memory::Address,
+    machine_state::main_memory::Address,
     state_backend::{Layout, ManagerAlloc, ManagerBase, Many},
 };
 use std::{convert::Infallible, marker::PhantomData};

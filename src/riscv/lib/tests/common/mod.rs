@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
-    machine_state::{bus::main_memory::M100M, DefaultCacheLayouts},
+    machine_state::{main_memory::M100M, DefaultCacheLayouts},
     pvm::PvmHooks,
     stepper::pvm::PvmStepper,
 };

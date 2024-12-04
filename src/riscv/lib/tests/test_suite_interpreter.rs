@@ -6,7 +6,7 @@
 use goldenfile::Mint;
 use octez_riscv::{
     machine_state::{
-        bus::main_memory::M1M,
+        main_memory::M1M,
         mode::Mode,
         registers::{gp, XRegister, XValue},
     },

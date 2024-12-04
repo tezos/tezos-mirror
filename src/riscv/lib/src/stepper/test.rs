@@ -8,7 +8,7 @@ use super::{StepResult, Stepper, StepperStatus};
 use crate::{
     kernel_loader,
     machine_state::{
-        bus::main_memory::{MainMemoryLayout, M1G},
+        main_memory::{MainMemoryLayout, M1G},
         mode, CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
         StepManyResult, TestCacheLayouts,
     },

@@ -3,17 +3,17 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    bus::main_memory::{self, Address},
     csregisters::{
         satp::{Satp, SvLength, TranslationAlgorithm},
         CSRRepr, CSRegister,
     },
+    main_memory::{self, Address},
     mode::Mode,
     MachineCoreState,
 };
 use crate::{
     bits::Bits64,
-    machine_state::{address_translation::pte::PageTableEntry, bus::main_memory::OutOfBounds},
+    machine_state::{address_translation::pte::PageTableEntry, main_memory::OutOfBounds},
     state_backend::{self as backend},
     traps::Exception,
 };

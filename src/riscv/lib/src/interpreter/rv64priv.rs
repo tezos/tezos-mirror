@@ -4,13 +4,13 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::{Address, MainMemoryLayout},
         csregisters::{
             effects::handle_csr_effect,
             xstatus::{MPPValue, SPPValue},
             CSRegister,
         },
         hart_state::HartState,
+        main_memory::{Address, MainMemoryLayout},
         mode::Mode,
         registers::XRegister,
         AccessType, MachineCoreState,
@@ -139,8 +139,8 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
-            bus::main_memory::tests::T1K,
             csregisters::{xstatus, CSRRepr, CSRegister},
+            main_memory::tests::T1K,
             mode::Mode,
             registers::{a0, t0},
             MachineCoreState, MachineCoreStateLayout,

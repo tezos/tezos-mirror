@@ -10,7 +10,7 @@
 
 use super::{
     block_cache::{self, BlockCacheLayout},
-    bus::main_memory::MainMemoryLayout,
+    main_memory::MainMemoryLayout,
 };
 
 /// Configuration bucket for the size of caches.

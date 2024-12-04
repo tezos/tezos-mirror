@@ -12,8 +12,8 @@ use octez_riscv::{
     bits::Bits64,
     kernel_loader::Error,
     machine_state::{
-        bus::main_memory::{self, Address, MainMemoryLayout},
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
+        main_memory::{self, Address, MainMemoryLayout},
         mode::Mode,
         AccessType, CacheLayouts, MachineCoreState,
     },
@@ -488,7 +488,7 @@ impl<'a> ProgramView<'a> {
 mod test {
     use super::*;
     use crate::{posix_exit_mode, ExitMode};
-    use octez_riscv::machine_state::bus::main_memory::M1G;
+    use octez_riscv::machine_state::main_memory::M1G;
     use std::fs;
 
     #[test]

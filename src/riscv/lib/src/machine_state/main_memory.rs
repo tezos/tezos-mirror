@@ -44,16 +44,15 @@ pub enum Sizes<const BYTES: usize> {}
 macro_rules! gen_memory_layout {
     ($name:ident = $size_in_g:literal GiB) => {
         pub type $name =
-            crate::machine_state::bus::main_memory::Sizes<{ $size_in_g * 1024 * 1024 * 1024 }>;
+            crate::machine_state::main_memory::Sizes<{ $size_in_g * 1024 * 1024 * 1024 }>;
     };
 
     ($name:ident = $size_in_m:literal MiB) => {
-        pub type $name =
-            crate::machine_state::bus::main_memory::Sizes<{ $size_in_m * 1024 * 1024 }>;
+        pub type $name = crate::machine_state::main_memory::Sizes<{ $size_in_m * 1024 * 1024 }>;
     };
 
     ($name:ident = $size_in_k:literal KiB) => {
-        pub type $name = crate::machine_state::bus::main_memory::Sizes<{ $size_in_k * 1024 }>;
+        pub type $name = crate::machine_state::main_memory::Sizes<{ $size_in_k * 1024 }>;
     };
 }
 

@@ -9,8 +9,8 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::{Address, MainMemoryLayout},
         hart_state::HartState,
+        main_memory::{Address, MainMemoryLayout},
         registers::{sp, x0, x1, x2, XRegister, XRegisters},
         MachineCoreState, ProgramCounterUpdate,
     },
@@ -274,7 +274,7 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
-            bus::main_memory::tests::T1K, registers::a4, MachineCoreState, MachineCoreStateLayout,
+            main_memory::tests::T1K, registers::a4, MachineCoreState, MachineCoreStateLayout,
         },
     };
     use proptest::{prelude::*, prop_assert_eq, proptest};

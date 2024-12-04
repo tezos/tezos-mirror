@@ -8,8 +8,8 @@ use crate::{
     bits::u64,
     default::ConstDefault,
     machine_state::{
-        bus::main_memory::Address,
         csregisters::{self, xstatus, CSRegister},
+        main_memory::Address,
         mode::{Mode, TrapMode},
         registers,
         reservation_set::{self, ReservationSet},

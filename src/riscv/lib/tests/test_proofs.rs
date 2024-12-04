@@ -7,7 +7,7 @@ mod common;
 
 use common::*;
 use octez_riscv::{
-    machine_state::{bus::main_memory::M100M, DefaultCacheLayouts},
+    machine_state::{main_memory::M100M, DefaultCacheLayouts},
     state_backend::hash,
     stepper::{pvm::PvmStepper, Stepper, StepperStatus},
 };

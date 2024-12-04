@@ -13,8 +13,8 @@
 //! dispatching every time an instruction is run.
 
 use super::{
-    bus::main_memory::MainMemoryLayout,
     csregisters::CSRegister,
+    main_memory::MainMemoryLayout,
     registers::{FRegister, XRegister},
     MachineCoreState, ProgramCounterUpdate,
 };
