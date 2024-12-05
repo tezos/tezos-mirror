@@ -907,6 +907,42 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
           true
       | _ -> false)
 
+(** Check that a double attestation evidence fails under aggregate_attestation
+    feature flag when operations have distinct slots and are otherwise
+    identical. *)
+let different_slots_under_feature_flag () =
+  let open Lwt_result_syntax in
+  let* genesis, _ =
+    Context.init2 ~consensus_threshold_size:0 ~aggregate_attestation:true ()
+  in
+  let* block = Block.bake genesis in
+  let* attesters = Context.get_attesters (B block) in
+  let delegate, slot1, slot2 =
+    (* Find an attester with more than 1 slot. *)
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (List.find_map
+         (fun (attester : RPC.Validators.t) ->
+           match attester.slots with
+           | slot1 :: slot2 :: _ -> Some (attester.delegate, slot1, slot2)
+           | _ -> None)
+         attesters)
+  in
+  let* attestation1 = Op.raw_attestation ~delegate ~slot:slot1 block in
+  let* attestation2 = Op.raw_attestation ~delegate ~slot:slot2 block in
+  let double_attestation_evidence =
+    double_attestation (B block) attestation1 attestation2
+  in
+  let*! res = Block.bake ~operation:double_attestation_evidence block in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Validate_errors.Anonymous.Invalid_denunciation
+            Misbehaviour.Double_attesting ->
+            true
+        | _ -> false)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -957,6 +993,10 @@ let tests =
       test_too_late_double_attestation_evidence;
     Tztest.tztest "different delegates" `Quick test_different_delegates;
     Tztest.tztest "wrong delegate" `Quick test_wrong_delegate;
+    Tztest.tztest
+      "different slots under feature flag"
+      `Quick
+      different_slots_under_feature_flag;
     (* This test has been deactivated following the changes of the
        forbidding mechanism that now forbids delegates right after the
        first denunciation, it should be fixed and reactivated
