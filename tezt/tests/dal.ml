@@ -7019,7 +7019,7 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
            fun json ->
              let peer = json |-> "peer" |-> "peer_id" |> as_string in
              let connection = json |-> "connection" in
-             let bootstrap = connection |-> "bootstrap" |> as_bool in
+             let bootstrap = json |-> "peer" |-> "bootstrap" |> as_bool in
              let topics =
                connection |-> "topics" |> as_list
                |> List.map (fun t ->
