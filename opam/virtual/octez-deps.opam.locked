@@ -172,6 +172,7 @@ depends: [
   "ocplib-endian" {= "1.2"}
   "ohex" {= "0.2.0"}
   "opentelemetry" {= "0.10"}
+  "rope" {= "0.6.2"}
   "optint" {= "0.3.0"}
   "ordering" {= "3.16.1"}
   "parsexp" {= "v0.16.0"}
