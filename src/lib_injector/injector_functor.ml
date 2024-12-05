@@ -1214,11 +1214,23 @@ module Make (Parameters : PARAMETERS) = struct
     Included_in_blocks.clear state.included.included_in_blocks ;
     Op_heap.clear state.heap
 
-  let remove_operations_with_tag tag state =
-    Op_heap.remove_predicate
-      (fun op ->
-        Parameters.Tag.equal (Parameters.operation_tag op.operation) tag)
-      state.heap
+  let remove_operations removal_criteria {heap; _} =
+    let predicate_f (op : Inj_operation.t) =
+      let is_op_tag tag =
+        Parameters.Tag.equal (Parameters.operation_tag op.operation) tag
+      in
+      let is_order_below ~drop_no_order order_below =
+        Option.map (fun op_order -> Z.lt op_order order_below) op.order
+        |> Option.value ~default:drop_no_order
+      in
+      match removal_criteria with
+      | Request.Operation_tag tag -> is_op_tag tag
+      | Order_below (order_below, drop_no_order) ->
+          is_order_below ~drop_no_order order_below
+      | Tag_and_order_below (tag, order_below, drop_no_order) ->
+          is_op_tag tag && is_order_below ~drop_no_order order_below
+    in
+    Op_heap.remove_predicate predicate_f heap
 
   module Types = struct
     type nonrec state = state
@@ -1276,10 +1288,10 @@ module Make (Parameters : PARAMETERS) = struct
       (* The execution of the request handler is protected to avoid stopping the
          worker in case of an exception. *)
       | Request.Inject -> protect @@ fun () -> on_inject state
-      | Request.Clear tag -> (
+      | Request.Clear removal_criteria -> (
           protect @@ fun () ->
-          match tag with
-          | Some tag -> remove_operations_with_tag tag state
+          match removal_criteria with
+          | Some removal_criteria -> remove_operations removal_criteria state
           | None ->
               let*! () = clear state in
               return_unit)
@@ -1656,24 +1668,30 @@ module Make (Parameters : PARAMETERS) = struct
   let put_request_and_wait w req =
     Worker.Dropbox.put_request_and_wait w req |> handle_request_error
 
-  let clear_all_queues () =
-    let workers = Worker.list table in
-    List.iter_ep
-      (fun (_tags, w) -> put_request_and_wait w (Request.Clear None))
-      workers
-
-  let clear_queues ?tag () =
+  let clear_queues ?(drop_no_order = false) ?order_below ?tag () =
     let open Lwt_result_syntax in
-    match tag with
-    | None -> clear_all_queues ()
-    | Some tag ->
-        let workers = Worker.list table in
-        List.iter_ep
-          (fun (tags, w) ->
-            let to_clean = Tags.mem tag tags in
-            if not to_clean then return_unit
-            else put_request_and_wait w (Request.Clear (Some tag)))
-          workers
+    let removal_criteria : Request.removal_criteria option =
+      match (tag, order_below) with
+      | Some tag, None -> Some (Operation_tag tag)
+      | None, Some order_below ->
+          Some (Order_below (order_below, drop_no_order))
+      | Some tag, Some order_below ->
+          Some (Tag_and_order_below (tag, order_below, drop_no_order))
+      | None, None -> None
+    in
+    let clear_worker_queue (tags, w) =
+      match removal_criteria with
+      | Some (Operation_tag tag) | Some (Tag_and_order_below (tag, _, _)) ->
+          (*If a tag is specified in the removal_criteria only clear
+            the worker that inject such operation tag *)
+          if Tags.mem tag tags then
+            put_request_and_wait w (Request.Clear removal_criteria)
+          else return_unit
+      | Some (Order_below _) | None ->
+          put_request_and_wait w (Request.Clear removal_criteria)
+    in
+    let workers = Worker.list table in
+    List.iter_ep clear_worker_queue workers
 
   let register_proto_client = Inj_proto.register
 end

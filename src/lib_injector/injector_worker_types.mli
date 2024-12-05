@@ -27,9 +27,23 @@
 open Injector_sigs
 
 module Request (Tag : TAG) (L1_operation : INJECTOR_OPERATION) : sig
+  (** Criteria to specify which operation to remove from the
+      injector. *)
+  type removal_criteria =
+    | Operation_tag of Tag.t
+        (** [Operation_tag kind] Clear all operation of type [kind] *)
+    | Order_below of (Z.t * bool)
+        (** [Order_below (order, drop_no_order] Clear all operation
+            that have an order specified below [order]. If
+            [drop_no_order] also clear all operation that has no order
+            specified.  *)
+    | Tag_and_order_below of (Tag.t * Z.t * bool)
+        (** [Tag_and_order_below (kind, order, drop_no_order)] Apply
+            {!Order_below} but only for operation of type [kind]. *)
+
   type ('a, 'b) t =
     | Inject : (unit, error trace) t
-    | Clear : Tag.t option -> (unit, error trace) t
+    | Clear : removal_criteria option -> (unit, error trace) t
 
   type view = View : _ t -> view
 

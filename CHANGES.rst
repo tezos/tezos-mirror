@@ -75,6 +75,19 @@ Smart Rollup node
   received chunk with the following priority order: First chunks with
   ascending order then chunks by order of arrival. (MR :gl:`!15672`)
 
+- updated RPC ``DELETE /admin/injector/queues`` with new query to
+  clear injector queues based on priority order. The RPC can takes two
+  optional arguments:
+
+  + ``order_below``: an integer that filters out all operations with
+    order strictly inferior to it.
+
+  + ``drop_no_order``: a boolean that if true remove all operations
+    that has no order specified. ``false`` by default.
+
+  When ``tag`` is specified only operation of that type will be
+  considered, else all operations are considered.(MR :gl:`!15929`)
+
 - Updated RPC ``/local/batcher/injection`` with a new query argument
   possibility. When the rpc contains ``"drop_duplicate": true`` then
   the batcher will drop the messages that were already injected with a

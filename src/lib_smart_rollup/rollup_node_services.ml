@@ -871,6 +871,21 @@ module Query = struct
     |+ opt_field "tag" Arg.operation_kind (fun k -> k)
     |> seal
 
+  let operation_tag_and_order_below_query =
+    let open Tezos_rpc.Query in
+    query (fun order operation_tag drop_no_order ->
+        object
+          method order = order
+
+          method operation_tag = operation_tag
+
+          method drop_no_order = drop_no_order
+        end)
+    |+ opt_field "order_below" Arg.z (fun q -> q#order)
+    |+ opt_field "tag" Arg.operation_kind (fun q -> q#operation_tag)
+    |+ field "drop_no_order" Tezos_rpc.Arg.bool false (fun q -> q#drop_no_order)
+    |> seal
+
   let order_and_drop_duplicate_query =
     let open Tezos_rpc.Query in
     query (fun order drop_duplicate ->
@@ -1186,7 +1201,7 @@ module Admin = struct
   let clear_injector_queues =
     Tezos_rpc.Service.delete_service
       ~description:"Clear operation queues of injectors"
-      ~query:Query.operation_tag_query
+      ~query:Query.operation_tag_and_order_below_query
       ~output:Data_encoding.unit
       (path / "injector" / "queues")
 
