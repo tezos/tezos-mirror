@@ -22,6 +22,51 @@ let init_teztale cloud agent =
   in
   Lwt.return teztale
 
+let add_prometheus_source ?dal_node ?sc_rollup_node ?evm_node ?node cloud agent
+    name =
+  let agent_name = Agent.name agent in
+  let target port app_name =
+    Cloud.{agent; port; app_name = Format.asprintf "%s:%s" agent_name app_name}
+  in
+  let node_metric_target =
+    Option.map
+      (fun node -> target (Node.metrics_port node) (Node.name node))
+      node
+  in
+  let dal_node_metric_target =
+    Option.map
+      (fun dal_node ->
+        target (Dal_node.metrics_port dal_node) (Dal_node.name dal_node))
+      dal_node
+  in
+  let sc_rollup_node_metric_target =
+    Option.map
+      (fun sc_rollup_node ->
+        target
+          (Sc_rollup_node.metrics sc_rollup_node |> snd)
+          (Sc_rollup_node.name sc_rollup_node))
+      sc_rollup_node
+  in
+  let evm_node_metric_target =
+    Option.map
+      (fun evm_node ->
+        target
+          (Tezos.Evm_node.rpc_port evm_node)
+          (Tezt_etherlink.Evm_node.name evm_node))
+      evm_node
+  in
+  let targets =
+    List.filter_map
+      Fun.id
+      [
+        node_metric_target;
+        dal_node_metric_target;
+        sc_rollup_node_metric_target;
+        evm_node_metric_target;
+      ]
+  in
+  Cloud.add_prometheus_source cloud ~name targets
+
 (** [init_explorus cloud node] uses [node]'s rpc endpoint to register explorus as a service *)
 let init_explorus cloud node =
   Cloud.add_service
