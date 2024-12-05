@@ -255,6 +255,14 @@ let attest_all_ =
 (* Does not produce a new block *)
 let attest_all = exec attest_all_
 
+let check_ai_launch_cycle_is_zero ~loc block =
+  let open Lwt_result_syntax in
+  let* ai_launch_cycle = Context.get_adaptive_issuance_launch_cycle (B block) in
+  let ai_launch_cycle = WithExceptions.Option.get ~loc ai_launch_cycle in
+  if not Cycle.(equal ai_launch_cycle root) then
+    Test.fail ~__LOC__:loc "AI launch cycle should always be zero" ;
+  return_unit
+
 (** Bake a block, with the given baker and the given operations. *)
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
@@ -365,9 +373,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
           attesters)
       state
   in
-  let* state =
-    State_ai_flags.AI_Activation.check_activation_cycle block state
-  in
+  let* () = check_ai_launch_cycle_is_zero ~loc:__LOC__ block in
   let* state = State.apply_rewards ~baker:baker_name block state in
   let new_future_current_cycle = Cycle.succ (Block.current_cycle block) in
   (* Dawn of a new cycle: apply cycle end operations *)

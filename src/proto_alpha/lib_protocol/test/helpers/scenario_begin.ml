@@ -147,12 +147,8 @@ let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
             pending_operations = [];
             pending_slashes = [];
             double_signings = [];
-            ai_activation_cycle = None;
             force_attest_all;
           }
       in
       let* () = check_all_balances block state in
-      let* state =
-        State_ai_flags.AI_Activation.check_activation_cycle block state
-      in
       return (block, state))
