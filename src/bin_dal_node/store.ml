@@ -581,7 +581,7 @@ let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
     (* This occurs when running the command:
        ./octez-dal-node debug print store schemas *)
     if not (Sys.file_exists skip_list_cells_data_dir) then
-      Lwt_utils_unix.create_dir (data_dir // Stores_dirs.skip_list_cells)
+      Lwt_utils_unix.create_dir skip_list_cells_data_dir
     else Lwt.return_unit
   in
   let*! () =
