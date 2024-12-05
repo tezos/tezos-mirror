@@ -270,8 +270,39 @@ let apply_slashing_state all_denunciations_to_apply
 let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
     (state : State.t) : State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let to_slash_later, to_slash_now =
-    State_ai_flags.Delayed_slashing.partition_slashes state current_cycle
+  let to_slash_now, to_slash_later =
+    List.partition
+      (fun (_, Protocol.Denunciations_repr.{misbehaviour; _}) ->
+        let misb_cycle =
+          Block.current_cycle_of_level
+            ~blocks_per_cycle:
+              state.constants
+                .Protocol.Alpha_context.Constants.Parametric.blocks_per_cycle
+            ~current_level:(Protocol.Raw_level_repr.to_int32 misbehaviour.level)
+        in
+        let open Protocol.Alpha_context in
+        let misb_slashing_cycle =
+          Cycle.add misb_cycle (Constants.max_slashing_period - 1)
+        in
+        if Cycle.(equal misb_slashing_cycle current_cycle) then
+          (* Slash now *)
+          true
+        else if
+          Cycle.(
+            misb_slashing_cycle > current_cycle && misb_cycle <= current_cycle)
+        then (* Slash later *) false
+        else
+          Test.fail
+            ~__LOC__
+            "Pending slash for %a (cycle %a) should not exist at the end of \
+             cycle %a"
+            Misbehaviour_repr.pp
+            misbehaviour
+            Cycle.pp
+            misb_cycle
+            Cycle.pp
+            current_cycle)
+      state.pending_slashes
   in
   (* Sort to_slash_now by level+round *)
   let to_slash_now =
@@ -280,7 +311,6 @@ let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
         Denunciations_repr.compare_item_except_hash item1 item2)
       to_slash_now
   in
-
   let* state, total_burnt =
     List.fold_left_es
       (fun (acc_state, acc_total) x ->

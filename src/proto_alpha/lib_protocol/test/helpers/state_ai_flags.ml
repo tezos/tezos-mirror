@@ -57,19 +57,3 @@ module AI = struct
         let current_cycle = Block.current_cycle block in
         Protocol.Alpha_context.Cycle.(current_cycle >= activation_cycle)
 end
-
-module Delayed_slashing = struct
-  (* Returns a pair, fst is the delayed slashes, snd is the slashes to apply now *)
-  let partition_slashes state current_cycle =
-    List.partition
-      (fun (_, Protocol.Denunciations_repr.{misbehaviour; _}) ->
-        let cycle =
-          Block.current_cycle_of_level
-            ~blocks_per_cycle:
-              state.constants
-                .Protocol.Alpha_context.Constants.Parametric.blocks_per_cycle
-            ~current_level:(Protocol.Raw_level_repr.to_int32 misbehaviour.level)
-        in
-        Protocol.Alpha_context.Cycle.(cycle = current_cycle))
-      state.pending_slashes
-end

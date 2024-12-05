@@ -30,19 +30,3 @@ module AI : sig
   (** AI is enabled iff the activation cycle is set and passed *)
   val enabled : Block.t -> State.t -> bool
 end
-
-module Delayed_slashing : sig
-  (** This module takes care of choosing the denunciations that need to be
-      applied at the end of a cycle. It depends on the flag [ns_enable]. *)
-
-  (** [partition_slashes s cycle] returns a pair [(l1,l2)] of lists of slashes,
-      partitioned from the [state.pending_slashes]. [l2] is the list of slashes to
-      apply at the end of the given [cycle], and [l1] is the rest (which should
-      usually replace [state.pending_slashes])
-      *)
-  val partition_slashes :
-    State.t ->
-    Protocol.Alpha_context.Cycle.t ->
-    (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list
-    * (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list
-end
