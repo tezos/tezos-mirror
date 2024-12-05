@@ -737,14 +737,14 @@ let upgrade_from_v1_to_v2 ~base_dir =
         let mv name =
           let previous_path = base_dir // name in
           let new_path = base_dir // Stores_dirs.skip_list_cells // name in
-          if Sys.(file_exists previous_path) then (
+          if Sys.(file_exists previous_path) then
             let*! () =
               if not (Sys.file_exists new_path) then
                 Lwt_utils_unix.copy_file ~src:previous_path ~dst:new_path ()
               else Lwt.return_unit
             in
-            Sys.remove previous_path ;
-            return_unit)
+            let*! () = Lwt_unix.unlink previous_path in
+            return_unit
           else return_unit
         in
         let*! () =
@@ -775,18 +775,18 @@ let upgrade_from_v1_to_v2 ~base_dir =
   | Error err ->
       (* Clean the sqlite store unless the storage backend was already set to sqlite. *)
       let* storage_backend = Storage_backend.load storage_backend_store in
-      let () =
+      let*! () =
         match storage_backend with
         | None | Some Legacy ->
             let rm name =
               let open Filename.Infix in
               let path = base_dir // Stores_dirs.skip_list_cells // name in
-              Sys.remove path
+              Lwt_unix.unlink path
             in
-            rm Dal_store_sqlite3.sqlite_file_name ;
-            rm (Dal_store_sqlite3.sqlite_file_name ^ "-shm") ;
+            let*! () = rm Dal_store_sqlite3.sqlite_file_name in
+            let*! () = rm (Dal_store_sqlite3.sqlite_file_name ^ "-shm") in
             rm (Dal_store_sqlite3.sqlite_file_name ^ "-wal")
-        | Some SQLite3 -> ()
+        | Some SQLite3 -> Lwt.return_unit
       in
       (* The store upgrade failed. *)
       let*! () = Event.(emit store_upgrade_error ()) in
