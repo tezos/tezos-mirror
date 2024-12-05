@@ -1278,6 +1278,7 @@ type stresstest_contract_parameters = {
     then a new random seed is generated.
 
     Optional parameters:
+    - [env] is the environment passed when calling the stresstest command
     - [seed] is the seed used for the random number generator
     - [fee] is the custom fee to pay instead of the default one
     - [gas_limit] is the custom gas limit
@@ -1290,6 +1291,7 @@ type stresstest_contract_parameters = {
 
     [endpoint]: cf {!create} *)
 val stresstest :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
@@ -1306,6 +1308,7 @@ val stresstest :
 
 (** Same as {!stresstest}, but do not wait for the process to exit. *)
 val spawn_stresstest :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
