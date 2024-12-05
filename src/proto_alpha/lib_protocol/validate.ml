@@ -1370,6 +1370,16 @@ module Anonymous = struct
     let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
     let same_slots = Slot.(e1.slot = e2.slot) in
     let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
+    (* attestations with different slots are not slashed when
+       aggregate_attestation feature flag is enabled. *)
+    let aggregate_attestation_feature_flag =
+      Constants.aggregate_attestation vi.ctxt
+    in
+    let is_slot_denunciable =
+      match kind with
+      | Misbehaviour.Double_attesting -> not aggregate_attestation_feature_flag
+      | _ -> true
+    in
     let is_denunciation_consistent =
       same_levels && same_rounds
       (* For the double (pre)attestations to be punishable, they
@@ -1385,7 +1395,8 @@ module Anonymous = struct
          rounds, payloads, branches, and slots, then only their
          signatures are different, which is not considered the
          delegate's fault and therefore is not punished. *)
-      && ((not same_payload) || (not same_branches) || not same_slots)
+      && ((not same_payload) || (not same_branches)
+         || ((not same_slots) && is_slot_denunciable))
       && (* we require an order on hashes to avoid the existence of
                equivalent evidences *)
       ordered_hashes
