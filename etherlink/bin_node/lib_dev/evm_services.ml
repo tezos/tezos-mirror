@@ -16,7 +16,7 @@ let get_smart_rollup_address_service =
     ~output:Tezos_crypto.Hashed.Smart_rollup_address.encoding
     Path.(evm_services_root / "smart_rollup_address")
 
-let get_time_between_blocks =
+let get_time_between_blocks_service =
   Service.get_service
     ~description:"Get the maximum time between two blocks"
     ~query:Query.empty
@@ -80,7 +80,7 @@ let create_blueprint_stream get_next_blueprint_number find_blueprint from_level
               "Something went wrong when trying to fetch a blueprint")
       else Lwt_stream.get stream
   in
-  Tezos_rpc.Answer.return_stream {next; shutdown}
+  return (Lwt_stream.from next, shutdown)
 
 let create_blueprint_watcher_service get_next_blueprint_number find_blueprint
     from_level =
@@ -101,17 +101,17 @@ let create_broadcast_service get_next_blueprint_number find_blueprint from_level
     (fun b -> Lwt_syntax.return_some @@ Broadcast.Blueprint b)
 
 let register_get_smart_rollup_address_service smart_rollup_address dir =
-  Directory.register0 dir get_smart_rollup_address_service (fun () () ->
+  Evm_directory.register0 dir get_smart_rollup_address_service (fun () () ->
       let open Lwt_syntax in
       return_ok smart_rollup_address)
 
 let register_get_time_between_block_service time_between_block dir =
-  Directory.register0 dir get_time_between_blocks (fun () () ->
+  Evm_directory.register0 dir get_time_between_blocks_service (fun () () ->
       let open Lwt_result_syntax in
       return time_between_block)
 
 let register_get_blueprint_service find_blueprint dir =
-  Directory.opt_register1 dir get_blueprint_service (fun level () () ->
+  Evm_directory.opt_register1 dir get_blueprint_service (fun level () () ->
       let open Lwt_result_syntax in
       let number = Ethereum_types.Qty (Z.of_int64 level) in
       let* blueprint = find_blueprint number in
@@ -119,14 +119,17 @@ let register_get_blueprint_service find_blueprint dir =
 
 let register_blueprint_watcher_service find_blueprint get_next_blueprint_number
     dir =
-  Directory.gen_register0 dir blueprint_watcher_service (fun level () ->
+  Evm_directory.streamed_register0
+    dir
+    blueprint_watcher_service
+    (fun level () ->
       create_blueprint_watcher_service
         get_next_blueprint_number
         find_blueprint
         level)
 
 let register_broadcast_service find_blueprint get_next_blueprint_number dir =
-  Directory.gen_register0 dir message_watcher_service (fun level () ->
+  Evm_directory.streamed_register0 dir message_watcher_service (fun level () ->
       create_broadcast_service get_next_blueprint_number find_blueprint level)
 
 let register get_next_blueprint_number find_blueprint smart_rollup_address
@@ -152,7 +155,7 @@ let get_time_between_blocks ?fallback ~evm_node_endpoint () =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_service
       [Media_type.octet_stream]
       ~base:evm_node_endpoint
-      get_time_between_blocks
+      get_time_between_blocks_service
       ()
       ()
       ()

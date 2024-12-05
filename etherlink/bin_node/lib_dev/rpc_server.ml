@@ -44,46 +44,71 @@ let callback server dir =
     dir
     callback_log
 
-let start_server rpc directory =
-  let open Lwt_result_syntax in
-  let open Tezos_rpc_http_server in
-  let Configuration.
-        {port; addr; cors_origins; cors_headers; max_active_connections; _} =
-    rpc
-  in
+module Resto = struct
+  let start_server rpc directory =
+    let open Lwt_result_syntax in
+    let open Tezos_rpc_http_server in
+    let Configuration.
+          {port; addr; cors_origins; cors_headers; max_active_connections; _} =
+      rpc
+    in
 
-  let p2p_addr = P2p_addr.of_string_exn addr in
-  let host = Ipaddr.V6.to_string p2p_addr in
-  let node = `TCP (`Port port) in
-  let acl = RPC_server.Acl.allow_all in
-  let cors =
-    Resto_cohttp.Cors.
-      {allowed_headers = cors_headers; allowed_origins = cors_origins}
-  in
-  let server =
-    RPC_server.init_server
-      ~acl
-      ~cors
-      ~media_types:Supported_media_types.all
-      directory
-  in
+    let p2p_addr = P2p_addr.of_string_exn addr in
+    let host = Ipaddr.V6.to_string p2p_addr in
+    let node = `TCP (`Port port) in
+    let acl = RPC_server.Acl.allow_all in
+    let cors =
+      Resto_cohttp.Cors.
+        {allowed_headers = cors_headers; allowed_origins = cors_origins}
+    in
+    let server =
+      RPC_server.init_server
+        ~acl
+        ~cors
+        ~media_types:Supported_media_types.all
+        directory
+    in
 
-  let*! () =
-    RPC_server.launch
-      ~max_active_connections
-      ~host
-      server
-      ~callback:(callback server directory)
-      node
-  in
+    let*! () =
+      RPC_server.launch
+        ~max_active_connections
+        ~host
+        server
+        ~callback:(callback server directory)
+        node
+    in
 
-  let finalizer () =
-    let open Lwt_syntax in
-    let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
-    return_unit
-  in
+    let finalizer () =
+      let open Lwt_syntax in
+      let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
+      return_unit
+    in
 
-  return finalizer
+    return finalizer
+end
+
+module Dream = struct
+  let start_server rpc routes =
+    let open Lwt_result_syntax in
+    let Configuration.{port; addr; cors_origins = _; cors_headers = _; _} =
+      rpc
+    in
+    let stop, resolve_stop = Lwt.wait () in
+    let shutdown () =
+      Lwt.wakeup_later resolve_stop () ;
+      Lwt.return_unit
+    in
+    Lwt.dont_wait
+      (fun () ->
+        routes |> Dream.router |> Dream.serve ~interface:addr ~port ~stop)
+      (fun exn ->
+        Format.eprintf "Dream server error: %s@." (Printexc.to_string exn)) ;
+    return shutdown
+end
+
+let start_server rpc = function
+  | Evm_directory.Resto dir -> Resto.start_server rpc dir
+  | Evm_directory.Dream routes -> Dream.start_server rpc routes
 
 let start_public_server ?delegate_health_check_to ?evm_services
     (config : Configuration.t) ctxt =
