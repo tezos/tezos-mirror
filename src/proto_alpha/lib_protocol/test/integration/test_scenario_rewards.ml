@@ -18,10 +18,10 @@ open State_account
 open Tez_helpers.Ez_tez
 open Scenario
 
-(** Tests reward distribution under AI:
+(** Tests reward distribution:
     - with and without stakers (sometimes overstaking);
     - with different values of edge. *)
-let test_wait_rewards_with_ai =
+let test_wait_rewards =
   let set_edge pct =
     let params =
       {
@@ -83,10 +83,10 @@ let test_wait_rewards_with_ai =
                                    < staked)))))
   --> set_baker "delegate" --> wait_n_cycles 20
 
-(** Tests reward distribution under AI for one baker and one staker,
+(** Tests reward distribution for one baker and one staker,
     and different arbitrary events:
     staking, unstaking, finalizing, slashing *)
-let test_wait_rewards_with_ai_staker_variation =
+let test_wait_rewards_staker_variation =
   let set_edge pct =
     let params =
       {
@@ -131,7 +131,7 @@ let test_wait_rewards_with_ai_staker_variation =
           state.State.constants.consensus_rights_delay + 1)
   --> set_baker "delegate" --> wait_n_cycles 10
 
-(** Tests reward distribution under AI for one baker and two stakers,
+(** Tests reward distribution for one baker and two stakers,
     and the baker changes its limit parameter while being overstaked.
     We expect the rewards for the stakers to change accordingly with the limit.
 *)
@@ -181,8 +181,9 @@ let test_overstake_different_limits =
       |+ Tag "limit >= 5" --> set_limit 6.)
   --> wait_delegate_parameters_activation --> wait_n_cycles 6
 
-(** Tests that the activation time for AI is as expected:
-    The expected delay is [consensus_rights_delay] + 1 cycles after activation. *)
+(** Tests the activation time for AI: the expected delay is
+    [consensus_rights_delay] + 1 cycles after activation (which happens
+    immediately at cycle 0). *)
 let test_ai_curve_activation_time =
   let consensus_rights_delay (_, state) =
     state.State.constants.consensus_rights_delay
@@ -501,9 +502,9 @@ let test_overstake =
 let tests =
   tests_of_scenarios
   @@ [
-       ("Test wait rewards with AI, stakers and edge", test_wait_rewards_with_ai);
-       ( "Test wait rewards with AI and stake variation events",
-         test_wait_rewards_with_ai_staker_variation );
+       ("Test wait rewards with stakers and edge", test_wait_rewards);
+       ( "Test wait rewards with stake variation events",
+         test_wait_rewards_staker_variation );
        ("Test ai curve activation time", test_ai_curve_activation_time);
        ( "Test static rate decreasing with stake ratio increasing",
          test_static_decreasing );

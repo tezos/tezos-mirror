@@ -45,9 +45,7 @@ let fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount =
      - staker = delegate
      - staker != delegate
     Any scenario that begins with this will be duplicated.
-
-    Also, ensures that AI is activated (sets EMA threshold to zero,
-    enables activation vote, and waits for AI activation). *)
+*)
 let init_staker_delegate_or_external =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
@@ -549,9 +547,10 @@ let forbid_costaking =
   (* Now possible *)
   --> stake "staker" amount
 
-(* Check that a delegate can be deactivated under AI by unstaking everything, even with stakers.
+(* Check that a delegate gets deactivated after it unstakes everything,
+   even if it has external stakers.
    Check that such a delegate can reactivate later, and still have their stakers *)
-let test_deactivation =
+let test_deactivation_after_unstake_all =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
@@ -743,7 +742,8 @@ let tests =
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
-       ("Test deactivation under AI", test_deactivation);
+       ( "Test deactivation after delegate unstakes everything",
+         test_deactivation_after_unstake_all );
        ("Test change delegates", test_change_delegates);
      ]
 

@@ -74,10 +74,12 @@ let check_grace_period ~loc src_name =
     grace
     rpc_grace
 
-(** Test that a delegate gets deactivated after a set period of time if it is not baking.
-    Test that with AI, the frozen funds stay frozen, and the delegate can still issue AI
-    operations without reactivating. *)
-let test_simple_scenario_with_ai =
+(** Test that a delegate gets deactivated after a set period of time
+    if it is not baking.
+
+    Test that the frozen funds stay frozen, and the delegate can still
+    issue staking operations without reactivating. *)
+let test_simple_scenario =
   init_constants ()
   --> begin_test ["delegate"; "baker"]
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
@@ -200,7 +202,7 @@ let test_deactivation_timing =
 let tests =
   tests_of_scenarios
     [
-      ("Test simple deactivation scenario with ai", test_simple_scenario_with_ai);
+      ("Test simple deactivation scenario", test_simple_scenario);
       ( "Test deactivation and reactivation scenarios with baking",
         test_baking_deactivation );
       ("Test deactivation timing", test_deactivation_timing);
