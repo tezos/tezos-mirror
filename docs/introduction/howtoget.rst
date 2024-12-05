@@ -10,14 +10,14 @@ Octez consists of :ref:`several binaries <tezos_binaries>` (i.e., executable fil
 
 There are several options for getting the binaries, depending on how you plan to use Octez:
 
-- :ref:`getting static binaries <getting_static_binaries>`.
-  This is the easiest way to get native binaries for the latest stable release,
-  requiring no dependencies, under Linux.
 - :ref:`installing binaries <installing_binaries>`.
   This is the easiest way to install native binaries for the latest stable release, together with their dependencies, using a package manager.
 - :ref:`using docker images <using_docker_images>`.
   This is the easiest way to run the latest stable release of the binaries in
   Docker containers, on any OS supported by Docker.
+- :ref:`getting static binaries <getting_static_binaries>`.
+  This is the easiest way to get native binaries for the latest stable release,
+  requiring no dependencies, under Linux.
 - :ref:`building the binaries via the OPAM source package manager <building_with_opam>`.
   Take this way to install the latest stable release in your native OS
   environment, automatically built from sources.
@@ -64,30 +64,6 @@ However, note that, by embedding all dependencies, static binary executables are
 
 For upgrading to a newer release, you just have to download and run the new
 versions of the binaries.
-
-.. _installing_binaries:
-
-Installing binaries
--------------------
-
-Depending on your operating system, you may install Octez (dynamically-linked)
-binaries and their dependencies by first downloading the packages for your
-distribution from the `Octez release page
-<https://gitlab.com/tezos/tezos/-/releases>`__, browsing to your distribution
-and then installing them with your package tool manager. Most of the
-configuration options are accessible by the user in ``/etc/default/<package>``.
-
-If you are upgrading from a different package distributor such as `Serokell's tezos-packaging <https://github.com/serokell/tezos-packaging>`__,
-please pay attention to the possible differences between the two packages, in
-particular regarding the home directory for the ``tezos`` user.
-
-There are several packages:
-
-- ``octez-client``: the client for manipulating wallets and signing items
-- ``octez-node``: the Octez node
-- ``octez-baker``: the Octez baking and VDF daemons
-- ``octez-smartrollup``: the Octez Smart Rollup daemons
-- ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
 .. _installing_packages:
 
@@ -372,6 +348,30 @@ If the above options are not enough, you can always replace the default ``entryp
         environment:
           PROTOCOL: alpha
      ...
+
+.. _installing_binaries:
+
+Installing binaries
+-------------------
+
+Depending on your operating system, you may install Octez (dynamically-linked)
+binaries and their dependencies by first downloading the packages for your
+distribution from the `Octez release page
+<https://gitlab.com/tezos/tezos/-/releases>`__, browsing to your distribution
+and then installing them with your package tool manager. Most of the
+configuration options are accessible by the user in ``/etc/default/<package>``.
+
+If you are upgrading from a different package distributor such as `Serokell's tezos-packaging <https://github.com/serokell/tezos-packaging>`__,
+please pay attention to the possible differences between the two packages, in
+particular regarding the home directory for the ``tezos`` user.
+
+There are several packages:
+
+- ``octez-client``: the client for manipulating wallets and signing items
+- ``octez-node``: the Octez node
+- ``octez-baker``: the Octez baking and VDF daemons
+- ``octez-smartrollup``: the Octez Smart Rollup daemons
+- ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
 .. _building_with_opam:
 
