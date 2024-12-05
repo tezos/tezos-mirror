@@ -3491,7 +3491,8 @@ let check_disconnection_event dal_node ~peer_id =
   wait_for_gossipsub_worker_event
     ~name:"disconnection"
     dal_node
-    (fun peer_event -> check_expected peer_id JSON.(peer_event |> as_string))
+    (fun peer_event ->
+      check_expected peer_id JSON.(peer_event |-> "peer_id" |> as_string))
 
 type peer_id = string
 

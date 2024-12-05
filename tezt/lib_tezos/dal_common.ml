@@ -752,7 +752,9 @@ module Helpers = struct
         ~name:"new_connection"
         main_node
         (fun event ->
-          let*?? peer_id = JSON.(event |-> "peer" |> as_string_opt) in
+          let*?? peer_id =
+            JSON.(event |-> "peer" |-> "peer_id" |> as_string_opt)
+          in
           let*?? () =
             check_expected is_trusted JSON.(event |-> "trusted" |> as_bool)
           in
