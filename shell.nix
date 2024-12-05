@@ -30,7 +30,7 @@
     src = null;
   });
 
-  devPackageSet = pkgs.opamPackages.overrideScope' (
+  devPackageSet = pkgs.opamPackages.overrideScope (
     pkgs.lib.composeManyExtensions [
       # Set the opam-repository which has the package descriptions.
       (final: prev: {

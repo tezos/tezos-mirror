@@ -3,7 +3,7 @@
 # continue to work in the future.
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     opam-nix-integration = {
       url = "github:vapourismo/opam-nix-integration";
