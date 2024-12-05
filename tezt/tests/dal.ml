@@ -3487,12 +3487,6 @@ let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
 
-let check_disconnection_event dal_node ~peer_id =
-  wait_for_gossipsub_worker_event
-    ~name:"disconnection"
-    dal_node
-    (fun peer_event -> check_expected peer_id JSON.(peer_event |> as_string))
-
 type peer_id = string
 
 type event_with_topic =
@@ -3856,7 +3850,9 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
   in
   let* peer_id = Dal_node.read_identity dal_node2 in
   (* kill dal_node2 and check "disconnection" event in node1. *)
-  let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
+  let disconn_ev_in_node1 =
+    Dal_common.Helpers.check_disconnection_event dal_node1 ~peer_id
+  in
   let* () = Dal_node.kill dal_node2 in
   disconn_ev_in_node1
 
@@ -4295,13 +4291,13 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
   (* Prepare disconnection events to observe. *)
   let disconn_ev_in_node1_2 =
-    check_disconnection_event dal_node1 ~peer_id:id_dal_node2
+    Dal_common.Helpers.check_disconnection_event dal_node1 ~peer_id:id_dal_node2
   in
   let disconn_ev_in_node1_3 =
-    check_disconnection_event dal_node1 ~peer_id:id_dal_node3
+    Dal_common.Helpers.check_disconnection_event dal_node1 ~peer_id:id_dal_node3
   in
   let disconn_ev_in_node2_3 =
-    check_disconnection_event dal_node2 ~peer_id:id_dal_node3
+    Dal_common.Helpers.check_disconnection_event dal_node2 ~peer_id:id_dal_node3
   in
 
   (* Prepare reconnection events checks between node1 and node2 (resp. 3). *)

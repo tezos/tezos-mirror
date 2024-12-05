@@ -163,6 +163,9 @@ module Helpers : sig
     unit ->
     unit Lwt.t
 
+  (** Wait for a disconnection from the given peer id. *)
+  val check_disconnection_event : Dal_node.t -> peer_id:string -> unit Lwt.t
+
   (** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
     [dal_node2] will use [dal_node1] as a bootstrap peer.
     For this to work, [dal_node1] must already be running.
