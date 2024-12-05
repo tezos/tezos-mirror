@@ -741,12 +741,19 @@ module Helpers = struct
   let wait_for_gossipsub_worker_event ~name dal_node lambda =
     Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
 
+  let check_expected expected found =
+    if expected <> found then None else Some ()
+
+  let check_disconnection_event dal_node ~peer_id =
+    wait_for_gossipsub_worker_event
+      ~name:"disconnection"
+      dal_node
+      (fun peer_event ->
+        check_expected peer_id JSON.(peer_event |-> "peer_id" |> as_string))
+
   let check_new_connection_event ~main_node ?other_peer_id ~other_node
       ~is_trusted () =
     let ( let*?? ) a b = Option.bind a b in
-    let check_expected expected found =
-      if expected <> found then None else Some ()
-    in
     let* peer_id =
       wait_for_gossipsub_worker_event
         ~name:"new_connection"
