@@ -219,7 +219,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
   let* _ = Node.wait_for_level node benchmark_starting_level in
   let bench_start = Unix.gettimeofday () in
   Log.info "The benchmark has been started" ;
-  let client_stresstest_process =
+  let* client_stresstest_process =
     Client.spawn_stresstest
       ~fee:regular_transaction_fee
       ~gas_limit:regular_transaction_gas_limit
