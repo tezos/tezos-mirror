@@ -126,8 +126,15 @@ module Peer : sig
      <remote_socket_addr>:<default_dal_p2p_port> (at the time of
      writing 11732). However, the remote node's user can override both
      the address and the port if desired and in that case, the
-     specified values will be used. *)
-  type t = {peer_id : P2p_peer.Id.t; maybe_reachable_point : P2p_point.Id.t}
+     specified values will be used.
+
+      We also know if a peer is a bootstrap one or not from connections
+      metatada. *)
+  type t = {
+    peer_id : P2p_peer.Id.t;
+    maybe_reachable_point : P2p_point.Id.t;
+    bootstrap : bool;
+  }
 
   (** Comparison is not a structural one, instead only the [peer_id]
       is used. *)
@@ -141,6 +148,9 @@ module Peer : sig
   module Set : Set.S with type elt = t
 
   module Map : Map.S with type key = t
+
+  (** Returns true iff the bootstrap flag of the given peer is set to [true]. *)
+  val is_bootstrap : t -> bool
 end
 
 (** A point is made of an IP address and a port. Only the worker knows about
@@ -351,12 +361,7 @@ end
 module Gossipsub : sig
   (** See {!Tezos_gossipsub.Introspection.connection}. Ideally we should reuse
       that type, but that would require a new dependency to be added. *)
-  type connection = {
-    topics : Topic.t list;
-    direct : bool;
-    outbound : bool;
-    bootstrap : bool;
-  }
+  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
 
   val connection_encoding : connection Data_encoding.t
 end
