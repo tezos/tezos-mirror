@@ -65,6 +65,15 @@ module Denunciator = struct
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
+  let double_attestation_ignored =
+    declare_2
+      ~section
+      ~level
+      ~name:"double_attestation_ignored"
+      ~msg:"ignoring non-denunciable double attestation"
+      ("existing_attestation", Operation_hash.encoding)
+      ("new_attestation", Operation_hash.encoding)
+
   let double_preattestation_detected =
     declare_2
       ~alternative_color:Internal_event.Magenta
@@ -85,6 +94,15 @@ module Denunciator = struct
       ("hash", Operation_hash.encoding)
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
+
+  let double_preattestation_ignored =
+    declare_2
+      ~section
+      ~level
+      ~name:"double_preattestation_ignored"
+      ~msg:"ignoring non-denunciable double pre-attestation"
+      ("existing_preattestation", Operation_hash.encoding)
+      ("new_preattestation", Operation_hash.encoding)
 
   let double_consensus_already_denounced =
     declare_1
