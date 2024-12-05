@@ -19,6 +19,11 @@
 
 ### Internals
 
+- Gas estimation requires multiple kernel simulation. Every time a simulation
+  was performed we would pick a new simulation timestamp, which could
+  technically lead to a different execution. Changes the behavior to pick
+  a single timestamp per simulation. (!15889)
+
 ## Verson 0.10 (2024-12-02)
 
 This is a bug fixes release, fixing the memory leak of the node and improving
