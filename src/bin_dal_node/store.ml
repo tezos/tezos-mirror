@@ -771,12 +771,18 @@ let upgrade_from_v1_to_v2 ~base_dir =
   | Error err ->
       (* Clean the sqlite store unless the storage backend was already set to sqlite. *)
       let* storage_backend = Storage_backend.load storage_backend_store in
-      let*! () =
+      let () =
         match storage_backend with
         | None | Some Legacy ->
-            Lwt_utils_unix.remove_dir
-              Filename.Infix.(base_dir // Dal_store_sqlite3.sqlite_file_name)
-        | Some SQLite3 -> Lwt.return_unit
+            let rm name =
+              let open Filename.Infix in
+              let path = base_dir // Stores_dirs.skip_list_cells // name in
+              Sys.remove path
+            in
+            rm Dal_store_sqlite3.sqlite_file_name ;
+            rm (Dal_store_sqlite3.sqlite_file_name ^ "-shm") ;
+            rm (Dal_store_sqlite3.sqlite_file_name ^ "-wal")
+        | Some SQLite3 -> ()
       in
       (* The store upgrade failed. *)
       let*! () = Event.(emit store_upgrade_error ()) in
