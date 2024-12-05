@@ -129,14 +129,36 @@ let () =
     ~pp:(fun ppf (prev, next) ->
       Format.fprintf
         ppf
-        "Cannot switch from history mode %a to %a. In order to change your \
-         history mode please refer to the Tezos node documentation. If you \
-         really want to change your history mode, run this command again with \
-         the `--force-history-mode-switch` option."
+        "@[<v 0>Cannot switch from history mode %a to %a.@,\
+         %s@,\
+         For more information, please refer to the Tezos node documentation:@,\
+         https://tezos.gitlab.io/user/history_modes.html#switching-between-node-s-modes.@."
         History_mode.pp
         prev
         History_mode.pp
-        next)
+        next
+        (let open History_mode in
+         if prev = next then
+           "The history mode is already set in the requested mode. This \
+            situation should not occur."
+         else
+           match (prev, next) with
+           | Archive, Full _ | Full _, Full _ | _, Rolling _ ->
+               "To force the switch, use the flag \
+                '--force-history-mode-switch'."
+           | Full _, Archive ->
+               "To force the switch to archive mode, use the 'reconstruct' \
+                command'."
+           | Rolling _, Archive | Rolling _, Full _ ->
+               Format.asprintf
+                 "There is not enough history in %a stores to switch to %a."
+                 History_mode.pp
+                 prev
+                 History_mode.pp
+                 next
+           | Archive, Archive ->
+               (* This case should be unreachable because of the initial equality check *)
+               assert false))
     (Data_encoding.obj2
        (Data_encoding.req "previous_mode" History_mode.encoding)
        (Data_encoding.req "next_mode" History_mode.encoding))
