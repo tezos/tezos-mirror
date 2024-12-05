@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name efunc_core)
+ (public_name efunc_core)
+ (libraries
+  zarith
+  octez-libs.data-encoding
+  lwt
+  rope
+  secp256k1-internal
+  digestif
+  fmt)
+ (flags
+  (:standard)
+  -open Data_encoding))

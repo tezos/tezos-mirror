@@ -1414,8 +1414,8 @@ opam:all_6:
       - octez-proto-libs
       - octez-libs
       - octez-l2-libs
+      - efunc_core
       - dal_node_migrations
-      - bls12-381
 
 opam:exec_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -2126,6 +2126,7 @@ opam:all_7:
       - octez-distributed-lwt-internal
       - octez-distributed-internal
       - octez-alcotezt
+      - bls12-381
 
 trigger:debian_repository_partial_auto:
   stage: test

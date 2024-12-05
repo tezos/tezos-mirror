@@ -97,6 +97,7 @@ depends: [
   "re" { >= "1.10.0" }
   "repr"
   "ringo" { >= "1.1.0" }
+  "rope" { = "0.6.2" }
   "rusage"
   "safepass"
   "secp256k1-internal" { >= "0.4.0" }
