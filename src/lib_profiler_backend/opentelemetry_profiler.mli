@@ -53,3 +53,11 @@ val trace_operation :
   string ->
   (unit -> 'a) ->
   'a
+
+type config = {service_name : string; verbosity : Profiler.verbosity}
+
+(** Mocked driver, that serves only to register the opentelemetry as a valid
+    profiler and enable relevant functions with the ppx. *)
+module Driver : Profiler.DRIVER with type config = config
+
+val opentelemetry : config Profiler.driver

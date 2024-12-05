@@ -50,3 +50,46 @@ let trace_operation op ?attrs =
     match attrs with None -> [metadata] | Some attrs -> metadata :: attrs
   in
   trace ~trace_id:(op_hash_to_trace_id op_hash) ~attrs
+
+type (_, _) Profiler.kind += Opentelemetry_profiler : ('a, 'b) Profiler.kind
+
+type config = {service_name : string; verbosity : Profiler.verbosity}
+
+module Driver = struct
+  type nonrec config = config
+
+  type state = State
+
+  let kind = Opentelemetry_profiler
+
+  let create _ = State
+
+  let time _ = Simple_profiler.time ()
+
+  let record _ _ _ = ()
+
+  let aggregate _ _ _ = ()
+
+  let stop _ = ()
+
+  let stamp _ _ _ = ()
+
+  let mark _ _ _ = ()
+
+  let span _ _ _ _ = ()
+
+  let inc _ _ = ()
+
+  let report _ = None
+
+  let close _ = ()
+end
+
+let opentelemetry : config Profiler.driver =
+  (module Driver : Profiler.DRIVER with type config = config)
+
+let () =
+  Profiler_instance.register_backend
+    ["opentelemetry"]
+    (fun ~verbosity ~directory:_ ~name ->
+      Profiler.instance opentelemetry {verbosity; service_name = name})
