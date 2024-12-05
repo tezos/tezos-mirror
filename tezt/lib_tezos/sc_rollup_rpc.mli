@@ -220,3 +220,23 @@ val get_local_outbox_pending_executable :
 (** RPC: [GET /local/outbox/pending/unexecutable] *)
 val get_local_outbox_pending_unexecutable :
   unit -> (int * outbox_msg list) list RPC_core.t
+
+(** RPC: [DELETE /admin/batcher/queue] *)
+val delete_admin_batcher_queue :
+  ?order_below:int -> ?drop_no_order:bool -> unit -> unit RPC_core.t
+
+(** RPC: [GET /admin/injector/queues] *)
+val get_admin_injector_queues :
+  ?tag:string -> unit -> (string list * JSON.t list) list RPC_core.t
+
+(** RPC: [GET /admin/injector/queues/total] *)
+val get_admin_injector_queues_total :
+  ?tag:string -> unit -> ((string list * int) list * int) RPC_core.t
+
+(** RPC: [DELETE /admin/injector/queues] *)
+val delete_admin_injector_queues :
+  ?operation_tag:string ->
+  ?order_below:int ->
+  ?drop_no_order:bool ->
+  unit ->
+  unit RPC_core.t

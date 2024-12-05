@@ -5923,6 +5923,33 @@ let test_batcher_order_msgs ~kind =
     unit
   in
 
+  let check_injector_queues ~__LOC__ ~expected_add_message_op =
+    let* injector_queues =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_admin_injector_queues ()
+    in
+    match injector_queues with
+    | [(injector_tag, injector_op_queue)] ->
+        Check.(list_mem string "add_messages" injector_tag ~__LOC__)
+          ~error_msg:"Injector queue %L operation tag does not contains tags %R" ;
+        let map_assert_only_add_messages op =
+          let kind = JSON.(op |-> "kind" |> as_string) in
+          Check.(("add_messages" = kind) string ~__LOC__)
+            ~error_msg:"Injector queue %L operation tag is not %R" ;
+          JSON.(
+            op |-> "message" |> as_list |> List.map JSON.as_string
+            |> List.map (fun s -> int_of_string @@ Hex.to_string (`Hex s)))
+        in
+        let add_messages_op =
+          List.map map_assert_only_add_messages injector_op_queue
+        in
+        Check.(
+          (add_messages_op = expected_add_message_op) (list (list int)) ~__LOC__)
+          ~error_msg:
+            "Injector queues add_messages %L was found but %R was expected" ;
+        unit
+    | _ -> failwith "invalid number of injector queues, only one expected"
+  in
   let bake_then_check_included_msgs ~__LOC__ ~expected_messages =
     let* level = Node.get_level node in
     let wait_for_injected =
@@ -5950,7 +5977,14 @@ let test_batcher_order_msgs ~kind =
   in
 
   let* level = Node.get_level node in
-  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
+  let* () =
+    Sc_rollup_node.run
+      ~event_level:`Debug
+      rollup_node
+      rollup_addr
+      [Injector_retention_period 0]
+    (*so injector included queued messages is not entraiving us *)
+  in
   let* _ = Sc_rollup_node.wait_for_level rollup_node level in
 
   (* To make sure we are all bootstrapped, might be unused *)
@@ -6043,6 +6077,123 @@ let test_batcher_order_msgs ~kind =
     [messages_order_1; messages_order_2; messages_no_order]
   in
   let* () = bake_then_check_included_msgs ~__LOC__ ~expected_messages in
+  Log.info "Testing the batcher clear RPCs." ;
+
+  Log.info "Clearing messages with order <= 2 in the batcher queue." ;
+  let* hash_1 = inject_int_of_string ~order:1 ~drop_duplicate:true [1] in
+  let* hash_2 = inject_int_of_string ~order:2 ~drop_duplicate:true [2] in
+  let* hash_3 = inject_int_of_string ~order:3 ~drop_duplicate:true [3] in
+  let expected_queued_hashes = hash_1 @ hash_2 @ hash_3 in
+  let expected_messages = [1; 2; 3] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_batcher_queue
+         ~drop_no_order:false
+         ~order_below:2
+         ()
+  in
+  let expected_queued_hashes = hash_3 in
+  let expected_messages = [3] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+
+  Log.info
+    "Clearing messages with order <= 2 in the batcher queue or no order \
+     specified." ;
+  let* hash_1 = inject_int_of_string ~order:1 ~drop_duplicate:true [1] in
+  let* hash_2 = inject_int_of_string ~order:2 ~drop_duplicate:true [2] in
+  (* [3] is still in the batcher *)
+  let* hash_4 = inject_int_of_string (* no order *) ~drop_duplicate:true [4] in
+  let expected_queued_hashes = hash_1 @ hash_2 @ hash_3 @ hash_4 in
+  let expected_messages = [1; 2; 3; 4] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_batcher_queue
+         ~drop_no_order:true
+         ~order_below:2
+         ()
+  in
+  let expected_queued_hashes = hash_3 in
+  let expected_messages = [3] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+
+  Log.info "Clearing all the messages in the batcher queue." ;
+  let* hashes =
+    inject_int_of_string ~order:1 ~drop_duplicate:true
+    @@ List.init half_min_batch Fun.id
+  in
+  let expected_queued_hashes = hashes in
+  let expected_messages = List.init half_min_batch Fun.id in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_batcher_queue ()
+  in
+  let* () =
+    check_queue ~__LOC__ ~expected_queued_hashes:[] ~expected_messages:[]
+  in
+
+  Log.info "Testing the injector clear RPCs." ;
+
+  Log.info "Clearing all operations in the injector queue." ;
+  (*enough messages to create an operations *)
+  let messages = List.init min_batch_elements Fun.id in
+  let* _hashes_1 = inject_int_of_string messages in
+
+  (*nothing left in the batcher*)
+  let* () =
+    check_queue ~__LOC__ ~expected_queued_hashes:[] ~expected_messages:[]
+  in
+  let expected_add_message_op = [messages] in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_injector_queues ()
+  in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op:[] in
+
+  Log.info "Clearing operations with order <= 1 ." ;
+  let messages_1 = messages in
+  let messages_2 =
+    List.init min_batch_elements (fun i -> min_batch_elements + i)
+  in
+  let messages_3 =
+    List.init min_batch_elements (fun i -> (2 * min_batch_elements) + i)
+  in
+
+  let* _hashes = inject_int_of_string ~order:0 messages_1 in
+  let* _hashes = inject_int_of_string ~order:1 messages_2 in
+  let* _hashes = inject_int_of_string ~order:2 messages_3 in
+
+  let expected_add_message_op = [messages_1; messages_2; messages_3] in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_injector_queues ~order_below:1 ()
+  in
+  let expected_add_message_op =
+    (* strictly below order messages are cleared *) [messages_2; messages_3]
+  in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+
+  Log.info "Clearing operations with order <= 1 and no order specified ." ;
+  let messages_no_order = messages in
+  let* _hashes_1 = inject_int_of_string @@ messages_no_order in
+
+  let expected_add_message_op = [messages_2; messages_3; messages_no_order] in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_injector_queues
+         ~order_below:2
+         ~drop_no_order:true
+         ()
+  in
+  let expected_add_message_op = [messages_3] in
+
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
   unit
 
 let test_injector_order_operations_by_kind ~kind =
