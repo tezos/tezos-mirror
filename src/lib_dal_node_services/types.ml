@@ -185,6 +185,7 @@ module Peer = struct
     peer_id : P2p_peer.Id.t;
     maybe_reachable_point : P2p_point.Id.t;
     bootstrap : bool;
+    direct : bool;
   }
 
   module Cmp = struct
@@ -206,26 +207,30 @@ module Peer = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {peer_id; maybe_reachable_point; bootstrap} ->
-        (peer_id, maybe_reachable_point, bootstrap))
-      (fun (peer_id, maybe_reachable_point, bootstrap) ->
-        {peer_id; maybe_reachable_point; bootstrap})
-      (obj3
+      (fun {peer_id; maybe_reachable_point; bootstrap; direct} ->
+        (peer_id, maybe_reachable_point, bootstrap, direct))
+      (fun (peer_id, maybe_reachable_point, bootstrap, direct) ->
+        {peer_id; maybe_reachable_point; bootstrap; direct})
+      (obj4
          (req "peer_id" P2p_peer.Id.encoding)
          (req "maybe_reachable_point" P2p_point.Id.encoding)
-         (req "bootstrap" bool))
+         (req "bootstrap" bool)
+         (req "direct" bool))
 
-  let pp fmt {peer_id; maybe_reachable_point; bootstrap} =
+  let pp fmt {peer_id; maybe_reachable_point; bootstrap; direct} =
     Format.fprintf
       fmt
-      "{peer_id=%a;@,maybe_reachable_point=%a;@,bootstrap=%b}"
+      "{peer_id=%a;@,maybe_reachable_point=%a;@,bootstrap=%b;@,direct=%b}"
       P2p_peer.Id.pp
       peer_id
       P2p_point.Id.pp
       maybe_reachable_point
       bootstrap
+      direct
 
   let is_bootstrap t = t.bootstrap
+
+  let is_direct t = t.direct
 end
 
 module Point = struct
@@ -631,17 +636,14 @@ module P2P = struct
 end
 
 module Gossipsub = struct
-  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
+  type connection = {topics : Topic.t list; outbound : bool}
 
   let connection_encoding =
     let open Data_encoding in
     conv
-      (fun {topics; direct; outbound} -> (topics, direct, outbound))
-      (fun (topics, direct, outbound) -> {topics; direct; outbound})
-      (obj3
-         (req "topics" (list Topic.encoding))
-         (req "direct" bool)
-         (req "outbound" bool))
+      (fun {topics; outbound} -> (topics, outbound))
+      (fun (topics, outbound) -> {topics; outbound})
+      (obj2 (req "topics" (list Topic.encoding)) (req "outbound" bool))
 end
 
 module Version = struct

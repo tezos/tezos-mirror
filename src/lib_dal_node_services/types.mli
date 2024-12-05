@@ -129,11 +129,17 @@ module Peer : sig
      specified values will be used.
 
       We also know if a peer is a bootstrap one or not from connections
-      metatada. *)
+      metatada. The notion of direct peer is currently not implemented. *)
   type t = {
     peer_id : P2p_peer.Id.t;
     maybe_reachable_point : P2p_point.Id.t;
     bootstrap : bool;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
+
+       Add the ability to have direct peers. *)
+    direct : bool;
+        (** A direct (aka explicit) peer is a peer to which we forward all the
+        messages. *)
   }
 
   (** Comparison is not a structural one, instead only the [peer_id]
@@ -151,6 +157,9 @@ module Peer : sig
 
   (** Returns true iff the bootstrap flag of the given peer is set to [true]. *)
   val is_bootstrap : t -> bool
+
+  (** Returns true iff the direct flag of the given peer is set to [true]. *)
+  val is_direct : t -> bool
 end
 
 (** A point is made of an IP address and a port. Only the worker knows about
@@ -361,7 +370,7 @@ end
 module Gossipsub : sig
   (** See {!Tezos_gossipsub.Introspection.connection}. Ideally we should reuse
       that type, but that would require a new dependency to be added. *)
-  type connection = {topics : Topic.t list; direct : bool; outbound : bool}
+  type connection = {topics : Topic.t list; outbound : bool}
 
   val connection_encoding : connection Data_encoding.t
 end

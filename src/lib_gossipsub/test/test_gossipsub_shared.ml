@@ -155,6 +155,8 @@ module Automaton_config :
     module Peer = struct
       let is_bootstrap _ = false
 
+      let is_direct _ = false
+
       include Int_iterable
     end
 
