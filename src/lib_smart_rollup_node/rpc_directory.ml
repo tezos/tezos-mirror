@@ -687,6 +687,18 @@ let () =
     ()
 
 let () =
+  Admin_directory.register0 Rollup_node_services.Admin.clear_batcher_queues
+  @@ fun _node_ctxt query () ->
+  Batcher.clean_queue
+    ?order_request:
+      (Option.map
+         (fun order_below ->
+           Batcher_worker_types.
+             {drop_no_order = query#drop_no_order; order_below})
+         query#order)
+    ()
+
+let () =
   Admin_directory.register0 Rollup_node_services.Admin.cancel_gc
   @@ fun node_ctxt () () ->
   let open Lwt_result_syntax in

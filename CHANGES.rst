@@ -88,6 +88,18 @@ Smart Rollup node
   When ``tag`` is specified only operation of that type will be
   considered, else all operations are considered.(MR :gl:`!15929`)
 
+- Added RPC ``DELETE /admin/batcher/queue``, which can take two optional
+  arguments:
+
+  + ``order_below``: an integer that filters all messages with order
+    inferior to it.
+
+  + ``drop_no_order``: a boolean that if true remove all messages that
+    has no order specified. ``false` by default. If no ``order_below``
+    is specified it completely clear the queue.
+
+  (MR :gl:`!15929`)
+
 - Updated RPC ``/local/batcher/injection`` with a new query argument
   possibility. When the rpc contains ``"drop_duplicate": true`` then
   the batcher will drop the messages that were already injected with a

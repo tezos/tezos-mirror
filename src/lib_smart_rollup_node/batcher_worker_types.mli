@@ -26,6 +26,8 @@
 (** This module contains the parameters for the worker (see {!Worker}) used by
     the batcher. *)
 
+type order_request = {drop_no_order : bool; order_below : Z.t}
+
 module Request : sig
   (** Type of requests accepted by the batcher worker. *)
   type ('a, 'b) t =
@@ -36,12 +38,20 @@ module Request : sig
       }
         -> (L2_message.id list, error trace) t
         (** Request to register new L2 messages in the queue. if
-            [drop_duplicate] is [true], then the elements of
-            [messages] already processed by the batcher, with
-            [drop_duplicate = true], are dropped. *)
+        [drop_duplicate] is [true], then the elements of
+        [messages] already processed by the batcher, with
+        [drop_duplicate = true], are dropped. *)
     | Produce_batches : (unit, error trace) t
         (** Request to produce new messages batches and
-             submit them to the injector. *)
+         submit them to the injector. *)
+    | Clear_queues : (unit, error trace) t
+        (** Request to clear all queues, the heap and the batched
+            messages.  *)
+    | Remove_messages : order_request -> (unit, error trace) t
+        (** Request to remove messages in the heap and batched with
+        order inferior to [order_below]. If [drop_no_order] is
+        set, remove also all messages that have no order
+        specified.  *)
 
   type view = View : _ t -> view
 

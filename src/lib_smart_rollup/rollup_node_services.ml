@@ -871,6 +871,18 @@ module Query = struct
     |+ opt_field "tag" Arg.operation_kind (fun k -> k)
     |> seal
 
+  let order_below_query =
+    let open Tezos_rpc.Query in
+    query (fun order drop_no_order ->
+        object
+          method order = order
+
+          method drop_no_order = drop_no_order
+        end)
+    |+ opt_field "order_below" Arg.z (fun q -> q#order)
+    |+ field "drop_no_order" Tezos_rpc.Arg.bool false (fun q -> q#drop_no_order)
+    |> seal
+
   let operation_tag_and_order_below_query =
     let open Tezos_rpc.Query in
     query (fun order operation_tag drop_no_order ->
@@ -1211,4 +1223,11 @@ module Admin = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.bool
       (path / "cancel_gc")
+
+  let clear_batcher_queues =
+    Tezos_rpc.Service.delete_service
+      ~description:"Clear operation queues of injectors"
+      ~query:Query.order_below_query
+      ~output:Data_encoding.unit
+      (path / "batcher" / "queue")
 end
