@@ -313,7 +313,7 @@ mod tztrunner_tests {
 
     const TZT_SAMPLE_MUTEZ_OVERFLOW: &str = r#"code { ADD } ;
         input { Stack_elt mutez 9223372036854775807 ; Stack_elt mutez 1 } ;
-        output (MutezOverflow 9223372036854775807 1)"#;
+        output Overflow"#;
 
     const TZT_SAMPLE_EXP_SUCC_BUT_FAIL: &str = r#"code { ADD } ;
         input { Stack_elt mutez 9223372036854775807 ; Stack_elt mutez 1 } ;

@@ -19,6 +19,7 @@ use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 use crate::context::*;
 use crate::interpreter::*;
+use crate::gas;
 use crate::irrefutable_match::irrefutable_match;
 use crate::parser::spanned_lexer;
 use crate::parser::Parser;
@@ -335,6 +336,8 @@ pub enum InterpreterErrorExpectation<'a> {
     MutezOverflow(i64, i64),
     /// Overflow error, which can happen with arithmetic operations.
     Overflow,
+    /// OutOfGas error, which happens when execution runs out of gas.
+    OutOfGas(gas::OutOfGas),
     /// FailedWith error, which happens when execution reaches `FAILWITH`
     /// instruction.
     FailedWith(Micheline<'a>),
@@ -347,6 +350,7 @@ impl fmt::Display for InterpreterErrorExpectation<'_> {
             GeneralOverflow(a1, a2) => write!(f, "General Overflow {} {}", a1, a2),
             Overflow => write!(f, "Overflow"),
             MutezOverflow(a1, a2) => write!(f, "MutezOverflow {} {}", a1, a2),
+            OutOfGas(_) => write!(f, "OutOfGas"),
             FailedWith(v) => write!(f, "FailedWith {:?}", v),
         }
     }

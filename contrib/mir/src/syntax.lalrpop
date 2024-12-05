@@ -17,6 +17,7 @@ use crate::lexer::{LexerError, Prim, Noun, TztPrim as TzP, Tok};
 use crate::lexer::macros::{MacroArgs, Macro};
 use crate::typechecker as TC;
 use crate::tzt::*;
+use crate::gas;
 use Noun::*;
 use Noun as PT;
 use typed_arena::Arena;
@@ -38,6 +39,7 @@ extern {
         "generalOverflow" => Tok::Noun(TztPrim(TzP::GeneralOverflow)),
         "Overflow" => Tok::Noun(TztPrim(TzP::Overflow)),
         "StaticError" => Tok::Noun(TztPrim(TzP::StaticError)),
+        "Gas_exhaustion" => Tok::Noun(TztPrim(TzP::OutOfGas)),
         "amount" => Tok::Noun(TztPrim(TzP::amount)),
         "balance" => Tok::Noun(TztPrim(TzP::balance)),
         "self" => Tok::Noun(TztPrim(TzP::self_)),
@@ -164,6 +166,7 @@ tztEntity : TztEntity<'a> = {
   "output" "(" "StaticError" <s:string> ")" => Output(TztError(TypecheckerError(Some(s)))),
   "output" "(" "StaticError" "_"  ")" => Output(TztError(TypecheckerError(None))),
   "output" "Overflow" => Output(TztError(InterpreterError(Overflow))),
+  "output" "Gas_exhaustion" => Output(TztError(InterpreterError(OutOfGas(gas::OutOfGas)))),
   "amount" <m:mutezAmount> => TztEntity::Amount(m),
   "balance" <m:mutezAmount> => TztEntity::Balance(m),
   "chain_id" <Micheline> => TztEntity::ChainId(<>),
