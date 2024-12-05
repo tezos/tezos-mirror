@@ -116,7 +116,6 @@
     "zk_rollup_max_ticket_payload_size": 2048,
     "global_limit_of_staking_over_baking": 9,
     "edge_of_staking_over_delegation": 3,
-    "adaptive_issuance_launch_ema_threshold": 0,
     "adaptive_rewards_params": {
         "issuance_ratio_final_min": {
             "numerator": "1",
@@ -150,8 +149,6 @@
             "denominator": "50"
         }
     },
-    "adaptive_issuance_activation_vote_enable": true,
-    "adaptive_issuance_force_activation": false,
     "direct_ticket_spending_enable": false,
     "aggregate_attestation": false,
     "allow_tz4_delegate_enable": false,
