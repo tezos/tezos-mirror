@@ -20,7 +20,7 @@ remain within the staker’s account at all times.
 
 Staked and delegated funds **have different weights** in the computation
 of delegates’ baking and voting powers: staked funds (both external
-stakes by stakers and the delegate’s own) count **twice** as much as
+stakes by stakers and the delegate’s own) count **three times** as much as
 delegated funds.
 
 Unlike delegated funds, staked funds are considered to contribute to the
