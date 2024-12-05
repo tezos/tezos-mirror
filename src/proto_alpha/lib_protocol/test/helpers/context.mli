@@ -391,6 +391,7 @@ type 'accounts init :=
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?allow_tz4_delegate_enable:bool ->
+  ?aggregate_attestation:bool ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

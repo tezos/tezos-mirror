@@ -571,7 +571,8 @@ let prepare_initial_context_params ?consensus_committee_size
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?consensus_rights_delay ?allow_tz4_delegate_enable () =
+    ?adaptive_issuance ?consensus_rights_delay ?allow_tz4_delegate_enable
+    ?aggregate_attestation () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -648,6 +649,9 @@ let prepare_initial_context_params ?consensus_committee_size
       ~default:constants.allow_tz4_delegate_enable
       allow_tz4_delegate_enable
   in
+  let aggregate_attestation =
+    Option.value ~default:constants.aggregate_attestation aggregate_attestation
+  in
   let cache_sampler_state_cycles =
     consensus_rights_delay + Constants_repr.max_slashing_period + 1
   and cache_stake_distribution_cycles =
@@ -680,6 +684,7 @@ let prepare_initial_context_params ?consensus_committee_size
       cache_sampler_state_cycles;
       cache_stake_distribution_cycles;
       allow_tz4_delegate_enable;
+      aggregate_attestation;
     }
   in
   let* () = check_constants_consistency constants in
@@ -713,7 +718,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?allow_tz4_delegate_enable
+    ?adaptive_issuance ?allow_tz4_delegate_enable ?aggregate_attestation
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
@@ -737,6 +742,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
       ?dal
       ?adaptive_issuance
       ?allow_tz4_delegate_enable
+      ?aggregate_attestation
       ()
   in
   let* () =
