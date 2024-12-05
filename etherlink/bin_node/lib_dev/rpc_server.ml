@@ -101,8 +101,12 @@ module Dream = struct
     Lwt.dont_wait
       (fun () ->
         routes |> Dream.router |> Dream.serve ~interface:addr ~port ~stop)
-      (fun exn ->
-        Format.eprintf "Dream server error: %s@." (Printexc.to_string exn)) ;
+      (function
+        | Unix.Unix_error (Unix.EADDRINUSE, _, _) ->
+            Logs.err (fun m ->
+                m "Cannot start RPC server on port %d, already in use." port) ;
+            exit 1
+        | exn -> Events.rpc_server_error exn) ;
     return shutdown
 end
 
