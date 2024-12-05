@@ -2106,6 +2106,7 @@ trigger:debian_repository_partial_auto:
     - debian-deps-build.Dockerfile
     - docs/introduction/install-bin-deb.sh
     - docs/introduction/upgrade-bin-deb.sh
+    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-packages-dependencies.sh
@@ -2114,6 +2115,7 @@ trigger:debian_repository_partial_auto:
     - scripts/packaging/Release.conf
     - scripts/packaging/build-deb-local.sh
     - scripts/packaging/octez/debian/*
+    - scripts/version.sh
     when: on_success
   needs:
   - job: trigger
@@ -2144,6 +2146,7 @@ trigger:rpm_repository_partial_auto:
   stage: test
   rules:
   - changes:
+    - manifest/**/*.ml*
     - rpm-deps-build.Dockerfile
     - scripts/ci/build-packages-dependencies.sh
     - scripts/ci/build-rpm-packages.sh
@@ -2152,6 +2155,7 @@ trigger:rpm_repository_partial_auto:
     - scripts/packaging/build-deb-local.sh
     - scripts/packaging/octez/rpm/*
     - scripts/packaging/tests/rpm/*
+    - scripts/version.sh
     when: on_success
   needs:
   - job: trigger
@@ -2182,11 +2186,13 @@ trigger:homebrew_auto:
   stage: test
   rules:
   - changes:
+    - manifest/**/*.ml*
     - scripts/ci/install-gsutil.sh
     - scripts/packaging/Formula/*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/test_homebrew_install.sh
+    - scripts/version.sh
     when: on_success
   needs:
   - job: trigger
