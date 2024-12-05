@@ -116,18 +116,13 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
            (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
        else Empty)
   --> set S.Adaptive_issuance.force_activation true
-  --> set S.Adaptive_issuance.ns_enable true
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
     delegates_name_list : (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
-      let constants =
-        constants
-        |> S.Adaptive_issuance.force_activation true
-        |> S.Adaptive_issuance.ns_enable true
-      in
+      let constants = constants |> S.Adaptive_issuance.force_activation true in
       let bootstrap = "__bootstrap__" in
       let delegates_name_list = bootstrap :: delegates_name_list in
       (* Override threshold value if activate *)

@@ -442,30 +442,6 @@ let cycle_from_level blocks_per_cycle level =
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
   current_cycle
 
-let pct_from_kind (block : Block.t) = function
-  | Protocol.Misbehaviour_repr.Double_baking ->
-      Protocol.Percentage.to_q
-        block.constants.percentage_of_frozen_deposits_slashed_per_double_baking
-      |> Q.(mul (100 // 1))
-      |> Q.to_int
-  | Double_attesting | Double_preattesting ->
-      Protocol.Percentage.to_q
-        block.constants
-          .percentage_of_frozen_deposits_slashed_per_double_attestation
-      |> Q.(mul (100 // 1))
-      |> Q.to_int
-
-let get_pending_slashed_pct_for_delegate (block, state) delegate =
-  let rec aux r = function
-    | [] -> r
-    | (culprit, {Protocol.Denunciations_repr.misbehaviour; _}) :: t ->
-        if Signature.Public_key_hash.equal delegate culprit then
-          let new_r = r + pct_from_kind block misbehaviour.kind in
-          if new_r >= 100 then 100 else aux new_r t
-        else aux r t
-  in
-  aux 0 state.State.pending_slashes
-
 let update_state_denunciation (block, state)
     {State.culprit; denounced; evidence = _; misbehaviour} =
   let open Lwt_result_syntax in

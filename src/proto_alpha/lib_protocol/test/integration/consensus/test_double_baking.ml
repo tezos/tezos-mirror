@@ -201,8 +201,12 @@ let test_valid_double_baking_followed_by_double_attesting () =
     Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
   let* csts = Context.get_constants (B genesis) in
-  let p_de =
-    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
+  let* p_de =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_a)
+      ~block_before_slash:blk_final
+      ~all_culprits:[delegate]
   in
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
@@ -282,8 +286,12 @@ let test_valid_double_attesting_followed_by_double_baking () =
     Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
   let* csts = Context.get_constants (B genesis) in
-  let p_de =
-    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
+  let* p_de =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_a)
+      ~block_before_slash:blk_with_db_evidence
+      ~all_culprits:[delegate]
   in
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking

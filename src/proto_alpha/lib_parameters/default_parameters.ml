@@ -275,8 +275,6 @@ let constants_mainnet : Constants.Parametric.t =
     limit_of_delegation_over_baking = 9;
     percentage_of_frozen_deposits_slashed_per_double_baking =
       Protocol.Percentage.p5;
-    percentage_of_frozen_deposits_slashed_per_double_attestation =
-      Protocol.Percentage.p50;
     max_slashing_per_block = Protocol.Percentage.p100;
     max_slashing_threshold;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -325,7 +323,6 @@ let constants_mainnet : Constants.Parametric.t =
           };
         activation_vote_enable = true;
         force_activation = false;
-        ns_enable = true;
       };
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6668
        Enable once at least the following is done:

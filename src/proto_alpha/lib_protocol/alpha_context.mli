@@ -893,7 +893,6 @@ module Constants : sig
       adaptive_rewards_params : adaptive_rewards_params;
       activation_vote_enable : bool;
       force_activation : bool;
-      ns_enable : bool;
     }
 
     type issuance_weights = {
@@ -938,8 +937,6 @@ module Constants : sig
       consensus_threshold : int;
       limit_of_delegation_over_baking : int;
       percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
-      percentage_of_frozen_deposits_slashed_per_double_attestation :
-        Percentage.t;
       max_slashing_per_block : Percentage.t;
       max_slashing_threshold : int;
       testnet_dictator : public_key_hash option;
@@ -1045,9 +1042,6 @@ module Constants : sig
   val limit_of_delegation_over_baking : context -> int
 
   val percentage_of_frozen_deposits_slashed_per_double_baking :
-    context -> Percentage.t
-
-  val percentage_of_frozen_deposits_slashed_per_double_attestation :
     context -> Percentage.t
 
   val testnet_dictator : context -> public_key_hash option

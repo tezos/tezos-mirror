@@ -93,10 +93,6 @@ module Set = struct
       percentage_of_frozen_deposits_slashed_per_double_baking (c : t) =
     {c with percentage_of_frozen_deposits_slashed_per_double_baking}
 
-  let percentage_of_frozen_deposits_slashed_per_double_attestation
-      percentage_of_frozen_deposits_slashed_per_double_attestation (c : t) =
-    {c with percentage_of_frozen_deposits_slashed_per_double_attestation}
-
   let max_slashing_per_block max_slashing_per_block (c : t) =
     {c with max_slashing_per_block}
 
@@ -139,9 +135,6 @@ module Set = struct
 
     let force_activation force_activation (c : t) =
       adaptive_issuance {c.adaptive_issuance with force_activation} c
-
-    let ns_enable ns_enable (c : t) =
-      adaptive_issuance {c.adaptive_issuance with ns_enable} c
 
     let launch_ema_threshold launch_ema_threshold (c : t) =
       adaptive_issuance {c.adaptive_issuance with launch_ema_threshold} c

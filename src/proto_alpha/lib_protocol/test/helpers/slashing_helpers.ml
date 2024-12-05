@@ -5,6 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let slashing_percentage ~block_before_slash
+    {Protocol.Misbehaviour_repr.level; round = _; kind} ~all_culprits =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Block.get_alpha_ctxt block_before_slash in
+  let raw_ctxt = Protocol.Alpha_context.Internal_for_tests.to_raw ctxt in
+  let level =
+    Protocol.Level_repr.level_from_raw
+      ~cycle_eras:(Protocol.Raw_context.cycle_eras raw_ctxt)
+      level
+  in
+  let*@ _, slashing_pct =
+    Protocol.Slash_percentage.get raw_ctxt ~kind ~level all_culprits
+  in
+  return slashing_pct
+
 module Misbehaviour_repr = struct
   open Protocol.Misbehaviour_repr
 
@@ -108,6 +123,18 @@ module Full_denunciation = struct
       pp
       list1
       list2
+
+  let slashing_percentage ~block_before_slash
+      (misbehaviour : Protocol.Misbehaviour_repr.t) all_denunciations_to_apply =
+    let all_culprits =
+      List.filter
+        (fun (_, (den : Protocol.Denunciations_repr.item)) ->
+          Misbehaviour_repr.equal misbehaviour den.misbehaviour)
+        all_denunciations_to_apply
+      |> List.map fst
+      |> List.sort_uniq Signature.Public_key_hash.compare
+    in
+    slashing_percentage ~block_before_slash misbehaviour ~all_culprits
 end
 
 let apply_slashing_account all_denunciations_to_apply
@@ -147,18 +174,10 @@ let apply_slashing_account all_denunciations_to_apply
     Misbehaviour_repr.pp
     misbehaviour ;
   let* slashed_pct =
-    match misbehaviour.kind with
-    | Double_baking ->
-        return
-          constants
-            .Protocol.Alpha_context.Constants.Parametric
-             .percentage_of_frozen_deposits_slashed_per_double_baking
-    | Double_attesting | Double_preattesting ->
-        State_ai_flags.NS.get_double_attestation_slashing_percentage
-          all_denunciations_to_apply
-          block_before_slash
-          state
-          misbehaviour
+    Full_denunciation.slashing_percentage
+      ~block_before_slash
+      misbehaviour
+      all_denunciations_to_apply
   in
   let slash_culprit
       ({frozen_deposits; unstaked_frozen; frozen_rights; parameters; _} as acc)

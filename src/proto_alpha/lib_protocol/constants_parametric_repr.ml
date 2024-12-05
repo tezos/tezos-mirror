@@ -233,7 +233,6 @@ type adaptive_issuance = {
   adaptive_rewards_params : adaptive_rewards_params;
   activation_vote_enable : bool;
   force_activation : bool;
-  ns_enable : bool;
 }
 
 type issuance_weights = {
@@ -278,7 +277,6 @@ type t = {
   consensus_threshold : int;
   limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
-  percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
   max_slashing_per_block : Percentage.t;
   max_slashing_threshold : int;
   testnet_dictator : Signature.Public_key_hash.t option;
@@ -484,22 +482,19 @@ let adaptive_issuance_encoding =
            adaptive_rewards_params;
            activation_vote_enable;
            force_activation;
-           ns_enable;
          } ->
       ( global_limit_of_staking_over_baking,
         edge_of_staking_over_delegation,
         launch_ema_threshold,
         adaptive_rewards_params,
         activation_vote_enable,
-        force_activation,
-        ns_enable ))
+        force_activation ))
     (fun ( global_limit_of_staking_over_baking,
            edge_of_staking_over_delegation,
            launch_ema_threshold,
            adaptive_rewards_params,
            activation_vote_enable,
-           force_activation,
-           ns_enable ) ->
+           force_activation ) ->
       {
         global_limit_of_staking_over_baking;
         edge_of_staking_over_delegation;
@@ -507,16 +502,14 @@ let adaptive_issuance_encoding =
         adaptive_rewards_params;
         activation_vote_enable;
         force_activation;
-        ns_enable;
       })
-    (obj7
+    (obj6
        (req "global_limit_of_staking_over_baking" uint8)
        (req "edge_of_staking_over_delegation" uint8)
        (req "adaptive_issuance_launch_ema_threshold" int32)
        (req "adaptive_rewards_params" adaptive_rewards_params_encoding)
        (req "adaptive_issuance_activation_vote_enable" bool)
-       (req "adaptive_issuance_force_activation" bool)
-       (req "ns_enable" bool))
+       (req "adaptive_issuance_force_activation" bool))
 
 let issuance_weights_encoding =
   let open Data_encoding in
@@ -598,7 +591,6 @@ let encoding =
             ( ( c.minimal_participation_ratio,
                 c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
-                c.percentage_of_frozen_deposits_slashed_per_double_attestation,
                 c.max_slashing_per_block,
                 c.max_slashing_threshold,
                 c.testnet_dictator,
@@ -644,7 +636,6 @@ let encoding =
                ( ( minimal_participation_ratio,
                    limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
-                   percentage_of_frozen_deposits_slashed_per_double_attestation,
                    max_slashing_per_block,
                    max_slashing_threshold,
                    testnet_dictator,
@@ -691,7 +682,6 @@ let encoding =
         consensus_threshold;
         limit_of_delegation_over_baking;
         percentage_of_frozen_deposits_slashed_per_double_baking;
-        percentage_of_frozen_deposits_slashed_per_double_attestation;
         max_slashing_per_block;
         max_slashing_threshold;
         testnet_dictator;
@@ -749,14 +739,11 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj8
+                (obj7
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
-                      Percentage.encoding)
-                   (req
-                      "percentage_of_frozen_deposits_slashed_per_double_attestation"
                       Percentage.encoding)
                    (req "max_slashing_per_block" Percentage.encoding)
                    (req "max_slashing_threshold" int31)

@@ -35,9 +35,6 @@ module Delayed_slashing : sig
   (** This module takes care of choosing the denunciations that need to be
       applied at the end of a cycle. It depends on the flag [ns_enable]. *)
 
-  (** [Delayed_slashing] is enabled iff [ns_enable = true]. *)
-  val enabled : State.t -> bool
-
   (** [partition_slashes s cycle] returns a pair [(l1,l2)] of lists of slashes,
       partitioned from the [state.pending_slashes]. [l2] is the list of slashes to
       apply at the end of the given [cycle], and [l1] is the rest (which should
@@ -48,21 +45,4 @@ module Delayed_slashing : sig
     Protocol.Alpha_context.Cycle.t ->
     (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list
     * (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list
-end
-
-module NS : sig
-  (** This module takes care of the new adaptive slashing mechanism.*)
-
-  (** It is enabled iff the flag [ns_enable] is set to true, and AI is
-      also enabled. *)
-  val enabled : Block.t -> State.t -> bool
-
-  (** Whatever the value of the flag is, this function returns the
-      slashing value for a given double attestation *)
-  val get_double_attestation_slashing_percentage :
-    (Signature.public_key_hash * Protocol.Denunciations_repr.item) list ->
-    Block.t ->
-    State.t ->
-    Protocol.Misbehaviour_repr.t ->
-    Protocol.Percentage.t tzresult Lwt.t
 end

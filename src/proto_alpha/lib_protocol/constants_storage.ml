@@ -177,10 +177,6 @@ let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
   constants.percentage_of_frozen_deposits_slashed_per_double_baking
 
-let percentage_of_frozen_deposits_slashed_per_double_attestation c =
-  let constants = Raw_context.constants c in
-  constants.percentage_of_frozen_deposits_slashed_per_double_attestation
-
 let testnet_dictator c =
   let constants = Raw_context.constants c in
   constants.testnet_dictator
@@ -294,8 +290,6 @@ let adaptive_issuance_activation_vote_enable c =
 
 let adaptive_issuance_force_activation c =
   (adaptive_issuance c).force_activation
-
-let adaptive_issuance_ns_enable c = (adaptive_issuance c).ns_enable
 
 let direct_ticket_spending_enable c =
   (Raw_context.constants c).direct_ticket_spending_enable

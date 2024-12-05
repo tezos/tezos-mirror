@@ -264,8 +264,6 @@ seq:
   type: u1
 - id: percentage_of_frozen_deposits_slashed_per_double_baking
   type: u2be
-- id: percentage_of_frozen_deposits_slashed_per_double_attestation
-  type: u2be
 - id: max_slashing_per_block
   type: u2be
 - id: max_slashing_threshold
@@ -345,9 +343,6 @@ seq:
   type: u1
   enum: bool
 - id: adaptive_issuance_force_activation
-  type: u1
-  enum: bool
-- id: ns_enable
   type: u1
   enum: bool
 - id: direct_ticket_spending_enable
