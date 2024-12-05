@@ -103,6 +103,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~config:sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ~keep_alive
+      ~drop_duplicate:
+        configuration.experimental_features.drop_duplicate_on_injection
       ()
   in
   let* () =

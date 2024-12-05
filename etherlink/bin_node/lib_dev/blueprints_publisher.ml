@@ -10,10 +10,12 @@ type parameters = {
   latest_level_seen : Z.t;
   config : Configuration.blueprints_publisher_config;
   keep_alive : bool;
+  drop_duplicate : bool;
 }
 
 type state = {
   rollup_node_endpoint : Uri.t;
+  drop_duplicate : bool;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
   max_blueprints_catchup : Z.t;
@@ -107,6 +109,7 @@ module Worker = struct
         (Float.of_int (List.length payload))
     in
     Rollup_services.publish
+      ~drop_duplicate:state.drop_duplicate
       ~keep_alive:false
       ~rollup_node_endpoint:state.rollup_node_endpoint
       payload
@@ -242,6 +245,7 @@ module Handlers = struct
            };
          latest_level_seen;
          keep_alive;
+         drop_duplicate;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -262,6 +266,7 @@ module Handlers = struct
         latest_level_seen;
         cooldown = 0;
         rollup_node_endpoint;
+        drop_duplicate;
         max_blueprints_lag = Z.of_int max_blueprints_lag;
         max_blueprints_ahead = Z.of_int max_blueprints_ahead;
         max_blueprints_catchup = Z.of_int max_blueprints_catchup;
@@ -324,13 +329,20 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
+let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive
+    ~drop_duplicate () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
-      {rollup_node_endpoint; config; latest_level_seen; keep_alive}
+      {
+        rollup_node_endpoint;
+        config;
+        latest_level_seen;
+        keep_alive;
+        drop_duplicate;
+      }
       (module Handlers)
   in
   let*! () = Blueprint_events.publisher_is_ready () in

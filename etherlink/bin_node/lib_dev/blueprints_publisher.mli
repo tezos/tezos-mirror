@@ -10,6 +10,7 @@ val start :
   config:Configuration.blueprints_publisher_config ->
   latest_level_seen:Z.t ->
   keep_alive:bool ->
+  drop_duplicate:bool ->
   unit ->
   unit tzresult Lwt.t
 
