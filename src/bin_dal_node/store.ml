@@ -716,14 +716,19 @@ let upgrade_from_v1_to_v2 ~base_dir =
     Event.(emit store_upgrade_start (Version.make 1, Version.make 2))
   in
   (* Initialize both stores and migrate. *)
-  let* kvs_store = init_skip_list_cells_store base_dir in
-  let* sql_store = init_sqlite_skip_list_cells_store base_dir in
   let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
   let* storage_backend = Storage_backend.load storage_backend_store in
   let*! res =
     match storage_backend with
     | None | Some Storage_backend.Legacy ->
-        Store_migrations.migrate_skip_list_store kvs_store sql_store
+        let* kvs_store = init_skip_list_cells_store base_dir in
+        let* sql_store = init_sqlite_skip_list_cells_store base_dir in
+        let* () =
+          Store_migrations.migrate_skip_list_store kvs_store sql_store
+        in
+        let* () = Kvs_skip_list_cells_store.close kvs_store in
+        let*! () = Dal_store_sqlite3.Skip_list_cells.close sql_store in
+        return_unit
     | Some SQLite3 ->
         (* If a previous sqlite database has been created using the
            `--sqlite3-backend` experimental flag. We simply move it to the
@@ -750,7 +755,6 @@ let upgrade_from_v1_to_v2 ~base_dir =
         let* () = mv (Dal_store_sqlite3.sqlite_file_name ^ "-wal") in
         return_unit
   in
-  let* () = Kvs_skip_list_cells_store.close kvs_store in
   match res with
   | Ok () ->
       (* Set the new storage backend to sqlite3. *)
