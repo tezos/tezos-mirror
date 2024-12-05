@@ -847,6 +847,13 @@ module Arg = struct
         Operation_kind.of_string s
         |> Option.to_result ~none:"Invalid operation kind")
       ()
+
+  let z =
+    Resto.Arg.make
+      ~name:"z"
+      ~destruct:(fun s -> Ok (Z.of_string s))
+      ~construct:Z.to_string
+      ()
 end
 
 module Query = struct
@@ -862,6 +869,19 @@ module Query = struct
     let open Tezos_rpc.Query in
     query (fun tag -> tag)
     |+ opt_field "tag" Arg.operation_kind (fun k -> k)
+    |> seal
+
+  let order_and_drop_duplicate_query =
+    let open Tezos_rpc.Query in
+    query (fun order drop_duplicate ->
+        object
+          method order = order
+
+          method drop_duplicate = drop_duplicate
+        end)
+    |+ opt_field "order" Arg.z (fun q -> q#order)
+    |+ field "drop_duplicate" Tezos_rpc.Arg.bool false (fun q ->
+           q#drop_duplicate)
     |> seal
 end
 
@@ -988,29 +1008,9 @@ module Local = struct
       (path / "gc_info")
 
   let injection =
-    let z_rpc_arg =
-      Resto.Arg.make
-        ~name:"z"
-        ~destruct:(fun s -> Ok (Z.of_string s))
-        ~construct:Z.to_string
-        ()
-    in
-    let query =
-      let open Tezos_rpc.Query in
-      query (fun order drop_duplicate ->
-          object
-            method order = order
-
-            method drop_duplicate = drop_duplicate
-          end)
-      |+ opt_field "order" z_rpc_arg (fun q -> q#order)
-      |+ field "drop_duplicate" Tezos_rpc.Arg.bool false (fun q ->
-             q#drop_duplicate)
-      |> seal
-    in
     Tezos_rpc.Service.post_service
       ~description:"Inject messages in the batcher's queue"
-      ~query
+      ~query:Query.order_and_drop_duplicate_query
       ~input:
         Data_encoding.(
           def
