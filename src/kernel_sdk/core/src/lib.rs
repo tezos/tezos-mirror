@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
@@ -20,6 +20,11 @@ pub mod target_impl;
 
 #[cfg(all(pvm_kind = "riscv", pvm_flavour = "hermit"))]
 #[path = "riscv_hermit_target.rs"]
+#[doc(hidden)]
+mod target_impl;
+
+#[cfg(all(pvm_kind = "riscv", pvm_flavour = "supervising"))]
+#[path = "riscv_supervising_target.rs"]
 #[doc(hidden)]
 mod target_impl;
 
