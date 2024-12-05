@@ -1528,6 +1528,21 @@ let jobs pipeline_type =
         tezt_static_binaries;
       ]
     in
+    let jobs_sdk_rust : tezos_job list =
+      let job_test_sdk_rust =
+        job
+          ~__POS__
+          ~name:"test_sdk_rust"
+          ~image:Images.rust_toolchain
+          ~stage:Stages.test
+          ~dependencies:dependencies_needs_start
+          ~rules:
+            (make_rules ~dependent:true ~changes:changeset_test_sdk_rust ())
+          ["make -C sdk/rust check"; "make -C sdk/rust test"]
+        |> enable_cargo_cache |> enable_sccache
+      in
+      [job_test_sdk_rust]
+    in
     let jobs_kernels : tezos_job list =
       let make_job_kernel ?dependencies ?(stage = Stages.test) ~__POS__ ~name
           ~changes script =
@@ -1671,8 +1686,8 @@ let jobs pipeline_type =
             job_homebrew_trigger_full;
           ]
     in
-    jobs_debian @ jobs_misc @ jobs_kernels @ jobs_unit @ jobs_install_octez
-    @ jobs_tezt
+    jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_kernels @ jobs_unit
+    @ jobs_install_octez @ jobs_tezt
   in
 
   (*Coverage jobs *)

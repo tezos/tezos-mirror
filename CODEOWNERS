@@ -34,6 +34,7 @@
 # @lthms = Thomas Letan
 # @rodibozman = Rodi-Can Bozman
 /src/kernel_sdk           @emturner @ole.kruger @lthms @rodibozman
+/sdk/rust                 @emturner @ole.kruger @lthms @rodibozman
 
 # Octez Merge Team
 #
