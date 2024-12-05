@@ -46,7 +46,7 @@ in
     };
 
     riscv64Pkgs = import pkgs-src {
-      crossSystem.config = "riscv64-unknown-linux-gnu";
+      crossSystem.config = "riscv64-unknown-linux-musl";
     };
 
     opam-repository = pkgs.callPackage ./opam-repo.nix {};

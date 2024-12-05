@@ -13,7 +13,7 @@
       pkgs.wabt
 
       # Cross-compilation for RISC-V
-      sources.riscv64Pkgs.clangStdenv.cc
+      sources.pkgs.pkgsCross.riscv64.pkgsStatic.stdenv.cc
 
       # Formatter/LSP for Cargo manifests (and TOML in general)
       pkgs.taplo
@@ -127,6 +127,7 @@ in
     # targeting other architectures.
     CC_wasm32_unknown_unknown = "${clangNoArch}/bin/clang";
     CC_riscv64gc_unknown_linux_gnu = "${clangNoArch}/bin/clang";
+    CC_riscv64gc_unknown_linux_musl = "${clangNoArch}/bin/clang";
     CC_riscv64gc_unknown_none_elf = "${clangNoArch}/bin/clang";
     CC_riscv64gc_unknown_hermit = "${clangNoArch}/bin/clang";
   }
