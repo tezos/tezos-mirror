@@ -47,6 +47,10 @@ val to_fully_qualified_lident_expr :
 
 val get_location : t -> Ppxlib.location
 
-(** [extract_rewriters attributes] inspects the given list of [attributes]
-    and returns the rewriters that are handled by this ppx. *)
-val extract_rewriters : Ppxlib.attribute list -> t list
+(** [extract_rewriters handled_drivers attributes] inspects the given list
+      of [attributes] and returns the rewriters that are handled by this ppx.
+
+      If an [attribute] has a [driver_ids] field that is not enabled by
+      `TEZOS_PPX_PROFILER`, the attribute is removed from the list of attributes
+      but will not be preprocessed *)
+val extract_rewriters : Handled_drivers.t -> Ppxlib.attribute list -> t list

@@ -14,7 +14,9 @@ type error =
   | Invalid_record of Key.t
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
+  | Invalid_list_of_driver_ids of Ppxlib.expression list
   | Improper_field of (Longident.t Location.loc * Ppxlib.expression)
+  | Improper_list_field of (Longident.t Location.loc * Ppxlib.expression)
   | Improper_let_binding of Ppxlib.expression
   | Improper_record of (Ppxlib.Ast.longident_loc * Ppxlib.expression) list
   | Malformed_attribute of Ppxlib.expression

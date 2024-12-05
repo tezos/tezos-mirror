@@ -42,17 +42,17 @@ let aggregate_s key location =
 
 let custom key location =
   match Key.content key with
-  | Key.Apply _ -> Custom
+  | Key.Apply _ | Key.Ident _ -> Custom
   | _ -> Error.error location (Error.Invalid_custom key)
 
 let custom_f key location =
   match Key.content key with
-  | Key.Apply _ -> Custom_f
+  | Key.Apply _ | Key.Ident _ -> Custom_f
   | _ -> Error.error location (Error.Invalid_custom key)
 
 let custom_s key location =
   match Key.content key with
-  | Key.Apply _ -> Custom_s
+  | Key.Apply _ | Key.Ident _ -> Custom_s
   | _ -> Error.error location (Error.Invalid_custom key)
 
 let mark key location =
@@ -166,7 +166,7 @@ let get_action_maker loc attribute =
       else None
 
 (** Transforms a rewriter in an OCaml function call:
-      - [@profiler.aggregate_s ...] will create a proper
+    - [@profiler.aggregate_s ...] will create a proper
         Parsetree Lident representing Profiler.aggregate_s *)
 let to_fully_qualified_lident_expr t loc =
   let lident =
@@ -218,7 +218,10 @@ let extract_content_from_structure loc structure =
       (* [@ppx ["label1"; "label2"; ...]] *)
       match extract_list expr with
       | Some labels -> Key.List labels
-      | None -> Error.error loc Error.(Malformed_attribute structure))
+      | None ->
+          (* This branch corresponds to the fact that the value
+             associated to the field is not a list, which is an error *)
+          Error.error loc Error.(Malformed_attribute structure))
 
 let exists_field field string =
   let Ppxlib.{txt; _}, _ = field in
@@ -228,6 +231,19 @@ let extract_field_from_record record string =
   match List.find (fun field -> exists_field field string) record with
   | field -> Some field
   | exception Not_found -> None
+
+(** [extract_list_from_record _ record field] checks that [field] exists
+      and that the associated value is a list.
+      If [field] is not present, returns [None] *)
+let extract_list_from_record loc record string =
+  Option.bind (extract_field_from_record record string) @@ function
+  | (_, [%expr [%e? expr]]) as field -> (
+      match extract_list expr with
+      | Some labels -> Some labels
+      | None ->
+          (* This branch corresponds to the fact that the value
+             associated to the field is not a list, which is an error *)
+          Error.error loc Error.(Improper_list_field field))
 
 (** [extract_enum_from_record _ record field] checks that [field] exists
       and that the associated value is an enum.
@@ -246,7 +262,27 @@ let extract_from_record loc record =
        expression associated to it as is *)
     Option.map snd (extract_field_from_record record "metadata")
   in
-  (verbosity, profiler_module, metadata)
+  let driver_ids =
+    (* Transforms a list of constructs (that all have an associated
+       labels) into a list of DriverKind.t *)
+    (match extract_list_from_record loc record "driver_ids" with
+    | None -> []
+    | Some expr_list ->
+        List.map
+          (function
+            | Ppxlib.
+                {
+                  pexp_desc =
+                    ( Pexp_construct ({txt = Lident ident; _}, None)
+                    | Pexp_ident {txt = Lident ident; _} );
+                  _;
+                } ->
+                Handled_drivers.Driver_kind.of_string ident
+            | _ -> Error.error loc Error.(Invalid_list_of_driver_ids expr_list))
+          expr_list)
+    |> Handled_drivers.of_list
+  in
+  (verbosity, profiler_module, metadata, driver_ids)
 
 let extract_key_from_payload loc payload =
   match payload with
@@ -263,17 +299,19 @@ let extract_key_from_payload loc payload =
             }]];
       ] ->
       (* [@ppx {<other infos>} ...] *)
-      let verbosity, profiler_module, metadata =
+      let verbosity, profiler_module, metadata, driver_ids =
         extract_from_record loc record
       in
       (match (verbosity, profiler_module, metadata) with
-      | None, None, None -> Error.error loc Error.(Improper_record record)
+      | None, None, None when Handled_drivers.is_empty driver_ids ->
+          Error.error loc Error.(Improper_record record)
       | _ -> ()) ;
       Key.
         {
           verbosity;
           profiler_module;
           metadata;
+          driver_ids;
           content = extract_content_from_structure loc structure;
         }
   | Ppxlib.PStr [[%stri [%e? structure]]] ->
@@ -283,6 +321,7 @@ let extract_key_from_payload loc payload =
           verbosity = None;
           profiler_module = None;
           metadata = None;
+          driver_ids = Handled_drivers.empty;
           content = extract_content_from_structure loc structure;
         }
   | Ppxlib.PStr [] ->
@@ -292,18 +331,32 @@ let extract_key_from_payload loc payload =
           verbosity = None;
           profiler_module = None;
           metadata = None;
+          driver_ids = Handled_drivers.empty;
           content = Key.Empty;
         }
   | _ -> Error.error loc Invalid_payload
 
-let of_attribute ({Ppxlib.attr_payload; attr_loc; _} as attribute) =
+let of_attribute handled_drivers
+    ({Ppxlib.attr_payload; attr_loc; _} as attribute) =
   match
     Ppxlib_helper.get_attribute_name attribute |> get_action_maker attr_loc
   with
   | Some action_maker ->
       let key = extract_key_from_payload attr_loc attr_payload in
-      let action = action_maker key attr_loc in
-      Some {key; location = attr_loc; action}
+      if
+        (* Preprocess this attribute if:
+           - the driver_ids was not provided
+           - one of the driver_ids provided is enabled by `TEZOS_PPX_PROFILER`
+        *)
+        Handled_drivers.is_empty key.driver_ids
+        || Handled_drivers.exists
+             (fun driver_id -> Handled_drivers.mem driver_id handled_drivers)
+             key.driver_ids
+      then
+        let action = action_maker key attr_loc in
+        Some {key; location = attr_loc; action}
+      else None
   | None -> None
 
-let extract_rewriters = List.filter_map of_attribute
+let extract_rewriters handled_drivers =
+  List.filter_map (of_attribute handled_drivers)

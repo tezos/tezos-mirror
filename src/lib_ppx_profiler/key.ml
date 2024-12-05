@@ -18,6 +18,7 @@ type t = {
   profiler_module : string option;
   metadata : Ppxlib.expression option;
   content : content;
+  driver_ids : Handled_drivers.t;
 }
 
 let[@inline] content {content; _} = content
