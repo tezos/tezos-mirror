@@ -427,7 +427,9 @@ let test_staking_operations =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Left (Protocol.parameter_file protocol))
-      [(["adaptive_issuance_force_activation"], `Bool true)]
+      (if Protocol.(number protocol <= number Quebec) then
+         [(["adaptive_issuance_force_activation"], `Bool true)]
+       else [])
   in
   Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
   let* node, client =

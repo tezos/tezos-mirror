@@ -534,7 +534,9 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
         smart_rollup_timeout_period_in_blocks
     (* AI is already active on mainnet, so it should be active
        immediately in tests *)
-    @ make_bool_parameter ["adaptive_issuance_force_activation"] (Some true)
+    @ (if Protocol.(number protocol <= number Quebec) then
+         make_bool_parameter ["adaptive_issuance_force_activation"] (Some true)
+       else [])
     @ parameters
   in
 
@@ -7251,15 +7253,7 @@ let scenario_tutorial_dal_baker =
        * in this test
        *)
       Log.info "Step 2: Running octez node with adaptive issuance" ;
-      with_layer1
-        ~parameters:
-          [
-            (* Force activation of adaptive issuance *)
-            (["adaptive_issuance_force_activation"], `Bool true);
-            (["adaptive_issuance_activation_vote_enable"], `Bool false);
-          ]
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~protocol
+      with_layer1 ~event_sections_levels:[("prevalidator", `Debug)] ~protocol
       @@ fun _parameters _cryptobox node client _key ->
       Log.info "Step 3: setup a baker account" ;
       (* Generate the "my_baker" user *)
