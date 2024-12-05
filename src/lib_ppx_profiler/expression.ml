@@ -78,6 +78,15 @@ let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
     [key] is a function application *)
 let add_custom_function_apply loc key = [%expr [%e Key.to_expression loc key]]
 
+(** [add_wrapping_custom_function expr _ key] will create
+      {[
+        key (fun () -> expr)
+      ]}
+
+    [key] is a function application *)
+let add_wrapping_custom_function expr loc key =
+  [%expr [%e Key.to_expression loc key] @@ fun () -> [%e expr]]
+
 let rewrite rewriters t =
   let loc = Ppxlib_helper.get_loc t in
   List.fold_left
@@ -117,7 +126,9 @@ let rewrite rewriters t =
             loc
             rewriter.key
           (* Custom functions *)
-      | Rewriter.Custom -> add_custom_function_apply loc rewriter.key)
+      | Rewriter.Custom -> add_custom_function_apply loc rewriter.key
+      | Rewriter.Custom_f | Rewriter.Custom_s ->
+          add_wrapping_custom_function expr loc rewriter.key)
     t
     rewriters
 
