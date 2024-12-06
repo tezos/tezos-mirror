@@ -119,6 +119,7 @@ module Pipeline : sig
       included in a regular pipeline (see {!trigger_job}). *)
   val register_child :
     ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+    ?inherit_:Gitlab_ci.Types.inherit_ ->
     description:string ->
     jobs:tezos_job list ->
     string ->
