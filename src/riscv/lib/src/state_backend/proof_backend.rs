@@ -15,9 +15,10 @@
 //! [`Merkleisable`]: merkle::Merkleisable
 
 use super::{
-    EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,
-    ManagerSerialise, ManagerWrite,
+    EnrichedCell, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,
+    ManagerSerialise, ManagerWrite, Ref,
 };
+use crate::storage::binary;
 use merkle::AccessInfo;
 use std::{
     cell::{Cell, RefCell},
@@ -387,6 +388,18 @@ impl<V: EnrichedValue, M: ManagerBase> ProofEnrichedCell<V, M> {
     }
 }
 
+impl<V: EnrichedValue, M: ManagerSerialise> ProofEnrichedCell<V, M> {
+    /// Serialise the wrapped cell only, discarding the additional data
+    /// of the proof-generating cell.
+    pub fn serialise_inner_enriched_cell(&self) -> bincode::Result<Vec<u8>>
+    where
+        V::E: serde::Serialize,
+    {
+        let value = EnrichedCell::<V, Ref<'_, M>>::bind(&self.source);
+        binary::serialise(&value)
+    }
+}
+
 /// A record of accessed addresses in a dynamic region
 #[derive(Default)]
 pub struct DynAccess(BTreeSet<usize>);
@@ -412,7 +425,7 @@ mod tests {
         owned_backend::Owned,
         proof_backend::merkle::Merkleisable,
         region::{DynCells, MERKLE_LEAF_SIZE},
-        Cells,
+        Cells, EnrichedCell,
     };
     use proptest::{array, prop_assert_eq, proptest};
     use std::collections::VecDeque;
@@ -676,6 +689,23 @@ mod tests {
             let derived = ProofGen::<Owned>::enriched_cell_read_derived(&proof_cell);
             prop_assert_eq!(derived, T::from(&value_after));
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
+
+            // Check correct Merkleisation
+            let cell = (value_before, T::from(&value_before));
+            let proof_cell: ProofEnrichedCell<Enriching, Owned> = ProofEnrichedCell::bind(cell);
+            let mut proof_cell: EnrichedCell<Enriching, ProofGen<Owned>> =
+                EnrichedCell::bind(proof_cell);
+            let initial_root_hash = proof_cell.hash().unwrap();
+            proof_cell.write(value_after);
+            prop_assert_eq!(proof_cell.hash().unwrap(), initial_root_hash);
+            let merkle_tree = proof_cell.to_merkle_tree().unwrap();
+            match merkle_tree {
+                MerkleTree::Leaf(hash, access_info, _) => {
+                    prop_assert_eq!(hash, initial_root_hash);
+                    prop_assert_eq!(access_info, AccessInfo::Write);
+                }
+                _ => panic!("Expected Merkle tree to contain a single written leaf"),
+            }
         });
     }
 }

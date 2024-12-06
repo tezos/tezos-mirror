@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -178,7 +179,7 @@ pub trait ManagerRead: ManagerBase {
         V: EnrichedValueLinked<Self::ManagerRoot>,
         V::D<Self::ManagerRoot>: Copy;
 
-    /// Obtain a refernce to the value contained in the enriched cell.
+    /// Obtain a reference to the value contained in the enriched cell.
     fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
     where
         V: EnrichedValue;
