@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
@@ -3632,18 +3632,26 @@ module Sc_rollup : sig
   module PVM : sig
     type boot_sector = string
 
-    module type S = sig
-      val parse_boot_sector : string -> boot_sector option
-
-      val pp_boot_sector : Format.formatter -> boot_sector -> unit
-
+    module type PROTO_ORIGINATION = sig
       type state
+
+      type hash = State_hash.t
+
+      val state_hash : state -> hash Lwt.t
+
+      val initial_state : empty:state -> state Lwt.t
+
+      val install_boot_sector : state -> string -> state Lwt.t
+    end
+
+    module type PROTO_VERIFICATION = sig
+      include PROTO_ORIGINATION
+
+      val parse_boot_sector : string -> boot_sector option
 
       val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
       type context
-
-      type hash = State_hash.t
 
       type proof
 
@@ -3653,31 +3661,11 @@ module Sc_rollup : sig
 
       val proof_stop_state : proof -> hash
 
-      val state_hash : state -> hash Lwt.t
-
-      val initial_state : empty:state -> state Lwt.t
-
-      val install_boot_sector : state -> string -> state Lwt.t
-
-      val is_input_state :
-        is_reveal_enabled:is_reveal_enabled -> state -> input_request Lwt.t
-
-      val set_input : input -> state -> state Lwt.t
-
-      val eval : state -> state Lwt.t
-
       val verify_proof :
         is_reveal_enabled:is_reveal_enabled ->
         input option ->
         proof ->
         input_request tzresult Lwt.t
-
-      val produce_proof :
-        context ->
-        is_reveal_enabled:is_reveal_enabled ->
-        input option ->
-        state ->
-        proof tzresult Lwt.t
 
       type output_proof
 
@@ -3685,12 +3673,9 @@ module Sc_rollup : sig
 
       val output_of_output_proof : output_proof -> output
 
-      val state_of_output_proof : output_proof -> State_hash.t
+      val state_of_output_proof : output_proof -> hash
 
       val verify_output_proof : output_proof -> output tzresult Lwt.t
-
-      val produce_output_proof :
-        context -> state -> output -> (output_proof, error) result Lwt.t
 
       val check_dissection :
         default_number_of_sections:int ->
@@ -3700,14 +3685,37 @@ module Sc_rollup : sig
         unit tzresult
 
       val get_current_level : state -> Raw_level.t option Lwt.t
+    end
+
+    module type S = sig
+      include PROTO_VERIFICATION
+
+      val is_input_state :
+        is_reveal_enabled:is_reveal_enabled -> state -> input_request Lwt.t
+
+      val set_input : input -> state -> state Lwt.t
+
+      val eval : state -> state Lwt.t
+
+      val produce_proof :
+        context ->
+        is_reveal_enabled:is_reveal_enabled ->
+        input option ->
+        state ->
+        proof tzresult Lwt.t
+
+      val produce_output_proof :
+        context -> state -> output -> (output_proof, error) result Lwt.t
 
       module Internal_for_tests : sig
         val insert_failure : state -> state Lwt.t
       end
+
+      val pp_boot_sector : Format.formatter -> boot_sector -> unit
     end
 
     type ('state, 'proof, 'output) implementation =
-      (module S
+      (module PROTO_VERIFICATION
          with type state = 'state
           and type proof = 'proof
           and type output_proof = 'output)
@@ -3760,7 +3768,7 @@ module Sc_rollup : sig
     end
 
     module Protocol_implementation :
-      PVM.S
+      PVM.PROTO_VERIFICATION
         with type context = Context.t
          and type state = Context.tree
          and type proof = Context.Proof.tree Context.Proof.t
@@ -3809,7 +3817,7 @@ module Sc_rollup : sig
     end
 
     module Protocol_implementation :
-      PVM.S
+      PVM.PROTO_VERIFICATION
         with type context = Context.t
          and type state = Context.tree
          and type proof = Context.Proof.tree Context.Proof.t
@@ -3817,7 +3825,7 @@ module Sc_rollup : sig
 
   module Riscv_PVM : sig
     module Protocol_implementation :
-      PVM.S
+      PVM.PROTO_VERIFICATION
         with type context = unit
          and type state = Sc_rollup_riscv.minimal_state
          and type proof = Sc_rollup_riscv.void

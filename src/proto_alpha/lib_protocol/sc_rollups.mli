@@ -29,16 +29,18 @@
 module PVM : sig
   type boot_sector = string
 
+  module type PROTO_ORIGINATION = Sc_rollup_PVM_sig.PROTO_ORIGINATION
+
+  module type PROTO_VERIFICATION = Sc_rollup_PVM_sig.PROTO_VERIFICATION
+
   module type S = sig
-    val parse_boot_sector : string -> boot_sector option
+    include Sc_rollup_PVM_sig.S
 
     val pp_boot_sector : Format.formatter -> boot_sector -> unit
-
-    include Sc_rollup_PVM_sig.S
   end
 
   type ('state, 'proof, 'output) implementation =
-    (module S
+    (module PROTO_VERIFICATION
        with type state = 'state
         and type proof = 'proof
         and type output_proof = 'output)
