@@ -10,11 +10,11 @@
 
 type docker_image = Gcp of {alias : string} | Octez_release of {tag : string}
 
-(** Equivalent to [Cli.tezt_cloud], but if not present, checks if `TEZT_CLOUD` 
+(** Equivalent to [Cli.tezt_cloud], but if not present, checks if `TEZT_CLOUD`
     is provided. *)
 val tezt_cloud : string
 
-(** [ssh_private_key_filename ?home ()] returns the private key path associated to 
+(** [ssh_private_key_filename ?home ()] returns the private key path associated to
     the [?home] path and the [tezt_cloud] argument. *)
 val ssh_private_key_filename : ?home:string -> unit -> string
 
@@ -114,10 +114,13 @@ val macosx : bool
 (** Equivalent to [Cli.check_file_consistency]. *)
 val check_file_consistency : bool
 
+(** Equivalent to [Cli.push_docker]. *)
+val push_docker : bool
+
 (** Equivalent to [Gcloud.project_id]. *)
 val project_id : unit -> string Lwt.t
 
-(** [init ()] initialises and deploys a Docker registry using Terraform, only when the 
+(** [init ()] initialises and deploys a Docker registry using Terraform, only when the
     [mode] is either [`Host] or [`Cloud]. *)
 val init : unit -> unit Lwt.t
 
@@ -132,8 +135,8 @@ val registry_uri : unit -> string Lwt.t
     [docker_image]'s type. *)
 val uri_of_docker_image : docker_image -> string Lwt.t
 
-(** [wait_process ?sleep ~is_ready ~run ()] recursively waits for [~run] process to be ready. 
-    When the process is successful, but no [~is_ready], it loops after [?sleep] seconds. If 
+(** [wait_process ?sleep ~is_ready ~run ()] recursively waits for [~run] process to be ready.
+    When the process is successful, but no [~is_ready], it loops after [?sleep] seconds. If
     it is ready, it returns the read output. If it fails, this gets logged. *)
 val wait_process :
   ?sleep:int ->
@@ -142,11 +145,11 @@ val wait_process :
   unit ->
   string Lwt.t
 
-(** [run_command ?cmd_wrapper cmd args] can wrap the command given by [cmd] and [args] with 
+(** [run_command ?cmd_wrapper cmd args] can wrap the command given by [cmd] and [args] with
     a [Gcloud] wrapper, depending on the value of [?cmd_wrapper]. *)
 val run_command :
   ?cmd_wrapper:Gcloud.cmd_wrapper -> string -> string list -> Process.t
 
-(** [dns_domains ()] returns a list of fully qualified domain names (FQDNs) based on current 
+(** [dns_domains ()] returns a list of fully qualified domain names (FQDNs) based on current
     configuration (given by [Cli.dns_domains]) and [mode] of operation. *)
 val dns_domains : unit -> string list Lwt.t

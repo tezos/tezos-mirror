@@ -263,3 +263,14 @@ let check_file_consistency =
        Although a scenario can opt in or opt out, this flag sets the default \
        behavior. Its default value is [true] unless [--macosx] is used."
     (not macosx)
+
+let push_docker =
+  Clap.flag
+    ~section
+    ~unset_long:"no-docker-push"
+    ~description:
+      "When used with a remote machine, by default, `tezt-cloud` pushes the \
+       Docker container to the created VM. When one tries to reuse an existing \
+       VM, and do not use the updated content of the Docker container, pushing \
+       this container takes a significant time for no purpose."
+    true
