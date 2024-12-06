@@ -162,6 +162,9 @@ Smart Rollup node
   node send old heads in its stream at the end of the migration.  (MR
   :gl:`!15739`)
 
+- New CLI switch ``--unsafe-disable-wasm-kernel-checks`` which allows to bypass
+  invalid kernel checks in the WASM VM, for use by jstz. (MR :gl:`!15910`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
