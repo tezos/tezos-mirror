@@ -86,6 +86,7 @@ val job :
 (** [trigger_job child_pipeline_path] constructs a {!trigger_job} job. *)
 val trigger_job :
   ?needs:need list ->
+  ?inherit_:inherit_ ->
   ?rules:job_rule list ->
   ?stage:string ->
   ?when_:when_trigger_job ->
