@@ -18,6 +18,7 @@
 - Blueprints from the past are refused on parsing. (!15636)
 - Clear blueprints on migration (!15637)
 - Support for legacy untagged format for delayed transactions has been dropped. (!15366)
+- Avoid writing gas price twice per block by adding it to block-in-progress. (!15574)
 
 ### Bug fixes
 
