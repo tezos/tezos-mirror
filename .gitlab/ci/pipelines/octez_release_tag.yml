@@ -319,6 +319,16 @@ gitlab:release:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
 
+trigger:octez_monitoring:
+  stage: build
+  inherit:
+    variables:
+    - ci_image_name
+    - jsonnet_image_name
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/octez_monitoring.yml
+
 oc.docker-build-debian-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
