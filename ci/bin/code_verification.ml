@@ -655,6 +655,7 @@ let jobs pipeline_type =
 
   (* Build jobs *)
   let build =
+    let stage = Stages.build in
     (* TODO: The code is a bit convoluted here because these jobs are
        either in the build or in the manual stage depending on the
        pipeline type. However, we can put them in the build stage on
@@ -672,7 +673,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"wasm-runtime-check"
         ~image:Images.CI.build
-        ~stage:Stages.build
+        ~stage
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_wasm_runtime_check_files ())
         ~before_script:
@@ -689,7 +690,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"ocaml-check"
         ~image:Images.CI.build
-        ~stage:Stages.build
+        ~stage
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
         ~before_script:
@@ -711,7 +712,7 @@ let jobs pipeline_type =
          pipelines. *)
       job
         ~__POS__
-        ~stage:Stages.build
+        ~stage
         ~image:Images.CI.build
         ~rules:(make_rules ~manual:Yes ())
         ~before_script:
@@ -749,6 +750,22 @@ let jobs pipeline_type =
       | Schedule_extended_test ->
           Common.job_build_grafazos ~rules:[job_rule ~when_:Always ()] ()
     in
+    let job_build_layer1_profiling =
+      job
+        ~__POS__
+        ~stage
+        ~image:Images.CI.build
+        ~name:"build-layer1-profiling"
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ~variables:[("TEZOS_PPX_PROFILER", "profiling")]
+        ["make octez-layer1"]
+      |> enable_cargo_cache |> enable_sccache
+    in
     [
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
@@ -762,6 +779,7 @@ let jobs pipeline_type =
       job_tezt_fetch_records;
       build_octez_source;
       job_build_grafazos;
+      job_build_layer1_profiling;
     ]
     @ Option.to_list job_select_tezts
     @ bin_packages_jobs
