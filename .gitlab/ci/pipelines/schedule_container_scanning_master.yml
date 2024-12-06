@@ -26,6 +26,7 @@ container_scanning:
   - gcp
   script:
   - gtcs scan > scan.log
+  - grep "Vulnerability DB:" -B2 -A4 scan.log
   variables:
     CS_IMAGE: tezos/tezos:master
     SECURE_LOG_LEVEL: "debug"
