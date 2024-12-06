@@ -128,6 +128,14 @@ module File = struct
       in
       replace_f ~regex ~f
 
+    type warn = Msg of string | Loc of string
+
+    let check_modif_count ~warn f file =
+      if f file = 0 then
+        match warn with
+        | Msg msg -> Log.warning "%s" msg
+        | Loc loc -> Log.warning "%s: no modification done in file %s" loc file
+
     let replace_string_all ~regex ~by files =
       List.map (replace_string ~regex ~by) files |> List.fold_left ( + ) 0
 
@@ -137,6 +145,20 @@ module File = struct
     let replace_assoc_all ~error ~regex ~assoc files =
       List.map (replace_assoc ~error ~regex ~assoc) files
       |> List.fold_left ( + ) 0
+
+    let check_modif_count_all ~warn f files =
+      if f files = 0 then
+        match warn with
+        | Msg msg -> Log.warning "%s" msg
+        | Loc loc ->
+            Log.warning
+              "%s: no modification done in files %a"
+              loc
+              Format.(
+                pp_print_list
+                  ~pp_sep:(fun fmt () -> fprintf fmt ", ")
+                  pp_print_string)
+              files
 
     let ocamlformat ~error files =
       let _ =
