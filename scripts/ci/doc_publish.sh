@@ -15,6 +15,12 @@ if [ "${CI_COMMIT_REF_NAME}" == "master" ]; then
     git add public
     git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}"
     git push origin master
+
+    # Install S3 CLI; credentials are set via the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables in CI
+    apk add aws-cli
+    # Update S3
+    # https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html
+    aws s3 sync ./public s3://site-prod.octez.tezos.com/docs --delete
   fi
 else
   echo "Skip pushing documentation. Only pushing for real master"
