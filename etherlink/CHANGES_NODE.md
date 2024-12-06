@@ -17,6 +17,12 @@
 
 ### Bug fixes
 
+- Fixes the mapping between L1 levels and finalized L2 levels in the node
+  store. In previous versions, the finalized L2 level associated to a given L1
+  level `l` (*i.e.*, the latest L2 level computed by the Rollup Nodes after
+  processing the level `l`) was actually the finalized L2 level of its
+  predecessor `l-1`. (!15884)
+
 ### Internals
 
 - Gas estimation requires multiple kernel simulation. Every time a simulation

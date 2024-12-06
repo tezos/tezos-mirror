@@ -6688,6 +6688,68 @@ let test_patch_kernel =
   in
   unit
 
+let test_finalized_persistent =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "finalized"]
+    ~title:"Persistent finalized block parameter"
+    ~time_between_blocks:Nothing
+    ~use_dal:
+      (* The logic tested here is orthogonal with the DAL, and the test itself is written with constants
+         for the case DAL is not enabled. *)
+      Register_without_feature
+  @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
+  (* Helper to finalize a L2 block by baking the minimum number of L1 block required *)
+  let rec bake_until_blueprint_finalized ?(remaining_attempts = 6) number =
+    if remaining_attempts <= 0 then
+      Test.fail "Could not finalize blueprint %ld" number
+    else
+      Lwt.catch
+        (fun () ->
+          let* _ =
+            Evm_node.wait_for_blueprint_finalized
+              ~timeout:5.
+              sequencer
+              Int32.(to_int number)
+          and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+          unit)
+        (fun _ ->
+          bake_until_blueprint_finalized
+            ~remaining_attempts:Int.(pred remaining_attempts)
+            number)
+  in
+
+  (* Finalized blueprint 0 *)
+  let* () = bake_until_blueprint_finalized 0l in
+
+  (* Create blueprints for level 1 and 2 *)
+  let* _ = produce_block sequencer in
+  let* _ = produce_block sequencer in
+
+  let target_finalized = 2l in
+
+  (* Create enough L1 blocks to finalized the blueprint 2 *)
+  let* () = bake_until_blueprint_finalized target_finalized in
+
+  (* Check the finalized blueprint is indeed the expected one *)
+  let*@ finalized_head = Rpc.get_block_by_number ~block:"finalized" sequencer in
+  Check.(
+    (finalized_head.number = target_finalized)
+      int32
+      ~error_msg:"Expected finalized level %R, got %L") ;
+
+  (* Restart the sequencer *)
+  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.run sequencer in
+
+  (* Check the finalized block is still the one we are expecting *)
+  let*@ finalized_head = Rpc.get_block_by_number ~block:"finalized" sequencer in
+  Check.(
+    (finalized_head.number = target_finalized)
+      int32
+      ~error_msg:"Expected finalized level %R, got %L") ;
+  unit
+
 let test_finalized_view =
   register_all
     ~kernels:
@@ -7582,6 +7644,7 @@ let () =
   test_fa_bridge_feature_flag protocols ;
   test_trace_call protocols ;
   test_patch_kernel protocols ;
+  test_finalized_persistent protocols ;
   test_finalized_view protocols ;
   test_finalized_view_forward_txn protocols ;
   test_finalized_block_param protocols ;

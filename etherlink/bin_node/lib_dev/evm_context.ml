@@ -392,19 +392,14 @@ module State = struct
         tzfail exit_error
 
   let blueprint_applied_event ctxt conn evm_state on_success
+      latest_finalized_level
       ({number = Qty number; hash = expected_block_hash} :
         Evm_events.Blueprint_applied.t) =
     let open Lwt_result_syntax in
-    let on_success session =
-      let (Qty finalized) = session.finalized_number in
-      (* We use [max] to not rely on the order of the EVM events (because
-         it is possible to see several blueprints applied during on L1
-         level). *)
-      let new_finalized = Z.(max number finalized) in
-      session.finalized_number <- Qty new_finalized ;
-      Metrics.set_confirmed_level ~level:new_finalized ;
-      on_success session
-    in
+    (* We use [max] to not rely on the order of the EVM events (because
+       it is possible to see several blueprints applied during on L1
+       level). *)
+    let latest_finalized_level = Z.max latest_finalized_level number in
     let* block_hash_opt =
       if ctxt.block_storage_sqlite3 then
         Evm_store.Blocks.find_hash_of_number conn (Qty number)
@@ -423,7 +418,7 @@ module State = struct
             Evm_events_follower_events.upstream_blueprint_applied
               (number, expected_block_hash)
           in
-          return (evm_state, on_success)
+          return (evm_state, on_success, latest_finalized_level)
         else
           let*! () =
             Evm_events_follower_events.diverged
@@ -439,7 +434,7 @@ module State = struct
           else
             (* Observers needs to reset at finalized level. *)
             let* evm_state = reset_to_finalized_level exit_error ctxt conn in
-            return (evm_state, on_success)
+            return (evm_state, on_success, latest_finalized_level)
     | None when ctxt.fail_on_missing_blueprint ->
         let*! () =
           Evm_events_follower_events.missing_blueprint
@@ -454,7 +449,7 @@ module State = struct
             (Qty number)
             expected_block_hash
         in
-        return (evm_state, on_success)
+        return (evm_state, on_success, latest_finalized_level)
 
   let current_blueprint_number ctxt =
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
@@ -799,7 +794,8 @@ module State = struct
     in
     return_unit
 
-  and apply_evm_event_unsafe on_success ctxt conn evm_state event =
+  and apply_evm_event_unsafe on_success ctxt conn evm_state event
+      latest_finalized_level =
     let open Lwt_result_syntax in
     let*! () = Evm_events_follower_events.new_event event in
     match event with
@@ -828,7 +824,7 @@ module State = struct
             upgrade
         in
         let*! () = Events.pending_upgrade upgrade in
-        return (evm_state, on_success)
+        return (evm_state, on_success, latest_finalized_level)
     | Sequencer_upgrade_event sequencer_upgrade ->
         let payload =
           Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
@@ -840,14 +836,20 @@ module State = struct
             ~value:payload
             evm_state
         in
-        return (evm_state, on_success)
+        return (evm_state, on_success, latest_finalized_level)
     | Blueprint_applied event ->
-        blueprint_applied_event ctxt conn evm_state on_success event
+        blueprint_applied_event
+          ctxt
+          conn
+          evm_state
+          on_success
+          latest_finalized_level
+          event
     | New_delayed_transaction delayed_transaction ->
         let* evm_state =
           on_new_delayed_transaction ~delayed_transaction evm_state
         in
-        return (evm_state, on_success)
+        return (evm_state, on_success, latest_finalized_level)
     | Flush_delayed_inbox flushed_blueprint ->
         let*! () =
           Evm_events_follower_events.flush_delayed_inbox
@@ -855,7 +857,7 @@ module State = struct
             flushed_blueprint.level
         in
         let* evm_state = flush_delayed_inbox ctxt conn flushed_blueprint in
-        return (evm_state, on_success)
+        return (evm_state, on_success, latest_finalized_level)
 
   and apply_evm_events ?finalized_level conn (ctxt : t) events =
     let open Lwt_result_syntax in
@@ -891,40 +893,56 @@ module State = struct
     in
     if needs_process then (
       let* context, evm_state, on_success =
-        let* on_success, ctxt, evm_state, context =
+        let* on_success, evm_state, context, Qty latest_finalized_number =
           match events with
           | [] ->
               (* Avoid an uncessary {!replace_current_commit} if the list is
                  empty. *)
-              return (ignore, ctxt, ctxt.session.evm_state, ctxt.session.context)
+              return
+                ( ignore,
+                  ctxt.session.evm_state,
+                  ctxt.session.context,
+                  ctxt.session.finalized_number )
           | events ->
-              let* on_success, ctxt, evm_state =
+              let* on_success, evm_state, latest_finalized_number =
                 List.fold_left_es
-                  (fun (on_success, ctxt, evm_state) event ->
-                    let* evm_state, on_success =
+                  (fun ( on_success,
+                         evm_state,
+                         Ethereum_types.Qty finalized_number )
+                       event ->
+                    let* evm_state, on_success, latest_finalized_level =
                       apply_evm_event_unsafe
                         on_success
                         ctxt
                         conn
                         evm_state
                         event
+                        finalized_number
                     in
-                    return (on_success, ctxt, evm_state))
-                  (ignore, ctxt, ctxt.session.evm_state)
+                    return
+                      ( on_success,
+                        evm_state,
+                        Ethereum_types.Qty latest_finalized_level ))
+                  (ignore, ctxt.session.evm_state, ctxt.session.finalized_number)
                   events
               in
               let* context = replace_current_commit ctxt conn evm_state in
-              return (on_success, ctxt, evm_state, context)
+              return (on_success, evm_state, context, latest_finalized_number)
+        in
+        (* Process the new `latest_finalized_number`. *)
+        let on_success session =
+          session.finalized_number <- Qty latest_finalized_number ;
+          Metrics.set_confirmed_level ~level:latest_finalized_number ;
+          on_success session
         in
         let* () =
           Option.iter_es
             (fun l1_level ->
-              let l2_level = current_blueprint_number ctxt in
               Evm_store.L1_l2_levels_relationships.store
                 conn
-                ~latest_l2_level:l2_level
                 ~l1_level
-                ~finalized_l2_level:ctxt.session.finalized_number)
+                ~latest_l2_level:(current_blueprint_number ctxt)
+                ~finalized_l2_level:(Qty latest_finalized_number))
             finalized_level
         in
         return (context, evm_state, on_success)
