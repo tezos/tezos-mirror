@@ -8,7 +8,7 @@
 open Sc_rollup_repr
 module PS = Sc_rollup_PVM_sig
 
-(* [void] definition from [Sc_rollup_machine_no_proofs] *)
+(* [void] definition from [Sc_rollup_machine_origination] *)
 type void = |
 
 let void =

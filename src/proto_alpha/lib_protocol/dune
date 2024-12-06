@@ -100,7 +100,7 @@
   Sc_rollup_arith
   Sc_rollup_wasm
   Sc_rollup_riscv
-  Sc_rollup_machine_no_proofs
+  Sc_rollup_origination_machine
   Sc_rollups
   Sc_rollup_data_version_sig
   Sc_rollup_inbox_repr
@@ -395,7 +395,7 @@
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollup_riscv.ml sc_rollup_riscv.mli
-  sc_rollup_machine_no_proofs.ml sc_rollup_machine_no_proofs.mli
+  sc_rollup_origination_machine.ml sc_rollup_origination_machine.mli
   sc_rollups.ml sc_rollups.mli
   sc_rollup_data_version_sig.ml
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
@@ -693,7 +693,7 @@
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollup_riscv.ml sc_rollup_riscv.mli
-  sc_rollup_machine_no_proofs.ml sc_rollup_machine_no_proofs.mli
+  sc_rollup_origination_machine.ml sc_rollup_origination_machine.mli
   sc_rollups.ml sc_rollups.mli
   sc_rollup_data_version_sig.ml
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
@@ -975,7 +975,7 @@
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollup_riscv.ml sc_rollup_riscv.mli
-  sc_rollup_machine_no_proofs.ml sc_rollup_machine_no_proofs.mli
+  sc_rollup_origination_machine.ml sc_rollup_origination_machine.mli
   sc_rollups.ml sc_rollups.mli
   sc_rollup_data_version_sig.ml
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
