@@ -78,3 +78,6 @@ val crawler_retries_on_disconnection : int
    disconnection error is encountered while retrieving data from L1 outside the
    {!Layer1.iter_heads} callback. *)
 val crawler_re_processing_delay : float
+
+(* Sleep delay between refreshing the ips associated to bootstrap dns names *)
+val bootstrap_dns_refresh_delay : float
