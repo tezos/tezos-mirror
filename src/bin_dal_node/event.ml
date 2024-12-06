@@ -64,7 +64,7 @@ let dal_node_sqlite3_store_init =
     ~section
     ~name:"dal_node_sqlite3_store_init"
     ~msg:"initializing the SQLite3 store"
-    ~level:Notice
+    ~level:Info
     ()
 
 let store_is_ready =
@@ -573,8 +573,8 @@ let store_upgrade_start =
     ~section
     ~name:"store_upgrading"
     ~msg:
-      "Starting to upgrade the store from version {old_version} to \
-       {new_version}."
+      "starting to upgrade the store from version {old_version} to \
+       {new_version}"
     ~level:Notice
     ("old_version", Data_encoding.int31)
     ("new_version", Data_encoding.int31)
@@ -584,7 +584,7 @@ let store_upgraded =
     ~section
     ~name:"store_upgraded"
     ~msg:
-      "The store has been upgraded from version {old_version} to {new_version}."
+      "the store has been upgraded from version {old_version} to {new_version}"
     ~level:Notice
     ("old_version", Data_encoding.int31)
     ("new_version", Data_encoding.int31)
