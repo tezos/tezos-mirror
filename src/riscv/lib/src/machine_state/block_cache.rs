@@ -846,9 +846,8 @@ fn run_instr<ML: MainMemoryLayout, M: ManagerReadWrite>(
     instr: &EnrichedCell<ICallPlaced<ML>, M>,
     core: &mut MachineCoreState<ML, M>,
 ) -> Result<ProgramCounterUpdate, Exception> {
-    let instr = instr.read_ref();
-    let args = &instr.0.args;
-    let icall = &instr.1;
+    let args = &instr.read_ref_stored().args;
+    let icall = instr.read_derived();
 
     icall.run(args, core)
 }

@@ -112,24 +112,26 @@ impl ManagerRead for Owned {
         }
     }
 
-    fn enriched_cell_read<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> (V::E, V::D<Self>)
-    where
-        V::E: Copy,
-        V::D<Self>: Copy,
-    {
-        *cell
-    }
-
-    fn enriched_cell_ref<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> (&V::E, &V::D<Self>) {
-        (&cell.0, &cell.1)
-    }
-
     fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
     where
         V: EnrichedValue,
         V::E: Copy,
     {
         cell.0
+    }
+
+    fn enriched_cell_read_derived<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> V::D<Self>
+    where
+        V::D<Self>: Copy,
+    {
+        cell.1
+    }
+
+    fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
+    where
+        V: EnrichedValue,
+    {
+        &cell.0
     }
 }
 
@@ -427,38 +429,39 @@ pub mod test_helpers {
     #[test]
     fn enriched_cell_serialise() {
         pub struct Enriching;
-        pub struct Fun(Box<dyn Fn(u64) -> u64>);
 
         impl EnrichedValue for Enriching {
             type E = u64;
-            type D<M: ManagerBase + ?Sized> = Fun;
+            type D<M: ManagerBase + ?Sized> = T;
         }
 
-        impl<'a> From<&'a u64> for Fun {
+        #[derive(Clone, Copy)]
+        pub struct T(u64);
+
+        impl<'a> From<&'a u64> for T {
             fn from(value: &'a u64) -> Self {
-                let value = *value;
-                Self(Box::new(move |x| value.wrapping_add(x)))
+                T(value.wrapping_add(1))
             }
         }
 
         proptest::proptest!(|(value: u64)| {
-            let mut cell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind((0u64, Fun::from(&0)));
+            let mut cell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind((0u64, T::from(&0)));
             cell.write(value);
 
-            assert_eq!(value, *cell.read_ref().0);
+            let read_value = cell.read_ref_stored();
+
+            assert_eq!(value, *read_value);
             let bytes = bincode::serialize(&cell).unwrap();
 
             let cell_after: EnrichedCell<Enriching, Owned> = bincode::deserialize(&bytes).unwrap();
 
-            for i in 0..5 {
-                assert_eq!(cell.read_ref().0, cell_after.read_ref().0);
+            assert_eq!(*cell.read_ref_stored(), *cell_after.read_ref_stored());
 
-                let fun = cell.read_ref().1;
-                let fun_after = cell_after.read_ref().1;
+            let derived = cell.read_derived();
+            let derived_after = cell_after.read_derived();
 
-                assert_eq!(value.wrapping_add(i), (fun.0)(i));
-                assert_eq!((fun.0)(i), (fun_after.0)(i));
-            }
+            assert_eq!(T::from(read_value).0, derived.0);
+            assert_eq!(derived.0, derived_after.0);
         });
     }
 
