@@ -67,7 +67,7 @@ let config_init_command =
           history_mode_arg
           cors_allowed_origins_arg
           cors_allowed_headers_arg)
-       (args1 bail_on_disagree_switch))
+       (args2 bail_on_disagree_switch unsafe_disable_wasm_kernel_checks_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -96,7 +96,7 @@ let config_init_command =
              history_mode,
              allowed_origins,
              allowed_headers ),
-           bail_on_disagree )
+           (bail_on_disagree, unsafe_disable_wasm_kernel_checks) )
          mode
          sc_rollup_address
          operators
@@ -122,6 +122,7 @@ let config_init_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
           ~history_mode
@@ -155,7 +156,7 @@ let legacy_run_command =
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg)
-       (args19
+       (args20
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -174,7 +175,8 @@ let legacy_run_command =
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
-          bail_on_disagree_switch))
+          bail_on_disagree_switch
+          unsafe_disable_wasm_kernel_checks_switch))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
              mode,
@@ -202,7 +204,8 @@ let legacy_run_command =
              allowed_origins,
              allowed_headers,
              apply_unsafe_patches,
-             bail_on_disagree ) )
+             bail_on_disagree,
+             unsafe_disable_wasm_kernel_checks ) )
          cctxt ->
       let* configuration =
         Configuration.Cli.create_or_read_config
@@ -226,6 +229,7 @@ let legacy_run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
           ~history_mode
@@ -262,7 +266,7 @@ let run_command =
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
-       (args15
+       (args16
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -277,7 +281,8 @@ let run_command =
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
-          bail_on_disagree_switch))
+          bail_on_disagree_switch
+          unsafe_disable_wasm_kernel_checks_switch))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -306,7 +311,8 @@ let run_command =
              allowed_origins,
              allowed_headers,
              apply_unsafe_patches,
-             bail_on_disagree ) )
+             bail_on_disagree,
+             unsafe_disable_wasm_kernel_checks ) )
          mode
          sc_rollup_address
          operators
@@ -332,6 +338,7 @@ let run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~unsafe_disable_wasm_kernel_checks
           ~boot_sector_file
           ~no_degraded
           ~gc_frequency

@@ -561,5 +561,14 @@ let bail_on_disagree_switch : (bool, Client_context.full) Tezos_clic.arg =
        with on L1."
     ()
 
+let unsafe_disable_wasm_kernel_checks_switch :
+    (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"unsafe-disable-wasm-kernel-checks"
+    ~doc:
+      "Allow to run the kernel without checking for its validity. Only for \
+       debug, do not use in production!"
+    ()
+
 let level_param next =
   Tezos_clic.param ~name:"level" ~desc:"Level" positive_int32_parameter next

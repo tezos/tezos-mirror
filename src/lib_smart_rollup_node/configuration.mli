@@ -137,6 +137,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
@@ -315,6 +316,7 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
+    unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     t tzresult Lwt.t
 
@@ -348,6 +350,7 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
+    unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     t tzresult Lwt.t
 end
