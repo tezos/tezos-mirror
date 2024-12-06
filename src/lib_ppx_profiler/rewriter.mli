@@ -51,6 +51,8 @@ and Rewriter : sig
     | Aggregate_f
     | Aggregate_s
     | Custom
+    | Custom_f
+    | Custom_s
     | Mark
     | Record
     | Record_f

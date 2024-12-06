@@ -20,6 +20,12 @@ module rec Constants : sig
   (** Constant representing [@profiler.custom] *)
   val custom_constant : t
 
+  (** Constant representing [@profiler.custom_f] *)
+  val custom_f_constant : t
+
+  (** Constant representing [@profiler.custom_s] *)
+  val custom_s_constant : t
+
   (** Constant representing [@profiler.mark] *)
   val mark_constant : t
 
@@ -78,6 +84,12 @@ end = struct
   (* [@profiler.custom] *)
   let custom_constant = create_constant "custom"
 
+  (* [@profiler.custom_f] *)
+  let custom_f_constant = create_constant "custom_f"
+
+  (* [@profiler.custom_s] *)
+  let custom_s_constant = create_constant "custom_s"
+
   (* [@profiler.mark] *)
   let mark_constant = create_constant "mark"
 
@@ -120,6 +132,8 @@ end = struct
       aggregate_f_constant;
       aggregate_s_constant;
       custom_constant;
+      custom_f_constant;
+      custom_s_constant;
       mark_constant;
       record_constant;
       record_f_constant;
@@ -156,6 +170,8 @@ and Rewriter : sig
     | Aggregate_f
     | Aggregate_s
     | Custom
+    | Custom_f
+    | Custom_s
     | Mark
     | Record
     | Record_f
@@ -183,6 +199,8 @@ end = struct
     | Aggregate_f
     | Aggregate_s
     | Custom
+    | Custom_f
+    | Custom_s
     | Mark
     | Record
     | Record_f
@@ -214,6 +232,16 @@ end = struct
   let custom key location =
     match Key.content key with
     | Key.Apply _ -> Custom
+    | _ -> Error.error location (Error.Invalid_custom key)
+
+  let custom_f key location =
+    match Key.content key with
+    | Key.Apply _ -> Custom_f
+    | _ -> Error.error location (Error.Invalid_custom key)
+
+  let custom_s key location =
+    match Key.content key with
+    | Key.Apply _ -> Custom_s
     | _ -> Error.error location (Error.Invalid_custom key)
 
   let mark key location =
@@ -274,6 +302,8 @@ end = struct
     | Aggregate_f -> Constants.aggregate_f_constant
     | Aggregate_s -> Constants.aggregate_s_constant
     | Custom -> Constants.custom_constant
+    | Custom_f -> Constants.custom_f_constant
+    | Custom_s -> Constants.custom_s_constant
     | Mark -> Constants.mark_constant
     | Record -> Constants.record_constant
     | Record_f -> Constants.record_f_constant
@@ -296,6 +326,8 @@ end = struct
       (Constants.aggregate_f_constant, aggregate_f);
       (Constants.aggregate_s_constant, aggregate_s);
       (Constants.custom_constant, custom);
+      (Constants.custom_f_constant, custom_f);
+      (Constants.custom_s_constant, custom_s);
       (Constants.mark_constant, mark);
       (Constants.record_constant, record);
       (Constants.record_f_constant, record_f);
@@ -343,7 +375,7 @@ end = struct
           | Span_s -> "span_s"
           | Stamp -> "stamp"
           | Stop -> "stop"
-          | Custom ->
+          | Custom | Custom_f | Custom_s ->
               Stdlib.failwith
                 "A custom function shouldn't be called with a leading module" )
     in
