@@ -36,7 +36,8 @@ If you were using RPM packages, use ``dnf`` instead of ``apt``.
 **If using Debian**, reconfigure ``dpkg``:
 
 - if needed, install the Dialog interface with ``sudo apt install dialog``
-- reconfigure debconf to force it to ask few interactive questions with ``sudo dpkg-reconfigure debconf``, by setting the priority to *medium*. The priority decides when debconf should ask configuration questions to the user, or rather use the maintainer default values.
+- reconfigure debconf to force it to ask few interactive questions with ``sudo dpkg-reconfigure debconf``, by setting the priority to *medium*.
+  This gives you a chance to disable automatic configuration, so as to reuse your existing data.
 
 
 4. Add NL Repository
@@ -123,10 +124,6 @@ The migration transitions from Serokell packages, which use custom scripts and c
 
 Understanding the differences between the legacy packages and the new packages helps adjusting the procedure for edge cases, such as multi-network setups.
 
-Backup Importance
------------------
-Serokell’s package removal does not delete data, but errors during migration may corrupt or misplace it. A verified backup ensures recoverability.
-
 Relocating Data
 ---------------
 Serokell stores node data in network-specific subdirectories, while NL uses ``.octez-node`` for all networks:
@@ -139,11 +136,6 @@ Adjust your data migration to fit this structure::
     sudo cp -a /var/lib/tezos/<network> /var/tezos/.octez-node
 
 Also copy the client data (which is presumably not network-dependent).
-
-Reconfiguring ``dpkg``
-----------------------
-NL Debian packages use standard tools (``debconf``) for configuration. Skipping automatic configuration during installation is recommended to reuse your existing data.
-For ensuring that the user has a chance to disable automatic configuration, we have to reconfigure the package manager and set the priority level.
 
 Baker Configuration
 -------------------
