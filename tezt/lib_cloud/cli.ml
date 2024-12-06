@@ -269,8 +269,10 @@ let push_docker =
     ~section
     ~unset_long:"no-docker-push"
     ~description:
-      "When used with a remote machine, by default, `tezt-cloud` pushes the \
-       Docker container to the created VM. When one tries to reuse an existing \
-       VM, and do not use the updated content of the Docker container, pushing \
-       this container takes a significant time for no purpose."
+      "When used in cloud mode (--cloud) or proxy mode (--proxy), by default, \
+       `tezt-cloud` pushes the Docker container n GCP. This is useful to save \
+       some bandwidth or some times during a redeployment that won't \
+       add/remove VMs that are already running. VM, and do not use the updated \
+       content of the Docker container, pushing this container takes a \
+       significant time for no purpose."
     true
