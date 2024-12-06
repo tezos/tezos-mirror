@@ -10,6 +10,19 @@ db_version 2.0
 # work directory to store temporary files associated to this package
 mkdir -p /run/octez-baker
 
+for file in /usr/bin/octez-baker-*; do
+  file=$(basename "$file")
+  suffix=$(echo "$file" | sed 's/^octez-baker-//')
+  if [ -z "$PROTO_CHOICES" ]; then
+    PROTO_CHOICES="$suffix"
+  else
+    PROTO_CHOICES="$PROTO_CHOICES, $suffix"
+  fi
+done
+
+db_subst octez-baker/baker-active-protocol choices "$PROTO_CHOICES"
+db_subst octez-baker/baker-next-protocol choices "$PROTO_CHOICES"
+
 case "${1}" in
 configure)
   # if $2 is empty, then we're doing a fresh install.
@@ -21,6 +34,14 @@ configure)
     db_get octez-baker/liquidity-vote
     echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
     echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
+
+    db_input medium octez-baker/baker-active-protocol || true
+    # shellcheck disable=SC2119
+    db_go || true
+
+    db_input medium octez-baker/baker-next-protocol || true
+    # shellcheck disable=SC2119
+    db_go || true
 
     db_get octez-baker/baker-key
     echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
