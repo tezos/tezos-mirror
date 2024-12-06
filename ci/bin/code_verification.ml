@@ -750,23 +750,6 @@ let jobs pipeline_type =
       | Schedule_extended_test ->
           Common.job_build_grafazos ~rules:[job_rule ~when_:Always ()] ()
     in
-    let job_build_layer1_profiling =
-      job
-        ~__POS__
-        ~stage
-        ~image:Images.CI.build
-        ~name:"build-layer1-profiling"
-        ~artifacts:(artifacts ~expire_in:(Duration (Days 1)) ["./octez-node"])
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ~variables:[("TEZOS_PPX_PROFILER", "profiling")]
-        ["make octez-layer1"]
-      |> enable_cargo_cache |> enable_sccache
-    in
     [
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;

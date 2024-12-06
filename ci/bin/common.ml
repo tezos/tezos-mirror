@@ -1326,6 +1326,23 @@ let job_build_grafazos ?rules () =
       ]
     ["make"]
 
+let job_build_layer1_profiling =
+  job
+    ~__POS__
+    ~stage:Stages.build
+    ~image:Images.CI.build
+    ~name:"build-layer1-profiling"
+    ~artifacts:(artifacts ~expire_in:(Duration (Days 1)) ["./octez-node"])
+    ~before_script:
+      (before_script
+         ~take_ownership:true
+         ~source_version:true
+         ~eval_opam:true
+         [])
+    ~variables:[("TEZOS_PPX_PROFILER", "profiling")]
+    ["make octez-layer1"]
+  |> enable_cargo_cache |> enable_sccache
+
 module Tezt = struct
   (** Create a tezt job.
 
