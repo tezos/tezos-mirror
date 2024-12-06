@@ -581,21 +581,7 @@ let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
     (* This occurs when running the command:
        ./octez-dal-node debug print store schemas *)
     if not (Sys.file_exists skip_list_cells_data_dir) then
-      Lwt_utils_unix.create_dir (data_dir // Stores_dirs.skip_list_cells)
-    else Lwt.return_unit
-  in
-  let*! () =
-    (* If a previous sqlite database has been created using the
-       `--sqlite3-backend` experimental flag. We simply move it to the
-       new destination path. *)
-    let previous_path = data_dir // Dal_store_sqlite3.sqlite_file_name in
-    if Sys.file_exists previous_path then (
-      let new_path =
-        skip_list_cells_data_dir // Dal_store_sqlite3.sqlite_file_name
-      in
-      let*! () = Lwt_utils_unix.copy_file ~src:previous_path ~dst:new_path () in
-      Sys.remove previous_path ;
-      Lwt.return_unit)
+      Lwt_utils_unix.create_dir skip_list_cells_data_dir
     else Lwt.return_unit
   in
   let*! () = Event.(emit dal_node_sqlite3_store_init ()) in
@@ -730,17 +716,45 @@ let upgrade_from_v1_to_v2 ~base_dir =
     Event.(emit store_upgrade_start (Version.make 1, Version.make 2))
   in
   (* Initialize both stores and migrate. *)
-  let* kvs_store = init_skip_list_cells_store base_dir in
-  let* sql_store = init_sqlite_skip_list_cells_store base_dir in
   let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
   let* storage_backend = Storage_backend.load storage_backend_store in
   let*! res =
     match storage_backend with
     | None | Some Storage_backend.Legacy ->
-        Store_migrations.migrate_skip_list_store kvs_store sql_store
-    | Some SQLite3 -> return_unit
+        let* kvs_store = init_skip_list_cells_store base_dir in
+        let* sql_store = init_sqlite_skip_list_cells_store base_dir in
+        let* () =
+          Store_migrations.migrate_skip_list_store kvs_store sql_store
+        in
+        let* () = Kvs_skip_list_cells_store.close kvs_store in
+        let*! () = Dal_store_sqlite3.Skip_list_cells.close sql_store in
+        return_unit
+    | Some SQLite3 ->
+        (* If a previous sqlite database has been created using the
+           `--sqlite3-backend` experimental flag. We simply move it to the
+           new destination path. *)
+        let open Filename.Infix in
+        let mv name =
+          let previous_path = base_dir // name in
+          let new_path = base_dir // Stores_dirs.skip_list_cells // name in
+          if Sys.(file_exists previous_path) then
+            let*! () =
+              if not (Sys.file_exists new_path) then
+                Lwt_utils_unix.copy_file ~src:previous_path ~dst:new_path ()
+              else Lwt.return_unit
+            in
+            let*! () = Lwt_unix.unlink previous_path in
+            return_unit
+          else return_unit
+        in
+        let*! () =
+          Lwt_utils_unix.create_dir (base_dir // Stores_dirs.skip_list_cells)
+        in
+        let* () = mv Dal_store_sqlite3.sqlite_file_name in
+        let* () = mv (Dal_store_sqlite3.sqlite_file_name ^ "-shm") in
+        let* () = mv (Dal_store_sqlite3.sqlite_file_name ^ "-wal") in
+        return_unit
   in
-  let* () = Kvs_skip_list_cells_store.close kvs_store in
   match res with
   | Ok () ->
       (* Set the new storage backend to sqlite3. *)
@@ -764,8 +778,14 @@ let upgrade_from_v1_to_v2 ~base_dir =
       let*! () =
         match storage_backend with
         | None | Some Legacy ->
-            Lwt_utils_unix.remove_dir
-              Filename.Infix.(base_dir // Dal_store_sqlite3.sqlite_file_name)
+            let rm name =
+              let open Filename.Infix in
+              let path = base_dir // Stores_dirs.skip_list_cells // name in
+              Lwt_unix.unlink path
+            in
+            let*! () = rm Dal_store_sqlite3.sqlite_file_name in
+            let*! () = rm (Dal_store_sqlite3.sqlite_file_name ^ "-shm") in
+            rm (Dal_store_sqlite3.sqlite_file_name ^ "-wal")
         | Some SQLite3 -> Lwt.return_unit
       in
       (* The store upgrade failed. *)
