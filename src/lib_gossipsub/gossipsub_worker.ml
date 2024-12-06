@@ -267,7 +267,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type worker_state = {
     stats : Introspection.stats;
     gossip_state : GS.state;
-    bootstrap_points : Point.Set.t;
+    bootstrap_points : unit -> Point.t list;
     trusted_peers : Peer.Set.t;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
@@ -650,9 +650,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
                  Connect {peer = trusted_peer; origin = Trusted}) ;
           let p2p_output_stream = state.p2p_output_stream in
+          let bootstrap_points =
+            state.bootstrap_points () |> Point.Set.of_list
+          in
           Point.Set.iter
             (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
-            state.bootstrap_points) ;
+            bootstrap_points) ;
         state
 
   let update_gossip_state state (gossip_state, output) =
@@ -871,12 +874,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_promise
 
   let make ?(events_logging = fun _event -> Monad.return ())
-      ?(bootstrap_points = []) rng limits parameters =
+      ?(bootstrap_points = fun () -> []) rng limits parameters =
     {
       status = Starting;
       state =
         {
-          bootstrap_points = Point.Set.of_list bootstrap_points;
+          bootstrap_points;
           stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
           trusted_peers = Peer.Set.empty;
