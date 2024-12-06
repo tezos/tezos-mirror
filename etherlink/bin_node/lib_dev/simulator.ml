@@ -37,11 +37,11 @@ module Make (SimulationBackend : SimulationBackend) = struct
           log_kernel_debug_file = Some log_file;
         }
 
-  let simulation_input ~simulation_version ~with_da_fees call =
+  let simulation_input ~simulation_version ~with_da_fees ~timestamp call =
     match simulation_version with
     | `V0 -> Simulation.V0 call
     | `V1 -> V1 {call; with_da_fees}
-    | `V2 -> V2 {call; with_da_fees; timestamp = Misc.now ()}
+    | `V2 -> V2 {call; with_da_fees; timestamp}
 
   (* Simulation have different versions in the kernel, the inputs change
      between the different versions.
@@ -72,6 +72,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
   let simulate_call ~overwrite_tick_limit call block_param state_override =
     let open Lwt_result_syntax in
     let* simulation_state = SimulationBackend.get_state ~block:block_param () in
+    let timestamp = Misc.now () in
     let* simulation_version = simulation_version simulation_state in
     let* simulation_state =
       if overwrite_tick_limit then
@@ -89,7 +90,12 @@ module Make (SimulationBackend : SimulationBackend) = struct
         simulation_state
         ~log_file:"simulate_call"
         ~input_encoder:Simulation.encode
-        ~input:(simulation_input ~simulation_version ~with_da_fees:true call)
+        ~input:
+          (simulation_input
+             ~timestamp
+             ~simulation_version
+             ~with_da_fees:true
+             call)
     in
     Lwt.return (Simulation.simulation_result bytes)
 
@@ -142,13 +148,17 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let da_fee = Fees.gas_for_fees ~da_fee_per_byte ~gas_price tx_data in
     return da_fee
 
-  let check_node_da_fees ~execution_gas ~node_da_fees ~simulation_version
-      simulation_state call =
+  let check_node_da_fees ~timestamp ~execution_gas ~node_da_fees
+      ~simulation_version simulation_state call =
     let open Lwt_result_syntax in
     let* kernel_da_fees =
       let* res =
         call_estimate_gas
-          (simulation_input ~simulation_version ~with_da_fees:true call)
+          (simulation_input
+             ~timestamp
+             ~simulation_version
+             ~with_da_fees:true
+             call)
           simulation_state
       in
       let* (Qty total_gas) =
@@ -183,8 +193,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
         in
         return_unit)
 
-  let rec confirm_gas ~maximum_gas_per_transaction ~simulation_version
-      (call : Ethereum_types.call) gas simulation_state =
+  let rec confirm_gas ~timestamp ~maximum_gas_per_transaction
+      ~simulation_version (call : Ethereum_types.call) gas simulation_state =
     let open Ethereum_types in
     let open Lwt_result_syntax in
     let double (Qty z) = Qty Z.(mul (of_int 2) z) in
@@ -192,7 +202,11 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let new_call = {call with gas = Some gas} in
     let* result =
       call_estimate_gas
-        (simulation_input ~simulation_version ~with_da_fees:false new_call)
+        (simulation_input
+           ~timestamp
+           ~simulation_version
+           ~with_da_fees:false
+           new_call)
         simulation_state
     in
     match result with
@@ -209,6 +223,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
           if reached_max new_gas then
             (* We try one last time with maximum gas possible. *)
             confirm_gas
+              ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
               call
@@ -216,6 +231,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
               simulation_state
           else
             confirm_gas
+              ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
               call
@@ -251,6 +267,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
           let* () =
             let (Qty gas_used) = gas_used in
             check_node_da_fees
+              ~timestamp
               ~execution_gas:gas_used
               ~node_da_fees:da_fees
               ~simulation_version
@@ -270,6 +287,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
        we need to give the block parameter to the call to
        {!simulation_version}. *)
     let* simulation_state = SimulationBackend.get_state () in
+    let timestamp = Misc.now () in
     let* (Qty maximum_gas_per_transaction) =
       Durable_storage.maximum_gas_per_transaction
         (SimulationBackend.read simulation_state)
@@ -277,7 +295,11 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let* simulation_version = simulation_version simulation_state in
     let* res =
       call_estimate_gas
-        (simulation_input ~simulation_version ~with_da_fees:false call)
+        (simulation_input
+           ~timestamp
+           ~simulation_version
+           ~with_da_fees:false
+           call)
         simulation_state
     in
     match res with
@@ -294,6 +316,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
         let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
         let+ gas_used =
           confirm_gas
+            ~timestamp
             ~maximum_gas_per_transaction
             ~simulation_version
             call
