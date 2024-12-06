@@ -18,23 +18,11 @@ module AI_Activation = struct
   (** AI can be activated with both flags set to false if the threshold is set to 0.
       If the vote is enabled, but the threshold is above the maximum EMA, then the vote
       cannot trigger the activation. *)
-  let enabled state =
-    state.constants.adaptive_issuance.force_activation
-    || (state.constants.adaptive_issuance.activation_vote_enable
-       && Compare.Int32.(
-            state.constants.adaptive_issuance.launch_ema_threshold
-            <= Protocol.Per_block_votes_repr.Internal_for_tests.ema_max))
-    || Compare.Int32.(
-         state.constants.adaptive_issuance.launch_ema_threshold = 0l)
+  let enabled _state = true
 
   let set_activation_cycle block state block_launch_cycle =
     let current_cycle = Block.current_cycle block in
-    let offset =
-      if state.constants.adaptive_issuance.force_activation then 0
-      else
-        1 + state.constants.consensus_rights_delay
-        + Protocol.Constants_repr.max_slashing_period
-    in
+    let offset = 0 in
     assert (
       Protocol.Alpha_context.Cycle.(
         add current_cycle offset = block_launch_cycle)) ;

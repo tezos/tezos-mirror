@@ -370,9 +370,6 @@ let init ctxt =
   let* ctxt = Storage.Adaptive_issuance.Launch_ema.init ctxt 0l in
   Storage.Adaptive_issuance.Activation.init ctxt None
 
-let activate ctxt ~cycle =
-  Storage.Adaptive_issuance.Activation.update ctxt (Some cycle)
-
 let set_adaptive_issuance_enable ctxt =
   let open Lwt_result_syntax in
   let+ enable =
@@ -402,27 +399,7 @@ let update_ema ctxt ~vote =
       (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
   in
   let* launch_cycle = launch_cycle ctxt in
-  let open Constants_storage in
-  let+ ctxt, launch_cycle =
-    if
-      (not (adaptive_issuance_activation_vote_enable ctxt))
-      || Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
-           new_ema < adaptive_issuance_launch_ema_threshold ctxt)
-    then return (ctxt, launch_cycle)
-    else
-      match launch_cycle with
-      | Some _ ->
-          (* the feature is already set to launch, do nothing to avoid postponing it. *)
-          return (ctxt, launch_cycle)
-      | None ->
-          (* set the feature to activate in a few cycles *)
-          let current_cycle = (Level_storage.current ctxt).cycle in
-          let delay = adaptive_issuance_activation_delay ctxt in
-          let cycle = safe_cycle_add current_cycle delay in
-          let+ ctxt = activate ctxt ~cycle in
-          (ctxt, Some cycle)
-  in
-  (ctxt, launch_cycle, new_ema)
+  return (ctxt, launch_cycle, new_ema)
 
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
