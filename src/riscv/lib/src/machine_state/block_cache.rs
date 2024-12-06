@@ -78,10 +78,10 @@
 //! dispatching on every 'instruction run'. See [`ICall`] for more information.
 
 use super::address_translation::PAGE_OFFSET_WIDTH;
-use super::bus::main_memory::MainMemoryLayout;
 use super::instruction::Instruction;
+use super::main_memory::MainMemoryLayout;
 use super::MachineCoreState;
-use super::{bus::main_memory::Address, ProgramCounterUpdate};
+use super::{main_memory::Address, ProgramCounterUpdate};
 use crate::cache_utils::Sizes;
 use crate::default::ConstDefault;
 use crate::machine_state::address_translation::PAGE_SIZE;
@@ -860,8 +860,8 @@ mod tests {
         backend_test, create_state,
         machine_state::{
             address_translation::PAGE_SIZE,
-            bus::main_memory,
             instruction::{Args, Instruction, OpCode},
+            main_memory,
             main_memory::tests::T1K,
             mode::Mode,
             registers::{a0, a1, a2, t0, t1},

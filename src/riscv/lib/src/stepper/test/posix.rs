@@ -4,7 +4,7 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
+        main_memory::MainMemoryLayout,
         mode::Mode,
         registers::{a0, a7},
         CacheLayouts, MachineState,

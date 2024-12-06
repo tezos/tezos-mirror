@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, CacheLayouts, MachineCoreState},
+    machine_state::{main_memory::MainMemoryLayout, CacheLayouts, MachineCoreState},
     state_backend::{ManagerBase, ManagerRead},
 };
 use std::ops::{AddAssign, Bound};

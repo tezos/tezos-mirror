@@ -14,7 +14,7 @@
 use super::PAGE_OFFSET_WIDTH;
 use crate::{
     bits::{ones, u64},
-    machine_state::{bus::main_memory::Address, csregisters::satp::SvLength},
+    machine_state::{csregisters::satp::SvLength, main_memory::Address},
 };
 
 /// Obtain `PPN[index]` from a PPN field specified by `sv_length` Standard.

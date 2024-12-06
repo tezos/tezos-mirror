@@ -9,8 +9,8 @@
 use super::float::FloatExt;
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
         hart_state::HartState,
+        main_memory::MainMemoryLayout,
         registers::{FRegister, FValue, XRegister},
         MachineCoreState,
     },
@@ -557,12 +557,12 @@ mod tests {
         bits::Bits64,
         create_state,
         machine_state::{
-            bus::main_memory::tests::T1K,
             csregisters::{
                 xstatus::{ExtensionValue, MStatus},
                 CSRegister,
             },
             hart_state::{HartState, HartStateLayout},
+            main_memory::tests::T1K,
             registers::{fa1, fa4, parse_fregister, parse_xregister, t0},
             MachineCoreState, MachineCoreStateLayout,
         },

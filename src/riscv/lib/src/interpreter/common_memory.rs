@@ -5,7 +5,7 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::{MainMemoryLayout, OutOfBounds},
+        main_memory::{MainMemoryLayout, OutOfBounds},
         registers::XRegister,
         AccessType, MachineCoreState,
     },

@@ -4,7 +4,7 @@
 
 use crate::{
     default::ConstDefault,
-    machine_state::{self, bus::main_memory},
+    machine_state::{self, main_memory},
     pvm::sbi,
     state_backend::{self, Atom, Cell},
     traps::EnvironException,
@@ -263,7 +263,7 @@ mod tests {
     use super::*;
     use crate::{
         machine_state::{
-            bus::main_memory::M1M,
+            main_memory::M1M,
             registers::{a0, a1, a2, a3, a6, a7},
             TestCacheLayouts,
         },

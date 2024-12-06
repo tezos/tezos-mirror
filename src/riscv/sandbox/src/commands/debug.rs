@@ -5,7 +5,7 @@
 
 use crate::{cli::DebugOptions, posix_exit_mode};
 use octez_riscv::{
-    machine_state::bus::main_memory::M1G,
+    machine_state::main_memory::M1G,
     stepper::{pvm::PvmStepper, test::TestStepper},
 };
 use std::{error::Error, fs};

@@ -9,7 +9,7 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
+        main_memory::MainMemoryLayout,
         registers::{sp, x0, XRegister, XRegisters},
         MachineCoreState,
     },

@@ -8,7 +8,7 @@
 //! Chapter 8 - Unprivileged spec
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, registers::XRegister, MachineCoreState},
+    machine_state::{main_memory::MainMemoryLayout, registers::XRegister, MachineCoreState},
     state_backend as backend,
     traps::Exception,
 };
@@ -222,7 +222,7 @@ mod test {
         backend_test, create_state,
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
         machine_state::{
-            bus::main_memory::tests::T1K,
+            main_memory::tests::T1K,
             registers::{a0, a1, a2},
             MachineCoreState, MachineCoreStateLayout,
         },

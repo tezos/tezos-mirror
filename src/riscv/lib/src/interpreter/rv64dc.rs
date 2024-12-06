@@ -9,7 +9,7 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
+        main_memory::MainMemoryLayout,
         registers::{sp, FRegister, XRegister},
         MachineCoreState,
     },
@@ -78,11 +78,11 @@ mod test {
         bits::Bits64,
         create_state,
         machine_state::{
-            bus::main_memory::tests::T1K,
             csregisters::{
                 xstatus::{ExtensionValue, MStatus},
                 CSRegister,
             },
+            main_memory::tests::T1K,
             registers::{fa2, fa3, parse_xregister, sp},
             MachineCoreState, MachineCoreStateLayout,
         },

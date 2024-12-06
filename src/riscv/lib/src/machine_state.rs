@@ -7,11 +7,11 @@
 
 pub mod address_translation;
 pub mod block_cache;
-pub mod bus;
 mod cache_layouts;
 pub mod csregisters;
 pub mod hart_state;
 pub mod instruction;
+pub mod main_memory;
 pub mod mode;
 pub mod registers;
 pub mod reservation_set;
@@ -19,20 +19,9 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
-pub use self::cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
-use self::{
-    block_cache::BlockCache,
-    bus::main_memory::{Address, MainMemory, OutOfBounds},
-    instruction::Instruction,
-};
 use crate::{
     bits::u64,
     devicetree,
-    machine_state::{
-        bus::main_memory,
-        csregisters::CSRegister,
-        hart_state::{HartState, HartStateLayout},
-    },
     parser::{
         instruction::{Instr, InstrCacheable, InstrUncacheable, InstrWidth},
         is_compressed, parse_compressed_instruction, parse_uncompressed_instruction,
@@ -47,7 +36,13 @@ use address_translation::{
     translation_cache::{TranslationCache, TranslationCacheLayout},
     PAGE_SIZE,
 };
+use block_cache::BlockCache;
+pub use cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
+use csregisters::CSRegister;
 use csregisters::{values::CSRValue, CSRRepr};
+use hart_state::{HartState, HartStateLayout};
+use instruction::Instruction;
+use main_memory::{Address, MainMemory, OutOfBounds};
 use mode::Mode;
 use std::ops::Bound;
 
@@ -660,8 +655,8 @@ pub enum MachineError {
 #[cfg(test)]
 mod tests {
     use super::{
-        bus::main_memory::tests::T1K,
         instruction::{Args, Instruction, OpCode},
+        main_memory::tests::T1K,
         MachineState, MachineStateLayout,
     };
     use crate::{
@@ -674,13 +669,13 @@ mod tests {
                 pte::{PPNField, PageTableEntry},
                 PAGE_SIZE,
             },
-            bus::main_memory::{self, M1M, M8K},
             cache_layouts,
             csregisters::{
                 satp::{Satp, TranslationAlgorithm},
                 xstatus::{self, MStatus},
                 CSRRepr, CSRegister,
             },
+            main_memory::{self, M1M, M8K},
             mode::Mode,
             registers::{a0, a1, a2, a5, t0, t1, t2, zero},
             DefaultCacheLayouts, TestCacheLayouts,
@@ -695,7 +690,7 @@ mod tests {
         },
         traps::{EnvironException, Exception, TrapContext},
     };
-    use crate::{bits::u64, machine_state::bus::main_memory::M1K};
+    use crate::{bits::u64, machine_state::main_memory::M1K};
     use proptest::{prop_assert_eq, proptest};
     use std::ops::Bound;
 
