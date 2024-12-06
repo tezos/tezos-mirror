@@ -35,6 +35,7 @@ let alert_template alert =
       ("expr", Tstr alert.expr);
       ("severity", Tstr (severity_to_string alert.severity));
     ]
+    @ Option.fold ~none:[] ~some:(fun v -> [("for_", Tstr v)]) alert.for_
     @ Option.fold
         ~none:[]
         ~some:(fun v -> [("description", Tstr v)])
