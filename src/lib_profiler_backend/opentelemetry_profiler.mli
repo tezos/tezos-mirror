@@ -5,9 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [initialize service_name] initializes the Opentelemetry client to output the
-    traces. *)
-val initialize : string -> unit
+(** [initialize ?unique_identifier service_name] initializes the Opentelemetry client to output the
+    traces. [?unique_identifier] can be used to discriminate a service used
+    in multiple binaries (for example multiple `octez-node` in the network). *)
+val initialize : ?unique_identifier:string -> string -> unit
 
 (** [op_hash_to_trace_id op_hash] returns a valid [Opentelemetry.Trace_id.t] that can be
     used when tracing. When tracing an operation application, using the

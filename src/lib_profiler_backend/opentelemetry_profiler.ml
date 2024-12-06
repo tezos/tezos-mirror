@@ -5,7 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let initialize service_name =
+let initialize ?unique_identifier service_name =
+  let service_name =
+    match unique_identifier with
+    | None -> service_name
+    | Some id -> Format.sprintf "%s-%s" service_name id
+  in
   Opentelemetry.Globals.service_name := service_name ;
   Opentelemetry.GC_metrics.basic_setup () ;
   Ambient_context.set_storage_provider (Ambient_context_lwt.storage ()) ;
@@ -22,6 +27,9 @@ let add_event ?attrs name =
     Scope.get_ambient_scope ()
     |> Option.iter @@ fun scope ->
        Trace.add_event scope @@ fun () -> Event.make ?attrs name)
+
+let add_attribute attrs id value =
+  match attrs with None -> [(id, value)] | Some attrs -> (id, value) :: attrs
 
 let trace ?force_new_trace_id ?trace_state ?service_name ?attrs ?kind ?trace_id
     ?parent ?scope ?links name k =
@@ -42,12 +50,11 @@ let trace_operation op ?attrs =
   let op_hash =
     match op with `Operation op -> Operation.hash op | `Hash oph -> oph
   in
-  let metadata =
-    ( "operation_hash",
-      `String (Tezos_crypto.Hashed.Operation_hash.to_b58check op_hash) )
-  in
   let attrs =
-    match attrs with None -> [metadata] | Some attrs -> metadata :: attrs
+    add_attribute
+      attrs
+      "operation_hash"
+      (`String (Tezos_crypto.Hashed.Operation_hash.to_b58check op_hash))
   in
   trace ~trace_id:(op_hash_to_trace_id op_hash) ~attrs
 
