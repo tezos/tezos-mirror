@@ -42,7 +42,7 @@ module Event = struct
     Internal_event.Simple.declare_0
       ~section
       ~name:"sequencer_disabled_native_execution"
-      ~msg:"native execution is disabled in sequencer mode"
+      ~msg:"Native execution is disabled in sequencer mode"
       ~level:Warning
       ()
 end
@@ -792,7 +792,7 @@ let sequencer_disable_native_execution configuration =
         kernel_execution =
           {configuration.kernel_execution with native_execution_policy = Never};
       }
-  | _ -> return configuration
+  | Never -> return configuration
 
 let make_event_config ~verbosity ~daily_logs_path
     ?(daily_logs_section_prefixes = []) () =

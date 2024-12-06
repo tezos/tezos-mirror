@@ -5,6 +5,7 @@ pub use rustzcash::*;
 pub mod api;
 mod bindings;
 mod host;
+mod reveal;
 mod runtime;
 mod types;
 mod write_debug;
