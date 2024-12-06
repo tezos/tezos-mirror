@@ -45,7 +45,7 @@ module Version = struct
      - 1: removed Irmin dependency; added slot and status stores; changed layout of shard
        store by indexing on slot ids instead of commitments
      - 2: switch the KVS skip list store for a sqlite3 one. *)
-  let current_version = 1
+  let current_version = 2
 
   type error += Could_not_read_data_dir_version of string
 
@@ -542,7 +542,6 @@ type t = {
   slot_header_statuses : Statuses.t;
   shards : Shards.t;
   slots : Slots.t;
-  skip_list_cells : Kvs_skip_list_cells_store.t;
   cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
@@ -550,8 +549,7 @@ type t = {
   finalized_commitments : Slot_id_cache.t;
   last_processed_level : Last_processed_level.t;
   first_seen_level : First_seen_level.t;
-  storage_backend : Storage_backend.kind;
-  sqlite3 : Dal_store_sqlite3.Skip_list_cells.t;
+  skip_list_cells_store : Dal_store_sqlite3.Skip_list_cells.t;
 }
 
 let cache {cache; _} = cache
@@ -564,10 +562,7 @@ let last_processed_level {last_processed_level; _} = last_processed_level
 
 let shards {shards; _} = shards
 
-let skip_list_cells t =
-  match t.storage_backend with
-  | Legacy -> `KVS t.skip_list_cells
-  | SQLite3 -> `SQLite3 t.sqlite3
+let skip_list_cells t = t.skip_list_cells_store
 
 let slot_header_statuses {slot_header_statuses; _} = slot_header_statuses
 
@@ -591,20 +586,24 @@ let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
     ()
 
 module Skip_list_cells = struct
-  let find t =
-    match t.storage_backend with
-    | Legacy -> Kvs_skip_list_cells_store.find t.skip_list_cells
-    | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.find t.sqlite3
+  let find ?conn t skip_list_hash =
+    Dal_store_sqlite3.Skip_list_cells.find
+      ?conn
+      t.skip_list_cells_store
+      skip_list_hash
 
-  let insert t =
-    match t.storage_backend with
-    | Legacy -> Kvs_skip_list_cells_store.insert t.skip_list_cells
-    | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.insert t.sqlite3
+  let insert ?conn t ~attested_level items =
+    Dal_store_sqlite3.Skip_list_cells.insert
+      ?conn
+      t.skip_list_cells_store
+      ~attested_level
+      items
 
-  let remove t =
-    match t.storage_backend with
-    | Legacy -> Kvs_skip_list_cells_store.remove t.skip_list_cells
-    | SQLite3 -> Dal_store_sqlite3.Skip_list_cells.remove t.sqlite3
+  let remove ?conn t ~attested_level =
+    Dal_store_sqlite3.Skip_list_cells.remove
+      ?conn
+      t.skip_list_cells_store
+      ~attested_level
 
   let schemas data_dir =
     let open Lwt_result_syntax in
@@ -850,29 +849,21 @@ let init config =
   let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
-  let* skip_list_cells = init_skip_list_cells_store base_dir in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
-  let* storage_backend =
-    let* store = Storage_backend.init ~root_dir:base_dir in
-    let sqlite3_backend = config.experimental_features.sqlite3_backend in
-    Storage_backend.set store ~sqlite3_backend
-  in
-  let* sqlite3 = init_sqlite_skip_list_cells_store base_dir in
+  let* skip_list_cells_store = init_sqlite_skip_list_cells_store base_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
       shards;
       slots;
       slot_header_statuses;
-      skip_list_cells;
       cache = Commitment_indexed_cache.create Constants.cache_size;
       finalized_commitments =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
       last_processed_level;
       first_seen_level;
-      storage_backend;
-      sqlite3;
+      skip_list_cells_store;
     }
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =

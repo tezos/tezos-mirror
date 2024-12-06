@@ -17,11 +17,7 @@ module Skip_list_handlers = struct
         Alpha_context.Dal.Slots_history.Pointer_hash.encoding
         cell_hash
     in
-    let* cell =
-      match rpc_context with
-      | `KVS store -> Kvs_skip_list_cells_store.find store hash
-      | `SQLite3 store -> Dal_store_sqlite3.Skip_list_cells.find store hash
-    in
+    let* cell = Dal_store_sqlite3.Skip_list_cells.find rpc_context hash in
     return
     @@ Dal_proto_types.Skip_list_cell.to_proto
          Alpha_context.Dal.Slots_history.encoding
