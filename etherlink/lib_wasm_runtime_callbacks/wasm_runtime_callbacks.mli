@@ -52,6 +52,12 @@ module Internal_for_tests : sig
     bytes ->
     (Irmin_context.tree * int, Error_code.t) result
 
+  val store_write_all :
+    Irmin_context.tree ->
+    string ->
+    bytes ->
+    (Irmin_context.tree, Error_code.t) result
+
   (** [check_reboot_flag tree] returns [true] if the reboot flag was set in the
       durable storage of [tree], [false] otherwise. Besides, it returns a new
       [tree] where the reboot flag as be removed (if it was absent, [tree] is

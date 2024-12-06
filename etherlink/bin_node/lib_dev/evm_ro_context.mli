@@ -8,6 +8,7 @@
 type t = {
   preimages : string;
   preimages_endpoint : Uri.t option;
+  native_execution_policy : Configuration.native_execution_policy;
   data_dir : string;
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;

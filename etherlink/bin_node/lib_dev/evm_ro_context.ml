@@ -8,6 +8,7 @@
 type t = {
   preimages : string;
   preimages_endpoint : Uri.t option;
+  native_execution_policy : Configuration.native_execution_policy;
   data_dir : string;
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -34,6 +35,8 @@ let load ?smart_rollup_address ~data_dir configuration =
     data_dir;
     preimages = configuration.Configuration.kernel_execution.preimages;
     preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
+    native_execution_policy =
+      configuration.kernel_execution.native_execution_policy;
     smart_rollup_address;
     block_storage_sqlite3 =
       configuration.experimental_features.block_storage_sqlite3;
@@ -244,6 +247,7 @@ struct
       in
       let* raw_insights =
         Evm_state.execute_and_inspect
+          ~native_execution_policy:Ctxt.ctxt.native_execution_policy
           ~config
           ~data_dir:Ctxt.ctxt.data_dir
           ~input
@@ -338,6 +342,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     ?profile
     ~data_dir:ctxt.data_dir
     ~config:(pvm_config ctxt)
+    ~native_execution_policy:ctxt.native_execution_policy
     evm_state
     blueprint.blueprint.payload
 
@@ -350,6 +355,11 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
     let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
       let open Lwt_result_syntax in
+      let native_execution =
+        match ctxt.native_execution_policy with
+        | Always | Rpcs_only -> true
+        | Never -> false
+      in
       let message =
         List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
       in
@@ -360,6 +370,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         ?log_file:input.log_kernel_debug_file
         ~data_dir:ctxt.data_dir
         ~config:pvm_config
+        ~native_execution
         evm_state
         message
   end in

@@ -23,10 +23,15 @@ type time_between_blocks =
           if there are no transactions to include, a block is produced after
            [time_between_blocks]. *)
 
+type native_execution_policy = Always | Rpcs_only | Never
+
 type kernel_execution_config = {
   preimages : string;  (** Path to the preimages directory. *)
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
+  native_execution_policy : native_execution_policy;
+      (** Policy deciding when to use the native execution for supported
+          kernels. *)
 }
 
 type blueprints_publisher_config = {
@@ -145,6 +150,8 @@ type t = {
   finalized_view : bool;
 }
 
+val native_execution_policy_encoding : native_execution_policy Data_encoding.t
+
 (** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir]. *)
 val encoding : string -> t Data_encoding.t
 
@@ -235,6 +242,7 @@ module Cli : sig
     verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
+    ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
@@ -271,6 +279,7 @@ module Cli : sig
     verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
+    ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
@@ -308,6 +317,7 @@ module Cli : sig
     verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
+    ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->

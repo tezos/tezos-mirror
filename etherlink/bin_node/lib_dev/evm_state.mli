@@ -27,6 +27,7 @@ val execute :
   ?log_file:string ->
   ?wasm_entrypoint:string ->
   config:Config.config ->
+  native_execution:bool ->
   t ->
   [< `Input of string] list ->
   t tzresult Lwt.t
@@ -62,6 +63,7 @@ val execute_and_inspect :
   data_dir:string ->
   ?wasm_entrypoint:string ->
   config:Config.config ->
+  native_execution_policy:Configuration.native_execution_policy ->
   input:Simulation.Encodings.simulate_input ->
   t ->
   bytes option list tzresult Lwt.t
@@ -91,6 +93,7 @@ val apply_blueprint :
   ?profile:bool ->
   data_dir:string ->
   config:Config.config ->
+  native_execution_policy:Configuration.native_execution_policy ->
   t ->
   Blueprint_types.payload ->
   apply_result tzresult Lwt.t

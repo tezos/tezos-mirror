@@ -107,12 +107,13 @@ pub fn wasm_runtime_new_context() -> Pointer<Context> {
 
 #[ocaml::func]
 #[ocaml::sig(
-    "context -> string -> string option -> string -> Irmin_context.tree -> bytes -> int32 -> string list ->  Irmin_context.tree"
+    "context -> string -> string option -> bool -> string -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
 )]
 pub fn wasm_runtime_run(
     mut ctxt: Pointer<Context>,
     preimages_dir: OCamlString,
     preimages_endpoint: Option<OCamlString>,
+    native_execution: bool,
     entrypoint: OCamlString,
     mut tree: EvmTree,
     rollup_address: SmartRollupAddress,
@@ -135,6 +136,7 @@ pub fn wasm_runtime_run(
             &mut ctxt.kernels_cache,
             host,
             entrypoint.as_str(),
+            native_execution,
         )?;
 
         match runtime.run()? {

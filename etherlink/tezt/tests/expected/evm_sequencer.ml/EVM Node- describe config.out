@@ -178,7 +178,15 @@
         $unistring
         /* Endpoint for downloading the preimages that cannot be found in the
            preimages directory. These preimages are downloaded by the node,
-           stored in the preimages directory and fed to the kernel. */ },
+           stored in the preimages directory and fed to the kernel. */,
+      "native_execution_policy"?:
+        $native_execution_policy
+        /* Policy regarding when to use the native execution for supported
+           kernels. Native execution provides better performance, but
+           increases the complexity of the software stack of the node by
+           adding an additional layer between what is executed by the EVM
+           node and the Smart Rollup nodes. Can be `never`, `rpcs_only` or
+           `always`. Default to `never`. */ },
   "public_rpc"?:
     { "port"?:
         integer ∈ [1, 2^16-1]
@@ -263,6 +271,13 @@ $max_active_rpc_connections:
   /* limited
      The number of maximum RPC connections allowed is limited to the given
      integer's value. */
+$native_execution_policy:
+  /* native_execution_policy
+     `never` means the native execution will never be used by the node.
+     `rpcs_only` will restrict the usage of the native execution to RPC
+     calls, leaving blueprint application to the WASM runtime. `always` will
+     always use native execution for supported kernels. */
+  "rpcs_only" | "always" | "never"
 $time_between_blocks: number /* Some */ || null /* None */
 $unistring:
   /* Universal string representation

@@ -59,6 +59,7 @@ mod ocaml_imports {
         pub fn layer2_store__store_value_size(evm_tree: EvmTree, key: &str) -> Result<isize, isize>;
         pub fn layer2_store__store_read(evm_tree: EvmTree, key: &str, offset: usize, num_bytes: usize) -> Result<OCamlBytes, isize>;
         pub fn layer2_store__store_write(evm_tree: EvmTree, key: &str, offset: usize, bytes: &[u8]) -> Result<(EvmTree, isize), isize>;
+        pub fn layer2_store__store_write_all(evm_tree: EvmTree, key: &str, bytes: &[u8]) -> Result<EvmTree, isize>;
     }
 }
 
@@ -235,4 +236,20 @@ pub fn check_reboot_flag(evm_tree: &EvmTree) -> Result<(bool, EvmTree), Bindings
         ocaml_imports::layer2_store__check_reboot_flag(&gc(), evm_tree.clone())
             .map_err(BindingsError::OCamlError)
     }
+}
+
+pub fn store_write_all<K>(
+    evm_tree: &EvmTree,
+    key: K,
+    bytes: &[u8],
+) -> Result<EvmTree, BindingsError>
+where
+    K: Key,
+{
+    let res = unsafe {
+        ocaml_imports::layer2_store__store_write_all(&gc(), evm_tree.clone(), key.as_str(), bytes)
+            .map_err(BindingsError::OCamlError)?
+    };
+
+    res.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
