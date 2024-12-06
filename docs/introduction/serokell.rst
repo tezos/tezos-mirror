@@ -82,7 +82,15 @@ Change the ``tezos`` user’s home directory and shell::
 
 8. Start Node Service
 ---------------------
-Enable and start the ``octez-node`` service::
+First, check the configuration file inherited from the old packages::
+
+    sudo -u tezos octez-node config show
+
+If the RPC port is not defined (no field ``listen-addrs``), open it, e.g.::
+
+    sudo -u tezos octez-node config update --rpc-addr=127.0.0.1:8732
+
+Now enable and start the ``octez-node`` service::
 
     sudo systemctl enable octez-node
     sudo systemctl start octez-node
