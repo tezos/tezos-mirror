@@ -113,7 +113,7 @@ pub enum ProxyInput {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum SequencerBlueprintRes {
-    SequencerBlueprint(SequencerBlueprint),
+    SequencerBlueprint(UnsignedSequencerBlueprint),
     InvalidNumberOfChunks,
     InvalidSignature,
     InvalidNumber,
@@ -352,7 +352,7 @@ pub fn parse_blueprint_chunk(
                 .unwrap_or(false);
 
             if correctly_signed {
-                SequencerBlueprintRes::SequencerBlueprint(seq_blueprint)
+                SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint)
             } else {
                 SequencerBlueprintRes::InvalidSignature
             }
