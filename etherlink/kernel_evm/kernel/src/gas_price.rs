@@ -9,7 +9,6 @@ use crate::storage::{read_minimum_base_fee_per_gas, store_base_fee_per_gas};
 
 use primitive_types::U256;
 use softfloat::F64;
-use tezos_ethereum::block::BlockFees;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
@@ -36,17 +35,6 @@ pub fn register_block(
     let base_fee_per_gas = base_fee_per_gas(host, bip.timestamp);
     store_base_fee_per_gas(host, base_fee_per_gas)?;
 
-    Ok(())
-}
-
-/// Update the kernel-wide base fee per gas with a new value.
-pub fn store_new_base_fee_per_gas(
-    host: &mut impl Runtime,
-    gas_price: U256,
-    constants: &mut BlockFees,
-) -> anyhow::Result<()> {
-    crate::storage::store_base_fee_per_gas(host, gas_price)?;
-    constants.set_base_fee_per_gas(gas_price);
     Ok(())
 }
 
@@ -199,7 +187,6 @@ mod test {
     fn gas_price_responds_to_load() {
         let mut host = MockKernelHost::default();
         let timestamp = 0_i64;
-        let mut block_fees = BlockFees::new(U256::zero(), U256::zero(), U256::zero());
 
         let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
@@ -208,6 +195,7 @@ mod test {
             // estimated ticks in run (ignored)
             0,
             timestamp.into(),
+            U256::zero(),
         );
         bip.estimated_ticks_in_block = TOLERANCE;
 
@@ -223,7 +211,7 @@ mod test {
         // register more blocks - now double tolerance
         register_block(&mut host, &bip).unwrap();
         let gas_price_now = base_fee_per_gas(&host, timestamp.into());
-        store_new_base_fee_per_gas(&mut host, gas_price_now, &mut block_fees).unwrap();
+        store_base_fee_per_gas(&mut host, gas_price_now).unwrap();
 
         let (min, gas_price) = load_gas_price(&mut host);
         assert!(gas_price > min);

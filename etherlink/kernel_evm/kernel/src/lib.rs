@@ -175,35 +175,50 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
         }
     }
 }
-fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
-    let minimum_base_fee_per_gas = match read_minimum_base_fee_per_gas(host) {
-        Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
+
+fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(
+    host: &mut Host,
+) -> Result<U256, Error> {
+    match read_minimum_base_fee_per_gas(host) {
+        Ok(minimum_base_fee_per_gas) => Ok(minimum_base_fee_per_gas),
         Err(_) => {
             let minimum_base_fee_per_gas = crate::fees::MINIMUM_BASE_FEE_PER_GAS.into();
             store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
-            minimum_base_fee_per_gas
+            Ok(minimum_base_fee_per_gas)
         }
-    };
+    }
+}
 
-    let base_fee_per_gas = match read_base_fee_per_gas(host) {
+fn retrieve_base_fee_per_gas<Host: Runtime>(
+    host: &mut Host,
+    minimum_base_fee_per_gas: U256,
+) -> Result<U256, Error> {
+    match read_base_fee_per_gas(host) {
         Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
-            base_fee_per_gas
+            Ok(base_fee_per_gas)
         }
         _ => {
             store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
-            minimum_base_fee_per_gas
+            Ok(minimum_base_fee_per_gas)
         }
-    };
+    }
+}
 
-    let da_fee = match read_da_fee(host) {
-        Ok(da_fee) => da_fee,
+fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+    match read_da_fee(host) {
+        Ok(da_fee) => Ok(da_fee),
         Err(_) => {
             let da_fee = U256::from(fees::DA_FEE_PER_BYTE);
             store_da_fee(host, da_fee)?;
-            da_fee
+            Ok(da_fee)
         }
-    };
+    }
+}
 
+fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
+    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)?;
+    let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+    let da_fee = retrieve_da_fee(host)?;
     let block_fees = BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee);
 
     Ok(block_fees)
@@ -282,7 +297,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         return Ok(());
     };
 
-    let block_fees = retrieve_block_fees(host)?;
     let trace_input = read_tracer_input(host)?;
 
     // Start processing blueprints
@@ -292,7 +306,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         if let block::ComputationResult::RebootNeeded = block::produce(
             host,
             chain_id,
-            block_fees,
             &mut configuration,
             sequencer_pool_address,
             trace_input,
@@ -603,11 +616,19 @@ mod tests {
             ..Configuration::default()
         };
 
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            block_fees.minimum_base_fee_per_gas(),
+        )
+        .unwrap();
+        crate::storage::store_base_fee_per_gas(&mut host, block_fees.base_fee_per_gas())
+            .unwrap();
+        crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
+
         // If the upgrade is started, it should raise an error
         let computation_result = crate::block::produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            block_fees,
             &mut configuration,
             None,
             None,
