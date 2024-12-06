@@ -303,24 +303,21 @@ pub struct SequencerParsingContext {
     // Delayed inbox transactions may come in chunks. If the buffer is
     // [Some _] a chunked transaction is being parsed,
     pub buffer_transaction_chunks: Option<BufferTransactionChunks>,
-    // Head level of the chain, handling blueprints before the head is useless.
-    // It is optional to handle when the first block has not been produced
-    // yet.
-    pub head_level: Option<U256>,
+    // Number of the next expected blueprint, handling blueprints
+    // before this is useless.
+    pub next_blueprint_number: U256,
 }
 
 fn check_unsigned_blueprint_chunk(
     unsigned_seq_blueprint: UnsignedSequencerBlueprint,
-    head_level: &Option<U256>,
+    next_blueprint_number: &U256,
 ) -> SequencerBlueprintRes {
     if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
         return SequencerBlueprintRes::InvalidNumberOfChunks;
     }
 
-    if let Some(head_level) = head_level {
-        if unsigned_seq_blueprint.number.le(head_level) {
-            return SequencerBlueprintRes::InvalidNumber;
-        }
+    if unsigned_seq_blueprint.number.lt(next_blueprint_number) {
+        return SequencerBlueprintRes::InvalidNumber;
     }
 
     SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint)
@@ -328,13 +325,13 @@ fn check_unsigned_blueprint_chunk(
 
 pub fn parse_unsigned_blueprint_chunk(
     bytes: &[u8],
-    head_level: &Option<U256>,
+    next_blueprint_number: &U256,
 ) -> SequencerBlueprintRes {
     // Parse an unsigned sequencer blueprint
     match UnsignedSequencerBlueprint::from_rlp_bytes(bytes).ok() {
         None => SequencerBlueprintRes::Unparsable,
         Some(unsigned_seq_blueprint) => {
-            check_unsigned_blueprint_chunk(unsigned_seq_blueprint, head_level)
+            check_unsigned_blueprint_chunk(unsigned_seq_blueprint, next_blueprint_number)
         }
     }
 }
@@ -342,7 +339,7 @@ pub fn parse_unsigned_blueprint_chunk(
 pub fn parse_blueprint_chunk(
     bytes: &[u8],
     sequencer: &PublicKey,
-    head_level: &Option<U256>,
+    next_blueprint_number: &U256,
 ) -> SequencerBlueprintRes {
     // Parse the sequencer blueprint
     match SequencerBlueprint::from_rlp_bytes(bytes).ok() {
@@ -350,7 +347,7 @@ pub fn parse_blueprint_chunk(
         Some(SequencerBlueprint {
             blueprint,
             signature,
-        }) => match check_unsigned_blueprint_chunk(blueprint, head_level) {
+        }) => match check_unsigned_blueprint_chunk(blueprint, next_blueprint_number) {
             SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint) => {
                 let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
 
@@ -384,7 +381,11 @@ impl SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
-        let res = parse_blueprint_chunk(bytes, &context.sequencer, &context.head_level);
+        let res = parse_blueprint_chunk(
+            bytes,
+            &context.sequencer,
+            &context.next_blueprint_number,
+        );
         InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(res)))
     }
 
@@ -897,7 +898,7 @@ pub mod tests {
             "edsk422LGdmDnai4Cya6csM6oFmgHpDQKUhatTURJRAY4h7NHNz9sz",
         )
         .unwrap();
-        let head_level: Option<U256> = Some(6.into());
+        let next_blueprint_number: U256 = 7.into();
 
         let blueprint = UnsignedSequencerBlueprint {
             chunk: vec![],
@@ -911,7 +912,7 @@ pub mod tests {
         let res = parse_blueprint_chunk(
             &sequencer_signed_blueprint_chunk_bytes(&blueprint, sk.clone()),
             &pk,
-            &head_level,
+            &next_blueprint_number,
         );
         assert!(matches!(res, SequencerBlueprintRes::SequencerBlueprint(_)));
 
@@ -922,7 +923,7 @@ pub mod tests {
         let res = parse_blueprint_chunk(
             &sequencer_signed_blueprint_chunk_bytes(&blueprint, invalid_sk),
             &pk,
-            &head_level,
+            &next_blueprint_number,
         );
         assert!(matches!(res, SequencerBlueprintRes::InvalidSignature));
 
@@ -935,7 +936,7 @@ pub mod tests {
                 sk.clone(),
             ),
             &pk,
-            &head_level,
+            &next_blueprint_number,
         );
         assert!(matches!(res, SequencerBlueprintRes::InvalidNumber));
 
@@ -948,7 +949,7 @@ pub mod tests {
                 sk.clone(),
             ),
             &pk,
-            &head_level,
+            &next_blueprint_number,
         );
         assert!(matches!(res, SequencerBlueprintRes::InvalidNumber));
     }

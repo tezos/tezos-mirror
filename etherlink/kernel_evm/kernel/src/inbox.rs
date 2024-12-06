@@ -363,8 +363,8 @@ impl InputHandler for SequencerInput {
             }) => {
                 log!(host, Debug, "Importing {} DAL signals", &signals.0.len());
                 let params = host.reveal_dal_parameters();
-                let head_level: Option<U256> =
-                    crate::block_storage::read_current_number(host).ok();
+                let next_blueprint_number: U256 =
+                    crate::blueprint_storage::read_next_blueprint_number(host)?;
                 for signal in signals.0.iter() {
                     let published_level = signal.published_level;
                     let slot_indices = &signal.slot_indices;
@@ -380,7 +380,7 @@ impl InputHandler for SequencerInput {
                             fetch_and_parse_sequencer_blueprint_from_dal(
                                 host,
                                 &params,
-                                &head_level,
+                                &next_blueprint_number,
                                 *slot_index,
                                 published_level,
                             )
@@ -692,7 +692,8 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // during this kernel run.
     let mut inbox_is_empty = true;
     let limits = fetch_limits(host);
-    let head_level: Option<U256> = crate::block_storage::read_current_number(host).ok();
+    let next_blueprint_number: U256 =
+        crate::blueprint_storage::read_next_blueprint_number(host)?;
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
@@ -701,7 +702,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
         dal_configuration: dal,
         buffer_transaction_chunks: None,
-        head_level,
+        next_blueprint_number,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of
