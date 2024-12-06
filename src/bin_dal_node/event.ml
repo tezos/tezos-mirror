@@ -116,19 +116,29 @@ let config_error_no_bootstrap =
     ~level:Error
     ()
 
+let resolved_bootstrap_points =
+  declare_2
+    ~section
+    ~name:"resolved_bootstrap_points"
+    ~msg:
+      "DNS resolution of {domainname} returned {number} bootstrap IP addresses"
+    ~level:Notice
+    ("domainname", Data_encoding.string)
+    ("number", Data_encoding.int31)
+
 let resolved_bootstrap_no_points =
   declare_0
     ~section
     ~name:"resolved_bootstrap_no_points"
-    ~msg:"no bootstrap points could be resolved"
+    ~msg:"DNS resolution returned no bootstrap IP address"
     ~level:Error
     ()
 
-let resolved_bootstrap_points =
+let resolved_bootstrap_points_total =
   declare_1
     ~section
-    ~name:"resolved_bootstrap_points"
-    ~msg:"resolved {number} bootstrap points"
+    ~name:"resolved_bootstrap_points_total"
+    ~msg:"DNS resolution returned a total of {number} bootstrap IP addresses"
     ~level:Notice
     ("number", Data_encoding.int31)
 

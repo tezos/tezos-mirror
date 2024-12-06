@@ -851,12 +851,32 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
       ^ Printexc.to_string exn
       |> Stdlib.failwith)
 
-let resolve points =
-  List.concat_map_es
-    (Tezos_base_unix.P2p_resolve.resolve_addr
-       ~default_addr:"::"
-       ~default_port:(Configuration_file.default.listen_addr |> snd))
-    points
+let resolve names =
+  let open Lwt_result_syntax in
+  (* Remove duplicates *)
+  let names = List.sort_uniq String.compare names in
+  (* Resolve the dns host names *)
+  let* points =
+    List.concat_map_es
+      (fun name ->
+        let* points =
+          Tezos_base_unix.P2p_resolve.resolve_addr
+            ~default_addr:"::"
+            ~default_port:(Configuration_file.default.listen_addr |> snd)
+            ~warn:false
+            name
+        in
+        let*! () =
+          Event.(emit resolved_bootstrap_points (name, List.length points))
+        in
+        return points)
+      names
+  in
+  let*! () =
+    if points = [] then Event.(emit resolved_bootstrap_no_points) ()
+    else Event.(emit resolved_bootstrap_points_total (List.length points))
+  in
+  return points
 
 let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
   let open Lwt_result_syntax in
@@ -1187,13 +1207,6 @@ let run ~data_dir ~configuration_override =
       catch_es
         (fun () ->
           let* current_points = resolve bootstrap_names in
-          let*! () =
-            if current_points = [] then
-              Event.(emit resolved_bootstrap_no_points) ()
-            else
-              Event.(
-                emit resolved_bootstrap_points (List.length current_points))
-          in
           bootstrap_points := current_points ;
           let*! () = Lwt_unix.sleep Constants.bootstrap_dns_refresh_delay in
           loop ())
