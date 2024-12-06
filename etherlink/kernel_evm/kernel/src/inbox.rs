@@ -504,6 +504,7 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
+    garbage_collect_blocks: bool,
 ) -> anyhow::Result<()> {
     match input {
         Input::ModeSpecific(input) => Mode::handle_input(host, input, inbox_content)?,
@@ -515,6 +516,9 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
             clear_events(host)?;
+            if garbage_collect_blocks {
+                crate::block_storage::garbage_collect_blocks(host)?;
+            }
             store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
             store_l1_level(host, info.level)?
         }
@@ -533,6 +537,7 @@ enum ReadStatus {
     Ongoing,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -541,6 +546,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
     enable_fa_bridge: bool,
+    garbage_collect_blocks: bool,
 ) -> anyhow::Result<ReadStatus> {
     let input: InputResult<Mode> = read_input(
         host,
@@ -572,7 +578,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
-            handle_input(host, input, res)?;
+            handle_input(host, input, res, garbage_collect_blocks)?;
             Ok(ReadStatus::Ongoing)
         }
     }
@@ -583,6 +589,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
+    garbage_collect_blocks: bool,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -601,6 +608,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
             &mut inbox_is_empty,
             &mut res,
             enable_fa_bridge,
+            garbage_collect_blocks,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -651,6 +659,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     delayed_inbox: &mut DelayedInbox,
     enable_fa_bridge: bool,
     dal: Option<DalConfiguration>,
+    garbage_collect_blocks: bool,
 ) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -691,6 +700,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             &mut inbox_is_empty,
             delayed_inbox,
             enable_fa_bridge,
+            garbage_collect_blocks,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -878,6 +888,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
+            false,
         )
         .unwrap()
         .unwrap();
@@ -907,6 +918,7 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
+            false,
             false,
         )
         .unwrap()
@@ -963,6 +975,7 @@ mod tests {
                 kernel_security_governance: None,
             },
             false,
+            false,
         )
         .unwrap()
         .unwrap();
@@ -1007,6 +1020,7 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
+            false,
             false,
         )
         .unwrap();
@@ -1058,6 +1072,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
+            false,
         )
         .unwrap();
 
@@ -1095,6 +1110,7 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
+            false,
             false,
         )
         .unwrap();
@@ -1151,6 +1167,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
+            false,
         )
         .unwrap()
         .unwrap();
@@ -1170,6 +1187,7 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
+            false,
             false,
         )
         .unwrap()
@@ -1232,6 +1250,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
+            false,
         )
         .unwrap()
         .unwrap();
@@ -1255,6 +1274,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
+            false,
         )
         .unwrap();
         assert!(inbox_content.is_some());
@@ -1264,6 +1284,7 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
+            false,
             false,
         )
         .unwrap();
@@ -1357,6 +1378,7 @@ mod tests {
             &mut delayed_inbox,
             false,
             None,
+            false,
         )
         .unwrap();
 

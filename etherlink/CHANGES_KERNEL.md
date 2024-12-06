@@ -5,6 +5,12 @@
 
 ### Features
 
+- Once this kernel activates, only the latest block of the chain will
+  be available in the rollup context, compared to the full history
+  with previous version. This should sensibly reduces the disk
+  consumption of full Rollup Node. The full history will remain
+  available via Octez EVM Node deployments. (!15490)
+
 ### Internal
 
 - Maximum gas per transaction is stored in the durable storage. (!15468)
