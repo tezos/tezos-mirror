@@ -875,15 +875,14 @@ module Actions = struct
       ("attestation_level", Data_encoding.int32)
       ("round", Round.encoding)
 
-  let warning_dal_timeout_old_round =
-    declare_0
+  let not_in_dal_committee =
+    declare_2
       ~section
-      ~name:"warning_dal_timeout_old_round"
-      ~level:Warning
-      ~msg:
-        "The DAL timeout computed was for an old round. Please report this \
-         issue."
-      ()
+      ~name:"not_in_dal_committee"
+      ~level:Notice
+      ~msg:"{delegate} has no assigned DAL shards at level {attestation_level}"
+      ("delegate", Signature.Public_key_hash.encoding)
+      ("attestation_level", Data_encoding.int32)
 
   let synchronizing_round =
     declare_1
