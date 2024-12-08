@@ -827,7 +827,8 @@ let check_version_and_may_upgrade base_dir =
       (* In the absence of a version file, we use an heuristic to determine the
          version. *)
       let*! exists = Lwt_unix.file_exists (Filename.concat base_dir "index") in
-      return @@ if exists then Version.make 0 else Version.make 1
+      return
+      @@ if exists then Version.make 0 else Version.make Version.current_version
   in
   if Version.(equal version current_version) then return_unit
   else
