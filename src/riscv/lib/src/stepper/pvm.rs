@@ -9,7 +9,6 @@ use crate::{
     kernel_loader,
     machine_state::{
         main_memory::{MainMemoryLayout, M1G},
-        mode::Mode,
         CacheLayouts, DefaultCacheLayouts, MachineCoreState, MachineError,
     },
     program::Program,
@@ -66,8 +65,21 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
         let mut pvm = Pvm::bind(space);
 
         let program = Program::<ML>::from_elf(program)?;
-        pvm.machine_state
-            .setup_boot(&program, initrd, Mode::Supervisor)?;
+
+        #[cfg(feature = "supervisor")]
+        {
+            pvm.machine_state.setup_linux_process(&program)?;
+            assert!(initrd.is_none(), "initrd is not supported");
+        }
+
+        #[cfg(not(feature = "supervisor"))]
+        {
+            pvm.machine_state.setup_boot(
+                &program,
+                initrd,
+                crate::machine_state::mode::Mode::Supervisor,
+            )?;
+        }
 
         Ok(Self {
             pvm,

@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+// When the Supervisor is enabled, most of this module is not used.
+#![cfg_attr(feature = "supervisor", allow(dead_code))]
+
 use super::{reveals::RevealRequest, PvmHooks, PvmStatus};
 use crate::{
     machine_state::{
