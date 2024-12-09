@@ -41,31 +41,17 @@ module Types = Tezos_dal_node_services.Types
 (** Peers exchanged via PX. [point] represents the (address, port) pair of the
     exchanged peer, while [peer] represents the cryptographic identity of the
     peer. *)
-type px_peer = {point : P2p_point.Id.t; peer : P2p_peer.Id.t}
+type px_peer = Types.Peer.t
 
-(** Without piggybacking, {!p2p_message} is almost identical to
-    {!Gs_interface.p2p_message}, except that for the [Prune] case,
-    {!P2p_peer.Id.t} elements in [px] are augmented by their {!P2p_point.Id.t}
-    counterpart. *)
-type p2p_message =
-  | Graft of {topic : Types.Topic.t}
-  | Prune of {topic : Types.Topic.t; px : px_peer Seq.t; backoff : Types.Span.t}
-  | IHave of {topic : Types.Topic.t; message_ids : Types.Message_id.t list}
-  | IWant of {message_ids : Types.Message_id.t list}
-  | Subscribe of {topic : Types.Topic.t}
-  | Unsubscribe of {topic : Types.Topic.t}
-  | Message_with_header of {
-      message : Types.Message.t;
-      topic : Types.Topic.t;
-      message_id : Types.Message_id.t;
-    }
+val p2p_message_encoding :
+  Gs_interface.Worker_instance.p2p_message Data_encoding.t
 
-val p2p_message_encoding : p2p_message Data_encoding.t
-
-val pp_p2p_message : Format.formatter -> p2p_message -> unit
+val pp_p2p_message :
+  Format.formatter -> Gs_interface.Worker_instance.p2p_message -> unit
 
 (** A P2P message config is parameterized by the network's name. *)
 val message_config :
-  network_name:string -> p2p_message P2p_params.message_config
+  network_name:string ->
+  Gs_interface.Worker_instance.p2p_message P2p_params.message_config
 
 val version : network_name:string -> Network_version.t

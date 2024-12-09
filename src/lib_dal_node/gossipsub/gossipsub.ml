@@ -39,7 +39,7 @@ module Transport_layer = struct
   module Default_parameters = Transport_layer_default_parameters
 
   type t =
-    ( Interface.p2p_message,
+    ( Gs_interface.Worker_instance.p2p_message,
       Types.P2P.Metadata.Peer.t,
       Types.P2P.Metadata.Connection.t )
     P2p.t
