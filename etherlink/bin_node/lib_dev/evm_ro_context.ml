@@ -180,7 +180,7 @@ struct
           failwith "Send_raw_transaction failed with message \"%s\"" message
 
     let check_batched_response =
-      let open Services in
+      let open Batch in
       function
       | Batch l -> List.iter_es check_response l
       | Singleton r -> check_response r
@@ -212,7 +212,7 @@ struct
             call_service
               ~keep_alive:Ctxt.keep_alive
               ~base:evm_node_endpoint
-              (Services.dispatch_batch_service ~path:Resto.Path.root)
+              (Batch.dispatch_batch_service ~path:Resto.Path.root)
               ()
               ()
               (Batch methods)

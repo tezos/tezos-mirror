@@ -14,6 +14,7 @@
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
     "block_storage_sqlite3": true,
+    "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
     "rpc_server": "resto",
     "enable_websocket": false
@@ -64,6 +65,7 @@
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
     "block_storage_sqlite3": true,
+    "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
     "rpc_server": "resto",
     "enable_websocket": false
@@ -107,6 +109,7 @@
     "drop_duplicate_on_injection": true,
     "enable_send_raw_transaction": true,
     "block_storage_sqlite3": true,
+    "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
     "rpc_server": "resto",
     "enable_websocket": false

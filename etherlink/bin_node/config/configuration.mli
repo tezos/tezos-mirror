@@ -70,6 +70,7 @@ type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
   block_storage_sqlite3 : bool;
+  replay_block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
   rpc_server : rpc_server;

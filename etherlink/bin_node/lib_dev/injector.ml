@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Batch
+
 let send_raw_transaction_method txn =
   let open Rpc_encodings in
   let message = Ethereum_types.hex_encode_string txn in
@@ -26,7 +28,7 @@ let send_raw_transaction ~keep_alive ~base raw_txn =
     call_service
       ~keep_alive
       ~base
-      (Services.dispatch_batch_service ~path:Resto.Path.root)
+      (dispatch_batch_service ~path:Resto.Path.root)
       ()
       ()
       (Singleton (send_raw_transaction_method raw_txn))

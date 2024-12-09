@@ -43,6 +43,7 @@ type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
   block_storage_sqlite3 : bool;
+  replay_block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
   rpc_server : rpc_server;
@@ -135,6 +136,7 @@ let default_experimental_features =
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
     block_storage_sqlite3 = false;
+    replay_block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
     garbage_collector = None;
     rpc_server = Resto;
@@ -696,6 +698,7 @@ let experimental_features_encoding =
            drop_duplicate_on_injection;
            enable_send_raw_transaction;
            block_storage_sqlite3;
+           replay_block_storage_sqlite3;
            overwrite_simulation_tick_limit;
            garbage_collector;
            rpc_server;
@@ -705,6 +708,7 @@ let experimental_features_encoding =
         enable_send_raw_transaction,
         None,
         block_storage_sqlite3,
+        replay_block_storage_sqlite3,
         overwrite_simulation_tick_limit,
         garbage_collector,
         None,
@@ -714,6 +718,7 @@ let experimental_features_encoding =
            enable_send_raw_transaction,
            _node_transaction_validation,
            block_storage_sqlite3,
+           replay_block_storage_sqlite3,
            overwrite_simulation_tick_limit,
            garbage_collector,
            _next_wasm_runtime,
@@ -723,12 +728,13 @@ let experimental_features_encoding =
         drop_duplicate_on_injection;
         enable_send_raw_transaction;
         block_storage_sqlite3;
+        replay_block_storage_sqlite3;
         overwrite_simulation_tick_limit;
         garbage_collector;
         rpc_server;
         enable_websocket;
       })
-    (obj9
+    (obj10
        (dft
           ~description:
             "Request the rollup node to filter messages it has already \
@@ -757,6 +763,13 @@ let experimental_features_encoding =
              removes them from the durable storage"
           bool
           default_experimental_features.block_storage_sqlite3)
+       (dft
+          "replay_block_storage_sqlite3"
+          ~description:
+            "Replace internal callbacks to support Mainnet's replay with block \
+             storage enabled"
+          bool
+          false)
        (dft
           "overwrite_simulation_tick_limit"
           ~description:

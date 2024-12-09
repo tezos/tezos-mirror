@@ -27,6 +27,7 @@
 
 open Tezos_rpc
 open Rpc_encodings
+open Batch
 
 let version_service =
   Service.get_service
@@ -143,42 +144,6 @@ let configuration config dir =
 let health_check ?delegate_to dir =
   Evm_directory.register0 dir health_check_service (fun () () ->
       health_check_handler ?delegate_to ())
-
-(* The node can either take a single request or multiple requests at
-   once. *)
-type 'a batched_request = Singleton of 'a | Batch of 'a list
-
-let batch_encoding kind =
-  Data_encoding.(
-    union
-      [
-        case
-          ~title:"singleton"
-          (Tag 0)
-          kind
-          (function Singleton i -> Some i | _ -> None)
-          (fun i -> Singleton i);
-        case
-          ~title:"batch"
-          (Tag 1)
-          (list kind)
-          (function Batch i -> Some i | _ -> None)
-          (fun i -> Batch i);
-      ])
-
-let dispatch_service ~path =
-  Service.post_service
-    ~query:Query.empty
-    ~input:JSONRPC.request_encoding
-    ~output:JSONRPC.response_encoding
-    path
-
-let dispatch_batch_service ~path =
-  Service.post_service
-    ~query:Query.empty
-    ~input:(batch_encoding JSONRPC.request_encoding)
-    ~output:(batch_encoding JSONRPC.response_encoding)
-    path
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -1041,35 +1006,3 @@ let private_directory rpc config
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
        ~block_production
-
-let call (type input output)
-    (module R : Rpc_encodings.METHOD
-      with type input = input
-       and type output = output) ~keep_alive ~evm_node_endpoint (input : input)
-    =
-  let open Lwt_result_syntax in
-  let* response =
-    Rollup_services.call_service
-      ~keep_alive
-      ~base:evm_node_endpoint
-      (dispatch_batch_service ~path:Resto.Path.root)
-      ()
-      ()
-      (Singleton
-         JSONRPC.
-           {
-             method_ = R.method_;
-             parameters =
-               Some (Data_encoding.Json.construct R.input_encoding input);
-             id = None;
-           })
-  in
-  match response with
-  | Singleton {value = Ok value; _} | Batch [{value = Ok value; _}] ->
-      return (Data_encoding.Json.destruct R.output_encoding value)
-  | Singleton {value = Error err; _} | Batch [{value = Error err; _}] ->
-      failwith
-        "Request failed with error %s"
-        Data_encoding.Json.(to_string (construct JSONRPC.error_encoding err))
-  | Batch l ->
-      failwith "request: unexpected number of responses (%d)" List.(length l)
