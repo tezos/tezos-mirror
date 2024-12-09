@@ -607,7 +607,7 @@ let test_drag_after_import speed export_mode =
         constants_test with
         blocks_per_cycle = 256l;
         cycles_per_voting_period = 1l;
-        consensus_threshold = 0;
+        consensus_threshold_size = 0;
         proof_of_work_threshold = -1L;
       }
   in
@@ -761,7 +761,7 @@ let tests speed =
         speed
         Tezos_protocol_alpha_parameters.Default_parameters.(
           parameters_of_constants
-            {constants_sandbox with consensus_threshold = 0})
+            {constants_sandbox with consensus_threshold_size = 0})
     in
     let tests_rolling = make_tests_rolling speed in
     let tests_drag_after_import = make_tests_drag_after_import speed in

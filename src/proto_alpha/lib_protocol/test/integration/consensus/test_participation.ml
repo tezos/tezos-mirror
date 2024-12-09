@@ -69,7 +69,9 @@ let bake_and_attest_once (_b_pred, b_cur) baker attester =
 let test_participation ~sufficient_participation () =
   let open Lwt_result_wrap_syntax in
   let n_accounts = 2 in
-  let* b0, accounts = Context.init_n ~consensus_threshold:1 n_accounts () in
+  let* b0, accounts =
+    Context.init_n ~consensus_threshold_size:1 n_accounts ()
+  in
   let* csts = Context.get_constants (B b0) in
   let blocks_per_cycle = Int32.to_int csts.parametric.blocks_per_cycle in
   let mpr = csts.parametric.minimal_participation_ratio in
@@ -185,7 +187,9 @@ let check_no_dal_participation
 let test_participation_rpc () =
   let open Lwt_result_wrap_syntax in
   let n_accounts = 2 in
-  let* b0, (account1, account2) = Context.init2 ~consensus_threshold:1 () in
+  let* b0, (account1, account2) =
+    Context.init2 ~consensus_threshold_size:1 ()
+  in
   let del1 = Context.Contract.pkh account1 in
   let del2 = Context.Contract.pkh account2 in
   let* csts = Context.get_constants (B b0) in

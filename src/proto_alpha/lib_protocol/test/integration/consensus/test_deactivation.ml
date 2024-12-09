@@ -112,7 +112,7 @@ let test_simple_staking_rights () =
     rights. *)
 let test_simple_staking_rights_after_baking () =
   let open Lwt_result_syntax in
-  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold_size:0 () in
   let* m1 = Context.Contract.manager (B b) a1 in
   let* m2 = Context.Contract.manager (B b) a2 in
   let* b = Block.bake_n ~policy:(By_account m2.pkh) 5 b in
@@ -135,7 +135,7 @@ let check_active_staking_balance ~loc ~deactivated b (m : Account.t) =
 
 let run_until_deactivation () =
   let open Lwt_result_syntax in
-  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold_size:0 () in
   let* balance_start = Context.Contract.balance (B b) a1 in
   let* m1 = Context.Contract.manager (B b) a1 in
   let* m2 = Context.Contract.manager (B b) a2 in
@@ -341,7 +341,7 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
    first and third accounts. *)
 let test_delegation () =
   let open Lwt_result_syntax in
-  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold_size:0 () in
   let m3 = Account.new_account () in
   Account.add_account m3 ;
   let* m1 = Context.Contract.manager (B b) a1 in

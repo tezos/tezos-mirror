@@ -224,7 +224,7 @@ let run_script transaction () =
         let* incr = Incremental.begin_construction block in
         return (parameter src_addr, Incremental.alpha_ctxt incr)
     | Simple {parameter; _} ->
-        let* b, _contract = Context.init1 ~consensus_threshold:0 () in
+        let* b, _contract = Context.init1 ~consensus_threshold_size:0 () in
         let* inc = Incremental.begin_construction b in
         let ctxt = Incremental.alpha_ctxt inc in
         let ctxt =

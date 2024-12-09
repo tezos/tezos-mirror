@@ -185,7 +185,7 @@ let init () =
 (** Initializes one address for operations and one baker. *)
 let init_for_operation () =
   let open Lwt_result_syntax in
-  let+ block, (src0, src1) = Context.init2 ~consensus_threshold:0 () in
+  let+ block, (src0, src1) = Context.init2 ~consensus_threshold_size:0 () in
   let baker = Context.Contract.pkh src0 in
   (baker, src1, block)
 

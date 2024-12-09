@@ -270,7 +270,7 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
     tup
     ~blocks_per_cycle
     ~cycles_per_voting_period:1l
-    ~consensus_threshold:0
+    ~consensus_threshold_size:0
     ~issuance_weights:
       {
         base_total_issued_per_minute = Tez.zero;

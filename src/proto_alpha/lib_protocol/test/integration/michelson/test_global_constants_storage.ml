@@ -58,7 +58,7 @@ let expr_to_hash expr =
    blocks. *)
 let get_happy_path () =
   let open Lwt_result_wrap_syntax in
-  let* b, (alice, bob) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (alice, bob) = Context.init2 ~consensus_threshold_size:0 () in
   let* b = Incremental.begin_construction b in
   let expr_str = "Pair 3 7" in
   let expr = Expr.from_string expr_str in
@@ -115,7 +115,7 @@ let test_registration_of_bad_expr_fails () =
 (* You cannot register the same expression twice. *)
 let test_no_double_register () =
   let open Lwt_result_syntax in
-  let* b, alice = Context.init1 ~consensus_threshold:0 () in
+  let* b, alice = Context.init1 ~consensus_threshold_size:0 () in
   let expr = Expr.from_string "Pair 1 2" in
   let* operation =
     Op.register_global_constant

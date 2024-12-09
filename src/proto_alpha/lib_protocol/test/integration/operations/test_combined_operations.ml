@@ -289,7 +289,7 @@ let test_failing_operation_in_the_middle_with_fees () =
 
 let test_wrong_signature_in_the_middle () =
   let open Lwt_result_syntax in
-  let* blk, (c1, c2) = Context.init2 ~consensus_threshold:0 () in
+  let* blk, (c1, c2) = Context.init2 ~consensus_threshold_size:0 () in
   let* op1 = Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one in
   let* op2 = Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one in
   (* Make legit transfers, performing reveals *)

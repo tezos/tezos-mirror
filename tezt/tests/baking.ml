@@ -495,11 +495,15 @@ let wrong_branch_operation_dismissal =
   let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client = Client.init ~endpoint:(Node node) () in
   let minimal_block_delay = 1 in
+  let consensus_threshold_name =
+    if Protocol.(number protocol >= 022) then "consensus_threshold_size"
+    else "consensus_threshold"
+  in
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Either.Right (protocol, None))
       [
-        (["consensus_threshold"], `Int 1);
+        ([consensus_threshold_name], `Int 1);
         (["minimal_block_delay"], `String_of_int minimal_block_delay);
         (["delay_increment_per_round"], `String "1");
       ]

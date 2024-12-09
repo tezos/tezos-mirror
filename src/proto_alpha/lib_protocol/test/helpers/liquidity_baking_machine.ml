@@ -879,7 +879,7 @@ module ConcreteBaseMachine :
     let* result =
       Context.init_n
         n
-        ~consensus_threshold:0
+        ~consensus_threshold_size:0
         ~bootstrap_balances
         ~cost_per_byte:Tez.zero
         ~origination_size:0

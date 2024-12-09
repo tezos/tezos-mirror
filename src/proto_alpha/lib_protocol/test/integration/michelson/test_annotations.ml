@@ -62,7 +62,7 @@ let lazy_none = Script.lazy_expr (Expr.from_string "None")
 
 let init_and_originate contract_code_string =
   let open Lwt_result_syntax in
-  let* b, source = Context.init1 ~consensus_threshold:0 () in
+  let* b, source = Context.init1 ~consensus_threshold_size:0 () in
   let* inc = Incremental.begin_construction b in
   let code = Expr.toplevel_from_string contract_code_string in
   let script = Script.{code = lazy_expr code; storage = lazy_none} in

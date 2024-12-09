@@ -39,7 +39,7 @@ open Alpha_context
 let init_genesis ?policy ?dal_enable () =
   let open Lwt_result_syntax in
   let* genesis, _contracts =
-    Context.init_n ?dal_enable ~consensus_threshold:0 5 ()
+    Context.init_n ?dal_enable ~consensus_threshold_size:0 5 ()
   in
   let* b = Block.bake ?policy genesis in
   return (genesis, b)
@@ -616,13 +616,13 @@ let test_no_conflict_various_levels_and_rounds () =
 let test_attestation_threshold ~sufficient_threshold () =
   let open Lwt_result_wrap_syntax in
   (* We choose a relative large number of accounts so that the probability that
-     any delegate has [consensus_threshold] slots is low and most delegates have
-     about 1 slot so we can get closer to the limit of [consensus_threshold]: we
-     check that a block with attesting power [consensus_threshold - 1] won't be
+     any delegate has [consensus_threshold_size] slots is low and most delegates have
+     about 1 slot so we can get closer to the limit of [consensus_threshold_size]: we
+     check that a block with attesting power [consensus_threshold_size - 1] won't be
      baked. *)
   let* genesis, _contracts = Context.init_n 10 () in
   let* b = Block.bake genesis in
-  let* {parametric = {consensus_threshold; _}; _} =
+  let* {parametric = {consensus_threshold_size; _}; _} =
     Context.get_constants (B b)
   in
   let* attesters_list = Context.get_attesters (B b) in
@@ -632,8 +632,9 @@ let test_attestation_threshold ~sufficient_threshold () =
       (fun (counter, attestations) {Plugin.RPC.Validators.delegate; slots; _} ->
         let new_counter = counter + List.length slots in
         if
-          (sufficient_threshold && counter < consensus_threshold)
-          || ((not sufficient_threshold) && new_counter < consensus_threshold)
+          (sufficient_threshold && counter < consensus_threshold_size)
+          || (not sufficient_threshold)
+             && new_counter < consensus_threshold_size
         then
           let* attestation = Op.attestation ~round ~delegate b in
           return (new_counter, attestation :: attestations)
@@ -709,7 +710,7 @@ let test_attester_not_in_dal_committee () =
       ~dal_enable:true
       ~dal
       ~consensus_committee_size:100
-      ~consensus_threshold:0
+      ~consensus_threshold_size:0
       ~bootstrap_balances
       (Context.TList (n + 1))
       ()
@@ -766,7 +767,7 @@ let test_attester_not_in_dal_committee () =
 let test_dal_attestation_threshold () =
   let open Lwt_result_wrap_syntax in
   let n = 100 in
-  let* genesis, contracts = Context.init_n n ~consensus_threshold:0 () in
+  let* genesis, contracts = Context.init_n n ~consensus_threshold_size:0 () in
   let contract = Stdlib.List.hd contracts in
   let* {
          parametric =

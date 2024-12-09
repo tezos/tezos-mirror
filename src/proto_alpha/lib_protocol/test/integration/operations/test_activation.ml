@@ -338,7 +338,7 @@ let secrets () =
     accounts and balances. *)
 let activation_init () =
   let open Lwt_result_syntax in
-  let+ b, c = Context.init1 ~consensus_threshold:0 ~commitments () in
+  let+ b, c = Context.init1 ~consensus_threshold_size:0 ~commitments () in
   let ss = secrets () in
   (b, c, ss)
 

@@ -78,7 +78,9 @@ end = struct
       ?(mk_evidence = fun ctxt p1 p2 -> Op.double_preattestation ctxt p1 p2)
       ~loc () =
     let open Lwt_result_syntax in
-    let* genesis, _contracts = Context.init_n ~consensus_threshold:0 10 () in
+    let* genesis, _contracts =
+      Context.init_n ~consensus_threshold_size:0 10 ()
+    in
     let* b1 = bake genesis in
     let* b2_A = bake ~policy:(By_round 0) b1 in
     let* e = Op.attestation b1 in
@@ -92,7 +94,7 @@ end = struct
 
   let max_slashing_period () =
     let open Lwt_result_syntax in
-    let* genesis, _contract = Context.init1 ~consensus_threshold:0 () in
+    let* genesis, _contract = Context.init1 ~consensus_threshold_size:0 () in
     let* {parametric = {blocks_per_cycle; _}; _} =
       Context.get_constants (B genesis)
     in
@@ -223,7 +225,7 @@ end = struct
     let* genesis, contracts =
       Context.init_n
         ~issuance_weights
-        ~consensus_threshold:0
+        ~consensus_threshold_size:0
         ~consensus_committee_size:64
         10
         ()
@@ -362,7 +364,7 @@ end = struct
   let test_two_double_preattestation_evidences_leads_to_duplicate_denunciation
       () =
     let open Lwt_result_syntax in
-    let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+    let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
     let* blk_1, blk_2 = block_fork genesis in
     let* blk_a = Block.bake blk_1 in
     let* blk_b = Block.bake blk_2 in

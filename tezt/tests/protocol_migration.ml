@@ -439,10 +439,14 @@ let start_protocol ?consensus_threshold ?round_duration
       | None -> (consensus_committee_size * 2 / 3) + 1
       | Some f -> f ~consensus_committee_size
     in
+    let consensus_threshold_name =
+      if Protocol.(number protocol >= 022) then "consensus_threshold_size"
+      else "consensus_threshold"
+    in
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       [
-        (["consensus_threshold"], `Int consensus_threshold);
+        ([consensus_threshold_name], `Int consensus_threshold);
         (["minimal_block_delay"], `String_of_int minimal_block_delay);
       ]
   in

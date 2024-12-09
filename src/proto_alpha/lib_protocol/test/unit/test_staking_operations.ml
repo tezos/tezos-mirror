@@ -26,7 +26,7 @@ let constants =
         Default_parameters.constants_test.issuance_weights with
         base_total_issued_per_minute = Tez.zero;
       };
-    consensus_threshold = 0;
+    consensus_threshold_size = 0;
     origination_size = 0;
   }
 

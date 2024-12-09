@@ -375,7 +375,7 @@ let pick_addr_attester ctxt =
 
 let init_params =
   Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
-    {Context.default_test_constants with consensus_threshold = 0}
+    {Context.default_test_constants with consensus_threshold_size = 0}
 
 let delegates_of_block block =
   let open Lwt_result_syntax in

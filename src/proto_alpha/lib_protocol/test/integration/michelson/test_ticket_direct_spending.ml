@@ -107,7 +107,7 @@ let test_spending ~direct_ticket_spending_enable ~constructor () =
     in
     {
       default_constants with
-      consensus_threshold = 0;
+      consensus_threshold_size = 0;
       direct_ticket_spending_enable;
     }
   in

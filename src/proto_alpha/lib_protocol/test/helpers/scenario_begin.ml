@@ -72,7 +72,7 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
   --> set S.liquidity_baking_subsidy Tez.zero
   --> set S.minimal_block_delay Protocol.Alpha_context.Period.one_minute
   --> set S.cost_per_byte Tez.zero
-  --> set S.consensus_threshold 0
+  --> set S.consensus_threshold_size 0
   -->
   if deactivate_dynamic then
     set

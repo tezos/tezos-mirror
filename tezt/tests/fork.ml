@@ -84,7 +84,11 @@ let test_fork =
   let* () =
     Client.Admin.connect_address ~endpoint:(Node node1) ~peer:node2 client1
   in
-  let parameters = [(["consensus_threshold"], `Int 0)] in
+  let parameters =
+    if Protocol.(number protocol >= 022) then
+      [(["consensus_threshold_size"], `Int 0)]
+    else [(["consensus_threshold"], `Int 0)]
+  in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
   in

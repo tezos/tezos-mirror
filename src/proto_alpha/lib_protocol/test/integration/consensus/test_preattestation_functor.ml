@@ -57,7 +57,9 @@ end = struct
         fun _predpred _pred _curr -> Lwt_result_syntax.return (None, None))
       ?(post_process = Ok (fun _ -> Lwt_result_syntax.return_unit)) ~loc () =
     let open Lwt_result_syntax in
-    let* genesis, _contracts = Context.init_n ~consensus_threshold:1 5 () in
+    let* genesis, _contracts =
+      Context.init_n ~consensus_threshold_size:1 5 ()
+    in
     let* b1 = bake genesis in
     let* attestation = Op.attestation b1 in
     let* b2 = bake b1 ~operations:[attestation] in

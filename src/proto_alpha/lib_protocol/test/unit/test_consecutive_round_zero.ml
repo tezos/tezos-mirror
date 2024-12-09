@@ -18,7 +18,8 @@ let register_test =
   Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["consecutive_round_zero"]
 
 (* blocks_per_cycle = 12l *)
-let constants = {Default_parameters.constants_test with consensus_threshold = 0}
+let constants =
+  {Default_parameters.constants_test with consensus_threshold_size = 0}
 
 let check_consecutive_round_zero ~loc ~title b ~expected =
   let open Lwt_result_syntax in

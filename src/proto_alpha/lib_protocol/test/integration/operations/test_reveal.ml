@@ -42,7 +42,7 @@ let ten_tez = of_int 10
 
 let test_simple_reveal () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   (* Create the contract *)
@@ -64,7 +64,7 @@ let test_simple_reveal () =
 
 let test_empty_account_on_reveal () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   let amount = Tez.one_mutez in
@@ -152,7 +152,7 @@ let test_transfer_fees_emptying_after_reveal_batched () =
    an application phase, do not allow to forge dishonest revelations. *)
 let test_reveal_with_fake_account () =
   let open Lwt_result_syntax in
-  let* blk, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* blk, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   (* Create two fresh, unrevealed, accounts a and b. *)
   let account_a = Account.new_account () in
   let a_pkh = account_a.pkh in
@@ -245,7 +245,7 @@ let test_reveal_with_fake_account () =
    account b, using a's pkh. *)
 let test_reveal_with_fake_account_already_revealed () =
   let open Lwt_result_syntax in
-  let* blk, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* blk, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   (* Create two fresh, unrevealed, accounts a and b. *)
   let account_a = Account.new_account () in
   let a_pkh = account_a.pkh in
@@ -336,7 +336,7 @@ let test_reveal_with_fake_account_already_revealed () =
    We test that backtracked reveals stay backtracked. *)
 let test_backtracked_reveal_in_batch () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
@@ -393,7 +393,7 @@ let test_backtracked_reveal_in_batch () =
    whole batch fail. *)
 let test_already_revealed_manager_in_batch () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
@@ -480,7 +480,7 @@ let test_already_revealed_manager_in_batch () =
    not revealed afterward. *)
 let test_no_reveal_when_gas_exhausted () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Fund the contract with a sufficient balance *)
@@ -543,7 +543,7 @@ let test_no_reveal_when_gas_exhausted () =
 *)
 let test_reveal_incorrect_position_in_batch () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
@@ -588,7 +588,7 @@ let test_reveal_incorrect_position_in_batch () =
    then first reveal being backtracked. *)
 let test_duplicate_valid_reveals () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
@@ -626,7 +626,7 @@ let test_duplicate_valid_reveals () =
    batch. *)
 let test_valid_reveal_after_gas_exhausted_one () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
@@ -671,7 +671,7 @@ let test_valid_reveal_after_gas_exhausted_one () =
    while processing the second reveal. *)
 let test_valid_reveal_after_insolvent_one () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   (* Create the contract *)
@@ -712,7 +712,7 @@ let test_valid_reveal_after_insolvent_one () =
    batch. *)
 let test_valid_reveal_after_emptying_balance () =
   let open Lwt_result_syntax in
-  let* blk, c = Context.init1 ~consensus_threshold:0 () in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
   let new_contract = Contract.Implicit new_c.pkh in
   let amount = Tez.one_mutez in

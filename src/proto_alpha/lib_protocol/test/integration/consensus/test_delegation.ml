@@ -138,7 +138,9 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
     delegation. *)
 let delegate_can_be_changed_from_unregistered_contract ~fee () =
   let open Lwt_result_syntax in
-  let* b, (bootstrap0, bootstrap1) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (bootstrap0, bootstrap1) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let unregistered = Contract.Implicit unregistered_pkh in
@@ -180,7 +182,7 @@ let delegate_can_be_changed_from_unregistered_contract ~fee () =
     delegation. *)
 let delegate_can_be_removed_from_unregistered_contract ~fee () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let unregistered = Contract.Implicit unregistered_pkh in
@@ -552,7 +554,7 @@ let test_unregistered_delegate_key_init_origination ~fee () =
     implicit contract has no delegate. *)
 let test_unregistered_delegate_key_init_delegation ~fee () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.Implicit unregistered_pkh in
@@ -606,7 +608,7 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
     delegate remains unchanged. *)
 let test_unregistered_delegate_key_switch_delegation ~fee () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
@@ -664,7 +666,7 @@ let test_unregistered_delegate_key_switch_delegation ~fee () =
     [amount], no self-delegation. *)
 let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.Implicit unregistered_pkh in
@@ -706,7 +708,7 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
     the amount [amount] of the implicit contract. *)
 let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.Implicit unregistered_pkh in
@@ -764,7 +766,7 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
     credits the amount [amount] to the implicit contract. *)
 let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
@@ -832,7 +834,7 @@ let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
 let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
     =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.Implicit unregistered_pkh in
@@ -881,7 +883,7 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
 let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
     =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.Implicit unregistered_pkh in
@@ -951,7 +953,7 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
 let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
     () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
@@ -1042,7 +1044,7 @@ let test_failed_self_delegation_no_transaction () =
 let test_failed_self_delegation_emptied_implicit_contract amount () =
   let open Lwt_result_syntax in
   (* create an implicit contract *)
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let unregistered_pkh = Account.(account.pkh) in
   let impl_contract = Contract.Implicit unregistered_pkh in
@@ -1071,7 +1073,7 @@ let test_failed_self_delegation_emptied_implicit_contract amount () =
     should fail as the contract is already delegated. *)
 let test_emptying_delegated_implicit_contract_fails amount () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let* bootstrap_manager = Context.Contract.manager (B b) bootstrap in
   let account = Account.new_account () in
   let unregistered_pkh = Account.(account.pkh) in
@@ -1112,7 +1114,7 @@ let test_emptying_delegated_implicit_contract_fails amount () =
 let test_valid_delegate_registration_init_delegation_credit amount () =
   let open Lwt_result_syntax in
   (* create an implicit contract *)
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.Implicit delegate_pkh in
@@ -1160,7 +1162,7 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
 let test_valid_delegate_registration_switch_delegation_credit amount () =
   let open Lwt_result_syntax in
   (* create an implicit contract *)
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.Implicit delegate_pkh in
@@ -1209,7 +1211,7 @@ let test_valid_delegate_registration_switch_delegation_credit amount () =
 let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   let open Lwt_result_syntax in
   (* create an implicit contract *)
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.Implicit delegate_pkh in
@@ -1268,7 +1270,7 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
 let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
   let open Lwt_result_syntax in
   (* create an implicit contract *)
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.Implicit delegate_pkh in
@@ -1329,7 +1331,7 @@ let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
     some credit. *)
 let test_double_registration () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let pkh = Account.(account.pkh) in
   let impl_contract = Contract.Implicit pkh in
@@ -1358,7 +1360,7 @@ let test_double_registration () =
     after first self-delegation. *)
 let test_double_registration_when_empty () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let pkh = Account.(account.pkh) in
   let impl_contract = Contract.Implicit pkh in
@@ -1393,7 +1395,7 @@ let test_double_registration_when_empty () =
     then credited back after first self-delegation. *)
 let test_double_registration_when_recredited () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let pkh = Account.(account.pkh) in
   let impl_contract = Contract.Implicit pkh in
@@ -1438,7 +1440,7 @@ let test_double_registration_when_recredited () =
 (** Self-delegation on unrevealed contract. *)
 let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let {Account.pkh; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; _} = Account.new_account () in
   let contract = Alpha_context.Contract.Implicit pkh in
@@ -1465,7 +1467,7 @@ let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
 (** Self-delegation on revealed but not registered contract. *)
 let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let {Account.pkh; pk; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; _} = Account.new_account () in
   let contract = Alpha_context.Contract.Implicit pkh in
@@ -1490,7 +1492,7 @@ let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
 (** Self-delegation emptying a fresh contract. *)
 let test_self_delegation_emptying_contract () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let {Account.pkh; pk; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; _} = Account.new_account () in
   let contract = Alpha_context.Contract.Implicit pkh in
@@ -1522,7 +1524,7 @@ let test_self_delegation_emptying_contract () =
 (** Self-delegation on revealed and registered contract. *)
 let test_registered_self_delegate_key_init_delegation () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let {Account.pkh; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; pk = delegate_pk; _} =
     Account.new_account ()
@@ -1552,7 +1554,7 @@ let test_registered_self_delegate_key_init_delegation () =
 let test_bls_account_self_delegate ~allow_tz4_delegate_enable () =
   let open Lwt_result_syntax in
   let* b, bootstrap =
-    Context.init1 ~consensus_threshold:0 ~allow_tz4_delegate_enable ()
+    Context.init1 ~consensus_threshold_size:0 ~allow_tz4_delegate_enable ()
   in
   let {Account.pkh = tz4_pkh; pk = tz4_pk; _} =
     Account.new_account ~algo:Bls ()
