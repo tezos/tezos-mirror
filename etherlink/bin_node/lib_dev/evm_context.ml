@@ -369,6 +369,9 @@ module State = struct
         let*! evm_state = Irmin_context.PVMState.get context in
         (* Clear the store. *)
         let* () = Evm_store.reset_after conn ~l2_level:finalized_number in
+        let* pending_upgrade =
+          Evm_store.Kernel_upgrades.find_latest_pending conn
+        in
         (* Update mutable session values. *)
         let next_blueprint_number =
           let (Qty finalized_number) = finalized_number in
@@ -379,14 +382,7 @@ module State = struct
         ctxt.session.evm_state <- evm_state ;
         ctxt.session.current_block_hash <- current_block_hash ;
         ctxt.session.context <- context ;
-        (* TODO: We need to fetch from the store (before it’s cleared) if there
-           is a pending upgrade at level [finalized_level]. It should be something
-           of the sort:
-
-           SELECT * FROM kernel_upgrades
-           WHERE injected_before <= {finalized_level}
-              && (applied_before >= {finalized_level} || applied_before IS NULL) *)
-        ctxt.session.pending_upgrade <- None ;
+        ctxt.session.pending_upgrade <- pending_upgrade ;
         let*! head_info in
         head_info := session_to_head_info ctxt.session ;
         return evm_state

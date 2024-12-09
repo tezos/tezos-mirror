@@ -290,7 +290,7 @@ module Q = struct
       (unit ->? pending_kernel_upgrade)
       @@ {|SELECT injected_before, root_hash, activation_timestamp
            FROM kernel_upgrades WHERE applied_before IS NULL
-           ORDER BY applied_before DESC
+           ORDER BY injected_before DESC
            LIMIT 1
     |}
 
