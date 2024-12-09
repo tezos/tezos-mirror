@@ -1474,7 +1474,7 @@ module State = struct
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
     return_unit
 
-  let potential_observer_reorg ~evm_node_endpoint:_ _conn _ctxt
+  let potential_observer_reorg ~evm_node_endpoint:_ conn _ctxt
       blueprint_with_events =
     let open Lwt_result_syntax in
     (*
@@ -1490,7 +1490,33 @@ module State = struct
       blueprint_with_events.Blueprint_types.blueprint.number
     in
     let*! () = Evm_context_events.observer_potential_reorg blueprint_number in
-    return_none
+    (* We check in the local storage if we already saw a blueprint
+       for this number, and whether it's the same or not.
+
+       If it's not the same blueprint, it might be the sign of a
+       reorganization.
+    *)
+    let* is_it_the_same_blueprint =
+      let+ blueprint_in_store =
+        Evm_store.Blueprints.find_with_events conn blueprint_number
+      in
+      match blueprint_in_store with
+      | None ->
+          (* The blueprint has been removed from the store, we cannot check it. *)
+          false
+      | Some blueprint_in_store ->
+          Blueprint_types.with_events_equal
+            blueprint_in_store
+            blueprint_with_events
+    in
+    if is_it_the_same_blueprint then
+      (* The endpoint simply republished an old blueprint. *)
+      let*! () =
+        Evm_context_events.observer_reorg_old_blueprint blueprint_number
+      in
+      return_none
+    else (* Next step is done in the next commit. *)
+      return_none
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
