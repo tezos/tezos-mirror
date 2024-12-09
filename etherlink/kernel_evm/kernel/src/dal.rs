@@ -18,6 +18,7 @@ const DAL_PADDING_TAG: u8 = 0;
 
 enum ParsedInput {
     UnsignedSequencerBlueprint(UnsignedSequencerBlueprint),
+    InvalidInput,
     Padding,
 }
 
@@ -80,8 +81,10 @@ fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
             ),
             SequencerBlueprintRes::InvalidNumberOfChunks
             | SequencerBlueprintRes::InvalidSignature
-            | SequencerBlueprintRes::InvalidNumber
-            | SequencerBlueprintRes::Unparsable => (None, chunk_length + TAG_SIZE),
+            | SequencerBlueprintRes::InvalidNumber => {
+                (Some(ParsedInput::InvalidInput), chunk_length + TAG_SIZE)
+            }
+            SequencerBlueprintRes::Unparsable => (None, chunk_length + TAG_SIZE),
         }
     } else {
         log!(host, Debug, "Read an invalid chunk from slot.");
@@ -144,6 +147,8 @@ fn parse_slot<Host: Runtime>(
             None => return buffer, // Once an unparsable input has been read,
             // stop reading and return the list of chunks read.
             Some(ParsedInput::UnsignedSequencerBlueprint(b)) => buffer.push(b),
+            // Invalid inputs are ignored.
+            Some(ParsedInput::InvalidInput) => {}
             Some(ParsedInput::Padding) => return buffer,
         }
 
