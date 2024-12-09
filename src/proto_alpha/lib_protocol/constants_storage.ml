@@ -144,9 +144,9 @@ let consensus_committee_size c =
   let constants = Raw_context.constants c in
   constants.consensus_committee_size
 
-let consensus_threshold c =
+let consensus_threshold_size c =
   let constants = Raw_context.constants c in
-  constants.consensus_threshold
+  constants.consensus_threshold_size
 
 let minimal_participation_ratio c =
   let constants = Raw_context.constants c in

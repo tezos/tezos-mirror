@@ -354,7 +354,7 @@ let attestation_quorum state =
   let power, attestations = state_attesting_power state in
   if
     Compare.Int.(
-      power >= state.global_state.constants.parametric.consensus_threshold)
+      power >= state.global_state.constants.parametric.consensus_threshold_size)
   then Some (power, attestations)
   else None
 
@@ -662,7 +662,7 @@ let rec baking_minimal_timestamp ~count state
     |> attestations_attesting_power state
   in
   let consensus_threshold =
-    state.global_state.constants.parametric.consensus_threshold
+    state.global_state.constants.parametric.consensus_threshold_size
   in
   let* () =
     if Compare.Int.(total_voting_power < consensus_threshold) then

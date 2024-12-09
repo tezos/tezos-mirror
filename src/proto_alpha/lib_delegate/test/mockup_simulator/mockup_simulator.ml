@@ -1081,7 +1081,7 @@ let deduce_baker_sk
 
 (** Generate the two initial genesis blocks. *)
 let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
-    ~consensus_committee_size ~consensus_threshold accounts_with_secrets
+    ~consensus_committee_size ~consensus_threshold_size accounts_with_secrets
     (total_accounts : int) =
   let open Lwt_result_syntax in
   let default_constants = Mockup.Protocol_parameters.default_value.constants in
@@ -1098,7 +1098,7 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
       default_constants with
       initial_seed;
       consensus_committee_size;
-      consensus_threshold;
+      consensus_threshold_size;
       minimal_block_delay = Alpha_context.Period.of_seconds_exn (max 1L round0);
       delay_increment_per_round =
         Alpha_context.Period.of_seconds_exn Int64.(max 1L (sub round1 round0));
@@ -1267,7 +1267,7 @@ type config = {
   delegate_selection : (int32 * (int32 * Signature.public_key_hash) list) list;
   initial_seed : State_hash.t option;
   consensus_committee_size : int;
-  consensus_threshold : int;
+  consensus_threshold_size : int;
 }
 
 let default_config =
@@ -1281,8 +1281,8 @@ let default_config =
     initial_seed = None;
     consensus_committee_size =
       Default_parameters.constants_mainnet.consensus_committee_size;
-    consensus_threshold =
-      Default_parameters.constants_mainnet.consensus_threshold;
+    consensus_threshold_size =
+      Default_parameters.constants_mainnet.consensus_threshold_size;
   }
 
 let make_baking_delegate
@@ -1332,7 +1332,7 @@ let run ?(config = default_config) bakers_spec =
         ~round0:config.round0
         ~round1:config.round1
         ~consensus_committee_size:config.consensus_committee_size
-        ~consensus_threshold:config.consensus_threshold
+        ~consensus_threshold_size:config.consensus_threshold_size
         accounts_with_secrets
         total_accounts
     in

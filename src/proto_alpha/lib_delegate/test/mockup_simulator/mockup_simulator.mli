@@ -151,7 +151,7 @@ type config = {
       (** Optional initial seed for protocol (used to control delegate selection) *)
   consensus_committee_size : int;
       (** Size of the committee for tenderbake in number of slots *)
-  consensus_threshold : int;
+  consensus_threshold_size : int;
       (** Threshold, in number of slots, for the quorum to be considered
      reached. Should be [2 * consensus_committee_size / 3 + 1] in
      usual setting for tenderbake. *)

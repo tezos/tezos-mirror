@@ -179,7 +179,7 @@ let constants_mainnet : Constants.Parametric.t =
   let consensus_committee_size = 7000 in
   let Constants.Generated.
         {
-          consensus_threshold;
+          consensus_threshold_size;
           issuance_weights =
             {
               base_total_issued_per_minute;
@@ -335,7 +335,7 @@ let constants_mainnet : Constants.Parametric.t =
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.of_seconds_exn 4L;
     consensus_committee_size;
-    consensus_threshold;
+    consensus_threshold_size;
     (* 4667 slots *)
     minimal_participation_ratio = {numerator = 2; denominator = 3};
     limit_of_delegation_over_baking = 9;
@@ -408,7 +408,7 @@ let constants_mainnet : Constants.Parametric.t =
 let constants_sandbox =
   let consensus_committee_size = 301 in
   let block_time = 1 in
-  let Constants.Generated.{consensus_threshold = _; issuance_weights} =
+  let Constants.Generated.{consensus_threshold_size = _; issuance_weights} =
     Constants.Generated.generate
       ~consensus_committee_size
       ~dal_rewards_ratio:default_dal.rewards_ratio
@@ -436,7 +436,7 @@ let constants_sandbox =
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
-    consensus_threshold = 0;
+    consensus_threshold_size = 0;
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
     allow_tz4_delegate_enable = true;
@@ -444,7 +444,7 @@ let constants_sandbox =
 
 let constants_test =
   let consensus_committee_size = 67 in
-  let Constants.Generated.{consensus_threshold; issuance_weights} =
+  let Constants.Generated.{consensus_threshold_size; issuance_weights} =
     Constants.Generated.generate
       ~consensus_committee_size
       ~dal_rewards_ratio:default_dal.rewards_ratio
@@ -475,7 +475,7 @@ let constants_test =
       Int64.(sub (shift_left 1L 62) 1L) (* 1/4 of nonces are accepted *);
     vdf_difficulty = 50_000L;
     consensus_committee_size;
-    consensus_threshold (* 17 slots *);
+    consensus_threshold_size (* 17 slots *);
     limit_of_delegation_over_baking =
       19
       (* Not 9 so that multiplication by a percentage and

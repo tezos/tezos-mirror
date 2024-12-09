@@ -900,7 +900,7 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
-    state.global_state.constants.parametric.consensus_threshold
+    state.global_state.constants.parametric.consensus_threshold_size
   in
   let get_slot_voting_power ~slot =
     Delegate_slots.voting_power state.level_state.delegate_slots ~slot
