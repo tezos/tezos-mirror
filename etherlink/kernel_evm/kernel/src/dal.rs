@@ -268,11 +268,11 @@ pub mod tests {
 
     pub fn chunk_blueprint(
         blueprint: BlueprintWithDelayedHashes,
+        number: U256,
     ) -> Vec<UnsignedSequencerBlueprint> {
         let bytes = blueprint.rlp_bytes();
         let chunks = bytes.chunks(MAX_CHUNK_SIZE);
         let nb_chunks = chunks.len();
-        let number = U256::zero();
         chunks
             .enumerate()
             .map(|(chunk_index, chunk)| UnsignedSequencerBlueprint {
@@ -344,7 +344,7 @@ pub mod tests {
         let mut host = MockKernelHost::default();
 
         let blueprint = dummy_big_blueprint(100);
-        let chunks = chunk_blueprint(blueprint);
+        let chunks = chunk_blueprint(blueprint, 0.into());
         assert!(
             chunks.len() >= 2,
             "Blueprint is composed of {} chunks, but at least two are required for the test to make sense",
@@ -376,7 +376,7 @@ pub mod tests {
         let mut host = MockKernelHost::default();
 
         let blueprint = dummy_big_blueprint(100);
-        let chunks = chunk_blueprint(blueprint);
+        let chunks = chunk_blueprint(blueprint, 0.into());
 
         assert!(
             chunks.len() >= 2,
@@ -436,17 +436,17 @@ pub mod tests {
     fn test_parse_slot_resume_after_invalid_chunk() {
         let mut host = MockKernelHost::default();
 
-        let valid_blueprint_chunks_1 = chunk_blueprint(dummy_big_blueprint(1));
+        let valid_blueprint_chunks_1 = chunk_blueprint(dummy_big_blueprint(1), 0.into());
 
         let invalid_blueprint_chunks = {
-            let mut chunks = chunk_blueprint(dummy_big_blueprint(1));
+            let mut chunks = chunk_blueprint(dummy_big_blueprint(1), 0.into());
             for chunk in chunks.iter_mut() {
                 chunk.nb_chunks = crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS + 1
             }
             chunks
         };
 
-        let valid_blueprint_chunks_2 = chunk_blueprint(dummy_big_blueprint(1));
+        let valid_blueprint_chunks_2 = chunk_blueprint(dummy_big_blueprint(1), 0.into());
 
         let mut chunks = vec![];
         chunks.extend(valid_blueprint_chunks_1.clone());
@@ -531,7 +531,7 @@ pub mod tests {
         let mut host = MockKernelHost::default();
 
         let blueprint = dummy_big_blueprint(1);
-        let chunks = chunk_blueprint(blueprint);
+        let chunks = chunk_blueprint(blueprint, 0.into());
 
         let dal_parameters = host.reveal_dal_parameters();
         let published_level = host.host.level();

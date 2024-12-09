@@ -758,7 +758,7 @@ mod tests {
 
     fn fill_slots(host: &mut MockKernelHost, slots: Vec<u8>) {
         let blueprint = dummy_big_blueprint(100);
-        let chunks = chunk_blueprint(blueprint);
+        let chunks = chunk_blueprint(blueprint, 0.into());
 
         let dal_parameters = host.reveal_dal_parameters();
         let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
