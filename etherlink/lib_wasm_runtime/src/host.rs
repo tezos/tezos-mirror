@@ -63,6 +63,11 @@ impl InputsBuffer {
     }
 }
 
+pub enum RuntimeVersion {
+    V0,
+    V1,
+}
+
 pub struct Host {
     inputs_buffer: InputsBuffer,
     tree: EvmTree,
@@ -70,6 +75,7 @@ pub struct Host {
     needs_kernel_reload: bool,
     preimages_dir: OCamlString,
     preimages_endpoint: Option<OCamlString>,
+    pub version: RuntimeVersion,
 }
 
 impl Host {
@@ -87,6 +93,7 @@ impl Host {
             needs_kernel_reload: false,
             preimages_dir,
             preimages_endpoint,
+            version: RuntimeVersion::V0,
         }
     }
 
@@ -411,13 +418,28 @@ impl Runtime for Host {
 
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         trace!("store_value_size({path})");
-        let res = bindings::store_value_size(self.tree(), path.as_bytes())
-            .map_err(from_binding_error)
-            .map_err(self.check_path_exists(path))?;
+        match self.version {
+            RuntimeVersion::V0 => {
+                let res = bindings::store_value_size(self.tree(), path.as_bytes())
+                    .map_err(from_binding_error)
+                    .map_err(self.check_path_exists(path))?;
 
-        Ok(res
-            .try_into()
-            .expect("inconsistent result from bindings::store_value_size"))
+                Ok(res
+                    .try_into()
+                    .expect("inconsistent result from bindings::store_value_size"))
+            }
+            RuntimeVersion::V1 => {
+                // Changes compared to V0 introduced by
+                // https://gitlab.com/tezos/tezos/-/merge_requests/15897.
+                let res = bindings::store_value_size(self.tree(), path.as_bytes())
+                    .map_err(from_binding_error)
+                    .map_err(self.check_path_has_value(path))?;
+
+                Ok(res
+                    .try_into()
+                    .expect("inconsistent result from bindings::store_value_size"))
+            }
+        }
     }
 
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
