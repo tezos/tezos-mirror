@@ -359,6 +359,8 @@ impl InputHandler for SequencerInput {
             }) => {
                 log!(host, Debug, "Importing {} DAL signals", &signals.0.len());
                 let params = host.reveal_dal_parameters();
+                let head_level: Option<U256> =
+                    crate::block_storage::read_current_number(host).ok();
                 for signal in signals.0.iter() {
                     let published_level = signal.published_level;
                     let slot_indices = &signal.slot_indices;
@@ -374,6 +376,7 @@ impl InputHandler for SequencerInput {
                             fetch_and_parse_sequencer_blueprint_from_dal(
                                 host,
                                 &params,
+                                &head_level,
                                 *slot_index,
                                 published_level,
                             )

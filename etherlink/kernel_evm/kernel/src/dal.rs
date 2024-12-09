@@ -4,6 +4,7 @@
 
 use crate::parsing::{parse_unsigned_blueprint_chunk, SequencerBlueprintRes};
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
+use primitive_types::U256;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
@@ -72,9 +73,10 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
 fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
+    head_level: &Option<U256>,
 ) -> (Option<ParsedInput>, usize) {
     if let Result::Ok(chunk_length) = rlp_length(bytes) {
-        match parse_unsigned_blueprint_chunk(&bytes[..chunk_length]) {
+        match parse_unsigned_blueprint_chunk(&bytes[..chunk_length], head_level) {
             SequencerBlueprintRes::SequencerBlueprint(unsigned_chunk) => (
                 Some(ParsedInput::UnsignedSequencerBlueprint(unsigned_chunk)),
                 chunk_length + TAG_SIZE,
@@ -95,6 +97,7 @@ fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
 fn parse_input<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
+    head_level: &Option<U256>,
 ) -> (Option<ParsedInput>, usize) {
     // The expected format is:
 
@@ -104,7 +107,7 @@ fn parse_input<Host: Runtime>(
         DAL_PADDING_TAG => (Some(ParsedInput::Padding), TAG_SIZE),
         DAL_BLUEPRINT_INPUT_TAG => {
             let bytes = &bytes[TAG_SIZE..];
-            parse_unsigned_sequencer_blueprint(host, bytes)
+            parse_unsigned_sequencer_blueprint(host, bytes, head_level)
         }
         invalid_tag => {
             log!(
@@ -122,6 +125,7 @@ fn parse_input<Host: Runtime>(
 fn parse_slot<Host: Runtime>(
     host: &mut Host,
     slot: &[u8],
+    head_level: &Option<U256>,
 ) -> Vec<UnsignedSequencerBlueprint> {
     // The format of a dal slot is
     // tagged chunk | tagged chunk | .. | padding
@@ -141,7 +145,7 @@ fn parse_slot<Host: Runtime>(
         if offset >= slot.len() {
             return buffer;
         };
-        let (next_input, length) = parse_input(host, &slot[offset..]);
+        let (next_input, length) = parse_input(host, &slot[offset..], head_level);
 
         match next_input {
             None => return buffer, // Once an unparsable input has been read,
@@ -161,6 +165,7 @@ fn parse_slot<Host: Runtime>(
 pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
     host: &mut Host,
     params: &RollupDalParameters,
+    head_level: &Option<U256>,
     slot_index: u8,
     published_level: u32,
 ) -> Option<Vec<UnsignedSequencerBlueprint>> {
@@ -177,7 +182,7 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
         // size, we need to remove this padding before parsing the
         // slot as a blueprint chunk.
 
-        let chunks = parse_slot(host, &slot);
+        let chunks = parse_slot(host, &slot, head_level);
         log!(
             host,
             Debug,
@@ -353,6 +358,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -392,6 +398,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -457,6 +464,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -534,6 +542,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -547,6 +556,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
