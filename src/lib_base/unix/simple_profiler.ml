@@ -219,24 +219,7 @@ let stop state =
 
 let stamp state verbosity id = stop (record state verbosity id)
 
-let pp_delta_t ppf t =
-  let t = int_of_float (t *. 1000000.) in
-  let t =
-    if t >= 0 then t
-    else (
-      Format.fprintf ppf "-" ;
-      -t)
-  in
-  let mus = t mod 1000 and t = t / 1000 in
-  let ms = t mod 1000 and t = t / 1000 in
-  let s = t mod 60 and t = t / 60 in
-  let m = t mod 60 and h = t / 60 in
-  if h <> 0 then Format.fprintf ppf "%dh" h ;
-  if m <> 0 || h <> 0 then Format.fprintf ppf "%dm" m ;
-  if s <> 0 || m <> 0 || h <> 0 then Format.fprintf ppf "%ds" s ;
-  Format.fprintf ppf "%d.%03dms" ms mus
-
-let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t t0 =
+let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t =
   let id =
     match
       List.filter_map (function "text", v -> Some v | _ -> None) metadata
@@ -273,20 +256,13 @@ let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t t0 =
   in
   Format.fprintf ppf "%s %-7i " (String.sub indentsym 0 80) n ;
   if t.wall = 0. then Format.fprintf ppf "                 "
-  else
-    Format.fprintf
-      ppf
-      "% 10.3fms %3d%%"
-      (t.wall *. 1000.)
-      (int_of_float (ceil (100. *. (t.cpu /. t.wall)))) ;
-  match t0 with
-  | None -> Format.fprintf ppf "@,"
-  | Some t0 -> Format.fprintf ppf " +%a@," pp_delta_t t0.wall
+  else Format.fprintf ppf "% 10.3fms" (t.wall *. 1000.) ;
+  Format.fprintf ppf "@,"
 
 let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
   IdMap.iter
     (fun id {count = n; total = Span d; children; node_verbosity = _} ->
-      pp_line nident ppf id n d None ;
+      pp_line nident ppf id n d ;
       pp_report
         ~toplevel_call:false
         t0
@@ -297,7 +273,7 @@ let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
   List.iter
     (fun (id, {start = t; duration = Span d; contents; item_verbosity = _}) ->
       let toplevel_timestamp = if toplevel_call then Some t else None in
-      pp_line ?toplevel_timestamp nident ppf id 1 d (Some (t -* t0)) ;
+      pp_line ?toplevel_timestamp nident ppf id 1 d ;
       pp_report ~toplevel_call:false t (nident + 1) ppf contents)
     recorded
 
