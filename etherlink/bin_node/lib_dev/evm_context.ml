@@ -1012,13 +1012,19 @@ module State = struct
          {transactions = delayed_transactions; timestamp; level = flushed_level}
        as flushed_blueprint) =
     let open Lwt_result_syntax in
+    let before_flushed_level =
+      Ethereum_types.Qty.pred
+        flushed_blueprint.Evm_events.Flushed_blueprint.level
+    in
+    (* save upgrades before reset *)
+    let* lost_upgrade =
+      Evm_store.Kernel_upgrades.find_latest_injected_after
+        conn
+        before_flushed_level
+    in
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
     let* (_ : Evm_state.t) =
-      let before_flushed_level =
-        Ethereum_types.Qty.pred
-          flushed_blueprint.Evm_events.Flushed_blueprint.level
-      in
       let* checkpoint =
         Evm_store.Context_hashes.find conn before_flushed_level
       in
@@ -1029,12 +1035,18 @@ module State = struct
       | Some checkpoint ->
           reset_to_level ctxt conn before_flushed_level checkpoint
     in
-    (* Reapply lost events on current head *)
+    (* Clean unreliable delayed inbox *)
     let* () = clear_head_delayed_inbox ctxt in
-    let events =
+    (* Reapply lost events on current head *)
+    let delayed_transactions_events =
       List.map
         (fun tx -> Evm_events.New_delayed_transaction tx)
         delayed_transactions
+    in
+    let events =
+      match lost_upgrade with
+      | None -> delayed_transactions_events
+      | Some u -> Upgrade_event u :: delayed_transactions_events
     in
     (* Prepare a blueprint payload signed by the sequencer to execute locally. *)
     let* parent_hash = Evm_state.current_block_hash ctxt.session.evm_state in

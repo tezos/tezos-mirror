@@ -94,6 +94,13 @@ module Kernel_upgrades : sig
   val record_apply : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  (** [find_latest_injecter_after n] returns the latest upgrade injected after
+   the blueprint [n] was applied. *)
+  val find_latest_injected_after :
+    conn ->
+    Ethereum_types.quantity ->
+    Evm_events.Upgrade.t option tzresult Lwt.t
 end
 
 module Delayed_transactions : sig
