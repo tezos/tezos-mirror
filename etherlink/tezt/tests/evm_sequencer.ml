@@ -3374,11 +3374,9 @@ let test_flushed_blueprint_reorg =
   let* () = Evm_node.terminate observer in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
 
-  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
-     Eth_account.bootstrap_accounts.(1). *)
-  let* raw_transfer =
+  let craft_raw_transfer account =
     Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~source_private_key:account.Eth_account.private_key
       ~chain_id:1337
       ~nonce:0
       ~gas_price:1_000_000_000
@@ -3387,15 +3385,28 @@ let test_flushed_blueprint_reorg =
       ~address:Eth_account.bootstrap_accounts.(1).address
       ()
   in
+  let* raw_transfer = craft_raw_transfer Eth_account.bootstrap_accounts.(0) in
+  let* raw_transfer_2 = craft_raw_transfer Eth_account.bootstrap_accounts.(1) in
   (* Add a transaction to the delayed inbox. *)
   let* _hash =
     send_raw_transaction_to_delayed_inbox
+      ~wait_for_next_level:false
       ~sc_rollup_node
       ~client
       ~l1_contracts
       ~sc_rollup_address
       raw_transfer
   in
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~sender:Constant.bootstrap3
+      raw_transfer_2
+  in
+
   (* We mark at which level the delayed inbox item was added. *)
   let* add_delayed_inbox_level = Client.level client in
   let wait_for_add_delayed_inbox =

@@ -248,7 +248,7 @@ module Flushed_blueprint = struct
         Option.map
           (fun hashes ->
             {
-              hashes;
+              hashes = List.rev hashes;
               timestamp = timestamp_of_bytes timestamp;
               level = decode_number_le level;
             })
