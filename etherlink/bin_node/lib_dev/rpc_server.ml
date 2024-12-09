@@ -132,6 +132,7 @@ let start_public_server ?delegate_health_check_to ?evm_services
     Events.is_ready
       ~rpc_addr:config.public_rpc.addr
       ~rpc_port:config.public_rpc.port
+      ~backend:config.experimental_features.rpc_server
   in
   return finalizer
 
@@ -147,6 +148,7 @@ let start_private_server ?(block_production = `Disabled) config ctxt =
         Events.private_server_is_ready
           ~rpc_addr:private_rpc.addr
           ~rpc_port:private_rpc.port
+          ~backend:config.experimental_features.rpc_server
       in
       return finalizer
   | None -> return (fun () -> Lwt_syntax.return_unit)

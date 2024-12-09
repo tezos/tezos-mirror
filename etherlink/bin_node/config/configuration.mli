@@ -161,6 +161,9 @@ val native_execution_policy_encoding : native_execution_policy Data_encoding.t
 (** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir]. *)
 val encoding : string -> t Data_encoding.t
 
+(** Encoding for {!type-rpc_server}. *)
+val rpc_server_encoding : rpc_server Data_encoding.t
+
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
 
