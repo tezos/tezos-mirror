@@ -285,3 +285,15 @@ let auto_approve =
       "If set to true (default), don't ask confirmation before updating a \
        deployment via terraform."
     true
+
+let faketime =
+  Clap.optional_string
+    ~section
+    ~long:"faketime"
+    ~description:
+      "This argument specifies the value used to set [FAKETIME] environment \
+       variable for the Docker images. Use it with a docker image that uses \
+       [libfaketime]. For instance, use [--faketime \"-10d\"] if you want to \
+       set your experminent 10 days in the past. See [libfaketime] for a \
+       complete overview about the [FAKETIME] available formats."
+    ()
