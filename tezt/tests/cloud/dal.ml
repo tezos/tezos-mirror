@@ -77,122 +77,6 @@ module Disconnect = struct
     Lwt.return {t with disconnected_bakers = bakers_to_keep_disconnected}
 end
 
-module Network = struct
-  type public_network = Mainnet | Ghostnet | Weeklynet of string
-  (* This string is the date of the genesis block of the current
-     weeklynet; typically it is last wednesday. *)
-
-  type t = Public of public_network | Sandbox
-
-  let to_string = function
-    | Public Mainnet -> "mainnet"
-    | Public Ghostnet -> "ghostnet"
-    | Public (Weeklynet date) -> sf "weeklynet-%s" date
-    | Sandbox -> "sandbox"
-
-  let public_rpc_endpoint testnet =
-    Endpoint.
-      {
-        scheme = "https";
-        host =
-          (match testnet with
-          | Mainnet -> "rpc.tzbeta.net"
-          | Ghostnet -> "rpc.ghostnet.teztnets.com"
-          | Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date);
-        port = 443;
-      }
-
-  let snapshot_service = function
-    | Mainnet -> "https://snapshots.eu.tzinit.org/mainnet"
-    | Ghostnet -> "https://snapshots.eu.tzinit.org/ghostnet"
-    | Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
-
-  (* Argument to give to the --network option of `octez-node config init`. *)
-  let to_octez_network_options = function
-    | Mainnet -> "mainnet"
-    | Ghostnet -> "ghostnet"
-    | Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
-
-  let default_bootstrap = function
-    | Mainnet -> "boot.tzinit.org"
-    | Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
-    | Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
-
-  let default_dal_bootstrap = function
-    | Mainnet -> "dalboot.mainnet.tzboot.net"
-    | Ghostnet ->
-        "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
-    | Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
-
-  let get_level endpoint =
-    let* json = RPC_core.call endpoint (RPC.get_chain_block_header_shell ()) in
-    JSON.(json |-> "level" |> as_int) |> Lwt.return
-
-  let expected_pow = function Public _ -> 26. | Sandbox -> 0.
-
-  let versions network =
-    match network with
-    | Public ((Mainnet | Ghostnet) as public_network) ->
-        let uri =
-          Format.sprintf
-            "https://api.%s.tzkt.io/v1/delegates?limit=5000&active=true"
-            (to_string (Public public_network))
-        in
-        let* output =
-          Process.spawn "curl" [uri] |> Process.check_and_read_stdout
-        in
-        let json_accounts =
-          JSON.parse ~origin:"Network.versions" output |> JSON.as_list
-        in
-        json_accounts |> List.to_seq
-        |> Seq.map (fun json_account ->
-               JSON.
-                 ( json_account |-> "address" |> as_string,
-                   json_account |-> "software" |-> "version" |> as_string_opt ))
-        |> Seq.filter_map (function
-               | address, None -> Some (address, "unknown")
-               | address, Some version -> Some (address, version))
-        |> Hashtbl.of_seq |> Lwt.return
-    | Public (Weeklynet _) ->
-        (* No easy way to get this information. *)
-        Lwt.return (Hashtbl.create 0)
-    | Sandbox ->
-        (* Not sure what to do here since it depends on the docker image. We can figure that out later. *)
-        Lwt.return (Hashtbl.create 0)
-
-  let aliases ?(accounts = []) network =
-    match network with
-    | Public ((Mainnet | Ghostnet) as public_network) ->
-        let uri =
-          Format.sprintf
-            "https://api.%s.tzkt.io/v1/delegates?limit=5000&active=true"
-            (to_string (Public public_network))
-        in
-        let* output =
-          Process.spawn "curl" [uri] |> Process.check_and_read_stdout
-        in
-        let json_accounts =
-          JSON.parse ~origin:"Network.aliases" output |> JSON.as_list
-        in
-        json_accounts |> List.to_seq
-        |> Seq.map (fun json_account ->
-               JSON.
-                 ( json_account |-> "address" |> as_string,
-                   json_account |-> "alias" |> as_string_opt ))
-        |> Seq.filter_map (function
-               | _, None -> None
-               | address, Some alias -> Some (address, alias))
-        |> Hashtbl.of_seq |> Lwt.return
-    | Public (Weeklynet _) ->
-        (* There is no aliases for weeklynet. *)
-        Lwt.return (Hashtbl.create 0)
-    | Sandbox ->
-        accounts |> List.to_seq
-        |> Seq.map (fun account ->
-               (account.Account.public_key_hash, account.alias))
-        |> Hashtbl.of_seq |> Lwt.return
-end
-
 module Node = struct
   let runner_of_agent = Agent.runner
 
@@ -211,7 +95,7 @@ module Node = struct
       agent =
     toplog "Inititializing a L1 node" ;
     match network with
-    | Network.Public network -> (
+    | (`Mainnet | `Ghostnet | `Weeklynet _) as network -> (
         match data_dir with
         | Some data_dir ->
             let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
@@ -286,7 +170,7 @@ module Node = struct
             let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
             toplog "Node is bootstrapped" ;
             Lwt.return node)
-    | Sandbox -> (
+    | `Sandbox -> (
         match data_dir with
         | None ->
             let* node = Node.Agent.create ~name agent in
@@ -523,17 +407,17 @@ module Cli = struct
         "Fundraiser secret key that have enough money on test network"
       ()
 
-  let network_typ =
+  let network_typ : Network.t Clap.typ =
     Clap.typ
       ~name:"network"
-      ~dummy:Network.(Public Ghostnet)
+      ~dummy:`Ghostnet
       ~parse:(function
-        | "mainnet" -> Some (Public Mainnet)
-        | "ghostnet" -> Some (Public Ghostnet)
+        | "mainnet" -> Some `Mainnet
+        | "ghostnet" -> Some `Ghostnet
         | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
             let date = String.sub s 10 10 in
-            Some (Public (Weeklynet date))
-        | "sandbox" -> Some Sandbox
+            Some (`Weeklynet date)
+        | "sandbox" -> Some `Sandbox
         | _ -> None)
       ~show:Network.to_string
 
@@ -544,13 +428,13 @@ module Cli = struct
       ~placeholder:"<network> (sandbox,ghostnet,weeklynet-YYYY-MM-DD,...)"
       ~description:"Allow to specify a network to use for the scenario"
       network_typ
-      Sandbox
+      `Sandbox
 
   let bootstrap =
     Clap.flag
       ~section
       ~set_long:"bootstrap"
-      (match network with Sandbox -> true | Public _ -> false)
+      (match network with `Sandbox -> true | _ -> false)
 
   let stake =
     let stake_typ =
@@ -572,7 +456,7 @@ module Cli = struct
          shares old by one baker. The total stake is given by the sum of all \
          shares."
       stake_typ
-      (match network with Sandbox -> [100] | Public _ -> [])
+      (match network with `Sandbox -> [100] | _ -> [])
 
   let stake_machine_type =
     let stake_machine_type_typ =
@@ -690,11 +574,7 @@ module Cli = struct
       ~placeholder:"<protocol_name> (such as alpha, oxford,...)"
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
-      (match network with
-      | Sandbox -> Alpha
-      | Public Mainnet -> ParisC
-      | Public Ghostnet -> ParisC
-      | Public (Weeklynet _) -> Alpha)
+      (Network.default_protocol network)
 
   let data_dir =
     Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
@@ -1508,7 +1388,7 @@ let may_copy_dal_node_identity_file agent node = function
       Lwt.return_unit
 
 let init_public_network cloud (configuration : configuration)
-    etherlink_configuration teztale agent (network : Network.public_network) =
+    etherlink_configuration teztale agent network =
   toplog "Init public network" ;
   let* bootstrap =
     match agent with
@@ -2411,7 +2291,7 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : baker list) (producers : producer list)
     (observers : observer list) etherlink =
   match (agent, network) with
-  | None, Network.Public _ -> (
+  | None, (`Mainnet | `Ghostnet | `Weeklynet _) -> (
       match (bakers, producers, observers, etherlink) with
       | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
       | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
@@ -2520,14 +2400,14 @@ let init ~(configuration : configuration) etherlink_configuration cloud
          producer_accounts,
          etherlink_rollup_operator_key ) =
     match configuration.network with
-    | Network.Sandbox ->
+    | `Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
         init_sandbox_and_activate_protocol
           cloud
           configuration
           ?etherlink_configuration
           bootstrap_agent
-    | Public network ->
+    | (`Ghostnet | `Mainnet | `Weeklynet _) as network ->
         init_public_network
           cloud
           configuration
@@ -2618,8 +2498,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let metrics = Hashtbl.create 101 in
   let* first_level =
     match configuration.network with
-    | Sandbox -> Lwt.return 1
-    | Public _public_network -> Network.get_level bootstrap.node_rpc_endpoint
+    | `Sandbox -> Lwt.return 1
+    | _ -> Network.get_level bootstrap.node_rpc_endpoint
   in
   Hashtbl.replace metrics first_level default_metrics ;
   let disconnection_state =
@@ -2746,8 +2626,8 @@ let on_new_level t ?etherlink level =
 let ensure_enough_funds t i =
   let producer = List.nth t.producers i in
   match t.configuration.network with
-  | Sandbox -> (* Producer has enough money *) Lwt.return_unit
-  | Public _ ->
+  | `Sandbox -> (* Producer has enough money *) Lwt.return_unit
+  | _ ->
       let* balance =
         Node.RPC.call producer.node
         @@ RPC.get_chain_block_context_contract_balance
