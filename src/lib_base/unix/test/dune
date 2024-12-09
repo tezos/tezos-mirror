@@ -15,7 +15,8 @@
   octez-libs.test-helpers
   qcheck-alcotest
   octez-alcotezt
-  tezt)
+  tezt
+  eio)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -27,7 +28,7 @@
   -open Tezos_error_monad
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_unix_error test_syslog))
+ (modules test_unix_error test_syslog test_event_loop))
 
 (executable
  (name main)

@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "octez-deps"
-version: "dev"
+version: "~dev"
 synopsis:
   "Virtual package depending on Octez dependencies (profile: octez-deps)"
 description:
@@ -81,6 +81,7 @@ depends: [
   "decompress" {= "1.5.3"}
   "digestif" {= "1.2.0"}
   "dmap" {= "0.5"}
+  "domain-local-await" {= "1.0.1"}
   "domain-name" {= "0.4.0"}
   "dream" {= "1.0.0~alpha7"}
   "dream-httpaf" {= "1.0.0~alpha3"}
@@ -92,6 +93,8 @@ depends: [
   "dune-site" {= "3.17.2"}
   "duration" {= "0.2.1"}
   "dyn" {= "3.17.2"}
+  "eio" {= "1.2"}
+  "eio_posix" {= "1.2"}
   "either" {= "1.0.0"}
   "eqaf" {= "0.10"}
   "ezgzip" {= "0.2.3"}
@@ -115,6 +118,7 @@ depends: [
   "hmap" {= "0.8.1"}
   "index" {= "1.6.2"}
   "integers" {= "0.7.0"}
+  "iomux" {= "0.3"}
   "ipaddr" {= "5.6.0"}
   "ipaddr-sexp" {= "5.6.0"}
   "jane-street-headers" {= "v0.16.0"}
@@ -135,6 +139,7 @@ depends: [
   "lwt-exit" {= "1.0"}
   "lwt-watcher" {= "0.2"}
   "lwt_log" {= "1.1.2"}
+  "lwt_eio" {= "0.5.1"}
   "lwt_ppx" {= "5.8.0"}
   "lwt_react" {= "1.2.0"}
   "lwt_ssl" {= "1.2.0"}
@@ -243,6 +248,7 @@ depends: [
   "tezos-sapling-parameters" {= "1.1.0"}
   "tezt" {= "4.2.0"}
   "tezt-bam" {= "0.3"}
+  "thread-table" {= "1.0.0"}
   "time_now" {= "v0.16.0"}
   "tls" {= "1.0.4"}
   "tls-lwt" {= "1.0.4"}

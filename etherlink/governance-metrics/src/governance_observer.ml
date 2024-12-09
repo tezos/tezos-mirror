@@ -291,4 +291,4 @@ let handle_error = function
         errs ;
       Stdlib.exit 1
 
-let () = Tezos_base_unix.Event_loop.main_run (parse_options ()) |> handle_error
+let () = Tezos_base_unix.Event_loop.main_run parse_options |> handle_error

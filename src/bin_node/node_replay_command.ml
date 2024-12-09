@@ -679,7 +679,7 @@ let process verbosity singleprocess strict repeat blocks stats_output data_dir
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
 
-  let run =
+  let run () =
     let open Lwt_result_syntax in
     let* config =
       let* data_dir, config =

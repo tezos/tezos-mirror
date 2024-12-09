@@ -65,6 +65,9 @@ depends: [
   "camlp-streams" { >= "5.0.1" }
   "uutf"
   "terminal"
+  "eio"
+  "eio_posix"
+  "lwt_eio"
   "ppxlib" { >= "0.34.0" }
   "ambient-context-lwt" { = "0.1.0" }
   "bheap" { >= "2.0.0" }

@@ -917,15 +917,15 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
       (function exn -> fail_with_exn exn)
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Tezos_base_unix.Event_loop.main_run
-    (let*! r = Lwt_exit.wrap_and_exit main_promise in
-     match r with
-     | Ok () ->
-         let*! _ = Lwt_exit.exit_and_wait 0 in
-         Lwt.return (`Ok ())
-     | Error err ->
-         let*! _ = Lwt_exit.exit_and_wait 1 in
-         Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err))
+  Tezos_base_unix.Event_loop.main_run (fun () ->
+      let*! r = Lwt_exit.wrap_and_exit main_promise in
+      match r with
+      | Ok () ->
+          let*! _ = Lwt_exit.exit_and_wait 0 in
+          Lwt.return (`Ok ())
+      | Error err ->
+          let*! _ = Lwt_exit.exit_and_wait 1 in
+          Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err))
 
 module Term = struct
   let verbosity =
