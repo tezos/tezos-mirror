@@ -3,7 +3,7 @@
 
 set -eu
 
-REPO="https://storage.googleapis.com/tezos-linux-repo/next/$CI_COMMIT_REF_NAME"
+REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/next/$CI_COMMIT_REF_NAME"
 DISTRO=$1
 RELEASE=$2
 
