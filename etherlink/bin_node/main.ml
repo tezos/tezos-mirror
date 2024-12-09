@@ -66,13 +66,14 @@ module Params = struct
 
   let native_execution_policy =
     Tezos_clic.parameter (fun _ policy ->
-        match
-          Data_encoding.Binary.of_string_opt
-            Configuration.native_execution_policy_encoding
-            policy
-        with
-        | Some policy -> Lwt.return_ok policy
-        | None -> failwith "'%s' is not a valid native execution policy" policy)
+        match policy with
+        | "always" -> Lwt.return_ok Always
+        | "rpcs_only" -> Lwt.return_ok Rpcs_only
+        | "never" -> Lwt.return_ok Never
+        | invalid_policy ->
+            failwith
+              "'%s' is not a valid native execution policy"
+              invalid_policy)
 
   let rollup_node_endpoint = endpoint
 
