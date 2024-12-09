@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::parsing::parse_unsigned_blueprint_chunk;
+use crate::parsing::{parse_unsigned_blueprint_chunk, SequencerBlueprintRes};
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
@@ -73,11 +73,16 @@ fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
     bytes: &[u8],
 ) -> (Option<ParsedInput>, usize) {
     if let Result::Ok(chunk_length) = rlp_length(bytes) {
-        let unsigned_chunk = parse_unsigned_blueprint_chunk(&bytes[..chunk_length]);
-        (
-            unsigned_chunk.map(ParsedInput::UnsignedSequencerBlueprint),
-            chunk_length + TAG_SIZE,
-        )
+        match parse_unsigned_blueprint_chunk(&bytes[..chunk_length]) {
+            SequencerBlueprintRes::SequencerBlueprint(unsigned_chunk) => (
+                Some(ParsedInput::UnsignedSequencerBlueprint(unsigned_chunk)),
+                chunk_length + TAG_SIZE,
+            ),
+            SequencerBlueprintRes::InvalidNumberOfChunks
+            | SequencerBlueprintRes::InvalidSignature
+            | SequencerBlueprintRes::InvalidNumber
+            | SequencerBlueprintRes::Unparsable => (None, chunk_length + TAG_SIZE),
+        }
     } else {
         log!(host, Debug, "Read an invalid chunk from slot.");
         (None, TAG_SIZE)

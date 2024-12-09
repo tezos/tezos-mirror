@@ -309,18 +309,18 @@ pub struct SequencerParsingContext {
     pub head_level: Option<U256>,
 }
 
-pub fn parse_unsigned_blueprint_chunk(
-    bytes: &[u8],
-) -> Option<UnsignedSequencerBlueprint> {
+pub fn parse_unsigned_blueprint_chunk(bytes: &[u8]) -> SequencerBlueprintRes {
     // Parse an unsigned sequencer blueprint
-    let unsigned_seq_blueprint: UnsignedSequencerBlueprint =
-        parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
+    match UnsignedSequencerBlueprint::from_rlp_bytes(bytes).ok() {
+        None => SequencerBlueprintRes::Unparsable,
+        Some(unsigned_seq_blueprint) => {
+            if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
+                return SequencerBlueprintRes::InvalidNumberOfChunks;
+            }
 
-    if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
-        return None;
+            SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint)
+        }
     }
-
-    Some(unsigned_seq_blueprint)
 }
 
 pub fn parse_blueprint_chunk(
