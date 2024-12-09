@@ -186,7 +186,7 @@ let setup_sequencer ?next_wasm_runtime ?block_storage_sqlite3
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
-    ?history_mode ~enable_dal ?dal_slots protocol =
+    ?history_mode ~enable_dal ?dal_slots ?rpc_server protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -269,6 +269,7 @@ let setup_sequencer ?next_wasm_runtime ?block_storage_sqlite3
       ~node_transaction_validation:true
       ?next_wasm_runtime
       ?block_storage_sqlite3
+      ?rpc_server
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
@@ -377,8 +378,13 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
       ~default:
         ((* If the value is not provided, we need to deactivate it for everything
               but latest. *)
-         kernel_tag = "latest")
+         kernel = Latest)
       block_storage_sqlite3
+  in
+  let rpc_server =
+    match kernel with
+    | Mainnet | Ghostnet -> None (* default *)
+    | Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
   in
   let body protocol =
     let* sequencer_setup =
@@ -413,6 +419,7 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
         ?history_mode
         ~enable_dal
         ?dal_slots
+        ?rpc_server
         protocol
     in
     body sequencer_setup protocol
