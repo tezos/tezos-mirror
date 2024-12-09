@@ -101,11 +101,6 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
       pvm_state.buffers.output
   in
   let backup pvm_state =
-    let* () =
-      match hooks.fast_exec_panicked with
-      | Some hook -> hook ()
-      | None -> Lwt_syntax.return_unit
-    in
     let+ pvm_state, ticks =
       Wasm_vm.compute_step_many
         ~wasm_entrypoint
@@ -178,6 +173,15 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
             ~stop_at_snapshot
             pvm_state
         else Lwt.return (pvm_state, accum_ticks)
+      in
+      let go_like_the_wind () =
+        Lwt.catch go_like_the_wind (fun exn ->
+            let* () =
+              match hooks.fast_exec_panicked with
+              | Some hook -> hook exn
+              | None -> Lwt_syntax.return_unit
+            in
+            Lwt.reraise exn)
       in
       match pvm_state.tick_state with
       | Snapshot when hooks.fast_exec_fallback ->
