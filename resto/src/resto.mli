@@ -564,6 +564,10 @@ module MakeService (Encoding : ENCODING) : sig
     ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service ->
     'query Query.t
 
+  val path :
+    ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service ->
+    ('prefix, 'params) Path.t
+
   type _ input =
     | No_input : unit input
     | Input : 'input Encoding.t -> 'input input

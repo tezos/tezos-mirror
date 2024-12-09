@@ -16,6 +16,7 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
+    "rpc_server": "resto",
     "enable_websocket": false
   },
   "proxy": {
@@ -66,6 +67,7 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
+    "rpc_server": "resto",
     "enable_websocket": false
   },
   "proxy": {
@@ -109,6 +111,7 @@
     "node_transaction_validation": true,
     "block_storage_sqlite3": true,
     "overwrite_simulation_tick_limit": false,
+    "rpc_server": "resto",
     "enable_websocket": false
   },
   "proxy": {

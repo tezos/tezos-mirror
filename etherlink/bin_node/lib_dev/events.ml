@@ -66,22 +66,34 @@ let catching_up_evm_event =
     ("to", Data_encoding.int32)
 
 let event_is_ready =
-  Internal_event.Simple.declare_2
+  Internal_event.Simple.declare_3
     ~section
     ~name:"is_ready"
-    ~msg:"the EVM node is listening to {addr}:{port}"
+    ~msg:"the EVM node RPC server ({backend}) is listening to {addr}:{port}"
     ~level:Notice
     ("addr", Data_encoding.string)
     ("port", Data_encoding.uint16)
+    ("backend", Configuration.rpc_server_encoding)
 
 let event_private_server_is_ready =
-  declare_2
+  declare_3
     ~section
     ~name:"private_server_is_ready"
-    ~msg:"the EVM node private RPC server is listening to {addr}:{port}"
+    ~msg:
+      "the EVM node private RPC server ({backend}) is listening to \
+       {addr}:{port}"
     ~level:Notice
     ("addr", Data_encoding.string)
     ("port", Data_encoding.uint16)
+    ("backend", Configuration.rpc_server_encoding)
+
+let event_rpc_server_error =
+  declare_1
+    ~section
+    ~name:"rpc_server_error"
+    ~msg:"RPC server error: {exception}"
+    ~level:Error
+    ("exception", Data_encoding.string)
 
 let event_shutdown_node =
   Internal_event.Simple.declare_1
@@ -247,10 +259,14 @@ let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
-let is_ready ~rpc_addr ~rpc_port = emit event_is_ready (rpc_addr, rpc_port)
+let is_ready ~rpc_addr ~rpc_port ~backend =
+  emit event_is_ready (rpc_addr, rpc_port, backend)
 
-let private_server_is_ready ~rpc_addr ~rpc_port =
-  emit event_private_server_is_ready (rpc_addr, rpc_port)
+let private_server_is_ready ~rpc_addr ~rpc_port ~backend =
+  emit event_private_server_is_ready (rpc_addr, rpc_port, backend)
+
+let rpc_server_error exn =
+  emit__dont_wait__use_with_care event_rpc_server_error (Printexc.to_string exn)
 
 let shutdown_rpc_server ~private_ =
   emit (event_shutdown_rpc_server ~private_) ()

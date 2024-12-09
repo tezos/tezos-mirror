@@ -580,6 +580,128 @@ let wait_for_processed_l1_level ?level evm_node =
   | None -> Some ()
   | Some level -> if level = event_level then Some () else None
 
+let mode_with_new_private_rpc (mode : mode) =
+  match mode with
+  | Observer
+      {
+        initial_kernel;
+        preimages_dir;
+        private_rpc_port = Some _;
+        rollup_node_endpoint;
+      } ->
+      Observer
+        {
+          initial_kernel;
+          preimages_dir;
+          private_rpc_port = Some (Port.fresh ());
+          rollup_node_endpoint;
+        }
+  | Sequencer
+      {
+        initial_kernel;
+        preimage_dir;
+        private_rpc_port = Some _;
+        time_between_blocks;
+        sequencer;
+        genesis_timestamp;
+        max_blueprints_lag;
+        max_blueprints_ahead;
+        max_blueprints_catchup;
+        catchup_cooldown;
+        max_number_of_chunks;
+        wallet_dir;
+        tx_pool_timeout_limit;
+        tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit;
+        dal_slots;
+      } ->
+      Sequencer
+        {
+          initial_kernel;
+          preimage_dir;
+          private_rpc_port = Some (Port.fresh ());
+          time_between_blocks;
+          sequencer;
+          genesis_timestamp;
+          max_blueprints_lag;
+          max_blueprints_ahead;
+          max_blueprints_catchup;
+          catchup_cooldown;
+          max_number_of_chunks;
+          wallet_dir;
+          tx_pool_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
+          dal_slots;
+        }
+  | Sandbox
+      {
+        initial_kernel;
+        preimage_dir;
+        private_rpc_port = Some _;
+        time_between_blocks;
+        genesis_timestamp;
+        max_number_of_chunks;
+        wallet_dir;
+        tx_pool_timeout_limit;
+        tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit;
+      } ->
+      Sandbox
+        {
+          initial_kernel;
+          preimage_dir;
+          private_rpc_port = Some (Port.fresh ());
+          time_between_blocks;
+          genesis_timestamp;
+          max_number_of_chunks;
+          wallet_dir;
+          tx_pool_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
+        }
+  | Threshold_encryption_sequencer
+      {
+        initial_kernel;
+        preimage_dir;
+        private_rpc_port = Some _;
+        time_between_blocks;
+        sequencer;
+        genesis_timestamp;
+        max_blueprints_lag;
+        max_blueprints_ahead;
+        max_blueprints_catchup;
+        catchup_cooldown;
+        max_number_of_chunks;
+        wallet_dir;
+        tx_pool_timeout_limit;
+        tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit;
+        sequencer_sidecar_endpoint;
+        dal_slots;
+      } ->
+      Threshold_encryption_sequencer
+        {
+          initial_kernel;
+          preimage_dir;
+          private_rpc_port = Some (Port.fresh ());
+          time_between_blocks;
+          sequencer;
+          genesis_timestamp;
+          max_blueprints_lag;
+          max_blueprints_ahead;
+          max_blueprints_catchup;
+          catchup_cooldown;
+          max_number_of_chunks;
+          wallet_dir;
+          tx_pool_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
+          sequencer_sidecar_endpoint;
+          dal_slots;
+        }
+  | _ -> mode
+
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =
@@ -1052,10 +1174,12 @@ type garbage_collector = {
   history_to_keep_in_seconds : int;
 }
 
+type rpc_server = Resto | Dream
+
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(node_transaction_validation = false) ?(block_storage_sqlite3 = true)
-    ?(next_wasm_runtime = true) ?garbage_collector () =
+    ?(next_wasm_runtime = true) ?garbage_collector ?rpc_server () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1105,6 +1229,9 @@ let patch_config_with_experimental_feature
              ( "history_to_keep_in_seconds",
                `Float (Int.to_float history_to_keep_in_seconds) );
            ])
+  |> optional_json_put ~name:"rpc_server" rpc_server (function
+         | Resto -> `String "resto"
+         | Dream -> `String "dream")
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     ?restricted_rpcs rollup_node =

@@ -59,6 +59,11 @@ type garbage_collector = {
   history_to_keep_in_seconds : int;
 }
 
+(** RPC server implementation. *)
+type rpc_server =
+  | Resto  (** Resto/Cohttp (default) *)
+  | Dream  (** Dream/httpun *)
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -68,6 +73,7 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
+  rpc_server : rpc_server;
   enable_websocket : bool;
 }
 
@@ -154,6 +160,9 @@ val native_execution_policy_encoding : native_execution_policy Data_encoding.t
 
 (** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir]. *)
 val encoding : string -> t Data_encoding.t
+
+(** Encoding for {!type-rpc_server}. *)
+val rpc_server_encoding : rpc_server Data_encoding.t
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string

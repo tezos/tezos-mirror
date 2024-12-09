@@ -72,83 +72,77 @@ let client_version =
     Stdlib.Sys.os_type
     Stdlib.Sys.ocaml_version
 
+let configuration_handler config =
+  let open Configuration in
+  (* Hide some parts of the configuration. *)
+  let hidden = "hidden" in
+  let kernel_execution =
+    Configuration.{config.kernel_execution with preimages = hidden}
+  in
+  let sequencer =
+    Option.map
+      (fun (sequencer_config : sequencer) ->
+        {sequencer_config with sequencer = Client_keys.sk_uri_of_string hidden})
+      config.sequencer
+  in
+  let observer =
+    Option.map
+      (fun (observer : observer) ->
+        {observer with evm_node_endpoint = Uri.of_string hidden})
+      config.observer
+  in
+  let proxy : proxy =
+    let evm_node_endpoint =
+      Option.map (fun _ -> Uri.of_string hidden) config.proxy.evm_node_endpoint
+    in
+    {config.proxy with evm_node_endpoint}
+  in
+
+  let config =
+    {
+      config with
+      rollup_node_endpoint = Uri.of_string hidden;
+      kernel_execution;
+      sequencer;
+      threshold_encryption_sequencer = None;
+      proxy;
+      observer;
+      private_rpc = None;
+    }
+  in
+
+  Data_encoding.Json.construct
+    ~include_default_fields:`Always
+    (Configuration.encoding hidden)
+    config
+
+let health_check_handler ?delegate_to () =
+  match delegate_to with
+  | None ->
+      let open Lwt_result_syntax in
+      let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping in
+      return_unit
+  | Some evm_node_endpoint ->
+      Rollup_services.call_service
+        ~keep_alive:false
+        ~base:evm_node_endpoint
+        ~media_types:[Media_type.json]
+        health_check_service
+        ()
+        ()
+        ()
+
 let version dir =
-  Directory.register0 dir version_service (fun () () ->
+  Evm_directory.register0 dir version_service (fun () () ->
       Lwt.return_ok client_version)
 
 let configuration config dir =
-  Directory.register0 dir configuration_service (fun () () ->
-      let open Configuration in
-      (* Hide some parts of the configuration. *)
-      let hidden = "hidden" in
-      let kernel_execution =
-        Configuration.{config.kernel_execution with preimages = hidden}
-      in
-      let sequencer =
-        Option.map
-          (fun (sequencer_config : sequencer) ->
-            {
-              sequencer_config with
-              sequencer = Client_keys.sk_uri_of_string hidden;
-            })
-          config.sequencer
-      in
-      let observer =
-        Option.map
-          (fun (observer : observer) ->
-            {observer with evm_node_endpoint = Uri.of_string hidden})
-          config.observer
-      in
-      let proxy : proxy =
-        let evm_node_endpoint =
-          Option.map
-            (fun _ -> Uri.of_string hidden)
-            config.proxy.evm_node_endpoint
-        in
-        {config.proxy with evm_node_endpoint}
-      in
-
-      let config =
-        {
-          config with
-          rollup_node_endpoint = Uri.of_string hidden;
-          kernel_execution;
-          sequencer;
-          threshold_encryption_sequencer = None;
-          proxy;
-          observer;
-          private_rpc = None;
-        }
-      in
-
-      Lwt.return_ok
-        (Data_encoding.Json.construct
-           ~include_default_fields:`Always
-           (Configuration.encoding hidden)
-           config))
+  Evm_directory.register0 dir configuration_service (fun () () ->
+      configuration_handler config |> Lwt.return_ok)
 
 let health_check ?delegate_to dir =
-  let handler =
-    match delegate_to with
-    | None ->
-        fun () () ->
-          let open Lwt_result_syntax in
-          let* () =
-            fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
-          in
-          return_unit
-    | Some evm_node_endpoint ->
-        fun () () ->
-          Rollup_services.call_service
-            ~keep_alive:false
-            ~base:evm_node_endpoint
-            ~media_types:[Media_type.json]
-            health_check_service
-            ()
-            ()
-            ()
-  in
-  Directory.register0 dir health_check_service handler
+  Evm_directory.register0 dir health_check_service (fun () () ->
+      health_check_handler ?delegate_to ())
 
 (* The node can either take a single request or multiple requests at
    once. *)
@@ -853,26 +847,30 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
+let dispatch_handler (rpc : Configuration.rpc) config ctx dispatch_request
+    (input : JSONRPC.request batched_request) =
+  let open Lwt_syntax in
+  match input with
+  | Singleton request ->
+      let* response = dispatch_request config ctx request in
+      return (Singleton response)
+  | Batch requests ->
+      let process =
+        if can_process_batch (List.length requests) rpc.batch_limit then
+          dispatch_request config ctx
+        else fun req ->
+          let value =
+            Error Rpc_errors.(invalid_request "too many requests in batch")
+          in
+          Lwt.return JSONRPC.{value; id = req.id}
+      in
+      let* outputs = List.map_s process requests in
+      return (Batch outputs)
+
 let generic_dispatch (rpc : Configuration.rpc) config ctx dir path
     dispatch_request =
-  Directory.register0 dir (dispatch_service ~path) (fun () input ->
-      let open Lwt_result_syntax in
-      match input with
-      | Singleton request ->
-          let*! response = dispatch_request config ctx request in
-          return (Singleton response)
-      | Batch requests ->
-          let process =
-            if can_process_batch (List.length requests) rpc.batch_limit then
-              dispatch_request config ctx
-            else fun req ->
-              let value =
-                Error Rpc_errors.(invalid_request "too many requests in batch")
-              in
-              Lwt.return JSONRPC.{value; id = req.id}
-          in
-          let*! outputs = List.map_s process requests in
-          return (Batch outputs))
+  Evm_directory.register0 dir (dispatch_service ~path) (fun () input ->
+      dispatch_handler rpc config ctx dispatch_request input |> Lwt_result.ok)
 
 let dispatch_public (rpc : Configuration.rpc) config ctx dir =
   generic_dispatch rpc config ctx dir Path.root (dispatch_request rpc)
@@ -889,7 +887,8 @@ let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
 
 let directory ?delegate_health_check_to rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
-  Directory.empty |> version |> configuration config
+  Evm_directory.empty config.experimental_features.rpc_server
+  |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
        rpc
@@ -897,12 +896,15 @@ let directory ?delegate_health_check_to rpc config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
 let private_directory rpc config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
-  Directory.empty |> version
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+    ~block_production =
+  Evm_directory.empty config.experimental_features.rpc_server
+  |> version
   |> dispatch_private
        rpc
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       ~block_production
 
 let call (type input output)
     (module R : Rpc_encodings.METHOD
