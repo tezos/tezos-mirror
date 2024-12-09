@@ -563,4 +563,38 @@ pub mod tests {
 
         assert_eq!(None, chunks_from_slot)
     }
+
+    fn chunk_blueprint_range(min: usize, max: usize) -> Vec<UnsignedSequencerBlueprint> {
+        let mut chunks = vec![];
+        for n in min..max {
+            chunks.extend(chunk_blueprint(dummy_big_blueprint(1), n.into()));
+        }
+        chunks
+    }
+
+    #[test]
+    fn test_parse_slot_with_blueprints_from_the_past() {
+        let mut host = MockKernelHost::default();
+
+        let head_level = Some(2.into());
+        let chunks = chunk_blueprint_range(0, 5);
+        let expected_chunks = chunk_blueprint_range(3, 5);
+
+        assert_eq!(5, chunks.len());
+        assert_eq!(2, expected_chunks.len());
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
+        prepare_dal_slot(&mut host, &chunks, published_level as i32, 0);
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            &head_level,
+            0,
+            published_level,
+        );
+
+        assert_eq!(chunks_from_slot, Some(expected_chunks));
+    }
 }
