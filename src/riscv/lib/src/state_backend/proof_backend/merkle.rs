@@ -8,9 +8,12 @@ use super::{
     proof::{MerkleProof, MerkleProofLeaf},
     DynAccess,
 };
-use crate::state_backend::{
-    hash::{Hash, HashError, RootHashable},
-    proof_backend::tree::{impl_modify_map_collect, ModifyResult},
+use crate::{
+    state_backend::{
+        hash::{Hash, HashError, RootHashable},
+        proof_backend::tree::{impl_modify_map_collect, ModifyResult},
+    },
+    storage::binary,
 };
 use std::convert::Infallible;
 
@@ -295,6 +298,19 @@ impl<T: Merkleisable, const N: usize> Merkleisable for [T; N] {
 impl<T: AccessInfoAggregatable, const N: usize> AccessInfoAggregatable for [T; N] {
     fn aggregate_access_info(&self) -> AccessInfo {
         self.as_slice().aggregate_access_info()
+    }
+}
+
+impl Merkleisable for () {
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        let serialised = binary::serialise(self)?;
+        MerkleTree::make_merkle_leaf(serialised, AccessInfo::NoAccess)
+    }
+}
+
+impl AccessInfoAggregatable for () {
+    fn aggregate_access_info(&self) -> AccessInfo {
+        AccessInfo::NoAccess
     }
 }
 

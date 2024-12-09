@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub(crate) mod binary;
+pub mod binary;
 mod chunked_io;
 
 pub use crate::state_backend::hash::{Hash, HashError, DIGEST_SIZE};

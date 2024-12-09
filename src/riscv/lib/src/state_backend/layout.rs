@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -111,6 +112,45 @@ macro_rules! struct_layout {
                             backend
                         )),+
                     }
+                }
+            }
+
+            use $crate::state_backend::proof_backend::merkle::{
+                AccessInfo, AccessInfoAggregatable, MerkleTree, Merkleisable,
+            };
+
+            impl <
+                $(
+                    [<$field_name:upper>]: AccessInfoAggregatable + serde::Serialize
+                ),+
+            > Merkleisable for [<$layout_t F>]<
+                $(
+                    [<$field_name:upper>]
+                ),+
+            > {
+                fn to_merkle_tree(&self) -> Result<MerkleTree, $crate::storage::HashError>
+                {
+                    let serialised = $crate::storage::binary::serialise(&self)?;
+                    MerkleTree::make_merkle_leaf(serialised, self.aggregate_access_info())
+                }
+            }
+
+            impl <
+                $(
+                    [<$field_name:upper>]: AccessInfoAggregatable + serde::Serialize
+                ),+
+            > AccessInfoAggregatable for [<$layout_t F>]<
+                $(
+                    [<$field_name:upper>]
+                ),+
+            > {
+                fn aggregate_access_info(&self) -> AccessInfo {
+                    let children = [
+                        $(
+                            self.$field_name.aggregate_access_info()
+                        ),+
+                    ];
+                    AccessInfo::fold(&children)
                 }
             }
         }
