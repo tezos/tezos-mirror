@@ -295,9 +295,12 @@ impl Runtime for Host {
 
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
         trace!("store_delete({path})");
+        if let Ok(None) = Runtime::store_has(self, path) {
+            return Err(RuntimeError::PathNotFound);
+        }
+
         let new_tree = bindings::store_delete(self.tree(), path.as_bytes(), false)
-            .map_err(from_binding_error)
-            .map_err(self.check_path_exists(path))?;
+            .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
         Ok(())
