@@ -426,6 +426,45 @@ pub mod tests {
     }
 
     #[test]
+    fn test_parse_slot_resume_after_invalid_chunk() {
+        let mut host = MockKernelHost::default();
+
+        let valid_blueprint_chunks_1 = chunk_blueprint(dummy_big_blueprint(1));
+
+        let invalid_blueprint_chunks = {
+            let mut chunks = chunk_blueprint(dummy_big_blueprint(1));
+            for chunk in chunks.iter_mut() {
+                chunk.nb_chunks = crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS + 1
+            }
+            chunks
+        };
+
+        let valid_blueprint_chunks_2 = chunk_blueprint(dummy_big_blueprint(1));
+
+        let mut chunks = vec![];
+        chunks.extend(valid_blueprint_chunks_1.clone());
+        chunks.extend(invalid_blueprint_chunks);
+        chunks.extend(valid_blueprint_chunks_2.clone());
+
+        let mut expected_chunks = vec![];
+        expected_chunks.extend(valid_blueprint_chunks_1);
+        expected_chunks.extend(valid_blueprint_chunks_2);
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
+        prepare_dal_slot(&mut host, &chunks, published_level as i32, 0);
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            0,
+            published_level,
+        );
+
+        assert_eq!(Some(expected_chunks), chunks_from_slot)
+    }
+
+    #[test]
     fn test_parse_slot_with_invalid_first_chunk() {
         // The tag announces a chunk, the data is not an RLP encoded chunk
         let mut invalid_data = vec![DAL_BLUEPRINT_INPUT_TAG];
