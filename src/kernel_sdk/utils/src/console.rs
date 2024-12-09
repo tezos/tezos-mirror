@@ -58,7 +58,7 @@ impl Write for Console<'_> {
 
                     if *c == b'\n' {
                         serde_json::to_writer(&mut self.lock, line)?;
-                        self.lock.write_all(&[b'\n'])?;
+                        self.lock.write_all(b"\n")?;
                         line.message.truncate(0);
                     } else {
                         line.message.push(*c);

@@ -38,5 +38,4 @@ pub use tezos_crypto_rs::public_key;
 #[doc(inline)]
 pub use tezos_crypto_rs::public_key_hash;
 
-#[cfg(feature = "testing")]
 pub mod testing;
