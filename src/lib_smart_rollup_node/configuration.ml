@@ -958,12 +958,16 @@ module Cli = struct
           {
             retention_period =
               Option.value
-                ~default:default_injector.retention_period
+                ~default:configuration.injector.retention_period
                 injector_retention_period;
             attempts =
-              Option.value ~default:default_injector.attempts injector_attempts;
+              Option.value
+                ~default:configuration.injector.attempts
+                injector_attempts;
             injection_ttl =
-              Option.value ~default:default_injector.injection_ttl injection_ttl;
+              Option.value
+                ~default:configuration.injector.injection_ttl
+                injection_ttl;
           };
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
         apply_unsafe_patches;
