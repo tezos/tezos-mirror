@@ -5,6 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let create_dir ?runner dir =
+  let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
+  let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
+  Lwt.return_unit
+
 module Node = struct
   include Tezt_tezos.Node
 
@@ -290,9 +295,88 @@ module Teztale = struct
       let* path = Agent.copy agent ~source:path in
       Teztale.Archiver.run ?runner ~path ?name ~node_port user feed
   end
-end
 
-let create_dir ?runner dir =
-  let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
-  let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
-  Lwt.return_unit
+  type t = {
+    agent : Agent.t;
+    server : Server.t;
+    address : string;
+    mutable archivers : Archiver.t list;
+  }
+
+  let user ~agent_name ~node_name : user =
+    let login = "teztale-archiver-" ^ agent_name ^ "-" ^ node_name in
+    {login; password = login}
+
+  let run_server
+      ?(path =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ()))) agent
+      =
+    let public_directory = "/tmp/teztale/public" in
+    let* () = create_dir public_directory in
+    let aliases_filename =
+      Filename.concat public_directory "delegates-aliases.json"
+    in
+    write_file aliases_filename ~contents:"[]" ;
+    let* _ =
+      Agent.copy ~source:aliases_filename ~destination:aliases_filename agent
+    in
+    let* _ =
+      Agent.copy
+        ~source:"tezt/lib_cloud/teztale-visualisation/index.html"
+        ~destination:(Format.asprintf "%s/index.html" public_directory)
+        agent
+    in
+    let* _ =
+      Agent.copy
+        ~is_directory:true
+        ~source:"tezt/lib_cloud/teztale-visualisation/assets"
+        ~destination:public_directory
+        agent
+    in
+    let* server = Server.run ~path ~public_directory agent () in
+    let address =
+      match Agent.point agent with
+      | None -> "127.0.0.1"
+      | Some point -> fst point
+    in
+    Lwt.return {agent; server; address; archivers = []}
+
+  let wait_server t = Server.wait_for_readiness t.server
+
+  let add_archiver
+      ?(path =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver" ()))) t
+      agent ~node_name ~node_port =
+    let user = user ~agent_name:(Agent.name agent) ~node_name in
+    let feed : interface list =
+      [{address = t.address; port = t.server.conf.interface.port}]
+    in
+    let* () =
+      Lwt_result.get_exn
+        (Server.add_user
+           ?runner:(Agent.runner agent)
+           ~public_address:t.address
+           t.server
+           user)
+    in
+    let* archiver = Archiver.run agent ~path user feed ~node_port in
+    t.archivers <- archiver :: t.archivers ;
+    Lwt.return_unit
+
+  let update_alias t ~address ~alias =
+    let dir = Option.get t.server.conf.public_directory in
+    let filename = Filename.concat dir "delegates-aliases.json" in
+    let aliases =
+      match JSON.parse_file filename |> JSON.unannotate with
+      | exception _ -> []
+      | `A aliases -> aliases
+      | _ -> assert false
+    in
+    let update = `O [("alias", `String alias); ("address", `String address)] in
+    let aliases = update :: aliases in
+    JSON.encode_to_file_u filename (`A aliases) ;
+    let* _ =
+      Agent.copy ~refresh:true ~source:filename ~destination:filename t.agent
+    in
+    Lwt.return_unit
+end
