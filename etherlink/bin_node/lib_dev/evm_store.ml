@@ -220,7 +220,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 14
+    let version = 15
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -486,22 +486,26 @@ module Q = struct
     (block_hash ->? context_hash)
     @@ {eos|SELECT c.context_hash from Context_hashes c JOIN Blocks b on c.id = b.level WHERE hash = ?|eos}
 
-  module GC = struct
-    let select_last_gc =
-      (unit ->? t2 level timestamp)
-      @@ {|SELECT last_gc_level, last_gc_timestamp FROM gc|}
-
-    let update_last_gc =
+  module Irmin_chunks = struct
+    let insert =
       (t2 level timestamp ->. unit)
-      @@ {eos|INSERT INTO gc (id, last_gc_level, last_gc_timestamp) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET last_gc_level = excluded.last_gc_level, last_gc_timestamp = excluded.last_gc_timestamp|eos}
+      @@ {|INSERT INTO irmin_chunks (level, timestamp) VALUES (?, ?)|}
 
-    let select_last_split =
+    let oldest =
+      (unit ->! t2 level timestamp)
+      @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level ASC LIMIT 1|}
+
+    let latest =
       (unit ->? t2 level timestamp)
-      @@ {|SELECT last_split_level, last_split_timestamp FROM gc|}
+      @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1|}
 
-    let update_last_split =
-      (t2 level timestamp ->. unit)
-      @@ {eos|INSERT INTO gc (id, last_split_level, last_split_timestamp) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET last_split_level = excluded.last_split_level, last_split_timestamp = excluded.last_split_timestamp|eos}
+    let count = (unit ->! int) @@ {|SELECT COUNT(*) FROM irmin_chunks|}
+
+    let clear_after =
+      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level > ?|}
+
+    let clear_before_included =
+      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level <= ?|}
   end
 
   module Pending_confirmations = struct
@@ -958,21 +962,31 @@ module Transactions = struct
     Db.exec conn Q.Transactions.clear_before level
 end
 
-module GC = struct
-  let last_gc store =
-    with_connection store @@ fun conn -> Db.find_opt conn Q.GC.select_last_gc ()
+module Irmin_chunks = struct
+  let insert conn level timestamp =
+    with_connection conn @@ fun conn ->
+    Db.exec conn Q.Irmin_chunks.insert (level, timestamp)
 
-  let update_last_gc store level timestamp =
-    with_connection store @@ fun conn ->
-    Db.exec conn Q.GC.update_last_gc (level, timestamp)
+  let oldest conn =
+    with_connection conn @@ fun conn -> Db.find conn Q.Irmin_chunks.oldest ()
 
-  let last_split store =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.GC.select_last_split ()
+  let latest conn =
+    with_connection conn @@ fun conn ->
+    Db.find_opt conn Q.Irmin_chunks.latest ()
 
-  let update_last_split store level timestamp =
+  let count conn =
+    let open Lwt_result_syntax in
+    with_connection conn @@ fun conn ->
+    let* count = Db.find_opt conn Q.Irmin_chunks.count () in
+    return (Option.value ~default:0 count)
+
+  let clear_after store level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.GC.update_last_split (level, timestamp)
+    Db.exec conn Q.Irmin_chunks.clear_after level
+
+  let clear_before_included store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Irmin_chunks.clear_before_included level
 end
 
 module Blocks = struct
@@ -1088,6 +1102,9 @@ let reset_after store ~l2_level =
   let* () = Transactions.clear_after store l2_level in
   (* Blocks in [Pending_confirmations] are always after the current head. *)
   let* () = Pending_confirmations.clear store in
+  (* If splits were produced on the resetted branch, they will be garbage
+     collected by the GC anyway later. *)
+  let* () = Irmin_chunks.clear_after store l2_level in
   return_unit
 
 let reset_before store ~l2_level =
@@ -1099,4 +1116,11 @@ let reset_before store ~l2_level =
   let* () = Delayed_transactions.clear_before store l2_level in
   let* () = Blocks.clear_before store l2_level in
   let* () = Transactions.clear_before store l2_level in
+  (* {!reset_before} is called when garbage collector is trigerred.
+     Garbage collector is trigerred when the maximum number of splits
+     is reached, [l2_level] was the pointer to the oldest split.
+
+     If it wasn't included, the garbage collector would keep the maximum
+     number of splits plus an additional one. *)
+  let* () = Irmin_chunks.clear_before_included store l2_level in
   return_unit

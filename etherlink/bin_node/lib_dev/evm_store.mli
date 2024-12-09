@@ -169,18 +169,20 @@ module Transactions : sig
     conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
 end
 
-module GC : sig
-  val last_gc :
+module Irmin_chunks : sig
+  val insert :
+    conn ->
+    Ethereum_types.quantity ->
+    Time.Protocol.t ->
+    unit Error_monad.tzresult Lwt.t
+
+  val oldest :
+    conn -> (Ethereum_types.quantity * Time.Protocol.t) tzresult Lwt.t
+
+  val latest :
     conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
 
-  val update_last_gc :
-    conn -> Ethereum_types.quantity -> Time.Protocol.t -> unit tzresult Lwt.t
-
-  val last_split :
-    conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
-
-  val update_last_split :
-    conn -> Ethereum_types.quantity -> Time.Protocol.t -> unit tzresult Lwt.t
+  val count : conn -> int tzresult Lwt.t
 end
 
 module Pending_confirmations : sig

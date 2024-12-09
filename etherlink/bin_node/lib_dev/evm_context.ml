@@ -41,8 +41,6 @@ type session_state = {
   mutable evm_state : Evm_state.t;
   mutable last_split_block : (Ethereum_types.quantity * Time.Protocol.t) option;
       (** Garbage collector session related information. *)
-  mutable last_gc_block : (Ethereum_types.quantity * Time.Protocol.t) option;
-      (** Garbage collector session related information. *)
 }
 
 type history =
@@ -184,6 +182,36 @@ module State = struct
     let* () = Evm_store.Context_hashes.store store number checkpoint in
     return context
 
+  let gc ctxt conn gc_level head_level =
+    let open Lwt_result_syntax in
+    let*! () = Evm_context_events.gc_started ~gc_level ~head_level in
+    let start_timestamp = Time.System.now () in
+    let* hash = Evm_store.Context_hashes.find conn gc_level in
+    let*? hash =
+      Option.to_result
+        ~none:
+          [
+            error_of_fmt
+              "Context hash of GC candidate %a is missing from store"
+              Ethereum_types.pp_quantity
+              gc_level;
+          ]
+        hash
+    in
+    let* () = Evm_store.reset_before conn ~l2_level:gc_level in
+    let*! () = Irmin_context.gc ctxt.index hash in
+    let gc_waiter () =
+      let open Lwt_syntax in
+      let* () = Irmin_context.wait_gc_completion ctxt.index in
+      let stop_timestamp = Time.System.now () in
+      Evm_context_events.gc_finished
+        ~gc_level
+        ~head_level
+        (Ptime.diff stop_timestamp start_timestamp)
+    in
+    Lwt.dont_wait gc_waiter Evm_context_events.gc_waiter_failed ;
+    return_unit
+
   let maybe_split_context ctxt conn timestamp level =
     let open Lwt_result_syntax in
     match ctxt.history with
@@ -206,69 +234,22 @@ module State = struct
         in
         if split then (
           Irmin_context.split ctxt.index ;
-          let* () = Evm_store.GC.update_last_split conn level timestamp in
+          let* () = Evm_store.Irmin_chunks.insert conn level timestamp in
           let*! () = Evm_context_events.gc_split level timestamp in
+          let* number_of_chunks = Evm_store.Irmin_chunks.count conn in
+          let max_number_of_chunks =
+            parameters.Configuration.number_of_chunks
+          in
+          let* () =
+            if number_of_chunks > max_number_of_chunks then
+              let* gc_level, _gc_timestamp =
+                Evm_store.Irmin_chunks.oldest conn
+              in
+              gc ctxt conn gc_level level
+            else return_unit
+          in
           return_some (level, timestamp))
         else return_none
-
-  let maybe_gc ctxt conn timestamp level =
-    let open Lwt_result_syntax in
-    match ctxt.history with
-    | Archive -> return_none
-    | Full {parameters} -> (
-        match ctxt.session.last_gc_block with
-        | None ->
-            (* The GC was never called, we do nothing and consider
-               that the GC was done. *)
-            let* () = Evm_store.GC.update_last_gc conn level timestamp in
-            return_some (level, timestamp)
-        | Some (last_gc_level, last_gc_timestamp) ->
-            let gc =
-              let timestamp = Time.Protocol.to_seconds timestamp in
-              let last_gc_timestamp =
-                Time.Protocol.to_seconds last_gc_timestamp
-              in
-              Compare.Int64.(
-                timestamp
-                >= Int64.(
-                     add
-                       last_gc_timestamp
-                       (of_int parameters.history_to_keep_in_seconds)))
-            in
-            if gc then (
-              let*! () =
-                Evm_context_events.gc_started
-                  ~gc_level:last_gc_level
-                  ~head_level:level
-              in
-              let start_timestamp = Time.System.now () in
-              let* hash = Evm_store.Context_hashes.find conn last_gc_level in
-              let*? hash =
-                Option.to_result
-                  ~none:
-                    [
-                      error_of_fmt
-                        "Context hash of GC candidate %a is missing from store"
-                        Ethereum_types.pp_quantity
-                        last_gc_level;
-                    ]
-                  hash
-              in
-              let* () = Evm_store.reset_before conn ~l2_level:last_gc_level in
-              let*! () = Irmin_context.gc ctxt.index hash in
-              let* () = Evm_store.GC.update_last_gc conn level timestamp in
-              let gc_waiter () =
-                let open Lwt_syntax in
-                let* () = Irmin_context.wait_gc_completion ctxt.index in
-                let stop_timestamp = Time.System.now () in
-                Evm_context_events.gc_finished
-                  ~gc_level:last_gc_level
-                  ~head_level:level
-                  (Ptime.diff stop_timestamp start_timestamp)
-              in
-              Lwt.dont_wait gc_waiter Evm_context_events.gc_waiter_failed ;
-              return_some (level, timestamp))
-            else return_none)
 
   let commit_next_head (ctxt : t) conn timestamp evm_state =
     let open Lwt_result_syntax in
@@ -282,10 +263,7 @@ module State = struct
     let* split_info =
       maybe_split_context ctxt conn timestamp ctxt.session.next_blueprint_number
     in
-    let* gc_info =
-      maybe_gc ctxt conn timestamp ctxt.session.next_blueprint_number
-    in
-    return (context, split_info, gc_info)
+    return (context, split_info)
 
   let replace_current_commit (ctxt : t) conn evm_state =
     let (Qty next) = ctxt.session.next_blueprint_number in
@@ -672,16 +650,10 @@ module State = struct
             ctxt.session.next_blueprint_number
         in
 
-        let* context, split_info, gc_info =
+        let* context, split_info =
           commit_next_head ctxt conn timestamp evm_state
         in
-        return
-          ( evm_state,
-            context,
-            block,
-            applied_kernel_upgrade,
-            split_info,
-            gc_info )
+        return (evm_state, context, block, applied_kernel_upgrade, split_info)
     | Apply_failure (* Did not produce a block *) ->
         let*! () =
           if ctxt.fail_on_missing_blueprint then
@@ -690,8 +662,8 @@ module State = struct
         in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-  let on_new_head ?split_info ?gc_info ctxt ~applied_upgrade evm_state context
-      block blueprint_with_events =
+  let on_new_head ?split_info ctxt ~applied_upgrade evm_state context block
+      blueprint_with_events =
     let open Lwt_syntax in
     let (Qty level) = ctxt.session.next_blueprint_number in
     ctxt.session.evm_state <- evm_state ;
@@ -702,9 +674,6 @@ module State = struct
       (fun (split_level, split_timestamp) ->
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))
       split_info ;
-    Option.iter
-      (fun gc_info -> ctxt.session.last_gc_block <- Some gc_info)
-      gc_info ;
     Broadcast.notify @@ Broadcast.Blueprint blueprint_with_events ;
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     let* head_info in
@@ -749,12 +718,7 @@ module State = struct
   let rec apply_blueprint ?conn ?(events = []) ctxt timestamp payload
       delayed_transactions =
     let open Lwt_result_syntax in
-    let* ( evm_state,
-           context,
-           current_block,
-           applied_kernel_upgrade,
-           split_info,
-           gc_info ) =
+    let* evm_state, context, current_block, applied_kernel_upgrade, split_info =
       let kont conn =
         let* () = apply_evm_events conn ctxt events in
         apply_blueprint_store_unsafe
@@ -781,7 +745,6 @@ module State = struct
       @@ fun () ->
       on_new_head
         ?split_info
-        ?gc_info
         ctxt
         ~applied_upgrade:applied_kernel_upgrade
         evm_state
@@ -1156,13 +1119,12 @@ module State = struct
                initial kernel"
     in
 
-    let* history, last_split_block, last_gc_block =
+    let* history, last_split_block =
       match garbage_collector with
       | Some parameters ->
-          let* last_split_opt = Evm_store.GC.last_split conn in
-          let* last_gc_opt = Evm_store.GC.last_gc conn in
-          return (Full {parameters}, last_split_opt, last_gc_opt)
-      | None -> return (Archive, None, None)
+          let* last_split_opt = Evm_store.Irmin_chunks.latest conn in
+          return (Full {parameters}, last_split_opt)
+      | None -> return (Archive, None)
     in
 
     let ctxt =
@@ -1182,7 +1144,6 @@ module State = struct
             pending_upgrade;
             evm_state;
             last_split_block;
-            last_gc_block;
           };
         store;
         fail_on_missing_blueprint;

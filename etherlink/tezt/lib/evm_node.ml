@@ -1171,7 +1171,7 @@ let endpoint = rpc_endpoint ?local:None
 
 type garbage_collector = {
   split_frequency_in_seconds : int;
-  history_to_keep_in_seconds : int;
+  number_of_chunks : int;
 }
 
 type rpc_server = Resto | Dream
@@ -1221,13 +1221,12 @@ let patch_config_with_experimental_feature
   |> optional_json_put
        ~name:"garbage_collector"
        garbage_collector
-       (fun {split_frequency_in_seconds; history_to_keep_in_seconds} ->
+       (fun {split_frequency_in_seconds; number_of_chunks} ->
          `O
            [
              ( "split_frequency_in_seconds",
                `Float (Int.to_float split_frequency_in_seconds) );
-             ( "history_to_keep_in_seconds",
-               `Float (Int.to_float history_to_keep_in_seconds) );
+             ("number_of_chunks", `Float (Int.to_float number_of_chunks));
            ])
   |> optional_json_put ~name:"rpc_server" rpc_server (function
          | Resto -> `String "resto"

@@ -253,7 +253,7 @@ val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
 type garbage_collector = {
   split_frequency_in_seconds : int;
-  history_to_keep_in_seconds : int;
+  number_of_chunks : int;
 }
 
 type rpc_server = Resto | Dream
