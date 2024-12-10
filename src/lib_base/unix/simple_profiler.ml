@@ -256,7 +256,12 @@ let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t =
   in
   Format.fprintf ppf "%s %-7i " (String.sub indentsym 0 80) n ;
   if t.wall = 0. then Format.fprintf ppf "                 "
-  else Format.fprintf ppf "% 10.3fms" (t.wall *. 1000.) ;
+  else
+    Format.fprintf
+      ppf
+      "% 10.3fms %3d%%"
+      (t.wall *. 1000.)
+      (int_of_float (ceil (100. *. (t.cpu /. t.wall)))) ;
   Format.fprintf ppf "@,"
 
 let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
