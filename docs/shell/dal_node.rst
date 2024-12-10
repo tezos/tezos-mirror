@@ -38,7 +38,7 @@ The DAL node has two modes:
   Nodes in this mode run in one or more profiles to determine what data they post, share, or attest, as described below.
 
 - **Bootstrap mode** is for nodes that help other nodes connect to peers.
-  Bootstrap nodes are already running on most Tezos networks, so in most cases, you don't need to run a node in bootstrap node unless you are starting a new Tezos network.
+  Bootstrap nodes are already running on most Tezos networks, so in most cases, you don't need to run a node in bootstrap mode unless you are starting a new Tezos network.
 
   To run a DAL node in bootstrap mode, pass the ``--bootstrap-profile`` argument, as in this example:
 
