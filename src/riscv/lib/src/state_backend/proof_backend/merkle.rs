@@ -137,6 +137,24 @@ impl AccessInfo {
             Self::ReadWrite => CompressedAccessInfo::ReadWrite(data),
         }
     }
+
+    /// Return the updated access information after a read.
+    pub fn and_read(self) -> Self {
+        match self {
+            AccessInfo::NoAccess => AccessInfo::Read,
+            AccessInfo::Write => AccessInfo::ReadWrite,
+            access => access,
+        }
+    }
+
+    /// Return the updated access information after a write.
+    pub fn and_write(self) -> Self {
+        match self {
+            AccessInfo::NoAccess => AccessInfo::Write,
+            AccessInfo::Read => AccessInfo::ReadWrite,
+            access => access,
+        }
+    }
 }
 
 /// Intermediary representation obtained when compressing a [`MerkleTree`].
