@@ -22,9 +22,8 @@ open Rpc.Syntax
 
 let register ?genesis_timestamp
     ?(garbage_collector =
-      Evm_node.
-        {split_frequency_in_seconds = 100; history_to_keep_in_seconds = 100})
-    ~title ~tags f =
+      Evm_node.{split_frequency_in_seconds = 100; number_of_chunks = 5}) ~title
+    ~tags f =
   Test.register
     ~__FILE__
     ~title
@@ -56,7 +55,7 @@ let test_gc_boundaries () =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
   let garbage_collector =
-    Evm_node.{split_frequency_in_seconds = 1; history_to_keep_in_seconds = 3}
+    Evm_node.{split_frequency_in_seconds = 1; number_of_chunks = 3}
   in
   register
     ~genesis_timestamp
@@ -69,23 +68,60 @@ let test_gc_boundaries () =
     Evm_node.wait_for_gc_finished ~gc_level:6 ~head_level:9 sequencer
   in
   (* Produce blocks, one per second. Enough to trigger a garbage collector. *)
+  let*@ level = Rpc.block_number sequencer in
+  let level = Int32.to_int level in
   let* _ =
     fold 9 () (fun i () ->
+        let level = level + i + 1 in
         let timestamp = sf "2020-01-01T00:00:0%dZ" (i + 1) in
-        let*@ _ = Rpc.produce_block ~timestamp sequencer in
+        let wait_for_split = Evm_node.wait_for_split ~level sequencer in
+        let wait_for_gc =
+          if level > 3 then
+            Some
+              (Evm_node.wait_for_gc_finished
+                 ~gc_level:(level - 3)
+                 ~head_level:level
+                 sequencer)
+          else None
+        in
+        let* _ = wait_for_split
+        and* _ =
+          match wait_for_gc with
+          | None -> unit
+          | Some wait_for_gc ->
+              let* _ = wait_for_gc in
+              unit
+        and* res = Rpc.produce_block ~timestamp sequencer in
+        (* Just a sanity check to make sure it's a success, but it should
+           be obviously true as it would have failed on the wait for events. *)
+        assert (Result.is_ok res) ;
         unit)
   in
-  let* _ = wait_for_split in
-  let* _ = wait_for_gc in
+  let* _ = wait_for_split and* _ = wait_for_gc in
   (* The GC happenned at level 6, therefore the block 6 is supposed to be the
      earliest block. *)
   let*@ block = Rpc.get_block_by_number ~block:"earliest" sequencer in
   Check.((block.number = 6l) int32)
     ~error_msg:"Earliest block should be 6, but got %L" ;
+  let*@ _balance =
+    Rpc.get_balance
+      ~address:"0xB53dc01974176E5dFf2298C5a94343c2585E3c54"
+      ~block:(Number 6)
+      sequencer
+  in
   (* The block storage should also have cleaned everything behind 6. *)
   let*@? err = Rpc.get_block_by_number ~block:"5" sequencer in
   Check.(err.message =~ rex "Block 5 not found")
     ~error_msg:"The block 5 should be missing" ;
+  let*@? err =
+    Rpc.get_balance
+      ~address:"0xB53dc01974176E5dFf2298C5a94343c2585E3c54"
+      ~block:(Number 5)
+      sequencer
+  in
+  Check.(err.message =~ rex "No state available for block 5")
+    ~error_msg:"The state for block 5 should be missing" ;
+
   unit
 
 let () = test_gc_boundaries ()

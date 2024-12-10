@@ -55,17 +55,14 @@ CREATE TABLE transactions (
   object_fields BLOB NOT NULL
 );
 
-CREATE TABLE gc (
-  id INTEGER PRIMARY KEY,
-  last_gc_level INTEGER,
-  last_gc_timestamp TIMESTAMP,
-  last_split_level INTEGER,
-  last_split_timestamp TIMESTAMP
-);
-
 CREATE UNIQUE INDEX block_hash_index ON blocks (hash);
 
 CREATE TABLE pending_confirmations (
     level serial PRIMARY KEY,
     hash VARCHAR(32) NOT NULL
+);
+
+CREATE TABLE irmin_chunks (
+  level INTEGER,
+  timestamp TIMESTAMP
 )

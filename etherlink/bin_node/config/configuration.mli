@@ -56,7 +56,7 @@ type blueprints_publisher_config = {
 
 type garbage_collector = {
   split_frequency_in_seconds : int;
-  history_to_keep_in_seconds : int;
+  number_of_chunks : int;
 }
 
 (** RPC server implementation. *)

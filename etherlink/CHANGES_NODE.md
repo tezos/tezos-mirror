@@ -34,6 +34,10 @@
   a single timestamp per simulation. (!15889)
 - Internal error in the EVM context emits an event instead of silently
   failing. (!15824)
+- Garbage collector experimental feature keeps a number of chunks
+  rather than keeping "number of seconds" of history. For example, if
+  `split_frequency_in_seconds` is set to 86_400 (1 day) and `number_of_chunks`
+  is set to 7, the node will keep 7 days of history. (!15928)
 
 ## Verson 0.10 (2024-12-02)
 
