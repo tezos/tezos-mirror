@@ -28,6 +28,8 @@ General
 Node
 ----
 
+- Changed the default ``history-mode`` from ``Full`` to ``Rolling``. (MR :gl:`!15942`)
+
 - Introduced a specific exit code for the ``octez-node upgrade storage
   --status`` command. It now returns the exit code 1 when an upgrade
   is available. 0 is returned when the storage is up to date. (MR :gl:`!15152`)
