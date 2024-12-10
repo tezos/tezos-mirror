@@ -35,8 +35,8 @@ Signals
 -------
 
 Upon receiving ``SIGINT`` (e.g., via Ctrl+C in an interactive session) or
-``SIGTERM`` (e.g., via ``systemctl stop``) the process will exit (with code 64 or
-255, see details below). Note that sending the same signal a second time (after
+``SIGTERM`` (e.g., via ``systemctl stop``) the process will exit with code 127 if the cleanup happens normally. However,
+sending the same signal a second time (after
 a one (1) second grace period) will terminate the process immediately,
-interrupting the normal clean-up functions of clean-up (in this case the exit
-code will be 255).
+interrupting the normal clean-up functions, and in this case the exit
+code will be 255.
