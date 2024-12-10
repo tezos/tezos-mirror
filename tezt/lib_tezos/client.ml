@@ -587,6 +587,17 @@ let import_encrypted_secret_key ?hooks ?force ?endpoint client
   let* () = Lwt_io.close output_channel in
   Process.check process
 
+let spawn_import_public_key ?(force = false) ?endpoint client
+    (public_key : Account.secret_key) ~alias =
+  let pk_uri =
+    "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ public_key
+  in
+  let force = if force then ["--force"] else [] in
+  spawn_command
+    ?endpoint
+    client
+    (["import"; "public"; "key"; alias; pk_uri] @ force)
+
 let spawn_import_secret_key ?(force = false) ?endpoint client
     (secret_key : Account.secret_key) ~alias =
   let sk_uri =
@@ -616,6 +627,10 @@ let import_signer_key ?endpoint ?force client ~public_key_hash ~alias signer_uri
     ~public_key_hash
     ~alias
     signer_uri
+  |> Process.check
+
+let import_public_key ?force ?endpoint client public_key ~alias =
+  spawn_import_public_key ?force ?endpoint client public_key ~alias
   |> Process.check
 
 let import_secret_key ?force ?endpoint client secret_key ~alias =
