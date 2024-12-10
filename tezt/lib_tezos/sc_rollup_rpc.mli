@@ -173,7 +173,11 @@ val get_global_block_durable_state_value :
     queue the rollup node's batcher and returns the list of message
     hashes injected. *)
 val post_local_batcher_injection :
-  ?drop_duplicate:bool -> messages:string list -> unit -> string list RPC_core.t
+  ?order:int ->
+  ?drop_duplicate:bool ->
+  messages:string list ->
+  unit ->
+  string list RPC_core.t
 
 (** RPC: [POST local/dal/batcher/injection] injects the given
     [messages] in the rollup node's DAL queue. *)

@@ -255,17 +255,21 @@ let get_global_block_durable_state_value ?(block = "head") ~pvm_kind ~operation
     ["global"; "block"; block; "durable"; pvm_kind; op]
     (f operation)
 
-let post_local_batcher_injection ?drop_duplicate ~messages () =
+let post_local_batcher_injection ?order ?drop_duplicate ~messages () =
   let data =
     Data (`A (List.map (fun s -> `String Hex.(of_string s |> show)) messages))
   in
   let query_string =
-    Option.map (fun b -> [("drop_duplicate", string_of_bool b)]) drop_duplicate
+    let order = Option.map (fun v -> ("order", string_of_int v)) order in
+    let drop_duplicate =
+      Option.map (fun b -> ("drop_duplicate", string_of_bool b)) drop_duplicate
+    in
+    Option.to_list order @ Option.to_list drop_duplicate
   in
   make
     POST
     ["local"; "batcher"; "injection"]
-    ?query_string
+    ~query_string
     ~data
     JSON.(fun json -> as_list json |> List.map as_string)
 

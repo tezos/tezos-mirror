@@ -5833,11 +5833,198 @@ let test_multiple_batcher_key ~kind =
     ~error_msg:"Reused %L keys but should have rotated not reused any." ;
   unit
 
+let test_batcher_order_msgs ~kind =
+  test_full_scenario
+    {
+      tags = ["batcher"; "messages"; "order"];
+      variant = None;
+      description = "rollup node - Batcher order message correctly";
+    }
+    ~mode:Batcher
+    ~kind
+    ~operators:[(Sc_rollup_node.Batching, Constant.bootstrap1.alias)]
+  @@ fun _protocol rollup_node rollup_addr node client ->
+  let min_batch_elements = 10 in
+  let max_batch_elements = 20 in
+  let* _config = Sc_rollup_node.config_init rollup_node rollup_addr in
+  let () =
+    Sc_rollup_node.Config_file.update rollup_node
+    @@ JSON.update "batcher"
+    @@ fun json ->
+    let json =
+      JSON.put
+        ( "min_batch_elements",
+          JSON.annotate
+            ~origin:"min batch elements size"
+            (`Float (Int.to_float min_batch_elements)) )
+        json
+    in
+    let json =
+      JSON.put
+        ( "max_batch_elements",
+          JSON.annotate
+            ~origin:"max batch elements size"
+            (`Float (Int.to_float max_batch_elements)) )
+        json
+    in
+    json
+  in
+
+  let inject_int_of_string ?order ?drop_duplicate messages =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.post_local_batcher_injection
+         ?order
+         ?drop_duplicate
+         ~messages:(List.map string_of_int messages)
+         ()
+  in
+  let wait_for_included_and_returns_msgs () =
+    let find_map_op_content op_content_json =
+      let kind = JSON.(op_content_json |-> "kind" |> as_string) in
+      if kind = "smart_rollup_add_messages" then
+        let msgs =
+          JSON.(op_content_json |-> "message" |> as_list |> List.map as_string)
+        in
+        Some msgs
+      else None
+    in
+    wait_for_included_and_map_ops_content
+      rollup_node
+      node
+      ~timeout:30.
+      ~find_map_op_content
+  in
+
+  let check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages =
+    let* queued_hashes, queued_msgs =
+      let* queued_msgs =
+        Sc_rollup_node.RPC.call rollup_node
+        @@ Sc_rollup_rpc.get_local_batcher_queue ()
+      in
+      return @@ List.split queued_msgs
+    in
+    Check.(
+      (List.sort String.compare queued_hashes
+      = List.sort_uniq String.compare expected_queued_hashes)
+        (list string)
+        ~__LOC__)
+      ~error_msg:"Queued msgs hashes %L was found but %R was expected" ;
+
+    Check.(
+      (List.map int_of_string queued_msgs = expected_messages)
+        (list int)
+        ~__LOC__)
+      ~error_msg:"Queued msgs  %L was found but %R was expected" ;
+    unit
+  in
+
+  let bake_then_check_included_msgs ~__LOC__ ~nb_batches ~expected_messages =
+    let* level = Node.get_level node in
+    let wait_for_injected =
+      wait_until_n_batches_are_injected rollup_node ~nb_batches
+    in
+    let* () = Client.bake_for_and_wait client
+    and* () = wait_for_injected
+    and* _lvl = Sc_rollup_node.wait_for_level rollup_node (level + 1) in
+    let wait_for_included = wait_for_included_and_returns_msgs () in
+    let* () = Client.bake_for_and_wait client
+    and* msgs = wait_for_included
+    and* _lvl = Sc_rollup_node.wait_for_level rollup_node (level + 2) in
+
+    Check.(
+      (List.map
+         (List.map (fun s -> int_of_string @@ Hex.to_string (`Hex s)))
+         msgs
+      = expected_messages)
+        (list (list int))
+        ~__LOC__)
+      ~error_msg:"Included msgs %L was found but %R was expected" ;
+    unit
+  in
+
+  let* level = Node.get_level node in
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
+  let* _ = Sc_rollup_node.wait_for_level rollup_node level in
+
+  (* To make sure we are all bootstrapped, might be unused *)
+  Log.info "injecting 3 messages with order specified (e.g. [10; 20; 30])" ;
+  let* hashes_1 =
+    fold 3 [] (fun i acc ->
+        let order = 10 * (i + 1) in
+        let* hashes = inject_int_of_string ~order [order] in
+        return @@ hashes @ acc)
+  in
+  Log.info
+    "injecting 4 messages with order specified in reverses (e.g. [ 30; 20; 10])" ;
+  let* hashes_2 =
+    fold 3 [] (fun i acc ->
+        let order = 30 - (10 * i) in
+        let* hashes = inject_int_of_string ~order [order] in
+        return @@ hashes @ acc)
+  in
+  Log.info "injecting 1 message with no order specified" ;
+  let* hashes_3 = inject_int_of_string [31] in
+  Log.info "injecting 2 time the same message with order 11 and ~drop_duplicate" ;
+  let* hashes_4 = inject_int_of_string ~order:11 ~drop_duplicate:true [1; 1] in
+  Log.info "Reinjecting the same message with order 0" ;
+  let* hashes_5 = inject_int_of_string ~order:0 ~drop_duplicate:true [1] in
+  let expected_queued_hashes =
+    hashes_1 @ hashes_2 @ hashes_3 @ hashes_4 @ hashes_5
+  in
+
+  let expected_messages = [1; 10; 10; 20; 20; 30; 30; 31] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+  let* () =
+    bake_then_check_included_msgs
+      ~__LOC__
+      ~nb_batches:1
+      ~expected_messages:[expected_messages]
+  in
+
+  Log.info
+    "Injecting lots of messages to make sure order is preserved over batches, \
+     e.g. first batches contains elements smaller than second batch." ;
+  let half_min_batch = min_batch_elements / 2 in
+  let* hashes_1 =
+    (* [0; 10; ... 40] *)
+    inject_int_of_string @@ List.init half_min_batch (fun i -> i * 10)
+  in
+  let* hashes_2 =
+    (* [50; 60; ... 80] *)
+    inject_int_of_string
+    @@ List.init (half_min_batch - 1) (fun i -> (half_min_batch + i) * 10)
+  in
+  let expected_queued_hashes = hashes_1 @ hashes_2 in
+  let expected_messages =
+    List.init (min_batch_elements - 1) (fun i -> i * 10)
+  in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+
+  (* this willl trigger batch production *)
+  let* _hashes_4 =
+    (* [90; 100; ... 290] *)
+    inject_int_of_string
+      (((min_batch_elements - 1) * 10)
+      :: List.init max_batch_elements (fun i -> (min_batch_elements + i) * 10))
+  in
+  let expected_messages =
+    [
+      (* [0; 10; ... 190] *)
+      List.init max_batch_elements (fun i -> i * 10);
+      (* [200; 210; ... 290] *)
+      List.init min_batch_elements (fun i -> (max_batch_elements + i) * 10);
+    ]
+  in
+  let* () =
+    bake_then_check_included_msgs ~__LOC__ ~nb_batches:1 ~expected_messages
+  in
+  unit
+
 (** Injector only uses key that have no operation in the mempool
    currently.
    1. Batcher setup:
    - 5 signers in the batcher.
-   - 10 batches to inject.
+   - 10 batches to inject_int_of_string.
    2. First Block:
    - Mempool:
      - Contains enough batches to fill the block from users with high fees.
@@ -5962,8 +6149,8 @@ let test_injector_uses_available_keys ~kind =
   let* _lvl = Client.bake_for_and_wait client in
   let* () =
     inject_n_msgs_batches_in_rollup_node
-    (* we inject 2 times the number of operators so the rollup node
-       must inject in two salvos all the batches. *)
+    (* we inject_int_of_string 2 times the number of operators so the rollup node
+       must inject_int_of_string in two salvos all the batches. *)
       ~nb_of_batches:(2 * nb_operators)
       ~msg_per_batch
       ~msg_size
@@ -6007,7 +6194,7 @@ let test_batcher_dont_reinject_already_injected_messages ~kind =
     }
   @@ fun _protocol rollup_node rollup_addr _node client ->
   Log.info "Batcher setup" ;
-  let inject ~drop_duplicate ~messages =
+  let inject_int_of_string ~drop_duplicate ~messages =
     Sc_rollup_node.RPC.call rollup_node
     @@ Sc_rollup_rpc.post_local_batcher_injection ~drop_duplicate ~messages ()
   in
@@ -6053,7 +6240,9 @@ let test_batcher_dont_reinject_already_injected_messages ~kind =
 
     let* () =
       if inject_msgs then (
-        let* message_ids = inject ~drop_duplicate:true ~messages in
+        let* message_ids =
+          inject_int_of_string ~drop_duplicate:true ~messages
+        in
         let message_id = List.nth message_ids 0 in
         Check.(
           (message_id = check_message_id)
@@ -6084,9 +6273,13 @@ let test_batcher_dont_reinject_already_injected_messages ~kind =
       [Injector_retention_period 1]
   and* _lvl = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
 
-  let* messages_id_first = inject ~drop_duplicate:false ~messages in
+  let* messages_id_first =
+    inject_int_of_string ~drop_duplicate:false ~messages
+  in
   let* () = check_batcher_queue_size ~__LOC__ ~expected_size:2 () in
-  let* messages_id_second = inject ~drop_duplicate:false ~messages in
+  let* messages_id_second =
+    inject_int_of_string ~drop_duplicate:false ~messages
+  in
   let* () = check_batcher_queue_size ~__LOC__ ~expected_size:4 () in
   Check.(
     (messages_id_first <> messages_id_second)
@@ -6094,7 +6287,9 @@ let test_batcher_dont_reinject_already_injected_messages ~kind =
       (list string)
       ~error_msg:"first messages batch id %L must be different than second %R") ;
 
-  let* first_message_ids = inject ~drop_duplicate:true ~messages in
+  let* first_message_ids =
+    inject_int_of_string ~drop_duplicate:true ~messages
+  in
   let* () = check_batcher_queue_size ~__LOC__ ~expected_size:5 () in
 
   let check_message_id = List.nth first_message_ids 0 in
@@ -6107,7 +6302,9 @@ let test_batcher_dont_reinject_already_injected_messages ~kind =
         "messages id with check on must be equal (given %L, expected %R).") ;
 
   Log.info "Resubmiting the same message dont add it to the queue." ;
-  let* second_message_ids = inject ~drop_duplicate:true ~messages in
+  let* second_message_ids =
+    inject_int_of_string ~drop_duplicate:true ~messages
+  in
   let* () = check_batcher_queue_size ~__LOC__ ~expected_size:5 () in
   Check.(
     (first_message_ids = second_message_ids)
@@ -6478,6 +6675,7 @@ let register_protocol_independent () =
   test_accuser protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
+  test_batcher_order_msgs ~kind protocols ;
   test_injector_uses_available_keys protocols ~kind ;
   test_batcher_dont_reinject_already_injected_messages protocols ~kind ;
   test_private_rollup_node_publish_in_whitelist protocols ;
