@@ -56,7 +56,7 @@ let default_full = Full None
 
 let default_rolling = Rolling None
 
-let default = default_full
+let default = default_rolling
 
 module Legacy = struct
   type t = Archive | Full | Rolling
