@@ -92,6 +92,10 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -106,6 +110,7 @@ oc.build:static-x86_64-linux-binaries:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -129,6 +134,10 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -143,6 +152,7 @@ oc.build:static-arm64-linux-binaries:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -167,6 +177,10 @@ oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -182,6 +196,7 @@ oc.build_arm64-released:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -215,6 +230,10 @@ oc.build_arm64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
   before_script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -232,6 +251,7 @@ oc.build_arm64-exp-dev-extra:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
