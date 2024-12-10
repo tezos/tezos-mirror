@@ -4226,11 +4226,14 @@ let observe_nodes_connection_via_bootstrap ?(extra_nodes_to_restart = []) client
     dal_node2 dal_node3 =
   let nodes = dal_node2 :: dal_node3 :: extra_nodes_to_restart in
   let* () = List.map Dal_node.terminate nodes |> Lwt.join in
+  let* dal_node2_identity = Dal_node.read_identity dal_node2 in
+  let* dal_node3_identity = Dal_node.read_identity dal_node3 in
   let check_conn_event_from_2_to_3 =
     Dal_common.Helpers.check_new_connection_event
       ~main_node:dal_node2
       ~other_node:dal_node3
       ~is_trusted:false
+      ~other_peer_id:dal_node3_identity
       ()
   in
   let check_conn_event_from_3_to_2 =
@@ -4238,6 +4241,7 @@ let observe_nodes_connection_via_bootstrap ?(extra_nodes_to_restart = []) client
       ~main_node:dal_node3
       ~other_node:dal_node2
       ~is_trusted:false
+      ~other_peer_id:dal_node2_identity
       ()
   in
   let* () = List.map (Dal_node.run ~wait_ready:true) nodes |> Lwt.join in
