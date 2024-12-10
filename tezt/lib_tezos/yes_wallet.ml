@@ -73,3 +73,10 @@ let create_from_context ?(aliases = List []) ~node ~client ~network t =
     |> Process.check
   in
   Lwt.return aliases_filename
+
+let convert_wallet_inplace ~client t =
+  let {path; name; runner} = t in
+  let args =
+    ["convert"; "wallet"; Client.base_dir client; "inplace"; "--force"]
+  in
+  Process.spawn ?runner ?name path args |> Process.check

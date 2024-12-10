@@ -37,3 +37,15 @@ val create_from_context :
   network:string ->
   t ->
   string Lwt.t
+
+(** Initialize a client wallet
+    {[
+        yes_wallet.exe convert \
+            wallet <BASE_DIR> \
+            inplace \
+            --force \
+    ]}
+
+    [<BASE_DIR>] is defined by [client]
+*)
+val convert_wallet_inplace : client:Client.t -> t -> unit Lwt.t
