@@ -99,7 +99,7 @@ let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let perform_protocol_migration ?node_name ?client_name ?parameter_file
-    ~blocks_per_cycle ~migration_level ~migrate_from ~migrate_to
+    ?more_node_args ~blocks_per_cycle ~migration_level ~migrate_from ~migrate_to
     ~baked_blocks_after_migration () =
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
@@ -107,6 +107,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     user_migratable_node_init
       ?node_name
       ?client_name
+      ?more_node_args
       ~migration_level
       ~migrate_to
       ()
@@ -200,6 +201,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   @@ fun () ->
   let* client0, node0 =
     perform_protocol_migration
+      ~more_node_args:[Node.History_mode (Full None)]
       ~node_name:"node0"
       ~client_name:"client0"
       ~blocks_per_cycle
