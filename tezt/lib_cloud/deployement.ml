@@ -189,7 +189,7 @@ module Remote = struct
              let* () =
                Jobs.docker_build
                  ~docker_image:configuration.Configuration.docker_image
-                 ~push:true
+                 ~push:Env.push_docker
                  ()
              in
              let* () = Terraform.VM.Workspace.select workspace_name in

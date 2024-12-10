@@ -569,7 +569,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
       | `Cloud ->
           (* The scenario is executed locally and the VMs are on the cloud. *)
           let* () = Jobs.deploy_docker_registry () in
-          let* () = Jobs.docker_build ~push:true () in
+          let* () = Jobs.docker_build ~push:Env.push_docker () in
           let* deployement = Deployement.deploy ~configurations in
           let* () =
             Deployement.agents deployement
@@ -582,7 +582,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
           let* proxy_running = try_reattach () in
           if not proxy_running then
             let* () = Jobs.deploy_docker_registry () in
-            let* () = Jobs.docker_build ~push:true () in
+            let* () = Jobs.docker_build ~push:Env.push_docker () in
             let* deployement = Deployement.deploy ~configurations in
             let* () =
               Deployement.agents deployement

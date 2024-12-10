@@ -83,6 +83,8 @@ let macosx = Cli.macosx
 
 let check_file_consistency = Cli.check_file_consistency
 
+let push_docker = Cli.push_docker
+
 let project_id = Gcloud.project_id
 
 let init () =

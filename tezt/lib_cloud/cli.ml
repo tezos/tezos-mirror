@@ -263,3 +263,15 @@ let check_file_consistency =
        Although a scenario can opt in or opt out, this flag sets the default \
        behavior. Its default value is [true] unless [--macosx] is used."
     (not macosx)
+
+let push_docker =
+  Clap.flag
+    ~section
+    ~unset_long:"no-docker-push"
+    ~description:
+      "When used in cloud mode (--cloud) or proxy mode (--proxy), by default, \
+       `tezt-cloud` pushes the Docker containers on GCP. To save some \
+       bandwidth or some time during a redeployment that won't add or remove \
+       VMs that are already running, it is useful to prevent those containers \
+       to be pushed."
+    true
