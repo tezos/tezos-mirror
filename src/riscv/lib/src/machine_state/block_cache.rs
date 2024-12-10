@@ -103,7 +103,7 @@ const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
 const CACHE_INSTR: usize = 20;
 
 /// Layout for an [`ICallPlaced`].
-pub struct ICallLayout<ML: MainMemoryLayout> {
+pub struct ICallLayout<ML> {
     _pd: PhantomData<ML>,
 }
 

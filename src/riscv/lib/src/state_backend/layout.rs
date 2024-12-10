@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Cell, Cells};
 use crate::default::ConstDefault;
 use std::marker::PhantomData;
 
@@ -36,7 +35,7 @@ impl<T: ConstDefault + 'static> Layout for Atom<T> {
 
     fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let region = backend.allocate_region([T::DEFAULT; 1]);
-        Cell::bind(region)
+        super::Cell::bind(region)
     }
 }
 
@@ -50,11 +49,11 @@ impl<T: 'static, const LEN: usize> Layout for Array<T, LEN>
 where
     [T; LEN]: ConstDefault,
 {
-    type Allocated<M: super::ManagerBase> = Cells<T, LEN, M>;
+    type Allocated<M: super::ManagerBase> = super::Cells<T, LEN, M>;
 
     fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let region = backend.allocate_region(<[T; LEN]>::DEFAULT);
-        Cells::bind(region)
+        super::Cells::bind(region)
     }
 }
 
@@ -80,7 +79,7 @@ macro_rules! struct_layout {
         $( , )?
     }) => {
         paste::paste! {
-            #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+            #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, Eq)]
             $vis struct [<$layout_t F>]<
                 $(
                     [<$field_name:upper>]

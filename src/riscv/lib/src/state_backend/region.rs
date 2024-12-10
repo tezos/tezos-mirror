@@ -194,8 +194,7 @@ impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<
 
 impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, ProofGen<M>> {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        let serialised = binary::serialise(&self)?;
-        MerkleTree::make_merkle_leaf(serialised, self.region.region.get_access_info())
+        self.region.to_merkle_tree()
     }
 }
 

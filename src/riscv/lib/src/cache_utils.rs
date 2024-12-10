@@ -75,14 +75,12 @@ impl<const BITS: usize, const SIZE: usize, CachedLayout> Sizes<BITS, SIZE, Cache
     }
 }
 
-type SizesLayout<const SIZE: usize, CachedLayout> = Many<CachedLayout, SIZE>;
-
 impl<const BITS: usize, const SIZE: usize, CachedLayout: Layout> Layout
     for Sizes<BITS, SIZE, CachedLayout>
 {
-    type Allocated<M: ManagerBase> = <SizesLayout<SIZE, CachedLayout> as Layout>::Allocated<M>;
+    type Allocated<M: ManagerBase> = <Many<CachedLayout, SIZE> as Layout>::Allocated<M>;
 
     fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        SizesLayout::<SIZE, CachedLayout>::allocate(backend)
+        Many::<CachedLayout, SIZE>::allocate(backend)
     }
 }
