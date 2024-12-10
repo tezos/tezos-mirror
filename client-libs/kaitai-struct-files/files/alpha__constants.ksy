@@ -300,7 +300,7 @@ seq:
   type: s8be
 - id: consensus_committee_size
   type: int31
-- id: consensus_threshold
+- id: consensus_threshold_size
   type: int31
 - id: minimal_participation_ratio
   type: minimal_participation_ratio
