@@ -1221,6 +1221,10 @@ build-layer1-profiling:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./octez-node
 
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
