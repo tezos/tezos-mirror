@@ -788,39 +788,42 @@ module State = struct
   let rec apply_blueprint ?(events = []) ctxt conn timestamp payload
       delayed_transactions =
     let open Lwt_result_syntax in
-    let* evm_state, context, current_block, applied_kernel_upgrade, split_info =
-      let* () = apply_evm_events conn ctxt events in
-      apply_blueprint_store_unsafe
-        ctxt
-        conn
-        timestamp
-        payload
-        delayed_transactions
-    in
-    let kernel_upgrade =
-      match ctxt.session.pending_upgrade with
-      | Some {injected_before; kernel_upgrade}
-        when injected_before = ctxt.session.next_blueprint_number ->
-          Some kernel_upgrade
-      | _ -> None
-    in
+    let* _current_block =
+      Misc.with_timing_f_e Blueprint_events.blueprint_applied @@ fun () ->
+      let* evm_state, context, current_block, applied_kernel_upgrade, split_info
+          =
+        let* () = apply_evm_events conn ctxt events in
+        apply_blueprint_store_unsafe
+          ctxt
+          conn
+          timestamp
+          payload
+          delayed_transactions
+      in
+      let kernel_upgrade =
+        match ctxt.session.pending_upgrade with
+        | Some {injected_before; kernel_upgrade}
+          when injected_before = ctxt.session.next_blueprint_number ->
+            Some kernel_upgrade
+        | _ -> None
+      in
 
-    let*! () =
-      Misc.with_timing (Blueprint_events.blueprint_applied current_block)
-      @@ fun () ->
-      on_new_head
-        ?split_info
-        ctxt
-        ~applied_upgrade:applied_kernel_upgrade
-        evm_state
-        context
-        current_block
-        {
-          delayed_transactions;
-          kernel_upgrade;
-          blueprint =
-            {number = ctxt.session.next_blueprint_number; timestamp; payload};
-        }
+      let*! () =
+        on_new_head
+          ?split_info
+          ctxt
+          ~applied_upgrade:applied_kernel_upgrade
+          evm_state
+          context
+          current_block
+          {
+            delayed_transactions;
+            kernel_upgrade;
+            blueprint =
+              {number = ctxt.session.next_blueprint_number; timestamp; payload};
+          }
+      in
+      return current_block
     in
     return_unit
 
