@@ -29,44 +29,54 @@ A bootstrap node remains connected to a large number of peers and is subscribed 
 When a DAL node starts, it gets the URLs of the bootstrap nodes from its layer 1 node and uses these bootstrap nodes to connect to peers.
 When a DAL node does not have the necessary connections to the P2P network, bootstrap nodes provide connection points with the relevant topics.
 
-.. _dal_profiles:
+Modes
+~~~~~
 
+The DAL node has two modes:
+
+- **Controller mode** is appropriate for most nodes; it is for nodes that post, share, or attest data.
+  Nodes in this mode run in one or more profiles to determine what data they post, share, or attest, as described below.
+
+- **Bootstrap mode** is for nodes that help other nodes connect to peers.
+  Bootstrap nodes are already running on most Tezos networks, so in most cases, you don't need to run a node in bootstrap node unless you are starting a new Tezos network.
+
+  To run a DAL node in bootstrap mode, pass the ``--bootstrap-profile`` argument, as in this example:
+
+  .. code-block:: shell
+
+    octez-dal-node run --endpoint http://127.0.0.1:8732 --bootstrap-profile --data-dir $DATA_DIR
+
+  The configuration file for a DAL node running in bootstrap mode shows only the base information about the node, as in this example:
+
+  .. code-block:: json
+
+    {
+      "data-dir": "dal-node/",
+      "endpoint": "http://127.0.0.1:8732",
+      "profiles": {
+        "kind": "bootstrap"
+      }
+    }
+
+  .. _dal_profiles:
 
 Profiles
 ~~~~~~~~
 
-Because node operators care about different parts of the DAL network, the DAL node runs in different profiles.
+As described above, different DAL node operators are interested in different data, and some want to produce data, others want to share data, and others want to attest data.
+For this reason, DAL controller nodes run in different profiles; these profiles control which data the nodes post, share, and attest.
 You can set these profiles in the node's configuration file, as CLI arguments to the node's commands, or via RPC calls.
 
-The DAL node runs in these profiles:
+Currently, a DAL node in controller mode can use any combination of profiles.
+However, for future-proofing and for production installations, run a DAL controller node in a single profile.
 
-- The ``producer`` profile (soon to be changed to the ``operator`` profile) is for users who are running a Smart Rollup and want to publish data to it. To run a DAL node with the ``producer`` profile, pass the ``--producer-profiles`` argument with the indexes of the slots to accept data for, as in this example:
+A DAL node in controller mode can run in these profiles:
+
+- The ``operator`` profile (formerly the ``producer`` profile) is for users who are running a Smart Rollup as an operator and want to post data. To run a DAL node with the ``operator`` profile, pass the ``--operator-profiles`` argument with the indexes of the slots to accept data for, as in this example:
 
    .. code-block:: shell
 
-      octez-dal-node run --endpoint http://127.0.0.1:8732 --producer-profiles=0,1 --data-dir $DATA_DIR
-
-  The configuration file for a DAL node running with the ``producer`` profile shows the slots that it accepts data for, as in this example:
-
-   .. code-block:: json
-
-      {
-        "data-dir": "dal-node/",
-        "endpoint": "http://127.0.0.1:8732",
-        "profiles": {
-          "kind": "operator",
-          "operator_profiles": [
-            {
-              "kind": "producer",
-              "slot_index": 1
-            },
-            {
-              "kind": "producer",
-              "slot_index": 2
-            }
-          ]
-        }
-      }
+      octez-dal-node run --endpoint http://127.0.0.1:8732 --operator-profiles=0,1 --data-dir $DATA_DIR
 
 - The ``attester`` profile is for bakers who want to attest to data. When an ``octez-baker`` daemon with attestation rights connects to a DAL node, it prompts the DAL node to run with the ``attester`` profile. The DAL node receives this prompt and runs in the ``attester`` profile unless it is running in bootstrap profile. To force the DAL node to run with the ``attester`` profile, pass the ``--attester-profiles`` argument with the public key hashes of the bakers to attest data for, as in this example:
 
@@ -74,31 +84,14 @@ The DAL node runs in these profiles:
 
       octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx --data-dir $DATA_DIR
 
-  The configuration file for a DAL node running with the ``attester`` profile shows the public key hashes, as in this example:
-
-   .. code-block:: json
-
-      {
-        "data-dir": "dal-node/",
-        "endpoint": "http://127.0.0.1:8732",
-        "profiles": {
-          "kind": "operator",
-          "operator_profiles": [
-            {
-              "kind": "attester",
-              "public_key_hash": "tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx"
-            }
-          ]
-        }
-      }
-
 - The ``observer`` profile contributes to the resilience of network by helping distribute data in the specified slots. To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
 
    .. code-block:: shell
 
       octez-dal-node run --endpoint http://127.0.0.1:8732 --observer-profiles=0,1 --data-dir $DATA_DIR
 
-  The configuration file for a DAL node running with the ``observer`` profile shows the slots that it is monitoring, as in this example:
+The configuration file for a DAL controller node shows its active profiles.
+For example, this configuration file shows that it is running in the ``operator`` profile and accepting data for slots 0 and 1:
 
    .. code-block:: json
 
@@ -106,27 +99,16 @@ The DAL node runs in these profiles:
         "data-dir": "dal-node/",
         "endpoint": "http://127.0.0.1:8732",
         "profiles": {
-          "kind": "operator",
-          "operator_profiles": [
-            {
-              "kind": "observer",
-              "slot_index": 1
-            },
-            {
-              "kind": "observer",
-              "slot_index": 2
-            }
-          ]
+          "kind": "controller",
+          "controller_profiles": {
+            "operators": [ 0, 1 ],
+            "observers": [],
+            "attesters": []
+          }
         }
       }
 
-- The ``bootstrap`` profile is for starting a DAL network and providing entry points for other DAL nodes to become part of the network. To run a DAL node with the ``bootstrap`` profile, pass the ``--bootstrap-profile`` argument, as in this example:
-
-   .. code-block:: shell
-
-      octez-dal-node run --endpoint http://127.0.0.1:8732 --bootstrap-profile --data-dir $DATA_DIR
-
-  The configuration file for a DAL node running with the ``bootstrap`` profile shows only the base information about the node, as in this example:
+The configuration file for a DAL node running with the ``attester`` profile shows the public key hashes of the associated bakers, as in this example:
 
    .. code-block:: json
 
@@ -134,14 +116,16 @@ The DAL node runs in these profiles:
         "data-dir": "dal-node/",
         "endpoint": "http://127.0.0.1:8732",
         "profiles": {
-          "kind": "bootstrap"
+          "kind": "controller",
+          "controller_profiles": {
+            "operators": [],
+            "observers": [],
+            "attesters": [ "tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx" ]
+          }
         }
       }
 
-By default, the DAL node runs in the producer profile without subscribing to any topics.
-
-Currently, the DAL node can use any combination of profiles except that the bootstrap profile is not compatible with any other profile.
-However, for future-proofing and for production installations, run a DAL node in a single profile.
+By default, the DAL node runs in controller mode without any profile.
 
 When a baker starts with the ``--dal-node`` argument, it checks the DAL node's configuration.
 If the DAL node is not in bootstrap mode and not already set up with the ``attester`` profile, the baker configures the DAL node to use the attester profile associated with the keys that it is using.
@@ -155,7 +139,7 @@ The amount of storage space a DAL node needs depends on how long it keeps the da
 
 - Bootstrap nodes store no DAL data and therefore require negligible storage.
 - Attester and observer nodes store data in memory for a few blocks after the attestation delay by default.
-- Producer nodes store data on disk for 3 months by default because the data may be needed for the Smart Rollup refutation game.
+- Operator nodes store data on disk for the slots registered with this profile for 3 months by default because the data may be needed for the Smart Rollup refutation game.
 
 You can set how long the node stores data with the ``--history-mode`` option.
 
