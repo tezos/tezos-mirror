@@ -2,11 +2,11 @@ Template: octez-node/history-mode
 Description: Select a mode for the node:
  The node can run in the following history modes:
  .
- Rolling: Store only a rolling fragment of blockchain data so the node can
- validate new blocks and stay in sync with the blockchain head. This mode
- initializes the fastest and requires the least disk space.
+ Rolling: Store only a rolling fragment of blockchain data so the
+ node can validate new blocks and stay in sync with the blockchain head. This
+ mode initializes the fastest and requires the least disk space.
  .
- Full (default): Store the minimum data to reconstruct the current state of the
+ Full: Store the minimum data to reconstruct the current state of the
  blockchain's ledger plus the full data for one previous cycle. This mode is
  appropriate for most uses including bakers and dApp developers who need a
  private node.
