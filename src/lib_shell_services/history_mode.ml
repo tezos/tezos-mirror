@@ -45,7 +45,6 @@ type t =
    suitable for baking services. It currently corresponds to 2 as we
    store 1 cycle below the last preserved block level of the current
    head, which is set to [blocks_preservation_cycles] cycles in the past.
-   TODO: https://gitlab.com/tezos/tezos/-/issues/1406
    As this value is potentially both network and protocol specific, it
    could be lifted as a protocol value or an hardcoded node
    configuration argument. *)
