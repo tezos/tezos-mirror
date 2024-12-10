@@ -175,7 +175,7 @@ let disconnections_handler gs_worker peer_id =
   | None -> (* Something is off, we should log something probably. *) ()
   | Some (peer, _) -> Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
-let try_connect ?expected_peer_id p2p_layer point =
+let try_connect ?expected_peer_id p2p_layer ~trusted point =
   let open Lwt_syntax in
   (* We don't wait for the promise to resolve here, because if the
      advertised peer is not reachable or is not responding, we might block
@@ -186,7 +186,7 @@ let try_connect ?expected_peer_id p2p_layer point =
   Lwt.dont_wait
     (fun () ->
       let* (_ : _ P2p.connection tzresult) =
-        P2p.connect ?expected_peer_id p2p_layer point
+        P2p.connect ?expected_peer_id ~trusted p2p_layer point
       in
       return_unit)
     (fun exn ->
@@ -241,10 +241,15 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
           P2p.find_connection_by_peer_id p2p_layer peer.peer_id
           |> Option.iter_s
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
-      | Connect {peer; origin = _} ->
+      | Connect {peer; origin} ->
+          let trusted = origin = Trusted in
           let Types.Peer.{maybe_reachable_point; peer_id} = peer in
-          try_connect ~expected_peer_id:peer_id p2p_layer maybe_reachable_point
-      | Connect_point {point} -> try_connect p2p_layer point
+          try_connect
+            ~trusted
+            ~expected_peer_id:peer_id
+            p2p_layer
+            maybe_reachable_point
+      | Connect_point {point} -> try_connect p2p_layer point ~trusted:false
       | Forget _ -> return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer
