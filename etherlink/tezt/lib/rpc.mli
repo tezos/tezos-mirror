@@ -59,6 +59,18 @@ module Request : sig
     block_count:string -> newest_block:string -> Evm_node.request
 
   val coinbase : Evm_node.request
+
+  type logs_input_param = {address : string; topics : string list}
+
+  type subscription_kind =
+    | NewHeads
+    | Logs of logs_input_param
+    | NewPendingTransactions
+    | Syncing
+
+  val eth_subscribe : kind:subscription_kind -> Evm_node.request
+
+  val eth_unsubscribe : id:string -> Evm_node.request
 end
 
 (** {2 RPC calls wrappers}
@@ -115,6 +127,15 @@ val get_block_by_hash :
   (Block.t, error) result Lwt.t
 
 val get_gas_price : ?websocket:Websocket.t -> Evm_node.t -> Int32.t Lwt.t
+
+val subscribe :
+  ?websocket:Websocket.t ->
+  kind:Request.subscription_kind ->
+  Evm_node.t ->
+  string Lwt.t
+
+val unsubscribe :
+  ?websocket:Websocket.t -> id:string -> Evm_node.t -> bool Lwt.t
 
 module Syntax : sig
   val ( let*@ ) : ('a, error) result Lwt.t -> ('a -> 'c Lwt.t) -> 'c Lwt.t

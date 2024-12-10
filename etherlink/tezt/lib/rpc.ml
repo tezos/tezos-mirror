@@ -213,6 +213,35 @@ module Request = struct
     }
 
   let coinbase = {method_ = "eth_coinbase"; parameters = `Null}
+
+  type logs_input_param = {address : string; topics : string list}
+
+  type subscription_kind =
+    | NewHeads
+    | Logs of logs_input_param
+    | NewPendingTransactions
+    | Syncing
+
+  let param_of_sub_kind = function
+    | NewHeads -> `A [`String "newHeads"]
+    | Logs {address; topics} ->
+        `A
+          [
+            `String "logs";
+            `O
+              [
+                ("address", `String address);
+                ("topics", `A (List.map (fun topic -> `String topic) topics));
+              ];
+          ]
+    | NewPendingTransactions -> `A [`String "newPendingTransactions"]
+    | Syncing -> `A [`String "syncing"]
+
+  let eth_subscribe ~kind =
+    {method_ = "eth_subscribe"; parameters = param_of_sub_kind kind}
+
+  let eth_unsubscribe ~id =
+    {method_ = "eth_unsubscribe"; parameters = `A [`String id]}
 end
 
 let net_version ?websocket evm_node =
@@ -290,6 +319,18 @@ let get_gas_price ?websocket evm_node =
       {method_ = "eth_gasPrice"; parameters = `Null}
   in
   return JSON.(json |-> "result" |> as_string |> Int32.of_string)
+
+let subscribe ?websocket ~kind evm_node =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node (Request.eth_subscribe ~kind)
+  in
+  return JSON.(json |-> "result" |> as_string)
+
+let unsubscribe ?websocket ~id evm_node =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node (Request.eth_unsubscribe ~id)
+  in
+  return JSON.(json |-> "result" |> as_bool)
 
 module Syntax = struct
   let ( let*@ ) x f =
