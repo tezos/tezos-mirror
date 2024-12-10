@@ -1,6 +1,28 @@
 # Changelog
 
-## Version 0.11 (2024-12-11)
+## Unreleased
+
+### Features
+
+#### UX
+
+- The sequencer can now handle when the delayed inbox is flushed to create
+  blueprints containing overdue items, for kernels advertizing it **(which is
+  not the case for Bifrost, currently activated on Etherlink Mainnet and
+  Testnet)**. It clears all blocks produced on its invalidated branch, then
+  starts a new one. (!15676)
+- If an observer detects a divergence between its local state and the branch
+  computed by the Rollup node it is connected to, it will reset its local state
+  to its latest finalized block instead of exiting. (!15751)
+- The node will no longer exit on invalid blueprint provided by its upstream
+  EVM node endpoint, and will instead keep waiting for a valid blueprint to be
+  provided. (!15751)
+
+### Bug fixes
+
+### Internals
+
+## Version 0.11 (2024-12-111)
 
 In addition to several bug fixes and internal changes, this release introduces
 several exciting new features, notably including support for executing the
