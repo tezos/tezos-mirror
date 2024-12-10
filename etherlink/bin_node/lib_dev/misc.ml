@@ -22,6 +22,18 @@ let with_timing event k =
 
   return res
 
+let with_timing_f_e event k =
+  let open Lwt_result_syntax in
+  let start = Time.System.now () in
+
+  let* res = k () in
+
+  let stop = Time.System.now () in
+  let diff = Ptime.diff stop start in
+  let*! () = event res diff in
+
+  return res
+
 let unwrap_error_monad f =
   let open Lwt_syntax in
   let* res = f () in
