@@ -58,8 +58,7 @@ let jobs pipeline_type =
          "${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE" )
     :: add
   in
-  let make_job_docker_build_rockylinux_dependencies ~__POS__ ~name ~matrix
-      ~distribution =
+  let make_job_docker_build_dependencies ~__POS__ ~name ~matrix ~distribution =
     job_docker_authenticated
       ~__POS__
       ~name
@@ -70,14 +69,14 @@ let jobs pipeline_type =
       ["./scripts/ci/build-packages-dependencies.sh rpm-deps-build.Dockerfile"]
   in
   let job_docker_build_rockylinux_dependencies : tezos_job =
-    make_job_docker_build_rockylinux_dependencies
+    make_job_docker_build_dependencies
       ~__POS__
       ~name:"oc.docker-build-rockylinux-dependencies"
       ~distribution:"rockylinux"
       ~matrix:(rockylinux_package_release_matrix pipeline_type)
   in
   let job_docker_build_fedora_dependencies : tezos_job =
-    make_job_docker_build_rockylinux_dependencies
+    make_job_docker_build_dependencies
       ~__POS__
       ~name:"oc.docker-build-fedora-dependencies"
       ~distribution:"fedora"

@@ -515,6 +515,8 @@ let changeset_debian_packages =
         "scripts/ci/create_debian_repo.sh";
         "docs/introduction/install-bin-deb.sh";
         "docs/introduction/upgrade-bin-deb.sh";
+        "scripts/version.sh";
+        "manifest/**/*.ml*";
       ])
 
 let changeset_rpm_packages =
@@ -529,6 +531,8 @@ let changeset_rpm_packages =
         "scripts/ci/build-rpm-packages.sh";
         "scripts/ci/prepare-apt-rpm-repo.sh";
         "scripts/ci/create_rpm_repo.sh";
+        "scripts/version.sh";
+        "manifest/**/*.ml*";
       ])
 
 let changeset_homebrew =
@@ -540,6 +544,8 @@ let changeset_homebrew =
         "scripts/ci/install-gsutil.sh";
         "scripts/packaging/homebrew_install.sh";
         "scripts/packaging/Formula/*";
+        "scripts/version.sh";
+        "manifest/**/*.ml*";
       ])
 
 (** The set of [changes:] that select opam jobs.
