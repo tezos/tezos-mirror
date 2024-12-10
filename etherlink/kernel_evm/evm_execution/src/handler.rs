@@ -2850,8 +2850,8 @@ mod test {
         address: &H160,
         index: &H256,
     ) -> H256 {
-        let account = handler.get_or_create_account(*address).unwrap();
-        account.get_storage(handler.borrow_host(), index).unwrap()
+        let layer = handler.evm_account_storage.stack_depth();
+        cached_storage_access(handler, *address, *index, layer)
     }
 
     fn dummy_first_block() -> BlockConstants {
