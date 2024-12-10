@@ -1280,11 +1280,11 @@ let jobs pipeline_type =
           ~manual:Yes
           ()
       in
-      let job_install_opam_jammy : tezos_job =
+      let job_install_opam_noble : tezos_job =
         job
           ~__POS__
-          ~name:"oc.install_opam_jammy"
-          ~image:Images.opam_ubuntu_jammy
+          ~name:"oc.install_opam_noble"
+          ~image:Images.opam_ubuntu_noble
           ~dependencies:dependencies_needs_start
           ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
@@ -1313,7 +1313,7 @@ let jobs pipeline_type =
           [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
         |> enable_networked_cargo
       in
-      [(* Test installing through opam *) job_install_opam_jammy]
+      [(* Test installing through opam *) job_install_opam_noble]
       @
       match pipeline_type with
       (* These tests make sure that the compilation instructions
@@ -1328,8 +1328,8 @@ let jobs pipeline_type =
               ~branch:"latest-release";
             job_compile_sources
               ~__POS__
-              ~name:"oc.compile_sources_doc_noble"
-              ~image:Images.opam_ubuntu_noble
+              ~name:"oc.compile_sources_doc_oracular"
+              ~image:Images.opam_ubuntu_oracular
               ~project:"tezos/tezos"
               ~branch:"latest-release";
           ]
