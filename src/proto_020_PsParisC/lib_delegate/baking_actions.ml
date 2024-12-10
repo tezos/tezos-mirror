@@ -425,7 +425,9 @@ let process_dal_rpc_result state delegate level round =
       return_none
   | `RPC_result (Ok res) -> (
       match res with
-      | Tezos_dal_node_services.Types.Not_in_committee -> return_none
+      | Tezos_dal_node_services.Types.Not_in_committee ->
+          let*! () = Events.(emit not_in_dal_committee (delegate, level)) in
+          return_none
       | Attestable_slots {slots; published_level} ->
           let number_of_slots =
             state.global_state.constants.parametric.dal.number_of_slots

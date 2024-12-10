@@ -147,9 +147,14 @@ DAL node
   (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
   exported by default.
 
-
 - **Breaking change** Removed the baker daemon's ``--dal-node-timeout-percentage``
   argument. (MR :gl:`!15554`)
+
+Baker
+~~~~~
+
+- Emit event at Notice level when the delegate is not in the DAL committee, that
+  is, it has no assigned shards at the current level. (:gl:`!15846`)
 
 Miscellaneous
 -------------
