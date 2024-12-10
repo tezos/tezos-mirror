@@ -1846,9 +1846,10 @@ let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
     ["stresstest"; "originate"; "smart"; "contracts"; "from"; source.alias]
   |> Process.check
 
-let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
-    ?batches_per_block ?initial_amount client =
+let stresstest_fund_accounts_from_source ?env ?endpoint ~source_key_pkh
+    ?batch_size ?batches_per_block ?initial_amount client =
   spawn_command
+    ?env
     ?endpoint
     client
     (["stresstest"; "fund"; "accounts"; "from"; source_key_pkh]

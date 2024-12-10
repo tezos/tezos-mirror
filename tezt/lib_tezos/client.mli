@@ -1379,6 +1379,7 @@ val stresstest_originate_smart_contracts :
 
      [endpoint]: cf {!create} *)
 val stresstest_fund_accounts_from_source :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   source_key_pkh:string ->
   ?batch_size:int ->
