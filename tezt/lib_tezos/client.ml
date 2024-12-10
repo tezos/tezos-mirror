@@ -676,6 +676,10 @@ let import_keys_from_mnemonic ?endpoint ?force ?passphrase ?encryption_password
   let* () = Lwt_io.close output_channel in
   Process.check process
 
+let forget_all_keys ?endpoint client =
+  spawn_command ?endpoint client ["forget"; "all"; "keys"; "--force"]
+  |> Process.check
+
 module Time = Tezos_base.Time.System
 
 let default_delay = Time.Span.of_seconds_exn (3600. *. 24. *. 365.)

@@ -492,6 +492,9 @@ val spawn_import_secret_key :
   alias:string ->
   Process.t
 
+(** Run [octez-client forget all keys --force] *)
+val forget_all_keys : ?endpoint:endpoint -> t -> unit Lwt.t
+
 (** Run [octez-client activate protocol].
 
     If [timestamp] is not specified explicitely, it is set to [Ago
