@@ -63,7 +63,8 @@ The DAL node has two modes:
 Profiles
 ~~~~~~~~
 
-As described above, different DAL node operators are interested in different data, and some want to produce data, others want to share data, and others want to attest data.
+As described above, different actors are interested in different data when running DAL nodes.
+Some some want to produce data, others want to share data, and others want to attest data.
 For this reason, DAL controller nodes run in different profiles; these profiles control which data the nodes post, share, and attest.
 You can set these profiles in the node's configuration file, as CLI arguments to the node's commands, or via RPC calls.
 
