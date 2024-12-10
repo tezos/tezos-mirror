@@ -42,7 +42,6 @@ type rpc_server = Resto | Dream
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   enable_send_raw_transaction : bool;
-  node_transaction_validation : bool;
   block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector : garbage_collector option;
@@ -135,7 +134,6 @@ let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
-    node_transaction_validation = true;
     block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
     garbage_collector = None;
@@ -697,7 +695,6 @@ let experimental_features_encoding =
     (fun {
            drop_duplicate_on_injection;
            enable_send_raw_transaction;
-           node_transaction_validation;
            block_storage_sqlite3;
            overwrite_simulation_tick_limit;
            garbage_collector;
@@ -706,7 +703,7 @@ let experimental_features_encoding =
          } ->
       ( drop_duplicate_on_injection,
         enable_send_raw_transaction,
-        node_transaction_validation,
+        None,
         block_storage_sqlite3,
         overwrite_simulation_tick_limit,
         garbage_collector,
@@ -715,7 +712,7 @@ let experimental_features_encoding =
         enable_websocket ))
     (fun ( drop_duplicate_on_injection,
            enable_send_raw_transaction,
-           node_transaction_validation,
+           _node_transaction_validation,
            block_storage_sqlite3,
            overwrite_simulation_tick_limit,
            garbage_collector,
@@ -725,7 +722,6 @@ let experimental_features_encoding =
       {
         drop_duplicate_on_injection;
         enable_send_raw_transaction;
-        node_transaction_validation;
         block_storage_sqlite3;
         overwrite_simulation_tick_limit;
         garbage_collector;
@@ -748,10 +744,12 @@ let experimental_features_encoding =
           "enable_send_raw_transaction"
           bool
           default_experimental_features.enable_send_raw_transaction)
-       (dft
+       (opt
+          ~description:
+            "DEPRECATED: You should remove this option from your configuration \
+             file."
           "node_transaction_validation"
-          bool
-          default_experimental_features.node_transaction_validation)
+          bool)
        (dft
           "block_storage_sqlite3"
           ~description:
@@ -1158,6 +1156,18 @@ let precheck json =
             failwith
               "`experimental_features.next_wasm_runtime` cannot be set to \
                `false` anymore."
+        | _ -> return_unit
+      in
+      let node_transaction_validation_conf =
+        json |-?> "experimental_features" |?-?> "node_transaction_validation"
+        |?> as_bool_opt
+      in
+      let* () =
+        match node_transaction_validation_conf with
+        | Some false ->
+            failwith
+              "`experimental_features.node_transaction_validation` cannot be \
+               set to `false` anymore."
         | _ -> return_unit
       in
 

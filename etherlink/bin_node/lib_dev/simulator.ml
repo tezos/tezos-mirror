@@ -325,16 +325,4 @@ module Make (SimulationBackend : SimulationBackend) = struct
         in
         Ok (Ok {Simulation.gas_used = Some gas_used; value})
     | _ -> return res
-
-  let is_tx_valid tx_raw =
-    let open Lwt_result_syntax in
-    let* simulation_state = SimulationBackend.get_state () in
-    let* bytes =
-      call_simulation
-        ~log_file:"tx_validity"
-        ~input_encoder:Simulation.encode_tx
-        ~input:tx_raw
-        simulation_state
-    in
-    Lwt.return (Simulation.is_tx_valid bytes)
 end
