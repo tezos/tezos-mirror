@@ -3,6 +3,7 @@
 ## Version next
 
 ### SDK
+
 - Add experimental support for compiling kernels to a Hermit RISC-V image behind the `proto-alpha` flag.
 - Add an experimental rollup host for RISC-V with an in-memory store behind the `experimental-host-in-memory-store` flag.
 - Add an `OutboxQueue` that can be used when more than 100 outbox messages are produced at a given level.
@@ -30,6 +31,7 @@
 - Remove redundant `testing` feature flag from `entrypoint` crate.
 - Remove redundant `testing` feature flag from `host` crate.
 - Disable `testing` as default features of the main `sdk` crate.
+- Change `Runtime::store_value_size` to return `PathNotFound` when the input is the path of a directory.
 
 ### Installer client/kernel
 
