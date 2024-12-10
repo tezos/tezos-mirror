@@ -52,27 +52,26 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1717179513,
-        "narHash": "sha256-vboIEwIQojofItm2xGCdZCzW96U85l9nDW3ifMuAIdM=",
+        "lastModified": 1733409684,
+        "narHash": "sha256-Kg8bvWdJ1u/IH8Ro/RGlG5mvAsqnC3VnlsgjIG/FtwQ=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "63dacb46bf939521bdc93981b4cbb7ecb58427a0",
+        "rev": "4bd660accd40798001cb010e0f7f85903bd61c09",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "24.05",
         "repo": "nixpkgs",
         "type": "github"
       }
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1688587528,
-        "narHash": "sha256-a1WlbVZyFtXVwqU/Ut+tl8aTgexp/GKloQtGA1Hfwjw=",
+        "lastModified": 1733413205,
+        "narHash": "sha256-J/Mr9HW5kT+pfOQoXF6U4a8NdPr/yKqTttkjaut4a64=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "08c696c8d702e98d6693efea6d0be94b54849a16",
+        "rev": "7822cb34f86bcdd0b9f31f2955062216857a6757",
         "type": "github"
       },
       "original": {
@@ -106,11 +105,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1728662094,
-        "narHash": "sha256-tOAquEaPr15wNWbfsxNqV6s6oCfC0yQvC5D5MRKm+ig=",
+        "lastModified": 1733485420,
+        "narHash": "sha256-8tdWH9ojaXR95yvskNO62ugSMpZdsOX/ipU0rPPWsok=",
         "owner": "vapourismo",
         "repo": "opam-nix-integration",
-        "rev": "576bfd60b8fc1cf548ae71b842496a15a797f4fd",
+        "rev": "698b636dc194511a818bdf9ba2f9d5639e268bea",
         "type": "github"
       },
       "original": {

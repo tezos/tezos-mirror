@@ -6,7 +6,7 @@
 
   overlays = pkgs.callPackage ./nix/overlays.nix {};
 
-  packageSet = pkgs.opamPackages.overrideScope' (pkgs.lib.composeManyExtensions [
+  packageSet = pkgs.opamPackages.overrideScope (pkgs.lib.composeManyExtensions [
     # Set the opam-repository which has the package descriptions.
     (final: prev: {
       repository = prev.repository.override {src = sources.opam-repository;};
