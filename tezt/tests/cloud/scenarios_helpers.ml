@@ -67,7 +67,6 @@ let add_prometheus_source ?dal_node ?sc_rollup_node ?evm_node ?node cloud agent
   in
   Cloud.add_prometheus_source cloud ~name targets
 
-(** [init_explorus cloud node] uses [node]'s rpc endpoint to register explorus as a service *)
 let init_explorus cloud node =
   Cloud.add_service
     cloud
