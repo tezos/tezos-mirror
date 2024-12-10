@@ -920,6 +920,21 @@ let compute_round proposal round_durations =
        ~predecessor_round:predecessor_block.round
        ~timestamp
 
+let notice_delegates_without_slots all_delegates delegate_slots level =
+  let delegates_without_slots =
+    List.filter
+      (fun {Baking_state.public_key_hash; _} ->
+        not
+        @@ List.exists
+             (fun {consensus_key_and_delegate = _, pkh_with_rights; _} ->
+               public_key_hash = pkh_with_rights)
+             (Baking_state.Delegate_slots.own_delegates delegate_slots))
+      all_delegates
+  in
+  match delegates_without_slots with
+  | [] -> Lwt.return_unit
+  | delegates -> Events.(emit delegates_without_slots (delegates, level))
+
 let update_to_level state level_update =
   let open Lwt_result_syntax in
   let {new_level_proposal; compute_new_state} = level_update in
@@ -952,6 +967,9 @@ let update_to_level state level_update =
        ~level:(Int32.succ new_level)
        ~chain
      [@profiler.record_s {verbosity = Debug} "compute current delegate slots"])
+  in
+  let*! () =
+    notice_delegates_without_slots delegates delegate_slots new_level
   in
   let round_durations = state.global_state.round_durations in
   let*? current_round =

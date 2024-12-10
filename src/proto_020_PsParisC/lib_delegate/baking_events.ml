@@ -1068,6 +1068,19 @@ module Actions = struct
       ~msg:"Signature call failed with {errors}"
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let delegates_without_slots =
+    declare_2
+      ~section
+      ~name:"delegates_without_slots"
+      ~level:Notice
+      ~msg:
+        "The following delegates have no attesting rights at level {level}: \
+         {delegates}"
+      ~pp1:(Format.pp_print_list Baking_state.pp_consensus_key)
+      ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
 end
 
 module VDF = struct
