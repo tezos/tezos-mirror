@@ -8367,6 +8367,61 @@ let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
       failwith "eth_unsubscribe shouldn't be callable via http requests")
     (fun _ -> unit)
 
+let test_websocket_newHeads_event =
+  register_all
+    ~tags:["evm"; "rpc"; "websocket"; "new_heads"]
+    ~title:"Check that websocket event `newHeads` is behaving correctly"
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:
+      ((Array.to_list Eth_account.bootstrap_accounts
+       |> List.map (fun a -> a.Eth_account.address))
+      @ Eth_account.lots_of_address)
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~rpc_server:Dream (* Websockets only available in Dream *)
+    ~websockets:true
+  @@ fun {sequencer; observer; _} _protocol ->
+  let scenario evm_node (lvl, lvl') =
+    let* websocket = Evm_node.open_websocket evm_node in
+    let* id = Rpc.subscribe ~websocket ~kind:NewHeads evm_node in
+    let check_block_number ~level =
+      let*@ _ = produce_block sequencer in
+      let* block = Websocket.recv websocket in
+      let Block.{number; _} =
+        JSON.(block |-> "params" |-> "result" |> Block.of_json)
+      in
+      Check.((number = level) int32)
+        ~error_msg:"Received block level was %L, expected %R" ;
+      unit
+    in
+    let* () = check_block_number ~level:lvl in
+    let* () = check_block_number ~level:lvl' in
+    let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
+    Check.((sub_status = true) bool)
+      ~error_msg:"Unsubscription from newHeads should be successful" ;
+    (* After unsubbing to newHeads, we shouldn't receive data anymore. *)
+    let*@ _ = produce_block sequencer in
+    let* result =
+      Lwt.pick
+        [
+          (let* never_return = Websocket.recv websocket in
+           return (Error never_return));
+          (let* () = Lwt_unix.sleep 2. in
+           return (Ok ()));
+        ]
+    in
+    (match result with
+    | Ok () -> ()
+    | Error _ -> failwith "The websocket shouldn't have received any new data.") ;
+    (* If we try to unsubscribe from this event again, it should return false as
+       we were already unsubbed. *)
+    let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
+    Check.((sub_status = false) bool)
+      ~error_msg:"Unsubscribing from the same event twice should return false" ;
+    unit
+  in
+  let* () = scenario sequencer (1l, 2l) in
+  scenario observer (4l, 5l)
+
 let protocols = Protocol.all
 
 let () =
@@ -8481,4 +8536,5 @@ let () =
   test_observer_reset [Protocol.Alpha] ;
   test_websocket_rpcs [Protocol.Alpha] ;
   test_websocket_subscription_rpcs_cant_be_called_via_http_requests
-    [Protocol.Alpha]
+    [Protocol.Alpha] ;
+  test_websocket_newHeads_event [Protocol.Alpha]
