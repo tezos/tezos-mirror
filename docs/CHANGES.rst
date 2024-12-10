@@ -3,6 +3,42 @@
 Changelog
 '''''''''
 
+Version 21.1
+============
+
+DAL node
+--------
+
+- Fix a peering issue when the P2P identity changed recently. (MR :gl:`!15977`)
+
+- Do not attempt to connect to a peer we are already connected with. (MR :gl:`!15984`)
+
+- Introduce a timeout preventing too many reconnections to unreachable
+  points. (MR :gl:`!16005`)
+
+- Emit various warnings when the registered attester does not seem to attest
+  correctly, or when the DAL node seems to be lagging. (:gl:`!15306`,
+  :gl:`!15607`, :gl:`!15756`)
+
+- Set the message validation function at node startup, fixing :gl:`#7629`. (MR
+  :gl:`!15830`)
+
+- Retry DNS resolution of bootstrap points every 5 minutes. (MR :gl:`!15858`)
+
+- Keep established connections alive. This applies to the Layer 1 node as
+  well. (MR :gl:`!15914`)
+
+Baker
+-----
+
+- **Breaking change** Removed the baker daemon's
+  ``--dal-node-timeout-percentage`` argument. The DAL node now fetches the
+  slots' attestation status from the DAL node one level in advance. (MR
+  :gl:`!15554`)
+
+- An event at Notice level is now emitted when the delegate is not in the DAL committee,
+  that is, it has no assigned shards at the current level. (:gl:`!15846`)
+
 Version 21.0
 ============
 
@@ -28,8 +64,21 @@ Smart Rollup node
 DAL node
 ~~~~~~~~
 
-- **Breaking** Changed binary encoding of /config/network/dal. This change is not retro-compatible.
-  As a result, the v21 DAL node is not compatible with earlier Octez nodes.
+- **Breaking_change** The configuration value ``metrics-addr`` is now an option.
+  It should not break unless the value differs from the default value
+  (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
+  exported by default.
+
+- **Breaking change** For the RPCs ``/p2p/gossipsub/topics/peers``,
+  ``/p2p/gossipsub/pkhs/peers``, and ``/p2p/gossipsub/slot_indexes/peers``, the
+  flag ``subscribed`` is removed and a new flag ``all`` is introduced. The
+  default behavior is now to list peers only for topics the current peer is
+  subscribed to, while the ``all`` flag can be used to recover the previous
+  behavior. (MR :gl:`!14518`)
+
+- **Breaking** Changed binary encoding of /config/network/dal. This change is
+  not retro-compatible.  As a result, the v21 DAL node is not compatible with
+  earlier Octez nodes.
 
 Version 21.0~rc3
 ================
