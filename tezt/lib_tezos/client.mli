@@ -1318,6 +1318,22 @@ val stresstest :
   t ->
   unit Lwt.t
 
+(** Same as {!stresstest}, but use a file path instead of lists of sources
+    and do not wait for the process to exit. *)
+val spawn_stresstest_with_filename :
+  ?env:string String_map.t ->
+  ?endpoint:endpoint ->
+  ?seed:int ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?transfers:int ->
+  ?tps:int ->
+  ?fresh_probability:float ->
+  ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
+  t ->
+  string ->
+  Process.t
+
 (** Same as {!stresstest}, but do not wait for the process to exit. *)
 val spawn_stresstest :
   ?env:string String_map.t ->

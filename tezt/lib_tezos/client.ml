@@ -1639,52 +1639,9 @@ let write_stresstest_sources_file ?runner ~sources filename =
   | Some runner ->
       Helpers.write_file ~runner filename ~contents:(JSON.encode_u sources)
 
-let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
-    ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
-    ?fresh_probability ?smart_contract_parameters client =
-  let runner = client.runner in
-  let sources =
-    (* [sources] is a string containing all the [source_aliases],
-       [source_pkhs], and [source_accounts] in JSON format, as
-       expected by the [stresstest] client command. If all three lists
-       [source_aliases], [source_pkhs], and [source_accounts] are
-       empty (typically, when none of these optional arguments is
-       provided to {!spawn_stresstest}), then [sources] instead
-       contains the [Constant.bootstrap_keys] i.e. [bootstrap1], ...,
-       [bootstrap5]. *)
-    (* Note: We provide the sources JSON directly as a string, rather
-       than writing it to a file, to avoid concurrency issues (we
-       would need to ensure that each call writes to a different file:
-       this would be doable, but providing a string containing the
-       JSON is simpler). *)
-    let open Account in
-    let account_to_obj account =
-      let sk = require_unencrypted_secret_key ~__LOC__ account.secret_key in
-      `O
-        [
-          ("pkh", `String account.public_key_hash);
-          ("pk", `String account.public_key);
-          ("sk", `String sk);
-        ]
-    in
-    let source_objs =
-      List.map (fun alias -> `O [("alias", `String alias)]) source_aliases
-      @ List.map (fun pkh -> `O [("pkh", `String pkh)]) source_pkhs
-      @ List.map account_to_obj source_accounts
-    in
-    let source_objs =
-      match source_objs with
-      | [] -> Array.map account_to_obj Account.Bootstrap.keys |> Array.to_list
-      | _ :: _ -> source_objs
-    in
-    `A source_objs
-  in
-  (* It is important to write the sources to a file because if we use a few
-     thousands of sources the command line becomes too long. *)
-  let sources_filename =
-    Temp.file ?runner (Format.sprintf "sources-%s.json" client.name)
-  in
-  let* () = write_stresstest_sources_file ?runner ~sources sources_filename in
+let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
+    ?transfers ?tps ?fresh_probability ?smart_contract_parameters client
+    sources_filename =
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
@@ -1732,8 +1689,7 @@ let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
                  items));
         ]
   in
-  Lwt.return
-  @@ spawn_command ?env ?endpoint client
+  spawn_command ?env ?endpoint client
   @@ [
        "stresstest";
        "transfer";
@@ -1748,6 +1704,66 @@ let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   @ make_int_opt_arg "--tps" tps
   @ make_float_opt_arg "--fresh-probability" fresh_probability
   @ smart_contract_parameters_arg
+
+let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
+    ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
+    ?fresh_probability ?smart_contract_parameters client =
+  let runner = client.runner in
+  let sources =
+    (* [sources] is a string containing all the [source_aliases],
+       [source_pkhs], and [source_accounts] in JSON format, as
+       expected by the [stresstest] client command. If all three lists
+       [source_aliases], [source_pkhs], and [source_accounts] are
+       empty (typically, when none of these optional arguments is
+       provided to {!spawn_stresstest}), then [sources] instead
+       contains the [Constant.bootstrap_keys] i.e. [bootstrap1], ...,
+       [bootstrap5]. *)
+    (* Note: We provide the sources JSON directly as a string, rather
+       than writing it to a file, to avoid concurrency issues (we
+       would need to ensure that each call writes to a different file:
+       this would be doable, but providing a string containing the
+       JSON is simpler). *)
+    let open Account in
+    let account_to_obj account =
+      let sk = require_unencrypted_secret_key ~__LOC__ account.secret_key in
+      `O
+        [
+          ("pkh", `String account.public_key_hash);
+          ("pk", `String account.public_key);
+          ("sk", `String sk);
+        ]
+    in
+    let source_objs =
+      List.map (fun alias -> `O [("alias", `String alias)]) source_aliases
+      @ List.map (fun pkh -> `O [("pkh", `String pkh)]) source_pkhs
+      @ List.map account_to_obj source_accounts
+    in
+    let source_objs =
+      match source_objs with
+      | [] -> Array.map account_to_obj Account.Bootstrap.keys |> Array.to_list
+      | _ :: _ -> source_objs
+    in
+    `A source_objs
+  in
+  (* It is important to write the sources to a file because if we use a few
+     thousands of sources the command line becomes too long. *)
+  let sources_filename =
+    Temp.file ?runner (Format.sprintf "sources-%s.json" client.name)
+  in
+  let* () = write_stresstest_sources_file ?runner ~sources sources_filename in
+  Lwt.return
+  @@ spawn_stresstest_with_filename
+       ?env
+       ?endpoint
+       ?seed
+       ?fee
+       ?gas_limit
+       ?transfers
+       ?tps
+       ?fresh_probability
+       ?smart_contract_parameters
+       client
+       sources_filename
 
 let stresstest ?env ?endpoint ?source_aliases ?source_pkhs ?source_accounts
     ?seed ?fee ?gas_limit ?transfers ?tps ?fresh_probability
