@@ -152,6 +152,7 @@ html_js_files = [
 html_extra_path = [
     '404.html',
     '_redirects',
+    '_redirects.s3',
     # manually copy images that are only included in raw HTML directives:
     'images/building_on_tezos_5.png',
     'images/contributing_to_octez_6.png',
