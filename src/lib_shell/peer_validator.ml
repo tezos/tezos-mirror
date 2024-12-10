@@ -75,7 +75,7 @@ module Types = struct
     parameters : parameters;
     mutable pipeline : Bootstrap_pipeline.t option;
     mutable last_validated_head : Block_header.t;
-    mutable last_advertised_head : Block_header.t;
+    mutable last_advertised_head : Block_hash.t * Block_header.t;
   }
 
   let pipeline_length = function
@@ -90,6 +90,10 @@ open Types
 type t = Worker.dropbox Worker.t
 
 let metrics = Shell_metrics.Peer_validator.init Name.base
+
+let get_last_advertised_head w =
+  let pv = Worker.state w in
+  pv.last_advertised_head
 
 let bootstrap_new_branch w unknown_prefix =
   let open Lwt_result_syntax in
@@ -550,7 +554,8 @@ let on_launch _ name parameters : (_, launch_error) result Lwt.t =
       parameters = {parameters with notify_new_block};
       pipeline = None;
       last_validated_head = Store.Block.header genesis;
-      last_advertised_head = Store.Block.header genesis;
+      last_advertised_head =
+        (Store.Block.hash genesis, Store.Block.header genesis);
     }
   and notify_new_block ({block; _} as new_block) =
     pv.last_validated_head <- Store.Block.header block ;
@@ -564,10 +569,10 @@ let table =
     let pv = Worker.state w in
     match neu with
     | Request.New_branch (locator, _) ->
-        pv.last_advertised_head <- locator.Block_locator.head_header ;
+        pv.last_advertised_head <- (locator.head_hash, locator.head_header) ;
         Some (Worker.Any_request neu)
-    | Request.New_head (_, header) -> (
-        pv.last_advertised_head <- header ;
+    | Request.New_head (hash, header) -> (
+        pv.last_advertised_head <- (hash, header) ;
         (* TODO penalize decreasing fitness *)
         match old with
         | Some (Worker.Any_request (Request.New_branch _) as old) ->

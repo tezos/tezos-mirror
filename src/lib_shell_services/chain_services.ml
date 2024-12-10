@@ -83,6 +83,26 @@ let protocol_info_encoding =
             "The activation block for a protocol is the migration block, i.e. \
              the last level of the previous protocol.")
 
+type active_peers_info = {
+  peer_id : P2p_peer.Id.t;
+  block_hash : Block_hash.t;
+  block_level : Int32.t;
+}
+
+let active_peers_info_encoding =
+  conv
+    (fun {peer_id; block_hash; block_level} ->
+      (peer_id, block_hash, block_level))
+    (fun (peer_id, block_hash, block_level) ->
+      {peer_id; block_hash; block_level})
+  @@ obj3
+       (req "peer_id" P2p_peer.Id.encoding)
+       (req "block_hash" Block_hash.encoding)
+       (req "block_level" int32)
+
+let active_peers_heads_encoding =
+  obj1 (req "active_peers_heads" (list active_peers_info_encoding))
+
 module S = struct
   let path : prefix Tezos_rpc.Path.context = Tezos_rpc.Path.open_root
 
@@ -111,6 +131,13 @@ module S = struct
       ~input:bootstrapped_flag_encoding
       ~output:unit
       path
+
+  let active_peers_heads =
+    Tezos_rpc.Service.get_service
+      ~description:"The heads of all active peers"
+      ~query:Tezos_rpc.Query.empty
+      ~output:active_peers_heads_encoding
+      Tezos_rpc.Path.(path / "active_peers_heads")
 
   module Levels = struct
     let path = Tezos_rpc.Path.(path / "levels")

@@ -143,6 +143,12 @@ let rpc_directory_with_validator dir validator =
       | Ok chain_validator ->
           let*! v = Chain_validator.force_bootstrapped chain_validator b in
           return v) ;
+  register0 dir S.active_peers_heads (fun chain_store () () ->
+      match Validator.get validator (Store.Chain.chain_id chain_store) with
+      | Error _ -> Lwt.fail Not_found
+      | Ok chain_validator ->
+          let*! ap = Chain_validator.active_peers_heads chain_validator in
+          return ap) ;
   (* invalid_blocks *)
   register0 dir S.Invalid_blocks.list (fun chain_store () () ->
       let convert (hash, {Store_types.level; errors}) = {hash; level; errors} in

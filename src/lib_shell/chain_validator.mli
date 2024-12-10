@@ -57,6 +57,8 @@ val is_bootstrapped : t -> bool
 
 val force_bootstrapped : t -> bool -> unit Lwt.t
 
+val active_peers_heads : t -> Chain_services.active_peers_info list Lwt.t
+
 val prevalidator : t -> Prevalidator.t option
 
 val chain_db : t -> Distributed_db.chain_db

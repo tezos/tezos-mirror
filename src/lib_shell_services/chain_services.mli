@@ -45,6 +45,13 @@ type protocol_info = {
          last level of the previous protocol. *)
 }
 
+(* Information regarding the last advertised head of a given peer. *)
+type active_peers_info = {
+  peer_id : P2p_peer.Id.t;
+  block_hash : Block_hash.t;
+  block_level : Int32.t;
+}
+
 val path : (unit, prefix) Tezos_rpc.Path.path
 
 open Tezos_rpc.Context
@@ -122,6 +129,15 @@ module S : sig
 
   val force_bootstrapped :
     ([`PATCH], prefix, prefix, unit, bool, unit) Tezos_rpc.Service.t
+
+  val active_peers_heads :
+    ( [`GET],
+      prefix,
+      prefix,
+      unit,
+      unit,
+      active_peers_info list )
+    Tezos_rpc.Service.t
 
   module Levels : sig
     val checkpoint :
