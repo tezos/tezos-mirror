@@ -190,7 +190,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   type p2p_input =
     | In_message of {from_peer : Peer.t; p2p_message : p2p_message}
-    | New_connection of {peer : Peer.t; trusted : bool}
+    | New_connection of {peer : Peer.t; direct : bool; trusted : bool}
     | Disconnection of {peer : Peer.t}
 
   type app_input =
@@ -714,8 +714,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ({gossip_state; _} as state) = function
-    | New_connection {peer; trusted} ->
-        let direct = Peer.is_direct peer in
+    | New_connection {peer; direct; trusted} ->
         GS.add_peer {direct; outbound = trusted; peer} gossip_state
         |> update_gossip_state state
         |> handle_new_connection peer ~trusted
