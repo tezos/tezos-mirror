@@ -486,7 +486,10 @@ module Reader = struct
       match status with
       | Success {result; size; stream} -> return (result, size, stream)
       | Error err ->
-          let*! () = Events.(emit read_error) () in
+          let*! () =
+            Events.(emit read_error)
+              (st.conn.info.P2p_connection.Info.peer_id, err)
+          in
           tzfail (P2p_errors.Decoding_error err)
       | Await decode_next_buf ->
           let* buf =

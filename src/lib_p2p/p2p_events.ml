@@ -756,12 +756,15 @@ module P2p_socket = struct
       ("peer", P2p_peer.Id.encoding)
 
   let read_error =
-    declare_0
+    declare_2
       ~section
       ~name:"socket_read_error"
-      ~level:Debug
-      ~msg:"[read message] incremental decoding error"
-      ()
+      ~level:Info
+      ~msg:"[read message] Error while reading messages from {peer}: {error}"
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:Data_encoding.Binary.pp_read_error
+      ("peer", P2p_peer.Id.encoding)
+      ("error", Data_encoding.Binary.read_error_encoding)
 
   let write_event =
     declare_2
