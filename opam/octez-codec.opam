@@ -16,6 +16,7 @@ depends: [
   "octez-shell-libs" { = version }
   "octez-node-config" { = version }
   "octez-version" { = version }
+  "tezos-dal-node-lib" { = version }
 ]
 depopts: [
   "octez-protocol-005-PsBabyM1-libs"

@@ -8696,3 +8696,19 @@ let () =
   @@ fun () ->
   let hooks = Tezos_regression.hooks in
   Dal_node.debug_print_store_schemas ~hooks ()
+
+let () =
+  Regression.register
+    ~__FILE__
+    ~title:"DAL Node: P2P message encoding"
+    ~tags:["dal"; "gossipsub"; "p2p"]
+    ~uses:[Constant.octez_codec]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* output = Codec.describe_binary_schema ~id:"dal_p2p_message" () in
+  Regression.capture output ;
+  let* output = Codec.describe_json_schema ~id:"dal_p2p_message" () in
+  Regression.capture output ;
+  unit
