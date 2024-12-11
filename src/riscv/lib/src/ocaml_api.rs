@@ -6,11 +6,17 @@
 mod move_semantics;
 mod pointer_apply;
 
-use crate::pvm::{
-    node_pvm::{NodePvm, PvmStorage, PvmStorageError},
-    PvmHooks, PvmStatus,
+use crate::{
+    pvm::{
+        node_pvm::{NodePvm, PvmStorage, PvmStorageError},
+        PvmHooks, PvmStatus,
+    },
+    state_backend::owned_backend::Owned,
 };
-use crate::storage::{self, StorageError};
+use crate::{
+    state_backend::proof_backend::proof,
+    storage::{self, StorageError},
+};
 use move_semantics::{ImmutableState, MutableState};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
@@ -26,10 +32,10 @@ type OcamlFallible<T> = Result<T, ocaml::Error>;
 pub struct Repo(PvmStorage);
 
 #[ocaml::sig]
-pub type State = ImmutableState<NodePvm>;
+pub type State = ImmutableState<NodePvm<Owned>>;
 
 #[ocaml::sig]
-pub type MutState = MutableState<NodePvm>;
+pub type MutState = MutableState<NodePvm<Owned>>;
 
 #[ocaml::sig]
 pub struct Id(storage::Hash);
@@ -427,7 +433,7 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
 
 /// Proofs
 #[ocaml::sig]
-pub struct Proof;
+pub type Proof = proof::Proof;
 
 ocaml::custom!(Proof);
 
@@ -446,10 +452,13 @@ pub fn octez_riscv_proof_stop_state(_proof: Pointer<Proof>) -> [u8; 32] {
 #[ocaml::func]
 #[ocaml::sig("input option -> proof -> input_request option")]
 pub unsafe fn octez_riscv_verify_proof(
-    _proof: Pointer<Proof>,
+    proof: Pointer<Proof>,
     _input: Option<Input>,
 ) -> Option<Pointer<InputRequest>> {
-    None
+    let _state = NodePvm::from_proof(proof.as_ref().tree())?;
+
+    // TODO: RV-369: Run a step over the PVM state
+    todo!("Can't verify proof just yet")
 }
 
 #[ocaml::func]
