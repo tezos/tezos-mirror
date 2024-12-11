@@ -699,7 +699,7 @@ module State = struct
                         must_exit = true;
                       }
                   in
-                  let* _evm_state =
+                  let* (_ : Evm_state.t) =
                     reset_to_finalized_level exit_error ctxt conn
                   in
                   (* If the observer managed to reset to finalized level it must
@@ -1484,7 +1484,9 @@ module State = struct
         in
         return_none
     | Some checkpoint ->
-        let* _evm_state = reset_to_level ctxt conn pred_number checkpoint in
+        let* (_ : Evm_state.t) =
+          reset_to_level ctxt conn pred_number checkpoint
+        in
         (* Apply the blueprint. *)
         let events =
           List.map
