@@ -740,22 +740,25 @@ let experimental_features_encoding =
              of the Smart Rollup node."
           "drop_duplicate_on_injection"
           bool
-          false)
+          default_experimental_features.drop_duplicate_on_injection)
        (dft
           ~description:
             "Enable or disable the `eth_sendRawTransaction` method. \
              DEPRECATED:  You should use \"rpc.restricted_rpcs\" instead."
           "enable_send_raw_transaction"
           bool
-          default_enable_send_raw_transaction)
-       (dft "node_transaction_validation" bool false)
+          default_experimental_features.enable_send_raw_transaction)
+       (dft
+          "node_transaction_validation"
+          bool
+          default_experimental_features.node_transaction_validation)
        (dft
           "block_storage_sqlite3"
           ~description:
             "Store the blocks and transactions in a sqlite3 database and \
              removes them from the durable storage"
           bool
-          false)
+          default_experimental_features.block_storage_sqlite3)
        (dft
           "overwrite_simulation_tick_limit"
           ~description:
@@ -766,7 +769,7 @@ let experimental_features_encoding =
              confusing UX for users, where eth_estimateGas fails when eth_call \
              succeeded."
           bool
-          false)
+          default_experimental_features.overwrite_simulation_tick_limit)
        (opt
           "garbage_collector"
           ~description:"Enables garbage collector in the node."
@@ -789,7 +792,7 @@ let experimental_features_encoding =
           "enable_websocket"
           ~description:"Enable or disable the experimental websocket server"
           bool
-          false))
+          default_experimental_features.enable_websocket))
 
 let proxy_encoding =
   let open Data_encoding in
