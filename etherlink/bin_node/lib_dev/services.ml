@@ -942,6 +942,54 @@ let dispatch_handler (rpc : Configuration.rpc) config ctx dispatch_request
 
 let websocket_response_of_response response = {response; subscription = None}
 
+let encode_subscription_response subscription r =
+  let result =
+    Data_encoding.Json.construct Ethereum_types.Subscription.output_encoding r
+  in
+  Rpc_encodings.Subscription.{params = {result; subscription}}
+
+let empty_stream =
+  let stream, push = Lwt_stream.create () in
+  push None ;
+  (stream, fun () -> ())
+
+let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
+
+let dispatch_websocket (rpc : Configuration.rpc) config ctx
+    (input : JSONRPC.request) =
+  let open Lwt_syntax in
+  match map_method_name ~restrict:rpc.restricted_rpcs input.method_ with
+  | Method (Subscribe.Method, module_) ->
+      let sub_stream = ref empty_stream in
+      let sid = ref empty_sid in
+      let f (kind : Ethereum_types.Subscription.kind) =
+        let id, stream = eth_subscribe ~kind in
+        (* This is an optimization to avoid having to search in the map
+           of subscriptions for `stream` and `id`. *)
+        sub_stream := stream ;
+        sid := id ;
+        rpc_ok id
+      in
+      let* value = build_with_input ~f module_ input.parameters in
+      let response = JSONRPC.{value; id = input.id} in
+      let subscription_id = !sid in
+      let stream, stopper = !sub_stream in
+      let stream =
+        Lwt_stream.map (encode_subscription_response subscription_id) stream
+      in
+      return
+        {response; subscription = Some {id = subscription_id; stream; stopper}}
+  | Method (Unsubscribe.Method, module_) ->
+      let f (id : Ethereum_types.Subscription.id) =
+        let status = eth_unsubscribe ~id in
+        rpc_ok status
+      in
+      let+ value = build_with_input ~f module_ input.parameters in
+      websocket_response_of_response JSONRPC.{value; id = input.id}
+  | _ ->
+      let+ response = dispatch_request rpc config ctx input in
+      websocket_response_of_response response
+
 let dispatch_private_websocket ~block_production (rpc : Configuration.rpc)
     config ctx (input : JSONRPC.request) =
   let open Lwt_syntax in
@@ -969,16 +1017,16 @@ let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
     (dispatch_private_request rpc ~block_production)
 
 let generic_websocket_dispatch (rpc : Configuration.rpc)
-    (config : Configuration.t) ctx dir path dispatch_request =
+    (config : Configuration.t) ctx dir path dispatch_websocket =
   if config.experimental_features.enable_websocket then
-    Evm_directory.jsonrpc_websocket_register dir path (fun request ->
-        let open Lwt_syntax in
-        let+ response = dispatch_request rpc config ctx request in
-        websocket_response_of_response response)
+    Evm_directory.jsonrpc_websocket_register
+      dir
+      path
+      (dispatch_websocket rpc config ctx)
   else dir
 
 let dispatch_websocket_public (rpc : Configuration.rpc) config ctx dir =
-  generic_websocket_dispatch rpc config ctx dir "/ws" dispatch_request
+  generic_websocket_dispatch rpc config ctx dir "/ws" dispatch_websocket
 
 let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
     config ctx dir =
@@ -988,7 +1036,7 @@ let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
     ctx
     dir
     "/private/ws"
-    (dispatch_private_request ~block_production)
+    (dispatch_private_websocket ~block_production)
 
 let directory ?delegate_health_check_to rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
