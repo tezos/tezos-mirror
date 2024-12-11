@@ -9,6 +9,7 @@ LICENSES
 opam
 script-inputs
 scripts
+sdk
 irmin
 brassaia
 rust-toolchain

@@ -515,6 +515,7 @@ oc.build:static-x86_64-linux-binaries:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -605,6 +606,7 @@ oc.build_x86_64-released:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -706,6 +708,7 @@ oc.build_x86_64-exp-dev-extra:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -955,6 +958,7 @@ oc.build_kernels:
     - script-inputs/**/*
     - scripts/**/*
     - scripts/ci/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -1035,6 +1039,7 @@ oc.build_dsn_node:
     - script-inputs/**/*
     - scripts/**/*
     - scripts/ci/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -1098,6 +1103,7 @@ oc.tezt:fetch-records:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -1257,6 +1263,7 @@ select_tezts:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2556,6 +2563,7 @@ oc.integration:compiler-rejections:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2617,6 +2625,7 @@ oc.script:test-gen-genesis:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -2737,6 +2746,7 @@ oc.script:test_octez_release_versions:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3379,6 +3389,7 @@ oc.unit:non-proto-x86_64:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3529,6 +3540,7 @@ oc.unit:other-x86_64:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3614,6 +3626,7 @@ oc.unit:proto-x86_64:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3699,6 +3712,7 @@ oc.unit:non-proto-arm64:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3773,6 +3787,7 @@ oc.unit:webassembly-x86_64:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -3818,6 +3833,7 @@ oc.unit:protocol_compiles:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4051,6 +4067,7 @@ tezt:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4139,6 +4156,7 @@ tezt-memory-3k:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4227,6 +4245,7 @@ tezt-memory-4k:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4315,6 +4334,7 @@ tezt-time-sensitive:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4402,6 +4422,7 @@ tezt-slow:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4487,6 +4508,7 @@ tezt-flaky:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4576,6 +4598,7 @@ tezt:static-binaries:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
@@ -4656,6 +4679,7 @@ oc.unified_coverage:
     - rust-toolchain
     - script-inputs/**/*
     - scripts/**/*
+    - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*

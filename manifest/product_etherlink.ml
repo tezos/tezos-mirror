@@ -106,6 +106,7 @@ let evm_node_rust_deps =
               [S "source_tree"; S "../../src/rustzcash_deps"];
               [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
               [S "source_tree"; S "../../src/kernel_sdk"];
+              [S "source_tree"; S "../../sdk/rust"];
               [S "source_tree"; S "src"];
             ];
             [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];

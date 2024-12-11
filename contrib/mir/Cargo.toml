@@ -9,11 +9,11 @@ lalrpop = "0.22.0"
 [dependencies]
 lalrpop-util = "0.22.0"
 checked = "0.5"
-tezos_data_encoding = "0.6.0"
 thiserror = "1.0"
 logos = "0.14.2"
 hex = "0.4"
-tezos_crypto_rs = { version = "0.6.0", default-features = false, features = [
+tezos_data_encoding = { path = "../../sdk/rust/encoding" }
+tezos_crypto_rs = { path = "../../sdk/rust/crypto", default-features = false, features = [
   "bls",
 ] }
 typed-arena = "2"
