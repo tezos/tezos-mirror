@@ -112,6 +112,38 @@ module JSONRPC = struct
            (req "id" (option id_repr_encoding))))
 end
 
+module Subscription = struct
+  let version = JSONRPC.version
+
+  let method_ = "eth_subscription"
+
+  type result = {
+    result : Data_encoding.json;
+    subscription : Ethereum_types.Subscription.id;
+  }
+
+  let result_encoding =
+    Data_encoding.(
+      conv
+        (fun {result; subscription} -> (result, subscription))
+        (fun (result, subscription) -> {result; subscription})
+        (obj2
+           (req "result" Data_encoding.json)
+           (req "subscription" Ethereum_types.Subscription.id_encoding)))
+
+  type response = {params : result}
+
+  let response_encoding =
+    Data_encoding.(
+      conv
+        (fun {params} -> ((), (), params))
+        (fun ((), (), params) -> {params})
+        (obj3
+           (req "jsonrpc" (constant version))
+           (req "method" (constant method_))
+           (req "params" result_encoding)))
+end
+
 module Error = struct
   type t = unit
 
@@ -858,6 +890,38 @@ module Coinbase = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Subscribe = struct
+  open Ethereum_types
+
+  type input = Subscription.kind
+
+  type output = Subscription.id
+
+  let input_encoding = Subscription.kind_encoding
+
+  let output_encoding = Subscription.id_encoding
+
+  let method_ = "eth_subscribe"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Unsubscribe = struct
+  open Ethereum_types
+
+  type input = Subscription.id
+
+  type output = bool
+
+  let input_encoding = Subscription.id_input_encoding
+
+  let output_encoding = Data_encoding.bool
+
+  let method_ = "eth_unsubscribe"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -911,6 +975,8 @@ let supported_methods : (module METHOD) list =
     (module Eth_fee_history);
     (module Coinbase);
     (module Trace_call);
+    (module Subscribe);
+    (module Unsubscribe);
   ]
 
 let unsupported_methods : string list =

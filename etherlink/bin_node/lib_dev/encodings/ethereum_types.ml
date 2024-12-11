@@ -1121,3 +1121,131 @@ let state_override_empty = AddressMap.empty
 
 let state_override_encoding =
   AddressMap.associative_array_encoding state_account_override_encoding
+
+module Subscription = struct
+  exception Unknown_subscription
+
+  type logs = {address : address; topics : hash list}
+
+  let logs_encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; topics} -> (address, topics))
+      (fun (address, topics) -> {address; topics})
+      (obj2
+         (req "address" address_encoding)
+         (req "topics" (list hash_encoding)))
+
+  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+
+  let kind_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"params_size_two"
+          (Tag 0)
+          (tup2 string logs_encoding)
+          (function Logs logs -> Some ("logs", logs) | _ -> None)
+          (function
+            | "logs", logs -> Logs logs | _ -> raise Unknown_subscription);
+        case
+          ~title:"params_size_one"
+          (Tag 1)
+          (tup1 string)
+          (function
+            | NewHeads -> Some "newHeads"
+            | NewPendingTransactions -> Some "newPendingTransactions"
+            | Syncing -> Some "syncing"
+            | _ -> None)
+          (function
+            | "newHeads" -> NewHeads
+            | "newPendingTransactions" -> NewPendingTransactions
+            | "syncing" -> Syncing
+            | _ -> raise Unknown_subscription);
+      ]
+
+  type id = Id of hex [@@ocaml.unboxed]
+
+  let id_of_string s = Id (hex_of_string (String.lowercase_ascii s))
+
+  let id_to_string (Id a) = hex_to_string a
+
+  let id_encoding = Data_encoding.(conv id_to_string id_of_string string)
+
+  let id_input_encoding =
+    Data_encoding.(conv id_to_string id_of_string (tup1 string))
+
+  type sync_status = {
+    startingBlock : quantity;
+    currentBlock : quantity;
+    highestBlock : quantity;
+    pulledStates : quantity;
+    knownStates : quantity;
+  }
+
+  let sync_status_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             startingBlock;
+             currentBlock;
+             highestBlock;
+             pulledStates;
+             knownStates;
+           } ->
+        (startingBlock, currentBlock, highestBlock, pulledStates, knownStates))
+      (fun (startingBlock, currentBlock, highestBlock, pulledStates, knownStates) ->
+        {startingBlock; currentBlock; highestBlock; pulledStates; knownStates})
+      (obj5
+         (req "startingBlock" quantity_encoding)
+         (req "currentBlock" quantity_encoding)
+         (req "highestBlock" quantity_encoding)
+         (req "pulledStates" quantity_encoding)
+         (req "knownStates" quantity_encoding))
+
+  type sync_output = {syncing : bool; status : sync_status}
+
+  let sync_output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {syncing; status} -> (syncing, status))
+      (fun (syncing, status) -> {syncing; status})
+      (obj2 (req "syncing" bool) (req "status" sync_status_encoding))
+
+  type output =
+    | NewHeads of block
+    | Logs of logs
+    | NewPendingTransactions of hash
+    | Syncing of sync_output
+
+  let output_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"newHeads"
+          (Tag 0)
+          block_encoding
+          (function NewHeads b -> Some b | _ -> None)
+          (fun b -> NewHeads b);
+        case
+          ~title:"logs"
+          (Tag 1)
+          logs_encoding
+          (function Logs l -> Some l | _ -> None)
+          (fun l -> Logs l);
+        case
+          ~title:"pendingTxs"
+          (Tag 2)
+          hash_encoding
+          (function NewPendingTransactions l -> Some l | _ -> None)
+          (fun l -> NewPendingTransactions l);
+        case
+          ~title:"sync"
+          (Tag 3)
+          sync_output_encoding
+          (function Syncing l -> Some l | _ -> None)
+          (fun l -> Syncing l);
+      ]
+end

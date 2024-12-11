@@ -87,6 +87,26 @@ module JSONRPC : sig
   val response_encoding : response Data_encoding.t
 end
 
+(* This isn't the JSON-RPC request that is sent to request websocket events but
+   the generic outputed data that is sent through the websocket periodically once
+   the appropriate websocket request was sent (see module [Subscribe]). *)
+module Subscription : sig
+  val version : string
+
+  val method_ : string
+
+  type result = {
+    result : Data_encoding.json;
+    subscription : Ethereum_types.Subscription.id;
+  }
+
+  val result_encoding : result Data_encoding.t
+
+  type response = {params : result}
+
+  val response_encoding : response Data_encoding.t
+end
+
 (* Errors returned by the RPC server, to be embedded as data to the JSON-RPC
    error object. *)
 module Error : sig
@@ -313,6 +333,14 @@ module Eth_fee_history :
 
 module Coinbase :
   METHOD with type input = unit and type output = Ethereum_types.address
+
+module Subscribe :
+  METHOD
+    with type input = Ethereum_types.Subscription.kind
+     and type output = Ethereum_types.Subscription.id
+
+module Unsubscribe :
+  METHOD with type input = Ethereum_types.Subscription.id and type output = bool
 
 type map_result =
   | Method :
