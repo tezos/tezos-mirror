@@ -152,6 +152,60 @@ macro_rules! struct_layout {
                     AccessInfo::fold(&children)
                 }
             }
+
+            impl $crate::state_backend::ProofLayout for $layout_t {
+                fn from_proof(proof: $crate::state_backend::ProofTree) -> Result<Self::Allocated<$crate::state_backend::verify_backend::Verifier>, $crate::state_backend::FromProofError> {
+                    if let $crate::state_backend::ProofTree::Present(proof) = proof {
+                        match proof {
+                            $crate::state_backend::proof_backend::tree::Tree::Leaf(_) => {
+                                Err($crate::state_backend::FromProofError::UnexpectedLeaf)
+                            }
+
+                            $crate::state_backend::proof_backend::tree::Tree::Node(branches) => {
+                                let mut branches = branches.iter();
+
+                                let expected_branches = 0 $(
+                                    + { let $field_name = 1; $field_name }
+                                )+;
+                                let successful_branches = 0;
+
+                                $(
+                                    let $field_name = branches.next().ok_or($crate::state_backend::FromProofError::BadNumberOfBranches {
+                                        got: successful_branches,
+                                        expected: expected_branches,
+                                    })?;
+                                    let $field_name = <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Present($field_name))?;
+                                    let successful_branches = successful_branches + 1;
+                                )+
+
+                                if branches.last().is_some() {
+                                    // There were more branches, this is bad.
+                                    return Err($crate::state_backend::FromProofError::BadNumberOfBranches {
+                                        got: successful_branches + 1,
+                                        expected: expected_branches,
+                                    });
+                                }
+
+                                Ok(
+                                    Self::Allocated {
+                                        $(
+                                            $field_name
+                                        ),+
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Ok(
+                            Self::Allocated {
+                                $(
+                                    $field_name: <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Absent)?
+                                ),+
+                            }
+                        )
+                    }
+                }
+            }
         }
     };
 }

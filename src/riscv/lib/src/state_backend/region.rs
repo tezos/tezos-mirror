@@ -157,6 +157,12 @@ impl<E: Copy, M: ManagerBase> Cell<E, M> {
     }
 }
 
+impl<E: 'static, M: ManagerBase> From<Cells<E, 1, M>> for Cell<E, M> {
+    fn from(region: Cells<E, 1, M>) -> Self {
+        Self { region }
+    }
+}
+
 impl<E: serde::Serialize, M: ManagerSerialise> serde::Serialize for Cell<E, M> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -579,7 +585,7 @@ pub const MERKLE_LEAF_SIZE: NonZeroUsize =
 
 // TODO RV-322: Choose optimal Merkleisation parameters for main memory.
 /// Arity of the Merkle tree used for Merkleising [`DynCells`].
-const MERKLE_ARITY: usize = 3;
+pub const MERKLE_ARITY: usize = 3;
 
 /// Helper function which allows iterating over chunks of a dynamic region
 /// and writing them to a writer. The last chunk may be smaller than the

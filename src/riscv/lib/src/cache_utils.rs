@@ -5,7 +5,9 @@
 use crate::{
     default::ConstDefault,
     machine_state::main_memory::Address,
-    state_backend::{Layout, ManagerAlloc, ManagerBase, Many},
+    state_backend::{
+        FromProofResult, Layout, ManagerAlloc, ManagerBase, Many, ProofLayout, ProofTree,
+    },
 };
 use std::{convert::Infallible, marker::PhantomData};
 
@@ -82,5 +84,13 @@ impl<const BITS: usize, const SIZE: usize, CachedLayout: Layout> Layout
 
     fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         Many::<CachedLayout, SIZE>::allocate(backend)
+    }
+}
+
+impl<const BITS: usize, const SIZE: usize, CachedLayout: ProofLayout> ProofLayout
+    for Sizes<BITS, SIZE, CachedLayout>
+{
+    fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
+        Many::<CachedLayout, SIZE>::from_proof(proof)
     }
 }
