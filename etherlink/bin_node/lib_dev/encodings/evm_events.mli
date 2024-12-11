@@ -55,7 +55,11 @@ module Blueprint_applied : sig
 end
 
 module Flushed_blueprint : sig
-  type t = {hashes : hash list; timestamp : Time.Protocol.t; level : quantity}
+  type t = {
+    transactions : Delayed_transaction.t list;
+    timestamp : Time.Protocol.t;
+    level : quantity;
+  }
 end
 
 type t =

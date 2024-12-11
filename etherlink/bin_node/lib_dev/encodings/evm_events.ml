@@ -233,34 +233,50 @@ module Blueprint_applied = struct
 end
 
 module Flushed_blueprint = struct
-  type t = {hashes : hash list; timestamp : Time.Protocol.t; level : quantity}
+  type t = {
+    transactions : Delayed_transaction.t list;
+    timestamp : Time.Protocol.t;
+    level : quantity;
+  }
 
-  let of_rlp = function
-    | Rlp.List [List hashes; Value timestamp; Value level] ->
-        let hashes =
+  let of_rlp rlp =
+    match rlp with
+    | Rlp.List [List transactions; Value timestamp; Value level] ->
+        let transactions =
           Helpers.fold_left_option
             (fun acc -> function
-              | Rlp.Value i -> Some (decode_hash i :: acc)
+              | Rlp.List [Rlp.Value hash; transaction_content] -> (
+                  let hash = decode_hash hash in
+                  match
+                    Delayed_transaction.of_rlp_content hash transaction_content
+                  with
+                  | Some tx -> Some (tx :: acc)
+                  | None -> None)
               | _ -> None)
             []
-            hashes
+            transactions
         in
         Option.map
-          (fun hashes ->
+          (fun transactions ->
             {
-              hashes = List.rev hashes;
+              transactions = List.rev transactions;
               timestamp = timestamp_of_bytes timestamp;
               level = decode_number_le level;
             })
-          hashes
+          transactions
     | _ -> None
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {hashes; timestamp; level = Qty level} -> (hashes, timestamp, level))
-      (fun (hashes, timestamp, level) -> {hashes; timestamp; level = Qty level})
-      (tup3 (Data_encoding.list hash_encoding) Time.Protocol.encoding z)
+      (fun {transactions; timestamp; level = Qty level} ->
+        (transactions, timestamp, level))
+      (fun (transactions, timestamp, level) ->
+        {transactions; timestamp; level = Qty level})
+      (tup3
+         (Data_encoding.list Delayed_transaction.encoding)
+         Time.Protocol.encoding
+         n)
 end
 
 type t =
@@ -282,9 +298,11 @@ let of_bytes bytes =
             Option.map (fun u -> Upgrade_event u) upgrade
         | "\x02" ->
             let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
+
             Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
         | "\x03" ->
             let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
+
             Option.map (fun u -> Blueprint_applied u) blueprint_applied
         | "\x04" -> (
             match rlp_content with
@@ -340,7 +358,7 @@ let pp fmt = function
         "New delayed transaction:@ %a"
         Delayed_transaction.pp_short
         delayed_transaction
-  | Flush_delayed_inbox {hashes = _; timestamp; level = Qty level} ->
+  | Flush_delayed_inbox {transactions = _; timestamp; level = Qty level} ->
       Format.fprintf
         fmt
         "Flush delayed inbox:@,timestamp:%a@, level: %a"

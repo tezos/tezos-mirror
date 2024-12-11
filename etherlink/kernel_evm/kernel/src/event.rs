@@ -17,7 +17,7 @@ pub const NEW_DELAYED_TRANSACTION_TAG: u8 = 0x04;
 pub const FLUSH_DELAYED_INBOX: u8 = 0x05;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Event {
+pub enum Event<'a> {
     Upgrade(upgrade::KernelUpgrade),
     SequencerUpgrade(upgrade::SequencerUpgrade),
     BlueprintApplied {
@@ -26,13 +26,13 @@ pub enum Event {
     },
     NewDelayedTransaction(Box<Transaction>),
     FlushDelayedInbox {
-        hashes: Vec<H256>,
+        transactions: &'a Vec<Transaction>,
         timestamp: Timestamp,
         level: U256,
     },
 }
 
-impl Encodable for Event {
+impl Encodable for Event<'_> {
     fn rlp_append(&self, stream: &mut RlpStream) {
         stream.begin_list(2);
         match self {
@@ -55,13 +55,13 @@ impl Encodable for Event {
                 stream.append(txn);
             }
             Event::FlushDelayedInbox {
-                hashes,
+                transactions,
                 timestamp,
                 level,
             } => {
                 stream.append(&FLUSH_DELAYED_INBOX);
                 stream.begin_list(3);
-                stream.append_list(hashes);
+                stream.append_list(transactions);
                 append_timestamp(stream, *timestamp);
                 stream.append(level);
             }
@@ -69,7 +69,7 @@ impl Encodable for Event {
     }
 }
 
-impl Event {
+impl Event<'_> {
     pub fn store<Host: Runtime>(&self, host: &mut Host) -> anyhow::Result<()> {
         storage::store_event(host, self)
     }
