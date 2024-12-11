@@ -28,7 +28,7 @@ use std::{
 
 pub mod merkle;
 pub mod proof;
-mod tree;
+pub mod tree;
 
 /// Proof-generating backend
 pub struct ProofGen<M: ManagerBase> {
