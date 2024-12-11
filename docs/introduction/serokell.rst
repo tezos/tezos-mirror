@@ -153,3 +153,5 @@ The protocol associated with these two services can be changed by reconfiguring 
     sudo dpkg-reconfigure octez-baker
 
 or manually editing the files in ``/etc/default/octez-baker*``.
+
+After the migration is complete, if you are using Debian packages consider removing all leftover configuration files from the Serokell packages, by doing ``apt purge tezos-client tezos-node tezos-baking``.
