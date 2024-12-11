@@ -2924,6 +2924,12 @@ module Dal : sig
     type t = {shard : Dal.shard; proof : Dal.shard_proof}
 
     val verify : cryptobox -> Slot.Commitment.t -> t -> unit tzresult
+
+    val share_is_trap :
+      Signature.Public_key_hash.t ->
+      Dal.share ->
+      traps_fraction:Q.t ->
+      bool tzresult
   end
 
   module Operations : sig
