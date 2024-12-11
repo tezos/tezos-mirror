@@ -78,6 +78,22 @@ val update :
   stored_requests ->
   Raw_context.t tzresult Lwt.t
 
+val finalize_unstake_and_check :
+  check_unfinalizable:
+    (Raw_context.t -> stored_requests -> Raw_context.t tzresult Lwt.t) ->
+  perform_finalizable_unstake_transfers:
+    (Raw_context.t ->
+    Contract_repr.t ->
+    (Signature.public_key_hash * Cycle_repr.t * Tez_repr.t) list ->
+    (Raw_context.t * Receipt_repr.balance_update_item list) tzresult Lwt.t) ->
+  Raw_context.t ->
+  Contract_repr.t ->
+  (Raw_context.t
+  * Receipt_repr.balance_update_item list
+  * stored_requests option)
+  tzresult
+  Lwt.t
+
 type error +=
   | Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
 

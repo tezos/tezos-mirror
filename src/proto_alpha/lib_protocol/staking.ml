@@ -63,49 +63,15 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
     (ctxt, [])
     finalizable
 
-(* The [check_unfinalizable] function in argument must consume its gas, if
-   relevant. *)
-let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
-  let open Lwt_result_syntax in
-  let*? ctxt =
-    Raw_context.consume_gas
-      ctxt
-      Adaptive_issuance_costs.prepare_finalize_unstake_cost
-  in
-  let* prepared_opt =
-    Unstake_requests_storage.prepare_finalize_unstake ctxt contract
-  in
-  match prepared_opt with
-  | None -> return (ctxt, [], None)
-  | Some {finalizable; unfinalizable} -> (
-      let* ctxt = check_unfinalizable ctxt unfinalizable in
-      match finalizable with
-      | [] -> return (ctxt, [], Some unfinalizable)
-      | _ ->
-          (* We only update the unstake requests if the [finalizable] list is not empty.
-             Indeed, if it is not empty, it means that at least one of the unstake operations
-             will be finalized, and the storage needs to be updated accordingly.
-             Conversely, if finalizable is empty, then [unfinalizable] contains
-             all the previous unstake requests, that should remain as requests after this
-             operation. *)
-          let*? ctxt =
-            Raw_context.consume_gas
-              ctxt
-              Adaptive_issuance_costs.finalize_unstake_and_check_cost
-          in
-          let* ctxt =
-            Unstake_requests_storage.update ctxt contract unfinalizable
-          in
-          let* ctxt, balance_updates =
-            perform_finalizable_unstake_transfers ctxt contract finalizable
-          in
-          return (ctxt, balance_updates, Some unfinalizable))
-
 let finalize_unstake ctxt contract =
   let open Lwt_result_syntax in
   let check_unfinalizable ctxt _unfinalizable = return ctxt in
   let* ctxt, balance_updates, _ =
-    finalize_unstake_and_check ~check_unfinalizable ctxt contract
+    Unstake_requests_storage.finalize_unstake_and_check
+      ~check_unfinalizable
+      ~perform_finalizable_unstake_transfers
+      ctxt
+      contract
   in
   return (ctxt, balance_updates)
 
@@ -279,7 +245,11 @@ let stake ctxt ~(amount : Tez_repr.t) ~sender ~delegate =
   in
   let sender_contract = Contract_repr.Implicit sender in
   let* ctxt, finalize_balance_updates, unfinalizable_requests_opt =
-    finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
+    Unstake_requests_storage.finalize_unstake_and_check
+      ~check_unfinalizable
+      ~perform_finalizable_unstake_transfers
+      ctxt
+      sender_contract
   in
   (* stake from unstake for eligible delegates *)
   let* ctxt, stake_balance_updates1, amount_from_liquid =

@@ -193,6 +193,41 @@ let update_stored_request ctxt contract updated_requests =
 
 let update = update_stored_request
 
+(* The [check_unfinalizable] function in argument must consume its gas, if
+   relevant. *)
+let finalize_unstake_and_check ~check_unfinalizable
+    ~perform_finalizable_unstake_transfers ctxt contract =
+  let open Lwt_result_syntax in
+  let*? ctxt =
+    Raw_context.consume_gas
+      ctxt
+      Adaptive_issuance_costs.prepare_finalize_unstake_cost
+  in
+  let* prepared_opt = prepare_finalize_unstake ctxt contract in
+  match prepared_opt with
+  | None -> return (ctxt, [], None)
+  | Some {finalizable; unfinalizable} -> (
+      let* ctxt = check_unfinalizable ctxt unfinalizable in
+      match finalizable with
+      | [] -> return (ctxt, [], Some unfinalizable)
+      | _ ->
+          (* We only update the unstake requests if the [finalizable] list is not empty.
+             Indeed, if it is not empty, it means that at least one of the unstake operations
+             will be finalized, and the storage needs to be updated accordingly.
+             Conversely, if finalizable is empty, then [unfinalizable] contains
+             all the previous unstake requests, that should remain as requests after this
+             operation. *)
+          let*? ctxt =
+            Raw_context.consume_gas
+              ctxt
+              Adaptive_issuance_costs.finalize_unstake_and_check_cost
+          in
+          let* ctxt = update ctxt contract unfinalizable in
+          let* ctxt, balance_updates =
+            perform_finalizable_unstake_transfers ctxt contract finalizable
+          in
+          return (ctxt, balance_updates, Some unfinalizable))
+
 let add ctxt ~contract ~delegate cycle amount =
   let open Lwt_result_syntax in
   let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
