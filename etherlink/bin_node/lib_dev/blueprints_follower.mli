@@ -5,10 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Ethereum_types
+
 (** A [handler] is a function that is called for every blueprint fetched
     from a remote EVM endpoint. *)
 type handler =
-  Ethereum_types.quantity -> Blueprint_types.with_events -> unit tzresult Lwt.t
+  quantity ->
+  Blueprint_types.with_events ->
+  [`Check_for_reorg of quantity | `Continue] tzresult Lwt.t
 
 (** [start ~time_between_blocks ~evm_node_endpoint ~get_next_blueprint_number k]
     is a never-returning function which iterates over blueprints streamed by
@@ -20,6 +24,6 @@ type handler =
 val start :
   time_between_blocks:Configuration.time_between_blocks ->
   evm_node_endpoint:Uri.t ->
-  next_blueprint_number:Ethereum_types.quantity ->
+  next_blueprint_number:quantity ->
   handler ->
   'a tzresult Lwt.t

@@ -8,9 +8,9 @@
 open Ethereum_types
 
 type handler =
-  Ethereum_types.quantity ->
+  quantity ->
   Blueprint_types.with_events ->
-  (unit, tztrace) result Lwt.t
+  [`Check_for_reorg of quantity | `Continue] tzresult Lwt.t
 
 type parameters = {
   on_new_blueprint : handler;
@@ -59,7 +59,7 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
 
 let quantity_succ (Qty x) = Qty Z.(succ x)
 
-let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
+let[@tailrec] rec catchup ?remote_head ~next_blueprint_number ~first_connection
     params =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
@@ -78,12 +78,19 @@ let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
         ~evm_node_endpoint:params.evm_node_endpoint
         next_blueprint_number
     in
-    let* () = params.on_new_blueprint next_blueprint_number blueprint in
-    (go [@tailcall])
-      ~next_blueprint_number:(quantity_succ next_blueprint_number)
-      ~remote_head
-      ~first_connection
-      params
+    let* r = params.on_new_blueprint next_blueprint_number blueprint in
+    match r with
+    | `Continue ->
+        (catchup [@tailcall])
+          ~next_blueprint_number:(quantity_succ next_blueprint_number)
+          ~remote_head
+          ~first_connection
+          params
+    | `Check_for_reorg level ->
+        (catchup [@tailcall])
+          ~next_blueprint_number:level
+          ~first_connection
+          params
   else
     let* () =
       when_ (not first_connection) @@ fun () ->
@@ -105,7 +112,10 @@ let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
     | Ok blueprints_stream ->
         (stream_loop [@tailcall]) next_blueprint_number params blueprints_stream
     | Error _ ->
-        (go [@tailcall]) ~next_blueprint_number ~first_connection:false params
+        (catchup [@tailcall])
+          ~next_blueprint_number
+          ~first_connection:false
+          params
 
 and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
   let open Lwt_result_syntax in
@@ -119,15 +129,22 @@ and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
       ]
   in
   match candidate with
-  | Ok (Some blueprint) ->
-      let* () = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
+  | Ok (Some blueprint) -> (
+      let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
       let* () = Tx_pool.pop_and_inject_transactions () in
-      (stream_loop [@tailcall])
-        (Qty (Z.succ next_blueprint_number))
-        params
-        stream
+      match r with
+      | `Continue ->
+          (stream_loop [@tailcall])
+            (Qty (Z.succ next_blueprint_number))
+            params
+            stream
+      | `Check_for_reorg level ->
+          (catchup [@tailcall])
+            ~next_blueprint_number:level
+            ~first_connection:false
+            params)
   | Ok None | Error [Timeout] ->
-      (go [@tailcall])
+      (catchup [@tailcall])
         ~next_blueprint_number:(Qty next_blueprint_number)
         ~first_connection:false
         params
@@ -135,7 +152,7 @@ and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
 
 let start ~time_between_blocks ~evm_node_endpoint ~next_blueprint_number
     on_new_blueprint =
-  go
+  catchup
     ~next_blueprint_number
     ~first_connection:true
     {time_between_blocks; evm_node_endpoint; on_new_blueprint}

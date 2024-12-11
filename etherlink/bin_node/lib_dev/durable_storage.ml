@@ -332,6 +332,12 @@ let da_fee_per_byte read =
     Durable_storage_path.da_fee_per_byte
     decode_number_le
 
+let sequencer read =
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.sequencer_key
+    (fun bytes -> Signature.Public_key.of_b58check_exn (String.of_bytes bytes))
+
 module Make (Reader : READER) = struct
   let read = Reader.read
 

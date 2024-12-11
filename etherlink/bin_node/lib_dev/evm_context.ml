@@ -404,6 +404,25 @@ module State = struct
         let root_hash = `Hex root_hash in
         Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
 
+  let reset_to_level ctxt conn l2_level checkpoint =
+    let open Lwt_result_syntax in
+    let*! () = Evm_context_events.reset_at_level l2_level in
+    (* Find the [l2_level] evm_state. *)
+    let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
+    let*! evm_state = Irmin_context.PVMState.get context in
+    (* Clear the store. *)
+    let* () = Evm_store.reset_after conn ~l2_level in
+    let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    (* Update mutable session values. *)
+    let next_blueprint_number = Ethereum_types.Qty.next l2_level in
+    let* current_block_hash = Evm_state.current_block_hash evm_state in
+    ctxt.session.next_blueprint_number <- next_blueprint_number ;
+    ctxt.session.evm_state <- evm_state ;
+    ctxt.session.current_block_hash <- current_block_hash ;
+    ctxt.session.context <- context ;
+    ctxt.session.pending_upgrade <- pending_upgrade ;
+    return evm_state
+
   let reset_to_finalized_level ?expected_finalized_number exit_error ctxt conn =
     let open Lwt_result_syntax in
     let* safe_checkpoint = Evm_store.Context_hashes.find_finalized conn in
@@ -421,27 +440,7 @@ module State = struct
                   in
                   tzfail exit_error)
         in
-        let*! () = Evm_context_events.reset_at_level finalized_number in
-        (* Find the "finalized" evm_state. *)
-        let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
-        let*! evm_state = Irmin_context.PVMState.get context in
-        (* Clear the store. *)
-        let* () = Evm_store.reset_after conn ~l2_level:finalized_number in
-        let* pending_upgrade =
-          Evm_store.Kernel_upgrades.find_latest_pending conn
-        in
-        (* Update mutable session values. *)
-        let next_blueprint_number =
-          let (Qty finalized_number) = finalized_number in
-          Ethereum_types.Qty (Z.succ finalized_number)
-        in
-        let* current_block_hash = Evm_state.current_block_hash evm_state in
-        ctxt.session.next_blueprint_number <- next_blueprint_number ;
-        ctxt.session.evm_state <- evm_state ;
-        ctxt.session.current_block_hash <- current_block_hash ;
-        ctxt.session.context <- context ;
-        ctxt.session.pending_upgrade <- pending_upgrade ;
-        return evm_state
+        reset_to_level ctxt conn finalized_number checkpoint
     | None ->
         let*! () =
           Evm_context_events.reset_impossible_missing_finalized_state ()
@@ -482,7 +481,12 @@ module State = struct
           in
           let exit_error =
             Node_error.Diverged
-              (number, expected_block_hash, Some found_block_hash)
+              {
+                level = number;
+                expected_block_hash;
+                found_block_hash = Some found_block_hash;
+                must_exit = true;
+              }
           in
           if ctxt.fail_on_missing_blueprint then
             (* Sequencer must fail in case of divergence. *)
@@ -496,7 +500,14 @@ module State = struct
           Evm_events_follower_events.missing_blueprint
             (number, expected_block_hash)
         in
-        tzfail (Node_error.Diverged (number, expected_block_hash, None))
+        tzfail
+          (Node_error.Diverged
+             {
+               level = number;
+               expected_block_hash;
+               found_block_hash = None;
+               must_exit = true;
+             })
     | None ->
         let*! () = Evm_events_follower_events.rollup_node_ahead (Qty number) in
         let* () =
@@ -672,20 +683,37 @@ module State = struct
                     block.number
                 else
                   let Ethereum_types.(Qty number) = block.number in
-                  let exit_error =
-                    Node_error.Diverged
-                      (number, expected_block_hash, Some block.hash)
-                  in
+
                   let*! () =
                     Evm_events_follower_events.diverged
                       (number, expected_block_hash, block.hash)
                   in
-                  let* _evm_state =
+                  (* If the observer cannot reset to finalized level it must
+                     exit. *)
+                  let exit_error =
+                    Node_error.Diverged
+                      {
+                        level = number;
+                        expected_block_hash;
+                        found_block_hash = Some block.hash;
+                        must_exit = true;
+                      }
+                  in
+                  let* (_ : Evm_state.t) =
                     reset_to_finalized_level exit_error ctxt conn
                   in
+                  (* If the observer managed to reset to finalized level it must
+                     not exit. *)
                   tzfail
-                    (Cannot_apply_blueprint {local_state_level = Z.pred next})
+                    (Node_error.Diverged
+                       {
+                         level = number;
+                         expected_block_hash;
+                         found_block_hash = Some block.hash;
+                         must_exit = false;
+                       })
         in
+
         let number_of_transactions =
           match block.transactions with
           | TxHash l -> List.length l
@@ -1444,6 +1472,157 @@ module State = struct
     in
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
     return_unit
+
+  let observer_apply_reorg ctxt conn blueprint_with_events pred_number =
+    let open Lwt_result_syntax in
+    (* Checkout the state before the blueprint. *)
+    let* checkpoint = Evm_store.Context_hashes.find conn pred_number in
+    match checkpoint with
+    | None ->
+        let*! () =
+          Evm_context_events.observer_reorg_cannot_find_state pred_number
+        in
+        return_none
+    | Some checkpoint ->
+        let* (_ : Evm_state.t) =
+          reset_to_level ctxt conn pred_number checkpoint
+        in
+        (* Apply the blueprint. *)
+        let events =
+          List.map
+            (fun delayed_transaction ->
+              Evm_events.New_delayed_transaction delayed_transaction)
+            blueprint_with_events.Blueprint_types.delayed_transactions
+        in
+        let* () =
+          apply_blueprint
+            ~events
+            ctxt
+            conn
+            blueprint_with_events.blueprint.timestamp
+            blueprint_with_events.blueprint.payload
+            blueprint_with_events.delayed_transactions
+        in
+
+        (* Ask the blueprint follower to restart at blueprint's successor. *)
+        return_some ctxt.session.next_blueprint_number
+
+  let rec potential_observer_reorg ~evm_node_endpoint conn ctxt
+      blueprint_with_events =
+    let open Lwt_result_syntax in
+    (*
+       1. Check if this blueprint was finalized on L1.
+       2. Check if the blueprint is different than the one
+          we already received.
+       3. Check if the sequencer signed this new blueprint.
+       4. Find the divergence point.
+       5. Apply the reorganized blueprint.
+       6. Restart blueprint follower after this level.
+    *)
+    let blueprint_number =
+      blueprint_with_events.Blueprint_types.blueprint.number
+    in
+    let*! () = Evm_context_events.observer_potential_reorg blueprint_number in
+    (* We check in the local storage if we already saw a blueprint
+       for this number, and whether it's the same or not.
+
+       If it's not the same blueprint, it might be the sign of a
+       reorganization.
+    *)
+    let* is_it_the_same_blueprint =
+      let+ blueprint_in_store =
+        Evm_store.Blueprints.find_with_events conn blueprint_number
+      in
+      match blueprint_in_store with
+      | None ->
+          (* The blueprint has been removed from the store, we cannot check it. *)
+          false
+      | Some blueprint_in_store ->
+          Blueprint_types.with_events_equal
+            blueprint_in_store
+            blueprint_with_events
+    in
+    if is_it_the_same_blueprint then
+      (* The endpoint simply republished an old blueprint. *)
+      let*! () =
+        Evm_context_events.observer_reorg_old_blueprint blueprint_number
+      in
+      return_none
+    else
+      (* As we have a different blueprint we want to check if it was signed
+         by the sequencer, otherwise it is meaningless.
+
+         We also decode the blueprint to retrieve the parent hash to see
+         if we agree with it.
+      *)
+      let* sequencer =
+        let read path =
+          let*! res = Evm_state.inspect ctxt.session.evm_state path in
+          return res
+        in
+        Durable_storage.sequencer read
+      in
+      let blueprint_parent_hash =
+        Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload
+          sequencer
+          blueprint_with_events.blueprint.payload
+      in
+      match blueprint_parent_hash with
+      | Some blueprint_parent_hash -> (
+          (* If the blueprint parent hash is not equal to whatever block hash
+             we have for its predecessor, that means this is not the first
+             block of the reorganization and we traverse backward the blueprints
+             until we find the blueprint.
+          *)
+          let (Qty pred_number) = Ethereum_types.Qty.pred blueprint_number in
+          let* local_parent_block_hash =
+            if ctxt.block_storage_sqlite3 then
+              Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
+            else
+              let*! bytes =
+                Evm_state.inspect
+                  ctxt.session.evm_state
+                  (Durable_storage_path.Indexes.block_by_number
+                     (Nth pred_number))
+              in
+              return (Option.map Ethereum_types.decode_block_hash bytes)
+          in
+          match local_parent_block_hash with
+          | None ->
+              let*! () =
+                Evm_context_events.observer_reorg_cannot_find_divergence
+                  blueprint_number
+              in
+              return_none
+          | Some local_parent_block_hash ->
+              if local_parent_block_hash <> blueprint_parent_hash then
+                (* Reorganization started on an older block, we
+                   traverse the chain backward. *)
+                let* blueprint_pred =
+                  Evm_services.get_blueprint
+                    ~keep_alive:true
+                    ~evm_node_endpoint
+                    (Qty pred_number)
+                in
+                potential_observer_reorg
+                  ~evm_node_endpoint
+                  conn
+                  ctxt
+                  blueprint_pred
+              else
+                (* We agree with the blueprint predecessor but not the blueprint,
+                   this is the divergence point. *)
+                observer_apply_reorg
+                  ctxt
+                  conn
+                  blueprint_with_events
+                  (Qty pred_number))
+      | None ->
+          let*! () =
+            Evm_context_events.observer_reorg_cannot_decode_blueprint
+              blueprint_number
+          in
+          return_none
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -1552,6 +1731,15 @@ module Handlers = struct
         protect @@ fun () ->
         let ctxt = Worker.state self in
         State.wasm_pvm_version ctxt
+    | Potential_observer_reorg {evm_node_endpoint; blueprint_with_events} ->
+        protect @@ fun () ->
+        let ctxt = Worker.state self in
+        State.Transaction.run ctxt @@ fun ctxt conn ->
+        State.potential_observer_reorg
+          ~evm_node_endpoint
+          conn
+          ctxt
+          blueprint_with_events
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -1574,14 +1762,15 @@ module Handlers = struct
       | Reconstruct _ -> Eq
       | Patch_state _ -> Eq
       | Wasm_pvm_version -> Eq
+      | Potential_observer_reorg _ -> Eq
   end
 
   let on_error (type a b) _self _st (req : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
     let open Lwt_result_syntax in
     match (req, errs) with
-    | Apply_evm_events _, [Node_error.Diverged _divergence]
-    | Apply_blueprint _, [Node_error.Diverged _divergence] ->
+    | Apply_evm_events _, [Node_error.Diverged {must_exit = true; _}]
+    | Apply_blueprint _, [Node_error.Diverged {must_exit = true; _}] ->
         Lwt_exit.exit_and_raise Node_error.exit_code_when_diverge
     | ( Apply_evm_events _,
         [Node_error.Out_of_sync {level_expected; level_received}] ) ->
@@ -1967,6 +2156,10 @@ let patch_sequencer_key ?block_number pk =
 let patch_state ?block_number ~key ~value () =
   worker_wait_for_request
     (Patch_state {commit = true; key; value; block_number})
+
+let potential_observer_reorg evm_node_endpoint blueprint_with_events =
+  worker_wait_for_request
+    (Potential_observer_reorg {evm_node_endpoint; blueprint_with_events})
 
 let shutdown () =
   let open Lwt_result_syntax in

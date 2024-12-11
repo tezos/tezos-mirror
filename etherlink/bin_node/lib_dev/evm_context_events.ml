@@ -146,6 +146,60 @@ let worker_request_failed =
     ("errors", Error_monad.trace_encoding)
     ~pp2:Error_monad.pp_print_trace
 
+let observer_potential_reorg =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_potential_reorg"
+    ~level:Warning
+    ~msg:"[Warning] Potential reorganization happening at level {level}"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
+let observer_reorg_old_blueprint =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_reorg_old_blueprint"
+    ~level:Warning
+    ~msg:
+      "[Warning] EVM Endpoint provided an old known blueprint (level {level})"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
+let observer_reorg_cannot_decode_blueprint =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_reorg_cannot_decode_blueprint"
+    ~level:Warning
+    ~msg:
+      "[Warning] EVM Endpoint provided a blueprint (level {level}) we cannot \
+       decode"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
+let observer_reorg_cannot_find_divergence =
+  declare_2
+    ~section
+    ~name:"evm_context_observer_reorg_cannot_find_divergence"
+    ~level:Warning
+    ~msg:
+      "[Warning] Potential blueprint of reorg is at level {level1}, cannot \
+       find block {level2} locally"
+    ~pp1:Z.pp_print
+    ~pp2:Z.pp_print
+    ("level1", Data_encoding.n)
+    ("level2", Data_encoding.n)
+
+let observer_reorg_cannot_find_state =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_reorg_cannot_find_state"
+    ~level:Warning
+    ~msg:
+      "[Warning] Reorganization needs state at level {level} but checkpoint is \
+       missing"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -181,3 +235,18 @@ let reset_at_level level = emit reset_at_level level
 
 let worker_request_failed request_view errs =
   emit worker_request_failed (request_view, errs)
+
+let observer_potential_reorg Ethereum_types.(Qty level) =
+  emit observer_potential_reorg level
+
+let observer_reorg_old_blueprint Ethereum_types.(Qty level) =
+  emit observer_reorg_old_blueprint level
+
+let observer_reorg_cannot_decode_blueprint Ethereum_types.(Qty level) =
+  emit observer_reorg_cannot_decode_blueprint level
+
+let observer_reorg_cannot_find_divergence Ethereum_types.(Qty level) =
+  emit observer_reorg_cannot_find_divergence (level, Z.pred level)
+
+let observer_reorg_cannot_find_state Ethereum_types.(Qty level) =
+  emit observer_reorg_cannot_find_state level

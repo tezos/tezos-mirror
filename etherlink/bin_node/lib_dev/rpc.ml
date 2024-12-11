@@ -91,4 +91,4 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   Broadcast.notify @@ Broadcast.Blueprint blueprint ;
   Metrics.set_level ~level:number ;
   let* () = set_metrics_confirmed_levels ctxt in
-  return_unit
+  return `Continue

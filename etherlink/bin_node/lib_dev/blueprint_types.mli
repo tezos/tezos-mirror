@@ -30,3 +30,5 @@ val encoding : t Data_encoding.t
 val payload_encoding : payload Data_encoding.t
 
 val with_events_encoding : with_events Data_encoding.t
+
+val with_events_equal : with_events -> with_events -> bool

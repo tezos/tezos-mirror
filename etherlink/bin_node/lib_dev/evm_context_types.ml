@@ -46,6 +46,11 @@ module Request = struct
       }
         -> (unit, tztrace) t
     | Wasm_pvm_version : (Tezos_scoru_wasm.Wasm_pvm_state.version, tztrace) t
+    | Potential_observer_reorg : {
+        evm_node_endpoint : Uri.t;
+        blueprint_with_events : Blueprint_types.with_events;
+      }
+        -> (Ethereum_types.quantity option, tztrace) t
 
   type view = View : _ t -> view
 
@@ -156,6 +161,26 @@ module Request = struct
           (obj1 (req "request" (constant "wasm_pvm_version")))
           (function View Wasm_pvm_version -> Some () | _ -> None)
           (fun () -> View Wasm_pvm_version);
+        case
+          (Tag 9)
+          ~title:"Potential_observer_reorg"
+          (obj3
+             (req "request" (constant "potential_observer_reorg"))
+             (req "evm_node_endpoint" string)
+             (req "blueprint_with_events" Blueprint_types.with_events_encoding))
+          (function
+            | View
+                (Potential_observer_reorg
+                  {evm_node_endpoint; blueprint_with_events}) ->
+                Some ((), Uri.to_string evm_node_endpoint, blueprint_with_events)
+            | _ -> None)
+          (fun ((), evm_node_endpoint, blueprint_with_events) ->
+            View
+              (Potential_observer_reorg
+                 {
+                   evm_node_endpoint = Uri.of_string evm_node_endpoint;
+                   blueprint_with_events;
+                 }));
       ]
 
   let pp ppf view =
