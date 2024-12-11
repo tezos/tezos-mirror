@@ -1084,6 +1084,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustversion"
+version = "1.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e819f2bc632f285be6d7cd36e25940d45b2391dd6d9b939e79de557f7014248"
+
+[[package]]
 name = "sct"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1363,6 +1369,7 @@ dependencies = [
 name = "tezos-smart-rollup-panic-hook"
 version = "0.2.2"
 dependencies = [
+ "rustversion",
  "tezos-smart-rollup-core",
 ]
 
@@ -1867,18 +1874,3 @@ dependencies = [
  "quote",
  "syn 2.0.66",
 ]
-
-[[patch.unused]]
-name = "tezos_crypto_rs"
-version = "0.5.2"
-source = "git+https://github.com/trilitech/tezedge.git?rev=0468da39f3133dbe6355fa8d443d3aeee10e3c0b#0468da39f3133dbe6355fa8d443d3aeee10e3c0b"
-
-[[patch.unused]]
-name = "tezos_data_encoding"
-version = "0.5.2"
-source = "git+https://github.com/trilitech/tezedge.git?rev=0468da39f3133dbe6355fa8d443d3aeee10e3c0b#0468da39f3133dbe6355fa8d443d3aeee10e3c0b"
-
-[[patch.unused]]
-name = "tezos_data_encoding_derive"
-version = "0.5.2"
-source = "git+https://github.com/trilitech/tezedge.git?rev=0468da39f3133dbe6355fa8d443d3aeee10e3c0b#0468da39f3133dbe6355fa8d443d3aeee10e3c0b"
