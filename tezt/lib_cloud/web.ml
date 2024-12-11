@@ -132,9 +132,34 @@ let run () =
   let prometheus = Env.prometheus in
   let monitoring = Env.monitoring in
   let stop, to_stop = Lwt.task () in
+  let logger next_handler request =
+    let meth = Dream.method_to_string (Dream.method_ request) in
+    let target = Dream.target request in
+    let req = Dream.client request in
+    let fd_field =
+      Dream.new_field ~name:"dream.fd" ~show_value:string_of_int ()
+    in
+    let fd_string =
+      match Dream.field request fd_field with
+      | None -> ""
+      | Some fd -> " fd " ^ string_of_int fd
+    in
+    let user_agent = Dream.headers request "User-Agent" |> String.concat " " in
+    Log.info
+      ~color:Log.Color.FG.blue
+      ~prefix:"dream"
+      "%s %s %s%s %s"
+      meth
+      target
+      req
+      fd_string
+      user_agent ;
+    next_handler request
+  in
   let process =
     Dream.serve ~stop ~port ~tls:false ~interface:"0.0.0.0"
-    @@ Dream.logger
+    (* @@ Dream.logger *)
+    @@ logger
     @@ Dream.router
          [
            Dream.get "/metrics" (fun _ ->
