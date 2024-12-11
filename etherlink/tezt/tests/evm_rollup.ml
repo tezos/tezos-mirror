@@ -435,11 +435,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       unit
     else unit
   in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~node_transaction_validation:true
-      ()
-  in
+  let patch_config = Evm_node.patch_config_with_experimental_feature () in
   let* produce_block, evm_node =
     match setup_mode with
     | Setup_proxy ->
@@ -466,7 +462,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         } ->
         let patch_config =
           Evm_node.patch_config_with_experimental_feature
-            ~node_transaction_validation:true
             ~block_storage_sqlite3
             ()
         in

@@ -267,7 +267,6 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
-      ~node_transaction_validation:true
       ?next_wasm_runtime
       ?block_storage_sqlite3
       ?rpc_server

@@ -259,14 +259,13 @@ type garbage_collector = {
 
 type rpc_server = Resto | Dream
 
-(** [patch_config_with_experimental_feature ?node_transaction_validation
-    ?drop_duplicate_when_injection ?block_storage_sqlite3 ?next_wasm_runtime
-    ?rpc_server json_config]
-    patches a config to add experimental feature. Each optional argument add the
+(** [patch_config_with_experimental_feature
+    ?drop_duplicate_when_injection ?block_storage_sqlite3
+    ?next_wasm_runtime ?rpc_server json_config] patches a config to
+    add experimental feature. Each optional argument add the
     correspondent experimental feature. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
-  ?node_transaction_validation:bool ->
   ?block_storage_sqlite3:bool ->
   ?next_wasm_runtime:bool ->
   ?garbage_collector:garbage_collector ->

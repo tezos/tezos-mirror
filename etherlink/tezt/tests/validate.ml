@@ -36,11 +36,7 @@ let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
             Constant.smart_rollup_installer;
           ]
       @@ fun () ->
-      let patch_config =
-        Evm_node.patch_config_with_experimental_feature
-          ~node_transaction_validation:true
-          ()
-      in
+      let patch_config = Evm_node.patch_config_with_experimental_feature () in
       let* sequencer =
         Helpers.init_sequencer_sandbox
           ?maximum_gas_per_transaction
