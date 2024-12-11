@@ -154,7 +154,14 @@ let add_and_subscribe_peers (topics : Topic.t list) (peers : Peer.t list)
   List.fold_left
     (fun state peer ->
       let state, output =
-        GS.add_peer {direct = direct peer; outbound = outbound peer; peer} state
+        GS.add_peer
+          {
+            direct = direct peer;
+            outbound = outbound peer;
+            peer;
+            bootstrap = false;
+          }
+          state
       in
       assert_output ~__LOC__ output Peer_added ;
       subscribe_peer_to_topics peer topics state)
@@ -1228,10 +1235,14 @@ let test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters =
   let inbound_peer = 99 in
   let outbound_peer = 98 in
   let state, _ =
-    GS.add_peer {direct = false; outbound = false; peer = inbound_peer} state
+    GS.add_peer
+      {direct = false; outbound = false; peer = inbound_peer; bootstrap = false}
+      state
   in
   let state, _ =
-    GS.add_peer {direct = false; outbound = true; peer = outbound_peer} state
+    GS.add_peer
+      {direct = false; outbound = true; peer = outbound_peer; bootstrap = false}
+      state
   in
   (* Send grafts. *)
   let state, _ = GS.handle_graft {peer = inbound_peer; topic} state in
@@ -2001,7 +2012,9 @@ let test_heartbeat_scenario rng limits parameters =
   let topic = "topic" in
   let peer = 0 in
   let s = GS.make rng limits parameters in
-  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  let s, output =
+    GS.add_peer {direct = false; outbound = false; peer; bootstrap = false} s
+  in
   assert_output ~__LOC__ output Peer_added ;
   let s, output = GS.handle_subscribe {topic; peer} s in
   assert_output ~__LOC__ output Subscribed ;
@@ -2021,7 +2034,9 @@ let test_heartbeat_scenario rng limits parameters =
       ~__LOC__) ;
   assert_mesh_size ~__LOC__ ~topic ~expected_size:0 s ;
   let peer = 1 in
-  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
+  let s, output =
+    GS.add_peer {direct = false; outbound = false; peer; bootstrap = false} s
+  in
   assert_output ~__LOC__ output Peer_added ;
   let s, output = GS.handle_subscribe {peer; topic} s in
   assert_output ~__LOC__ output Subscribed ;

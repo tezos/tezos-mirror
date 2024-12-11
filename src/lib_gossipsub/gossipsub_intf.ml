@@ -583,7 +583,12 @@ module type AUTOMATON = sig
 
   (** The types of payloads for inputs to the gossipsub automaton. *)
 
-  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+  type add_peer = {
+    direct : bool;
+    outbound : bool;
+    peer : Peer.t;
+    bootstrap : bool;
+  }
 
   type remove_peer = {peer : Peer.t}
 
@@ -926,6 +931,7 @@ module type AUTOMATON = sig
         Peer.t ->
         direct:bool ->
         outbound:bool ->
+        bootstrap:bool ->
         t ->
         [`added of t | `already_known]
 
