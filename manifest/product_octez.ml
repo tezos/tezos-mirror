@@ -2387,6 +2387,7 @@ let tezt_cloud =
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         jingoo;
+        dream;
         data_encoding;
       ]
 
