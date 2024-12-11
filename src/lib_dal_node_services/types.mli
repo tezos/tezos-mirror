@@ -129,17 +129,11 @@ module Peer : sig
      specified values will be used.
 
       We also know if a peer is a bootstrap one or not from connections
-      metatada. The notion of direct peer is currently not implemented. *)
+      metatada. *)
   type t = {
     peer_id : P2p_peer.Id.t;
     maybe_reachable_point : P2p_point.Id.t;
     bootstrap : bool;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
-
-       Add the ability to have direct peers. *)
-    direct : bool;
-        (** A direct (aka explicit) peer is a peer to which we forward all the
-        messages. *)
   }
 
   (** Comparison is not a structural one, instead only the [peer_id]
