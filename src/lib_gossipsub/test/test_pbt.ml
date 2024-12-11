@@ -583,7 +583,10 @@ module Test_connections = struct
                   let conns =
                     match i with
                     | Add_peer {peer; outbound} -> (
-                        match Connections.add_peer peer ~outbound conns with
+                        let direct = Peer.is_direct peer in
+                        match
+                          Connections.add_peer peer ~direct ~outbound conns
+                        with
                         | `added conns -> conns
                         | `already_known -> conns)
                     | Remove_peer {peer} -> Connections.remove peer conns
