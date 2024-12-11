@@ -12,8 +12,11 @@ let exit_code_when_out_of_sync = 101
 let exit_code_when_flushed_blueprint = 102
 
 type error +=
-  | Diverged of
-      (Z.t * Ethereum_types.block_hash * Ethereum_types.block_hash option)
+  | Diverged of {
+      level : Z.t;
+      expected_block_hash : Ethereum_types.block_hash;
+      found_block_hash : Ethereum_types.block_hash option;
+    }
   | Out_of_sync of {level_expected : int32; level_received : int32}
   | Cannot_handle_flushed_blueprint of Ethereum_types.quantity
 
@@ -39,14 +42,14 @@ let () =
     Data_encoding.(
       obj3
         (req "blueprint_level" z)
-        (req "expected_hash" Ethereum_types.block_hash_encoding)
-        (opt "found_hash" Ethereum_types.block_hash_encoding))
+        (req "expected_block_hash" Ethereum_types.block_hash_encoding)
+        (opt "found_block_hash" Ethereum_types.block_hash_encoding))
     (function
-      | Diverged (level, expected_hash, found_hash) ->
-          Some (level, expected_hash, found_hash)
+      | Diverged {level; expected_block_hash; found_block_hash} ->
+          Some (level, expected_block_hash, found_block_hash)
       | _ -> None)
-    (fun (level, expected_hash, found_hash) ->
-      Diverged (level, expected_hash, found_hash)) ;
+    (fun (level, expected_block_hash, found_block_hash) ->
+      Diverged {level; expected_block_hash; found_block_hash}) ;
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.evm_event_follower.rollup_out_of_sync"

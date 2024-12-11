@@ -482,7 +482,11 @@ module State = struct
           in
           let exit_error =
             Node_error.Diverged
-              (number, expected_block_hash, Some found_block_hash)
+              {
+                level = number;
+                expected_block_hash;
+                found_block_hash = Some found_block_hash;
+              }
           in
           if ctxt.fail_on_missing_blueprint then
             (* Sequencer must fail in case of divergence. *)
@@ -496,7 +500,9 @@ module State = struct
           Evm_events_follower_events.missing_blueprint
             (number, expected_block_hash)
         in
-        tzfail (Node_error.Diverged (number, expected_block_hash, None))
+        tzfail
+          (Node_error.Diverged
+             {level = number; expected_block_hash; found_block_hash = None})
     | None ->
         let*! () = Evm_events_follower_events.rollup_node_ahead (Qty number) in
         let* () =
@@ -674,7 +680,11 @@ module State = struct
                   let Ethereum_types.(Qty number) = block.number in
                   let exit_error =
                     Node_error.Diverged
-                      (number, expected_block_hash, Some block.hash)
+                      {
+                        level = number;
+                        expected_block_hash;
+                        found_block_hash = Some block.hash;
+                      }
                   in
                   let*! () =
                     Evm_events_follower_events.diverged
