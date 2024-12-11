@@ -45,14 +45,15 @@ module Basic_fragments = struct
   let prune_backoff = Milliseconds.Span.of_int_s 10
 
   let add_peer_do_stuff_then_remove_peer ~gen_peer f : t =
-    bind_gen (add_peer ~gen_peer ~gen_outbound:M.bool) @@ fun ap ->
+    bind_gen (add_peer ~gen_peer ~gen_direct:M.bool ~gen_outbound:M.bool)
+    @@ fun ap ->
     of_list [I.add_peer ap]
     @% f ap.peer
     @% of_list [I.remove_peer {peer = ap.peer}]
 
   let add_then_remove_peer ~gen_peer : t =
-    of_input_gen (add_peer ~gen_peer ~gen_outbound:M.bool) @@ fun ap ->
-    [I.add_peer ap; I.remove_peer {peer = ap.peer}]
+    of_input_gen (add_peer ~gen_peer ~gen_direct:M.bool ~gen_outbound:M.bool)
+    @@ fun ap -> [I.add_peer ap; I.remove_peer {peer = ap.peer}]
 
   let join_then_leave_topic ~gen_topic : t =
     of_input_gen (join ~gen_topic) @@ fun jp ->
@@ -118,8 +119,8 @@ module Basic_fragments = struct
     of_input_gen (unsubscribe ~gen_topic ~gen_peer) (fun unsubscribe ->
         [I.unsubscribe unsubscribe])
 
-  let add_peer ~gen_peer ~gen_outbound : t =
-    of_input_gen (add_peer ~gen_peer ~gen_outbound) (fun add_peer ->
+  let add_peer ~gen_peer ~gen_direct ~gen_outbound : t =
+    of_input_gen (add_peer ~gen_peer ~gen_direct ~gen_outbound) (fun add_peer ->
         [I.add_peer add_peer])
 
   let remove_peer ~gen_peer : t =
@@ -132,11 +133,10 @@ module Basic_fragments = struct
       (fun set_application_score ->
         [I.set_application_score set_application_score])
 
-  (** [add_distinct_peers_and_subscribe ~all_peers ~gen_outbound
-      ~topics_to_subscribe] returns [add_peer] inputs for peers [all_peers]
-      using generators [gen_outbound] followed by [subscribe] inputs for all
-      topics in [topics_to_subscribe] for all [all_peers]. *)
-  let add_distinct_peers_and_subscribe ~all_peers ~gen_outbound
+  (** [add_distinct_peers_and_subscribe ~all_peers ~gen_direct ~gen_outbound ~topics_to_subscribe]
+      returns [add_peer] inputs for peers [all_peers] using generators [gen_direct] and [gen_outbound]
+      followed by [subscribe] inputs for all topics in [topics_to_subscribe] for all [all_peers]. *)
+  let add_distinct_peers_and_subscribe ~all_peers ~gen_direct ~gen_outbound
       ~topics_to_subscribe =
     let many_peer_gens =
       all_peers
@@ -145,6 +145,7 @@ module Basic_fragments = struct
              let+ add_peer =
                Gossipsub_pbt_generators.add_peer
                  ~gen_peer:(M.return peer_id)
+                 ~gen_direct
                  ~gen_outbound
              in
              (peer_id, add_peer))
@@ -171,8 +172,13 @@ module Basic_fragments = struct
     assert (count_outbound <= count) ;
     let many_peer_gens =
       List.init ~when_negative_length:() count (fun i ->
+          (* Setting [direct=false] otherwise the peers won't be grafted. *)
+          let gen_direct = M.return false in
           let gen_outbound = M.return (i < count_outbound) in
-          Gossipsub_pbt_generators.add_peer ~gen_peer:(M.return i) ~gen_outbound)
+          Gossipsub_pbt_generators.add_peer
+            ~gen_peer:(M.return i)
+            ~gen_direct
+            ~gen_outbound)
       |> WithExceptions.Result.get_ok ~loc:__LOC__
       |> M.flatten_l
     in
@@ -582,8 +588,10 @@ module Test_connections = struct
               | Gossipsub_pbt_generators.Input i ->
                   let conns =
                     match i with
-                    | Add_peer {peer; outbound} -> (
-                        match Connections.add_peer peer ~outbound conns with
+                    | Add_peer {peer; direct; outbound} -> (
+                        match
+                          Connections.add_peer peer ~direct ~outbound conns
+                        with
                         | `added conns -> conns
                         | `already_known -> conns)
                     | Remove_peer {peer} -> Connections.remove peer conns
@@ -1241,6 +1249,7 @@ module Test_handle_ihave = struct
              ~all_peers
              ~topics_to_subscribe:all_topics
              ~gen_outbound:M.bool
+             ~gen_direct:(M.return false)
         @% interleave
              [
                repeat_at_most total_ticks (heartbeat @% tick);
@@ -1560,9 +1569,12 @@ module Test_opportunistic_grafting = struct
       let peers_gen =
         List.init ~when_negative_length:() count (fun i ->
             let open M in
+            (* Set [direct = false] otherwise the peer won't be grafted. *)
+            let gen_direct = M.return false in
             let gen_outbound = M.bool in
             Gossipsub_pbt_generators.add_peer
               ~gen_peer:(return (first_peer + i))
+              ~gen_direct
               ~gen_outbound)
         |> WithExceptions.Result.get_ok ~loc:__LOC__
         |> M.flatten_l
@@ -1920,6 +1932,7 @@ module Test_handle_graft = struct
              ~all_peers
              ~topics_to_subscribe:all_topics
              ~gen_outbound:M.bool
+             ~gen_direct:(M.return false)
         @% interleave
              [
                repeat_at_most 100 (heartbeat @% tick);
@@ -2108,6 +2121,7 @@ module Test_score_status_matches_mesh = struct
              ~all_peers:peers
              ~topics_to_subscribe:topics
              ~gen_outbound:M.bool
+             ~gen_direct:(M.return false)
         @% interleave
              [
                repeat_at_most 100 (heartbeat @% tick);
@@ -2122,7 +2136,12 @@ module Test_score_status_matches_mesh = struct
                repeat_at_most 10 (unsubscribe ~gen_topic ~gen_peer);
                repeat_at_most 10 (subscribe ~gen_topic ~gen_peer);
                repeat_at_most 10 (remove_peer ~gen_peer);
-               repeat_at_most 10 (add_peer ~gen_peer ~gen_outbound:M.bool);
+               repeat_at_most
+                 10
+                 (add_peer
+                    ~gen_peer
+                    ~gen_direct:(return false)
+                    ~gen_outbound:M.bool);
                repeat_at_most
                  10
                  (prune ~gen_peer ~gen_topic ~gen_backoff ~gen_px_count);

@@ -138,6 +138,7 @@ let make_peers ~number =
     gossipsub connections and subscribes each peer to [topics]. *)
 let add_and_subscribe_peers (topics : Topic.t list) (peers : Peer.t list)
     ~(to_subscribe : Peer.t * Topic.t -> bool)
+    ?(direct : Peer.t -> bool = fun _ -> false)
     ?(outbound : Peer.t -> bool = fun _ -> false) state =
   let subscribe_peer_to_topics peer topics state =
     List.fold_left
@@ -152,7 +153,9 @@ let add_and_subscribe_peers (topics : Topic.t list) (peers : Peer.t list)
   in
   List.fold_left
     (fun state peer ->
-      let state, output = GS.add_peer {outbound = outbound peer; peer} state in
+      let state, output =
+        GS.add_peer {direct = direct peer; outbound = outbound peer; peer} state
+      in
       assert_output ~__LOC__ output Peer_added ;
       subscribe_peer_to_topics peer topics state)
     state
@@ -160,12 +163,13 @@ let add_and_subscribe_peers (topics : Topic.t list) (peers : Peer.t list)
 
 let init_state ~rng ~limits ~parameters ~peers ~topics
     ?(to_join : Topic.t -> bool = fun _ -> true)
+    ?(direct : Peer.t -> bool = fun _ -> false)
     ?(outbound : Peer.t -> bool = fun _ -> false)
     ~(to_subscribe : Peer.t * Topic.t -> bool) () =
   let state = GS.make rng limits parameters in
   (* Add and subscribe the given peers. *)
   let state =
-    add_and_subscribe_peers topics peers ~to_subscribe ~outbound state
+    add_and_subscribe_peers topics peers ~to_subscribe ~direct ~outbound state
   in
   (* Join to the given topics. *)
   let state =
@@ -1223,8 +1227,12 @@ let test_accept_only_outbound_peer_grafts_when_mesh_full rng limits parameters =
   (* Add an outbound peer and an inbound peer. *)
   let inbound_peer = 99 in
   let outbound_peer = 98 in
-  let state, _ = GS.add_peer {outbound = false; peer = inbound_peer} state in
-  let state, _ = GS.add_peer {outbound = true; peer = outbound_peer} state in
+  let state, _ =
+    GS.add_peer {direct = false; outbound = false; peer = inbound_peer} state
+  in
+  let state, _ =
+    GS.add_peer {direct = false; outbound = true; peer = outbound_peer} state
+  in
   (* Send grafts. *)
   let state, _ = GS.handle_graft {peer = inbound_peer; topic} state in
   let state, _ = GS.handle_graft {peer = outbound_peer; topic} state in
@@ -1993,7 +2001,7 @@ let test_heartbeat_scenario rng limits parameters =
   let topic = "topic" in
   let peer = 0 in
   let s = GS.make rng limits parameters in
-  let s, output = GS.add_peer {outbound = false; peer} s in
+  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
   assert_output ~__LOC__ output Peer_added ;
   let s, output = GS.handle_subscribe {topic; peer} s in
   assert_output ~__LOC__ output Subscribed ;
@@ -2013,7 +2021,7 @@ let test_heartbeat_scenario rng limits parameters =
       ~__LOC__) ;
   assert_mesh_size ~__LOC__ ~topic ~expected_size:0 s ;
   let peer = 1 in
-  let s, output = GS.add_peer {outbound = false; peer} s in
+  let s, output = GS.add_peer {direct = false; outbound = false; peer} s in
   assert_output ~__LOC__ output Peer_added ;
   let s, output = GS.handle_subscribe {peer; topic} s in
   assert_output ~__LOC__ output Subscribed ;

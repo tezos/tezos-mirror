@@ -82,13 +82,16 @@ module Events = struct
       ("topic", Types.Topic.encoding)
 
   let new_connection =
-    declare_2
+    declare_3
       ~section
       ~name:(prefix "new_connection")
-      ~msg:"Process New_connection from/to {peer} (trusted={trusted})"
+      ~msg:
+        "Process New_connection from/to {peer} (direct={direct}, \
+         trusted={trusted})"
       ~level:Notice
       ~pp1:Types.Peer.pp
       ("peer", Types.Peer.encoding)
+      ("direct", bool)
       ("trusted", bool)
 
   let disconnection =
@@ -202,7 +205,8 @@ let event =
       | Leave topic -> emit leave topic)
   | P2P_input event -> (
       match event with
-      | New_connection {peer; trusted} -> emit new_connection (peer, trusted)
+      | New_connection {peer; direct; trusted} ->
+          emit new_connection (peer, direct, trusted)
       | Disconnection {peer} -> emit disconnection peer
       | In_message {from_peer; p2p_message} -> (
           match p2p_message with

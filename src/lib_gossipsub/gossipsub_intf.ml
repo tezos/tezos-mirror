@@ -45,8 +45,6 @@ module type PEER = sig
      want to refactor the code to enable the instantiation of the GS automaton
      in the worker, which will allow refining this interface. *)
   val is_bootstrap : t -> bool
-
-  val is_direct : t -> bool
 end
 
 module type AUTOMATON_SUBCONFIG = sig
@@ -585,7 +583,7 @@ module type AUTOMATON = sig
 
   (** The types of payloads for inputs to the gossipsub automaton. *)
 
-  type add_peer = {outbound : bool; peer : Peer.t}
+  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
 
   type remove_peer = {peer : Peer.t}
 
@@ -774,9 +772,9 @@ module type AUTOMATON = sig
   (** Initialise a state. *)
   val make : Random.State.t -> limits -> parameters -> state
 
-  (** [add_peer { outbound; peer }] is called to notify a new connection. If
-      [Peer.is_direct peer] is [true], the gossipsub always forwards messages to
-      those peers. [outbound] is [true] if it is an outbound connection, that
+  (** [add_peer { direct; outbound; peer }] is called to notify a new
+      connection. If [direct] is [true], the gossipsub always forwards messages
+      to those peers. [outbound] is [true] if it is an outbound connection, that
       is, a connection initiated by the local (not the remote) peer. Note
       however that the notion of "outbound" connections can be refined, relaxed
       or redefined by the application layer to fit its own needs. *)
@@ -904,7 +902,7 @@ module type AUTOMATON = sig
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig
-    type connection = {topics : Topic.Set.t; outbound : bool}
+    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -920,7 +918,11 @@ module type AUTOMATON = sig
       val mem : Peer.t -> t -> bool
 
       val add_peer :
-        Peer.t -> outbound:bool -> t -> [`added of t | `already_known]
+        Peer.t ->
+        direct:bool ->
+        outbound:bool ->
+        t ->
+        [`added of t | `already_known]
 
       val subscribe :
         Peer.t -> Topic.t -> t -> [`unknown_peer | `subscribed of t]
@@ -1119,7 +1121,7 @@ module type WORKER = sig
       layer. *)
   type p2p_input =
     | In_message of {from_peer : GS.Peer.t; p2p_message : p2p_message}
-    | New_connection of {peer : GS.Peer.t; trusted : bool}
+    | New_connection of {peer : GS.Peer.t; direct : bool; trusted : bool}
     | Disconnection of {peer : GS.Peer.t}
 
   (** The different kinds of input events that could be received from the
