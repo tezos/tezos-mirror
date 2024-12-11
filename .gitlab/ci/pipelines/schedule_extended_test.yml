@@ -837,6 +837,10 @@ build-layer1-profiling:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./octez-node
 
 oc.build:rpm:amd64:
   image: $DISTRIBUTION

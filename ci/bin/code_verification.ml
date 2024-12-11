@@ -756,6 +756,7 @@ let jobs pipeline_type =
         ~stage
         ~image:Images.CI.build
         ~name:"build-layer1-profiling"
+        ~artifacts:(artifacts ~expire_in:(Duration (Days 1)) ["./octez-node"])
         ~before_script:
           (before_script
              ~take_ownership:true
