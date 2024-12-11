@@ -8340,6 +8340,33 @@ let test_websocket_rpcs =
     ~error_msg:"eth_coinbase returned %L, expected %R" ;
   unit
 
+let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
+  register_all
+    ~tags:["evm"; "rpc"; "websocket"; "http"]
+    ~title:
+      "Check that subscriptions rpcs can't be called via regular http requests"
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:
+      ((Array.to_list Eth_account.bootstrap_accounts
+       |> List.map (fun a -> a.Eth_account.address))
+      @ Eth_account.lots_of_address)
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~rpc_server:Dream (* Websockets only available in Dream *)
+    ~websockets:true
+  @@ fun {sequencer; _} _protocol ->
+  let* () =
+    Lwt.catch
+      (fun () ->
+        let* _ = Rpc.subscribe ~kind:NewHeads sequencer in
+        failwith "eth_subscribe shouldn't be callable via http requests")
+      (fun _ -> unit)
+  in
+  Lwt.catch
+    (fun () ->
+      let* _ = Rpc.unsubscribe ~id:"0x0" sequencer in
+      failwith "eth_unsubscribe shouldn't be callable via http requests")
+    (fun _ -> unit)
+
 let protocols = Protocol.all
 
 let () =
@@ -8452,4 +8479,6 @@ let () =
   test_inconsistent_da_fees protocols ;
   test_produce_block_with_no_delayed_transactions protocols ;
   test_observer_reset [Protocol.Alpha] ;
-  test_websocket_rpcs [Protocol.Alpha]
+  test_websocket_rpcs [Protocol.Alpha] ;
+  test_websocket_subscription_rpcs_cant_be_called_via_http_requests
+    [Protocol.Alpha]
