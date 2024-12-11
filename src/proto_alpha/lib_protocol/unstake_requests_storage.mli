@@ -44,6 +44,8 @@
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
 
+type transfer_result = Raw_context.t * Receipt_repr.balance_update_item list
+
 type stored_requests = Storage.Unstake_request.t = {
   delegate : Signature.Public_key_hash.t;
   requests : (Cycle_repr.t * Tez_repr.t) list;
@@ -85,21 +87,21 @@ val stake_from_unstake_for_delegate :
   Tez_repr.t ->
   (Raw_context.t * 'a list * Tez_repr.t) tzresult Lwt.t
 
-val finalize_unstake_and_check :
-  check_unfinalizable:
-    (Raw_context.t -> stored_requests -> Raw_context.t tzresult Lwt.t) ->
-  perform_finalizable_unstake_transfers:
-    (Raw_context.t ->
-    Contract_repr.t ->
-    (Signature.public_key_hash * Cycle_repr.t * Tez_repr.t) list ->
-    (Raw_context.t * Receipt_repr.balance_update_item list) tzresult Lwt.t) ->
+(** [handle_finalizable_and_clear ctxt ~check_delegate_of_unfinalizable_requests ~handle_finalizable contract] will update the storage
+    by removing all finalizable unstake request and calling [handle_finalizable]
+    on each of them.
+
+    [check_delegate_of_unfinalizable_requests] can be used to interrupt the current
+    finalisation by returning an error if it would be illegal to actually unstake funds from the given delegate.
+*)
+val handle_finalizable_and_clear :
   Raw_context.t ->
   Contract_repr.t ->
-  (Raw_context.t
-  * Receipt_repr.balance_update_item list
-  * stored_requests option)
-  tzresult
-  Lwt.t
+  check_delegate_of_unfinalizable_requests:
+    (Signature.public_key_hash -> unit tzresult Lwt.t) ->
+  handle_finalizable:
+    (Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) ->
+  transfer_result tzresult Lwt.t
 
 type error +=
   | Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate

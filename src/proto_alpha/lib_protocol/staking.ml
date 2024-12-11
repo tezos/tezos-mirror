@@ -47,7 +47,7 @@ let () =
     (fun () ->
       Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate)
 
-let perform_finalizable_unstake_transfers ctxt contract finalizable =
+let perform_finalizable_unstake_transfers contract ctxt finalizable =
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, cycle, amount) ->
@@ -65,11 +65,10 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
 
 let finalize_unstake ctxt contract =
   let open Lwt_result_syntax in
-  let check_unfinalizable ctxt _unfinalizable = return ctxt in
-  let* ctxt, balance_updates, _ =
-    Unstake_requests_storage.finalize_unstake_and_check
-      ~check_unfinalizable
-      ~perform_finalizable_unstake_transfers
+  let* ctxt, balance_updates =
+    Unstake_requests_storage.handle_finalizable_and_clear
+      ~check_delegate_of_unfinalizable_requests:(fun _ -> return_unit)
+      ~handle_finalizable:(perform_finalizable_unstake_transfers contract)
       ctxt
       contract
   in
@@ -98,23 +97,28 @@ let transfer_from_unstake_request ctxt cycle delegate sender_contract amount =
 
 let stake ctxt ~(amount : Tez_repr.t) ~sender ~delegate =
   let open Lwt_result_syntax in
-  let check_unfinalizable ctxt
-      Unstake_requests_storage.{delegate = unstake_delegate; requests} =
-    match requests with
-    | [] -> return ctxt
-    | _ :: _ ->
-        if Signature.Public_key_hash.(delegate <> unstake_delegate) then
-          tzfail
-            Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
-        else return ctxt
+  let check_delegate_of_unfinalizable_requests unstake_delegate =
+    if Signature.Public_key_hash.(delegate <> unstake_delegate) then
+      tzfail
+        Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+    else return_unit
   in
   let sender_contract = Contract_repr.Implicit sender in
-  let* ctxt, finalize_balance_updates, unfinalizable_requests_opt =
-    Unstake_requests_storage.finalize_unstake_and_check
-      ~check_unfinalizable
-      ~perform_finalizable_unstake_transfers
+  let* ctxt, finalize_balance_updates =
+    Unstake_requests_storage.handle_finalizable_and_clear
+      ~check_delegate_of_unfinalizable_requests
+      ~handle_finalizable:
+        (perform_finalizable_unstake_transfers sender_contract)
       ctxt
       sender_contract
+  in
+  let* unfinalizable_requests_opt =
+    Unstake_requests_storage.prepare_finalize_unstake ctxt sender_contract
+  in
+  let unfinalizable_requests_opt =
+    Option.map
+      (fun Unstake_requests_storage.{unfinalizable; _} -> unfinalizable)
+      unfinalizable_requests_opt
   in
   (* stake from unstake for eligible delegates *)
   let* ctxt, stake_balance_updates1, amount_from_liquid =

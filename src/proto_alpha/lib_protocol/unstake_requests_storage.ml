@@ -47,6 +47,8 @@ let () =
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
 
+type transfer_result = Raw_context.t * Receipt_repr.balance_update_item list
+
 let finalizable_encoding =
   let open Data_encoding in
   let elt_encoding =
@@ -112,7 +114,8 @@ let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
     amount
     slashing_history
 
-let prepare_finalize_unstake ctxt contract =
+let prepare_finalize_unstake ctxt ~check_delegate_of_unfinalizable_requests
+    contract =
   let open Lwt_result_syntax in
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
@@ -174,6 +177,11 @@ let prepare_finalize_unstake ctxt contract =
             Storage.Unstake_request.
               {delegate; requests = unfinalizable_requests}
           in
+          let* () =
+            if not (List.is_empty unfinalizable_requests) then
+              check_delegate_of_unfinalizable_requests delegate
+            else return_unit
+          in
           return_some {finalizable; unfinalizable})
 
 (* Update the storage with the given requests.
@@ -191,40 +199,33 @@ let update_stored_request ctxt contract updated_requests =
   | _ :: _ ->
       Storage.Contract.Unstake_requests.update ctxt contract updated_requests
 
-(* The [check_unfinalizable] function in argument must consume its gas, if
-   relevant. *)
-let finalize_unstake_and_check ~check_unfinalizable
-    ~perform_finalizable_unstake_transfers ctxt contract =
+let handle_finalizable_and_clear ctxt contract
+    ~check_delegate_of_unfinalizable_requests ~handle_finalizable =
   let open Lwt_result_syntax in
   let*? ctxt =
     Raw_context.consume_gas
       ctxt
       Adaptive_issuance_costs.prepare_finalize_unstake_cost
   in
-  let* prepared_opt = prepare_finalize_unstake ctxt contract in
+  let* prepared_opt =
+    prepare_finalize_unstake
+      ~check_delegate_of_unfinalizable_requests
+      ctxt
+      contract
+  in
   match prepared_opt with
-  | None -> return (ctxt, [], None)
-  | Some {finalizable; unfinalizable} -> (
-      let* ctxt = check_unfinalizable ctxt unfinalizable in
-      match finalizable with
-      | [] -> return (ctxt, [], Some unfinalizable)
-      | _ ->
-          (* We only update the unstake requests if the [finalizable] list is not empty.
-             Indeed, if it is not empty, it means that at least one of the unstake operations
-             will be finalized, and the storage needs to be updated accordingly.
-             Conversely, if finalizable is empty, then [unfinalizable] contains
-             all the previous unstake requests, that should remain as requests after this
-             operation. *)
-          let*? ctxt =
-            Raw_context.consume_gas
-              ctxt
-              Adaptive_issuance_costs.finalize_unstake_and_check_cost
-          in
-          let* ctxt = update_stored_request ctxt contract unfinalizable in
-          let* ctxt, balance_updates =
-            perform_finalizable_unstake_transfers ctxt contract finalizable
-          in
-          return (ctxt, balance_updates, Some unfinalizable))
+  | None -> return (ctxt, [])
+  | Some {finalizable; unfinalizable} ->
+      let*? ctxt =
+        Raw_context.consume_gas
+          ctxt
+          Adaptive_issuance_costs.finalize_unstake_and_check_cost
+      in
+      let* ctxt, balance_updates_finalized =
+        handle_finalizable ctxt finalizable
+      in
+      let* ctxt = update_stored_request ctxt contract unfinalizable in
+      return (ctxt, balance_updates_finalized)
 
 let add ctxt ~contract ~delegate cycle amount =
   let open Lwt_result_syntax in
@@ -387,6 +388,10 @@ let stake_from_unstake_for_delegate ctxt ~delegate
               {delegate; requests = updated_requests}
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
+
+let prepare_finalize_unstake =
+  prepare_finalize_unstake ~check_delegate_of_unfinalizable_requests:(fun _ ->
+      return_unit)
 
 module For_RPC = struct
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
