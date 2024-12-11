@@ -34,6 +34,10 @@ val start : parameters -> unit tzresult Lwt.t
     to be processed. *)
 val shutdown : unit -> unit tzresult Lwt.t
 
+(** Watcher that gets notified each time a transaction is added to the
+    pending state. *)
+val txs_watcher : Ethereum_types.Subscription.output Lwt_watcher.input
+
 (** [add transaction_object raw_tx] adds a eth transaction and its raw contents
     to the tx-pool.
 
