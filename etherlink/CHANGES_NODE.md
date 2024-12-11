@@ -4,27 +4,81 @@
 
 ### Features
 
-- If an observer detects a divergence it will reset to the latest finalized
-  block instead of exiting immediately. The node will also no longer exit
-  on invalid blueprint provided by its upstream EVM Node endpoint but will keep
-  waiting for a valid blueprint. (!15751)
-- If the delayed inbox is flushed by the rollup node, the sequencer
-  reorganizes its history. It clears all blocks produced on the
-  invalid branch if any and start processing new ones. (!15676)
-- The sequencer can now uses the experimental features
-  `drop_duplicate_in_injection` if activated when publishing
-  blueprints. (!15867)
+#### UX
+
+- The sequencer can now handle when the delayed inbox is flushed to create
+  blueprints containing overdue items, for kernels advertizing it **(which is
+  not the case for Bifrost, currently activated on Etherlink Mainnet and
+  Testnet)**. It clears all blocks produced on its invalidated branch, then
+  starts a new one. (!15676)
+- If an observer detects a divergence between its local state and the branch
+  computed by the Rollup node it is connected to, it will reset its local state
+  to its latest finalized block instead of exiting. (!15751)
+- The node will no longer exit on invalid blueprint provided by its upstream
+  EVM node endpoint, and will instead keep waiting for a valid blueprint to be
+  provided. (!15751)
+
+### Bug fixes
+
+### Internals
+
+## Version 0.11 (2024-12-111)
+
+In addition to several bug fixes and internal changes, this release introduces
+several exciting new features, notably including support for executing the
+Bifrost kernel natively, and an experimental alternative backend for the RPC
+server which shows promising results in terms of raw performances.
+
+This release will apply one migration to the node’s store (version 15), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
+#### Performances
+
+- It is now possible to execute Bifrost (the kernel currently activated on
+  Etherlink Mainnet and Testnet) natively, which leads to improved
+  performances. For now, this features is disabled by default, but can be
+  enabled by setting the `kernel_execution.native_execution_policy` in your
+  configuration file, or with the `--native-execution-policy` CLI argument
+  (*e.g.*, in `run observer`). For now, we recommend against using
+  `--native-execution-policy always` in production. (!15736)
+
+### UX
+
+- Gas estimation requires multiple kernel simulation. Every time a simulation
+  was performed we would pick a new simulation timestamp, which could
+  technically lead to a different execution. Changes the behavior to pick
+  a single timestamp per simulation. (!15889)
+- Internal error in the EVM context emits an event instead of silently
+  failing. (!15824)
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- The sequencer will use the `drop_duplicate` feature of the Rollup node when
+  publishing blueprints if it is configured to do so (with
+  `experimental_features.drop_duplicate_on_injection` is set to `true`).
+  **Requires a Rollup Node from version 21.0 or higher.** (!15867)
 - Experimental support for alternative RPC server backend
   [Dream](https://aantron.github.io/dream) with feature flag
   `experimental_features.rpc_server = "dream"`. (!15560)
 
 ### Bug fixes
 
-- Fixes the mapping between L1 levels and finalized L2 levels in the node
-  store. In previous versions, the finalized L2 level associated to a given L1
-  level `l` (*i.e.*, the latest L2 level computed by the Rollup Nodes after
-  processing the level `l`) was actually the finalized L2 level of its
-  predecessor `l-1`. (!15884)
+#### RPCs
+
+- Fix the RPC mode having an outdated view of the latest finalized block of the
+  chain. (!15884)
+
+#### Structured logs
+
+- The `blueprint_applied` event now advertizes the correct processing time. It
+  was significantly underestimated before. (!15948)
 
 ### Internals
 
