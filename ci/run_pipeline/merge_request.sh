@@ -7,7 +7,8 @@ CI_PROJECT_NAMESPACE="${CI_PROJECT_NAMESPACE:-tezos}"
 BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
 # Compile parameters into a JSON input for GitLab's API.
-DATA="$(cat <<EOF
+DATA="$(
+  cat << EOF
 {
   "ref": "$BRANCH",
   "variables": [
@@ -25,7 +26,7 @@ EOF
 )"
 
 # Tell the user what is going to happen.
-cat <<EOF
+cat << EOF
 Will run a before_merging pipeline for:
 
   CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
