@@ -585,7 +585,7 @@ module type AUTOMATON = sig
 
   (** The types of payloads for inputs to the gossipsub automaton. *)
 
-  type add_peer = {outbound : bool; peer : Peer.t}
+  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
 
   type remove_peer = {peer : Peer.t}
 
@@ -774,9 +774,9 @@ module type AUTOMATON = sig
   (** Initialise a state. *)
   val make : Random.State.t -> limits -> parameters -> state
 
-  (** [add_peer { outbound; peer }] is called to notify a new connection. If
-      [Peer.is_direct peer] is [true], the gossipsub always forwards messages to
-      those peers. [outbound] is [true] if it is an outbound connection, that
+  (** [add_peer { direct; outbound; peer }] is called to notify a new
+      connection. If [direct] is [true], the gossipsub always forwards messages
+      to those peers. [outbound] is [true] if it is an outbound connection, that
       is, a connection initiated by the local (not the remote) peer. Note
       however that the notion of "outbound" connections can be refined, relaxed
       or redefined by the application layer to fit its own needs. *)

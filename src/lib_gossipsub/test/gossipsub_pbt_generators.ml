@@ -146,9 +146,11 @@ struct
       pp_last_state
       trace
 
-  let add_peer ~gen_peer ~gen_outbound =
-    let+ outbound = gen_outbound and+ peer = gen_peer in
-    ({outbound; peer} : GS.add_peer)
+  let add_peer ~gen_peer ~gen_direct ~gen_outbound =
+    let+ direct = gen_direct
+    and+ outbound = gen_outbound
+    and+ peer = gen_peer in
+    ({direct; outbound; peer} : GS.add_peer)
 
   let remove_peer ~gen_peer =
     let+ peer = gen_peer in
