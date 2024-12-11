@@ -8060,6 +8060,7 @@ let _octez_codec =
          octez_event_logging |> open_;
          octez_signer_services;
          octez_version_value;
+         octez_dal_node_gossipsub_lib;
        ]
       @ Protocol.all_optionally
       @@ [
