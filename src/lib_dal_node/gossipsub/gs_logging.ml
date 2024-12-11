@@ -205,7 +205,7 @@ let event =
       | Leave topic -> emit leave topic)
   | P2P_input event -> (
       match event with
-      | New_connection {peer; direct; trusted} ->
+      | New_connection {peer; direct; trusted; bootstrap = _} ->
           emit new_connection (peer, direct, trusted)
       | Disconnection {peer} -> emit disconnection peer
       | In_message {from_peer; p2p_message} -> (
