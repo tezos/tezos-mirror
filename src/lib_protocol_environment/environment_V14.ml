@@ -1587,6 +1587,13 @@ struct
       | Error (`Invalid_page | `Invalid_degree_strictly_less_than_expected _) ->
           Ok false
       | Ok () -> Ok true
+
+    let share_is_trap delegate share ~traps_fraction =
+      match
+        Tezos_crypto_dal.Trap.share_is_trap delegate share ~traps_fraction
+      with
+      | Error _e -> Error `Decoding_error
+      | Ok b -> Ok b
   end
 
   module Skip_list = Skip_list
