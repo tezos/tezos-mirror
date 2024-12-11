@@ -34,7 +34,15 @@ module P2p_message_V1 = struct
 
   type p2p_message = Gs_interface.Worker_instance.p2p_message
 
-  let px_peer_encoding = Types.Peer.encoding
+  let px_peer_encoding =
+    let open Data_encoding in
+    conv
+      (fun Types.Peer.{maybe_reachable_point; peer_id} ->
+        (maybe_reachable_point, peer_id))
+      (fun (maybe_reachable_point, peer_id) -> {maybe_reachable_point; peer_id})
+      (obj2
+         (req "maybe_reachable_point" P2p_point.Id.encoding)
+         (req "peer" P2p_peer.Id.encoding))
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5564
 

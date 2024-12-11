@@ -36,19 +36,8 @@ module type ITERABLE = sig
   module Map : Map.S with type key = t
 end
 
-module type PEER = sig
-  include ITERABLE
-
-  (* Note: The [is_bootstrap] function is needed by the worker, but not by the
-     automaton. However, since the automaton is currently provided instantiated
-     to the GS worker, we cannot specialize interfaces. In the future, we might
-     want to refactor the code to enable the instantiation of the GS automaton
-     in the worker, which will allow refining this interface. *)
-  val is_bootstrap : t -> bool
-end
-
 module type AUTOMATON_SUBCONFIG = sig
-  module Peer : PEER
+  module Peer : ITERABLE
 
   module Topic : ITERABLE
 
@@ -445,7 +434,7 @@ module type SCORE = sig
 end
 
 module type MESSAGE_CACHE = sig
-  module Peer : PEER
+  module Peer : ITERABLE
 
   module Topic : ITERABLE
 
@@ -540,7 +529,7 @@ end
 
 module type AUTOMATON = sig
   (** Module for peer *)
-  module Peer : PEER
+  module Peer : ITERABLE
 
   (** Module for topic *)
   module Topic : ITERABLE
@@ -583,7 +572,12 @@ module type AUTOMATON = sig
 
   (** The types of payloads for inputs to the gossipsub automaton. *)
 
-  type add_peer = {direct : bool; outbound : bool; peer : Peer.t}
+  type add_peer = {
+    direct : bool;
+    outbound : bool;
+    peer : Peer.t;
+    bootstrap : bool;
+  }
 
   type remove_peer = {peer : Peer.t}
 
@@ -902,7 +896,12 @@ module type AUTOMATON = sig
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig
-    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
+    type connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+      outbound : bool;
+      bootstrap : bool;
+    }
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 
@@ -921,6 +920,7 @@ module type AUTOMATON = sig
         Peer.t ->
         direct:bool ->
         outbound:bool ->
+        bootstrap:bool ->
         t ->
         [`added of t | `already_known]
 
@@ -1121,7 +1121,12 @@ module type WORKER = sig
       layer. *)
   type p2p_input =
     | In_message of {from_peer : GS.Peer.t; p2p_message : p2p_message}
-    | New_connection of {peer : GS.Peer.t; direct : bool; trusted : bool}
+    | New_connection of {
+        peer : GS.Peer.t;
+        direct : bool;
+        trusted : bool;
+        bootstrap : bool;
+      }
     | Disconnection of {peer : GS.Peer.t}
 
   (** The different kinds of input events that could be received from the

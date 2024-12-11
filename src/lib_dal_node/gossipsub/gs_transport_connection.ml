@@ -102,9 +102,8 @@ let peer_of_connection p2p_layer conn =
   let port =
     Option.value remote_metadata.advertised_net_port ~default:default_port
   in
-  let bootstrap = remote_metadata.is_bootstrap_peer in
   let maybe_reachable_point = (addr, port) in
-  Types.Peer.{peer_id; maybe_reachable_point; bootstrap}
+  Types.Peer.{peer_id; maybe_reachable_point}
 
 (** This handler forwards information about connections established by the P2P
     layer to the Gossipsub worker.
@@ -122,6 +121,9 @@ let peer_of_connection p2p_layer conn =
 let new_connections_handler gs_worker p2p_layer peer_id conn =
   let P2p_connection.Info.{id_point = addr, port_opt; _} =
     P2p.connection_info p2p_layer conn
+  in
+  let Types.P2P.Metadata.Connection.{is_bootstrap_peer = bootstrap; _} =
+    P2p.connection_remote_metadata p2p_layer conn
   in
   let pool_opt = P2p.pool p2p_layer in
   let fold_pool_opt f arg =
@@ -141,7 +143,8 @@ let new_connections_handler gs_worker p2p_layer peer_id conn =
      Add the ability to have direct peers. *)
   let direct = false in
   let peer = peer_of_connection p2p_layer conn in
-  Worker.(New_connection {peer; direct; trusted} |> p2p_input gs_worker)
+  Worker.(
+    New_connection {peer; direct; trusted; bootstrap} |> p2p_input gs_worker)
 
 (** This handler forwards information about P2P disconnections to the Gossipsub
     worker. *)
@@ -240,9 +243,7 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
                (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
       | Connect {peer; origin} ->
           let trusted = origin = Trusted in
-          let Types.Peer.{maybe_reachable_point; peer_id; bootstrap = _} =
-            peer
-          in
+          let Types.Peer.{maybe_reachable_point; peer_id} = peer in
           try_connect
             ~trusted
             ~expected_peer_id:peer_id
