@@ -160,6 +160,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   in
   let messages = Lwt_pipe.Maybe_bounded.create ?bound () in
   let greylister () =
+    let+ () = Events.(emit greylist) (peer_id, fst id_point, snd id_point) in
     t.dependencies.pool_greylist_peer
       t.pool
       (P2p_peer_state.Info.peer_id peer_info)
