@@ -486,6 +486,7 @@ module State = struct
                 level = number;
                 expected_block_hash;
                 found_block_hash = Some found_block_hash;
+                must_exit = true;
               }
           in
           if ctxt.fail_on_missing_blueprint then
@@ -502,7 +503,12 @@ module State = struct
         in
         tzfail
           (Node_error.Diverged
-             {level = number; expected_block_hash; found_block_hash = None})
+             {
+               level = number;
+               expected_block_hash;
+               found_block_hash = None;
+               must_exit = true;
+             })
     | None ->
         let*! () = Evm_events_follower_events.rollup_node_ahead (Qty number) in
         let* () =
@@ -678,24 +684,37 @@ module State = struct
                     block.number
                 else
                   let Ethereum_types.(Qty number) = block.number in
+
+                  let*! () =
+                    Evm_events_follower_events.diverged
+                      (number, expected_block_hash, block.hash)
+                  in
+                  (* If the observer cannot reset to finalized level it must
+                     exit. *)
                   let exit_error =
                     Node_error.Diverged
                       {
                         level = number;
                         expected_block_hash;
                         found_block_hash = Some block.hash;
+                        must_exit = true;
                       }
-                  in
-                  let*! () =
-                    Evm_events_follower_events.diverged
-                      (number, expected_block_hash, block.hash)
                   in
                   let* _evm_state =
                     reset_to_finalized_level exit_error ctxt conn
                   in
+                  (* If the observer managed to reset to finalized level it must
+                     not exit. *)
                   tzfail
-                    (Cannot_apply_blueprint {local_state_level = Z.pred next})
+                    (Node_error.Diverged
+                       {
+                         level = number;
+                         expected_block_hash;
+                         found_block_hash = Some block.hash;
+                         must_exit = false;
+                       })
         in
+
         let number_of_transactions =
           match block.transactions with
           | TxHash l -> List.length l
@@ -1590,8 +1609,8 @@ module Handlers = struct
       unit tzresult Lwt.t =
     let open Lwt_result_syntax in
     match (req, errs) with
-    | Apply_evm_events _, [Node_error.Diverged _divergence]
-    | Apply_blueprint _, [Node_error.Diverged _divergence] ->
+    | Apply_evm_events _, [Node_error.Diverged {must_exit = true; _}]
+    | Apply_blueprint _, [Node_error.Diverged {must_exit = true; _}] ->
         Lwt_exit.exit_and_raise Node_error.exit_code_when_diverge
     | ( Apply_evm_events _,
         [Node_error.Out_of_sync {level_expected; level_received}] ) ->
