@@ -45,8 +45,6 @@ module type PEER = sig
      want to refactor the code to enable the instantiation of the GS automaton
      in the worker, which will allow refining this interface. *)
   val is_bootstrap : t -> bool
-
-  val is_direct : t -> bool
 end
 
 module type AUTOMATON_SUBCONFIG = sig
