@@ -321,6 +321,21 @@ module P2p_connect_handler = struct
       ~level:Debug
       ("active_connections", Data_encoding.int16)
       ("min_connections", Data_encoding.int16)
+
+  let greylist =
+    declare_4
+      ~section
+      ~name:"greylist_peer"
+      ~msg:"Peer {peer} on point {addr}:{port} has been greylisted ({motive})"
+      ~level:Notice
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:P2p_addr.pp
+      ~pp3:(Format.pp_print_option Format.pp_print_int)
+      ~pp4:Format.pp_print_string
+      ("peer", P2p_peer.Id.encoding)
+      ("addr", P2p_addr.encoding)
+      ("port", Data_encoding.option Data_encoding.uint16)
+      ("motive", Data_encoding.string)
 end
 
 module P2p_conn = struct
