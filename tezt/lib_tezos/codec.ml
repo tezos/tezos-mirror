@@ -50,3 +50,21 @@ let spawn_dump_encodings ?path () = spawn_command ?path ["dump"; "encodings"]
 let dump_encodings ?path () =
   let* json = spawn_dump_encodings ?path () |> Process.check_and_read_stdout in
   return (JSON.parse ~origin:"octez-codec dump encodings" json)
+
+let spawn_describe_binary_schema ?path ~id () =
+  spawn_command ?path ["describe"; id; "binary"; "schema"]
+
+let spawn_describe_json_schema ?path ~id () =
+  spawn_command ?path ["describe"; id; "json"; "schema"]
+
+let describe_binary_schema ?path ~id () =
+  let* output =
+    spawn_describe_binary_schema ?path ~id () |> Process.check_and_read_stdout
+  in
+  return output
+
+let describe_json_schema ?path ~id () =
+  let* output =
+    spawn_describe_json_schema ?path ~id () |> Process.check_and_read_stdout
+  in
+  return output
