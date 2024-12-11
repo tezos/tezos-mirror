@@ -229,8 +229,6 @@ module Peer = struct
       direct
 
   let is_bootstrap t = t.bootstrap
-
-  let is_direct t = t.direct
 end
 
 module Point = struct
