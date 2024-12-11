@@ -3755,6 +3755,7 @@ version = "0.2.2"
 dependencies = [
  "hermit",
  "hex",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -3768,6 +3769,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-smart-rollup-build-utils"
+version = "0.2.2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustc_version",
+]
+
+[[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
 
@@ -3775,6 +3785,7 @@ version = "0.2.2"
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
 dependencies = [
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
 ]
 
@@ -3810,6 +3821,7 @@ version = "0.2.2"
 dependencies = [
  "cfg-if",
  "dlmalloc",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-host",
@@ -3820,6 +3832,7 @@ dependencies = [
 name = "tezos-smart-rollup-host"
 version = "0.2.2"
 dependencies = [
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos_crypto_rs",
  "tezos_data_encoding",
@@ -3850,6 +3863,7 @@ dependencies = [
  "quote",
  "shellexpand",
  "syn 2.0.89",
+ "tezos-smart-rollup-build-utils",
 ]
 
 [[package]]
@@ -3869,6 +3883,7 @@ name = "tezos-smart-rollup-panic-hook"
 version = "0.2.2"
 dependencies = [
  "rustversion",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
 ]
 

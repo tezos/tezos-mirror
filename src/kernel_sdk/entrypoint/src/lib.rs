@@ -14,7 +14,7 @@ mod panic_protection;
 #[cfg(feature = "experimental-host-in-memory-store")]
 pub(crate) mod host_in_memory_store;
 
-#[cfg(all(feature = "dlmalloc", target_arch = "wasm32"))]
+#[cfg(all(feature = "dlmalloc", pvm_kind = "wasm"))]
 mod allocator {
     use dlmalloc::GlobalDlmalloc;
 

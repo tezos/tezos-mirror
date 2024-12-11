@@ -32,6 +32,10 @@ features = ["full"]
 [dependencies.shellexpand]
 version = "3.1.0"
 
+[dependencies.tezos-smart-rollup-build-utils]
+path = "../build-utils"
+features = ["macro-support"]
+
 [dev-dependencies.tezos-smart-rollup]
 version = "0.2.2"
 path = "../sdk"

@@ -5,13 +5,13 @@
 #![allow(unused_imports)]
 
 cfg_if::cfg_if! {
-    if #[cfg(target_arch = "wasm32")] {
+    if #[cfg(pvm_kind = "wasm")] {
         mod wasm;
         pub use wasm::*;
-    } else if #[cfg(all(target_arch = "riscv64", target_os = "hermit"))] {
+    } else if #[cfg(pvm_kind = "riscv")] {
         mod riscv;
         pub use riscv::*;
-    } else {
+    } else if #[cfg(pvm_kind = "none")] {
         mod native;
         pub use native::*;
     }

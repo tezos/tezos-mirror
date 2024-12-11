@@ -23,6 +23,9 @@ path = "../sdk"
 version = "0.2.2"
 default-features = false
 
+[build-dependencies.tezos-smart-rollup-build-utils]
+path = "../build-utils"
+
 [dependencies.tezos-smart-rollup-installer-config]
 path = "../installer-config"
 version = "0.2.2"

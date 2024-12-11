@@ -4,7 +4,7 @@
 
 //! Wrapper utilities to make a `Runtime` unwindable.
 
-#![cfg(all(target_arch = "riscv64", target_os = "hermit"))]
+#![cfg(pvm_kind = "riscv")]
 
 use super::{Runtime, RuntimeError, ValueType};
 #[cfg(feature = "alloc")]

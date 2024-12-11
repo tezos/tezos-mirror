@@ -15,7 +15,7 @@
 //! to use this installer kernel. When originating a rollup, you may use a configured
 //! installer kernel - which will then proceed to upgrade to your desired kernel.
 
-#![cfg_attr(all(target_arch = "wasm32", not(feature = "std")), no_std)]
+#![cfg_attr(all(pvm_kind = "wasm", not(feature = "std")), no_std)]
 #![forbid(unsafe_code)]
 
 mod instr;
@@ -54,7 +54,7 @@ pub fn installer<Host: Runtime>(host: &mut Host) {
 ///
 /// Any error when installing a kernel is fatal, therefore we
 /// handle panics by panicking again, which aborts execution.
-#[cfg_attr(all(target_arch = "wasm32", not(feature = "std")), panic_handler)]
+#[cfg_attr(all(pvm_kind = "wasm", not(feature = "std")), panic_handler)]
 #[allow(dead_code)]
 fn panic(_info: &PanicInfo) -> ! {
     panic!()

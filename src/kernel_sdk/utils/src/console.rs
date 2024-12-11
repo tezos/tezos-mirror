@@ -4,10 +4,7 @@
 
 //! Options for how the debug logs from the kernel are printed.
 
-#![cfg(not(any(
-    target_arch = "wasm32",
-    all(target_arch = "riscv64", target_os = "hermit")
-)))]
+#![cfg(pvm_kind = "none")]
 
 use quanta::Instant;
 use serde::{ser::SerializeStruct, Serialize};

@@ -10,7 +10,7 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(all(target_arch = "riscv64", target_os = "hermit", feature = "proto-alpha"))]
+#[cfg(pvm_flavour = "hermit")]
 extern crate hermit;
 
 #[cfg(feature = "utils")]
@@ -112,7 +112,7 @@ pub mod storage {
     pub use tezos_smart_rollup_storage as accounts;
 }
 
-#[cfg(all(feature = "testing", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "testing", not(pvm_kind = "wasm")))]
 pub mod testing {
     //! Utilities for writing unit tests for kernels.
     //!
