@@ -1,6 +1,6 @@
 #!/bin/bash
 
-distribution=$1
+distroname=$1
 release=$2
 
 bucket="$GCP_LINUX_PACKAGES_BUCKET"
@@ -10,19 +10,19 @@ protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
 
 case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
-  distribution="RC/${distribution}"
+  distribution="RC/${distroname}"
   ;;
 Release | TestRelease)
   : nop
   ;;
 Master)
-  distribution="master/${distribution}"
+  distribution="master/${distroname}"
   ;;
 SoftRelease)
-  distribution="${CI_COMMIT_TAG}/${distribution}"
+  distribution="${CI_COMMIT_TAG}/${distroname}"
   ;;
 TestBranch)
-  distribution="${CI_COMMIT_REF_NAME}/${distribution}"
+  distribution="${CI_COMMIT_REF_NAME}/${distroname}"
   ;;
 *)
   echo "Cannot test packages on this branch"
@@ -37,11 +37,13 @@ if [ "$RELEASETYPE" = "Master" ]; then
   # [add repository]
   # Update and install the config-mananger plugin
   dnf -y update
-  dnf -y install 'dnf-command(config-manager)'
+  dnf -y install dnf-plugins-core
 
   # Add the repository
   dnf -y config-manager --add-repo "https://packages.nomadic-labs.com/next/$distribution/dists/$release/"
-  dnf -y config-manager --set-enabled devel
+  if [ "$distroname" = "rockylinux" ]; then
+    dnf -y config-manager --set-enabled devel
+  fi
   dnf -y update
 
   # Install public key
@@ -50,11 +52,14 @@ if [ "$RELEASETYPE" = "Master" ]; then
 else
   # Update and install the config-mananger plugin
   dnf -y update
-  dnf -y install 'dnf-command(config-manager)'
+  dnf -y install dnf-plugins-core
 
   # Add the repository
   dnf -y config-manager --add-repo "https://storage.googleapis.com/$bucket/next/$distribution/dists/$release/"
-  dnf -y config-manager --set-enabled devel
+
+  if [ "$distroname" = "rockylinux" ]; then
+    dnf -y config-manager --set-enabled devel
+  fi
   dnf -y update
 
   # Install public key
