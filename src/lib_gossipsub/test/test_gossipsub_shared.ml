@@ -152,12 +152,7 @@ module Automaton_config :
   end
 
   module Subconfig = struct
-    module Peer = struct
-      let is_bootstrap _ = false
-
-      include Int_iterable
-    end
-
+    module Peer = Int_iterable
     module Topic = String_iterable
 
     module Message_id = struct
