@@ -902,7 +902,12 @@ module type AUTOMATON = sig
   val pp_output : Format.formatter -> 'a output -> unit
 
   module Introspection : sig
-    type connection = {topics : Topic.Set.t; direct : bool; outbound : bool}
+    type connection = {
+      topics : Topic.Set.t;
+      direct : bool;
+      outbound : bool;
+      bootstrap : bool;
+    }
 
     type fanout_peers = {peers : Peer.Set.t; last_published_time : Time.t}
 

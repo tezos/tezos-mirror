@@ -157,6 +157,8 @@ module Make (C : AUTOMATON_CONFIG) :
         (** Intuitively, an outbound connection is a connection we
             initiated. But, the application layer can refine, relax or redefine
             this notion to fit its needs. *)
+    bootstrap : bool;
+        (** True if the connection is related to a bootstrap node *)
   }
 
   (** [Connections] implements a bidirectional map from peers to connections and from
@@ -221,7 +223,12 @@ module Make (C : AUTOMATON_CONFIG) :
         let peer_to_conn =
           Peer.Map.add
             peer
-            {topics = Topic.Set.empty; direct; outbound}
+            {
+              topics = Topic.Set.empty;
+              direct;
+              outbound;
+              bootstrap = Peer.is_bootstrap peer;
+            }
             map.peer_to_conn
         in
         `added {map with peer_to_conn}
@@ -2448,6 +2455,7 @@ module Make (C : AUTOMATON_CONFIG) :
       topics : Topic.Set.t;
       direct : bool;
       outbound : bool;
+      bootstrap : bool;
     }
 
     type nonrec fanout_peers = fanout_peers = {
