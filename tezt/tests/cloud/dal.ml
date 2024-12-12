@@ -16,14 +16,14 @@ let toplog (fmt : ('a, Format.formatter, unit, unit) format4) : 'a =
 module Disconnect = struct
   module IMap = Map.Make (Int)
 
-  (* The [disconnected_bakers] map contains bakers indexes whose DAL node
-     have been disconnected, associated with the level at which they have
-     been disconnected.
-     Each [frequency] number of levels, a baker, chosen in a round-robin
-     fashion, is disconnected.
-     A disconnected baker reconnects after [reconnection_delay] levels.
-     The next baker to disconnect is stored in [next_to_disconnect];
-     it is 0 when no baker has been disconnected yet *)
+  (** The [disconnected_bakers] map contains bakers indexes whose DAL node
+      have been disconnected, associated with the level at which they have
+      been disconnected.
+      Each [frequency] number of levels, a baker, chosen in a round-robin
+      fashion, is disconnected.
+      A disconnected baker reconnects after [reconnection_delay] levels.
+      The next baker to disconnect is stored in [next_to_disconnect];
+      it is 0 when no baker has been disconnected yet *)
   type t = {
     disconnected_bakers : int IMap.t;
     frequency : int;
@@ -32,6 +32,11 @@ module Disconnect = struct
   }
 
   let init (frequency, reconnection_delay) =
+    if frequency <= 0 then
+      Test.fail
+        "Unexpected error: The disconnection frequency must be strictly \
+         positive, rather than %d"
+        frequency ;
     {
       disconnected_bakers = IMap.empty;
       frequency;
@@ -39,10 +44,10 @@ module Disconnect = struct
       next_to_disconnect = 0;
     }
 
-  (* When a relevant level is reached, [disconnect t level f] puts the baker of
-     index [t.next_to_disconnect] in [t.disconnected_bakers] and applies [f] to
-     this baker. If it is already disconnected, the function does nothing and
-     returns [t] unchanged *)
+  (** When a relevant level is reached, [disconnect t level f] puts the baker of
+      index [t.next_to_disconnect] in [t.disconnected_bakers] and applies [f] to
+      this baker. If it is already disconnected, the function does nothing and
+      returns [t] unchanged *)
   let disconnect t level f =
     if level mod t.frequency <> 0 then Lwt.return t
     else
@@ -62,12 +67,13 @@ module Disconnect = struct
               next_to_disconnect = t.next_to_disconnect + 1;
             }
 
-  (* Applies [f] on the bakers DAL nodes that have been disconnected for long
-     enough *)
+  (** Applies [f] on the bakers DAL nodes that have been disconnected for [t.reconnection_delay]
+      levels from [level]. *)
   let reconnect t level f =
     let bakers_to_reconnect, bakers_to_keep_disconnected =
       IMap.partition
-        (fun _ disco_level -> level >= disco_level + t.reconnection_delay)
+        (fun _ disconnected_level ->
+          level >= disconnected_level + t.reconnection_delay)
         t.disconnected_bakers
     in
     let* () =
@@ -94,7 +100,7 @@ module Node = struct
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~name network
       agent =
-    toplog "Inititializing a L1 node" ;
+    toplog "Inititializing an L1 node" ;
     match network with
     | (`Mainnet | `Ghostnet | `Weeklynet _) as network -> (
         match data_dir with
@@ -145,7 +151,7 @@ module Node = struct
                   Node.snapshot_import ~no_check:true node "snapshot_file"
                 in
                 let () = toplog "Snapshot import succeeded." in
-                unit
+                Lwt.return_unit
               with _ ->
                 (* Failing to import the snapshot could happen on a
                    very young Weeklynet, before the first snapshot is
@@ -156,7 +162,7 @@ module Node = struct
                     "Snapshot import failed, the node will be bootstrapped \
                      from genesis."
                 in
-                unit
+                Lwt.return_unit
             in
             toplog "Launching the node." ;
             let* () =
@@ -1226,12 +1232,12 @@ let init_public_network cloud (configuration : configuration)
       let () = toplog "Waiting 10 seconds" in
       let* () = Lwt_unix.sleep 10. in
       let () = toplog "Waiting 10 seconds: done" in
-      unit
+      Lwt.return_unit
     else
       let () =
         toplog "Skipping batch injection because there is no account to fund"
       in
-      unit
+      Lwt.return_unit
   in
   Lwt.return
     (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
@@ -2569,7 +2575,7 @@ let benchmark () =
         match t.etherlink with
         | None ->
             let () = toplog "No Etherlink loop to start" in
-            unit
+            Lwt.return_unit
         | Some etherlink ->
             let () = toplog "Starting Etherlink loop" in
             etherlink_loop etherlink

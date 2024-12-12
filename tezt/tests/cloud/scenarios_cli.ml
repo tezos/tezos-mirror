@@ -65,7 +65,7 @@ let fundraiser =
   Clap.optional_string
     ~section
     ~long:"fundraiser"
-    ~description:"Fundraiser secret key that have enough money on test network"
+    ~description:"Fundraiser secret key that has enough money on test network"
     ()
 
 let network_typ : Network.t Clap.typ =
@@ -103,8 +103,9 @@ let stake =
     ~long:"stake"
     ~placeholder:"<integer>, <integer>, <integer>, ..."
     ~description:
-      "Specify the stake repartition. Each number specify the number of shares \
-       old by one baker. The total stake is given by the sum of all shares."
+      "Specify the stake repartition. Each number specifies the number of \
+       shares held by one baker. The total stake is given by the sum of all \
+       shares."
     (Clap.list_of_int ~dummy:[100] "stake")
     (match network with `Sandbox -> [100] | _ -> [])
 
