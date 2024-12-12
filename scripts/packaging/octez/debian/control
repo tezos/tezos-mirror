@@ -47,12 +47,13 @@ Description: Client for interacting with the Tezos blockchain
 
 Package: octez-baker
 Architecture: amd64 arm64
-Pre-Depends: octez-client (= ${source:Version})
+Pre-Depends:
+ octez-client (= ${source:Version}),
+ debconf (>= 0.5) | debconf-2.0
 Depends:
  ${misc:Depends}, ${shlibs:Depends},
  octez-node (= ${source:Version}),
- curl, systemd,
- debconf (>= 0.5) | debconf-2.0
+ curl, systemd
 Recommends: octez-signer (= ${source:Version}),
 Description: Octez baking software for the Tezos blockchain.
  The Octez baker includes the necessary tools and functionalities for

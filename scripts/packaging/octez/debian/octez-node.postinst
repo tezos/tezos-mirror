@@ -47,7 +47,7 @@ configure)
 
     db_get octez-node/configure
     case "$RET" in
-    no)
+    false)
       db_get octez-node/network
       NETWORK=${RET}
       db_get octez-node/history-mode
@@ -60,7 +60,7 @@ configure)
               --rpc-addr=\"127.0.0.1:8732\""
       fi
       ;;
-    *)
+    true)
       echo "Skipping initialization."
       ;;
     esac
