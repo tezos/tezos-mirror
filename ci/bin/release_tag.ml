@@ -41,6 +41,19 @@ type release_tag_pipeline_type =
   | Non_release_tag
   | Schedule_test
 
+let monitoring_child_pipeline =
+  Pipeline.register_child
+    "octez_monitoring"
+    ~description:"Octez monitoring jobs"
+    ~inherit_:
+      (Gitlab_ci.Types.Variable_list ["ci_image_name"; "jsonnet_image_name"])
+    ~jobs:
+      [
+        job_datadog_pipeline_trace;
+        job_build_grafazos ();
+        job_build_layer1_profiling;
+      ]
+
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are
@@ -196,6 +209,13 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [Job job_docker_merge])
       ()
   in
+  let job_trigger_monitoring =
+    trigger_job
+      ~__POS__
+      ~dependencies:(Dependent [])
+      ~stage:Stages.build
+      monitoring_child_pipeline
+  in
   [
     (* Stage: start *)
     job_datadog_pipeline_trace;
@@ -208,6 +228,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_build_homebrew_release;
     job_docker_merge;
     job_gitlab_release_or_publish;
+    job_trigger_monitoring;
   ]
   @ jobs_debian_repository
   @

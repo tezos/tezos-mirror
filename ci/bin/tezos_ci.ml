@@ -143,6 +143,7 @@ module Pipeline = struct
     name : string;
     description : string;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
+    inherit_ : Gitlab_ci.Types.inherit_ option;
     jobs : tezos_job list;
   }
 
@@ -178,8 +179,8 @@ module Pipeline = struct
     register_raw
       (Pipeline {variables; if_; name; jobs; auto_cancel; description})
 
-  let register_child ?auto_cancel ~description ~jobs name =
-    let child_pipeline = {name; jobs; auto_cancel; description} in
+  let register_child ?auto_cancel ?inherit_ ~description ~jobs name =
+    let child_pipeline = {name; inherit_; jobs; auto_cancel; description} in
     register_raw (Child_pipeline child_pipeline) ;
     child_pipeline
 
@@ -868,8 +869,13 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
 
 let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
     Pipeline.
-      {name = child_pipeline_name; jobs = _; auto_cancel = _; description = _} :
-    tezos_job =
+      {
+        name = child_pipeline_name;
+        inherit_;
+        jobs = _;
+        auto_cancel = _;
+        description = _;
+      } : tezos_job =
   let job_name = "trigger:" ^ child_pipeline_name in
   let needs, dependencies = resolve_dependencies job_name dependencies in
   if dependencies != [] then
@@ -880,6 +886,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ~__POS__ ~stage
   let trigger_job =
     Gitlab_ci.Util.trigger_job
       ?needs
+      ?inherit_
       ?rules
       ~stage:(Stage.name stage)
       ~name:job_name
