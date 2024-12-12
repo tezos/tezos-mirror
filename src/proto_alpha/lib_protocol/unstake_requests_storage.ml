@@ -255,6 +255,138 @@ let add ctxt ~contract ~delegate cycle amount =
   in
   return ctxt
 
+let can_stake_from_unstake ctxt ~delegate =
+  let open Lwt_result_syntax in
+  let* slashing_history_opt = Storage.Slashed_deposits.find ctxt delegate in
+  let slashing_history = Option.value slashing_history_opt ~default:[] in
+
+  let* slashing_history_opt_o =
+    Storage.Contract.Slashed_deposits__Oxford.find
+      ctxt
+      (Contract_repr.Implicit delegate)
+  in
+  let slashing_history_o =
+    Option.value slashing_history_opt_o ~default:[]
+    |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+  in
+
+  let slashing_history = slashing_history @ slashing_history_o in
+
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
+  in
+  let oldest_slashable_cycle =
+    Cycle_repr.sub current_cycle (slashable_deposits_period + 1)
+    |> Option.value ~default:Cycle_repr.root
+  in
+  let*! is_denounced =
+    Pending_denunciations_storage.has_pending_denunciations ctxt delegate
+  in
+  let is_slashed =
+    List.exists
+      (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
+      slashing_history
+  in
+  return @@ not (is_denounced || is_slashed)
+
+let stake_from_unstake_for_delegate ctxt ~delegate
+    ~transfer_from_unstake_request ~unfinalizable_requests_opt amount =
+  let open Lwt_result_syntax in
+  match unfinalizable_requests_opt with
+  | None -> return (ctxt, [], amount)
+  | Some {delegate = delegate_requests; requests} ->
+      if
+        Signature.Public_key_hash.(delegate <> delegate_requests)
+        && not (List.is_empty requests)
+      then (* Should not be possible *)
+        return (ctxt, [], Tez_repr.zero)
+      else
+        let* allowed = can_stake_from_unstake ctxt ~delegate in
+        if not allowed then
+          (* a slash could have modified the unstaked frozen deposits: cannot stake from unstake *)
+          return (ctxt, [], amount)
+        else
+          let sender_contract = Contract_repr.Implicit delegate in
+          let requests_sorted =
+            List.sort
+              (fun (cycle1, _) (cycle2, _) ->
+                Cycle_repr.compare cycle2 cycle1
+                (* decreasing cycle order, to release first the tokens
+                   that would be frozen for the longest time *))
+              requests
+          in
+          let rec transfer_from_unstake ctxt balance_updates
+              remaining_amount_to_transfer updated_requests_rev requests =
+            if Tez_repr.(remaining_amount_to_transfer = zero) then
+              return
+                ( ctxt,
+                  balance_updates,
+                  Tez_repr.zero,
+                  List.rev_append requests updated_requests_rev )
+            else
+              match requests with
+              | [] ->
+                  return
+                    ( ctxt,
+                      balance_updates,
+                      remaining_amount_to_transfer,
+                      updated_requests_rev )
+              | (cycle, requested_amount) :: t ->
+                  if Tez_repr.(remaining_amount_to_transfer >= requested_amount)
+                  then
+                    let* ctxt, cycle_balance_updates =
+                      transfer_from_unstake_request
+                        ctxt
+                        cycle
+                        delegate
+                        sender_contract
+                        requested_amount
+                    in
+                    let*? remaining_amount =
+                      Tez_repr.(
+                        remaining_amount_to_transfer -? requested_amount)
+                    in
+                    transfer_from_unstake
+                      ctxt
+                      (balance_updates @ cycle_balance_updates)
+                      remaining_amount
+                      updated_requests_rev
+                      t
+                  else
+                    let* ctxt, cycle_balance_updates =
+                      transfer_from_unstake_request
+                        ctxt
+                        cycle
+                        delegate
+                        sender_contract
+                        remaining_amount_to_transfer
+                    in
+                    let*? new_requested_amount =
+                      Tez_repr.(
+                        requested_amount -? remaining_amount_to_transfer)
+                    in
+                    return
+                      ( ctxt,
+                        balance_updates @ cycle_balance_updates,
+                        Tez_repr.zero,
+                        List.rev_append
+                          t
+                          ((cycle, new_requested_amount) :: updated_requests_rev)
+                      )
+          in
+          let* ( ctxt,
+                 balance_updates,
+                 remaining_amount_to_transfer,
+                 updated_requests_rev ) =
+            transfer_from_unstake ctxt [] amount [] requests_sorted
+          in
+          let updated_requests = List.rev updated_requests_rev in
+          let* ctxt =
+            update ctxt sender_contract {delegate; requests = updated_requests}
+          in
+          return (ctxt, balance_updates, remaining_amount_to_transfer)
+
 module For_RPC = struct
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
     let open Lwt_result_syntax in

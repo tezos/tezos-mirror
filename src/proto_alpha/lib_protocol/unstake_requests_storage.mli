@@ -78,6 +78,20 @@ val update :
   stored_requests ->
   Raw_context.t tzresult Lwt.t
 
+val stake_from_unstake_for_delegate :
+  Raw_context.t ->
+  delegate:Signature.public_key_hash ->
+  transfer_from_unstake_request:
+    (Raw_context.t ->
+    Cycle_repr.t ->
+    Signature.public_key_hash ->
+    Contract_repr.t ->
+    Tez_repr.t ->
+    (Raw_context.t * 'a list) tzresult Lwt.t) ->
+  unfinalizable_requests_opt:stored_requests option ->
+  Tez_repr.t ->
+  (Raw_context.t * 'a list * Tez_repr.t) tzresult Lwt.t
+
 val finalize_unstake_and_check :
   check_unfinalizable:
     (Raw_context.t -> stored_requests -> Raw_context.t tzresult Lwt.t) ->
