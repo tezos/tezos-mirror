@@ -18,16 +18,14 @@ Suggests: lz4 curl sudo
 %install
 mkdir -p %{buildroot}/usr/bin/
 mkdir -p %{buildroot}/usr/share/octez-node/
-install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-node %{buildroot}/usr/bin/
-install -m 0755 $HOME/rpmbuild/SPECS/scripts/octez-node-prestart.sh %{buildroot}/usr/share/octez-node/
-install -m 0755 $HOME/rpmbuild/SPECS/scripts/snapshot-import.sh %{buildroot}/usr/share/octez-node/
-install -m 0755 $HOME/rpmbuild/SPECS/scripts/wait-for-node-up.sh %{buildroot}/usr/share/octez-node/
-install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-node.1 %{buildroot}%{_mandir}/man1/octez-node.1
+install -D -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-node %{buildroot}/usr/bin/
+install -D -m 0755 $HOME/rpmbuild/SPECS/scripts/octez-node-prestart.sh %{buildroot}/usr/share/octez-node/
+install -D -m 0755 $HOME/rpmbuild/SPECS/scripts/snapshot-import.sh %{buildroot}/usr/share/octez-node/
+install -D -m 0755 "$HOME/rpmbuild/SPECS/scripts/wait-for-node-up.sh" %{buildroot}/usr/share/octez-node/
+install -D -m 0644 $HOME/rpmbuild/SPECS/manpages/octez-node.1 %{buildroot}%{_mandir}/man1/octez-node.1
+install -D -m 0644 $HOME/rpmbuild/SPECS/octez-node.default %{buildroot}/etc/default/octez-node
 gzip %{buildroot}%{_mandir}/man1/octez-node.1
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-node.service %{buildroot}/usr/lib/systemd/system/octez-node.service
-install -D -m 644  $HOME/rpmbuild/SPECS/octez-node.default %{buildroot}/etc/default/octez-node
-install -D -m 644  $HOME/rpmbuild/SPECS/scripts/snapshot_import.sh %{buildroot}/usr/share/octez-node/snapshot_import.sh
-install -D -m 644  $HOME/rpmbuild/SPECS/scripts/octez-node-prestart.sh %{buildroot}/usr/share/octez-node/octez-node-prestart.sh
 %files
 /usr/bin/octez-node
 %{_mandir}/man1/octez-node.1*
