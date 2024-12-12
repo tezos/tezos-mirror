@@ -141,3 +141,9 @@ val verify_shard :
     | `Shard_length_mismatch
     | `Shard_index_out_of_range of string ] )
   Result.t
+
+val share_is_trap :
+  Signature.Public_key_hash.t ->
+  share ->
+  traps_fraction:Q.t ->
+  (bool, [> `Decoding_error]) Result.t

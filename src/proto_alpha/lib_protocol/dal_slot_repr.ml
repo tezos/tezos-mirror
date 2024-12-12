@@ -167,6 +167,29 @@ module Shard_with_proof = struct
         fail_with_error_msg "Shard_length_mismatch"
     | Error (`Shard_index_out_of_range str) ->
         fail_with_error_msg ("Shard_index_out_of_range (" ^ str ^ ")")
+
+  type error += Dal_encoding_error_in_share_is_trap
+
+  let () =
+    let open Data_encoding in
+    let description =
+      "An encoding error occurred while checking whether a shard is a trap."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"dal_slot_repr.shard_with_proof.share_is_trap_error"
+      ~title:"encoding error in Dal.share_is_trap"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      unit
+      (function Dal_encoding_error_in_share_is_trap -> Some () | _ -> None)
+      (fun () -> Dal_encoding_error_in_share_is_trap)
+
+  let share_is_trap delegate share ~traps_fraction =
+    let open Result_syntax in
+    match Dal.share_is_trap delegate share ~traps_fraction with
+    | Ok res -> return res
+    | Error `Decoding_error -> error Dal_encoding_error_in_share_is_trap
 end
 
 module Page = struct
