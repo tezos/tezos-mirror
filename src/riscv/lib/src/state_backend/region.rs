@@ -7,7 +7,7 @@ use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
     proof_backend::{
         merkle::{MerkleTree, MerkleWriter, Merkleisable},
-        ProofDynRegion, ProofGen,
+        ProofDynRegion, ProofEnrichedCell, ProofGen,
     },
     Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
     ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
@@ -392,6 +392,16 @@ where
 {
     fn hash(&self) -> Result<Hash, HashError> {
         Hash::blake2b_hash(self)
+    }
+}
+
+impl<V: EnrichedValue, M: ManagerSerialise> Merkleisable for EnrichedCell<V, ProofGen<M>>
+where
+    V::E: serde::Serialize,
+{
+    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
+        let serialised = ProofEnrichedCell::serialise_inner_enriched_cell(&self.cell)?;
+        MerkleTree::make_merkle_leaf(serialised, self.cell.get_access_info())
     }
 }
 
