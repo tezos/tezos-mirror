@@ -6,6 +6,7 @@
 (package (name RPC-toy))
 (package (name bls12-381))
 (package (name dal_node_migrations))
+(package (name efunc_core))
 (package (name etherlink-governance-observer))
 (package (name gitlab_ci))
 (package (name internal-devtools))

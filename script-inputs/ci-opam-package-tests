@@ -1,5 +1,6 @@
-bls12-381	all	6
+bls12-381	all	7
 dal_node_migrations	all	6
+efunc_core	all	6
 octez-accuser-PsParisC	exec	1
 octez-accuser-PsQuebec	exec	1
 octez-alcotezt	all	7

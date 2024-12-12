@@ -12,6 +12,7 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        product_opentelemetry.mli product_opentelemetry.ml \
        product_prometheus.mli product_prometheus.ml \
        product_resto.mli product_resto.ml \
+       product_efunc_core.mli product_efunc_core.ml \
        product_octez.mli product_octez.ml \
        product_client_libs.mli product_client_libs.ml \
        product_tooling.mli product_tooling.ml \
