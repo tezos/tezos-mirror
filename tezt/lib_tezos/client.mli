@@ -444,6 +444,15 @@ val spawn_import_encrypted_secret_key :
   alias:string ->
   Process.t * Lwt_io.output_channel
 
+(** Run [octez-client import public key]. *)
+val import_public_key :
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.secret_key ->
+  alias:string ->
+  unit Lwt.t
+
 (** Run [octez-client import secret key]. *)
 val import_secret_key :
   ?force:bool ->
@@ -482,6 +491,9 @@ val spawn_import_secret_key :
   Account.secret_key ->
   alias:string ->
   Process.t
+
+(** Run [octez-client forget all keys --force] *)
+val forget_all_keys : ?endpoint:endpoint -> t -> unit Lwt.t
 
 (** Run [octez-client activate protocol].
 
@@ -1306,6 +1318,22 @@ val stresstest :
   t ->
   unit Lwt.t
 
+(** Same as {!stresstest}, but use a file path instead of lists of sources
+    and do not wait for the process to exit. *)
+val spawn_stresstest_with_filename :
+  ?env:string String_map.t ->
+  ?endpoint:endpoint ->
+  ?seed:int ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?transfers:int ->
+  ?tps:int ->
+  ?fresh_probability:float ->
+  ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
+  t ->
+  string ->
+  Process.t
+
 (** Same as {!stresstest}, but do not wait for the process to exit. *)
 val spawn_stresstest :
   ?env:string String_map.t ->
@@ -1367,6 +1395,7 @@ val stresstest_originate_smart_contracts :
 
      [endpoint]: cf {!create} *)
 val stresstest_fund_accounts_from_source :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   source_key_pkh:string ->
   ?batch_size:int ->
