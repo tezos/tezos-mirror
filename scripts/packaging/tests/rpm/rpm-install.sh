@@ -9,10 +9,13 @@ RELEASE=$2
 
 # Update and install the config-mananger plugin
 dnf -y update
-dnf -y install 'dnf-command(config-manager)'
+dnf -y install dnf-plugins-core
 
 # Add the repository
 dnf -y config-manager --add-repo "$REPO/$DISTRO/dists/$RELEASE"
+if [ "$DISTRO" = "rockylinux" ]; then
+  dnf -y config-manager --set-enabled devel
+fi
 dnf -y update
 
 # Install public key
