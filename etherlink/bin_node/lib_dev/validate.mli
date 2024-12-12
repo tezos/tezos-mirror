@@ -10,4 +10,4 @@
 val is_tx_valid :
   (module Services_backend_sig.S) ->
   string ->
-  Simulation.validation_result Simulation.simulation_result tzresult Lwt.t
+  (Ethereum_types.transaction_object, string) result tzresult Lwt.t

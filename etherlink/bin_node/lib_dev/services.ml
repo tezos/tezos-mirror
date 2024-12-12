@@ -641,7 +641,7 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
                       Tx_pool_events.invalid_transaction ~transaction:tx_raw
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
-                | Ok (Either.Left transaction_object) -> (
+                | Ok transaction_object -> (
                     let* (Qty balance) =
                       Backend_rpc.balance
                         transaction_object.from
@@ -665,10 +665,6 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
                       | Error reason ->
                           rpc_error
                             (Rpc_errors.transaction_rejected reason None))
-                | Ok (Either.Right _) ->
-                    rpc_error
-                      (Rpc_errors.internal_error
-                         "Transaction validation in the kernel is deprecated")
               in
               build_with_input ~f module_ parameters
         | Eth_call.Method ->
