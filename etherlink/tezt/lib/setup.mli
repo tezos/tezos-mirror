@@ -166,5 +166,6 @@ val setup_sequencer :
   ?history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list ->
+  ?rpc_server:Evm_node.rpc_server ->
   Protocol.t ->
   sequencer_setup Lwt.t
