@@ -73,7 +73,7 @@ in
   pkgs.mkShell {
     name = "tezos-shell";
 
-    hardeningDisable = ["stackprotector"];
+    hardeningDisable = ["stackprotector" "zerocallusedregs"];
 
     inherit (mainPackage) NIX_LDFLAGS NIX_CFLAGS_COMPILE TEZOS_WITHOUT_OPAM OPAM_SWITCH_PREFIX;
 
