@@ -419,7 +419,7 @@ oc.build:static-x86_64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_CACHE_SIZE: 2G
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
   artifacts:
     paths:
