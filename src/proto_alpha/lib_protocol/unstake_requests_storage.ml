@@ -191,8 +191,6 @@ let update_stored_request ctxt contract updated_requests =
   | _ :: _ ->
       Storage.Contract.Unstake_requests.update ctxt contract updated_requests
 
-let update = update_stored_request
-
 (* The [check_unfinalizable] function in argument must consume its gas, if
    relevant. *)
 let finalize_unstake_and_check ~check_unfinalizable
@@ -222,7 +220,7 @@ let finalize_unstake_and_check ~check_unfinalizable
               ctxt
               Adaptive_issuance_costs.finalize_unstake_and_check_cost
           in
-          let* ctxt = update ctxt contract unfinalizable in
+          let* ctxt = update_stored_request ctxt contract unfinalizable in
           let* ctxt, balance_updates =
             perform_finalizable_unstake_transfers ctxt contract finalizable
           in
@@ -383,7 +381,10 @@ let stake_from_unstake_for_delegate ctxt ~delegate
           in
           let updated_requests = List.rev updated_requests_rev in
           let* ctxt =
-            update ctxt sender_contract {delegate; requests = updated_requests}
+            update_stored_request
+              ctxt
+              sender_contract
+              {delegate; requests = updated_requests}
           in
           return (ctxt, balance_updates, remaining_amount_to_transfer)
 

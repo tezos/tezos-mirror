@@ -71,13 +71,6 @@ val prepare_finalize_unstake :
   Contract_repr.t ->
   prepared_finalize_unstake option tzresult Lwt.t
 
-(** [update ctxt contract requests] updates unstake requests for [contract]. *)
-val update :
-  Raw_context.t ->
-  Contract_repr.t ->
-  stored_requests ->
-  Raw_context.t tzresult Lwt.t
-
 val stake_from_unstake_for_delegate :
   Raw_context.t ->
   delegate:Signature.public_key_hash ->
