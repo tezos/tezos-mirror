@@ -351,7 +351,7 @@ val change_node_and_restart :
 
 (** Change the rollup mode. This does not terminate nor restart the
     node. Change will take effect when the node is run/restart. *)
-val change_node_mode : t -> mode -> t
+val change_node_mode : t -> mode -> unit
 
 (** Change the rollup node operators. This does not terminate nor restart the
     node. Change will take effect when the node is run/restart. *)
