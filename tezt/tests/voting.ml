@@ -307,7 +307,9 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
     Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
   in
   (* Start a node and activate [from_protocol]. *)
-  let* node = Node.init [Synchronisation_threshold 0] in
+  let* node =
+    Node.init [Synchronisation_threshold 0; History_mode (Full None)]
+  in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () =
     Client.activate_protocol ~protocol:from_protocol ~parameter_file client
