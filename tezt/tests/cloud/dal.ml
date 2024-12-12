@@ -709,52 +709,29 @@ let update_ratio_published_commitments_last_level t per_level_info metrics =
         *. 100. /. float_of_int producers
 
 let update_ratio_attested_commitments t per_level_info metrics =
-  match metrics.level_first_commitment_attested with
-  | None -> 0.
-  | Some level_first_commitment_attested -> (
-      let published_level =
-        published_level_of_attested_level t per_level_info.level
-      in
-      if published_level <= t.first_level then (
+  let published_level =
+    published_level_of_attested_level t per_level_info.level
+  in
+  if published_level <= t.first_level then (
+    Log.warn
+      "Unable to retrieve information for published level %d because it \
+       precedes the earliest available level (%d)."
+      published_level
+      t.first_level ;
+    metrics.ratio_attested_commitments)
+  else
+    match Hashtbl.find_opt t.infos published_level with
+    | None ->
         Log.warn
-          "Unable to retrieve information for published level %d because it \
-           precedes the earliest available level (%d)."
-          published_level
-          t.first_level ;
-        metrics.ratio_attested_commitments)
-      else
-        match Hashtbl.find_opt t.infos published_level with
-        | None ->
-            Log.warn
-              "Unexpected error: The level %d is missing in the infos table"
-              published_level ;
-            metrics.ratio_attested_commitments
-        | Some old_per_level_info ->
-            let n = Hashtbl.length old_per_level_info.published_commitments in
-            let maximum_number_of_blocks =
-              t.configuration.metrics_retention / t.time_between_blocks
-            in
-            (* Until [t.configuration.metrics_retention] has been reached,
-               we use a simple arithmetic mean.
-               We then switch to an exponential moving average
-               of characteristic time [t.configuration.metrics_retention]. *)
-            let weight =
-              min
-                maximum_number_of_blocks
-                (per_level_info.level - level_first_commitment_attested)
-              |> float_of_int
-            in
-            if n = 0 then metrics.ratio_attested_commitments
-            else
-              let bitset =
-                Z.popcount per_level_info.attested_commitments * 100 / n
-                |> float_of_int
-              in
-              let ratio =
-                ((metrics.ratio_attested_commitments *. weight) +. bitset)
-                /. (weight +. 1.)
-              in
-              ratio)
+          "Unexpected error: The level %d is missing in the infos table"
+          published_level ;
+        metrics.ratio_attested_commitments
+    | Some old_per_level_info ->
+        let n = Hashtbl.length old_per_level_info.published_commitments in
+        if n = 0 then metrics.ratio_attested_commitments
+        else
+          float (Z.popcount per_level_info.attested_commitments)
+          *. 100. /. float n
 
 let update_ratio_attested_commitments_per_baker t per_level_info metrics =
   let default () =
