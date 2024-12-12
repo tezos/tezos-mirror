@@ -365,7 +365,6 @@ defined as the conjunction of the following conditions:
   solvent to pay the announced fees for all the operations in the
   batch.
 
-.. _co-valid_operations:
 .. _co-valid_operations_alpha:
 
 Co-valid operations
