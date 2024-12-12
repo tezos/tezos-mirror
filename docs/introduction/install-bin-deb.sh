@@ -81,6 +81,8 @@ octez-node octez-node/configure string yes
 octez-node octez-node/history-mode string full
 octez-node octez-node/network string mainnet
 octez-node octez-node/purge_warning string yes
+octez-node octez-node/snapshot-import boolean true
+octez-node octez-node/snapshot-no-check boolean true
 debconf debconf/frontend select Noninteractive
 EOF
   # preseed the package
