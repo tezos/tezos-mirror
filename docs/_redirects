@@ -1,9 +1,5 @@
-/007/cli-commands.html /shell/cli-commands.html 301
-/007/glossary.html /alpha/glossary.html 301
-/007/michelson.html /alpha/michelson.html 301
-/007/proof_of_stake.html /alpha/proof_of_stake.html 301
-/007/rpc.html /shell/rpc.html 301
-/007/voting.html /alpha/voting.html 301
+/007/cli-commands.html https://octez.tezos.com/docs/shell/cli-commands.html 301
+/007/* https://octez.tezos.com/docs/alpha/:splat 301
 /009/glossary.html /active/glossary.html 301
 /009/michelson.html /active/michelson.html 301
 /009/proof_of_stake.html /active/proof_of_stake.html 301
