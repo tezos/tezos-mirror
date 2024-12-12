@@ -59,8 +59,8 @@ let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?image
     parallel;
   }
 
-let trigger_job ?needs ?rules ?stage ?when_ ~name trigger_include =
-  {name; needs; rules; stage; when_; trigger_include}
+let trigger_job ?needs ?inherit_ ?rules ?stage ?when_ ~name trigger_include =
+  {name; needs; inherit_; rules; stage; when_; trigger_include}
 
 let artifacts ?expire_in ?reports ?when_ ?expose_as ?name paths =
   (match (reports, paths) with

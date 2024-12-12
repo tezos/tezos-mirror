@@ -311,14 +311,19 @@ let enc_job : job -> value =
       opt "parallel" enc_parallel parallel;
     ]
 
+let enc_inherit : inherit_ -> value = function
+  | Variable_bool b -> `O (key "variables" bool b)
+  | Variable_list v -> `O (key "variables" (list string) v)
+
 let enc_trigger_job : trigger_job -> value =
   let enc_trigger_include trigger_include =
     `O [("include", `String trigger_include)]
   in
-  fun {name = _; stage; when_; rules; needs; trigger_include} ->
+  fun {name = _; stage; when_; inherit_; rules; needs; trigger_include} ->
     obj_flatten
       [
         opt "stage" string stage;
+        opt "inherit" enc_inherit inherit_;
         opt "rules" enc_job_rules rules;
         opt "needs" enc_needs needs;
         opt "when" enc_when_trigger_job when_;

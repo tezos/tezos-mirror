@@ -194,6 +194,11 @@ type matrix = (string * string list) list list
     YAML keyword reference for more information. *)
 type parallel = Vector of int | Matrix of matrix
 
+(** Represents an inherit rule.
+
+    See https://docs.gitlab.com/ee/ci/yaml/index.html#inherit *)
+type inherit_ = Variable_list of string list | Variable_bool of bool
+
 type job = {
   name : string;
       (** Note that [name] does not translate to a field in a job, but
@@ -252,6 +257,7 @@ type job = {
     - [extends].
     - [needs], but not [needs:project].
     - [only] and [except].
+    - [inherit]
     - [rules].
     - [stage].
     - [trigger].
@@ -268,6 +274,7 @@ type trigger_job = {
   name : string;
   stage : string option;
   when_ : when_trigger_job option;
+  inherit_ : inherit_ option;
   rules : job_rule list option;
   needs : need list option;
   trigger_include : string;
