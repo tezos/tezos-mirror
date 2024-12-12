@@ -95,6 +95,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
@@ -530,6 +531,7 @@ let encoding default_display : t Data_encoding.t =
            index_buffer_size;
            irmin_cache_size;
            log_kernel_debug;
+           unsafe_disable_wasm_kernel_checks;
            no_degraded;
            gc_parameters;
            history_mode;
@@ -557,16 +559,14 @@ let encoding default_display : t Data_encoding.t =
             l1_blocks_cache_size,
             l2_blocks_cache_size,
             prefetch_blocks ),
-          ( l1_rpc_timeout,
-            loop_retry_delay,
-            index_buffer_size,
-            irmin_cache_size,
-            log_kernel_debug,
-            no_degraded,
-            gc_parameters,
-            history_mode,
-            cors,
-            bail_on_disagree ) ) ))
+          ( ( l1_rpc_timeout,
+              loop_retry_delay,
+              index_buffer_size,
+              irmin_cache_size,
+              log_kernel_debug,
+              unsafe_disable_wasm_kernel_checks ),
+            (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
+          ) ) ))
     (fun ( ( ( sc_rollup_address,
                boot_sector_file,
                operators,
@@ -588,16 +588,14 @@ let encoding default_display : t Data_encoding.t =
                l1_blocks_cache_size,
                l2_blocks_cache_size,
                prefetch_blocks ),
-             ( l1_rpc_timeout,
-               loop_retry_delay,
-               index_buffer_size,
-               irmin_cache_size,
-               log_kernel_debug,
-               no_degraded,
-               gc_parameters,
-               history_mode,
-               cors,
-               bail_on_disagree ) ) ) ->
+             ( ( l1_rpc_timeout,
+                 loop_retry_delay,
+                 index_buffer_size,
+                 irmin_cache_size,
+                 log_kernel_debug,
+                 unsafe_disable_wasm_kernel_checks ),
+               (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
+             ) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -629,6 +627,7 @@ let encoding default_display : t Data_encoding.t =
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters;
         history_mode;
@@ -708,20 +707,32 @@ let encoding default_display : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj10
-             (dft "l1_rpc_timeout" Data_encoding.float default_l1_rpc_timeout)
-             (dft
-                "loop_retry_delay"
-                Data_encoding.float
-                default_loop_retry_delay)
-             (opt "index_buffer_size" int31 ~description:"Deprecated")
-             (opt "irmin_cache_size" int31)
-             (dft "log-kernel-debug" Data_encoding.bool false)
-             (dft "no-degraded" Data_encoding.bool false)
-             (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
-             (opt "history-mode" history_mode_encoding)
-             (dft "cors" cors_encoding Resto_cohttp.Cors.default)
-             (dft "bail-on-disagree" bool false))))
+          (merge_objs
+             (obj6
+                (dft
+                   "l1_rpc_timeout"
+                   Data_encoding.float
+                   default_l1_rpc_timeout)
+                (dft
+                   "loop_retry_delay"
+                   Data_encoding.float
+                   default_loop_retry_delay)
+                (opt "index_buffer_size" int31 ~description:"Deprecated")
+                (opt "irmin_cache_size" int31)
+                (dft "log-kernel-debug" Data_encoding.bool false)
+                (dft
+                   "unsafe-disable-wasm-kernel-checks"
+                   Data_encoding.bool
+                   false))
+             (obj5
+                (dft "no-degraded" Data_encoding.bool false)
+                (dft
+                   "gc-parameters"
+                   gc_parameters_encoding
+                   default_gc_parameters)
+                (opt "history-mode" history_mode_encoding)
+                (dft "cors" cors_encoding Resto_cohttp.Cors.default)
+                (dft "bail-on-disagree" bool false)))))
 
 let encoding_no_default = encoding `Show
 
@@ -837,8 +848,8 @@ module Cli = struct
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches ~bail_on_disagree
-      =
+      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -893,6 +904,7 @@ module Cli = struct
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters =
           {frequency_in_blocks = gc_frequency; context_splitting_period = None};
@@ -915,7 +927,7 @@ module Cli = struct
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
       ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~bail_on_disagree =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -979,6 +991,9 @@ module Cli = struct
         irmin_cache_size =
           Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
+        unsafe_disable_wasm_kernel_checks =
+          unsafe_disable_wasm_kernel_checks
+          || configuration.unsafe_disable_wasm_kernel_checks;
         no_degraded = no_degraded || configuration.no_degraded;
         gc_parameters =
           {
@@ -1011,8 +1026,8 @@ module Cli = struct
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches ~bail_on_disagree
-      =
+      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -1060,6 +1075,7 @@ module Cli = struct
           ~allowed_origins
           ~allowed_headers
           ~apply_unsafe_patches
+          ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
       in
       return configuration
@@ -1110,6 +1126,7 @@ module Cli = struct
           ~allowed_headers
           ~allowed_origins
           ~apply_unsafe_patches
+          ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
       in
       return config

@@ -27,9 +27,9 @@
 open Protocol
 open Alpha_context
 
-(** Mutable API for the PVM. 
+(** Mutable API for the PVM.
     - PVM functions which update the state in-place instead of returning a new state.
-    
+
     This API helps the RISC-V PVM avoid unnecessary state copying. *)
 module type MUTABLE_STATE_S = sig
   type t
@@ -48,6 +48,7 @@ module type MUTABLE_STATE_S = sig
   val set_input : Sc_rollup.input -> t -> unit Lwt.t
 
   val eval_many :
+    ?check_invalid_kernel:bool ->
     reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
     write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
     is_reveal_enabled:Sc_rollup.is_reveal_enabled ->
@@ -99,6 +100,7 @@ module type S = sig
   (** [eval_many ~max_steps s0] returns a state [s1] resulting from the
       execution of up to [~max_steps] steps of the rollup at state [s0]. *)
   val eval_many :
+    ?check_invalid_kernel:bool ->
     reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
     write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
     is_reveal_enabled:Sc_rollup.is_reveal_enabled ->

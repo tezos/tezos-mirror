@@ -192,8 +192,8 @@ let get_outbox _level _state = Lwt.return []
    [eval_many] always stops at the beginning of a new Tezos block,
    so no execution of several Tezos block inboxes is possible. *)
 (* Copied from [arith_pvm.ml]. *)
-let eval_many ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled
-    ?stop_at_snapshot ~max_steps initial_state =
+let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug:_
+    ~is_reveal_enabled ?stop_at_snapshot ~max_steps initial_state =
   ignore stop_at_snapshot ;
   ignore max_steps ;
   ignore is_reveal_enabled ;

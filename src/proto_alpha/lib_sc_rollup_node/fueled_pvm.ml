@@ -201,6 +201,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                and should be reported as such. *)
             let*! executed_ticks =
               PVM_mut_state.eval_many
+                ~check_invalid_kernel:
+                  (not node_ctxt.config.unsafe_disable_wasm_kernel_checks)
                 ~reveal_builtins
                 ~write_debug:(Printer node_ctxt.kernel_debug_logger)
                 ~max_steps
