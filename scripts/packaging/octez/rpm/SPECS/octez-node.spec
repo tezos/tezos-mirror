@@ -6,7 +6,7 @@ Epoch: %{epoch}
 Release: 1%{?dist}
 Summary: L1 Octez node for the Tezos network
 License: MIT
-Requires: shadow-utils logrotate octez-zcash-params systemd
+Requires: shadow-utils logrotate octez-zcash-params systemd sudo
 Recommends: octez-client
 Suggests: lz4 curl sudo
 %description
