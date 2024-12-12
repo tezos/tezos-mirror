@@ -10,7 +10,7 @@
 type t = {
   fast_exec_invalid_kernel :
     [`Check_with_hook of (unit -> unit Lwt.t) option | `No_check];
-  fast_exec_panicked : (unit -> unit Lwt.t) option;
+  fast_exec_panicked : (exn -> unit Lwt.t) option;
   fast_exec_completed : (unit -> unit Lwt.t) option;
   fast_exec_fallback : bool;
 }
@@ -31,7 +31,7 @@ val on_fast_exec_invalid_kernel : (unit -> unit Lwt.t) -> t -> t
 
 (** [on_fast_exec_panicked k hooks] {b replaces b} the hook executed when
     the Fast Execution engine panics by [k] in [hooks]. *)
-val on_fast_exec_panicked : (unit -> unit Lwt.t) -> t -> t
+val on_fast_exec_panicked : (exn -> unit Lwt.t) -> t -> t
 
 (** [on_fast_exec_completed k hooks] {b replaces b} the hook executed when
     the Fast Execution engine completes a [kernel_run] by [k] in [hooks]. *)

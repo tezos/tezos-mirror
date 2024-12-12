@@ -191,6 +191,8 @@ let patch_durable_storage ~data_dir ~key ~value =
 
 let hooks ~check_invalid_kernel =
   let open Tezos_scoru_wasm.Hooks in
-  let hooks = no_hooks in
+  let hooks =
+    no_hooks |> on_fast_exec_panicked Interpreter_event.fast_exec_panic
+  in
   if check_invalid_kernel then hooks
   else disable_fast_exec_invalid_kernel_check hooks
