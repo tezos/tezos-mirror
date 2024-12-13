@@ -64,9 +64,6 @@ let bake_set_delegate_parameters_until_activation b ~delegate =
 
 let create_delegate_and_staker ~self_delegate_staker ?amount () =
   let open Lwt_result_syntax in
-  let constants =
-    constants |> Constants_helpers.Set.Adaptive_issuance.force_activation true
-  in
   let* b, delegate = Context.init_with_constants1 constants in
   let* b, staker = originate_implicit_unrevealed_account ?amount b delegate in
   let* b = bake_set_delegate_parameters_until_activation b ~delegate in

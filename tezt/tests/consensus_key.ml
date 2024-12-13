@@ -98,12 +98,11 @@ let test_update_consensus_key =
       (["consensus_rights_delay"], `Int consensus_rights_delay);
       (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      (["adaptive_issuance_force_activation"], `Bool true);
     ]
     @
     if Protocol.(number protocol > number Quebec) then
       [(["allow_tz4_delegate_enable"], `Bool true)]
-    else []
+    else [(["adaptive_issuance_force_activation"], `Bool true)]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -638,8 +637,11 @@ let register ?(regression = true) title test =
       (["consensus_rights_delay"], `Int consensus_rights_delay);
       (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      (["adaptive_issuance_force_activation"], `Bool true);
     ]
+  in
+  let parameters =
+    if Protocol.(number protocol > number Quebec) then parameters
+    else (["adaptive_issuance_force_activation"], `Bool true) :: parameters
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters

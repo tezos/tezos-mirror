@@ -88,4 +88,4 @@ Internal
 
 - Removed obsolete feature flags and code related to adaptive issuance
   activation, auto-staking, and old slashing. (MRs :gl:`!15215`,
-  :gl:`!15223`)
+  :gl:`!15223`, :gl:`!15211`)

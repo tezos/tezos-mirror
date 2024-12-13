@@ -889,10 +889,7 @@ module Constants : sig
     type adaptive_issuance = {
       global_limit_of_staking_over_baking : int;
       edge_of_staking_over_delegation : int;
-      launch_ema_threshold : int32;
       adaptive_rewards_params : adaptive_rewards_params;
-      activation_vote_enable : bool;
-      force_activation : bool;
     }
 
     type issuance_weights = {

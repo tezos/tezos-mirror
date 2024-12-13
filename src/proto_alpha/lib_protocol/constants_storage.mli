@@ -146,14 +146,8 @@ val adaptive_issuance_global_limit_of_staking_over_baking : Raw_context.t -> int
 
 val adaptive_issuance_edge_of_staking_over_delegation : Raw_context.t -> int
 
-val adaptive_issuance_launch_ema_threshold : Raw_context.t -> int32
-
-val adaptive_issuance_activation_vote_enable : Raw_context.t -> bool
-
 val adaptive_issuance_rewards_params :
   Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params
-
-val adaptive_issuance_force_activation : Raw_context.t -> bool
 
 val direct_ticket_spending_enable : Raw_context.t -> bool
 

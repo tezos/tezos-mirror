@@ -67,7 +67,7 @@
         "contract": "[PUBLIC_KEY_HASH]",
         "change": "2399999", "origin": "block" } ],
   "liquidity_baking_toggle_ema": 0, "adaptive_issuance_vote_ema": 0,
-  "adaptive_issuance_activation_cycle": 5,
+  "adaptive_issuance_activation_cycle": 0,
   "implicit_operations_results":
     [ { "kind": "origination",
         "balance_updates":

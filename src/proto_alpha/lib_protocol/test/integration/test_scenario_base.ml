@@ -92,7 +92,7 @@ let test_bake_until_next_cycle =
   in
   let blocks_per_cycle = 8l in
   init_constants ~blocks_per_cycle ()
-  --> activate_ai `Force --> begin_test ["delegate"]
+  --> begin_test ["delegate"]
   --> List.fold_left
         (fun acc i ->
           acc
@@ -117,7 +117,7 @@ let test_bake_until_cycle_end =
   in
   let blocks_per_cycle = 8l in
   init_constants ~blocks_per_cycle ()
-  --> activate_ai `Force --> begin_test ["delegate"]
+  --> begin_test ["delegate"]
   --> List.fold_left
         (fun acc i ->
           acc
@@ -142,7 +142,7 @@ let test_bake_until_cycle_end_but_one =
   in
   let blocks_per_cycle = 8l in
   init_constants ~blocks_per_cycle ()
-  --> activate_ai `Force --> begin_test ["delegate"]
+  --> begin_test ["delegate"]
   --> List.fold_left
         (fun acc i ->
           acc

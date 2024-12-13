@@ -38,7 +38,6 @@ let never_slashed_delegate2 = "bootstrap3"
    - 4 delegates
    - potentialy three stakers (2 delegating to first_slashed_delegate and 1 to
      never_slashed_delegate1 respectively)
-   - AI enabled
    - alternative parameters for first_slashed_delegate and
      never_slashed_delegate1
 *)
@@ -76,7 +75,7 @@ let init_with_stakers () =
           Half
     |+ Empty
   in
-  init_constants () --> activate_ai `Force
+  init_constants ()
   --> begin_test
         ~force_attest_all:true
         [

@@ -26,7 +26,7 @@
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
-  "pending_staking_parameters": [], "baking_power": "4000000000000",
+  "pending_staking_parameters": [], "baking_power": "1466666666666",
   "total_staked": "200000000000", "total_delegated": "3800000000000",
   "min_delegated_in_current_cycle":
     { "amount": "3800000000000",

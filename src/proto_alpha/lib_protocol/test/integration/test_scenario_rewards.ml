@@ -18,21 +18,10 @@ open State_account
 open Tez_helpers.Ez_tez
 open Scenario
 
-(** Test reward distribution without AI and without autostaking.
-    [State_account.add_*_rewards] ensures the rewards are distributed
-    correctly, and it is checked at the end of every block.
-*)
-let test_wait_rewards_no_ai_no_auto =
-  (* Prime number to always trigger roundings *)
-  init_constants ~reward_per_block:1_000_000_007L ()
-  --> activate_ai `No
-  --> begin_test ["delegate1"; "delegate2"; "delegate3"]
-  --> wait_n_cycles 20
-
-(** Tests reward distribution under AI:
+(** Tests reward distribution:
     - with and without stakers (sometimes overstaking);
     - with different values of edge. *)
-let test_wait_rewards_with_ai =
+let test_wait_rewards =
   let set_edge pct =
     let params =
       {
@@ -43,7 +32,6 @@ let test_wait_rewards_with_ai =
     set_delegate_params "delegate" params
   in
   init_constants ~reward_per_block:1_000_000_007L ()
-  --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
   --> (Tag "edge = 0" --> set_edge 0.
       |+ Tag "edge = 0.24" --> set_edge 0.24
@@ -95,10 +83,10 @@ let test_wait_rewards_with_ai =
                                    < staked)))))
   --> set_baker "delegate" --> wait_n_cycles 20
 
-(** Tests reward distribution under AI for one baker and one staker,
+(** Tests reward distribution for one baker and one staker,
     and different arbitrary events:
     staking, unstaking, finalizing, slashing *)
-let test_wait_rewards_with_ai_staker_variation =
+let test_wait_rewards_staker_variation =
   let set_edge pct =
     let params =
       {
@@ -109,7 +97,6 @@ let test_wait_rewards_with_ai_staker_variation =
     set_delegate_params "delegate" params
   in
   init_constants ~reward_per_block:1_000_000_007L ()
-  --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
   --> set_edge 0.24 --> wait_delegate_parameters_activation
   --> add_account_with_funds
@@ -144,7 +131,7 @@ let test_wait_rewards_with_ai_staker_variation =
           state.State.constants.consensus_rights_delay + 1)
   --> set_baker "delegate" --> wait_n_cycles 10
 
-(** Tests reward distribution under AI for one baker and two stakers,
+(** Tests reward distribution for one baker and two stakers,
     and the baker changes its limit parameter while being overstaked.
     We expect the rewards for the stakers to change accordingly with the limit.
 *)
@@ -159,7 +146,6 @@ let test_overstake_different_limits =
     set_delegate_params "delegate" params
   in
   init_constants ~reward_per_block:1_000_000_007L ()
-  --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
   --> set_baker "faucet"
   --> unstake "delegate" (Amount (Tez.of_mutez 190_000_000_000L))
@@ -195,19 +181,17 @@ let test_overstake_different_limits =
       |+ Tag "limit >= 5" --> set_limit 6.)
   --> wait_delegate_parameters_activation --> wait_n_cycles 6
 
-(** Tests that the activation time for AI is as expected:
-    The expected delay is [consensus_rights_delay] + 1 cycles after activation. *)
+(** Tests the activation time for AI: the expected delay is
+    [consensus_rights_delay] + 1 cycles after activation (which happens
+    immediately at cycle 0). *)
 let test_ai_curve_activation_time =
   let consensus_rights_delay (_, state) =
     state.State.constants.consensus_rights_delay
   in
   init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
-  --> activate_ai `Zero_threshold
   --> begin_test ~burn_rewards:true [""]
-  --> next_block --> save_current_rate (* before AI rate *)
-  --> wait_ai_activation
-  (* Rate remains unchanged right after AI activation, we must wait [pc + 1] cycles *)
-  --> check_rate_evolution Q.equal
+  --> next_block --> save_current_rate (* initial rate *)
+  (* Rate remains unchanged for consensus_rights_delay cycles after AI activation *)
   --> wait_n_cycles_f consensus_rights_delay
   --> check_rate_evolution Q.equal
   --> next_cycle
@@ -251,9 +235,7 @@ let test_static_decreasing =
   --> set
         S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_initial_max
         Q.one
-  --> activate_ai `Zero_threshold
   --> begin_test ~burn_rewards:true ["delegate"]
-  --> next_block --> wait_ai_activation
   (* We stake about 50% of the total supply *)
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
@@ -294,7 +276,6 @@ let test_static_timing =
   --> set
         S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_initial_max
         Q.one
-  --> activate_ai `Force
   --> begin_test ~burn_rewards:true ["delegate"]
   (* We stake about 50% of the total supply *)
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
@@ -321,7 +302,6 @@ let begin_test_with_rewards_checks ~init_limit =
     set_delegate_params name params
   in
   init_constants ~reward_per_block:1_000_000_000L ()
-  --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
   --> set_baker "delegate"
   --> add_account_with_funds
@@ -522,10 +502,9 @@ let test_overstake =
 let tests =
   tests_of_scenarios
   @@ [
-       ("Test wait rewards no AI no autostake", test_wait_rewards_no_ai_no_auto);
-       ("Test wait rewards with AI, stakers and edge", test_wait_rewards_with_ai);
-       ( "Test wait rewards with AI and stake variation events",
-         test_wait_rewards_with_ai_staker_variation );
+       ("Test wait rewards with stakers and edge", test_wait_rewards);
+       ( "Test wait rewards with stake variation events",
+         test_wait_rewards_staker_variation );
        ("Test ai curve activation time", test_ai_curve_activation_time);
        ( "Test static rate decreasing with stake ratio increasing",
          test_static_decreasing );

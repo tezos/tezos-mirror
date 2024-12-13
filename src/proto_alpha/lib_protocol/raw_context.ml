@@ -1145,10 +1145,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           let ({
                  global_limit_of_staking_over_baking;
                  edge_of_staking_over_delegation;
-                 launch_ema_threshold;
                  adaptive_rewards_params = _;
-                 activation_vote_enable;
-                 force_activation;
                }
                 : Previous.adaptive_issuance) =
             c.adaptive_issuance
@@ -1157,10 +1154,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             {
               global_limit_of_staking_over_baking;
               edge_of_staking_over_delegation;
-              launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable;
-              force_activation;
             }
         in
         let issuance_weights =
@@ -1436,11 +1430,11 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           let ({
                  global_limit_of_staking_over_baking = _;
                  edge_of_staking_over_delegation;
-                 launch_ema_threshold;
+                 launch_ema_threshold = _;
                  adaptive_rewards_params = _;
-                 activation_vote_enable;
+                 activation_vote_enable = _;
                  autostaking_enable = _;
-                 force_activation;
+                 force_activation = _;
                  ns_enable = _;
                }
                 : Previous.adaptive_issuance) =
@@ -1450,10 +1444,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             {
               global_limit_of_staking_over_baking = 9;
               edge_of_staking_over_delegation;
-              launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable;
-              force_activation;
             }
         in
         let issuance_weights =

@@ -183,6 +183,15 @@ let get_round (b : t) =
     let+ fitness = from_raw fitness in
     round fitness)
 
+let block_producer block =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = get_alpha_ctxt block in
+  let*?@ round = Fitness.round_from_raw block.header.shell.fitness in
+  let*@ _ctxt, _slot, block_producer =
+    Stake_distribution.baking_rights_owner ctxt (Level.current ctxt) ~round
+  in
+  return block_producer
+
 module Forge = struct
   type header = {
     baker : public_key_hash;

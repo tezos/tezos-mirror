@@ -255,6 +255,14 @@ let attest_all_ =
 (* Does not produce a new block *)
 let attest_all = exec attest_all_
 
+let check_ai_launch_cycle_is_zero ~loc block =
+  let open Lwt_result_syntax in
+  let* ai_launch_cycle = Context.get_adaptive_issuance_launch_cycle (B block) in
+  let ai_launch_cycle = WithExceptions.Option.get ~loc ai_launch_cycle in
+  if not Cycle.(equal ai_launch_cycle root) then
+    Test.fail ~__LOC__:loc "AI launch cycle should always be zero" ;
+  return_unit
+
 (** Bake a block, with the given baker and the given operations. *)
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
@@ -365,9 +373,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
           attesters)
       state
   in
-  let* state =
-    State_ai_flags.AI_Activation.check_activation_cycle block state
-  in
+  let* () = check_ai_launch_cycle_is_zero ~loc:__LOC__ block in
   let* state = State.apply_rewards ~baker:baker_name block state in
   let new_future_current_cycle = Cycle.succ (Block.current_cycle block) in
   (* Dawn of a new cycle: apply cycle end operations *)
@@ -531,9 +537,6 @@ let wait_cycle_until condition =
   let to_, done_ =
     let rec get_names condition =
       match condition with
-      | `AI_activation -> ("AI activation", "AI activated")
-      | `AI_activation_with_votes ->
-          ("AI activation (with votes)", "AI activated")
       | `delegate_parameters_activation ->
           ("delegate parameters activation", "delegate parameters activated")
       | `right_before_delegate_parameters_activation ->
@@ -549,33 +552,6 @@ let wait_cycle_until condition =
   let condition (init_block, init_state) =
     let rec stopper condition =
       match condition with
-      | `AI_activation -> (
-          fun (block, _state) ->
-            (* Expects the launch cycle to be already set *)
-            match init_state.State.ai_activation_cycle with
-            | Some launch_cycle ->
-                let current_cycle = Block.current_cycle block in
-                Cycle.(current_cycle >= launch_cycle)
-            | _ ->
-                Log.error
-                  "wait_cycle_until `AI_activation: launch cycle not found, \
-                   aborting." ;
-                assert false)
-      | `AI_activation_with_votes ->
-          fun (block, state) ->
-            if State_ai_flags.AI_Activation.enabled init_state then
-              match state.State.ai_activation_cycle with
-              (* Since AI_activation is enabled, we expect the activation
-                 cycle to be set eventually *)
-              | Some launch_cycle ->
-                  let current_cycle = Block.current_cycle block in
-                  Cycle.(current_cycle >= launch_cycle)
-              | _ -> false
-            else (
-              Log.error
-                "wait_cycle_until `AI_activation_with_votes: AI cannot \
-                 activate with the current protocol parameters, aborting." ;
-              assert false)
       | `delegate_parameters_activation ->
           fun (block, _state) ->
             let init_cycle = Block.current_cycle init_block in
@@ -607,14 +583,6 @@ let wait_cycle_until condition =
   log ~color:time_color "Fast forward to %s" to_
   --> wait_cycle_f condition
   --> log ~color:event_color "%s" done_
-
-(** Wait until AI activates.
-    Fails if AI is not set to be activated in the future. *)
-let wait_ai_activation =
-  wait_cycle_until `AI_activation
-  --> exec_unit (fun (block, state) ->
-          assert (State_ai_flags.AI.enabled block state) ;
-          Lwt_result_syntax.return_unit)
 
 (** wait delegate_parameters_activation_delay cycles  *)
 let wait_delegate_parameters_activation =
