@@ -75,7 +75,7 @@
         "Sc_rollup_arith",
         "Sc_rollup_wasm",
         "Sc_rollup_riscv",
-        "Sc_rollup_machine_no_proofs",
+        "Sc_rollup_origination_machine",
         "Sc_rollups",
         "Sc_rollup_data_version_sig",
         "Sc_rollup_inbox_repr",

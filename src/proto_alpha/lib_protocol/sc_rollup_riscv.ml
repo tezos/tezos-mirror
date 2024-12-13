@@ -2,13 +2,14 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Sc_rollup_repr
 module PS = Sc_rollup_PVM_sig
 
-(* [void] definition from [Sc_rollup_machine_no_proofs] *)
+(* [void] definition from [Sc_rollup_origination_machine] *)
 type void = |
 
 let void =
@@ -48,16 +49,8 @@ let state_hash _state =
   State_hash.of_b58check_exn
     "srs129JscUr3XsPcNFUEiKqVNP38tn8oksbGir1qYXgQs8QD7bcNNd"
 
-module type S = sig
-  include PS.S
-
-  val parse_boot_sector : string -> string option
-
-  val pp_boot_sector : Format.formatter -> string -> unit
-end
-
 module Protocol_implementation :
-  S
+  Sc_rollup_PVM_sig.PROTO_VERIFICATION
     with type context = unit
      and type state = minimal_state
      and type proof = void = struct
@@ -85,31 +78,7 @@ module Protocol_implementation :
   let install_boot_sector state boot_sector =
     Lwt.return {state with payload = boot_sector}
 
-  let is_input_state ~is_reveal_enabled:_ state =
-    Lwt.return
-    @@
-    match state.level with
-    | None -> PS.Initial
-    | Some level -> PS.First_after (level, state.message_counter)
-
-  let set_input input state =
-    Lwt.return
-    @@
-    match input with
-    | PS.Inbox_message {inbox_level; message_counter; payload} ->
-        {
-          payload = Sc_rollup_inbox_message_repr.unsafe_to_string payload;
-          level = Some inbox_level;
-          message_counter;
-          tick = Z.succ state.tick;
-        }
-    | PS.Reveal _s -> assert false
-
-  let eval state = Lwt.return {state with tick = Z.succ state.tick}
-
   let verify_proof ~is_reveal_enabled:_ _input = function (_ : proof) -> .
-
-  let produce_proof _context ~is_reveal_enabled:_ _state _step = assert false
 
   type output_proof = void
 
@@ -121,19 +90,11 @@ module Protocol_implementation :
 
   let verify_output_proof = function (_ : proof) -> .
 
-  let produce_output_proof _context _state _output = assert false
-
   let check_dissection ~default_number_of_sections:_ ~start_chunk:_
       ~stop_chunk:_ =
     assert false
 
-  let get_current_level {level; _} = Lwt.return level
-
   let parse_boot_sector s = Some s
 
-  let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
-
-  module Internal_for_tests = struct
-    let insert_failure _state = assert false
-  end
+  let get_current_level {level; _} = Lwt.return level
 end

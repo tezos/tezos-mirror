@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -510,7 +510,8 @@ let pp_output fmt {outbox_level; message_index; message} =
     Sc_rollup_outbox_message_repr.pp
     message
 
-module type S = sig
+(** Minimal protocol signature of a PVM for performing an origination *)
+module type PROTO_ORIGINATION = sig
   (** The state of the PVM denotes a state of the rollup.
 
       The life cycle of the PVM is as follows. It starts its execution
@@ -525,15 +526,35 @@ module type S = sig
       inbox to be executable. *)
   type state
 
+  (** A [hash] characterizes the contents of a state. *)
+  type hash = Sc_rollup_repr.State_hash.t
+
+  (** [state_hash state] returns a compressed representation of [state]. *)
+  val state_hash : state -> hash Lwt.t
+
+  (** [initial_state ~empty] is the initial state of the PVM, before its
+      specialization with a given [boot_sector]. The initial state is built on
+      the [empty] state which must be provided. *)
+  val initial_state : empty:state -> state Lwt.t
+
+  (** [install_boot_sector state boot_sector] specializes the initial
+      [state] of a PVM using a dedicated [boot_sector], submitted at
+      the origination of the rollup. *)
+  val install_boot_sector : state -> string -> state Lwt.t
+end
+
+(** Minimal signature for a protocol implementation of a PVM *)
+module type PROTO_VERIFICATION = sig
+  include PROTO_ORIGINATION
+
+  val parse_boot_sector : string -> string option
+
   val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
   (** A [context] represents the executable environment needed by the state to
       exist. Typically, the rollup node storage can be part of this context to
       allow the PVM state to be persistent. *)
   type context
-
-  (** A [hash] characterizes the contents of a state. *)
-  type hash = Sc_rollup_repr.State_hash.t
 
   (** During interactive refutation games, a player may need to provide a proof
       that a given execution step is valid. The PVM implementation is
@@ -595,34 +616,6 @@ module type S = sig
       execution step. *)
   val proof_stop_state : proof -> hash
 
-  (** [state_hash state] returns a compressed representation of [state]. *)
-  val state_hash : state -> hash Lwt.t
-
-  (** [initial_state ~empty] is the initial state of the PVM, before its
-      specialization with a given [boot_sector]. The initial state is built on
-      the [empty] state which must be provided. *)
-  val initial_state : empty:state -> state Lwt.t
-
-  (** [install_boot_sector state boot_sector] specializes the initial
-      [state] of a PVM using a dedicated [boot_sector], submitted at
-      the origination of the rollup. *)
-  val install_boot_sector : state -> string -> state Lwt.t
-
-  (** [is_input_state ~is_reveal_enabled state] returns the input expectations of the
-      [state]---does it need input, and if so, how far through the inbox
-      has it read so far? *)
-  val is_input_state :
-    is_reveal_enabled:is_reveal_enabled -> state -> input_request Lwt.t
-
-  (** [set_input input state] sets [input] in [state] as the next
-      input to be processed. This must answer the [input_request]
-      from [is_input_state state]. *)
-  val set_input : input -> state -> state Lwt.t
-
-  (** [eval s0] returns a state [s1] resulting from the
-      execution of an atomic step of the rollup at state [s0]. *)
-  val eval : state -> state Lwt.t
-
   (** [verify_proof ~is_reveal_enabled input p] checks the proof [p] with input [input]
       and returns the [input_request] before the evaluation of the proof. See the
       doc-string for the [proof] type.
@@ -634,19 +627,6 @@ module type S = sig
     input option ->
     proof ->
     input_request tzresult Lwt.t
-
-  (** [produce_proof ctxt ~is_reveal_enabled input_given state] should return a [proof]
-      for the PVM step starting from [state], if possible. This may fail for
-      a few reasons:
-        - the [input_given] doesn't match the expectations of [state] ;
-        - the [context] for this instance of the PVM doesn't have access
-        to enough of the [state] to build the proof. *)
-  val produce_proof :
-    context ->
-    is_reveal_enabled:is_reveal_enabled ->
-    input option ->
-    state ->
-    proof tzresult Lwt.t
 
   (** The following type is inhabited by the proofs that a given [output]
       is part of the outbox of a given [state]. *)
@@ -668,11 +648,6 @@ module type S = sig
       [state]'s outbox. *)
   val verify_output_proof : output_proof -> output tzresult Lwt.t
 
-  (** [produce_output_proof ctxt state output] returns a proof that witnesses
-      the fact that [output] is part of [state]'s outbox. *)
-  val produce_output_proof :
-    context -> state -> output -> (output_proof, error) result Lwt.t
-
   (** [check_dissection ~default_number_of_sections ~start_chunk
       ~stop_chunk chunks] fails if the dissection encoded by the list
       [[start_chunk] @ chunks @ [stop_chunk]] does not satisfy the
@@ -687,6 +662,44 @@ module type S = sig
   (** [get_current_level state] returns the current level of the [state],
       returns [None] if it is not possible to compute the level. *)
   val get_current_level : state -> Raw_level_repr.t option Lwt.t
+end
+
+(** Full signature of a PVM for the current protocol *)
+module type S = sig
+  include PROTO_VERIFICATION
+
+  (** [is_input_state ~is_reveal_enabled state] returns the input expectations of the
+      [state]---does it need input, and if so, how far through the inbox
+      has it read so far? *)
+  val is_input_state :
+    is_reveal_enabled:is_reveal_enabled -> state -> input_request Lwt.t
+
+  (** [set_input input state] sets [input] in [state] as the next
+      input to be processed. This must answer the [input_request]
+      from [is_input_state state]. *)
+  val set_input : input -> state -> state Lwt.t
+
+  (** [eval s0] returns a state [s1] resulting from the
+      execution of an atomic step of the rollup at state [s0]. *)
+  val eval : state -> state Lwt.t
+
+  (** [produce_proof ctxt ~is_reveal_enabled input_given state] should return a [proof]
+      for the PVM step starting from [state], if possible. This may fail for
+      a few reasons:
+        - the [input_given] doesn't match the expectations of [state] ;
+        - the [context] for this instance of the PVM doesn't have access
+        to enough of the [state] to build the proof. *)
+  val produce_proof :
+    context ->
+    is_reveal_enabled:is_reveal_enabled ->
+    input option ->
+    state ->
+    proof tzresult Lwt.t
+
+  (** [produce_output_proof ctxt state output] returns a proof that witnesses
+      the fact that [output] is part of [state]'s outbox. *)
+  val produce_output_proof :
+    context -> state -> output -> (output_proof, error) result Lwt.t
 
   module Internal_for_tests : sig
     (** [insert_failure state] corrupts the PVM state. This is used in

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,16 +27,18 @@
 module PVM = struct
   type boot_sector = string
 
+  module type PROTO_ORIGINATION = Sc_rollup_PVM_sig.PROTO_ORIGINATION
+
+  module type PROTO_VERIFICATION = Sc_rollup_PVM_sig.PROTO_VERIFICATION
+
   module type S = sig
-    val parse_boot_sector : string -> boot_sector option
+    include Sc_rollup_PVM_sig.S
 
     val pp_boot_sector : Format.formatter -> boot_sector -> unit
-
-    include Sc_rollup_PVM_sig.S
   end
 
   type ('state, 'proof, 'output) implementation =
-    (module S
+    (module PROTO_VERIFICATION
        with type state = 'state
         and type proof = 'proof
         and type output_proof = 'output)
@@ -95,17 +97,17 @@ module Kind = struct
     | Wasm_2_0_0 -> wasm_2_0_0_pvm
     | Riscv -> riscv_pvm
 
-  let no_proof_machine_of : t -> (module Sc_rollup_machine_no_proofs.S) =
+  let no_proof_machine_of : t -> (module Sc_rollup_origination_machine.S) =
     function
-    | Example_arith -> (module Sc_rollup_machine_no_proofs.Arith)
-    | Wasm_2_0_0 -> (module Sc_rollup_machine_no_proofs.Wasm)
-    | Riscv -> (module Sc_rollup_machine_no_proofs.Riscv)
+    | Example_arith -> (module Sc_rollup_origination_machine.Arith)
+    | Wasm_2_0_0 -> (module Sc_rollup_origination_machine.Wasm)
+    | Riscv -> (module Sc_rollup_origination_machine.Riscv)
 end
 
 let genesis_state_hash_of ~boot_sector kind =
   let open Lwt_syntax in
   let (module Machine) = Kind.no_proof_machine_of kind in
-  let empty = Sc_rollup_machine_no_proofs.empty_tree () in
+  let empty = Sc_rollup_origination_machine.empty_tree () in
   let* tree = Machine.initial_state ~empty in
   let* tree = Machine.install_boot_sector tree boot_sector in
   Machine.state_hash tree

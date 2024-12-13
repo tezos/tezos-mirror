@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,9 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides instantiation of both the WASM and Arith PVM which can
-    be used to perform rollup computations, {b but} cannot be used to compute
-    proofs. *)
+(** This module provides instantiation of all PVM kinds which can
+    be used to perform rollup origination, {b but} cannot be used to compute
+    proofs or run computations. *)
 
 type void = |
 
@@ -35,17 +36,7 @@ type tree = Context_binary.tree
 
 val empty_tree : unit -> tree
 
-module type S = sig
-  val parse_boot_sector : string -> string option
-
-  val pp_boot_sector : Format.formatter -> string -> unit
-
-  include
-    Sc_rollup_PVM_sig.S
-      with type context = t
-       and type state = tree
-       and type proof = void
-end
+module type S = Sc_rollup_PVM_sig.PROTO_ORIGINATION with type state = tree
 
 module Arith : S
 
