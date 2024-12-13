@@ -35,8 +35,9 @@ pub(crate) fn main_attribute(attr: TokenStream, item: TokenStream) -> TokenStrea
     };
 
     let hermit_meta = Target::RISCV_HERMIT.to_meta();
+    let riscv_supervising_meta = Target::RISCV_SUPERVISING.to_meta();
     let hermit_code = quote! {
-        #[cfg(#hermit_meta)]
+        #[cfg(any(#hermit_meta, #riscv_supervising_meta))]
         fn main() {
             tezos_smart_rollup::entrypoint::kernel_entrypoint_fn(#fn_name);
         }

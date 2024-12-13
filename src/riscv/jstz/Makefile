@@ -19,7 +19,9 @@ print-native-target:
 .PHONY: build-deps
 build-deps:
 	@exec ../scripts/install-rust-std-hermit.sh
+	@rustup toolchain install 1.82.0
 	@rustup component add rustfmt clippy
+	@rustup target add --toolchain 1.82.0 riscv64gc-unknown-linux-musl
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
@@ -38,6 +40,10 @@ build-kernel-static:
 .PHONY: build-kernel-native
 build-kernel-native:
 	@INBOX_FILE=$(INBOX_FILE) cargo build -p jstz --release --features static-inbox $(NATIVE_OPT)
+
+.PHONY: build-kernel-linux-musl
+build-kernel-linux-musl:
+	@cargo +1.82.0 build --target=riscv64gc-unknown-linux-musl --package jstz --release
 
 .PHONY: test
 test:
