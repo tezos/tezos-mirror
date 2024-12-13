@@ -156,6 +156,9 @@ let remove_old_published_dal_slot_headers ctxt ~level ~attestation_lag =
   in
   aux ctxt 0
 
+let initialize_consecutive_round_zero_table_for_proto_r ctxt =
+  Storage.Consecutive_round_zero.init ctxt 0l
+
 (* End of code to remove at next automatic protocol snapshot *)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -195,6 +198,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt = Forbidden_delegates_storage.init_for_genesis ctxt in
         let*! ctxt = Storage.Contract.Total_supply.add ctxt Tez_repr.zero in
         let* ctxt = Storage.Block_round.init ctxt Round_repr.zero in
+        let* ctxt = Storage.Consecutive_round_zero.init ctxt 0l in
         let init_commitment (ctxt, balance_updates)
             Commitment_repr.{blinded_public_key_hash; amount} =
           let* ctxt, new_balance_updates =
@@ -270,6 +274,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
             ~level
             ~attestation_lag:parametric.dal.attestation_lag
         in
+        let* ctxt = initialize_consecutive_round_zero_table_for_proto_r ctxt in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in

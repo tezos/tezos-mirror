@@ -3011,6 +3011,10 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       (predecessor_hash, block_payload_hash)
   in
   let* ctxt = Round.update ctxt round in
+  let* ctxt =
+    if Round.(round = zero) then Consecutive_round_zero.incr ctxt
+    else Consecutive_round_zero.reset ctxt
+  in
   (* end of level  *)
   let* ctxt =
     match block_data_contents.Block_header.seed_nonce_hash with
