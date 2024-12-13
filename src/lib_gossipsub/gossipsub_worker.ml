@@ -598,16 +598,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | state, GS.PX peers ->
         Introspection.update_count_recv_prunes state.stats `Incr ;
         let peers =
-          let current_connections =
-            let GS.Introspection.{connections; _} =
-              GS.Introspection.(view state.gossip_state)
-            in
-            connections
+          let GS.Introspection.
+                {connections = current_connections; heartbeat_ticks; _} =
+            GS.Introspection.(view state.gossip_state)
+          in
+          let can_be_contacted peer =
+            let point = maybe_reachable_point peer in
+            match Point.Map.find_opt point state.unreachable_points with
+            | None -> true
+            | Some next_attempt ->
+                Int64.compare heartbeat_ticks next_attempt >= 0
           in
           Peer.Set.filter
             (fun peer ->
               (not (GS.Introspection.Connections.mem peer current_connections))
-              && not (Peer.equal peer self))
+              && (not (Peer.equal peer self))
+              && can_be_contacted peer)
             peers
         in
         emit_p2p_output
@@ -660,6 +666,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    state
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
+        let point_can_be_contacted point =
+          match Point.Map.find_opt point state.unreachable_points with
+          | None -> true
+          | Some next_attempt ->
+              Int64.compare gstate_view.heartbeat_ticks next_attempt >= 0
+        in
+        let peer_can_be_contacted peer =
+          let point = maybe_reachable_point peer in
+          point_can_be_contacted point
+        in
         (* Once every 15 hearbreat ticks, try to reconnect to trusted peers if
            they are disconnected. Also try to reconnect to bootstrap points. *)
         if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then (
@@ -673,11 +689,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
               else Seq.cons trusted_peer seq)
             state.trusted_peers
             Seq.empty
+          |> Seq.filter peer_can_be_contacted
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
                  Connect {peer = trusted_peer; origin = Trusted}) ;
           let p2p_output_stream = state.p2p_output_stream in
           let bootstrap_points =
-            state.bootstrap_points () |> Point.Set.of_list
+            state.bootstrap_points ()
+            |> List.filter point_can_be_contacted
+            |> Point.Set.of_list
           in
           Point.Set.iter
             (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
