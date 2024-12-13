@@ -89,7 +89,7 @@ pub enum ModifyResult<D, N, L> {
 ///
 /// This is done in 3 steps while traversing the tree in a pre-order DFS traversal:
 /// 1. Apply `modify` on current subtree: This operation changes the structure of the current
-///    subtree before traversing it's children.
+///    subtree before traversing its children.
 /// 2. When encountering leaves, `map` is called to transform a leaf from `A` to `B` type.
 ///    This is done on children of subtrees which have been traversed after `modify` was called.
 /// 3. After modifying & mapping the children of a node, the `collect` method gathers the newly

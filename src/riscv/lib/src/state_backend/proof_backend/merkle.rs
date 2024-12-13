@@ -120,12 +120,40 @@ pub enum AccessInfo {
 impl AccessInfo {
     /// Obtain the [`AccessInfo`] which corresponds to the `read` and `write` values.
     pub fn from_bools(read: bool, write: bool) -> Self {
+        use AccessInfo::*;
         match (read, write) {
-            (false, false) => AccessInfo::NoAccess,
-            (true, false) => AccessInfo::Read,
-            (false, true) => AccessInfo::Write,
-            (true, true) => AccessInfo::ReadWrite,
+            (false, false) => NoAccess,
+            (true, false) => Read,
+            (false, true) => Write,
+            (true, true) => ReadWrite,
         }
+    }
+
+    /// Return the updated access information after merging with another [`AccessInfo`] value.
+    #[inline(always)]
+    pub fn merge(self, other: Self) -> Self {
+        use AccessInfo::*;
+        match (self, other) {
+            (NoAccess, info) | (info, NoAccess) => info,
+            (Read, Read) => Read,
+            (Write, Write) => Write,
+            (Read, Write) | (Write, Read) | (ReadWrite, _) | (_, ReadWrite) => ReadWrite,
+        }
+    }
+
+    /// Fold a slice of [`AccessInfo`] values.
+    ///
+    /// Terminates early if the highest access level [`AccessInfo::ReadWrite`]
+    /// is reached.
+    pub fn fold(accesses: &[Self]) -> Self {
+        let mut acc = Self::NoAccess;
+        for e in accesses.iter() {
+            acc = acc.merge(*e);
+            if let Self::ReadWrite = acc {
+                break;
+            }
+        }
+        acc
     }
 
     /// Convert an access info to a compressed access info, potentially with additional data.
@@ -140,20 +168,12 @@ impl AccessInfo {
 
     /// Return the updated access information after a read.
     pub fn and_read(self) -> Self {
-        match self {
-            AccessInfo::NoAccess => AccessInfo::Read,
-            AccessInfo::Write => AccessInfo::ReadWrite,
-            access => access,
-        }
+        self.merge(Self::Read)
     }
 
     /// Return the updated access information after a write.
     pub fn and_write(self) -> Self {
-        match self {
-            AccessInfo::NoAccess => AccessInfo::Write,
-            AccessInfo::Read => AccessInfo::ReadWrite,
-            access => access,
-        }
+        self.merge(Self::Write)
     }
 }
 
@@ -221,6 +241,15 @@ pub trait Merkleisable {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError>;
 }
 
+pub trait AccessInfoAggregatable {
+    /// Aggregate the access information of the Merkle tree described by
+    /// the layout of the given data, without constructing the tree.
+    ///
+    /// Used in implementations of `to_merkle_tree` in which certain leaves can
+    /// combine data corresponding to multiple layout elements.
+    fn aggregate_access_info(&self) -> AccessInfo;
+}
+
 impl<T: Merkleisable> Merkleisable for [T] {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         let children = self
@@ -232,15 +261,40 @@ impl<T: Merkleisable> Merkleisable for [T] {
     }
 }
 
+impl<T: AccessInfoAggregatable> AccessInfoAggregatable for [T] {
+    fn aggregate_access_info(&self) -> AccessInfo {
+        let mut acc = AccessInfo::NoAccess;
+        for e in self.iter() {
+            acc = acc.merge(e.aggregate_access_info());
+            if let AccessInfo::ReadWrite = acc {
+                break;
+            }
+        }
+        acc
+    }
+}
+
 impl<T: Merkleisable> Merkleisable for Vec<T> {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         self.as_slice().to_merkle_tree()
     }
 }
 
+impl<T: AccessInfoAggregatable> AccessInfoAggregatable for Vec<T> {
+    fn aggregate_access_info(&self) -> AccessInfo {
+        self.as_slice().aggregate_access_info()
+    }
+}
+
 impl<T: Merkleisable, const N: usize> Merkleisable for [T; N] {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        self.as_ref().to_merkle_tree()
+        self.as_slice().to_merkle_tree()
+    }
+}
+
+impl<T: AccessInfoAggregatable, const N: usize> AccessInfoAggregatable for [T; N] {
+    fn aggregate_access_info(&self) -> AccessInfo {
+        self.as_slice().aggregate_access_info()
     }
 }
 
@@ -253,7 +307,15 @@ macro_rules! impl_merkleisable_for_tuple {
                 let children: Result<Vec<MerkleTree>, HashError> = [$($name.to_merkle_tree(),)*].into_iter().collect();
                 let children = children?;
                 Ok(MerkleTree::Node(children.hash()?, children))
+            }
+        }
 
+        impl<$($name: AccessInfoAggregatable),*> AccessInfoAggregatable for ($($name,)*) {
+            fn aggregate_access_info(&self) -> AccessInfo {
+                #[allow(non_snake_case)]
+                let ($($name,)*) = self;
+                let children = [$($name.aggregate_access_info(),)*];
+                AccessInfo::fold(&children)
             }
         }
     }

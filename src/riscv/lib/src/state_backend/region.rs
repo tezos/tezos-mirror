@@ -6,7 +6,7 @@
 use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
     proof_backend::{
-        merkle::{MerkleTree, MerkleWriter, Merkleisable},
+        merkle::{AccessInfo, AccessInfoAggregatable, MerkleTree, MerkleWriter, Merkleisable},
         ProofDynRegion, ProofEnrichedCell, ProofGen,
     },
     Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
@@ -196,6 +196,12 @@ impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, ProofGen
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         let serialised = binary::serialise(&self)?;
         MerkleTree::make_merkle_leaf(serialised, self.region.region.get_access_info())
+    }
+}
+
+impl<E: serde::Serialize, M: ManagerSerialise> AccessInfoAggregatable for Cell<E, ProofGen<M>> {
+    fn aggregate_access_info(&self) -> AccessInfo {
+        self.region.region.get_access_info()
     }
 }
 
@@ -415,6 +421,15 @@ where
     }
 }
 
+impl<V: EnrichedValue, M: ManagerSerialise> AccessInfoAggregatable for EnrichedCell<V, ProofGen<M>>
+where
+    V::E: serde::Serialize,
+{
+    fn aggregate_access_info(&self) -> AccessInfo {
+        self.cell.get_access_info()
+    }
+}
+
 impl<'de, E: serde::Deserialize<'de>, const LEN: usize, M: ManagerDeserialise>
     serde::Deserialize<'de> for Cells<E, LEN, M>
 {
@@ -463,6 +478,14 @@ impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> Merkleisable
         // is too large for a proof.
         let serialised = binary::serialise(&self)?;
         MerkleTree::make_merkle_leaf(serialised, self.region.get_access_info())
+    }
+}
+
+impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> AccessInfoAggregatable
+    for Cells<E, LEN, ProofGen<M>>
+{
+    fn aggregate_access_info(&self) -> AccessInfo {
+        self.region.get_access_info()
     }
 }
 
