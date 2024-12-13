@@ -1198,6 +1198,9 @@ module type WORKER = sig
       to the worker's input stream. *)
   val app_input : t -> app_input -> unit
 
+  (** [set_unreachable_point state point] declares this point as unreachable. *)
+  val set_unreachable_point : t -> Point.t -> unit
+
   (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
       worker's input stream. *)
   val p2p_input : t -> p2p_input -> unit
