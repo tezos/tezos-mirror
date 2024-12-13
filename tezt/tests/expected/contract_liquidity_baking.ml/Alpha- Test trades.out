@@ -252,24 +252,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 9001 from bootstrap2 to KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 --burn-cap 10 --entrypoint xtzToToken --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 0 "2050-01-01T00:00:00Z")'
 Node is bootstrapped.
-Estimated gas: 6070.421 units (will add 100 for safety)
+Estimated gas: 8070.421 units (will add 100 for safety)
 Estimated storage: 327 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oogc3Wbh8bGJdTZYeAaKP7YmR9nmp51JCCYPeEc3hqBZ27jKzaK'
+Operation hash is 'ooTgurzrZgVEpPP8tX9Vh9wFRqgnZnkCrGe2e2cutcyjm9yNThe'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oogc3Wbh8bGJdTZYeAaKP7YmR9nmp51JCCYPeEc3hqBZ27jKzaK to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for ooTgurzrZgVEpPP8tX9Vh9wFRqgnZnkCrGe2e2cutcyjm9yNThe to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-    Fee to the baker: ꜩ0.000965
+    Fee to the baker: ꜩ0.001165
     Expected counter: 2
-    Gas limit: 6171
+    Gas limit: 8171
     Storage limit: 347 bytes
     Balance updates:
-      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000965
-      payload fees(the block proposer) ....... +ꜩ0.000965
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.001165
+      payload fees(the block proposer) ....... +ꜩ0.001165
     Transaction:
       Amount: ꜩ9001
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
@@ -316,7 +316,7 @@ This sequence of operations was run:
           From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
           To: tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU
           This transaction was successfully applied
-          Consumed gas: 100
+          Consumed gas: 2100
           Balance updates:
             KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... -ꜩ9.001
             tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU ... +ꜩ9.001
@@ -368,24 +368,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 from bootstrap3 --entrypoint tokenToXtz --arg '(Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" 100 0 "2050-01-01T00:00:00Z")' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 7067.428 units (will add 100 for safety)
+Estimated gas: 11067.428 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'opSJtQyATVZNAw8iVpDX7V7RU82Q3Kczsjn262NH2jsSJSqzMt6'
+Operation hash is 'oouiqtyogD9wGzuZxFETeargpq8TChwdnkdf9toy3qSxeeCJ3Wa'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for opSJtQyATVZNAw8iVpDX7V7RU82Q3Kczsjn262NH2jsSJSqzMt6 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for oouiqtyogD9wGzuZxFETeargpq8TChwdnkdf9toy3qSxeeCJ3Wa to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
-    Fee to the baker: ꜩ0.001062
+    Fee to the baker: ꜩ0.001462
     Expected counter: 2
-    Gas limit: 7168
+    Gas limit: 11168
     Storage limit: 0 bytes
     Balance updates:
-      tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.001062
-      payload fees(the block proposer) ....... +ꜩ0.001062
+      tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.001462
+      payload fees(the block proposer) ....... +ꜩ0.001462
     Transaction:
       Amount: ꜩ0
       From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
@@ -424,7 +424,7 @@ This sequence of operations was run:
           From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
           To: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
           This transaction was successfully applied
-          Consumed gas: 100
+          Consumed gas: 2100
           Balance updates:
             KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... -ꜩ164.584923
             tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... +ꜩ164.584923
@@ -433,7 +433,7 @@ This sequence of operations was run:
           From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
           To: tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU
           This transaction was successfully applied
-          Consumed gas: 100
+          Consumed gas: 2100
           Balance updates:
             KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... -ꜩ0.16475
             tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU ... +ꜩ0.16475

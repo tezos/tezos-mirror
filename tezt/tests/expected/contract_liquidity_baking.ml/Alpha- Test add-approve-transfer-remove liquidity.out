@@ -332,24 +332,24 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 from bootstrap2 --entrypoint removeLiquidity --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 1000 0 0 "2050-01-01T00:00:00Z")' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 9102.578 units (will add 100 for safety)
+Estimated gas: 11102.578 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oocZ2DJUHkYB3mFFwk3enBtC39BKNEu6pvyLC7dwnsa6NiDUbJA'
+Operation hash is 'oo3WBjPrt96asNojRu1AZmsr638ZRRzFLxvV7hpbkEHcje463mP'
 NOT waiting for the operation to be included.
 Use command
-  octez-client wait for oocZ2DJUHkYB3mFFwk3enBtC39BKNEu6pvyLC7dwnsa6NiDUbJA to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for oo3WBjPrt96asNojRu1AZmsr638ZRRzFLxvV7hpbkEHcje463mP to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-    Fee to the baker: ꜩ0.001273
+    Fee to the baker: ꜩ0.001473
     Expected counter: 3
-    Gas limit: 9203
+    Gas limit: 11203
     Storage limit: 87 bytes
     Balance updates:
-      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.001273
-      payload fees(the block proposer) ....... +ꜩ0.001273
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.001473
+      payload fees(the block proposer) ....... +ꜩ0.001473
     Transaction:
       Amount: ꜩ0
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
@@ -403,7 +403,7 @@ This sequence of operations was run:
           From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
           To: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
           This transaction was successfully applied
-          Consumed gas: 100
+          Consumed gas: 2100
           Balance updates:
             KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... -ꜩ4.167766
             tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... +ꜩ4.167766

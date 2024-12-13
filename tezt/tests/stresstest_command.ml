@@ -228,6 +228,7 @@ let test_stresstest_sources_format =
                ~source_aliases
                ~source_pkhs
                ~source_accounts
+               ~gas_limit:4000
                ~fresh_probability:0.
                (* Prevent the command from randomly creating fresh
                   accounts, as this would allow more operations than
@@ -422,6 +423,7 @@ let test_stresstest_multiple_nodes =
               non_terminating_process
               @@ Client.spawn_stresstest
                    ~source_accounts
+                   ~gas_limit:4000
                    ~fresh_probability:0.
                    (* Prevent the command from randomly creating fresh
                       accounts, as this would allow more operations than

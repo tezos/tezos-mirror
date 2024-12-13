@@ -153,13 +153,13 @@ module Operation = struct
 
   let inject_transfer
       ?(gas_limit =
-        1520 (* We make transfers to non allocated contracts in these tests *))
+        3520 (* We make transfers to non allocated contracts in these tests *))
       =
     inject_transfer ~gas_limit ~async:true ~force:true
 
   let inject_transfers =
     inject_transfers
-      ~gas_limit:1520
+      ~gas_limit:3520
         (* We make transfers to non allocated contracts in these tests *)
       ~async:true
       ~force:true
@@ -240,7 +240,7 @@ module Helpers = struct
         nodes.main.client
         ~source:Constant.bootstrap2
         ~dest:key
-        ~gas_limit:1500
+        ~gas_limit:3500
         ~amount
         ~fee
     in
@@ -1489,7 +1489,7 @@ module Simple_transfers = struct
         ~protocol
         ~source:key1
         ~dest:key2
-        ~gas_limit:1500
+        ~gas_limit:3500
         ~fee
         ~amount:to_transfer
         nodes.main.client
@@ -1530,7 +1530,7 @@ module Simple_transfers = struct
         ~protocol
         ~source:key1
         ~dest:key2
-        ~gas_limit:1900
+        ~gas_limit:3900
         ~fee
         ~amount:to_transfer
         nodes.main.client
@@ -1568,7 +1568,7 @@ module Simple_transfers = struct
         ~protocol
         ~source:key1
         ~dest:Constant.bootstrap2
-        ~gas_limit:1900
+        ~gas_limit:3900
         ~fee
         ~amount:to_transfer
         nodes.main.client

@@ -338,7 +338,7 @@ let test_bad_revelations =
       client
       ~source:Constant.bootstrap2
       ~dest:fresh_account
-      ~gas_limit:1500
+      ~gas_limit:3500
       ~amount:10_000_000
   in
   let* () = Client.bake_for_and_wait ~node client in
@@ -527,7 +527,7 @@ let test_misc_manager_ops_from_fresh_account =
       client
       ~source:Constant.bootstrap2
       ~dest:fresh_account
-      ~gas_limit:1500
+      ~gas_limit:3500
       ~amount:(2 * amount)
   in
   let* () = Client.bake_for_and_wait ~node client in
