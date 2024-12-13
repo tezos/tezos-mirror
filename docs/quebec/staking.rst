@@ -35,7 +35,7 @@ delegate’s staking balance. To simplify slashing, double-baking
 penalties are now proportional to staked funds: instead of the previous
 fixed sum of 640 tez they are now set to 5% of the delegate’s stake.
 Moreover, denunciation rewards (both for double-baking and
-double-attestations) are reduced from one half to one seventh of the
+double-attestations) are reduced from one half to one eleventh of the
 slashed funds. The chosen value prevents adversarial delegates from
 abusing the slashing mechanism for profit at the expense of their
 stakers.
