@@ -27,10 +27,6 @@ Data Availability Layer
 Adaptive Issuance
 -----------------
 
-- Bumped the
-  :ref:`GLOBAL_LIMIT_OF_STAKING_OVER_BAKING<overstaking_alpha>`
-  protocol constant from 5 to 9.  (MR :gl:`!14905`)
-
 Gas improvements
 ----------------
 
