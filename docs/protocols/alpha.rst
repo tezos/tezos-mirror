@@ -30,6 +30,9 @@ Adaptive Issuance
 Gas improvements
 ----------------
 
+- Increase gas cost for transfers to implicit accounts by 2000 gas
+  units. (MR :gl:`!15993`)
+
 Breaking Changes
 ----------------
 
