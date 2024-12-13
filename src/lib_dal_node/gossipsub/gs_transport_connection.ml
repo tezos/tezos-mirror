@@ -175,7 +175,7 @@ let disconnections_handler gs_worker peer_id =
   | None -> (* Something is off, we should log something probably. *) ()
   | Some (peer, _) -> Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
-let try_connect ?expected_peer_id p2p_layer ~trusted point =
+let try_connect ?expected_peer_id gs_worker p2p_layer ~trusted point =
   let open Lwt_syntax in
   (* We don't wait for the promise to resolve here, because if the
      advertised peer is not reachable or is not responding, we might block
@@ -194,9 +194,12 @@ let try_connect ?expected_peer_id p2p_layer ~trusted point =
           Implement a better PX exchange.
       *)
       ignore expected_peer_id ;
-      let* (_ : _ P2p.connection tzresult) =
+      let* (result : _ P2p.connection tzresult) =
         P2p.connect ~trusted p2p_layer point
       in
+      Result.iter_error
+        (fun _ -> Worker.set_unreachable_point gs_worker point)
+        result ;
       return_unit)
     (fun exn ->
       Format.eprintf
@@ -256,9 +259,11 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
           try_connect
             ~trusted
             ~expected_peer_id:peer_id
+            gs_worker
             p2p_layer
             maybe_reachable_point
-      | Connect_point {point} -> try_connect p2p_layer point ~trusted:false
+      | Connect_point {point} ->
+          try_connect gs_worker p2p_layer point ~trusted:false
       | Forget _ -> return_unit
       | Kick {peer} ->
           P2p.pool p2p_layer
