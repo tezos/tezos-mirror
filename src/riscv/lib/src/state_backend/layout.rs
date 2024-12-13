@@ -75,7 +75,7 @@ where
 #[macro_export]
 macro_rules! struct_layout {
     ($vis:vis struct $layout_t:ident {
-        $($field_name:ident: $cell_repr:ty),+
+        $($field_vis:vis $field_name:ident: $cell_repr:ty),+
         $( , )?
     }) => {
         paste::paste! {
@@ -86,7 +86,7 @@ macro_rules! struct_layout {
                 ),+
             > {
                 $(
-                    $field_name: [<$field_name:upper>]
+                    $field_vis $field_name: [<$field_name:upper>]
                 ),+
             }
 
