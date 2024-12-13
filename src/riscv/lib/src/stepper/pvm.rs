@@ -14,8 +14,11 @@ use crate::{
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
     state_backend::{
-        hash::RootHashable, owned_backend::Owned, proof_backend::proof::MerkleProof, AllocatedOf,
-        FnManagerIdent, Ref,
+        hash::{Hash, RootHashable},
+        owned_backend::Owned,
+        proof_backend::proof::Proof,
+        verify_backend::Verifier,
+        AllocatedOf, FnManagerIdent, Ref,
     },
     storage::binary,
 };
@@ -124,7 +127,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     }
 
     /// Obtain the root hash for the PVM state.
-    pub fn hash<'a>(&'a self) -> crate::state_backend::hash::Hash
+    pub fn hash<'a>(&'a self) -> Hash
     where
         AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: RootHashable,
     {
@@ -133,14 +136,33 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     }
 
     /// Produce the Merkle proof for evaluating one step on the given PVM state.
-    pub fn produce_proof(&mut self) -> MerkleProof {
+    pub fn produce_proof(&mut self) -> Proof {
         // TODO RV-338 PVM stepper can produce a proof
         todo!()
     }
 
-    pub fn verify_proof(&mut self, _proof: MerkleProof) -> bool {
-        // TODO RV-337 PVM stepper can verify a proof
-        todo!()
+    /// Verify a Merkle proof. The [`PvmStepper`] is used for inbox information.
+    pub fn verify_proof(&self, proof: Proof) -> bool {
+        // Allow some warnings while this method goes through iterations.
+        #![allow(
+            dead_code,
+            unreachable_code,
+            unused_variables,
+            clippy::diverging_sub_expression
+        )]
+
+        // TODO: RV-360: Instantiate the PVM from a Merkle proof
+        let space = todo!("Can't parse the merkle proof yet");
+        let pvm = Pvm::<ML, CL, Verifier>::bind(space);
+
+        // TODO: RV-361: Exercise the PVM
+        todo!("Can't exercise the PVM during proof verification yet");
+
+        // TODO: RV-362: Check the final state
+        let refs = pvm.struct_ref::<FnManagerIdent>();
+        let hash: Hash = todo!("Can't obtain the hash of a verification state yet");
+
+        &hash == proof.final_state_hash()
     }
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
