@@ -46,11 +46,15 @@ extensions = [
     'sphinxcontrib.jquery',
     'sphinx_copybutton',
     'sphinx_sitemap',
+    'sphinx_pushfeedback',
 ]
 
 # Sitemap
 sitemap_url_scheme = '{link}'
 html_baseurl = 'https://tezos.gitlab.io/'
+
+# pushfeedback.com
+pushfeedback_project = '42c4fpgh27'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
