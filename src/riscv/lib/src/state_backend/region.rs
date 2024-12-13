@@ -198,13 +198,15 @@ impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<
     }
 }
 
-impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, ProofGen<M>> {
+impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, Ref<'_, ProofGen<M>>> {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         self.region.to_merkle_tree()
     }
 }
 
-impl<E: serde::Serialize, M: ManagerSerialise> AccessInfoAggregatable for Cell<E, ProofGen<M>> {
+impl<E: serde::Serialize, M: ManagerSerialise> AccessInfoAggregatable
+    for Cell<E, Ref<'_, ProofGen<M>>>
+{
     fn aggregate_access_info(&self) -> AccessInfo {
         self.region.region.get_access_info()
     }
@@ -416,17 +418,18 @@ where
     }
 }
 
-impl<V: EnrichedValue, M: ManagerSerialise> Merkleisable for EnrichedCell<V, ProofGen<M>>
+impl<V: EnrichedValue, M: ManagerSerialise> Merkleisable for EnrichedCell<V, Ref<'_, ProofGen<M>>>
 where
     V::E: serde::Serialize,
 {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        let serialised = ProofEnrichedCell::serialise_inner_enriched_cell(&self.cell)?;
+        let serialised = ProofEnrichedCell::serialise_inner_enriched_cell(self.cell)?;
         MerkleTree::make_merkle_leaf(serialised, self.cell.get_access_info())
     }
 }
 
-impl<V: EnrichedValue, M: ManagerSerialise> AccessInfoAggregatable for EnrichedCell<V, ProofGen<M>>
+impl<V: EnrichedValue, M: ManagerSerialise> AccessInfoAggregatable
+    for EnrichedCell<V, Ref<'_, ProofGen<M>>>
 where
     V::E: serde::Serialize,
 {
@@ -476,7 +479,7 @@ impl<A: PartialEq<B> + Copy, B: Copy, const LEN: usize, M: ManagerRead, N: Manag
 }
 
 impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> Merkleisable
-    for Cells<E, LEN, ProofGen<M>>
+    for Cells<E, LEN, Ref<'_, ProofGen<M>>>
 {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         // RV-282: Break down into multiple leaves if the size of the `Cells`
@@ -487,7 +490,7 @@ impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> Merkleisable
 }
 
 impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> AccessInfoAggregatable
-    for Cells<E, LEN, ProofGen<M>>
+    for Cells<E, LEN, Ref<'_, ProofGen<M>>>
 {
     fn aggregate_access_info(&self) -> AccessInfo {
         self.region.get_access_info()
@@ -634,7 +637,7 @@ impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
     }
 }
 
-impl<const LEN: usize, M: ManagerRead> Merkleisable for DynCells<LEN, ProofGen<M>> {
+impl<const LEN: usize, M: ManagerRead> Merkleisable for DynCells<LEN, Ref<'_, ProofGen<M>>> {
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         let mut writer = MerkleWriter::new(
             MERKLE_LEAF_SIZE,
@@ -644,7 +647,7 @@ impl<const LEN: usize, M: ManagerRead> Merkleisable for DynCells<LEN, ProofGen<M
             LEN.div_ceil(MERKLE_ARITY),
         );
         let read = |address| -> [u8; MERKLE_LEAF_SIZE.get()] {
-            ProofDynRegion::inner_dyn_region_read(&self.region, address)
+            ProofDynRegion::inner_dyn_region_read(self.region, address)
         };
         chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
         writer.finalise()

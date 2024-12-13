@@ -12,7 +12,7 @@ use crate::{
             merkle::{MerkleTree, Merkleisable},
             ProofGen,
         },
-        verify_backend, ManagerDeserialise, ManagerRead, ManagerSerialise,
+        verify_backend, ManagerDeserialise, ManagerRead, ManagerSerialise, Ref,
     },
     storage::binary,
 };
@@ -129,7 +129,7 @@ pub trait MainMemoryLayout: backend::ProofLayout + 'static {
     fn hash_data<M: ManagerRead>(data: &Self::Data<M>) -> Result<Hash, HashError>;
 
     fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Data<ProofGen<M>>,
+        data: &Self::Data<Ref<'_, ProofGen<M>>>,
     ) -> Result<MerkleTree, HashError>;
 }
 
@@ -203,7 +203,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
     }
 
     fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Data<ProofGen<M>>,
+        data: &Self::Data<Ref<'_, ProofGen<M>>>,
     ) -> Result<MerkleTree, HashError> {
         data.to_merkle_tree()
     }
@@ -394,7 +394,9 @@ impl<L: MainMemoryLayout, M: ManagerRead> RootHashable for MainMemory<L, M> {
     }
 }
 
-impl<L: MainMemoryLayout, M: backend::ManagerRead> Merkleisable for MainMemory<L, ProofGen<M>> {
+impl<L: MainMemoryLayout, M: backend::ManagerRead> Merkleisable
+    for MainMemory<L, Ref<'_, ProofGen<M>>>
+{
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
         L::to_merkle_tree(&self.data)
     }
