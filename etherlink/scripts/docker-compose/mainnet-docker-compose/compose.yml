@@ -29,11 +29,11 @@ services:
     ports:
       - ${EVM_OCTEZ_PORT}:8545
     entrypoint: /usr/local/bin/octez-evm-node
-    command: run proxy --finalized-view --ignore-block-param --evm-node-endpoint https://relay.mainnet.etherlink.com
+    command: run proxy $FINALIZED_VIEW --ignore-block-param --evm-node-endpoint $EVM_NODE_ENDPOINT
     profiles: [proxy]
 
   observer:
-    container_name: evm-ovserver
+    container_name: evm-observer
     image: tezos/tezos-bare:${EVM_OCTEZ_TAG}
     restart: always
     volumes:
@@ -41,7 +41,7 @@ services:
     ports:
       - ${EVM_OCTEZ_PORT}:8545
     entrypoint: /usr/local/bin/octez-evm-node
-    command: run observer --finalized-view --evm-node-endpoint https://relay.mainnet.etherlink.com
+    command: run observer $FINALIZED_VIEW --evm-node-endpoint $EVM_NODE_ENDPOINT
     profiles: [observer]
 
   curl-runner:
