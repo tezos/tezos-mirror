@@ -283,7 +283,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   }
 
   (** A worker instance is made of its status and state. *)
-  type t = {mutable status : worker_status; mutable state : worker_state}
+  type t = {
+    mutable status : worker_status;
+    mutable state : worker_state;
+    self : Peer.t;
+  }
 
   let state {state; _} = GS.Introspection.view state.gossip_state
 
@@ -799,7 +803,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Check_unknown_messages -> check_unknown_messages_id state
 
   (** A helper function that pushes events in the state *)
-  let push e {status = _; state} = Stream.push e state.events_stream
+  let push e {status = _; state; self = _} = Stream.push e state.events_stream
 
   let app_input t input = push (App_input input) t
 
@@ -891,8 +895,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_promise
 
   let make ?(events_logging = fun _event -> Monad.return ())
-      ?(bootstrap_points = fun () -> []) rng limits parameters =
+      ?(bootstrap_points = fun () -> []) ~self rng limits parameters =
     {
+      self;
       status = Starting;
       state =
         {

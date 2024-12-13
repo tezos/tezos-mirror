@@ -1181,6 +1181,7 @@ module type WORKER = sig
   val make :
     ?events_logging:(event -> unit Monad.t) ->
     ?bootstrap_points:(unit -> Point.t list) ->
+    self:GS.Peer.t ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->
     (GS.Peer.t, GS.Message_id.t) parameters ->

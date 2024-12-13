@@ -146,7 +146,8 @@ let test_worker_start_and_stop rng limits parameters =
      the expected outputs. *)
   let expected_p2p_output = Queue.create () in
   let expected_app_output = Queue.create () in
-  let worker = Worker.make rng limits parameters in
+  let self = -1 in
+  let worker = Worker.make ~self rng limits parameters in
   let heartbeat_span = limits.heartbeat_interval in
   let () = Worker.start ["1"; "2"; "3"] worker in
   let context =
@@ -187,7 +188,8 @@ let test_worker_connect_and_graft rng limits parameters =
      the expected outputs. *)
   let expected_p2p_output = Queue.create () in
   let expected_app_output = Queue.create () in
-  let worker = Worker.make rng limits parameters in
+  let self = -1 in
+  let worker = Worker.make ~self rng limits parameters in
   let heartbeat_span = limits.heartbeat_interval in
   (* 1. The worker joins topic "1" at startup. *)
   let () = Worker.start [topic] worker in
@@ -277,7 +279,8 @@ let test_worker_filter_messages_for_app rng limits parameters =
      the expected outputs. *)
   let expected_p2p_output = Queue.create () in
   let expected_app_output = Queue.create () in
-  let worker = Worker.make rng limits parameters in
+  let self = -1 in
+  let worker = Worker.make ~self rng limits parameters in
   (* 1. The worker joins topic "1" at startup. *)
   let () = Worker.start [topic] worker in
   let heartbeat_span = limits.heartbeat_interval in
@@ -365,7 +368,8 @@ let test_worker_join rng limits parameters =
     ~title:"GS worker: Join topic"
     ~tags:["gossipsub"; "worker"; "join"]
   @@ fun () ->
-  let worker = Worker.make rng limits parameters in
+  let self = -1 in
+  let worker = Worker.make ~self rng limits parameters in
   let () = Worker.start [] worker in
   let () = Worker.app_input worker (Join "topic") in
   Check.(
