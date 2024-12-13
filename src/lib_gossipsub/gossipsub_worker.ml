@@ -280,6 +280,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
     events_logging : event -> unit Monad.t;
     unknown_validity_messages : Bounded_message_map.t;
+    unreachable_points : int64 Point.Map.t;
+        (* For each point, stores the next heartbeat tick when we can try to recontact this point again. *)
   }
 
   (** A worker instance is made of its status and state. *)
@@ -913,6 +915,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           app_output_stream = Stream.empty ();
           events_logging;
           unknown_validity_messages = Bounded_message_map.make ~capacity:10_000;
+          unreachable_points = Point.Map.empty;
         };
     }
 
@@ -926,6 +929,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let is_subscribed t topic =
     GS.Introspection.(has_joined topic (view t.state.gossip_state))
+
+  let set_unreachable_point t point =
+    let GS.Introspection.{heartbeat_ticks; _} =
+      GS.Introspection.(view t.state.gossip_state)
+    in
+    let unreachable_points =
+      Point.Map.update
+        point
+        (function
+          | None -> Some (Int64.add 5L heartbeat_ticks)
+          | Some x ->
+              Some
+                (Int64.mul x 2L |> Int64.max 300L |> Int64.add heartbeat_ticks))
+        t.state.unreachable_points
+    in
+    t.state <- {t.state with unreachable_points}
 
   let pp_list pp_elt =
     Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt
