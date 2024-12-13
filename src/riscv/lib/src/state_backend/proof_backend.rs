@@ -148,7 +148,7 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
 
 /// Implementation of [`ManagerWrite`] which wraps another manager and
 /// records written locations but does not write to the wrapped region directly.
-impl<M: ManagerWrite> ManagerWrite for ProofGen<M> {
+impl<M: ManagerBase> ManagerWrite for ProofGen<M> {
     fn region_write<E, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
@@ -211,7 +211,7 @@ impl<M: ManagerWrite> ManagerWrite for ProofGen<M> {
 
 /// Implementation of [`ManagerReadWrite`] which wraps another manager and
 /// additionally records read and written locations.
-impl<M: ManagerReadWrite> ManagerReadWrite for ProofGen<M> {
+impl<M: ManagerRead> ManagerReadWrite for ProofGen<M> {
     fn region_replace<E: Copy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
