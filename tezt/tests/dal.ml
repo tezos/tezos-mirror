@@ -4897,6 +4897,9 @@ module History_rpcs = struct
       if level > max_level then return commitments
       else
         let published_level = level + 1 in
+        let wait_mempool_injection =
+          Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
+        in
         let* commitment =
           Helpers.publish_and_store_slot
             client
@@ -4906,6 +4909,7 @@ module History_rpcs = struct
             ~force:true
           @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
         in
+        let* () = wait_mempool_injection in
         Log.info
           "Publish commitment %s at published_level %d@."
           commitment
@@ -5138,7 +5142,7 @@ module History_rpcs = struct
     in
 
     let description = "test commitments history with migration" in
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to
