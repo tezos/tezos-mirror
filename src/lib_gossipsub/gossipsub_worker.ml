@@ -589,6 +589,18 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         state
     | state, GS.PX peers ->
         Introspection.update_count_recv_prunes state.stats `Incr ;
+        let peers =
+          let current_connections =
+            let GS.Introspection.{connections; _} =
+              GS.Introspection.(view state.gossip_state)
+            in
+            connections
+          in
+          Peer.Set.filter
+            (fun peer ->
+              not (GS.Introspection.Connections.mem peer current_connections))
+            peers
+        in
         emit_p2p_output
           state
           ~mk_output:(fun to_peer ->
