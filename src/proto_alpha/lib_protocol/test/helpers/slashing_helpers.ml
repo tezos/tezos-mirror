@@ -282,7 +282,7 @@ let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
         in
         let open Protocol.Alpha_context in
         let misb_slashing_cycle =
-          Cycle.add misb_cycle (Constants.max_slashing_period - 1)
+          Cycle.add misb_cycle Constants.slashing_delay
         in
         if Cycle.(equal misb_slashing_cycle current_cycle) then
           (* Slash now *)

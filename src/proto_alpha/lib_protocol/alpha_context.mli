@@ -824,7 +824,9 @@ module Constants : sig
 
   val michelson_maximum_type_size : int
 
-  val max_slashing_period : int
+  val denunciation_period : int
+
+  val slashing_delay : int
 
   val sc_rollup_message_size_limit : int
 

@@ -82,10 +82,7 @@ let wait_for_unfreeze_and_check wait =
   --> next_cycle
   --> assert_failure_in_check_snapshot_balances ~loc:__LOC__ "wait snap"
 
-let unstake_wait (_, state) =
-  let crd = state.State.constants.consensus_rights_delay in
-  let msp = Protocol.Constants_repr.max_slashing_period in
-  crd + msp
+let unstake_wait (_, state) = State.unstake_wait state
 
 let finalize staker =
   assert_failure_in_check_balance_field

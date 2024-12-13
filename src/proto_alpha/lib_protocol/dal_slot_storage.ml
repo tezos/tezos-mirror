@@ -123,7 +123,7 @@ let update_number_of_attested_slots ctxt num_attested_slots =
 let remove_old_headers ctxt ~published_level =
   let open Lwt_syntax in
   let denunciation_period =
-    Constants_repr.max_slashing_period
+    (Constants_repr.denunciation_period + 1)
     * (Int32.to_int @@ Constants_storage.blocks_per_cycle ctxt)
   in
   match Raw_level_repr.(sub published_level denunciation_period) with

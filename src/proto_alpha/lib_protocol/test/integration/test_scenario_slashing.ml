@@ -114,6 +114,9 @@ let test_multiple_misbehaviors =
     Empty
     [1; 3]
 
+let wait_for_slashing =
+  wait_n_cycles (Protocol.Constants_repr.slashing_delay + 1)
+
 let check_is_forbidden ~loc baker =
   assert_failure
     ~expected_error:(fun (_, state) errs ->
@@ -220,8 +223,7 @@ let test_delegate_forbidden =
          --> wait_n_cycles_f crd
          --> check_is_not_forbidden "delegate"
       |+ Tag "Is not forbidden after a denunciation is outdated"
-         --> double_attest "delegate"
-         --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
+         --> double_attest "delegate" --> wait_for_slashing
          --> assert_failure
                ~expected_error:(fun (_block, state) errs ->
                  Error_helpers.expect_outdated_denunciation_state
@@ -324,7 +326,7 @@ let test_slash_timing =
   --> List.fold_left
         (fun acc i ->
           acc |+ Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
-        (wait_n_cycles Protocol.Constants_repr.max_slashing_period)
+        wait_for_slashing
         [3; 4; 5; 6]
   --> double_bake "delegate"
   --> exclude_bakers ["delegate"]
@@ -340,7 +342,7 @@ let test_no_shortcut_for_cheaters =
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
   --> set_baker "bootstrap1" (* exclude_bakers ["delegate"] *)
-  --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
+  --> wait_for_slashing
   --> snapshot_balances "init" ["delegate"]
   --> unstake "delegate" amount
   --> (List.fold_left
@@ -412,7 +414,7 @@ let test_slash_correct_amount_after_stake_from_unstake =
                 ~unstaked_finalizable:Tez.zero
           --> exclude_bakers ["delegate"]
           --> double_bake "delegate" --> make_denunciations ()
-          --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
+          --> wait_for_slashing
           -->
           if cycles_to_wait > consensus_rights_delay then
             (* The misbehaviour happens at least two full cycles after
@@ -544,8 +546,7 @@ let test_mega_slash =
   -->
   (* The "incident" *)
   let incident =
-    double_attest "delegate" --> make_denunciations ()
-    --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
+    double_attest "delegate" --> make_denunciations () --> wait_for_slashing
     (* We check stakers can still unstake and change delegates *)
     --> assert_success (unstake "staker1" Half)
     --> assert_success (unstake "staker1" All)
@@ -597,8 +598,7 @@ let test_mega_slash =
   loop 3 incident
   (*  but 4 will. *)
   --> double_attest "delegate"
-  --> make_denunciations ()
-  --> wait_n_cycles Protocol.Constants_repr.max_slashing_period
+  --> make_denunciations () --> wait_for_slashing
   (* We check stakers can still unstake and finalize, despite everything *)
   --> assert_success
         (unstake "staker1" Half

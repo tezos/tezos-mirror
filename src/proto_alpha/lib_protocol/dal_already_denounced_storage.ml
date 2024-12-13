@@ -28,7 +28,13 @@ let add_denunciation ctxt delegate (level : Level_repr.t) slot_index =
   return (ctxt, already_denounced)
 
 let clear_outdated_cycle ctxt ~new_cycle =
-  match Cycle_repr.(sub new_cycle Constants_repr.max_slashing_period) with
+  (* Misbehaviours from cycles [new_cycle - denunciation_period] and
+     higher might still be denounced during [new_cycle], so we need to
+     keep known denunciations on them. Anything older than that can be
+     discarded. In practice, we only need to clear cycle [new_cycle -
+     denunciation_period - 1], because prior cycles have already been
+     cleaned up earlier. *)
+  match Cycle_repr.(sub new_cycle (Constants_repr.denunciation_period + 1)) with
   | None -> Lwt.return ctxt
   | Some outdated_cycle ->
       Storage.Dal_already_denounced.clear (ctxt, outdated_cycle)

@@ -64,7 +64,14 @@ let michelson_maximum_type_size = 2001
    mechanism (see {Context.Cache}). *)
 let cache_layout_size = 3
 
-let max_slashing_period = 2
+(* /!\ Several parts of the codebase may assume that
+   [denunciation_period = 1] and [slashing_delay = 1] **without being
+   parametrized using these constants**. So if they are ever modified,
+   the codebase needs to be examined extensively; searching for places
+   that use these constants is not enough. *)
+let denunciation_period = 1
+
+let slashing_delay = denunciation_period
 
 (* The {!Sc_rollups.wrapped_proof_encoding} uses unbounded sub-encodings.
    To avoid attacks through too large proofs and long decoding times on public
@@ -119,7 +126,8 @@ let fixed_encoding =
           max_allowed_global_constant_depth,
           cache_layout_size,
           michelson_maximum_type_size ),
-        ( max_slashing_period,
+        ( denunciation_period,
+          slashing_delay,
           sc_max_wrapped_proof_binary_size,
           sc_rollup_message_size_limit,
           sc_rollup_max_number_of_messages_per_level ) ))
@@ -133,7 +141,8 @@ let fixed_encoding =
              _max_allowed_global_constant_depth,
              _cache_layout_size,
              _michelson_maximum_type_size ),
-           ( _max_slashing_period,
+           ( _denunciation_period,
+             _slashing_delay,
              _sc_max_wrapped_proof_binary_size,
              _sc_rollup_message_size_limit,
              _sc_rollup_number_of_messages_per_level ) ) -> ())
@@ -149,8 +158,9 @@ let fixed_encoding =
           (req "max_allowed_global_constants_depth" int31)
           (req "cache_layout_size" uint8)
           (req "michelson_maximum_type_size" uint16))
-       (obj4
-          (req "max_slashing_period" uint8)
+       (obj5
+          (req "denunciation_period" uint8)
+          (req "slashing_delay" uint8)
           (req "smart_rollup_max_wrapped_proof_binary_size" int31)
           (req "smart_rollup_message_size_limit" int31)
           (req "smart_rollup_max_number_of_messages_per_level" n)))
@@ -358,14 +368,14 @@ let check_constants constants =
     error_unless
       Compare.Int.(
         constants.cache_stake_distribution_cycles
-        = constants.consensus_rights_delay + max_slashing_period + 1)
+        = constants.consensus_rights_delay + slashing_delay + 2)
       (Invalid_protocol_constants
          (Format.sprintf
             "We should have cache_stake_distribution_cycles (%d) = \
-             consensus_rights_delay (%d) + max_slashing_period (%d) + 1."
+             consensus_rights_delay (%d) + slashing_delay (%d) + 2."
             constants.cache_stake_distribution_cycles
             constants.consensus_rights_delay
-            max_slashing_period))
+            slashing_delay))
   in
   let* () =
     error_unless

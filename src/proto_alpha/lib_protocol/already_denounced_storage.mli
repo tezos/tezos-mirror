@@ -55,8 +55,7 @@ val add_denunciation :
   Misbehaviour_repr.kind ->
   (Raw_context.t * bool) tzresult Lwt.t
 
-(** Clear {!Storage.Already_denounced} for the cycle [new_cycle -
-    max_slashing_period]. Indeed, denunciations on events which
-    happened during this cycle are no longer allowed anyway. *)
+(** Clear {!Storage.Already_denounced} for old cycles that we no
+    longer need denunciations for. *)
 val clear_outdated_cycle :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t

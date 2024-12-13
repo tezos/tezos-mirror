@@ -1303,9 +1303,8 @@ module Anonymous = struct
     let open Result_syntax in
     let current_cycle = vi.current_level.cycle in
     let given_cycle = (Level.from_raw vi.ctxt given_level).cycle in
-    let max_slashing_period = Constants.max_slashing_period in
-    let last_slashable_cycle =
-      Cycle.add given_cycle (max_slashing_period - 1)
+    let last_denunciable_cycle =
+      Cycle.add given_cycle Constants.denunciation_period
     in
     let* () =
       error_unless
@@ -1319,14 +1318,14 @@ module Anonymous = struct
               {level = given_level; current = vi.current_level.level})
     in
     error_unless
-      Cycle.(last_slashable_cycle >= current_cycle)
+      Cycle.(last_denunciable_cycle >= current_cycle)
       (match kind with
       | `Consensus_denounciation kind ->
           Outdated_denunciation
-            {kind; level = given_level; last_cycle = last_slashable_cycle}
+            {kind; level = given_level; last_cycle = last_denunciable_cycle}
       | `Dal_denounciation ->
           Outdated_dal_denunciation
-            {level = given_level; last_cycle = last_slashable_cycle})
+            {level = given_level; last_cycle = last_denunciable_cycle})
 
   let check_double_attesting_evidence (type kind) vi
       (op1 : kind Kind.consensus Operation.t)

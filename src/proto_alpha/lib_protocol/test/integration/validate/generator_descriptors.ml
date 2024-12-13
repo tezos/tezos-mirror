@@ -428,7 +428,7 @@ let entrapment_descriptor =
 let double_baking_descriptor =
   {
     parameters = Fun.id;
-    required_cycle = (fun _params -> Constants_repr.max_slashing_period);
+    required_cycle = (fun _params -> Constants.slashing_delay + 1);
     required_block = (fun _ -> 0);
     prelude =
       ( From 2,

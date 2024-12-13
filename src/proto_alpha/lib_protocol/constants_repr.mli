@@ -77,17 +77,58 @@ val max_allowed_global_constant_depth : int
  *)
 val michelson_maximum_type_size : int
 
-(** The max slashing period is the maximum number of cycles after which a
-    misbehaviour can be denounced, i.e. if a misbehaviour happened at cycle [c],
-    it will be rejected if it is denounced at cycle [c + max_slashing_period].
-    Having [max_slashing_period] strictly smaller than 2 doesn't make sense.
-    Indeed, if a misbehaviour happens at the very last block of a cycle, it
-    couldn't be denounced.
-    [max_slashing_period = 2] leaves one cycle to denounce a misbehaviour in
-    the worst case, which is deemed enough.
-    Several parts of the codebase may use the fact that
-    [max_slashing_period = 2], so let's ensure it cannot be different. *)
-val max_slashing_period : int
+(** The number of **full cycles** after a misbehaviour during which it
+    can still be denounced.
+
+    More precisely, the window for denouncing a misbehaviour that
+    happens during cycle [n] spans from the misbehaviour itself until
+    the end of cycle [n + denunciation_period]. So it indeed lasts
+    [denunciation_period] full cycles plus part of cycle [n].
+
+    (Technically, denunciations of the misbehaviour are actually
+    allowed from the beginning of cycle [n], even on earlier levels
+    than the misbehaviour's. But this is only relevant if someone
+    crafts double blocks or consensus operations in the future for some
+    reason. In practice, we expect misbehaviours to only happen around
+    the time when the chain reaches their level, which is why we don't
+    count cycle [n] itself as a full cycle for denouncing.)
+
+    Note that we must have [denunciation_period >= 1], otherwise if a
+    misbehaviour happens at the very last block of a cycle, there is no
+    time frame to denounce it.
+
+    Currently [denunciation_period = 1] which is considered enough
+    time for all misbehaviours to be denounced.
+
+    /!\ Several parts of the codebase may assume that
+    [denunciation_period = 1] **without being parametrized using this
+    constant**. So if it is ever modified, the codebase needs to be
+    examined extensively; searching for places that use this constant
+    is not enough. *)
+val denunciation_period : int
+
+(** The number of **full cycles** between a misbehaviour and its
+    slashing (assuming that it has been denounced).
+
+    That is, a misbehaviour that happens during cycle [n] is always
+    slashed at the end of cycle [n + slashing_delay], regardless of
+    when it has been denounced (and if it has not been denounced by
+    then, then it is too late and it will never be slashed).
+
+    Note that we must have [slashing_delay >= denunciation_period],
+    otherwise the chain would accept denunciations for which the
+    slashing can no longer happen because it is too late.
+
+    Also note that to make the slashing possible, information on
+    baking rights for cycle [n] needs to be kept in the context until
+    the end of cycle [n + slashing_delay].
+
+    /!\ Several parts of the codebase may assume that
+    [slashing_delay = 1] **without being parametrized using this
+    constant**. So if it is ever modified, the codebase needs to be
+    examined extensively; searching for places that use this constant
+    is not enough. *)
+val slashing_delay : int
 
 (** A size limit for {!Sc_rollups.wrapped_proof} binary encoding. *)
 val sc_max_wrapped_proof_binary_size : int

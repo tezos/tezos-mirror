@@ -54,7 +54,7 @@ let issuance_modification_delay c =
 *)
 let adaptive_issuance_activation_delay c =
   let constants = Raw_context.constants c in
-  1 + constants.consensus_rights_delay + Constants_repr.max_slashing_period
+  1 + constants.consensus_rights_delay + Constants_repr.slashing_delay + 1
 
 (** Tolerated inactivity period for delegates before being deactivated. *)
 let tolerated_inactivity_period c =
@@ -74,7 +74,7 @@ let slashable_deposits_period c =
   constants.consensus_rights_delay
 
 let unstake_finalization_delay c =
-  slashable_deposits_period c + (Constants_repr.max_slashing_period - 1)
+  slashable_deposits_period c + Constants_repr.slashing_delay
 
 let blocks_per_cycle c =
   let constants = Raw_context.constants c in

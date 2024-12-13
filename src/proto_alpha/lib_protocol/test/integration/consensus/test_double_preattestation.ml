@@ -93,11 +93,10 @@ end = struct
   let max_slashing_period () =
     let open Lwt_result_syntax in
     let* genesis, _contract = Context.init1 ~consensus_threshold:0 () in
-    let max_slashing_period = Constants.max_slashing_period in
     let* {parametric = {blocks_per_cycle; _}; _} =
       Context.get_constants (B genesis)
     in
-    return (max_slashing_period * Int32.to_int blocks_per_cycle)
+    return ((Constants.slashing_delay + 1) * Int32.to_int blocks_per_cycle)
 
   let already_denounced loc res =
     Assert.proto_error ~loc res (function

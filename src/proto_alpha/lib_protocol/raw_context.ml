@@ -1564,9 +1564,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             initial_seed;
             cache_script_size;
             cache_stake_distribution_cycles =
-              consensus_rights_delay + Constants_repr.max_slashing_period + 1;
+              consensus_rights_delay + Constants_repr.slashing_delay + 2;
             cache_sampler_state_cycles =
-              consensus_rights_delay + Constants_repr.max_slashing_period + 1;
+              consensus_rights_delay + Constants_repr.slashing_delay + 2;
             dal;
             sc_rollup;
             zk_rollup;
