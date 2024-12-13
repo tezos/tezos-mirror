@@ -177,8 +177,21 @@ val consensus_key_activation_delay : Raw_context.t -> int
 
 (** Number of cycles during which a misbehavior of a delegate will induce a
     slashing of the funds that are currently in its frozen deposit. *)
-
 val slashable_deposits_period : Raw_context.t -> int
+
+(** Number of **full cycles** to wait for an unstake request to become
+    finalizable.
+
+    In other words, if the unstake is requested during cycle [n], then
+    it becomes finalizable after the end of cycle [n +
+    unstake_finalization_delay], at the beginning of cycle [n +
+    unstake_finalization_delay + 1].
+
+    The exact waiting time depends on when the unstake operation
+    happened inside cycle [n], but it is always at least [n +
+    unstake_finalization_delay] cycles and less than [n +
+    unstake_finalization_delay + 1] cycles. *)
+val unstake_finalization_delay : Raw_context.t -> int
 
 (* attestation aggregation feature flag *)
 val aggregate_attestation : Raw_context.t -> bool

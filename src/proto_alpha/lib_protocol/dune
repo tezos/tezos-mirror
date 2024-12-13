@@ -163,6 +163,7 @@
   Ticket_hash_builder
   Constants_storage
   Level_storage
+  Cycle_storage
   Nonce_storage
   Seed_storage
   Contract_manager_storage
@@ -460,6 +461,7 @@
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
   level_storage.ml level_storage.mli
+  cycle_storage.ml cycle_storage.mli
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
@@ -759,6 +761,7 @@
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
   level_storage.ml level_storage.mli
+  cycle_storage.ml cycle_storage.mli
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
@@ -1042,6 +1045,7 @@
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
   level_storage.ml level_storage.mli
+  cycle_storage.ml cycle_storage.mli
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli

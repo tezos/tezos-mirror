@@ -120,16 +120,11 @@ let prepare_finalize_unstake_uncarbonated ctxt
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
   in
-  let max_slashing_period = Constants_repr.max_slashing_period in
-  let slashable_plus_denunciation_delay =
-    slashable_deposits_period + max_slashing_period
-  in
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
   let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
   match requests_opt with
   | None | Some {delegate = _; requests = []} -> return_none
   | Some {delegate; requests} -> (
-      match Cycle_repr.sub current_cycle slashable_plus_denunciation_delay with
+      match Cycle_storage.greatest_unstake_finalizable_cycle ctxt with
       | None (* no finalizable cycle *) ->
           return_some {finalizable = []; unfinalizable = {delegate; requests}}
       | Some greatest_finalizable_cycle ->

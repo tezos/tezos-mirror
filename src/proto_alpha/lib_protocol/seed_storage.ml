@@ -219,7 +219,7 @@ let for_cycle ctxt cycle =
   let open Lwt_result_syntax in
   let delay = Constants_storage.consensus_rights_delay ctxt in
   let max_slashing_period = Constants_repr.max_slashing_period in
-  let current_cycle = (Level_storage.current ctxt).cycle in
+  let current_cycle = Cycle_storage.current ctxt in
   let latest =
     if Cycle_repr.(current_cycle = root) then
       Cycle_repr.add current_cycle (delay + 1)

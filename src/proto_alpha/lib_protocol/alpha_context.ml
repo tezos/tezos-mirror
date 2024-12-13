@@ -243,7 +243,11 @@ module Raw_level = struct
   end
 end
 
-module Cycle = Cycle_repr
+module Cycle = struct
+  include Cycle_repr
+  include Cycle_storage
+end
+
 module Fees = Fees_storage
 
 type public_key = Signature.Public_key.t

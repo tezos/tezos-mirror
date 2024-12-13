@@ -1141,13 +1141,10 @@ let f_external_delegated ctxt pkh () () =
 
 let total_unstaked_per_cycle ctxt pkh =
   let open Lwt_result_syntax in
-  let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
+  let ctxt_cycle = Cycle.current ctxt in
   let last_unslashable_cycle =
     Option.value ~default:Cycle.root
-    @@ Cycle.sub
-         ctxt_cycle
-         (Constants.slashable_deposits_period ctxt
-         + Constants_repr.max_slashing_period)
+    @@ Cycle.greatest_unstake_finalizable_cycle ctxt
   in
   let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
   List.map_es

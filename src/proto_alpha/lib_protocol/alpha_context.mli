@@ -276,7 +276,8 @@ module Raw_level : sig
   end
 end
 
-(** This module re-exports definitions from {!Cycle_repr}. *)
+(** This module re-exports definitions from {!Cycle_repr} and
+    {!Cycle_storage}. *)
 module Cycle : sig
   include BASIC_DATA
 
@@ -299,6 +300,12 @@ module Cycle : sig
   val ( ---> ) : cycle -> cycle -> cycle list
 
   module Map : Map.S with type key = cycle
+
+  (** See {!Cycle_storage.current}. *)
+  val current : context -> cycle
+
+  (** See {!Cycle_storage.greatest_unstake_finalizable_cycle}. *)
+  val greatest_unstake_finalizable_cycle : context -> cycle option
 end
 
 (** This module re-exports definitions from {!Round_repr}. *)
@@ -982,6 +989,9 @@ module Constants : sig
   val tolerated_inactivity_period : context -> int
 
   val slashable_deposits_period : context -> int
+
+  (** See {!Constants_storage.unstake_finalization_delay}. *)
+  val unstake_finalization_delay : context -> int
 
   val issuance_modification_delay : context -> int
 

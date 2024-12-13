@@ -73,6 +73,9 @@ let slashable_deposits_period c =
   let constants = Raw_context.constants c in
   constants.consensus_rights_delay
 
+let unstake_finalization_delay c =
+  slashable_deposits_period c + (Constants_repr.max_slashing_period - 1)
+
 let blocks_per_cycle c =
   let constants = Raw_context.constants c in
   constants.blocks_per_cycle

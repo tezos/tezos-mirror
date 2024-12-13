@@ -144,6 +144,7 @@
         "Ticket_hash_builder",
         "Constants_storage",
         "Level_storage",
+        "Cycle_storage",
         "Nonce_storage",
         "Seed_storage",
         "Contract_manager_storage",
