@@ -334,6 +334,9 @@ module Worker_config = struct
   module GS = GS
   module Point = Int_iterable
 
+  (* This should be modified in the future. *)
+  let maybe_reachable_point _ = -2
+
   module Monad = struct
     type 'a t = 'a Lwt.t
 

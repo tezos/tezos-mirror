@@ -1051,6 +1051,8 @@ module type WORKER_CONFIGURATION = sig
 
   module Point : ITERABLE
 
+  val maybe_reachable_point : GS.Peer.t -> Point.t
+
   (** Abstraction of the IO monad used by the worker. *)
   module Monad : sig
     (** The monad type. *)

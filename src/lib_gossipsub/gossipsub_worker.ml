@@ -291,6 +291,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     self : Peer.t;
   }
 
+  let maybe_reachable_point = C.maybe_reachable_point
+
   let state {state; _} = GS.Introspection.view state.gossip_state
 
   let emit_app_output state e = Stream.push e state.app_output_stream
