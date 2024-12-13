@@ -35,6 +35,7 @@ val make :
   ?enable_dal:string * string ->
   ?dal_slots:string * string ->
   ?set_account_code:(string * string) list ->
+  ?max_delayed_inbox_blueprint_length:string * string ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

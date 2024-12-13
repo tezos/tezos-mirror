@@ -237,15 +237,16 @@ let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
   body sequencer
 
 (* Register all variants of a test. *)
-let register_all ?block_storage_sqlite3 ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
-    ?commitment_period ?challenge_window ?additional_uses
+let register_all ?max_delayed_inbox_blueprint_length ?block_storage_sqlite3
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
+    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
+    ?additional_uses
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration) ~title ~tags body protocols =
   let dal_cases =
@@ -270,6 +271,7 @@ let register_all ?block_storage_sqlite3 ?sequencer_rpc_port
         (fun (enable_dal, dal_tags) ->
           register_test_for_kernels
             ~__FILE__
+            ?max_delayed_inbox_blueprint_length
             ?block_storage_sqlite3
             ?sequencer_rpc_port
             ?sequencer_private_rpc_port
@@ -3336,7 +3338,7 @@ let test_delayed_inbox_flushing_event =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* () = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -3445,7 +3447,7 @@ let test_flushed_blueprint_reorg =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* () = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -3472,6 +3474,153 @@ let test_flushed_blueprint_reorg =
 
   (* As the observer was down during the reorganization, restarting it
      will be enough, it'll apply the new branch as expected. *)
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  in
+
+  unit
+
+let test_multiple_flushed_blueprints =
+  register_all
+    ~max_delayed_inbox_blueprint_length:1
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:
+      [
+        "evm";
+        "sequencer";
+        "delayed_inbox";
+        "timeout";
+        "flush";
+        "reorg";
+        "multiple";
+      ]
+    ~title:"Multiple flushed blueprints"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* () = Evm_node.terminate observer in
+  (* Observer does not track rollup node events, therefore it will blindly
+     follow the sequencer then reorganizes when the sequencer will push the
+     flushed blueprint. *)
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  (* Add 2 transactions to the delayed inbox. *)
+  let* tx1 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  and* tx2 =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+
+  let* _hash1 =
+    send_raw_transaction_to_delayed_inbox
+      ~wait_for_next_level:false
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~sender:Constant.bootstrap2
+      tx1
+  and* _hash2 =
+    send_raw_transaction_to_delayed_inbox
+      ~wait_for_next_level:false
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~sender:Constant.bootstrap3
+      tx2
+  in
+
+  let*@ proxy_head_before_flush = Rpc.block_number proxy in
+
+  (* Both delayed transaction added *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  (* Flush of delayed inbox in kernel *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  (* We mark at which level the delayed inbox was flushed. *)
+  let* flushed_delayed_inbox_level = Client.level client in
+
+  let wait_for_processed_l1_level =
+    Evm_node.wait_for_processed_l1_level
+      ~level:flushed_delayed_inbox_level
+      sequencer
+  in
+  let wait_for_first_flush =
+    Evm_node.wait_for_flush_delayed_inbox ~level:1 sequencer
+  in
+  let wait_for_second_flush =
+    Evm_node.wait_for_flush_delayed_inbox ~level:2 sequencer
+  in
+
+  (* Make the {!flushed_delayed_inbox_level} final and ait until the
+     event is completely processed. Head of sequencer and proxy should
+     be in sync. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* _ = wait_for_first_flush
+  and* _ = wait_for_second_flush
+  and* () = wait_for_processed_l1_level in
+
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  let*@ proxy_head_after_flush = Rpc.block_number proxy in
+  Check.(
+    (Int32.to_int proxy_head_before_flush + 2
+    = Int32.to_int proxy_head_after_flush)
+      int)
+    ~error_msg:
+      (sf
+         "Expected 2 flushed bqlueprints, proxy level before flush is %ld, \
+          after is %%R"
+         proxy_head_before_flush) ;
+
+  (* Sequencer resumes block production. *)
+  let* () =
+    repeat 5 (fun _ ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+
   let* () =
     Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
   in
@@ -3571,7 +3720,7 @@ let test_observer_reorg_on_blueprint_stream =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* () = wait_for_flush
+  let* _ = wait_for_flush
   and* () = wait_for_processed_l1_level
   and* () = wait_for_observer_reset in
 
@@ -3693,7 +3842,7 @@ let test_observer_reorg_on_blueprint_catchup =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* () = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
 
   let* () =
     check_head_consistency
@@ -3815,7 +3964,7 @@ let test_flushed_blueprint_reorg_late =
     Evm_node.wait_for_processed_l1_level
       ~level:flushed_delayed_inbox_level
       sequencer
-  and* () = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  and* _ = Evm_node.wait_for_flush_delayed_inbox sequencer in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -3962,7 +4111,7 @@ let test_flushed_blueprint_reorg_done_late =
     Evm_node.wait_for_processed_l1_level
       ~level:flushed_delayed_inbox_level
       sequencer
-  and* () = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  and* _ = Evm_node.wait_for_flush_delayed_inbox sequencer in
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
@@ -8166,6 +8315,7 @@ let () =
   test_forced_blueprint_takes_l1_timestamp protocols ;
   test_delayed_inbox_flushing_event protocols ;
   test_flushed_blueprint_reorg protocols ;
+  test_multiple_flushed_blueprints protocols ;
   test_observer_reorg_on_blueprint_stream protocols ;
   test_observer_reorg_on_blueprint_catchup protocols ;
   test_flushed_blueprint_reorg_late protocols ;

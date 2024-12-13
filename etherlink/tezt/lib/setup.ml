@@ -171,9 +171,9 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
   in
   return observer
 
-let setup_sequencer ?next_wasm_runtime ?block_storage_sqlite3
-    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
-    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
+    ?block_storage_sqlite3 ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?commitment_period ?challenge_window
@@ -223,6 +223,7 @@ let setup_sequencer ?next_wasm_runtime ?block_storage_sqlite3
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
+      ?max_delayed_inbox_blueprint_length
       ~mainnet_compat
       ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
@@ -353,16 +354,17 @@ let setup_sequencer ?next_wasm_runtime ?block_storage_sqlite3
     }
 
 (* Register a single variant of a test but for all protocols. *)
-let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
-    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
-    ?(additional_uses = []) ?history_mode ~enable_dal
+let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
+    ?block_storage_sqlite3 ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?bootstrap_accounts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?commitment_period ?challenge_window
+    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
+    ?history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None) body ~title
     ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
@@ -389,6 +391,7 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
+        ?max_delayed_inbox_blueprint_length
         ~block_storage_sqlite3
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
@@ -451,21 +454,22 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
       ~tags
       protocols
 
-let register_test_for_kernels ~__FILE__ ?block_storage_sqlite3
-    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
-    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
-    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
-    ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots ~title ~tags
-    body protocols =
+let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
+    ?block_storage_sqlite3 ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
+    ?commitment_period ?challenge_window ?additional_uses ~threshold_encryption
+    ~enable_dal ?dal_slots ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
         ~__FILE__
+        ?max_delayed_inbox_blueprint_length
         ?block_storage_sqlite3
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port

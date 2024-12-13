@@ -463,6 +463,7 @@ Miscellaneous commands:
       [--bootstrap-balance <9999000000000000000000>]
       [--bootstrap-account <0x...>] [--set-code <0x...,0x....>]
       [--enable-fa-bridge] [--enable-dal] [--dal-slots <0,1,4,6,...>]
+      [--max-delayed-inbox-blueprint-length <1000>]
     Transforms the JSON list of instructions to a RLP list
     <kernel config file>: file path where the config will be written to
     --mainnet-compat: Generate a configuration compatible with the first Etherlink Mainnet kernel
@@ -490,6 +491,7 @@ Miscellaneous commands:
     --enable-fa-bridge: enable flag enable_fa_bridge in the installer config
     --enable-dal: enable flag enable_dal in the installer config
     --dal-slots <0,1,4,6,...>: value for dal_slots in the installer config
+    --max-delayed-inbox-blueprint-length <1000>: value for max_delayed_inbox_blueprint_length in the installer config
   
   patch state at <path> with <value> [--data-dir <data-dir>]
       [--block-number <N>] [-f --force]

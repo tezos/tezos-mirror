@@ -21,6 +21,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
+use tezos_storage::read_u16_le_default;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
@@ -28,7 +29,11 @@ pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/evm/delayed-inbo
 
 // Maximum number of transaction included in a blueprint when
 // forcing timed-out transactions from the delayed inbox.
-pub const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: usize = 1000;
+pub const DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: u16 = 1000;
+
+// Path to override the default value.
+pub const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH: RefPath =
+    RefPath::assert_from(b"/evm/max_delayed_inbox_blueprint_length");
 
 // Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
@@ -338,12 +343,17 @@ impl DelayedInbox {
         &mut self,
         host: &mut Host,
     ) -> Result<Option<Vec<Transaction>>> {
+        let max_delayed_inbox_blueprint_length = read_u16_le_default(
+            host,
+            &MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH,
+            DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
+        )?;
         let mut popped: Vec<Transaction> = vec![];
         while let Some(tx) = self.pop_first(host)? {
             popped.push(tx);
             // Check if the number of transactions has reached the limit per
             // blueprint
-            if popped.len() >= MAX_DELAYED_INBOX_BLUEPRINT_LENGTH {
+            if popped.len() as u16 >= max_delayed_inbox_blueprint_length {
                 break;
             }
         }
