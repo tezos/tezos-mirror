@@ -8,7 +8,8 @@
 type service = {name : string; url : string}
 
 type t = {
-  process : Process.t;
+  process : unit Lwt.t;
+  to_stop : unit Lwt.u;
   dir : string;
   monitoring : bool;
   prometheus : bool;
@@ -130,18 +131,54 @@ let run () =
   let port = Env.website_port in
   let prometheus = Env.prometheus in
   let monitoring = Env.monitoring in
-  let process =
-    Process.spawn
-      "python3"
-      [
-        "-m";
-        "http.server";
-        string_of_int port;
-        "--directory";
-        Filename.dirname index;
-      ]
+  let stop, to_stop = Lwt.task () in
+  let logger next_handler request =
+    let meth = Dream.method_to_string (Dream.method_ request) in
+    let target = Dream.target request in
+    let req = Dream.client request in
+    let fd_field =
+      Dream.new_field ~name:"dream.fd" ~show_value:string_of_int ()
+    in
+    let fd_string =
+      match Dream.field request fd_field with
+      | None -> ""
+      | Some fd -> " fd " ^ string_of_int fd
+    in
+    let user_agent = Dream.headers request "User-Agent" |> String.concat " " in
+    Log.info
+      ~color:Log.Color.FG.blue
+      ~prefix:"dream"
+      "%s %s %s%s %s"
+      meth
+      target
+      req
+      fd_string
+      user_agent ;
+    next_handler request
   in
-  Lwt.return {process; dir; monitoring; prometheus; services = []}
+  let process =
+    Dream.serve ~stop ~port ~tls:false ~interface:"0.0.0.0"
+    (* @@ Dream.logger *)
+    @@ logger
+    @@ Dream.router
+         [
+           Dream.get "/metrics" (fun _ ->
+               let content = read_file (dir // "metrics.txt") in
+               let response = Dream.response content in
+               Dream.add_header
+                 response
+                 "Content-type"
+                 "text/plain; version=0.0.4; charset=utf-8" ;
+               Lwt.return response);
+           Dream.get "/style.css" (fun _ ->
+               let content = read_file (dir // "style.css") in
+               Dream.respond content);
+           Dream.get "/" (fun _ ->
+               let content = read_file index in
+               Dream.html content);
+         ]
+  in
+  Lwt.return {process; to_stop; dir; monitoring; prometheus; services = []}
 
 let start ~agents =
   let* t = run () in
@@ -150,9 +187,9 @@ let start ~agents =
 
 let shutdown t =
   Log.info "Shutting down the website..." ;
-  Process.terminate t.process ;
+  Lwt.wakeup t.to_stop () ;
   (* Do not fail if something happened during shutdown. *)
-  let* _ = Process.wait t.process in
+  let* () = t.process in
   Lwt.return_unit
 
 let push_metric =

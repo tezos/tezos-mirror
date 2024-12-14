@@ -7,8 +7,6 @@ FROM debian:sid AS base
 RUN apt-get update && apt-get install -y \
     # netbase is needed to handle transport services
     netbase \
-    # python3 is not strictly needed but could be used to run an html server for example
-    python3 \
     # openssh-server is needed for sshd
     openssh-server \
     # Tezos dependencies
@@ -33,8 +31,6 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     # DL3009: Delete the apt-get lists after Installing
     rm -rf /var/lib/apt/lists/* && \
-    # To create and make the /usr/bin/python binary points to /usr/bin/python3 binary
-    update-alternatives --install /usr/bin/python python /usr/bin/python3 1 && \
     # This directory is necessary for running sshd
     mkdir -p /run/sshd && \
     # A server ssh also requires a key. We generate one for all the main schemes

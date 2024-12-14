@@ -51,7 +51,7 @@ let netdata_source_of_agents agents =
 let tezt_source =
   {
     name = "tezt_metrics";
-    metrics_path = "/metrics.txt";
+    metrics_path = "/metrics";
     targets =
       [
         {
