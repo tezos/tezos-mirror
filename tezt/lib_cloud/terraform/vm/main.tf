@@ -98,7 +98,7 @@ provider "google" {
 # A service account must be associated with a VM
 resource "google_service_account" "default" {
   account_id   = "${terraform.workspace}-id"
-  display_name = "${terraform.workspace} service Account"
+  display_name = "${terraform.workspace}"
 }
 
 # We want the service account to be able to fetch docker image from
@@ -216,7 +216,7 @@ resource "google_compute_subnetwork" "default" {
 # are machines. We ensure to give them a unique name.
 resource "google_compute_address" "default" {
   count        = var.number_of_vms
-  name         = format("${terraform.workspace}-address-%02d", count.index)
+  name         = format("${terraform.workspace}-%02d", count.index)
   address_type = "EXTERNAL"
 
   # See https://cloud.google.com/network-tiers/docs/set-network-tier
@@ -291,7 +291,7 @@ resource "google_compute_instance_template" "default" {
 
   project = var.project_id
 
-  name_prefix = "instance-template-${terraform.workspace}"
+  name_prefix = "${terraform.workspace}-template"
 
   service_account {
     # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.
