@@ -275,3 +275,13 @@ let push_docker =
        VMs that are already running, it is useful to prevent those containers \
        to be pushed."
     true
+
+let auto_approve =
+  Clap.flag
+    ~section
+    ~set_long:"auto-approve"
+    ~unset_long:"no-auto-approve"
+    ~description:
+      "If set to true (default), don't ask confirmation before updating a \
+       deployment via terraform."
+    true
