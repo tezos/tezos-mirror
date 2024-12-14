@@ -1906,7 +1906,7 @@ module Alert = struct
   let low_DAL_attested_commitments_ratio =
     alert
       "LowDALAttestedCommitmentsRatio"
-      ~for_:"30m"
+      ~for_:"5m"
       ~severity:`Info
       ~expr:{|vector(1)|}
       ~summary:"DAL attested commitments ratio over the last 12 hours"
@@ -1918,7 +1918,7 @@ module Alert = struct
 
   let dal_slack_receiver = slack_webhook_receiver ~name:"slack-notifications"
 
-  let dal_group = group "dal" dal_slack_receiver
+  let dal_group = group ~repeat_interval:"12h" "dal" dal_slack_receiver
 
   let low_DAL_attested_ratio_slack_handler =
     Handler.make ~name:"low-DAL-attested-ratio-slack-handler" ~setup:(fun t ->
