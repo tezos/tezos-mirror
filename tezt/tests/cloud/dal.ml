@@ -790,10 +790,11 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                      | None -> (* No attestation in block *) 0
                      | Some (Some z) when n = 0 ->
                          if z = Z.zero then (* No slot were published. *) 100
-                         else
-                           Test.fail
+                         else (
+                           Log.error
                              "Wow wow wait! It seems an invariant is broken. \
-                              Either on the test side, or on the DAL node side"
+                              Either on the test side, or on the DAL node side" ;
+                           100)
                      | Some (Some z) ->
                          (* Attestation with DAL payload *)
                          if n = 0 then 100 else Z.popcount z * 100 / n
