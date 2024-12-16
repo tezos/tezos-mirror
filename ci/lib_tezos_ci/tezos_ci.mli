@@ -1,12 +1,14 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
 (** A GitLab CI job annotated with Octez-specific meta-data. *)
 type tezos_job
+
+module Rules : module type of Rules
 
 (** The name of a {!tezos_job} as given to [~name] of {!job}.
 

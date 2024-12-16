@@ -1,3 +1,11 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(*                                                                           *)
+(*****************************************************************************)
+
+module Rules = Rules
 open Gitlab_ci.Util
 
 let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
