@@ -51,7 +51,7 @@ let monitoring_child_pipeline =
       [
         job_datadog_pipeline_trace;
         job_build_grafazos ();
-        job_build_layer1_profiling;
+        job_build_layer1_profiling ();
       ]
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
