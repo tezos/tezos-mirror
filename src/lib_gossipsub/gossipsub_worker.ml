@@ -701,6 +701,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           Point.Set.iter
             (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
             bootstrap_points) ;
+        let state =
+          (* We reset the map every 6h. This prevents this map to contain outdated points. *)
+          if Int64.(equal (rem gstate_view.heartbeat_ticks 21600L) 0L) then
+            {state with unreachable_points = Point.Map.empty}
+          else state
+        in
         state
 
   let update_gossip_state state (gossip_state, output) =
