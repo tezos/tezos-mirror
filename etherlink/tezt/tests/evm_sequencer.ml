@@ -8422,6 +8422,39 @@ let test_websocket_newHeads_event =
   let* () = scenario sequencer (1l, 2l) in
   scenario observer (4l, 5l)
 
+(* This test is flaky because Dream may not correctly detect websocket
+   connections closed by the client. *)
+let test_websocket_cleanup =
+  register_all
+    ~tags:["evm"; "rpc"; "websocket"; "cleanup"; Tag.flaky]
+    ~title:"Check that websocket subscriptions are cleaned up on close"
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:
+      ((Array.to_list Eth_account.bootstrap_accounts
+       |> List.map (fun a -> a.Eth_account.address))
+      @ Eth_account.lots_of_address)
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~rpc_server:Dream (* Websockets only available in Dream *)
+    ~websockets:true
+  @@ fun {sequencer; _} _protocol ->
+  let* websocket = Evm_node.open_websocket sequencer in
+  let* id1 = Rpc.subscribe ~websocket ~kind:NewHeads sequencer in
+  let* id2 = Rpc.subscribe ~websocket ~kind:NewHeads sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
+  Log.info "Closing websocket" ;
+  let* () = Websocket.close websocket in
+  let* () = Lwt_unix.sleep 1. in
+  Log.info "New websocket connection" ;
+  let* websocket = Evm_node.open_websocket sequencer in
+  let* sub_status = Rpc.unsubscribe ~websocket ~id:id2 sequencer in
+  Check.((sub_status = false) bool)
+    ~error_msg:"Subscription should have been cleaned up from node" ;
+  let* sub_status = Rpc.unsubscribe ~websocket ~id:id1 sequencer in
+  Check.((sub_status = false) bool)
+    ~error_msg:"All subscriptions should have been cleaned up from node" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -8537,4 +8570,5 @@ let () =
   test_websocket_rpcs [Protocol.Alpha] ;
   test_websocket_subscription_rpcs_cant_be_called_via_http_requests
     [Protocol.Alpha] ;
-  test_websocket_newHeads_event [Protocol.Alpha]
+  test_websocket_newHeads_event [Protocol.Alpha] ;
+  test_websocket_cleanup [Protocol.Alpha]
