@@ -1207,6 +1207,8 @@ let run ~data_dir ~configuration_override =
     in
     return (fun () -> !bootstrap_points)
   in
+  let* p2p_config = Transport_layer_parameters.p2p_config config in
+  let p2p_limits = Transport_layer_parameters.p2p_limits in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
@@ -1246,11 +1248,18 @@ let run ~data_dir ~configuration_override =
         }
       else limits
     in
+    let identity = p2p_config.P2p.identity in
+    let self =
+      (* What matters is the identity, the reachable point is more like a placeholder here. *)
+      Types.Peer.
+        {peer_id = identity.peer_id; maybe_reachable_point = public_addr}
+    in
     let gs_worker =
       Gossipsub.Worker.(
         make
           ~bootstrap_points:get_bootstrap_points
           ~events_logging:Logging.event
+          ~self
           rng
           limits
           peer_filter_parameters)
@@ -1261,8 +1270,6 @@ let run ~data_dir ~configuration_override =
   let points = get_bootstrap_points () in
   (* Create a transport (P2P) layer instance. *)
   let* transport_layer =
-    let open Transport_layer_parameters in
-    let* p2p_config = p2p_config config in
     Gossipsub.Transport_layer.create
       ~public_addr
       ~is_bootstrap_peer:(profile = Profile_manager.bootstrap)
