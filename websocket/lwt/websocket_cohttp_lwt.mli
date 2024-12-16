@@ -21,6 +21,7 @@ open Websocket
 val upgrade_connection :
   Cohttp.Request.t ->
   (Frame.t -> unit) ->
+  (exn -> unit Lwt.t) ->
   (Cohttp_lwt_unix.Server.response_action * (Frame.t option -> unit)) Lwt.t
 (** [upgrade_connection req incoming_handler] takes [req], a
     connection request, and [incoming_handler], a function that will
