@@ -18,6 +18,8 @@ you start using them, you probably want to use `octez-evm-node check config
     real-time notifications of new blocks. (!15899)
   - Added support for the WebSocket event `newPendingTransactions`, enabling clients
     to receive real-time notifications of incoming pending transactions. (!15991)
+  - Added support for the WebSocket event `logs`, enabling clients to receive real-time
+    notifications for contract events filtered by address and topics. (!16011)
 
 ### Bug fixes
 
