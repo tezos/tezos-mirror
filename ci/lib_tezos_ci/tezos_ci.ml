@@ -1245,3 +1245,298 @@ let append_after_script script tezos_job =
 let with_interruptible value tezos_job =
   map_non_trigger_job tezos_job @@ fun job ->
   {job with interruptible = Some value}
+
+(* Define [stages:]
+
+   The "manual" stage exists to fix a UI problem that occurs when mixing
+   manual and non-manual jobs. *)
+module Stages = struct
+  let start = Stage.register "start"
+
+  (* All automatic image creation is done in the stage [images]. *)
+  let images = Stage.register "images"
+
+  let sanity = Stage.register "sanity"
+
+  let build = Stage.register "build"
+
+  let test = Stage.register "test"
+
+  let test_coverage = Stage.register "test_coverage"
+
+  let packaging = Stage.register "packaging"
+
+  let publishing = Stage.register "publishing"
+
+  let publishing_tests = Stage.register "publishing_tests"
+
+  let doc = Stage.register "doc"
+
+  let prepare_release = Stage.register "prepare_release"
+
+  let publish_release_gitlab = Stage.register "publish_release_gitlab"
+
+  let publish_release = Stage.register "publish_release"
+
+  let publish_package_gitlab = Stage.register "publish_package_gitlab"
+
+  let manual = Stage.register "manual"
+end
+
+(* Register external images.
+
+   Use this module to register images that are as built outside the
+   [tezos/tezos] CI. *)
+module Images_external = struct
+  let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
+
+  (* Match GitLab executors version and directly use the Docker socket
+     The Docker daemon is already configured, experimental features are enabled
+     The following environment variables are already set:
+     - [BUILDKIT_PROGRESS]
+     - [DOCKER_DRIVER]
+     - [DOCKER_VERSION]
+     For more info, see {{:https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding}} here.
+
+     This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
+  let docker =
+    Image.mk_external
+      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0"
+
+  (* Image used in initial pipeline job that sends to Datadog useful
+     info for CI visibility.
+
+     The [datadog-ci] version should be consistent across all CI
+     images that use it. At the moment it is installed in the
+     external image below and the internal image [e2etest]. *)
+  let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v2.44.0"
+
+  let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
+
+  let ubuntu_noble =
+    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.04_stable"
+
+  let ubuntu_jammy =
+    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"
+
+  let ubuntu_oracular =
+    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.10_stable"
+
+  let fedora_37 = Image.mk_external ~image_path:"fedora:37"
+
+  let fedora_39 = Image.mk_external ~image_path:"fedora:39"
+
+  let rockylinux_93 = Image.mk_external ~image_path:"rockylinux:9.3"
+
+  let opam_ubuntu_oracular =
+    Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.10"
+
+  let opam_ubuntu_noble =
+    Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.04"
+
+  let opam_debian_bookworm =
+    Image.mk_external ~image_path:"ocaml/opam:debian-12"
+
+  let ci_release =
+    Image.mk_external
+      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0"
+
+  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
+
+  (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
+     latest release, then an update in the parser or analyser could result in new
+     errors being found even if the code doesn't change. This would place the
+     burden for fixing the code on the wrong dev (the devs who happen to open an
+     MR coinciding with the semgrep update rather than the dev who wrote the
+     infringing code in the first place).
+     Update the hash in scripts/semgrep/README.md too when updating it here
+     Last update: 2022-01-03 *)
+  let semgrep_agent =
+    Image.mk_external ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
+end
+
+let opt_var name f = function Some value -> [(name, f value)] | None -> []
+
+(** {2 Job makers} *)
+
+(** Helper to create jobs that uses the Docker daemon.
+
+    It sets the appropriate image. Furthermore, unless
+    [skip_docker_initialization] is [true], it:
+    - activates the Docker daemon as a service;
+    - sets up authentification with Docker registries
+    in the job's [before_script] section.
+
+    If [ci_docker_hub] is set to [true], then the job will
+    authenticate with Docker Hub provided the environment variable
+    [CI_DOCKER_AUTH] contains the appropriate credentials. *)
+let job_docker_authenticated ?(skip_docker_initialization = false)
+    ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
+    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?retry ?description
+    ~__POS__ ~stage ~name script : tezos_job =
+  let docker_version = "24.0.7" in
+  job
+    ?rules
+    ?dependencies
+    ?image_dependencies
+    ?artifacts
+    ?arch
+    ?tag
+    ?allow_failure
+    ?parallel
+    ?retry
+    ?description
+    ~__POS__
+    ~image:Images_external.docker
+    ~variables:
+      ([("DOCKER_VERSION", docker_version)]
+      @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
+      @ variables)
+    ~before_script:
+      (if not skip_docker_initialization then
+         ["./scripts/ci/docker_initialize.sh"]
+       else [])
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~stage
+    ~name
+    script
+
+(** A set of internally and externally built images.
+
+    Use this module to register images built in the CI of
+    [tezos/tezos] that are also used in the same pipelines. See
+    {!Images_external} for external images.
+
+    To make the distinction between internal and external images
+    transparent to job definitions, this module also includes
+    {!Images_external}.
+
+    For documentation on the [CI] images and the [rust_toolchain]
+    images, refer to [images/README.md]. *)
+module Images = struct
+  (* Include external images here for convenience. *)
+  include Images_external
+
+  (* Internal images are built in the stage {!Stages.images}. *)
+  let stage = Stages.images
+
+  let client_libs_dependencies =
+    let image_builder_amd64 =
+      job_docker_authenticated
+        ~__POS__
+        ~stage
+        ~name:"oc.docker:client-libs-dependencies"
+        ~description:"Build internal client-libs-dependencies images"
+          (* This image is not built for external use. *)
+        ~ci_docker_hub:false
+          (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
+        ~skip_docker_initialization:true
+        ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
+        ~artifacts:
+          (artifacts
+             ~reports:
+               (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
+             [])
+    in
+    let image_path =
+      "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
+    in
+    Image.mk_internal ~image_builder_amd64 ~image_path ()
+
+  (** The rust toolchain image *)
+  let rust_toolchain =
+    (* The job that builds the rust_toolchain image.
+       This job is automatically included in any pipeline that uses this image. *)
+    let image_builder arch =
+      job_docker_authenticated
+        ~__POS__
+        ~arch
+        ~skip_docker_initialization:true
+        ~stage
+        ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
+        ~description:
+          ("Build internal rust-toolchain images for " ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts
+             ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
+             [])
+        ["./scripts/ci/docker_rust_toolchain_build.sh"]
+    in
+    let image_path =
+      "${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
+    in
+    Image.mk_internal
+      ~image_builder_amd64:(image_builder Amd64)
+      ~image_builder_arm64:(image_builder Arm64)
+      ~image_path
+      ()
+
+  (** The jsonnet image *)
+  let jsonnet =
+    let image_builder arch =
+      job_docker_authenticated
+        ~__POS__
+        ~arch
+        ~stage
+        ~name:("oc.docker:jsonnet:" ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
+        ["./scripts/ci/docker_jsonnet_build.sh"]
+    in
+    let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
+    Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
+
+  module CI = struct
+    (* The job that builds the CI images.
+       This job is automatically included in any pipeline that uses any of these images. *)
+    let job_docker_ci arch =
+      let variables = Some [("ARCH", arch_to_string_alt arch)] in
+      let retry =
+        match arch with
+        | Amd64 -> None
+        (* We're currently seeing flakiness in the arm64 jobs *)
+        | Arm64 ->
+            Some {Gitlab_ci.Types.max = 1; when_ = [Runner_system_failure]}
+      in
+      job_docker_authenticated
+        ?variables
+        ?retry
+        ~__POS__
+        ~arch
+        ~skip_docker_initialization:true
+        ~stage
+        ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
+        ~description:("Build internal CI images for " ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
+        ["./images/ci_create_ci_images.sh"]
+
+    let mk_ci_image ~image_path =
+      Image.mk_internal
+        ~image_builder_amd64:(job_docker_ci Amd64)
+        ~image_builder_arm64:(job_docker_ci Arm64)
+        ~image_path
+        ()
+
+    (* Reuse the same image_builder job [job_docker_ci] for all
+       the below images, since they're all produced in that same job.
+
+       Depending on any of these images ensures that the job
+       [job_docker_ci] is included exactly once in the pipeline. *)
+    let runtime =
+      mk_ci_image ~image_path:"${ci_image_name}/runtime:${ci_image_tag}"
+
+    let prebuild =
+      mk_ci_image ~image_path:"${ci_image_name}/prebuild:${ci_image_tag}"
+
+    let build = mk_ci_image ~image_path:"${ci_image_name}/build:${ci_image_tag}"
+
+    let test = mk_ci_image ~image_path:"${ci_image_name}/test:${ci_image_tag}"
+
+    let e2etest =
+      mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
+  end
+end

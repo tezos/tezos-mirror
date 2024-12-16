@@ -459,3 +459,147 @@ val append_after_script : string list -> tezos_job -> tezos_job
 
     Has no effect on {!trigger_job}s. *)
 val with_interruptible : bool -> tezos_job -> tezos_job
+
+val job_docker_authenticated :
+  ?skip_docker_initialization:bool ->
+  ?ci_docker_hub:bool ->
+  ?artifacts:Gitlab_ci.Types.artifacts ->
+  ?variables:(string * string) list ->
+  ?rules:Gitlab_ci.Types.job_rule list ->
+  ?dependencies:dependencies ->
+  ?image_dependencies:Image.t list ->
+  ?arch:arch ->
+  ?tag:tag ->
+  ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
+  ?parallel:Gitlab_ci.Types.parallel ->
+  ?retry:Gitlab_ci.Types.retry ->
+  ?description:string ->
+  __POS__:string * int * int * int ->
+  stage:Stage.t ->
+  name:string ->
+  string list ->
+  tezos_job
+
+module Stages : sig
+  val start : Stage.t
+
+  val images : Stage.t
+
+  val sanity : Stage.t
+
+  val build : Stage.t
+
+  val test : Stage.t
+
+  val test_coverage : Stage.t
+
+  val packaging : Stage.t
+
+  val publishing : Stage.t
+
+  val publishing_tests : Stage.t
+
+  val doc : Stage.t
+
+  val prepare_release : Stage.t
+
+  val publish_release_gitlab : Stage.t
+
+  val publish_release : Stage.t
+
+  val publish_package_gitlab : Stage.t
+
+  val manual : Stage.t
+end
+
+module Images_external : sig
+  val nix : Image.t
+
+  val docker : Image.t
+
+  val datadog_ci : Image.t
+
+  val debian_bookworm : Image.t
+
+  val ubuntu_noble : Image.t
+
+  val ubuntu_jammy : Image.t
+
+  val ubuntu_oracular : Image.t
+
+  val fedora_37 : Image.t
+
+  val fedora_39 : Image.t
+
+  val rockylinux_93 : Image.t
+
+  val opam_ubuntu_oracular : Image.t
+
+  val opam_ubuntu_noble : Image.t
+
+  val opam_debian_bookworm : Image.t
+
+  val ci_release : Image.t
+
+  val hadolint : Image.t
+
+  val semgrep_agent : Image.t
+end
+
+module Images : sig
+  val nix : Image.t
+
+  val docker : Image.t
+
+  val datadog_ci : Image.t
+
+  val debian_bookworm : Image.t
+
+  val ubuntu_noble : Image.t
+
+  val ubuntu_jammy : Image.t
+
+  val ubuntu_oracular : Image.t
+
+  val fedora_37 : Image.t
+
+  val fedora_39 : Image.t
+
+  val rockylinux_93 : Image.t
+
+  val opam_ubuntu_oracular : Image.t
+
+  val opam_ubuntu_noble : Image.t
+
+  val opam_debian_bookworm : Image.t
+
+  val ci_release : Image.t
+
+  val hadolint : Image.t
+
+  val semgrep_agent : Image.t
+
+  val stage : Stage.t
+
+  val client_libs_dependencies : Image.t
+
+  val rust_toolchain : Image.t
+
+  val jsonnet : Image.t
+
+  module CI : sig
+    val job_docker_ci : arch -> tezos_job
+
+    val mk_ci_image : image_path:string -> Image.t
+
+    val runtime : Image.t
+
+    val prebuild : Image.t
+
+    val build : Image.t
+
+    val test : Image.t
+
+    val e2etest : Image.t
+  end
+end
