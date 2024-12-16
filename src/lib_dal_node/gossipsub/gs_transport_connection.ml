@@ -185,8 +185,17 @@ let try_connect ?expected_peer_id p2p_layer ~trusted point =
      be delayed. *)
   Lwt.dont_wait
     (fun () ->
+      (* We don't check [expected_peer_id] anymore because people frequently
+         wipe / regenerate their peer identities while keeping the same IP
+         addresses. The [expected_peer_id] check, if enabled, will make
+         Octez-p2p reject any other connection with a different identity. *)
+      (* DAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7646
+
+          Implement a better PX exchange.
+      *)
+      ignore expected_peer_id ;
       let* (_ : _ P2p.connection tzresult) =
-        P2p.connect ?expected_peer_id ~trusted p2p_layer point
+        P2p.connect ~trusted p2p_layer point
       in
       return_unit)
     (fun exn ->
