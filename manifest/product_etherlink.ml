@@ -18,7 +18,7 @@ open Product_prometheus
 include Product (struct
   let name = "etherlink"
 
-  let source = ["etherlink"; "src"]
+  let source = ["etherlink"; "src"] @ Product_websocket.product_source
 end)
 
 let tezt_etherlink =
