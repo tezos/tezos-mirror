@@ -11,3 +11,4 @@ It contains the following libraries:
 - {{!module-Evm_node_rust_deps}Evm_node_rust_deps}: WASM runtime foreign archive
 - {{!module-Evm_node_wasm_runtime}Evm_node_wasm_runtime}: WASM runtime compatible with the WASM PVM
 - {{!module-Wasm_runtime_callbacks}Wasm_runtime_callbacks}: Callbacks implementing the I/O functions required to implement the host functions of the WASM runtime
+- {{!module-Websocket_cohttp_lwt}Websocket_cohttp_lwt}

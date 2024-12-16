@@ -10,6 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "astring"
+  "base64" { >= "3.3.0" }
+  "ocplib-endian"
+  "conduit-lwt" { >= "7.1.0" }
+  "cohttp" { >= "5.3.1" }
+  "mirage-crypto-rng" { >= "1.0.0" }
   "octez-libs"
   "octez-shell-libs"
   "octez-l2-libs"
@@ -23,6 +29,9 @@ depends: [
   "lwt-exit"
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"
+]
+conflicts: [
+  "websocket"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
