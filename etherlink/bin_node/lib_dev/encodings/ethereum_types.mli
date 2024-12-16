@@ -310,10 +310,42 @@ module From_rlp : sig
   val decode_hex : Rlp.item -> hex tzresult
 end
 
+module Filter : sig
+  (** Event filter, see
+    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs *)
+  type topic = One of hash | Or of hash list
+
+  val topic_encoding : topic Data_encoding.t
+
+  type filter_address = Single of address | Vec of address list
+
+  val filter_address_encoding : filter_address Data_encoding.t
+
+  type changes =
+    | Block_filter of block_hash
+    | Pending_transaction_filter of hash
+    | Log of transaction_log
+
+  val changes_encoding : changes Data_encoding.t
+
+  type t = {
+    from_block : Block_parameter.t option;
+    to_block : Block_parameter.t option;
+    address : filter_address option;
+    topics : topic option list option;
+    block_hash : block_hash option;
+  }
+
+  val encoding : t Data_encoding.t
+end
+
 module Subscription : sig
   exception Unknown_subscription
 
-  type logs = {address : address; topics : hash list}
+  type logs = {
+    address : Filter.filter_address option;
+    topics : Filter.topic option list option;
+  }
 
   type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
 
@@ -337,7 +369,7 @@ module Subscription : sig
 
   type output =
     | NewHeads of block
-    | Logs of logs
+    | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
 

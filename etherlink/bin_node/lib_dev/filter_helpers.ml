@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Ethereum_types
 
 (**
@@ -53,7 +54,7 @@ type error +=
   | Incompatible_block_params
   | Block_range_too_large of {limit : int}
   | Topic_list_too_large
-  | Receipt_not_found of Ethereum_types.hash
+  | Receipt_not_found of hash
   | Too_many_logs of {limit : int}
 
 (** [height_from_param (module Rollup_node_rpc) from to_] returns the
@@ -333,7 +334,7 @@ let () =
     ~id:"evm_node_dev_receipt_not_found"
     ~title:"Receipt not found"
     ~description:"Could not found requested receipt"
-    Data_encoding.(obj1 (req "receipt_not_found" Ethereum_types.hash_encoding))
+    Data_encoding.(obj1 (req "receipt_not_found" hash_encoding))
     (function Receipt_not_found hash -> Some hash | _ -> None)
     (fun hash -> Receipt_not_found hash) ;
   register_error_kind
