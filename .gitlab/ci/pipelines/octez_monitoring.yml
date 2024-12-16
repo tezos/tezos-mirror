@@ -122,6 +122,6 @@ build-layer1-profiling:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   artifacts:
-    expire_in: 1 day
+    expire_in: never
     paths:
     - ./octez-binaries/x86_64/octez-node
