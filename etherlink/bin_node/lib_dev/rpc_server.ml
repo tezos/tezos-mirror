@@ -46,6 +46,8 @@ module Resto = struct
       dir
       callback_log
 
+  let conn_closed conn = Evm_websocket.on_conn_closed conn
+
   let start_server rpc directory =
     let open Lwt_result_syntax in
     let open Tezos_rpc_http_server in
@@ -76,6 +78,7 @@ module Resto = struct
         ~host
         server
         ~callback:(callback server directory)
+        ~conn_closed
         node
     in
 
