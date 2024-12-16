@@ -45,6 +45,16 @@ module Event = struct
       ~msg:"Native execution is disabled in sequencer mode"
       ~level:Warning
       ()
+
+  let buggy_dream_websocket =
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:"dream_websocket"
+      ~msg:
+        "[Warning] Websocket support in Dream is known to be buggy, consider \
+         using Resto as an RPC server or disabling websockets."
+      ~level:Warning
+      ()
 end
 
 module Params = struct
@@ -707,6 +717,14 @@ let snapshot_file_arg =
        is based on the snapshot information."
     Params.string
 
+let websocket_checks config =
+  match config.experimental_features with
+  | {enable_websocket = true; rpc_server = Dream; _} ->
+      Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
+  | {enable_websocket = true; rpc_server = Resto; _} ->
+      failwith "Resto RPC server backend does not support websockets"
+  | _ -> Lwt_result_syntax.return_unit
+
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?cors_origins ?cors_headers ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
@@ -859,13 +877,6 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ~finalized_view
       ()
   in
-  let*! configuration =
-    match sandbox_key with
-    | None ->
-        (* We are running in sequencer mode (not in sandbox mode), we need to disable native execution *)
-        sequencer_disable_native_execution configuration
-    | _ -> Lwt.return configuration
-  in
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
@@ -887,6 +898,14 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     in
     init ~config ()
   in
+  let*! configuration =
+    match sandbox_key with
+    | None ->
+        (* We are running in sequencer mode (not in sandbox mode), we need to disable native execution *)
+        sequencer_disable_native_execution configuration
+    | _ -> Lwt.return configuration
+  in
+  let* () = websocket_checks configuration in
   let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
 
   Evm_node_lib_dev.Sequencer.main
@@ -947,7 +966,6 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
       ~finalized_view
       ()
   in
-  let*! configuration = sequencer_disable_native_execution configuration in
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
     let config =
@@ -969,6 +987,8 @@ let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
     in
     init ~config ()
   in
+  let*! configuration = sequencer_disable_native_execution configuration in
+  let* () = websocket_checks configuration in
   let*! () = Internal_event.Simple.emit Event.event_starting "te_sequencer" in
   Evm_node_lib_dev.Threshold_encryption_sequencer.main
     ~data_dir
@@ -1107,6 +1127,7 @@ let rpc_command =
         in
         init ~config ()
       in
+      let* () = websocket_checks config in
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
       Evm_node_lib_dev.Rpc.main ~data_dir ~evm_node_endpoint ~config)
 
@@ -1173,6 +1194,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     in
     init ~config ()
   in
+  let* () = websocket_checks config in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   Evm_node_lib_dev.Observer.main
     ~no_sync
@@ -1736,6 +1758,12 @@ mode.|}
           ~finalized_view
           ()
       in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config = make_with_defaults ~verbosity:Warning () in
+        init ~config ()
+      in
+      let* () = websocket_checks config in
       Configuration.save ~force ~data_dir config)
 
 let check_config_command =
@@ -1748,16 +1776,22 @@ let check_config_command =
     (args3 data_dir_arg config_path_arg print_config_arg)
     (prefixes ["check"; "config"] @@ stop)
     (fun (data_dir, config_path, print_config) () ->
-      let+ config =
+      let* config =
         match config_path with
         | Some config_path ->
             load_file ~data_dir:Configuration.default_data_dir config_path
         | None -> load ~data_dir
       in
-
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config = make_with_defaults ~verbosity:Warning () in
+        init ~config ()
+      in
+      let* () = websocket_checks config in
       if print_config then
         Format.printf "%a\n" (Configuration.pp_print_json ~data_dir) config
-      else Format.printf "Configuration has been parsed successfully.\n")
+      else Format.printf "Configuration has been parsed successfully.\n" ;
+      return_unit)
 
 let config_key_arg ~name ~placeholder =
   let open Lwt_result_syntax in
