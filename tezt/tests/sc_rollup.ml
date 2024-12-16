@@ -3389,6 +3389,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
   let commitment_period = 5 in
   let challenge_window = 5 in
   test_full_scenario
+    ~operator
     ~kind
     {
       variant = None;
@@ -3416,7 +3417,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
     @@ Sc_rollup_rpc.get_local_last_published_commitment ()
   in
   Log.info "Terminate the node" ;
-  let* () = Sc_rollup_node.kill sc_rollup_node in
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
   Log.info "Bake until refutation period is over" ;
   let* () = bake_levels challenge_window tezos_client in
   (* manually cement the commitment *)
@@ -3470,13 +3471,16 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
+      ~operators:[(Recovering, Constant.bootstrap2.public_key_hash)]
+      ~data_dir:(Sc_rollup_node.data_dir sc_rollup_node)
   in
-  let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup []
-  and* () =
+  let wait_for_bailout_exit =
     let event_name = "smart_rollup_node_daemon_exit_bailout_mode.v0" in
     bake_until_event tezos_client ~event_name
     @@ Sc_rollup_node.wait_for sc_rollup_node' event_name (Fun.const (Some ()))
   in
+  let* () = Sc_rollup_node.run ~event_level:`Debug sc_rollup_node' sc_rollup []
+  and* () = wait_for_bailout_exit in
   Log.info "Check that the bond have been recovered by the rollup node" ;
   let* frozen_balance =
     Client.RPC.call tezos_client
