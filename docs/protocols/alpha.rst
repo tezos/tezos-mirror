@@ -39,6 +39,11 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Added RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/consecutive_round_zero``,
+  which returns the number of blocks consecutively baked at round
+  zero. (MR :gl:`!15945`)
+
 Operation receipts
 ------------------
 
