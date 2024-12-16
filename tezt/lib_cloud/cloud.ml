@@ -27,22 +27,6 @@ let sigint =
       previous_behaviour := previous_handler ;
       promise
 
-let eof =
-  let promise, resolver = Lwt.task () in
-  Lwt.dont_wait
-    (fun () ->
-      let rec loop () =
-        let* input = Input.next () in
-        match input with
-        | None ->
-            Lwt.wakeup resolver () ;
-            Lwt.return_unit
-        | Some _ -> loop ()
-      in
-      loop ())
-    (fun _ -> Lwt.wakeup resolver ()) ;
-  promise
-
 (* This exception is raised when the test is interrupted by Ctrl+C. *)
 exception Interrupted
 
@@ -275,7 +259,7 @@ let attach agent =
       Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
       |> Process.check
     in
-    let* _ = eof in
+    let* _ = Input.eof in
     let* () =
       let process = Process.spawn ~runner "pkill" ["screen"] in
       let* _ = Process.wait process in
@@ -296,7 +280,7 @@ let attach agent =
     Lwt.return_unit
   in
   let on_eof =
-    let* () = eof in
+    let* () = Input.eof in
     Log.info "Detach from the proxy process." ;
     if !has_sigint then on_sigint
     else

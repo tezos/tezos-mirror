@@ -34,3 +34,19 @@ let _ =
       !resolvers |> List.iter (fun resolver -> Lwt.wakeup_later resolver None) ;
       stdin_closed := true ;
       Lwt.return_unit)
+
+let eof =
+  let promise, resolver = Lwt.task () in
+  Lwt.dont_wait
+    (fun () ->
+      let rec loop () =
+        let* input = next () in
+        match input with
+        | None ->
+            Lwt.wakeup resolver () ;
+            Lwt.return_unit
+        | Some _ -> loop ()
+      in
+      loop ())
+    (fun _ -> Lwt.wakeup resolver ()) ;
+  promise

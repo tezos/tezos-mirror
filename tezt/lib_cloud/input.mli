@@ -9,3 +9,6 @@
 
 (** [next ()] returns the next line on stdin or none if stdin is closed. *)
 val next : unit -> string option Lwt.t
+
+(** [eof] is resolved when the [stdin] is closed. *)
+val eof : unit Lwt.t
