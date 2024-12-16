@@ -164,17 +164,21 @@ val produce_proposal :
   Evm_node.t ->
   (unit, error) result Lwt.t
 
-(** [state_value evm_node path] calls the private RPC [stateValue]. *)
+(** [state_value ?websocket evm_node ?block path] calls the private
+    RPC [stateValue]. *)
 val state_value :
   ?websocket:Websocket.t ->
   Evm_node.t ->
+  ?block:string ->
   string ->
   (string option, error) result Lwt.t
 
-(** [state_subkeys evm_node path] calls the private RPC [stateSubkeys]. *)
+(** [state_subkeys ?websocket evm_node ?block path] calls the private
+    RPC [stateSubkeys]. *)
 val state_subkeys :
   ?websocket:Websocket.t ->
   Evm_node.t ->
+  ?block:string ->
   string ->
   (string list option, error) result Lwt.t
 

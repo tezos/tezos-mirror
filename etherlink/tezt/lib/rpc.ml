@@ -90,9 +90,21 @@ module Request = struct
     let parameters = `O (with_delayed_transactions @ timestamp) in
     {method_ = "produceBlock"; parameters}
 
-  let stateValue path = {method_ = "stateValue"; parameters = `String path}
+  let stateValue ?block path =
+    let parameters =
+      match block with
+      | None -> `A [`String path]
+      | Some block -> `A [`String path; `String block]
+    in
+    {method_ = "stateValue"; parameters}
 
-  let stateSubkeys path = {method_ = "stateSubkeys"; parameters = `String path}
+  let stateSubkeys ?block path =
+    let parameters =
+      match block with
+      | None -> `A [`String path]
+      | Some block -> `A [`String path; `String block]
+    in
+    {method_ = "stateSubkeys"; parameters}
 
   let produceProposal ?timestamp () =
     let parameters =
@@ -383,26 +395,26 @@ let produce_proposal ?websocket ?timestamp evm_node =
          if JSON.is_null json then () else ())
        json
 
-let state_value ?websocket evm_node path =
+let state_value ?websocket evm_node ?block path =
   let* json =
     Evm_node.jsonrpc
       ?websocket
       ~private_:true
       evm_node
-      (Request.stateValue path)
+      (Request.stateValue ?block path)
   in
   return
   @@ decode_or_error
        (fun json -> Evm_node.extract_result json |> JSON.as_string_opt)
        json
 
-let state_subkeys ?websocket evm_node path =
+let state_subkeys ?websocket evm_node ?block path =
   let* json =
     Evm_node.jsonrpc
       ?websocket
       ~private_:true
       evm_node
-      (Request.stateSubkeys path)
+      (Request.stateSubkeys ?block path)
   in
   return
   @@ decode_or_error

@@ -299,12 +299,14 @@ module Inject_transaction :
 
 module Durable_state_value :
   METHOD
-    with type input = Durable_storage_path.path
+    with type input =
+      Durable_storage_path.path * Ethereum_types.Block_parameter.extended
      and type output = Bytes.t option
 
 module Durable_state_subkeys :
   METHOD
-    with type input = Durable_storage_path.path
+    with type input =
+      Durable_storage_path.path * Ethereum_types.Block_parameter.extended
      and type output = string list
 
 module Eth_max_priority_fee_per_gas :
