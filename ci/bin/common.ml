@@ -1334,7 +1334,10 @@ let job_build_layer1_profiling =
     ~stage:Stages.build
     ~image:Images.CI.build
     ~name:"build-layer1-profiling"
-    ~artifacts:(artifacts ~expire_in:(Duration (Days 1)) ["./octez-node"])
+    ~artifacts:
+      (artifacts
+         ~expire_in:(Duration (Days 1))
+         ["./octez-binaries/x86_64/octez-node"])
     ~before_script:
       (before_script
          ~take_ownership:true
@@ -1342,7 +1345,11 @@ let job_build_layer1_profiling =
          ~eval_opam:true
          [])
     ~variables:[("TEZOS_PPX_PROFILER", "profiling"); ("PROFILE", "static")]
-    ["make octez-layer1"]
+    [
+      "make octez-layer1";
+      "mkdir -p octez-binaries/x86_64/";
+      "mv octez-node octez-binaries/x86_64/";
+    ]
   |> enable_cargo_cache |> enable_sccache
 
 module Tezt = struct
