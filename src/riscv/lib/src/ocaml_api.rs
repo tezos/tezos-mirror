@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023-2024 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -11,7 +11,7 @@ use crate::{
         node_pvm::{NodePvm, PvmStorage, PvmStorageError},
         PvmHooks, PvmStatus,
     },
-    state_backend::owned_backend::Owned,
+    state_backend::{owned_backend::Owned, proof_backend::proof::serialise_proof},
 };
 use crate::{
     state_backend::proof_backend::proof,
@@ -116,6 +116,17 @@ pub enum Input<'a> {
 pub struct InputRequest;
 
 ocaml::custom!(InputRequest);
+
+// TODO RV-365 Implement Output & OutputProof types
+#[ocaml::sig]
+pub struct Output;
+
+ocaml::custom!(Output);
+
+#[ocaml::sig]
+pub struct OutputProof;
+
+ocaml::custom!(OutputProof);
 
 impl<'a> PvmHooks<'a> {
     fn from_printer(printer: ocaml::Value, gc: &'a ocaml::Runtime) -> PvmHooks<'a> {
@@ -468,4 +479,55 @@ pub unsafe fn octez_riscv_produce_proof(
     _state: Pointer<State>,
 ) -> Option<Pointer<InputRequest>> {
     None
+}
+
+#[ocaml::func]
+#[ocaml::sig("proof -> bytes")]
+pub unsafe fn octez_riscv_serialise_proof(proof: Pointer<Proof>) -> ocaml::Value {
+    // Safety: the function needs to return the same `ocaml::Value` as in the signature.
+    // In this case, an ocaml bytes value has to be returned.
+    let serialisation: Vec<u8> = serialise_proof(proof.as_ref()).collect();
+    ocaml::Value::bytes(serialisation)
+}
+
+#[ocaml::func]
+#[ocaml::sig("bytes -> (proof, string) Result.t")]
+pub fn octez_riscv_deserialise_proof(_bytes: &[u8]) -> Result<Pointer<Proof>, String> {
+    todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("output_proof -> output")]
+pub fn octez_riscv_output_of_output_proof(
+    _output_proof: Pointer<OutputProof>,
+) -> Result<Pointer<Proof>, String> {
+    todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("output_proof -> bytes")]
+pub fn octez_riscv_state_of_output_proof(_output_proof: Pointer<OutputProof>) -> [u8; 32] {
+    todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("output_proof -> output option")]
+pub fn octez_riscv_verify_output_proof(
+    _output_proof: Pointer<OutputProof>,
+) -> Option<Pointer<Output>> {
+    todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("output_proof -> bytes")]
+pub fn octez_riscv_serialise_output_proof(_output_proof: Pointer<OutputProof>) -> ocaml::Value {
+    // TODO RV-365 Implement Output & OutputProof types
+    // Ue similar implementation to octez_riscv_serialise_proof
+    todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("bytes -> (output_proof, string) result")]
+pub fn octez_riscv_deserialise_output_proof(_bytes: &[u8]) -> Result<Pointer<OutputProof>, String> {
+    todo!()
 }

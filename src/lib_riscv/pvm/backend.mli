@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -16,15 +16,19 @@ type hash = Tezos_crypto.Hashed.Smart_rollup_state_hash.t
 
 type state = Api.state
 
-type status = Octez_riscv_api.status
+type status = Api.status
 
-type reveal_data = Octez_riscv_api.reveal_data
+type reveal_data = Api.reveal_data
 
-type input = Octez_riscv_api.input
+type input = Api.input
 
-type input_request = Octez_riscv_api.input_request
+type input_request = Api.input_request
 
-type proof = Octez_riscv_api.proof
+type proof = Api.proof
+
+type output_proof = Api.output_proof
+
+type output = Api.output
 
 module Mutable_state : sig
   type t = Api.mut_state
@@ -89,3 +93,17 @@ val proof_stop_state : proof -> hash
 val verify_proof : input option -> proof -> input_request option
 
 val produce_proof : input option -> state -> proof option
+
+val serialise_proof : proof -> bytes
+
+val deserialise_proof : bytes -> (proof, string) result
+
+val output_of_output_proof : output_proof -> output
+
+val state_of_output_proof : output_proof -> hash
+
+val verify_output_proof : output_proof -> output option
+
+val serialise_output_proof : output_proof -> bytes
+
+val deserialise_output_proof : bytes -> (output_proof, string) result

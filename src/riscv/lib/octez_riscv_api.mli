@@ -12,6 +12,8 @@ type status = Evaluating | WaitingForInput | WaitingForMetadata
 type reveal_data = RawData of string | Metadata of bytes * int32
 type input = InboxMessage of int32 * int64 * string | Reveal of reveal_data
 type input_request
+type output
+type output_proof
 type proof
 external octez_riscv_from_imm: state -> mut_state = "octez_riscv_from_imm"
 external octez_riscv_to_imm: mut_state -> state = "octez_riscv_to_imm"
@@ -49,3 +51,10 @@ external octez_riscv_proof_start_state: proof -> bytes = "octez_riscv_proof_star
 external octez_riscv_proof_stop_state: proof -> bytes = "octez_riscv_proof_stop_state"
 external octez_riscv_verify_proof: input option -> proof -> input_request option = "octez_riscv_verify_proof"
 external octez_riscv_produce_proof: input option -> state -> proof option = "octez_riscv_produce_proof"
+external octez_riscv_serialise_proof: proof -> bytes = "octez_riscv_serialise_proof"
+external octez_riscv_deserialise_proof: bytes -> (proof, string) Result.t = "octez_riscv_deserialise_proof"
+external octez_riscv_output_of_output_proof: output_proof -> output = "octez_riscv_output_of_output_proof"
+external octez_riscv_state_of_output_proof: output_proof -> bytes = "octez_riscv_state_of_output_proof"
+external octez_riscv_verify_output_proof: output_proof -> output option = "octez_riscv_verify_output_proof"
+external octez_riscv_serialise_output_proof: output_proof -> bytes = "octez_riscv_serialise_output_proof"
+external octez_riscv_deserialise_output_proof: bytes -> (output_proof, string) result = "octez_riscv_deserialise_output_proof"

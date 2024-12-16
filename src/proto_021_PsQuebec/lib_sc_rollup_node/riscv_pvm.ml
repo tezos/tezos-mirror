@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 Trilitech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -52,7 +52,7 @@ module PVM :
 
   let proof_stop_state = function (_ : proof) -> .
 
-  let state_hash state = Lwt.return (Backend.state_hash state)
+  let state_hash state = Lwt.return @@ Backend.state_hash state
 
   let initial_state ~empty:_ = Lwt.return (Storage.empty ())
 

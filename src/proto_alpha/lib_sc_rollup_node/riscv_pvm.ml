@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 Trilitech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -99,7 +99,7 @@ module PVM :
 
   let proof_stop_state proof = Backend.proof_stop_state proof
 
-  let state_hash state = Lwt.return (Backend.state_hash state)
+  let state_hash state = Lwt.return @@ Backend.state_hash state
 
   let initial_state ~empty:_ = Lwt.return (Storage.empty ())
 
@@ -195,7 +195,7 @@ module Mutable_state :
     let* tick = Backend.Mutable_state.get_tick state in
     return (Sc_rollup.Tick.of_z tick)
 
-  let state_hash state = Lwt.return (Backend.Mutable_state.state_hash state)
+  let state_hash state = Lwt.return @@ Backend.Mutable_state.state_hash state
 
   let is_input_state =
     make_is_input_state

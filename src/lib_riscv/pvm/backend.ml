@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -22,11 +22,15 @@ type reveal_data = Api.reveal_data
 
 type input = Api.input
 
-type input_request = Octez_riscv_api.input_request
+type input_request = Api.input_request
 
-type proof = Octez_riscv_api.proof
+type proof = Api.proof
 
-let riscv_hash_to_state_hash (bytes : bytes) : hash =
+type output_proof = Api.output_proof
+
+type output = Api.output
+
+let riscv_hash_to_rollup_state_hash (bytes : bytes) : hash =
   Tezos_crypto.Hashed.Smart_rollup_state_hash.of_bytes_exn bytes
 
 (* The kernel debug logging function (`string -> unit Lwt.t`) passed by the node
@@ -72,7 +76,7 @@ module Mutable_state = struct
   let get_current_level state = Lwt.return (Api.octez_riscv_mut_get_level state)
 
   let state_hash state =
-    riscv_hash_to_state_hash @@ Api.octez_riscv_mut_state_hash state
+    riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_mut_state_hash state
 
   let set_input state input =
     Lwt.return (Api.octez_riscv_mut_set_input state input)
@@ -111,16 +115,36 @@ let install_boot_sector state boot_sector =
 let get_current_level state = Lwt.return (Api.octez_riscv_get_level state)
 
 let state_hash state =
-  riscv_hash_to_state_hash @@ Api.octez_riscv_state_hash state
+  riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_state_hash state
 
 let set_input state input = Lwt.return (Api.octez_riscv_set_input state input)
 
 let proof_start_state proof =
-  riscv_hash_to_state_hash @@ Api.octez_riscv_proof_start_state proof
+  riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_proof_start_state proof
 
 let proof_stop_state proof =
-  riscv_hash_to_state_hash @@ Api.octez_riscv_proof_stop_state proof
+  riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_proof_stop_state proof
 
 let verify_proof input proof = Api.octez_riscv_verify_proof input proof
 
 let produce_proof input state = Api.octez_riscv_produce_proof input state
+
+let serialise_proof proof = Api.octez_riscv_serialise_proof proof
+
+let deserialise_proof proof = Api.octez_riscv_deserialise_proof proof
+
+let output_of_output_proof output_proof =
+  Api.octez_riscv_output_of_output_proof output_proof
+
+let state_of_output_proof output_proof =
+  riscv_hash_to_rollup_state_hash
+  @@ Api.octez_riscv_state_of_output_proof output_proof
+
+let verify_output_proof output_proof =
+  Api.octez_riscv_verify_output_proof output_proof
+
+let serialise_output_proof output_proof =
+  Api.octez_riscv_serialise_output_proof output_proof
+
+let deserialise_output_proof bytes =
+  Api.octez_riscv_deserialise_output_proof bytes
