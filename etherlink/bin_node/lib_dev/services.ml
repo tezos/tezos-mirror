@@ -218,15 +218,43 @@ let generate_id () =
   Bytes.iteri (fun i _ -> Bytes.set_uint8 id i (Random.int 256)) id ;
   encode_id id
 
+let logs_of_filter logs =
+  match logs with
+  | Ethereum_types.Filter.Log logs ->
+      Some (Ethereum_types.Subscription.Logs logs)
+  | Ethereum_types.Filter.Block_filter _
+  | Ethereum_types.Filter.Pending_transaction_filter _ ->
+      None
+
+let filter_from ~address ~topics =
+  Ethereum_types.Filter.
+    {from_block = None; to_block = None; address; topics; block_hash = None}
+
+let filter_logs ~bloom_filter ~receipt =
+  let logs = Filter_helpers.filter_receipt bloom_filter receipt in
+  let logs = Option.value ~default:[] logs in
+  List.filter_map logs_of_filter logs
+
+let produce_logs_stream ~bloom_filter stream =
+  Lwt_stream.map_list (fun receipt -> filter_logs ~bloom_filter ~receipt) stream
+
 let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
+  let open Lwt_result_syntax in
   let id = make_id ~id:(generate_id ()) in
-  let stream, stopper =
+  let* stream, stopper =
     match kind with
-    | NewHeads -> Lwt_watcher.create_stream Evm_context.head_watcher
-    | Logs _ ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7640 *)
-        Stdlib.failwith "The websocket event [logs] is not implemented yet."
-    | NewPendingTransactions -> Lwt_watcher.create_stream Tx_pool.txs_watcher
+    | NewHeads -> return @@ Lwt_watcher.create_stream Evm_context.head_watcher
+    | Logs {address; topics} ->
+        let filter = filter_from ~address ~topics in
+        let* bloom_filter = Filter_helpers.validate_bloom_filter filter in
+        let stream, stopper =
+          Lwt_watcher.create_stream Evm_context.receipt_watcher
+        in
+        let stream = produce_logs_stream ~bloom_filter stream in
+        return (stream, stopper)
+    | NewPendingTransactions ->
+        let stream, stopper = Lwt_watcher.create_stream Tx_pool.txs_watcher in
+        return (stream, stopper)
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
@@ -236,7 +264,7 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
     Lwt_watcher.shutdown stopper
   in
   Stdlib.Hashtbl.add subscriptions id {kind; stream; stopper} ;
-  (id, (stream, stopper))
+  return (id, (stream, stopper))
 
 let eth_unsubscribe ~id =
   match Stdlib.Hashtbl.find_opt subscriptions id with
@@ -902,7 +930,17 @@ let dispatch_websocket (rpc : Configuration.rpc) config ctx
       let sub_stream = ref empty_stream in
       let sid = ref empty_sid in
       let f (kind : Ethereum_types.Subscription.kind) =
-        let id, stream = eth_subscribe ~kind in
+        let* id_stream = eth_subscribe ~kind in
+        let id, stream =
+          match id_stream with
+          | Ok id_stream -> id_stream
+          | Error err ->
+              Format.kasprintf
+                Stdlib.failwith
+                "The websocket `logs` event produced the following error: %a"
+                pp_print_trace
+                err
+        in
         (* This is an optimization to avoid having to search in the map
            of subscriptions for `stream` and `id`. *)
         sub_stream := stream ;

@@ -128,6 +128,9 @@ let lock_data_dir ~data_dir =
 let head_watcher : Ethereum_types.Subscription.output Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
+let receipt_watcher : Transaction_receipt.t Lwt_watcher.input =
+  Lwt_watcher.create_input ()
+
 module State = struct
   let current_blueprint_number ctxt =
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
@@ -586,7 +589,9 @@ module State = struct
                   Durable_storage.transaction_receipt read hash
                 in
                 match receipt_opt with
-                | Some receipt -> return receipt
+                | Some receipt ->
+                    Lwt_watcher.notify receipt_watcher receipt ;
+                    return receipt
                 | None ->
                     failwith
                       "Receipt missing for %a"
