@@ -14,6 +14,7 @@ use crate::{
         MachineCoreState,
     },
     state_backend::ManagerReadWrite,
+    traps::Exception,
 };
 
 /// Instruction Context Builder contains operations required to
@@ -42,6 +43,22 @@ pub trait ICB {
     ///
     /// This behaves identically for both signed & unsigned values.
     fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
+
+    /// Representation for the manipulation of fallible operations.
+    type IResult<Value>;
+
+    /// Wrap a value as a fallible value.
+    fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value>;
+
+    /// Map the fallible-value into a fallible-value of a different type.
+    fn map<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
+    where
+        F: FnOnce(Value) -> Next;
+
+    /// Run a fallible operation over the fallible-value as input.
+    fn and_then<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
+    where
+        F: FnOnce(Value) -> Self::IResult<Next>;
 }
 
 impl<ML: MainMemoryLayout, M: ManagerReadWrite> ICB for MachineCoreState<ML, M> {
@@ -71,5 +88,28 @@ impl<ML: MainMemoryLayout, M: ManagerReadWrite> ICB for MachineCoreState<ML, M> 
     fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         // Wrapped addition in two's complement behaves the same for signed and unsigned
         lhs.wrapping_add(rhs)
+    }
+
+    type IResult<In> = Result<In, Exception>;
+
+    #[inline(always)]
+    fn ok<In>(&mut self, val: In) -> Self::IResult<In> {
+        Ok(val)
+    }
+
+    #[inline(always)]
+    fn map<In, Out, F>(res: Self::IResult<In>, f: F) -> Self::IResult<Out>
+    where
+        F: FnOnce(In) -> Out,
+    {
+        res.map(f)
+    }
+
+    #[inline(always)]
+    fn and_then<In, Out, F>(res: Self::IResult<In>, f: F) -> Self::IResult<Out>
+    where
+        F: FnOnce(In) -> Self::IResult<Out>,
+    {
+        res.and_then(f)
     }
 }
