@@ -8266,6 +8266,80 @@ let test_produce_block_with_no_delayed_transactions =
 
   unit
 
+let test_websocket_rpcs =
+  register_all
+    ~tags:["evm"; "rpc"; "websocket"]
+    ~title:"RPC methods over websocket"
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:
+      ((Array.to_list Eth_account.bootstrap_accounts
+       |> List.map (fun a -> a.Eth_account.address))
+      @ Eth_account.lots_of_address)
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~rpc_server:Dream (* Websockets only available in Dream *)
+    ~websockets:true
+  @@ fun {sequencer; _} _protocol ->
+  Log.info "Opening a websocket connection with the node" ;
+  let* websocket = Evm_node.open_websocket sequencer in
+  Log.info "getBalance" ;
+  let*@ balance =
+    Rpc.get_balance
+      ~websocket
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      sequencer
+  in
+  Check.((balance = Helpers.default_bootstrap_account_balance) Wei.typ)
+    ~error_msg:
+      (sf
+         "Expected balance of %s should be %%R, but got %%L"
+         Eth_account.bootstrap_accounts.(0).address) ;
+  Log.info "getBlockByNumber" ;
+  let*@ block = Rpc.get_block_by_number ~websocket ~block:"0" sequencer in
+  Check.((block.number = 0l) int32)
+    ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
+  Log.info "getBlockByHash" ;
+  let* block' =
+    let* block =
+      Evm_node.(
+        jsonrpc
+          ~websocket
+          sequencer
+          {
+            method_ = "eth_getBlockByHash";
+            parameters = `A [`String block.hash; `Bool false];
+          })
+    in
+    return @@ (block |> Evm_node.extract_result |> Block.of_json)
+  in
+  assert (block = block') ;
+  Log.info "blockNumber" ;
+  let* () =
+    repeat 2 (fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+  in
+  let*@ block_number = Rpc.block_number ~websocket sequencer in
+  Check.((block_number = 2l) int32)
+    ~error_msg:"Expected a block number of %R, but got %L" ;
+  Log.info "getTransactionCount" ;
+  let*@ transaction_count =
+    Rpc.get_transaction_count
+      ~websocket
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      sequencer
+  in
+  Check.((transaction_count = 0L) int64)
+    ~error_msg:"Expected a nonce of %R, but got %L" ;
+  Log.info "netVersion" ;
+  let*@ net_version = Rpc.net_version ~websocket sequencer in
+  Check.((net_version = "1337") string)
+    ~error_msg:"Expected net_version is %R, but got %L" ;
+  Log.info "coinbase" ;
+  let*@ coinbase = Rpc.coinbase ~websocket sequencer in
+  Check.((coinbase = "0x0000000000000000000000000000000000000000") string)
+    ~error_msg:"eth_coinbase returned %L, expected %R" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -8377,4 +8451,5 @@ let () =
   test_overwrite_simulation_tick_limit protocols ;
   test_inconsistent_da_fees protocols ;
   test_produce_block_with_no_delayed_transactions protocols ;
-  test_observer_reset [Protocol.Alpha]
+  test_observer_reset [Protocol.Alpha] ;
+  test_websocket_rpcs [Protocol.Alpha]
