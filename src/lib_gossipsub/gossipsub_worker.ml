@@ -280,6 +280,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     app_output_stream : app_output Stream.t;
     events_logging : event -> unit Monad.t;
     unknown_validity_messages : Bounded_message_map.t;
+    unreachable_points : int64 Point.Map.t;
+        (* For each point, stores the next heartbeat tick when we can try to recontact this point again. *)
   }
 
   (** A worker instance is made of its status and state. *)
@@ -288,6 +290,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     mutable state : worker_state;
     self : Peer.t;
   }
+
+  let maybe_reachable_point = C.maybe_reachable_point
 
   let state {state; _} = GS.Introspection.view state.gossip_state
 
@@ -594,16 +598,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | state, GS.PX peers ->
         Introspection.update_count_recv_prunes state.stats `Incr ;
         let peers =
-          let current_connections =
-            let GS.Introspection.{connections; _} =
-              GS.Introspection.(view state.gossip_state)
-            in
-            connections
+          let GS.Introspection.
+                {connections = current_connections; heartbeat_ticks; _} =
+            GS.Introspection.(view state.gossip_state)
+          in
+          let can_be_contacted peer =
+            let point = maybe_reachable_point peer in
+            match Point.Map.find_opt point state.unreachable_points with
+            | None -> true
+            | Some next_attempt ->
+                Int64.compare heartbeat_ticks next_attempt >= 0
           in
           Peer.Set.filter
             (fun peer ->
               (not (GS.Introspection.Connections.mem peer current_connections))
-              && not (Peer.equal peer self))
+              && (not (Peer.equal peer self))
+              && can_be_contacted peer)
             peers
         in
         emit_p2p_output
@@ -656,6 +666,16 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                    state
                    (IHave {topic; message_ids})
                    (Seq.return peer)) ;
+        let point_can_be_contacted point =
+          match Point.Map.find_opt point state.unreachable_points with
+          | None -> true
+          | Some next_attempt ->
+              Int64.compare gstate_view.heartbeat_ticks next_attempt >= 0
+        in
+        let peer_can_be_contacted peer =
+          let point = maybe_reachable_point peer in
+          point_can_be_contacted point
+        in
         (* Once every 15 hearbreat ticks, try to reconnect to trusted peers if
            they are disconnected. Also try to reconnect to bootstrap points. *)
         if Int64.(equal (rem gstate_view.heartbeat_ticks 15L) 0L) then (
@@ -669,15 +689,24 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
               else Seq.cons trusted_peer seq)
             state.trusted_peers
             Seq.empty
+          |> Seq.filter peer_can_be_contacted
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
                  Connect {peer = trusted_peer; origin = Trusted}) ;
           let p2p_output_stream = state.p2p_output_stream in
           let bootstrap_points =
-            state.bootstrap_points () |> Point.Set.of_list
+            state.bootstrap_points ()
+            |> List.filter point_can_be_contacted
+            |> Point.Set.of_list
           in
           Point.Set.iter
             (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
             bootstrap_points) ;
+        let state =
+          (* We reset the map every 6h. This prevents this map to contain outdated points. *)
+          if Int64.(equal (rem gstate_view.heartbeat_ticks 21600L) 0L) then
+            {state with unreachable_points = Point.Map.empty}
+          else state
+        in
         state
 
   let update_gossip_state state (gossip_state, output) =
@@ -913,6 +942,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           app_output_stream = Stream.empty ();
           events_logging;
           unknown_validity_messages = Bounded_message_map.make ~capacity:10_000;
+          unreachable_points = Point.Map.empty;
         };
     }
 
@@ -926,6 +956,22 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let is_subscribed t topic =
     GS.Introspection.(has_joined topic (view t.state.gossip_state))
+
+  let set_unreachable_point t point =
+    let GS.Introspection.{heartbeat_ticks; _} =
+      GS.Introspection.(view t.state.gossip_state)
+    in
+    let unreachable_points =
+      Point.Map.update
+        point
+        (function
+          | None -> Some (Int64.add 5L heartbeat_ticks)
+          | Some x ->
+              Some
+                (Int64.mul x 2L |> Int64.max 300L |> Int64.add heartbeat_ticks))
+        t.state.unreachable_points
+    in
+    t.state <- {t.state with unreachable_points}
 
   let pp_list pp_elt =
     Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt

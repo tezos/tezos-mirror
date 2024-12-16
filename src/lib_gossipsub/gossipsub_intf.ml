@@ -1051,6 +1051,8 @@ module type WORKER_CONFIGURATION = sig
 
   module Point : ITERABLE
 
+  val maybe_reachable_point : GS.Peer.t -> Point.t
+
   (** Abstraction of the IO monad used by the worker. *)
   module Monad : sig
     (** The monad type. *)
@@ -1197,6 +1199,9 @@ module type WORKER = sig
   (** [app_input state app_input] adds the given application input [app_input]
       to the worker's input stream. *)
   val app_input : t -> app_input -> unit
+
+  (** [set_unreachable_point state point] declares this point as unreachable. *)
+  val set_unreachable_point : t -> Point.t -> unit
 
   (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
       worker's input stream. *)

@@ -105,6 +105,9 @@ module Worker_config :
   module Monad = Monad
   module Point = Types.Point
 
+  let maybe_reachable_point Types.Peer.{maybe_reachable_point; _} =
+    maybe_reachable_point
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5596
 
      Use Seq_s instead of Lwt_stream to implement module Stream. *)
