@@ -20,6 +20,9 @@
 
 ### Bug fixes
 
+- Fixes a Wasm Runtime host function that would copy only instead of moving
+  a subtree. (!16009)
+
 ### Internals
 
 ## Version 0.11 (2024-12-111)

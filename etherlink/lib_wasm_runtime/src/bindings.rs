@@ -154,7 +154,7 @@ where
     K: Key,
 {
     let res = unsafe {
-        ocaml_imports::layer2_store__store_copy(&gc(), evm_tree.clone(), from.as_str(), to.as_str())
+        ocaml_imports::layer2_store__store_move(&gc(), evm_tree.clone(), from.as_str(), to.as_str())
             .map_err(BindingsError::OCamlError)?
     };
 
