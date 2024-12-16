@@ -15,6 +15,14 @@ open Prometheus
 
 let registry = CollectorRegistry.create ()
 
+type metrics_body = {body : string; content_type : string}
+
+let get_metrics () =
+  let open Lwt_syntax in
+  let+ data = CollectorRegistry.collect registry in
+  let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
+  {body; content_type = "text/plain; version=0.0.4"}
+
 module Cohttp (Server : Cohttp_lwt.S.Server) = struct
   let callback _conn req _body =
     let open Cohttp in
@@ -22,13 +30,8 @@ module Cohttp (Server : Cohttp_lwt.S.Server) = struct
     let uri = Request.uri req in
     match (Request.meth req, Uri.path uri) with
     | `GET, "/metrics" ->
-        let* data = CollectorRegistry.collect registry in
-        let body =
-          Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data
-        in
-        let headers =
-          Header.init_with "Content-Type" "text/plain; version=0.0.4"
-        in
+        let* {body; content_type} = get_metrics () in
+        let headers = Header.init_with "Content-Type" content_type in
         Server.respond_string ~status:`OK ~headers ~body ()
     | _ -> Server.respond_error ~status:`Bad_request ~body:"Bad request" ()
 end

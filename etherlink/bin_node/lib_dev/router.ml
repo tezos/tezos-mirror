@@ -231,3 +231,11 @@ let make_stream_route service handler =
   in
   shutdown () ;
   return_unit
+
+let make_metrics_route path =
+  let open Lwt_syntax in
+  Dream.get path @@ fun _request ->
+  let* {body; content_type} = Metrics.get_metrics () in
+  let* response = Dream.respond body in
+  Dream.set_header response "Content-type" content_type ;
+  return response

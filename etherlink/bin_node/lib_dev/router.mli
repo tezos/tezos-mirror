@@ -40,3 +40,7 @@ val make_stream_route :
   'input ->
   ('output Lwt_stream.t * (unit -> unit)) Lwt.t) ->
   Dream.route
+
+(** [make_metrics_route path] builds a route that returns collected metrics in
+    plain text format. *)
+val make_metrics_route : string -> Dream.route
