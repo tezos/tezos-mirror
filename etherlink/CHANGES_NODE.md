@@ -4,6 +4,35 @@
 
 ### Features
 
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Experimental support for websockets on endpoints (`/ws` and `/private/ws`) for
+  JSON-RPC requests with feature flag `experimental_features.enable_websocket =
+  true`. (!15566)
+  - Added support for the WebSocket event `newHeads`, allowing clients to receive
+    real-time notifications of new blocks. (!15899)
+  - Added support for the WebSocket event `newPendingTransactions`, enabling clients
+    to receive real-time notifications of incoming pending transactions. (!15991)
+
+### Bug fixes
+
+### Internals
+
+## Version 0.12 (2024-12-17)
+
+This release notably addresses a bug introduced in the previous release,
+leading the data directory of the node to grow in size more than necessary.
+
+This release will apply one migration to the node’s store (version 15), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
 #### UX
 
 - The sequencer can now handle when the delayed inbox is flushed to create
@@ -22,25 +51,21 @@
 
 - The transaction's validation is now performed in native OCaml instead of
   using the kernel's simulation, which makes the validation of transactions
-  on `eth_sendRawTransaction` faster. (!15959)
+  on `eth_sendRawTransaction` faster. (!15958)
 
 ### Bug fixes
 
-- Fixes a Wasm Runtime host function that would copy only instead of moving
-  a subtree. (!16009)
-
-#### Experimental
-
-- Experimental support for websockets on endpoints (`/ws` and `/private/ws`) for
-  JSON-RPC requests with feature flag `experimental_features.enable_websocket =
-  true`. (!15566)
+- Fixes the `store_move` host function implementation of the WASM Runtime host
+  function, that would copy only instead of moving a subtree. The main impact
+  of this bug was to needlessly increase the size of the node data directory.
+  (!16009)
 
 ### Internals
 
 - Private RPCs stateValue and stateSubkeys can now take the block parameter,
   e.g. `"params": ["/evm/chain_id", "finalized"]`. (!16010)
 
-## Version 0.11 (2024-12-111)
+## Version 0.11 (2024-12-11)
 
 In addition to several bug fixes and internal changes, this release introduces
 several exciting new features, notably including support for executing the
@@ -62,7 +87,7 @@ it is not possible to downgrade to the previous version.
   (*e.g.*, in `run observer`). For now, we recommend against using
   `--native-execution-policy always` in production. (!15736)
 
-### UX
+#### UX
 
 - Gas estimation requires multiple kernel simulation. Every time a simulation
   was performed we would pick a new simulation timestamp, which could
@@ -85,10 +110,6 @@ you start using them, you probably want to use `octez-evm-node check config
 - Experimental support for alternative RPC server backend
   [Dream](https://aantron.github.io/dream) with feature flag
   `experimental_features.rpc_server = "dream"`. (!15560)
-- Added support for the WebSocket event `newHeads`, allowing clients to receive
-  real-time notifications of new blocks. (!15899)
-- Added support for the WebSocket event `newPendingTransactions`, enabling clients
-  to receive real-time notifications of incoming pending transactions. (!15991)
   
 ### Bug fixes
 
