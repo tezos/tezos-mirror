@@ -15,7 +15,7 @@ type evm_services_methods = {
   time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
 }
 
-type block_production = [`Single_node | `Threshold_encryption | `Disabled]
+type block_production = [`Single_node | `Disabled]
 
 module Resto = struct
   let callback server Evm_directory.{dir; extra} =

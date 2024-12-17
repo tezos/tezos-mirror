@@ -917,87 +917,6 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?sandbox_key
     ()
 
-let start_threshold_encryption_sequencer ?password_filename ~wallet_dir
-    ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins ?cors_headers
-    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-    ~keep_alive ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
-    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-    ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
-    ?sequencer_sidecar_endpoint ?dal_slots ~finalized_view () =
-  let open Lwt_result_syntax in
-  let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-  let* sequencer_key =
-    Option.map_es
-      (Client_keys.Secret_key.parse_source_string wallet_ctxt)
-      sequencer_str
-  in
-  let* configuration =
-    Cli.create_or_read_config
-      ~data_dir
-      ?rpc_addr
-      ?rpc_port
-      ?rpc_batch_limit
-      ?cors_origins
-      ?cors_headers
-      ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit
-      ~keep_alive
-      ?rollup_node_endpoint
-      ~verbose
-      ?preimages
-      ?preimages_endpoint
-      ?time_between_blocks
-      ?max_number_of_chunks
-      ?private_rpc_port
-      ?sequencer_key
-      ?max_blueprints_lag
-      ?max_blueprints_ahead
-      ?max_blueprints_catchup
-      ?catchup_cooldown
-      ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs
-      ?log_filter_chunk_size
-      ?sequencer_sidecar_endpoint
-      ?restricted_rpcs
-      ?dal_slots
-      ~finalized_view
-      ()
-  in
-  let*! () =
-    let open Tezos_base_unix.Internal_event_unix in
-    let config =
-      make_event_config
-        ~verbosity:configuration.verbose
-        ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
-          (* Show only above Info rpc_server events, they are not
-             relevant as we do not have a REST-API server. If not
-             set, the daily logs are polluted with these
-             uninformative logs. *)
-        ~daily_logs_section_prefixes:
-          [
-            ("rpc_server", Some Notice);
-            ("rpc_server", Some Warning);
-            ("rpc_server", Some Error);
-            ("rpc_server", Some Fatal);
-          ]
-        ()
-    in
-    init ~config ()
-  in
-  let*! configuration = sequencer_disable_native_execution configuration in
-  let* () = websocket_checks configuration in
-  let*! () = Internal_event.Simple.emit Event.event_starting "te_sequencer" in
-  Evm_node_lib_dev.Threshold_encryption_sequencer.main
-    ~data_dir
-    ?genesis_timestamp
-    ~cctxt:(wallet_ctxt :> Client_context.wallet)
-    ~configuration
-    ?kernel
-    ()
-
 let rpc_run_args =
   Tezos_clic.args4
     evm_node_endpoint_arg
@@ -2165,109 +2084,6 @@ let sandbox_command =
         ~finalized_view
         ())
 
-let threshold_encryption_sequencer_config_args =
-  Tezos_clic.args16
-    preimages_arg
-    preimages_endpoint_arg
-    time_between_blocks_arg
-    max_number_of_chunks_arg
-    private_rpc_port_arg
-    sequencer_key_arg
-    maximum_blueprints_lag_arg
-    maximum_blueprints_ahead_arg
-    maximum_blueprints_catchup_arg
-    catchup_cooldown_arg
-    genesis_timestamp_arg
-    initial_kernel_arg
-    wallet_dir_arg
-    sequencer_sidecar_endpoint_arg
-    (Client_config.password_filename_arg ())
-    dal_slots_arg
-
-let threshold_encryption_sequencer_command =
-  let open Tezos_clic in
-  command
-    ~desc:"Start the EVM node in sequencer mode"
-    (merge_options
-       common_config_args
-       threshold_encryption_sequencer_config_args)
-    (prefixes ["run"; "threshold"; "encryption"; "sequencer"] stop)
-    (fun ( ( data_dir,
-             rpc_addr,
-             rpc_port,
-             rpc_batch_limit,
-             cors_origins,
-             cors_headers,
-             log_filter_max_nb_blocks,
-             log_filter_max_nb_logs,
-             log_filter_chunk_size,
-             keep_alive,
-             rollup_node_endpoint,
-             tx_pool_timeout_limit,
-             tx_pool_addr_limit,
-             tx_pool_tx_per_addr_limit,
-             verbose,
-             restricted_rpcs,
-             blacklisted_rpcs,
-             whitelisted_rpcs,
-             finalized_view ),
-           ( preimages,
-             preimages_endpoint,
-             time_between_blocks,
-             max_number_of_chunks,
-             private_rpc_port,
-             sequencer_str,
-             max_blueprints_lag,
-             max_blueprints_ahead,
-             max_blueprints_catchup,
-             catchup_cooldown,
-             genesis_timestamp,
-             kernel,
-             wallet_dir,
-             sequencer_sidecar_endpoint,
-             password_filename,
-             dal_slots ) )
-         () ->
-      let open Lwt_result_syntax in
-      let* restricted_rpcs =
-        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
-      in
-      start_threshold_encryption_sequencer
-        ?password_filename
-        ~wallet_dir
-        ~data_dir
-        ?rpc_addr
-        ?rpc_port
-        ?rpc_batch_limit
-        ?cors_origins
-        ?cors_headers
-        ?tx_pool_timeout_limit
-        ?tx_pool_addr_limit
-        ?tx_pool_tx_per_addr_limit
-        ~keep_alive
-        ?rollup_node_endpoint
-        ~verbose
-        ?preimages
-        ?preimages_endpoint
-        ?time_between_blocks
-        ?max_number_of_chunks
-        ?private_rpc_port
-        ?sequencer_str
-        ?max_blueprints_lag
-        ?max_blueprints_ahead
-        ?max_blueprints_catchup
-        ?catchup_cooldown
-        ?log_filter_max_nb_blocks
-        ?log_filter_max_nb_logs
-        ?log_filter_chunk_size
-        ?genesis_timestamp
-        ?sequencer_sidecar_endpoint
-        ?restricted_rpcs
-        ?kernel
-        ?dal_slots
-        ~finalized_view
-        ())
-
 let observer_run_args =
   Tezos_clic.args8
     evm_node_endpoint_arg
@@ -2536,7 +2352,6 @@ let commands =
     sandbox_command;
     proxy_command;
     sequencer_command;
-    threshold_encryption_sequencer_command;
     observer_command;
     rpc_command;
     snapshot_info_command;
