@@ -43,6 +43,7 @@ vm-fdt = "0.3.0"
 goldenfile = "1.7.1"
 arbitrary-int = "1.2.7"
 rustc-demangle = "0.1"
+range-collections = "0.4.5"
 
 [workspace.dependencies.tezos-smart-rollup]
 path = "../kernel_sdk/sdk"
