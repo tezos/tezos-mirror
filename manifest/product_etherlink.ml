@@ -399,3 +399,10 @@ let _etherlink_governance_observer =
       ]
     ~release_status:Experimental
     ~bisect_ppx:Yes
+
+(* Back-register the websocket library. *)
+let () =
+  Sub_lib.add_doc_link
+    registered_octez_evm_node_libs
+    ~target:"!module-Websocket_cohttp_lwt"
+    ~text:"Websocket_cohttp_lwt"
