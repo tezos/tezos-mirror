@@ -215,14 +215,15 @@ module Request = struct
   let coinbase = {method_ = "eth_coinbase"; parameters = `Null}
 end
 
-let net_version evm_node =
-  let* json = Evm_node.call_evm_rpc evm_node Request.net_version in
+let net_version ?websocket evm_node =
+  let* json = Evm_node.jsonrpc ?websocket evm_node Request.net_version in
   return
     (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
 
-let get_transaction_by_hash ~transaction_hash evm_node =
+let get_transaction_by_hash ?websocket ~transaction_hash evm_node =
   let* json =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       (Request.eth_getTransactionByHash ~transaction_hash)
   in
@@ -235,28 +236,32 @@ let get_transaction_by_hash ~transaction_hash evm_node =
            else Some (Transaction.transaction_object_of_json json)))
        json)
 
-let get_code ~address evm_node =
+let get_code ?websocket ~address evm_node =
   let* json =
-    Evm_node.call_evm_rpc evm_node (Request.eth_getCode ~address ~block:Latest)
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.eth_getCode ~address ~block:Latest)
   in
   return
     (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
 
-let block_number evm_node =
-  let* json = Evm_node.call_evm_rpc evm_node Request.eth_blockNumber in
+let block_number ?websocket evm_node =
+  let* json = Evm_node.jsonrpc ?websocket evm_node Request.eth_blockNumber in
   return
     (decode_or_error (fun json -> JSON.(json |-> "result" |> as_int32)) json)
 
-let block_number_opt evm_node =
-  let* json = Evm_node.call_evm_rpc evm_node Request.eth_blockNumber in
+let block_number_opt ?websocket evm_node =
+  let* json = Evm_node.jsonrpc ?websocket evm_node Request.eth_blockNumber in
   return
     (decode_or_error
        (fun json -> JSON.(json |-> "result" |> as_opt |> Option.map as_int32))
        json)
 
-let get_block_by_number ?(full_tx_objects = false) ~block evm_node =
+let get_block_by_number ?websocket ?(full_tx_objects = false) ~block evm_node =
   let* json =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       (Request.eth_getBlockByNumber ~block ~full_tx_objects)
   in
@@ -265,9 +270,10 @@ let get_block_by_number ?(full_tx_objects = false) ~block evm_node =
        (fun json -> JSON.(json |-> "result" |> Block.of_json))
        json)
 
-let get_block_by_hash ?(full_tx_objects = false) ~block evm_node =
+let get_block_by_hash ?websocket ?(full_tx_objects = false) ~block evm_node =
   let* json =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       (Request.eth_getBlockByHash ~block ~full_tx_objects)
   in
@@ -276,9 +282,10 @@ let get_block_by_hash ?(full_tx_objects = false) ~block evm_node =
        (fun json -> JSON.(json |-> "result" |> Block.of_json))
        json)
 
-let get_gas_price evm_node =
+let get_gas_price ?websocket evm_node =
   let* json =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       {method_ = "eth_gasPrice"; parameters = `Null}
   in
@@ -307,9 +314,10 @@ module Syntax = struct
     | Error err -> f err
 end
 
-let produce_block ?with_delayed_transactions ?timestamp evm_node =
+let produce_block ?websocket ?with_delayed_transactions ?timestamp evm_node =
   let* json =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       ~private_:true
       evm_node
       (Request.produceBlock ?with_delayed_transactions ?timestamp ())
@@ -319,9 +327,10 @@ let produce_block ?with_delayed_transactions ?timestamp evm_node =
        (fun json -> Evm_node.extract_result json |> JSON.as_int)
        json
 
-let produce_proposal ?timestamp evm_node =
+let produce_proposal ?websocket ?timestamp evm_node =
   let* json =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       ~private_:true
       evm_node
       (Request.produceProposal ?timestamp ())
@@ -333,18 +342,26 @@ let produce_proposal ?timestamp evm_node =
          if JSON.is_null json then () else ())
        json
 
-let state_value evm_node path =
+let state_value ?websocket evm_node path =
   let* json =
-    Evm_node.call_evm_rpc ~private_:true evm_node (Request.stateValue path)
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      (Request.stateValue path)
   in
   return
   @@ decode_or_error
        (fun json -> Evm_node.extract_result json |> JSON.as_string_opt)
        json
 
-let state_subkeys evm_node path =
+let state_subkeys ?websocket evm_node path =
   let* json =
-    Evm_node.call_evm_rpc ~private_:true evm_node (Request.stateSubkeys path)
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      (Request.stateSubkeys path)
   in
   return
   @@ decode_or_error
@@ -354,18 +371,24 @@ let state_subkeys evm_node path =
          | None -> None)
        json
 
-let send_raw_transaction ~raw_tx evm_node =
+let send_raw_transaction ?websocket ~raw_tx evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.eth_sendRawTransaction ~raw_tx)
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.eth_sendRawTransaction ~raw_tx)
   in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
 
-let get_transaction_receipt ~tx_hash evm_node =
+let get_transaction_receipt ?websocket ~tx_hash evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.eth_getTransactionReceipt ~tx_hash)
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.eth_getTransactionReceipt ~tx_hash)
   in
   return
   @@ decode_or_error
@@ -375,9 +398,10 @@ let get_transaction_receipt ~tx_hash evm_node =
          |> Option.map Transaction.transaction_receipt_of_json)
        response
 
-let estimate_gas eth_call evm_node =
+let estimate_gas ?websocket eth_call evm_node =
   let* response =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       (Request.eth_estimateGas ~eth_call ~block:"latest")
   in
@@ -386,9 +410,10 @@ let estimate_gas eth_call evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_int64)
        response
 
-let get_transaction_count ?(block = "latest") ~address evm_node =
+let get_transaction_count ?websocket ?(block = "latest") ~address evm_node =
   let* response =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       (Request.eth_getTransactionCount ~address ~block)
   in
@@ -397,32 +422,36 @@ let get_transaction_count ?(block = "latest") ~address evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_int64)
        response
 
-let tez_kernelVersion evm_node =
-  let* response = Evm_node.call_evm_rpc evm_node Request.tez_kernelVersion in
-  return
-  @@ decode_or_error
-       (fun response -> Evm_node.extract_result response |> JSON.as_string)
-       response
-
-let tez_kernelRootHash evm_node =
-  let* response = Evm_node.call_evm_rpc evm_node Request.tez_kernelRootHash in
-  return
-  @@ decode_or_error
-       (fun response -> Evm_node.extract_result response |> JSON.as_string_opt)
-       response
-
-let call ~to_ ~data ?(block = Latest) evm_node =
+let tez_kernelVersion ?websocket evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.eth_call ~block ~to_ ~data)
+    Evm_node.jsonrpc ?websocket evm_node Request.tez_kernelVersion
   in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
 
-let get_balance ~address ?(block = Latest) evm_node =
+let tez_kernelRootHash ?websocket evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.get_balance ~address ~block)
+    Evm_node.jsonrpc ?websocket evm_node Request.tez_kernelRootHash
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string_opt)
+       response
+
+let call ?websocket ~to_ ~data ?(block = Latest) evm_node =
+  let* response =
+    Evm_node.jsonrpc ?websocket evm_node (Request.eth_call ~block ~to_ ~data)
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string)
+       response
+
+let get_balance ?websocket ~address ?(block = Latest) evm_node =
+  let* response =
+    Evm_node.jsonrpc ?websocket evm_node (Request.get_balance ~address ~block)
   in
   return
   @@ decode_or_error
@@ -430,22 +459,28 @@ let get_balance ~address ?(block = Latest) evm_node =
          Evm_node.extract_result response |> JSON.as_string |> Wei.of_string)
        response
 
-let get_storage_at ~address ?(block = Latest) ~pos evm_node =
+let get_storage_at ?websocket ~address ?(block = Latest) ~pos evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.get_storage_at ~address ~pos ~block)
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.get_storage_at ~address ~pos ~block)
   in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
 
-let get_max_priority_fee_per_gas evm_node =
-  let* json = Evm_node.call_evm_rpc evm_node Request.eth_maxPriorityFeePerGas in
+let get_max_priority_fee_per_gas ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node Request.eth_maxPriorityFeePerGas
+  in
   return JSON.(json |-> "result" |> as_int32)
 
-let replay_block blockNumber evm_node =
+let replay_block ?websocket blockNumber evm_node =
   let* response =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       ~private_:true
       evm_node
       (Request.replayBlock blockNumber)
@@ -457,8 +492,8 @@ let replay_block blockNumber evm_node =
 
 type txpool_slot = {address : string; transactions : (int64 * JSON.t) list}
 
-let txpool_content evm_node =
-  let* response = Evm_node.call_evm_rpc evm_node Request.txpool_content in
+let txpool_content ?websocket evm_node =
+  let* response = Evm_node.jsonrpc ?websocket evm_node Request.txpool_content in
   let parse txpool field =
     let open JSON in
     let pool = txpool |-> field in
@@ -483,18 +518,21 @@ let txpool_content evm_node =
          (parse txpool "pending", parse txpool "queued"))
        response
 
-let trace_transaction ~transaction_hash ?tracer ?tracer_config evm_node =
+let trace_transaction ?websocket ~transaction_hash ?tracer ?tracer_config
+    evm_node =
   let* response =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       (Request.trace_transaction ~transaction_hash ?tracer ?tracer_config ())
   in
   return
   @@ decode_or_error (fun response -> Evm_node.extract_result response) response
 
-let trace_call ~block ~to_ ~data ?tracer ?tracer_config evm_node =
+let trace_call ?websocket ~block ~to_ ~data ?tracer ?tracer_config evm_node =
   let* response =
-    Evm_node.call_evm_rpc
+    Evm_node.jsonrpc
+      ?websocket
       evm_node
       (Request.trace_call ~block ~to_ ~data ?tracer ?tracer_config ())
   in
@@ -507,10 +545,12 @@ type fee_history = {
   gas_used_ratio : float list;
 }
 
-let fee_history block_count newest_block evm_node =
+let fee_history ?websocket block_count newest_block evm_node =
   let* response =
-    Evm_node.(
-      call_evm_rpc evm_node (Request.eth_feeHistory ~block_count ~newest_block))
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.eth_feeHistory ~block_count ~newest_block)
   in
 
   let decode_fee_history_result response =
@@ -531,8 +571,8 @@ let fee_history block_count newest_block evm_node =
 
   return @@ decode_or_error decode_fee_history_result response
 
-let coinbase evm_node =
-  let* response = Evm_node.call_evm_rpc evm_node Request.coinbase in
+let coinbase ?websocket evm_node =
+  let* response = Evm_node.jsonrpc ?websocket evm_node Request.coinbase in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)

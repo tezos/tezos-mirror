@@ -6,15 +6,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Resto of unit Tezos_rpc.Directory.t | Dream of Dream.route list
+module EndpointMap = Map.Make (struct
+  type t = Cohttp.Code.meth * string
+
+  let compare = Stdlib.compare
+end)
+
+type resto_dir = {
+  dir : unit Tezos_rpc.Directory.t;
+  extra :
+    (Cohttp_lwt_unix.Server.conn ->
+    Cohttp.Request.t ->
+    Cohttp_lwt.Body.t ->
+    Cohttp_lwt_unix.Server.response_action Lwt.t)
+    EndpointMap.t;
+}
+
+type t = Resto of resto_dir | Dream of Dream.route list
 
 let empty = function
-  | Configuration.Resto -> Resto Tezos_rpc.Directory.empty
+  | Configuration.Resto ->
+      Resto {dir = Tezos_rpc.Directory.empty; extra = EndpointMap.empty}
   | Configuration.Dream -> Dream []
 
 let register dir service handler =
   match dir with
-  | Resto dir -> Resto (Tezos_rpc.Directory.register dir service handler)
+  | Resto {dir; extra} ->
+      Resto {dir = Tezos_rpc.Directory.register dir service handler; extra}
   | Dream routes ->
       let route =
         Router.make_tz_route service (fun ~params ~query input ->
@@ -24,7 +42,8 @@ let register dir service handler =
 
 let opt_register dir service handler =
   match dir with
-  | Resto dir -> Resto (Tezos_rpc.Directory.opt_register dir service handler)
+  | Resto {dir; extra} ->
+      Resto {dir = Tezos_rpc.Directory.opt_register dir service handler; extra}
   | Dream routes ->
       let route =
         Router.make_opt_tz_route service (fun ~params ~query input ->
@@ -34,7 +53,8 @@ let opt_register dir service handler =
 
 let lwt_register dir service handler =
   match dir with
-  | Resto dir -> Resto (Tezos_rpc.Directory.lwt_register dir service handler)
+  | Resto {dir; extra} ->
+      Resto {dir = Tezos_rpc.Directory.lwt_register dir service handler; extra}
   | Dream routes ->
       let route =
         Router.make_route service (fun ~params ~query input ->
@@ -45,19 +65,41 @@ let lwt_register dir service handler =
 let streamed_register dir service handler =
   let open Lwt_syntax in
   match dir with
-  | Resto dir ->
+  | Resto {dir; extra} ->
       let dir =
         Tezos_rpc.Directory.gen_register dir service (fun params query input ->
             let* stream, shutdown = handler params query input in
             let next () = Lwt_stream.get stream in
             Tezos_rpc.Answer.return_stream {next; shutdown})
       in
-      Resto dir
+      Resto {dir; extra}
   | Dream routes ->
       let route =
         Router.make_stream_route service (fun ~params ~query input ->
             handler params query input)
       in
+      Dream (route :: routes)
+
+let register_metrics path dir =
+  match dir with
+  | Resto {dir; extra} ->
+      let open Lwt_syntax in
+      let callback conn req body =
+        let+ response = Metrics.Metrics_server.callback conn req body in
+        `Response response
+      in
+      Resto {dir; extra = EndpointMap.add (`GET, "/metrics") callback extra}
+  | Dream routes ->
+      let route = Router.make_metrics_route path in
+      Dream (route :: routes)
+
+let jsonrpc_websocket_register dir path handler =
+  match dir with
+  | Resto dir ->
+      (* No support for websockets in Resto. *)
+      Resto dir
+  | Dream routes ->
+      let route = Router.make_jsonrpc_websocket_route path handler in
       Dream (route :: routes)
 
 module Curry = struct

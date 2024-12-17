@@ -168,6 +168,7 @@ val bake_until_sync :
     transaction_hash and returns only when the receipt is non null, or [count]
     blocks have passed and the receipt is still not available. *)
 val wait_for_transaction_receipt :
+  ?websocket:Websocket.t ->
   ?count:int ->
   evm_node:Evm_node.t ->
   transaction_hash:string ->
@@ -184,6 +185,7 @@ val wait_for_application :
 (** [batch_n_transactions ~evm_node raw_transactions] batches [raw_transactions]
     to the [evm_node] and returns the requests and transaction hashes. *)
 val batch_n_transactions :
+  ?websocket:Websocket.t ->
   evm_node:Evm_node.t ->
   string list ->
   (Evm_node.request list * string list) Lwt.t
@@ -193,6 +195,7 @@ val batch_n_transactions :
     until the first one is applied in a block and returns, or fails if it isn't
     applied after [wait_for_blocks] blocks. *)
 val send_n_transactions :
+  ?websocket:Websocket.t ->
   produce_block:(unit -> ('a, Rpc.error) result Lwt.t) ->
   evm_node:Evm_node.t ->
   ?wait_for_blocks:int ->

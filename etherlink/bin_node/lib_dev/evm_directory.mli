@@ -8,10 +8,22 @@
 
 (** {1 Directories depending on backends} *)
 
+module EndpointMap : Map.S with type key = Cohttp.Code.meth * string
+
+type resto_dir = {
+  dir : unit Tezos_rpc.Directory.t;
+  extra :
+    (Cohttp_lwt_unix.Server.conn ->
+    Cohttp.Request.t ->
+    Cohttp_lwt.Body.t ->
+    Cohttp_lwt_unix.Server.response_action Lwt.t)
+    EndpointMap.t;
+}
+
 (** The type of RPC directory for EVM node depending on the chosen RPC server
     backend. *)
 type t = private
-  | Resto of unit Tezos_rpc.Directory.t  (** A Resto directory *)
+  | Resto of resto_dir  (** A Resto directory *)
   | Dream of Dream.route trace  (** A list of Dream routes *)
 
 (** An empty directory depending on the RPC server backend. *)
@@ -50,6 +62,15 @@ val streamed_register :
   ([< Resto.meth], unit, 'params, 'query, 'input, 'output) Tezos_rpc.Service.t ->
   ('params -> 'query -> 'input -> ('output Lwt_stream.t * (unit -> unit)) Lwt.t) ->
   t
+
+(** Register a new endpoint for collecting metrics. *)
+val register_metrics : string -> t -> t
+
+(** Register a new websocket service. The handler should return an initial
+    JSONRPC response and optionally produce output elements in a stream for
+    subscription services. *)
+val jsonrpc_websocket_register :
+  t -> string -> Rpc_encodings.websocket_handler -> t
 
 (** {2 Curried functions with respect to service parameters} *)
 

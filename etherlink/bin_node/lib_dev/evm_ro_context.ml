@@ -212,7 +212,7 @@ struct
             call_service
               ~keep_alive:Ctxt.keep_alive
               ~base:evm_node_endpoint
-              (Services.dispatch_service ~path:Resto.Path.root)
+              (Services.dispatch_batch_service ~path:Resto.Path.root)
               ()
               ()
               (Batch methods)

@@ -87,6 +87,8 @@ val register_test :
   ?history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -129,6 +131,8 @@ val register_test_for_kernels :
   threshold_encryption:bool ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -170,5 +174,6 @@ val setup_sequencer :
   enable_dal:bool ->
   ?dal_slots:int list ->
   ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
   Protocol.t ->
   sequencer_setup Lwt.t

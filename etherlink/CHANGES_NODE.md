@@ -29,6 +29,12 @@
 - Fixes a Wasm Runtime host function that would copy only instead of moving
   a subtree. (!16009)
 
+#### Experimental
+
+- Experimental support for websockets on endpoints (`/ws` and `/private/ws`) for
+  JSON-RPC requests with feature flag `experimental_features.enable_websocket =
+  true`. (!15566)
+
 ### Internals
 
 ## Version 0.11 (2024-12-111)

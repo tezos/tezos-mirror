@@ -316,7 +316,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
-    ?restricted_rpcs ?(enable_dal = false) ?dal_slots protocol =
+    ?restricted_rpcs ?(enable_dal = false) ?dal_slots ?websockets protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -445,6 +445,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             ~patch_config
             ~mode
             ?restricted_rpcs
+            ?websockets
             (Sc_rollup_node.endpoint sc_rollup_node)
         in
         return
@@ -492,6 +493,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             ~patch_config
             ~mode:sequencer_mode
             ?restricted_rpcs
+            ?websockets
             (Sc_rollup_node.endpoint sc_rollup_node)
         in
         let produce_block () = Rpc.produce_block sequencer in
@@ -501,6 +503,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             Evm_node.create
               ~data_dir:(Evm_node.data_dir sequencer)
               ~mode:(Rpc Evm_node.(mode sequencer))
+              ?websockets
               (Evm_node.endpoint sequencer)
           in
           let* () = Evm_node.run evm_node in
@@ -527,8 +530,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?(additional_uses = []) ?commitment_period ?challenge_window
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs ~setup_mode
-    ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None) f protocols
-    =
+    ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None) ?websockets
+    f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -578,6 +581,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ~setup_mode
               ~enable_dal
               ?dal_slots
+              ?websockets
               protocol
           in
           f ~protocol ~evm_setup)
@@ -587,7 +591,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
 let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
-    ?maximum_allowed_ticks ?restricted_rpcs f protocols =
+    ?maximum_allowed_ticks ?restricted_rpcs ?websockets f protocols =
   let register ~enable_dal : unit =
     register_test
       ~title
@@ -605,6 +609,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       ?rollup_operator_key
       ?maximum_allowed_ticks
       ?restricted_rpcs
+      ?websockets
       f
       protocols
       ~enable_dal
@@ -618,7 +623,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?(block_storage_sqlite3 = false) f protocols =
+    ?max_blueprints_ahead ?(block_storage_sqlite3 = false) ?websockets f
+    protocols =
   let register ~enable_dal : unit =
     register_test
       ~title
@@ -636,6 +642,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       ?rollup_operator_key
       ?maximum_allowed_ticks
       ?restricted_rpcs
+      ?websockets
       f
       protocols
       ~enable_dal
@@ -656,7 +663,8 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?block_storage_sqlite3 f protocols : unit =
+    ?max_blueprints_ahead ?block_storage_sqlite3 ?websockets f protocols : unit
+    =
   register_proxy
     ~title
     ~tags
@@ -673,6 +681,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?rollup_operator_key
     ?maximum_allowed_ticks
     ?restricted_rpcs
+    ?websockets
     f
     protocols ;
   register_sequencer
@@ -694,6 +703,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?restricted_rpcs
     ?max_blueprints_ahead
     ?block_storage_sqlite3
+    ?websockets
     f
     protocols
 
@@ -883,10 +893,12 @@ let test_rpc_getBlockByNumber =
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   unit
 
-let get_block_by_hash ?(full_tx_objects = false) evm_setup block_hash =
+let get_block_by_hash ?websocket ?(full_tx_objects = false) evm_setup block_hash
+    =
   let* block =
     Evm_node.(
-      call_evm_rpc
+      jsonrpc
+        ?websocket
         evm_setup.evm_node
         {
           method_ = "eth_getBlockByHash";
@@ -910,14 +922,7 @@ let test_rpc_getBlockByHash =
   assert (block = block') ;
   unit
 
-let test_rpc_getBlockReceipts =
-  register_both
-    ~time_between_blocks:Nothing
-    ~bootstrap_accounts:Eth_account.lots_of_address
-    ~tags:["evm"; "rpc"; "get_block_receipts"]
-    ~title:"RPC method eth_getBlockReceipts"
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
+let test_rpc_getBlockReceipts_aux ?websocket {evm_node; produce_block; _} =
   let txs =
     read_tx_from_file ()
     |> List.filteri (fun i _ -> i < 5)
@@ -928,7 +933,8 @@ let test_rpc_getBlockReceipts =
   in
   let* receipts =
     Evm_node.(
-      call_evm_rpc
+      jsonrpc
+        ?websocket
         evm_node
         {
           method_ = "eth_getBlockReceipts";
@@ -950,6 +956,15 @@ let test_rpc_getBlockReceipts =
   in
   assert (List.equal ( = ) txs expected_txs) ;
   unit
+
+let test_rpc_getBlockReceipts =
+  register_both
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~tags:["evm"; "rpc"; "get_block_receipts"]
+    ~title:"RPC method eth_getBlockReceipts"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  @@ fun ~protocol:_ ~evm_setup -> test_rpc_getBlockReceipts_aux evm_setup
 
 let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
   register_both
@@ -1061,7 +1076,7 @@ let test_rpc_getTransactionCountBatch =
             ~block:"latest";
         ]
     in
-    match JSON.as_list transaction_count with
+    match transaction_count with
     | [transaction_count] ->
         return JSON.(transaction_count |-> "result" |> as_int64)
     | _ -> Test.fail "Unexpected result from batching one request"
@@ -1083,7 +1098,7 @@ let test_rpc_batch =
     let* results =
       Evm_node.batch_evm_rpc evm_node [transaction_count; chain_id]
     in
-    match JSON.as_list results with
+    match results with
     | [transaction_count; chain_id] ->
         return
           ( JSON.(transaction_count |-> "result" |> as_int64),
@@ -1511,7 +1526,7 @@ let config_setup evm_setup =
   let* results =
     Evm_node.batch_evm_rpc evm_setup.evm_node [web3_clientVersion; chain_id]
   in
-  match JSON.as_list results with
+  match results with
   | [web3_clientVersion; chain_id] ->
       (* We don't need to return the web3_clientVersion because,
          it might change after the upgrade.

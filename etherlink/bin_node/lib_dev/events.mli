@@ -38,20 +38,22 @@ val ignored_kernel_arg : unit -> unit Lwt.t
     node from L1 level [from] to [to_]. *)
 val catching_up_evm_event : from:int32 -> to_:int32 -> unit Lwt.t
 
-(** [is_ready ~rpc_addr ~rpc_port ~backend] advertises that the
+(** [is_ready ~rpc_addr ~rpc_port ~websockets ~backend] advertises that the
     sequencer is ready and listens to [rpc_addr]:[rpc_port]. *)
 val is_ready :
   rpc_addr:string ->
   rpc_port:int ->
+  websockets:bool ->
   backend:Configuration.rpc_server ->
   unit Lwt.t
 
-(** [private_server_is_ready ~rpc_addr ~rpc_port ~backend]
+(** [private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend]
     advertises that the private rpc server is ready and listens to
     [rpc_addr]:[rpc_port]. *)
 val private_server_is_ready :
   rpc_addr:string ->
   rpc_port:int ->
+  websockets:bool ->
   backend:Configuration.rpc_server ->
   unit Lwt.t
 

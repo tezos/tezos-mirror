@@ -67,11 +67,29 @@ let encode media encoding =
 
 let decode media encoding =
   match media with
-  | `Json ->
+  | `Json -> (
       fun s ->
-        Ezjsonm.value_from_string s |> Data_encoding.Json.destruct encoding
+        match Ezjsonm.value_from_string_result s with
+        | Error err -> Error (Ezjsonm.read_error_description err)
+        | Ok json -> (
+            try Ok (Data_encoding.Json.destruct encoding json)
+            with exn ->
+              let err =
+                Format.asprintf
+                  "%a"
+                  (Data_encoding.Json.print_error ~print_unknown:(fun fmt exn ->
+                       Format.fprintf
+                         fmt
+                         "Unknown exception %s"
+                         (Printexc.exn_slot_name exn)))
+                  exn
+              in
+              Error err))
   | `Octets ->
-      Data_encoding.Binary.of_string_exn (Data_encoding.dynamic_size encoding)
+      fun s ->
+        Data_encoding.Binary.of_string (Data_encoding.dynamic_size encoding) s
+        |> Result.map_error
+             (Format.asprintf "%a" Data_encoding.Binary.pp_read_error)
 
 let content_header = function
   | `Json -> Dream.application_json
@@ -82,6 +100,14 @@ let respond ?status ?code ?headers media v =
   let* response = Dream.respond ?status ?code ?headers v in
   Dream.set_header response "Content-type" (content_header media) ;
   return response
+
+let respond_error ?status ?code ?headers media err =
+  respond
+    ?status
+    ?code
+    ?headers
+    media
+    (encode media (Rpc_encodings.JSONRPC.error_encoding Data_encoding.json) err)
 
 let get_params :
     type params.
@@ -161,11 +187,13 @@ let make_gen_route :
       | Ok params -> (
           match input_encoding with
           | No_input -> handler request ~params ~query ()
-          | Input input_encoding ->
+          | Input input_encoding -> (
               let* body = Dream.body request in
               let media = content_media request in
-              let input = decode media input_encoding body in
-              handler request ~params ~query input))
+              match decode media input_encoding body with
+              | Error msg ->
+                  respond_error output_media (Rpc_errors.parse_error msg)
+              | Ok input -> handler request ~params ~query input)))
 
 let make_route service handler =
   make_gen_route service @@ fun request ~params ~query input ->
@@ -231,3 +259,106 @@ let make_stream_route service handler =
   in
   shutdown () ;
   return_unit
+
+let make_metrics_route path =
+  let open Lwt_syntax in
+  Dream.get path @@ fun _request ->
+  let* {body; content_type} = Metrics.get_metrics () in
+  let* response = Dream.respond body in
+  Dream.set_header response "Content-type" content_type ;
+  return response
+
+let send_error media websocket error =
+  let text_or_binary = match media with `Json -> `Text | `Octets -> `Binary in
+  Dream.send
+    ~text_or_binary
+    websocket
+    (encode
+       media
+       (Rpc_encodings.JSONRPC.error_encoding Data_encoding.json)
+       error)
+
+let make_jsonrpc_websocket_route path
+    (handler : Rpc_encodings.websocket_handler) =
+  let open Lwt_syntax in
+  let open Rpc_encodings in
+  Dream.get path @@ fun request ->
+  let input_media = content_media request in
+  let output_media = accept_media request in
+  let text_or_binary =
+    match output_media with `Json -> `Text | `Octets -> `Binary
+  in
+  Dream.websocket @@ fun websocket ->
+  let subscriptions = Stdlib.Hashtbl.create 17 in
+  let write_stream {id; stream; stopper} =
+    Stdlib.Hashtbl.add subscriptions id stopper ;
+    let* () =
+      Lwt_stream.iter_s
+        (function
+          | Ok output ->
+              let output =
+                encode output_media Subscription.response_encoding output
+              in
+              (* WARNING: https://gitlab.com/tezos/tezos/-/issues/7645
+                 Dream.send can 100% cpu on closed connections (see
+                 https://github.com/aantron/dream/issues/230). *)
+              Dream.send ~text_or_binary websocket output
+          | Error exn ->
+              send_error
+                output_media
+                websocket
+                (Rpc_errors.internal_error (Printexc.exn_slot_name exn)))
+        (Lwt_stream.wrap_exn stream)
+    in
+    stopper () ;
+    Stdlib.Hashtbl.remove subscriptions id ;
+    return_unit
+  in
+  let async_write_stream subscription =
+    Lwt.dont_wait
+      (fun () -> write_stream subscription)
+      (fun exn ->
+        subscription.stopper () ;
+        Stdlib.Hashtbl.remove subscriptions subscription.id ;
+        Dream.error @@ fun log ->
+        log
+          "Websocket write exception with %s: %s"
+          (Dream.client request)
+          (Printexc.to_string exn))
+  in
+  let rec loop () =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7645
+       Dream.receive may not resolve (with None) on closed connections. *)
+    let* message = Dream.receive websocket in
+    match message with
+    | None ->
+        (* The websocket is closed, cleaning up. *)
+        Dream.log
+          "Websocket connection with %s is closed, cleaning up (%d \
+           subscriptions)"
+          (Dream.client request)
+          (Stdlib.Hashtbl.length subscriptions) ;
+        Stdlib.Hashtbl.iter (fun _id stopper -> stopper ()) subscriptions ;
+        Stdlib.Hashtbl.clear subscriptions ;
+        Dream.close_websocket websocket
+    | Some message ->
+        let* () =
+          match decode input_media JSONRPC.request_encoding message with
+          | Error msg ->
+              send_error output_media websocket (Rpc_errors.parse_error msg)
+          | Ok input ->
+              let* ws_response = handler input in
+              let response =
+                encode
+                  output_media
+                  JSONRPC.response_encoding
+                  ws_response.response
+              in
+              let* () = Dream.send ~text_or_binary websocket response in
+              (* Support multiple asynchronous requests on websocket. *)
+              Option.iter async_write_stream ws_response.subscription ;
+              return_unit
+        in
+        loop ()
+  in
+  loop ()

@@ -17,34 +17,35 @@ type evm_services_methods = {
 
 type block_production = [`Single_node | `Threshold_encryption | `Disabled]
 
-let callback server dir =
-  let open Cohttp in
-  let open Lwt_syntax in
-  let callback_log conn req body =
-    let path = Request.uri req |> Uri.path in
-    if path = "/metrics" then
-      let* response = Metrics.Metrics_server.callback conn req body in
-      Lwt.return (`Response response)
-    else
-      let uri = req |> Request.uri |> Uri.to_string in
-      let meth = req |> Request.meth |> Code.string_of_method in
-      let* body_str = body |> Cohttp_lwt.Body.to_string in
-      let* () = Events.callback_log ~uri ~meth ~body:body_str in
-      Tezos_rpc_http_server.RPC_server.resto_callback
-        server
-        conn
-        req
-        (Cohttp_lwt.Body.of_string body_str)
-  in
-  let update_metrics uri meth =
-    Prometheus.Summary.(time (labels Metrics.Rpc.metrics [uri; meth]) Sys.time)
-  in
-  Tezos_rpc_http_server.RPC_middleware.rpc_metrics_transform_callback
-    ~update_metrics
-    dir
-    callback_log
-
 module Resto = struct
+  let callback server Evm_directory.{dir; extra} =
+    let open Cohttp in
+    let open Lwt_syntax in
+    let callback_log conn req body =
+      let path = Request.uri req |> Uri.path in
+      let meth = Request.meth req in
+      match Evm_directory.EndpointMap.find (meth, path) extra with
+      | Some callback -> callback conn req body
+      | None ->
+          let uri = req |> Request.uri |> Uri.to_string in
+          let meth = req |> Request.meth |> Code.string_of_method in
+          let* body_str = body |> Cohttp_lwt.Body.to_string in
+          let* () = Events.callback_log ~uri ~meth ~body:body_str in
+          Tezos_rpc_http_server.RPC_server.resto_callback
+            server
+            conn
+            req
+            (Cohttp_lwt.Body.of_string body_str)
+    in
+    let update_metrics uri meth =
+      Prometheus.Summary.(
+        time (labels Metrics.Rpc.metrics [uri; meth]) Sys.time)
+    in
+    Tezos_rpc_http_server.RPC_middleware.rpc_metrics_transform_callback
+      ~update_metrics
+      dir
+      callback_log
+
   let start_server rpc directory =
     let open Lwt_result_syntax in
     let open Tezos_rpc_http_server in
@@ -66,7 +67,7 @@ module Resto = struct
         ~acl
         ~cors
         ~media_types:Supported_media_types.all
-        directory
+        directory.Evm_directory.dir
     in
 
     let*! () =
@@ -130,6 +131,7 @@ let start_public_server ?delegate_health_check_to ?evm_services
   let directory =
     Services.directory ?delegate_health_check_to config.public_rpc config ctxt
     |> register_evm_services
+    |> Evm_directory.register_metrics "/metrics"
   in
   let* finalizer = start_server config.public_rpc directory in
   let*! () =
@@ -137,6 +139,7 @@ let start_public_server ?delegate_health_check_to ?evm_services
       ~rpc_addr:config.public_rpc.addr
       ~rpc_port:config.public_rpc.port
       ~backend:config.experimental_features.rpc_server
+      ~websockets:config.experimental_features.enable_websocket
   in
   return finalizer
 
@@ -146,6 +149,7 @@ let start_private_server ?(block_production = `Disabled) config ctxt =
   | Some private_rpc ->
       let directory =
         Services.private_directory private_rpc ~block_production config ctxt
+        |> Evm_directory.register_metrics "/metrics"
       in
       let* finalizer = start_server private_rpc directory in
       let*! () =
@@ -153,6 +157,7 @@ let start_private_server ?(block_production = `Disabled) config ctxt =
           ~rpc_addr:private_rpc.addr
           ~rpc_port:private_rpc.port
           ~backend:config.experimental_features.rpc_server
+          ~websockets:config.experimental_features.enable_websocket
       in
       return finalizer
   | None -> return (fun () -> Lwt_syntax.return_unit)
