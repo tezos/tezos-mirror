@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Experimental support for websockets on endpoints (`/ws` and `/private/ws`) for
+  JSON-RPC requests with feature flag `experimental_features.enable_websocket =
+  true`. (!15566)
+  - Added support for the WebSocket event `newHeads`, allowing clients to receive
+    real-time notifications of new blocks. (!15899)
+  - Added support for the WebSocket event `newPendingTransactions`, enabling clients
+    to receive real-time notifications of incoming pending transactions. (!15991)
+
+### Bug fixes
+
+### Internals
+
 ## Version 0.12 (2024-12-17)
 
 This release notably addresses a bug introduced in the previous release,
