@@ -39,6 +39,16 @@ impl Proof {
             partial_tree: proof,
         }
     }
+
+    /// Get the proof tree.
+    pub fn tree(&self) -> &MerkleProof {
+        &self.partial_tree
+    }
+
+    /// Get the final state hash of the proof.
+    pub fn final_state_hash(&self) -> &Hash {
+        &self.final_state_hash
+    }
 }
 
 /// Tag of a node

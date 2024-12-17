@@ -11,7 +11,10 @@ use crate::{
         self,
         hash::RootHashable,
         owned_backend::Owned,
-        proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
+        proof_backend::{
+            proof::MerkleProof, ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion,
+        },
+        verify_backend::Verifier,
         AllocatedOf, Ref,
     },
     storage::{self, Hash, Repo},
@@ -87,6 +90,14 @@ impl<M: state_backend::ManagerBase> State<M> {
         }
 
         State::bind(self.struct_ref::<ProofWrapper>())
+    }
+}
+
+impl State<Verifier> {
+    /// Construct a PVM state from a Merkle proof.
+    pub fn from_proof(_proof: &MerkleProof) -> Option<Self> {
+        // TODO: RV-348: Parse the Merkle proof to obtain a PVM state
+        todo!("Can't parse the merkle proof yet")
     }
 }
 

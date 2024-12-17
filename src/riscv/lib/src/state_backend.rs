@@ -64,6 +64,7 @@ pub mod owned_backend;
 pub mod proof_backend;
 mod region;
 mod trans;
+pub mod verify_backend;
 
 pub use effects::*;
 pub use elems::*;

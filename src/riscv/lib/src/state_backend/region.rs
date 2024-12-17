@@ -108,7 +108,7 @@ pub struct Cell<E: 'static, M: ManagerBase + ?Sized> {
 
 impl<E: 'static, M: ManagerBase> Cell<E, M> {
     /// Bind this state to the single element region.
-    pub fn bind(region: M::Region<E, 1>) -> Self {
+    pub const fn bind(region: M::Region<E, 1>) -> Self {
         Self {
             region: Cells::bind(region),
         }
@@ -120,6 +120,11 @@ impl<E: 'static, M: ManagerBase> Cell<E, M> {
         Cell {
             region: self.region.struct_ref::<F>(),
         }
+    }
+
+    /// Obtain the underlying region.
+    pub fn into_region(self) -> M::Region<E, 1> {
+        self.region.into_region()
     }
 }
 
@@ -303,7 +308,7 @@ pub struct Cells<E: 'static, const LEN: usize, M: ManagerBase + ?Sized> {
 
 impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     /// Bind this state to the given region.
-    pub fn bind(region: M::Region<E, LEN>) -> Self {
+    pub const fn bind(region: M::Region<E, LEN>) -> Self {
         Self { region }
     }
 
@@ -313,6 +318,11 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         Cells {
             region: F::map_region(&self.region),
         }
+    }
+
+    /// Obtain the underlying region.
+    pub fn into_region(self) -> M::Region<E, LEN> {
+        self.region
     }
 }
 
