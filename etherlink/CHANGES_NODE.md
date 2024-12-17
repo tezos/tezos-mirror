@@ -37,6 +37,9 @@
 
 ### Internals
 
+- Private RPCs stateValue and stateSubkeys can now take the block parameter,
+  e.g. `"params": ["/evm/chain_id", "finalized"]`. (!16010)
+
 ## Version 0.11 (2024-12-111)
 
 In addition to several bug fixes and internal changes, this release introduces

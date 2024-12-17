@@ -769,11 +769,16 @@ module Inject_transaction = struct
 end
 
 module Durable_state_value = struct
-  type input = Durable_storage_path.path
+  type input =
+    Durable_storage_path.path * Ethereum_types.Block_parameter.extended
 
   type output = Bytes.t option
 
-  let input_encoding = Data_encoding.string
+  let input_encoding =
+    Helpers.encoding_with_optional_last_param
+      Data_encoding.string
+      Ethereum_types.Block_parameter.extended_encoding
+      Ethereum_types.Block_parameter.(Block_parameter Latest)
 
   let output_encoding = Data_encoding.(option bytes)
 
@@ -783,11 +788,16 @@ module Durable_state_value = struct
 end
 
 module Durable_state_subkeys = struct
-  type input = Durable_storage_path.path
+  type input =
+    Durable_storage_path.path * Ethereum_types.Block_parameter.extended
 
   type output = string list
 
-  let input_encoding = Data_encoding.string
+  let input_encoding =
+    Helpers.encoding_with_optional_last_param
+      Data_encoding.string
+      Ethereum_types.Block_parameter.extended_encoding
+      Ethereum_types.Block_parameter.(Block_parameter Latest)
 
   let output_encoding = Data_encoding.(list string)
 
