@@ -31,8 +31,7 @@ container_scanning:
   parallel:
     matrix:
       - IMAGE:
-          - "tezos/tezos:octez-v21.0"
-          - "tezos/tezos:octez-v20.3"
+          - "tezos/tezos:latest"
   artifacts:
     paths:
       - scan.log
