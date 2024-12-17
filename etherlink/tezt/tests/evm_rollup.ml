@@ -70,14 +70,6 @@ type full_evm_setup = {
   kernel_root_hash : string;
 }
 
-let hex_256_of_address acc =
-  let s = acc.Eth_account.address in
-  (* strip 0x and convert to lowercase *)
-  let n = String.length s in
-  let s = String.lowercase_ascii @@ String.sub s 2 (n - 2) in
-  (* prepend 24 leading zeros *)
-  String.("0x" ^ make 24 '0' ^ s)
-
 let expected_gas_fees ~gas_price ~gas_used =
   let open Wei in
   let gas_price = gas_price |> Z.of_int64 |> Wei.to_wei_z in

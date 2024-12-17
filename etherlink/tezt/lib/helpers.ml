@@ -55,6 +55,14 @@ let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
 
 let hex_256_of_int n = Printf.sprintf "%064x" n
 
+let hex_256_of_address acc =
+  let s = acc.Eth_account.address in
+  (* strip 0x and convert to lowercase *)
+  let n = String.length s in
+  let s = String.lowercase_ascii @@ String.sub s 2 (n - 2) in
+  (* prepend 24 leading zeros *)
+  String.("0x" ^ make 24 '0' ^ s)
+
 let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
   Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node
