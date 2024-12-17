@@ -115,7 +115,6 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
-      ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
       ()
   in
