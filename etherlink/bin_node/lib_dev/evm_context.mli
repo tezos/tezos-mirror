@@ -46,10 +46,6 @@ val export_store :
     [data_dir] is the path to the data-dir of the node, notably containing the
     SQLite store and the Irmin context.
 
-    [native_execution_policy] decides if native execution is used for supported
-    kernel. In the context of the [Evm_context] worker, the native execution
-    will only be used in [native_execution_policy = Always].
-
     [smart_rollup_address] can be provided either when starting from a
     non-existing data-dir, or when starting a sandbox.
 
@@ -72,7 +68,6 @@ val start :
   configuration:Configuration.t ->
   ?kernel_path:string ->
   data_dir:string ->
-  native_execution_policy:Configuration.native_execution_policy ->
   ?smart_rollup_address:string ->
   fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->

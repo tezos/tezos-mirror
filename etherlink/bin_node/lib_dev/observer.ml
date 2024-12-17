@@ -112,7 +112,6 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~configuration:config
       ~data_dir
       ?kernel_path
-      ~native_execution_policy:config.kernel_execution.native_execution_policy
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)

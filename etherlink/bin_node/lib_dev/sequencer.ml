@@ -67,8 +67,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~configuration
       ?kernel_path:kernel
       ~data_dir
-      ~native_execution_policy:
-        configuration.kernel_execution.native_execution_policy
       ~fail_on_missing_blueprint:true
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write

@@ -22,7 +22,6 @@ type parameters = {
   configuration : Configuration.t;
   kernel_path : string option;
   data_dir : string;
-  native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
@@ -50,7 +49,6 @@ type t = {
   configuration : Configuration.t;
   data_dir : string;
   index : Irmin_context.rw_index;
-  native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
@@ -651,7 +649,8 @@ module State = struct
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
           Evm_state.apply_blueprint
-            ~native_execution_policy:ctxt.native_execution_policy
+            ~native_execution_policy:
+              ctxt.configuration.kernel_execution.native_execution_policy
             ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
             ~data_dir
             ~config
@@ -909,7 +908,9 @@ module State = struct
     | New_delayed_transaction delayed_transaction ->
         let* evm_state =
           on_new_delayed_transaction
-            ~native_execution:(ctxt.native_execution_policy = Always)
+            ~native_execution:
+              (ctxt.configuration.kernel_execution.native_execution_policy
+             = Always)
             ~delayed_transaction
             evm_state
         in
@@ -1113,8 +1114,7 @@ module State = struct
 
   let init ~(configuration : Configuration.t) ?kernel_path
       ~block_storage_sqlite3 ?garbage_collector ~fail_on_missing_blueprint
-      ~data_dir ~native_execution_policy ?smart_rollup_address ~store_perm
-      ?sequencer_wallet () =
+      ~data_dir ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1218,7 +1218,6 @@ module State = struct
         configuration;
         index;
         data_dir;
-        native_execution_policy;
         smart_rollup_address;
         session =
           {
@@ -1497,7 +1496,6 @@ module Handlers = struct
         configuration : Configuration.t;
         kernel_path : string option;
         data_dir : string;
-        native_execution_policy;
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
         store_perm;
@@ -1511,7 +1509,6 @@ module Handlers = struct
         ~configuration
         ?kernel_path
         ~data_dir
-        ~native_execution_policy
         ?smart_rollup_address
         ~fail_on_missing_blueprint
         ~store_perm
@@ -1695,9 +1692,9 @@ let export_store ~data_dir ~output_db_file =
   let* () = Evm_store.vacuum ~conn ~output_db_file in
   return {rollup_address; current_number}
 
-let start ~configuration ?kernel_path ~data_dir ~native_execution_policy
-    ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
-    ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
+let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
+    ~fail_on_missing_blueprint ~store_perm ~block_storage_sqlite3
+    ?garbage_collector ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1708,7 +1705,6 @@ let start ~configuration ?kernel_path ~data_dir ~native_execution_policy
         configuration;
         kernel_path;
         data_dir;
-        native_execution_policy;
         smart_rollup_address;
         fail_on_missing_blueprint;
         store_perm;
@@ -1896,7 +1892,6 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
     start
       ~configuration
       ~data_dir
-      ~native_execution_policy:Never
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
