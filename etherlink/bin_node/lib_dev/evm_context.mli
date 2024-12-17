@@ -46,7 +46,6 @@ val export_store :
     [data_dir] is the path to the data-dir of the node, notably containing the
     SQLite store and the Irmin context.
 
-    [preimages] is the path to the preimages directory, while a
     [preimages_endponit] URI can be optionally provided to download missing
     preimages when they are requested by the current kernel (during upgrades).
 
@@ -76,7 +75,6 @@ val start :
   configuration:Configuration.t ->
   ?kernel_path:string ->
   data_dir:string ->
-  preimages:string ->
   preimages_endpoint:Uri.t option ->
   native_execution_policy:Configuration.native_execution_policy ->
   ?smart_rollup_address:string ->

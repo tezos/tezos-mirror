@@ -112,7 +112,6 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~configuration:config
       ~data_dir
       ?kernel_path
-      ~preimages:config.kernel_execution.preimages
       ~preimages_endpoint:config.kernel_execution.preimages_endpoint
       ~native_execution_policy:config.kernel_execution.native_execution_policy
       ~smart_rollup_address:
