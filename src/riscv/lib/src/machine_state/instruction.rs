@@ -20,6 +20,7 @@ use super::{
 };
 use crate::{
     default::ConstDefault,
+    interpreter::i,
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBTypeArgs, CJTypeArgs, CRJTypeArgs, CRTypeArgs, CSSDTypeArgs,
@@ -567,6 +568,16 @@ macro_rules! impl_r_type {
             Ok(Next(InstrWidth::Uncompressed))
         }
     };
+    ($impl: path, $fn: ident) => {
+        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            $impl(&mut core.hart.xregisters, self.rs1, self.rs2, self.rd);
+
+            Ok(Next(InstrWidth::Uncompressed))
+        }
+    };
 }
 
 macro_rules! impl_i_type {
@@ -870,7 +881,7 @@ macro_rules! impl_f_r_type {
 
 impl Args {
     // RV64I R-type instructions
-    impl_r_type!(run_add);
+    impl_r_type!(i::run_add, run_add);
     impl_r_type!(run_sub);
     impl_r_type!(run_xor);
     impl_r_type!(run_or);
