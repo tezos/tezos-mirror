@@ -260,7 +260,7 @@ type t = {
   (* attestation aggregation feature flag *)
   aggregate_attestation : bool;
   allow_tz4_delegate_enable : bool;
-  all_bakers_attest_enable : bool;
+  all_bakers_attest_activation_level : Raw_level_repr.t option;
 }
 
 val encoding : t Data_encoding.encoding

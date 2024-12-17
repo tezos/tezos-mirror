@@ -78,6 +78,10 @@ val attesting_rights_count :
   Level_repr.t ->
   (Raw_context.t * int Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
+(** [check_all_bakers_attest_at_level ctxt level] checks that at the given
+    level, all bakers were allowed (and expected) to attest. *)
+val check_all_bakers_attest_at_level : Raw_context.t -> Level_repr.t -> bool
+
 module For_RPC : sig
   (** The baking power for a given delegate computed from its current
     stake. *)

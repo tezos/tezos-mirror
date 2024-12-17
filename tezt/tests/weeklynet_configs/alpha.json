@@ -151,6 +151,5 @@
     },
     "direct_ticket_spending_enable": false,
     "aggregate_attestation": false,
-    "allow_tz4_delegate_enable": false,
-    "all_bakers_attest_enable": false
+    "allow_tz4_delegate_enable": false
 }

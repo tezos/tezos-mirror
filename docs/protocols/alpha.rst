@@ -77,7 +77,7 @@ Minor Changes
 - Added a feature flag which would allow tz4 (BLS) addresses as delegate and or
   as consensus keys. (MR :gl:`!15311`)
 
-- Added a feature flag for allowing all bakers to attest. (MR :gl:`!15584`)
+- Added a feature flag for allowing all bakers to attest. (MR :gl:`!15584`, :gl:`!15764`)
 
 Internal
 --------
