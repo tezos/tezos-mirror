@@ -59,3 +59,8 @@ let with_events_equal x y =
     |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
   in
   hash_bytes x = hash_bytes y
+
+let with_events_to_events with_events =
+  Evm_events.of_parts
+    with_events.delayed_transactions
+    with_events.kernel_upgrade
