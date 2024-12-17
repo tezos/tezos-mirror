@@ -82,7 +82,9 @@ you start using them, you probably want to use `octez-evm-node check config
 - Experimental support for alternative RPC server backend
   [Dream](https://aantron.github.io/dream) with feature flag
   `experimental_features.rpc_server = "dream"`. (!15560)
-
+- Added support for the WebSocket event `newHeads`, allowing clients to receive
+  real-time notifications of new blocks. (!15899)
+  
 ### Bug fixes
 
 #### RPCs

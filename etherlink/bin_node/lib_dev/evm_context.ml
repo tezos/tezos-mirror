@@ -132,6 +132,9 @@ let lock_data_dir ~data_dir =
   in
   return_unit
 
+let head_watcher : Ethereum_types.Subscription.output Lwt_watcher.input =
+  Lwt_watcher.create_input ()
+
 module State = struct
   let current_blueprint_number ctxt =
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
@@ -759,6 +762,7 @@ module State = struct
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
     ctxt.session.current_block_hash <- Ethereum_types.(block.hash) ;
+    Lwt_watcher.notify head_watcher (Ethereum_types.Subscription.NewHeads block) ;
     Option.iter
       (fun (split_level, split_timestamp) ->
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))

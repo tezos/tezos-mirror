@@ -25,7 +25,7 @@ let connect ?runner ?hooks ?name url =
   in
   let url = Uri.with_scheme (Uri.of_string url) (Some "ws") |> Uri.to_string in
   let process, stdin =
-    Process.spawn_with_stdin ~name ?runner ?hooks "websocat" [url]
+    Process.spawn_with_stdin ~name ?runner ?hooks "websocat" [url; "-E"]
   in
   let () =
     try Unix.kill (Process.pid process) 0
@@ -63,6 +63,7 @@ let read_json ~origin {process; _} =
 let close ws =
   let* () = Lwt_io.close ws.stdin in
   Process.terminate ws.process ;
+  let* _ = Process.wait ws.process in
   unit
 
 let send =

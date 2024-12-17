@@ -213,6 +213,76 @@ let block_transaction_count block =
   | TxHash l -> List.length l
   | TxFull l -> List.length l
 
+type sub_stream = {
+  kind : Ethereum_types.Subscription.kind;
+  stream : Ethereum_types.Subscription.output Lwt_stream.t;
+  stopper : unit -> unit;
+}
+
+let subscriptions :
+    (Ethereum_types.Subscription.id, sub_stream) Stdlib.Hashtbl.t =
+  (* 10 seems like a reasonable number since there is only
+     four types of subscription, and only `logs` make sense
+     to be sent multiple times. *)
+  Stdlib.Hashtbl.create 10
+
+let () = Random.self_init ()
+
+let encode_id bytes =
+  let id_hex = Hex.of_bytes bytes |> Hex.show in
+  let buf = Buffer.create (String.length id_hex) in
+  (* Trimming leading zeros. *)
+  String.fold_left
+    (fun only_zeros -> function
+      | '0' when only_zeros -> only_zeros
+      | c ->
+          Buffer.add_char buf c ;
+          false)
+    true
+    id_hex
+  |> ignore ;
+  Buffer.contents buf
+
+let make_id ~id = Ethereum_types.Subscription.(Id (Hex id))
+
+(* [generate_id]'s implementation is inspired by geth's one.
+   See:
+   https://github.com/ethereum/go-ethereum/blob/master/rpc/subscription.go *)
+let generate_id () =
+  let id = Bytes.make 16 '\000' in
+  Bytes.iteri (fun i _ -> Bytes.set_uint8 id i (Random.int 256)) id ;
+  encode_id id
+
+let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
+  let id = make_id ~id:(generate_id ()) in
+  let stream, stopper =
+    match kind with
+    | NewHeads -> Lwt_watcher.create_stream Evm_context.head_watcher
+    | Logs _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7640 *)
+        Stdlib.failwith "The websocket event [logs] is not implemented yet."
+    | NewPendingTransactions ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7641 *)
+        Stdlib.failwith
+          "The websocket event [newPendingTransactions] is not implemented yet."
+    | Syncing ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
+        Stdlib.failwith "The websocket event [syncing] is not implemented yet."
+  in
+  let stopper () =
+    Stdlib.Hashtbl.remove subscriptions id ;
+    Lwt_watcher.shutdown stopper
+  in
+  Stdlib.Hashtbl.add subscriptions id {kind; stream; stopper} ;
+  (id, (stream, stopper))
+
+let eth_unsubscribe ~id =
+  match Stdlib.Hashtbl.find_opt subscriptions id with
+  | Some {stopper; _} ->
+      stopper () ;
+      true
+  | None -> false
+
 let decode :
     type a. (module METHOD with type input = a) -> Data_encoding.json -> a =
  fun (module M) v -> Data_encoding.Json.destruct M.input_encoding v
@@ -872,6 +942,54 @@ let dispatch_handler (rpc : Configuration.rpc) config ctx dispatch_request
 
 let websocket_response_of_response response = {response; subscription = None}
 
+let encode_subscription_response subscription r =
+  let result =
+    Data_encoding.Json.construct Ethereum_types.Subscription.output_encoding r
+  in
+  Rpc_encodings.Subscription.{params = {result; subscription}}
+
+let empty_stream =
+  let stream, push = Lwt_stream.create () in
+  push None ;
+  (stream, fun () -> ())
+
+let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
+
+let dispatch_websocket (rpc : Configuration.rpc) config ctx
+    (input : JSONRPC.request) =
+  let open Lwt_syntax in
+  match map_method_name ~restrict:rpc.restricted_rpcs input.method_ with
+  | Method (Subscribe.Method, module_) ->
+      let sub_stream = ref empty_stream in
+      let sid = ref empty_sid in
+      let f (kind : Ethereum_types.Subscription.kind) =
+        let id, stream = eth_subscribe ~kind in
+        (* This is an optimization to avoid having to search in the map
+           of subscriptions for `stream` and `id`. *)
+        sub_stream := stream ;
+        sid := id ;
+        rpc_ok id
+      in
+      let* value = build_with_input ~f module_ input.parameters in
+      let response = JSONRPC.{value; id = input.id} in
+      let subscription_id = !sid in
+      let stream, stopper = !sub_stream in
+      let stream =
+        Lwt_stream.map (encode_subscription_response subscription_id) stream
+      in
+      return
+        {response; subscription = Some {id = subscription_id; stream; stopper}}
+  | Method (Unsubscribe.Method, module_) ->
+      let f (id : Ethereum_types.Subscription.id) =
+        let status = eth_unsubscribe ~id in
+        rpc_ok status
+      in
+      let+ value = build_with_input ~f module_ input.parameters in
+      websocket_response_of_response JSONRPC.{value; id = input.id}
+  | _ ->
+      let+ response = dispatch_request rpc config ctx input in
+      websocket_response_of_response response
+
 let dispatch_private_websocket ~block_production (rpc : Configuration.rpc)
     config ctx (input : JSONRPC.request) =
   let open Lwt_syntax in
@@ -899,16 +1017,16 @@ let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
     (dispatch_private_request rpc ~block_production)
 
 let generic_websocket_dispatch (rpc : Configuration.rpc)
-    (config : Configuration.t) ctx dir path dispatch_request =
+    (config : Configuration.t) ctx dir path dispatch_websocket =
   if config.experimental_features.enable_websocket then
-    Evm_directory.jsonrpc_websocket_register dir path (fun request ->
-        let open Lwt_syntax in
-        let+ response = dispatch_request rpc config ctx request in
-        websocket_response_of_response response)
+    Evm_directory.jsonrpc_websocket_register
+      dir
+      path
+      (dispatch_websocket rpc config ctx)
   else dir
 
 let dispatch_websocket_public (rpc : Configuration.rpc) config ctx dir =
-  generic_websocket_dispatch rpc config ctx dir "/ws" dispatch_request
+  generic_websocket_dispatch rpc config ctx dir "/ws" dispatch_websocket
 
 let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
     config ctx dir =
@@ -918,7 +1036,7 @@ let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
     ctx
     dir
     "/private/ws"
-    (dispatch_private_request ~block_production)
+    (dispatch_private_websocket ~block_production)
 
 let directory ?delegate_health_check_to rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =

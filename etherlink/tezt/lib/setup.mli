@@ -47,6 +47,8 @@ val run_new_observer_node :
   ?finalized_view:bool ->
   ?patch_config:(Tezt_wrapper.JSON.t -> Tezt_wrapper.JSON.t) ->
   sc_rollup_node:Sc_rollup_node.t ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
   Evm_node.t ->
   Evm_node.t Lwt.t
 

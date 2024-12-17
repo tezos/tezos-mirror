@@ -130,7 +130,7 @@ let run_new_rpc_endpoint evm_node =
   return rpc_node
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
-    ~sc_rollup_node evm_node =
+    ~sc_rollup_node ?rpc_server ?websockets evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
   let patch_config =
@@ -141,6 +141,14 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
             ("finalized_view", annotate ~origin:"" (`Bool true))
             (patch_config json))
     else patch_config
+  in
+  let patch_config =
+    match rpc_server with
+    | None -> patch_config
+    | Some rpc_server ->
+        fun c ->
+          Evm_node.patch_config_with_experimental_feature ~rpc_server ()
+          @@ patch_config c
   in
   let* observer_mode =
     if Evm_node.supports_threshold_encryption evm_node then
@@ -167,7 +175,11 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
            })
   in
   let* observer =
-    Evm_node.init ~patch_config ~mode:observer_mode (Evm_node.endpoint evm_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:observer_mode
+      ?websockets
+      (Evm_node.endpoint evm_node)
   in
   return observer
 
@@ -330,7 +342,12 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* observer =
-    run_new_observer_node ~patch_config ~sc_rollup_node sequencer
+    run_new_observer_node
+      ~patch_config
+      ~sc_rollup_node
+      ?rpc_server
+      ?websockets
+      sequencer
   in
   let* proxy =
     Evm_node.init
