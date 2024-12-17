@@ -11,7 +11,9 @@ use crate::{
         node_pvm::{NodePvm, PvmStorage, PvmStorageError},
         PvmHooks, PvmStatus,
     },
-    state_backend::{owned_backend::Owned, proof_backend::proof::serialise_proof},
+    state_backend::{
+        hash::Hash, owned_backend::Owned, proof_backend::proof::serialise_proof, ManagerReadWrite,
+    },
 };
 use crate::{
     state_backend::proof_backend::proof,
@@ -393,7 +395,7 @@ pub fn octez_riscv_mut_state_hash(state: Pointer<MutState>) -> [u8; 32] {
     state.apply_ro(NodePvm::hash).into()
 }
 
-fn apply_set_input(pvm: &mut NodePvm, input: Input) {
+fn apply_set_input<M: ManagerReadWrite>(pvm: &mut NodePvm<M>, input: Input) {
     match input {
         Input::InboxMessage(level, message_counter, payload) => {
             pvm.set_input_message(level, message_counter, payload.to_vec())
@@ -467,14 +469,28 @@ pub fn octez_riscv_proof_stop_state(_proof: Pointer<Proof>) -> [u8; 32] {
 
 #[ocaml::func]
 #[ocaml::sig("input option -> proof -> input_request option")]
+// Allow some warnings while this method goes through iterations.
+#[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
 pub unsafe fn octez_riscv_verify_proof(
     proof: Pointer<Proof>,
-    _input: Option<Input>,
+    input: Option<Input>,
 ) -> Option<Pointer<InputRequest>> {
-    let _state = NodePvm::from_proof(proof.as_ref().tree())?;
+    let mut state = NodePvm::from_proof(proof.as_ref().tree())?;
 
-    // TODO: RV-369: Run a step over the PVM state
-    todo!("Can't verify proof just yet")
+    match input {
+        Some(input) => apply_set_input(&mut state, input),
+        None => state.compute_step(&mut PvmHooks::none()),
+    }
+
+    // TODO: RV-362: Check the final state
+    let hash: Hash = todo!("Can't obtain the final state hash just yet");
+
+    if &hash != proof.as_ref().final_state_hash() {
+        return None;
+    }
+
+    // TODO: RV-336: Need to construct InputRequest
+    Some(Pointer::from(InputRequest))
 }
 
 #[ocaml::func]
