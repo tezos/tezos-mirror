@@ -20,7 +20,7 @@ use crate::{
         owned_backend::Owned,
         proof_backend::{merkle::Merkleisable, proof::Proof, ProofGen},
         verify_backend::Verifier,
-        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref, RefOwnedAlloc,
+        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref,
     },
     storage::binary,
 };
@@ -52,7 +52,7 @@ pub struct PvmStepper<
     origination_level: u32,
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> {
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, Owned> {
     /// Create a new PVM stepper.
     pub fn new(
         program: &[u8],
@@ -78,6 +78,16 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
         })
     }
 
+    /// Obtain the root hash for the PVM state.
+    pub fn hash(&self) -> Hash {
+        let refs = self.pvm.struct_ref::<FnManagerIdent>();
+        PvmLayout::<ML, CL>::state_hash(refs).unwrap()
+    }
+}
+
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
+    PvmStepper<'hooks, ML, CL, M>
+{
     /// Non-continuing variant of [`Stepper::step_max`]
     fn step_max_once(&mut self, steps: Bound<usize>) -> StepperStatus {
         match self.pvm.status() {
@@ -135,33 +145,28 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
         }
     }
 
-    /// Obtain the root hash for the PVM state.
-    pub fn hash(&self) -> Hash {
-        let refs = self.pvm.struct_ref::<FnManagerIdent>();
-        PvmLayout::<ML, CL>::state_hash(refs).unwrap()
-    }
-
     /// Create a new stepper in which the existing PVM is managed by
     /// the proof-generating backend.
-    pub fn start_proof_mode<'a>(&'a self) -> PvmStepper<'hooks, ML, CL, ProofGen<Ref<'a, Owned>>> {
-        PvmStepper::<'hooks, ML, CL, ProofGen<Ref<'a, Owned>>> {
+    pub fn start_proof_mode<'a>(&'a self) -> PvmStepper<'hooks, ML, CL, ProofGen<Ref<'a, M>>> {
+        PvmStepper::<'hooks, ML, CL, ProofGen<Ref<'a, M>>> {
             pvm: self.pvm.start_proof(),
-            hooks: PvmHooks::none(),
-            inbox: self.inbox.clone(),
             rollup_address: self.rollup_address,
             origination_level: self.origination_level,
+
+            // The inbox needs to be cloned because we should not mutate it through the new stepper
+            // instance.
+            inbox: self.inbox.clone(),
+
+            // We don't want to re-use the same hooks to avoid polluting logs with refutation game
+            // output. Instead we use hooks that don't do anything.
+            hooks: PvmHooks::none(),
         }
     }
 
     /// Verify a Merkle proof. The [`PvmStepper`] is used for inbox information.
     pub fn verify_proof(&self, proof: Proof) -> bool {
         // Allow some warnings while this method goes through iterations.
-        #![allow(
-            dead_code,
-            unreachable_code,
-            unused_variables,
-            clippy::diverging_sub_expression
-        )]
+        #![allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
 
         let proof_tree = ProofTree::Present(proof.tree());
         let Some(space) = PvmLayout::<ML, CL>::from_proof(proof_tree).ok() else {
@@ -169,12 +174,30 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
         };
 
         let pvm = Pvm::<ML, CL, Verifier>::bind(space);
+        let mut stepper = PvmStepper {
+            pvm,
+            rollup_address: self.rollup_address,
+            origination_level: self.origination_level,
 
-        // TODO: RV-361: Exercise the PVM
-        todo!("Can't exercise the PVM during proof verification yet");
+            // The inbox needs to be cloned because we should not mutate it through the new stepper
+            // instance.
+            inbox: self.inbox.clone(),
+
+            // We don't want to re-use the same hooks to avoid polluting logs with refutation game
+            // output. Instead we use hooks that don't do anything.
+            hooks: PvmHooks::none(),
+        };
+
+        match stepper.step_max_once(Bound::Included(1)) {
+            // We don't include errors in this case because errors count as 0 steps. That means if
+            // we receive a [`StepperStatus::Errored`] with `steps: 1` then it tried to run 2 steps
+            // but failed at the second.
+            StepperStatus::Running { steps: 1 } | StepperStatus::Exited { steps: 1, .. } => {}
+            _ => return false,
+        }
 
         // TODO: RV-362: Check the final state
-        let refs = pvm.struct_ref::<FnManagerIdent>();
+        let _refs = stepper.pvm.struct_ref::<FnManagerIdent>();
         let hash: Hash = todo!("Can't obtain the hash of a verification state yet");
 
         &hash == proof.final_state_hash()
@@ -182,7 +205,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
-    pub fn struct_ref(&self) -> RefOwnedAlloc<PvmLayout<ML, CL>> {
+    pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<ML, CL>, Ref<'_, M>> {
         self.pvm.struct_ref::<FnManagerIdent>()
     }
 
@@ -190,8 +213,8 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     /// ephemeral state that doesn't make it into the serialised output.
     pub fn rebind_via_serde(&mut self)
     where
-        for<'a> RefOwnedAlloc<'a, PvmLayout<ML, CL>>: Serialize,
-        AllocatedOf<PvmLayout<ML, CL>, Owned>: DeserializeOwned,
+        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, M>>: Serialize,
+        AllocatedOf<PvmLayout<ML, CL>, M>: DeserializeOwned,
     {
         let space = {
             let refs = self.pvm.struct_ref::<FnManagerIdent>();
