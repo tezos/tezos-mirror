@@ -4268,6 +4268,168 @@ let test_upgrade_injected_before_flush_level =
   in
   unit
 
+let test_upgrade_activated_after_flush_level =
+  let genesis_timestamp = "2020-01-01T00:00:00Z" in
+  let activation_timestamp = "2020-01-01T00:01:00Z" in
+  let after_timestamp = "2020-01-01T00:02:00Z" in
+  register_all
+    ~kernels:[Latest]
+    ~time_between_blocks:Nothing
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~tags:
+      [
+        "evm";
+        "sequencer";
+        "delayed_inbox";
+        "timeout";
+        "flush";
+        "reorg";
+        "upgrade";
+        "after";
+        "reactivate";
+      ]
+    ~title:
+      "Upgrade injected and activated after flushed level (on invalid branch)"
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           kernel;
+           _;
+         }
+             _protocol ->
+  (* This test the situation where the injected before of the upgrade
+     event is AT the flushed level and activated in invalid branch.
+
+     It can be a bit tedious to read the test, here is what happens:
+
+     (l2_level)             0
+                            1
+                            2
+                           /
+                          /
+        Upgrade event -> 3
+                         5
+        Activation    -> 6
+                         7
+
+     Then a flush happens at level 3, invalidating the branch and creating a new
+     one.
+
+     (l2_level)             0
+                            1
+                            2
+                           / \
+                          /   \
+                         X     3' <- Flushed blueprint, upgrade event
+                               4' <- activation
+
+     The upgrade event must be retrieved from the invalid branch before
+     resetting to level 2 and applying level 3'.
+  *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  (* Set a pending upgrade at the flush level. *)
+  let* _root_hash =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:kernel
+      ~activation_timestamp
+  in
+  (* Produces 2 valid blocks and wait until they are synchronized. *)
+  let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
+  let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  (* Shutdown the rollup, restart it without Batcher mode, we will be able
+     to create the invalid branch without publishing it. *)
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  Sc_rollup_node.change_node_mode sc_rollup_node Observer ;
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* _ =
+    repeat 2 (fun () ->
+        let* _ = produce_block ~timestamp:after_timestamp sequencer in
+        unit)
+    (* make sure the upgrade is done on invalid branch *)
+  and* _ = Evm_node.wait_for_successful_upgrade sequencer in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  (* Send a delayed transaction. *)
+  let* _hash =
+    let* tx =
+      Cast.craft_tx
+        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+        ~chain_id:1337
+        ~nonce:0
+        ~gas_price:1_000_000_000
+        ~gas:23_300
+        ~value:(Wei.of_eth_int 1)
+        ~address:Eth_account.bootstrap_accounts.(1).address
+        ()
+    in
+    send_raw_transaction_to_delayed_inbox
+      ~wait_for_next_level:true
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      tx
+  in
+  (* Flush the delayed inbox. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* flush_l1_level = Client.level client in
+
+  (* Make the flush final. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  let* _ = Evm_node.wait_for_processed_l1_level ~level:flush_l1_level sequencer
+  and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = produce_block ~timestamp:after_timestamp sequencer in
+        unit)
+    (* Make sure the upgrade still happens *)
+  and* rh_seq, lvl_seq = Evm_node.wait_for_successful_upgrade sequencer in
+  let*@ sequencer_head = Rpc.block_number sequencer in
+
+  (* The observer should follow the reorg and reach the same head *)
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
+  and* rh_obs, lvl_obs = Evm_node.wait_for_successful_upgrade observer in
+  Check.((rh_seq = rh_obs) string) ~error_msg:"Root hash should be the same" ;
+  Check.((lvl_seq = lvl_obs) int)
+    ~error_msg:"Level of upgrade should be the same" ;
+
+  let* () =
+    check_head_consistency
+      ~left:observer
+      ~right:sequencer
+      ~error_msg:"The head should be the same after flush"
+      ()
+  in
+  unit
+
 let test_upgrade_injected_after_flush_level =
   let genesis_timestamp = "2020-01-01T00:00:00Z" in
   let activation_timestamp = "2020-01-01T00:01:00Z" in
@@ -8994,6 +9156,7 @@ let () =
   test_flushed_blueprint_reorg_done_late protocols ;
   test_upgrade_injected_before_flush_level protocols ;
   test_upgrade_injected_after_flush_level protocols ;
+  test_upgrade_activated_after_flush_level protocols ;
   test_flushed_blueprint_reorg_upgrade protocols ;
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
