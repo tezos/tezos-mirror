@@ -449,16 +449,18 @@ let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
     Fun.id
 
 let get_chain_block_operations ?(chain = "main") ?(block = "head") ?version
-    ?(force_metadata = false) () =
+    ?(force_metadata = false) ?(metadata = true) () =
   let query_string =
     Query_arg.opt "version" Fun.id version
-    @ if force_metadata then [("force_metadata", "")] else []
+    @
+    if force_metadata then [("force_metadata", "")]
+    else [] @ if metadata then [] else [("metadata", "never")]
   in
   make ~query_string GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
 
 let get_chain_block_operations_validation_pass ?(chain = "main")
-    ?(block = "head") ?version ?(force_metadata = false) ?operation_offset
-    ~validation_pass () =
+    ?(block = "head") ?version ?(force_metadata = false) ?(metadata = true)
+    ?operation_offset ~validation_pass () =
   let path =
     [
       "chains";
@@ -472,7 +474,9 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
   in
   let query_string =
     Query_arg.opt "version" Fun.id version
-    @ if force_metadata then [("force_metadata", "")] else []
+    @
+    if force_metadata then [("force_metadata", "")]
+    else [] @ if metadata then [] else [("metadata", "never")]
   in
   make ~query_string GET path Fun.id
 

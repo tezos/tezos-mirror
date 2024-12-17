@@ -21,6 +21,7 @@ module Node = struct
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
+      let arguments = Metadata_size_limit (Some 10_000) :: arguments in
       create
         ?data_dir
         ?name
@@ -39,6 +40,7 @@ module Node = struct
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
+      let arguments = Metadata_size_limit (Some 10_000) :: arguments in
       init
         ?name
         ?data_dir

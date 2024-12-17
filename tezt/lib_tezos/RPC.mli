@@ -442,6 +442,7 @@ val get_chain_block_operations :
   ?block:string ->
   ?version:string ->
   ?force_metadata:bool ->
+  ?metadata:bool ->
   unit ->
   JSON.t t
 
@@ -460,6 +461,7 @@ val get_chain_block_operations_validation_pass :
   ?block:string ->
   ?version:string ->
   ?force_metadata:bool ->
+  ?metadata:bool ->
   ?operation_offset:int ->
   validation_pass:int ->
   unit ->
