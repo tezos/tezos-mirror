@@ -463,8 +463,14 @@ type metrics = {
   level_first_commitment_published : int option;
   level_first_commitment_attested : int option;
   total_published_commitments : int;
+  total_published_commitments_per_slot : (int, int) Hashtbl.t;
+  (* A hash table mapping slot indices to their total number of
+     published commitments. *)
   expected_published_commitments : int;
   total_attested_commitments : int;
+  total_attested_commitments_per_slot : (int, int) Hashtbl.t;
+  (* A hash table mapping slot indices to their total number of
+     attested commitments. *)
   ratio_published_commitments : float;
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
@@ -477,8 +483,10 @@ let default_metrics =
     level_first_commitment_published = None;
     level_first_commitment_attested = None;
     total_published_commitments = 0;
+    total_published_commitments_per_slot = Hashtbl.create 32;
     expected_published_commitments = 0;
     total_attested_commitments = 0;
+    total_attested_commitments_per_slot = Hashtbl.create 32;
     ratio_published_commitments = 0.;
     ratio_attested_commitments = 0.;
     ratio_published_commitments_last_level = 0.;
@@ -517,8 +525,10 @@ let pp_metrics t
       level_first_commitment_published;
       level_first_commitment_attested;
       total_published_commitments;
+      total_published_commitments_per_slot;
       expected_published_commitments;
       total_attested_commitments;
+      total_attested_commitments_per_slot;
       ratio_published_commitments;
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
@@ -561,15 +571,23 @@ let pp_metrics t
              Log.info "Ratio for %s (with stake %d): %f" alias stake ratio) ;
   Log.info
     "Balance of the Etherlink operator: %s tez"
-    (Tez.to_string etherlink_operator_balance)
+    (Tez.to_string etherlink_operator_balance) ;
+  Hashtbl.iter
+    (Log.info "Slot index %d: total published commitments = %d")
+    total_published_commitments_per_slot ;
+  Hashtbl.iter
+    (Log.info "Slot index %d: total attested commitments = %d")
+    total_attested_commitments_per_slot
 
 let push_metrics t
     {
       level_first_commitment_published = _;
       level_first_commitment_attested = _;
       total_published_commitments;
+      total_published_commitments_per_slot;
       expected_published_commitments;
       total_attested_commitments;
+      total_attested_commitments_per_slot;
       ratio_published_commitments;
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
@@ -599,6 +617,28 @@ let push_metrics t
            ~labels
            ~name:"tezt_dal_commitments_attested_ratio"
            value) ;
+  Hashtbl.iter
+    (fun slot_index value ->
+      let labels = [("slot_index", string_of_int slot_index)] in
+      Cloud.push_metric
+        t.cloud
+        ~help:"Total published commitments per slot"
+        ~typ:`Gauge
+        ~labels
+        ~name:"tezt_total_published_commitments_per_slot"
+        (float value))
+    total_published_commitments_per_slot ;
+  Hashtbl.iter
+    (fun slot_index value ->
+      let labels = [("slot_index", string_of_int slot_index)] in
+      Cloud.push_metric
+        t.cloud
+        ~help:"Total attested commitments per slot"
+        ~typ:`Gauge
+        ~labels
+        ~name:"tezt_total_attested_commitments_per_slot"
+        (float value))
+    total_attested_commitments_per_slot ;
   Cloud.push_metric
     t.cloud
     ~help:"Ratio between the number of published and expected commitments"
@@ -737,6 +777,69 @@ let update_ratio_attested_commitments t per_level_info metrics =
           float (Z.popcount per_level_info.attested_commitments)
           *. 100. /. float n
 
+let update_published_and_attested_commitments_per_slot t per_level_info
+    total_published_commitments_per_slot total_attested_commitments_per_slot =
+  let published_level =
+    published_level_of_attested_level t per_level_info.level
+  in
+  if published_level <= t.first_level then (
+    Log.warn
+      "Unable to retrieve information for published level %d because it \
+       precedes the earliest available level (%d)."
+      published_level
+      t.first_level ;
+    (total_published_commitments_per_slot, total_attested_commitments_per_slot))
+  else
+    match Hashtbl.find_opt t.infos published_level with
+    | None ->
+        Log.warn
+          "Unexpected error: The level %d is missing in the infos table"
+          published_level ;
+        ( total_published_commitments_per_slot,
+          total_attested_commitments_per_slot )
+    | Some old_per_level_info ->
+        let published_commitments = old_per_level_info.published_commitments in
+        for slot_index = 0 to pred t.parameters.number_of_slots do
+          let is_published = Hashtbl.mem published_commitments slot_index in
+          let total_published_commitments =
+            Option.value
+              ~default:0
+              (Hashtbl.find_opt total_published_commitments_per_slot slot_index)
+          in
+          let new_total_published_commitments =
+            if is_published then succ total_published_commitments
+            else total_published_commitments
+          in
+          Hashtbl.replace
+            total_published_commitments_per_slot
+            slot_index
+            new_total_published_commitments ;
+          (* per_level_info.attested_commitments is a binary
+             sequence of length parameters.number_of_slots
+             (e.g. '00111111001110100010101011100101').
+             For each index i:
+             - 1 indicates the slot has been attested
+             - 0 indicates the slot has not been attested. *)
+          let is_attested =
+            Z.testbit per_level_info.attested_commitments slot_index
+          in
+          let total_attested_commitments =
+            Option.value
+              ~default:0
+              (Hashtbl.find_opt total_attested_commitments_per_slot slot_index)
+          in
+          let new_total_attested_commitments =
+            if is_attested then succ total_attested_commitments
+            else total_attested_commitments
+          in
+          Hashtbl.replace
+            total_attested_commitments_per_slot
+            slot_index
+            new_total_attested_commitments
+        done ;
+        ( total_published_commitments_per_slot,
+          total_attested_commitments_per_slot )
+
 let update_ratio_attested_commitments_per_baker t per_level_info metrics =
   let default () =
     Hashtbl.to_seq_keys per_level_info.attestations
@@ -865,12 +968,22 @@ let get_metrics t infos_per_level metrics =
   let ratio_attested_commitments_per_baker =
     update_ratio_attested_commitments_per_baker t infos_per_level metrics
   in
+  let total_published_commitments_per_slot, total_attested_commitments_per_slot
+      =
+    update_published_and_attested_commitments_per_slot
+      t
+      infos_per_level
+      metrics.total_published_commitments_per_slot
+      metrics.total_attested_commitments_per_slot
+  in
   {
     level_first_commitment_published;
     level_first_commitment_attested;
     total_published_commitments;
+    total_published_commitments_per_slot;
     expected_published_commitments;
     total_attested_commitments;
+    total_attested_commitments_per_slot;
     ratio_published_commitments;
     ratio_attested_commitments;
     ratio_published_commitments_last_level;
