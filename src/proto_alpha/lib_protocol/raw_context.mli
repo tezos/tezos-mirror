@@ -98,6 +98,17 @@ type previous_protocol =
   | Alpha
   | (* Alpha predecessor *) Quebec (* Alpha predecessor *)
 
+(** Prepares the context for the first block of the protocol.
+
+    Among other things, this sets the constant values that will be
+    used during the whole lifetime of the protocol. By default,
+    constant values are copied over from the previous protocol when
+    applicable, but any exceptions to this rule happen in this
+    function.
+
+    See {!Constants_parametric_repr} for instructions on how to add or
+    modify a constant.
+*)
 val prepare_first_block :
   level:int32 ->
   timestamp:Time.t ->

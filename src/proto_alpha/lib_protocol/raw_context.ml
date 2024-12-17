@@ -1291,6 +1291,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
     | Quebec ->
+        (* See {!Constants_parametric_repr} for instructions on how to
+           add or modify a constant. *)
         let module Previous = Constants_parametric_previous_repr in
         let*! c = get_previous_protocol_constants ctxt in
         let dal =

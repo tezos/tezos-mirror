@@ -24,12 +24,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Concrete constant values available for various test setups.
+
+    See {!Protocol.Constants_parametric_repr} for documentation on
+    constant management and instructions on how to add/modify a
+    constant.
+
+    See [default_parameters.ml] for documentation on individual
+    constants.
+*)
+
 open Protocol.Alpha_context
 
+(** The same constants as on mainnet, to be used in tests when we need
+    to simulate mainnet conditions.
+
+    Note that this does not control constant values on mainnet; it
+    merely mirrors them. Mainnet constant values are set in
+    {!Protocol.Raw_context.prepare_first_block} (and therefore cannot
+    be modified without impacting the protocol hash). Any update to
+    constant values there should be propagated here. *)
 val constants_mainnet : Constants.Parametric.t
 
+(** Default constant values for sandbox mode. *)
 val constants_sandbox : Constants.Parametric.t
 
+(** Default constant values to use in most tests.
+
+    For instance, [blocks_per_cycle] is much lower so that we may
+    observe cycle transitions without needing to bake a prohibitively
+    large number of blocks. *)
 val constants_test : Constants.Parametric.t
 
 val test_commitments : Commitment.t list lazy_t
