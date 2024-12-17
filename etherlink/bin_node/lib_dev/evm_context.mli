@@ -59,9 +59,6 @@ val export_store :
     [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
     to use [Evm_ro_context] instead.
 
-    [block_storage_sqlite3] decides whether or not the blocks are stored in the
-    SQLite store or not.
-
     [garbage_collector] can be optionally provided to enable the garbage
     collector of the node with a given configuration. *)
 val start :
@@ -71,7 +68,6 @@ val start :
   ?smart_rollup_address:string ->
   fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->
-  block_storage_sqlite3:bool ->
   ?garbage_collector:Configuration.garbage_collector ->
   ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
   unit ->

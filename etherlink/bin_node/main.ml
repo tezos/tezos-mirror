@@ -1513,7 +1513,6 @@ let patch_kernel_command =
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
             ~fail_on_missing_blueprint:true
-            ~block_storage_sqlite3:false
             ()
         in
         Evm_context.patch_kernel ?block_number kernel_path
@@ -2291,7 +2290,6 @@ let patch_state_command =
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
             ~fail_on_missing_blueprint:true
-            ~block_storage_sqlite3:false
             ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()

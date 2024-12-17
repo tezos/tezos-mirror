@@ -25,7 +25,6 @@ type parameters = {
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
-  block_storage_sqlite3 : bool;
   garbage_collector : Configuration.garbage_collector option;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
@@ -53,7 +52,6 @@ type t = {
   store : Evm_store.t;
   session : session_state;
   fail_on_missing_blueprint : bool;
-  block_storage_sqlite3 : bool;
   history : history;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
@@ -448,7 +446,7 @@ module State = struct
        level). *)
     let latest_finalized_level = Z.max latest_finalized_level number in
     let* block_hash_opt =
-      if ctxt.block_storage_sqlite3 then
+      if ctxt.configuration.experimental_features.block_storage_sqlite3 then
         Evm_store.Blocks.find_hash_of_number conn (Qty number)
       else
         let*! bytes =
@@ -726,7 +724,7 @@ module State = struct
         in
 
         let* evm_state =
-          if ctxt.block_storage_sqlite3 then
+          if ctxt.configuration.experimental_features.block_storage_sqlite3 then
             let* () = store_block_unsafe conn evm_state block in
             let*! evm_state = Evm_state.clear_block_storage block evm_state in
             return evm_state
@@ -1112,9 +1110,9 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ~(configuration : Configuration.t) ?kernel_path
-      ~block_storage_sqlite3 ?garbage_collector ~fail_on_missing_blueprint
-      ~data_dir ?smart_rollup_address ~store_perm ?sequencer_wallet () =
+  let init ~(configuration : Configuration.t) ?kernel_path ?garbage_collector
+      ~fail_on_missing_blueprint ~data_dir ?smart_rollup_address ~store_perm
+      ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1231,7 +1229,6 @@ module State = struct
           };
         store;
         fail_on_missing_blueprint;
-        block_storage_sqlite3;
         history;
         sequencer_wallet;
       }
@@ -1431,8 +1428,8 @@ module State = struct
           *)
           let (Qty pred_number) = Ethereum_types.Qty.pred blueprint_number in
           let* local_parent_block_hash =
-            if ctxt.block_storage_sqlite3 then
-              Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
+            if ctxt.configuration.experimental_features.block_storage_sqlite3
+            then Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
             else
               let*! bytes =
                 Evm_state.inspect
@@ -1499,7 +1496,6 @@ module Handlers = struct
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
         store_perm;
-        block_storage_sqlite3;
         garbage_collector;
         sequencer_wallet;
       } =
@@ -1512,7 +1508,6 @@ module Handlers = struct
         ?smart_rollup_address
         ~fail_on_missing_blueprint
         ~store_perm
-        ~block_storage_sqlite3
         ?garbage_collector
         ?sequencer_wallet
         ()
@@ -1693,8 +1688,8 @@ let export_store ~data_dir ~output_db_file =
   return {rollup_address; current_number}
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
-    ~fail_on_missing_blueprint ~store_perm ~block_storage_sqlite3
-    ?garbage_collector ?sequencer_wallet () =
+    ~fail_on_missing_blueprint ~store_perm ?garbage_collector ?sequencer_wallet
+    () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1708,7 +1703,6 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         smart_rollup_address;
         fail_on_missing_blueprint;
         store_perm;
-        block_storage_sqlite3;
         garbage_collector;
         sequencer_wallet;
       }
@@ -1895,7 +1889,6 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
-      ~block_storage_sqlite3:false
       ()
   in
   worker_wait_for_request
