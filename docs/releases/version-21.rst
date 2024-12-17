@@ -1,4 +1,4 @@
-Version 21.0
+Version 21.1
 ============
 
 Version 21 contains a new version (V13) of the protocol environment.
@@ -59,7 +59,16 @@ corresponding modes of an accompanying smart rollup node.
 .. warning::
 
    The binary encoding of ``/config/netwok/dal`` changed.
-      As a result, The v21 DAL node is not compatible with earlier versions of Octez -- it cannot interact with earlier versioned Octez nodes. If you are operating a Tezos DAL node, make sure to upgrade all Octez infra to v21.0
+   As a result, the v21 DAL node is not compatible with earlier versions of Octez -- it cannot interact with earlier versioned Octez nodes. If you are operating a Tezos DAL node, make sure to upgrade all Octez infra to v21.1 (or at least v21.0).
+   Also, for attesters, it is recommended that they start their DAL node using the argument ``--attester-profiles=<pkh>`` where <pkh> is the attester's address (not the alias).
+
+Octez v21.1 contains several improvements concerning the DAL, mainly concerning network reliability and diagnostics enabling bakers to detect more easily whether their DAL node is working as expected.
+In particular, the DAL node now does the following.
+(1) It keeps established connections alive.
+(2) It retries DNS resolution of bootstrap nodes' domain names every five minutes in order to not lose connections when their IP address changes.
+(3) It can maintain a connection even when a peer has changed its P2P identity recently.
+The baker daemon now fetches attestation statuses one level in advance, thus not delaying the injection of attestation operations.
+The DAL node also emits more warnings for potential issues, such as attesters not attesting correctly or the node lagging (w.r.t. L1 node).
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
@@ -115,14 +124,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v21.0
+  git checkout octez-v21.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v21.0`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v21.1`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -138,6 +147,7 @@ Check :ref:`the documentation <new_packages>` for more details.
 Changelog
 ---------
 
+- `Version 21.1 <../CHANGES.html#version-21-1>`_
 - `Version 21.0 <../CHANGES.html#version-21-0>`_
 - `Version 21.0~rc3 <../CHANGES.html#version-21-0-rc3>`_
 - `Version 21.0~rc1 and rc2 <../CHANGES.html#version-21-0-rc1-and-rc2>`_

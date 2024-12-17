@@ -180,34 +180,6 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
-- **Breaking_change** The configuration value ``metrics-addr`` is now an option.
-  It should not break unless the value differs from the default value
-  (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
-  exported by default.
-
-- **Breaking change** For the RPCs ``/p2p/gossipsub/topics/peers``,
-  ``/p2p/gossipsub/pkhs/peers``, and ``/p2p/gossipsub/slot_indexes/peers``, the
-  flag ``subscribed`` is removed and a new flag ``all`` is introduced. The
-  default behavior is now to list peers only for topics the current peer is
-  subscribed to, while the ``all`` flag can be used to recover the previous
-  behavior. (MR :gl:`!14518`)
-
-- Fixed file descriptor leak in resto affecting connections to the L1 node.
-  (MR :gl:`!15322`)
-
-- **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
-  argument has been removed. (MR :gl:`!15554`)
-
-Protocol
-~~~~~~~~
-
-- A new antonymous operation "DAL entrapment evidence" was added. This operation
-  is not valid when the feature flag for DAL incentives is turned off. (MR
-  :gl:`!15677`)
-- Set the message validation function at node startup, fixing
-  https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
-- A warning has been introduced in case it is observed that the DAL node lags
-  behind the L1 node. (MR :gl:`!15756`)
 - **Change** The DAL node store version has been upgraded from 1 to 2.
   The DAL node store will automatically upgrade without requiring any
   user action. For users running the DAL node with the
@@ -215,11 +187,15 @@ Protocol
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
 
+Protocol
+~~~~~~~~
+
+- A new anonymous operation "DAL entrapment evidence" was added. This operation
+  is not valid when the feature flag for DAL incentives is turned off. (MR
+  :gl:`!15677`)
+
 Baker
 ~~~~~
-
-- Emit event at Notice level when the delegate is not in the DAL committee, that
-  is, it has no assigned shards at the current level. (:gl:`!15846`)
 
 Miscellaneous
 -------------
