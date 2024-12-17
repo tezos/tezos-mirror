@@ -1078,13 +1078,13 @@ function update_tezt_tests() {
   alpha_regression="Alpha-"
 
   # for regression files, protocol_name should be at least 5 character long, if not add enough trailing '-' at the end
-  regression_protocol_name=${capitalized_label}
-  while [[ ${#regression_protocol_name} -lt 5 ]]; do
+  #regression_protocol_name=${capitalized_label}
+  while [[ ${#regression_protocol_name} -le 5 ]]; do
     regression_protocol_name="${regression_protocol_name}-"
   done
 
-  regression_source_name=${capitalized_source}
-  while [[ ${#regression_source_name} -lt 5 ]]; do
+  #regression_source_name=${capitalized_source}
+  while [[ ${#regression_source_name} -le 5 ]]; do
     regression_source_name="${regression_source_name}-"
   done
 
