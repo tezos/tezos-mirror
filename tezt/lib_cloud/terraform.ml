@@ -153,8 +153,8 @@ module VM = struct
   let init () =
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
-  let deploy ~max_run_duration ~machine_type ~base_port ~ports_per_vm
-      ~number_of_vms ~docker_image ~os =
+  let deploy ~auto_approve ~max_run_duration ~machine_type ~base_port
+      ~ports_per_vm ~number_of_vms ~docker_image ~os =
     let* project_id = Gcloud.project_id () in
     let max_run_duration =
       match max_run_duration with
@@ -180,11 +180,26 @@ module VM = struct
           Format.asprintf "os=%s" os;
         ]
     in
-    Process.run
-      ~name
-      ~color
-      "terraform"
-      (chdir Path.terraform_vm @ ["apply"; "--auto-approve"] @ args)
+    if auto_approve then
+      Process.run
+        ~name
+        ~color
+        "terraform"
+        (chdir Path.terraform_vm @ ["apply"; "--auto-approve"] @ args)
+    else
+      let process, output_channel =
+        Process.spawn_with_stdin
+          ~name
+          ~color
+          "terraform"
+          (chdir Path.terraform_vm @ ["apply"] @ args)
+      in
+      let* input = Input.next () in
+      (* If the user pressed Ctrl+D, i.e. input is [None], we don't
+         care what the input is. *)
+      let input = Option.value ~default:"" input in
+      let* () = Lwt_io.write_line output_channel input in
+      Process.check process
 
   let points () =
     let* output =

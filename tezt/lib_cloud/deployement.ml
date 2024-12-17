@@ -56,8 +56,10 @@ module Remote = struct
     let ports_per_vm = Env.ports_per_vm in
     let base_port = Env.vm_base_port in
     let os = configuration.os in
+    let auto_approve = Env.auto_approve in
     let* () =
       Terraform.VM.deploy
+        ~auto_approve
         ~max_run_duration
         ~machine_type
         ~base_port

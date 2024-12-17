@@ -117,6 +117,9 @@ val check_file_consistency : bool
 (** Equivalent to [Cli.push_docker]. *)
 val push_docker : bool
 
+(** Equivalent to [Cli.auto_approve]. *)
+val auto_approve : bool
+
 (** Equivalent to [Gcloud.project_id]. *)
 val project_id : unit -> string Lwt.t
 
