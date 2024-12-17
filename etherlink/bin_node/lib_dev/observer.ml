@@ -109,6 +109,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
   in
   let* _loaded =
     Evm_context.start
+      ~configuration:config
       ~data_dir
       ?kernel_path
       ~preimages:config.kernel_execution.preimages

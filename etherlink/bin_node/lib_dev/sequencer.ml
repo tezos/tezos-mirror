@@ -64,6 +64,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* status, smart_rollup_address_typed =
     Evm_context.start
+      ~configuration
       ?kernel_path:kernel
       ~data_dir
       ~preimages:configuration.kernel_execution.preimages

@@ -73,6 +73,7 @@ val export_store :
     [garbage_collector] can be optionally provided to enable the garbage
     collector of the node with a given configuration. *)
 val start :
+  configuration:Configuration.t ->
   ?kernel_path:string ->
   data_dir:string ->
   preimages:string ->
@@ -94,6 +95,7 @@ val start :
     [omit_delayed_tx_events] dont populate the delayed tx event from
     the state into the db. *)
 val init_from_rollup_node :
+  configuration:Configuration.t ->
   omit_delayed_tx_events:bool ->
   data_dir:string ->
   rollup_node_data_dir:string ->

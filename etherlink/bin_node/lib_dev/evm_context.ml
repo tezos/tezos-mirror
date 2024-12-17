@@ -19,6 +19,7 @@ type head = {
 }
 
 type parameters = {
+  configuration : Configuration.t;
   kernel_path : string option;
   data_dir : string;
   preimages : string;
@@ -48,6 +49,7 @@ type history =
   | Archive
 
 type t = {
+  configuration : Configuration.t;
   data_dir : string;
   index : Irmin_context.rw_index;
   preimages : string;
@@ -1106,7 +1108,7 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ?kernel_path ~block_storage_sqlite3 ?garbage_collector
+  let init ~configuration ?kernel_path ~block_storage_sqlite3 ?garbage_collector
       ~fail_on_missing_blueprint ~data_dir ~preimages ~preimages_endpoint
       ~native_execution_policy ?smart_rollup_address ~store_perm
       ?sequencer_wallet () =
@@ -1208,6 +1210,7 @@ module State = struct
 
     let ctxt =
       {
+        configuration;
         index;
         data_dir;
         preimages;
@@ -1488,6 +1491,7 @@ module Handlers = struct
 
   let on_launch _self ()
       {
+        configuration : Configuration.t;
         kernel_path : string option;
         data_dir : string;
         preimages : string;
@@ -1503,6 +1507,7 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let* ctxt, status =
       State.init
+        ~configuration
         ?kernel_path
         ~data_dir
         ~preimages
@@ -1691,7 +1696,7 @@ let export_store ~data_dir ~output_db_file =
   let* () = Evm_store.vacuum ~conn ~output_db_file in
   return {rollup_address; current_number}
 
-let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
+let start ~configuration ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ~native_execution_policy ?smart_rollup_address ~fail_on_missing_blueprint
     ~store_perm ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
   let open Lwt_result_syntax in
@@ -1701,6 +1706,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       table
       ()
       {
+        configuration;
         kernel_path;
         data_dir;
         preimages;
@@ -1875,7 +1881,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
-let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
+let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
     ~rollup_node_data_dir () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
@@ -1891,6 +1897,7 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
   in
   let* _loaded =
     start
+      ~configuration
       ~data_dir
       ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
       ~preimages_endpoint:None
