@@ -49,7 +49,8 @@ RUN echo 'tezos:x:1000:tezos' >> /etc/group \
 COPY ./zcash-params/sapling-output.params ./zcash-params/sapling-spend.params /usr/share/zcash-params/
 
 # hadolint ignore=DL3018
-RUN apk --no-cache add \
+RUN apk update \
+ && apk add --no-cache \
     binutils \
     gcc \
     gmp \
