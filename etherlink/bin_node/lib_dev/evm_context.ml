@@ -1037,17 +1037,8 @@ module State = struct
     in
     (* Clean unreliable delayed inbox *)
     let* () = clear_head_delayed_inbox ctxt in
-    (* Reapply lost events on current head *)
-    let delayed_transactions_events =
-      List.map
-        (fun tx -> Evm_events.New_delayed_transaction tx)
-        delayed_transactions
-    in
-    let events =
-      match lost_upgrade with
-      | None -> delayed_transactions_events
-      | Some u -> Upgrade_event u :: delayed_transactions_events
-    in
+    (* Prepare an event list to be reapplied on current head *)
+    let events = Evm_events.of_parts delayed_transactions lost_upgrade in
     (* Prepare a blueprint payload signed by the sequencer to execute locally. *)
     let* parent_hash = Evm_state.current_block_hash ctxt.session.evm_state in
     let* payload =
@@ -1406,10 +1397,7 @@ module State = struct
         in
         (* Apply the blueprint. *)
         let events =
-          List.map
-            (fun delayed_transaction ->
-              Evm_events.New_delayed_transaction delayed_transaction)
-            blueprint_with_events.Blueprint_types.delayed_transactions
+          Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
         let* () =
           apply_blueprint
