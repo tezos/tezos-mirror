@@ -117,7 +117,6 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
            smart_rollup_address)
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
-      ?garbage_collector:config.experimental_features.garbage_collector
       ()
   in
   let* ro_ctxt = Evm_ro_context.load ~smart_rollup_address ~data_dir config in

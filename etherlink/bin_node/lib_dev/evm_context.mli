@@ -58,9 +58,7 @@ val export_store :
     (it is most certainly an artifact of the past, made outdated by the
     [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
     to use [Evm_ro_context] instead.
-
-    [garbage_collector] can be optionally provided to enable the garbage
-    collector of the node with a given configuration. *)
+*)
 val start :
   configuration:Configuration.t ->
   ?kernel_path:string ->
@@ -68,7 +66,6 @@ val start :
   ?smart_rollup_address:string ->
   fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->
-  ?garbage_collector:Configuration.garbage_collector ->
   ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t

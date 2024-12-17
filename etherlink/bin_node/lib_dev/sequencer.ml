@@ -70,7 +70,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~fail_on_missing_blueprint:true
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write
-      ?garbage_collector:configuration.experimental_features.garbage_collector
       ~sequencer_wallet:(sequencer_config.sequencer, cctxt)
       ()
   in

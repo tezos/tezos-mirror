@@ -25,7 +25,6 @@ type parameters = {
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
-  garbage_collector : Configuration.garbage_collector option;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
 
@@ -1110,7 +1109,7 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ~(configuration : Configuration.t) ?kernel_path ?garbage_collector
+  let init ~(configuration : Configuration.t) ?kernel_path
       ~fail_on_missing_blueprint ~data_dir ?smart_rollup_address ~store_perm
       ?sequencer_wallet () =
     let open Lwt_result_syntax in
@@ -1204,7 +1203,7 @@ module State = struct
     in
 
     let* history, last_split_block =
-      match garbage_collector with
+      match configuration.experimental_features.garbage_collector with
       | Some parameters ->
           let* last_split_opt = Evm_store.Irmin_chunks.latest conn in
           return (Full {parameters}, last_split_opt)
@@ -1496,7 +1495,6 @@ module Handlers = struct
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
         store_perm;
-        garbage_collector;
         sequencer_wallet;
       } =
     let open Lwt_result_syntax in
@@ -1508,7 +1506,6 @@ module Handlers = struct
         ?smart_rollup_address
         ~fail_on_missing_blueprint
         ~store_perm
-        ?garbage_collector
         ?sequencer_wallet
         ()
     in
@@ -1688,8 +1685,7 @@ let export_store ~data_dir ~output_db_file =
   return {rollup_address; current_number}
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
-    ~fail_on_missing_blueprint ~store_perm ?garbage_collector ?sequencer_wallet
-    () =
+    ~fail_on_missing_blueprint ~store_perm ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1703,7 +1699,6 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         smart_rollup_address;
         fail_on_missing_blueprint;
         store_perm;
-        garbage_collector;
         sequencer_wallet;
       }
       (module Handlers)
