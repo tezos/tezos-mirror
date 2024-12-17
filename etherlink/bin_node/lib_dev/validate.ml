@@ -120,7 +120,7 @@ let valid_transaction_object ~backend_rpc ~decode ~hash tx_raw =
     Transaction.to_transaction_object ~hash transaction
   in
   let** () = validate backend_rpc transaction ~caller:transaction_object.from in
-  return (Ok (Either.Left transaction_object))
+  return (Ok transaction_object)
 
 let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
     tx_raw =
