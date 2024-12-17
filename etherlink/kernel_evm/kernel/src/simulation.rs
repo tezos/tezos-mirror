@@ -10,7 +10,7 @@
 
 use crate::block_storage;
 use crate::configuration::fetch_limits;
-use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
+use crate::fees::simulation_add_gas_for_fees;
 use crate::storage::{read_sequencer_pool_address, read_tracer_input};
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
@@ -30,14 +30,12 @@ use evm_execution::{
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
-use sha3::{Digest, Keccak256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
     decode_timestamp, next, VersionedEncoding,
 };
 use tezos_ethereum::transaction::TransactionObject;
-use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
@@ -51,7 +49,10 @@ pub const SIMULATION_CHUNK_TAG: u8 = 3;
 /// Tag indicating simulation is an evaluation.
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
-pub const VALIDATION_TAG: u8 = 0x01;
+///
+/// This tag can no longer be used, if you plan to add another tag,
+/// do not reuse this one to avoid mistakes.
+const _VALIDATION_TAG: u8 = 0x01;
 
 /// Version of the encoding in use.
 pub const SIMULATION_ENCODING_VERSION: u8 = 0x01;
@@ -59,17 +60,9 @@ pub const SIMULATION_ENCODING_VERSION: u8 = 0x01;
 pub const OK_TAG: u8 = 0x1;
 pub const ERR_TAG: u8 = 0x2;
 
-const INCORRECT_SIGNATURE: &str = "Incorrect signature.";
-const INVALID_CHAIN_ID: &str = "Invalid chain id.";
-const NONCE_TOO_LOW: &str = "Nonce too low.";
-const CANNOT_PREPAY: &str = "Cannot prepay transaction.";
-const MAX_GAS_FEE_TOO_LOW: &str = "Max gas fee too low.";
 const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
     is allocated. Try reducing its gas consumption or splitting the call in
     multiple steps, if possible.";
-const GAS_LIMIT_TOO_LOW: &str = "Gas limit too low.";
-const GAS_LIMIT_TOO_HIGH: &str = "Gas limit (for execution) is too high.";
-
 // Redefined Result as we cannot implement Decodable and Encodable traits on Result
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SimulationResult<T, E> {
@@ -497,173 +490,8 @@ impl Evaluation {
 }
 
 #[derive(Debug, PartialEq)]
-struct TxValidation {
-    transaction: EthereumTransactionCommon,
-}
-
-impl TxValidation {
-    // Run the transaction and ensure
-    // - it won't fail with  out-of-ticks
-    // - it won't fail due to not-enough gas fees to cover da fee
-    pub fn validate<Host: Runtime>(
-        host: &mut Host,
-        transaction: &EthereumTransactionCommon,
-        caller: &H160,
-        enable_fa_withdrawals: bool,
-    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
-        let chain_id = retrieve_chain_id(host)?;
-        let block_fees = retrieve_block_fees(host)?;
-        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-
-        let current_constants = match block_storage::read_current(host) {
-            Ok(block) => {
-                BlockConstants {
-                    number: block.number + 1,
-                    coinbase,
-                    // The timestamp is incorrect in simulation. The simulation
-                    // caller should provide a view of the real timestamp.
-                    timestamp: U256::from(block.timestamp.as_u64()),
-                    gas_limit: crate::block::GAS_LIMIT,
-                    block_fees,
-                    chain_id,
-                    prevrandao: None,
-                }
-            }
-            Err(_) => {
-                let timestamp = current_timestamp(host);
-                let timestamp = U256::from(timestamp.as_u64());
-                BlockConstants::first_block(
-                    timestamp,
-                    chain_id,
-                    block_fees,
-                    crate::block::GAS_LIMIT,
-                    coinbase,
-                )
-            }
-        };
-
-        let mut evm_account_storage = account_storage::init_account_storage()
-            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
-        let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
-        let tx_data_size = transaction.data.len() as u64;
-        let limits = fetch_limits(host);
-        let allocated_ticks =
-            tick_model::estimate_remaining_ticks_for_transaction_execution(
-                limits.maximum_allowed_ticks,
-                0,
-                tx_data_size,
-            );
-
-        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false)
-        else {
-            return Self::to_error(GAS_LIMIT_TOO_LOW);
-        };
-
-        if gas_limit > limits.maximum_gas_limit {
-            return Self::to_error(GAS_LIMIT_TOO_HIGH);
-        }
-
-        match run_transaction(
-            host,
-            &current_constants,
-            &mut evm_account_storage,
-            &precompiles,
-            CONFIG,
-            transaction.to,
-            *caller,
-            transaction.data.clone(),
-            Some(gas_limit), // gas could be omitted
-            block_fees.base_fee_per_gas(),
-            transaction.value,
-            true,
-            allocated_ticks,
-            false,
-            false,
-            None,
-        ) {
-            Ok(Some(ExecutionOutcome {
-                result: ExecutionOutcomeResult::OutOfTicks,
-                ..
-            })) => Self::to_error(OUT_OF_TICKS_MSG),
-            Ok(None) => Self::to_error(CANNOT_PREPAY),
-            _ => Ok(SimulationResult::Ok(ValidationResult {
-                transaction_object: TransactionObject {
-                    block_number: U256::zero(),
-                    from: *caller,
-                    to: transaction.to,
-                    gas_used: transaction.gas_limit_with_fees().into(),
-                    gas_price: transaction.max_fee_per_gas,
-                    hash: Keccak256::digest(transaction.to_bytes()).into(),
-                    input: transaction.data.clone(),
-                    nonce: transaction.nonce,
-                    index: 0,
-                    value: transaction.value,
-                    signature: transaction.signature.clone(),
-                },
-            })),
-        }
-    }
-
-    pub fn to_error(
-        msg: &str,
-    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
-        Ok(SimulationResult::Err(String::from(msg)))
-    }
-
-    /// Execute the simulation
-    pub fn run<Host: Runtime>(
-        &self,
-        host: &mut Host,
-        enable_fa_withdrawals: bool,
-    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
-        let tx = &self.transaction;
-        let evm_account_storage = account_storage::init_account_storage()?;
-        // Get the caller
-        let Ok(caller) = tx.caller() else {
-            return Self::to_error(INCORRECT_SIGNATURE);
-        };
-        // Get the caller account
-        let caller_account_path = evm_execution::account_storage::account_path(&caller)?;
-        let caller_account = evm_account_storage.get(host, &caller_account_path)?;
-        // Get the nonce of the caller
-        let caller_nonce = match &caller_account {
-            Some(account) => account.nonce(host)?,
-            None => 0,
-        };
-        let block_fees = retrieve_block_fees(host)?;
-        // Get the chain_id
-        let chain_id = storage::read_chain_id(host)?;
-        // Check if nonce is too low
-        if tx.nonce < caller_nonce {
-            return Self::to_error(NONCE_TOO_LOW);
-        }
-        // Check if the chain id is correct
-        if tx.chain_id.is_some() && tx.chain_id != Some(chain_id) {
-            return Self::to_error(INVALID_CHAIN_ID);
-        }
-        // Check if the gas price is high enough
-        if tx.max_fee_per_gas < block_fees.base_fee_per_gas() {
-            return Self::to_error(MAX_GAS_FEE_TOO_LOW);
-        }
-        // Check if running the transaction (assuming it is valid) would run out
-        // of ticks, or fail validation for another reason.
-        Self::validate(host, tx, &caller, enable_fa_withdrawals)
-    }
-}
-
-impl TryFrom<&[u8]> for TxValidation {
-    type Error = DecoderError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        let transaction = EthereumTransactionCommon::from_bytes(bytes)?;
-        Ok(Self { transaction })
-    }
-}
-
-#[derive(Debug, PartialEq)]
 enum Message {
     Evaluation(Evaluation),
-    TxValidation(Box<TxValidation>),
 }
 
 impl TryFrom<&[u8]> for Message {
@@ -679,8 +507,6 @@ impl TryFrom<&[u8]> for Message {
 
         match tag {
             EVALUATION_TAG => Evaluation::from_bytes(bytes).map(Message::Evaluation),
-            VALIDATION_TAG => TxValidation::try_from(bytes)
-                .map(|tx| Message::TxValidation(Box::new(tx))),
             _ => Err(DecoderError::Custom("Unknown message to simulate")),
         }
     }
@@ -800,10 +626,6 @@ pub fn start_simulation_mode<Host: Runtime>(
             let outcome = simulation.run(host, tracer_input, enable_fa_withdrawals)?;
             storage::store_simulation_result(host, outcome)
         }
-        Message::TxValidation(tx_validation) => {
-            let outcome = tx_validation.run(host, enable_fa_withdrawals)?;
-            storage::store_simulation_result(host, outcome)
-        }
     }
 }
 
@@ -811,14 +633,10 @@ pub fn start_simulation_mode<Host: Runtime>(
 mod tests {
 
     use primitive_types::H256;
-    use tezos_ethereum::{
-        block::BlockConstants, transaction::TransactionType, tx_signature::TxSignature,
-    };
+    use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
-    use crate::{
-        current_timestamp, fees::gas_for_fees, retrieve_block_fees, retrieve_chain_id,
-    };
+    use crate::{current_timestamp, retrieve_block_fees, retrieve_chain_id};
 
     use super::*;
 
@@ -1139,180 +957,6 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(expected, parsed, "should have parsed a chunk");
-    }
-
-    #[test]
-    fn parse_tx_validation() {
-        let expected = {
-            let v = 2710.into();
-
-            let r = H256::from_slice(
-                &hex::decode(
-                    "0c4604516693aafd2e74a993c280455fcad144a414f5aa580d96f3c51d4428e5",
-                )
-                .unwrap(),
-            );
-
-            let s = H256::from_slice(
-                &hex::decode(
-                    "630fb7fc1af4c1c1a82cabb4ef9d12f8fc2e54a047eb3e3bdffc9d23cd07a94e",
-                )
-                .unwrap(),
-            );
-
-            let signature = TxSignature::new(v, r, s).unwrap();
-
-            EthereumTransactionCommon::new(
-                TransactionType::Legacy,
-                Some(1337.into()),
-                0,
-                U256::default(),
-                U256::default(),
-                2000000,
-                Some(H160::default()),
-                U256::default(),
-                vec![],
-                Vec::default(),
-                Some(signature),
-            )
-        };
-
-        let hex = "f8628080831e84809400000000000000000000000000000000000000008080820a96a00c4604516693aafd2e74a993c280455fcad144a414f5aa580d96f3c51d4428e5a0630fb7fc1af4c1c1a82cabb4ef9d12f8fc2e54a047eb3e3bdffc9d23cd07a94e";
-        let data = hex::decode(hex).unwrap();
-        let tx = EthereumTransactionCommon::from_bytes(&data).unwrap();
-
-        assert_eq!(tx, expected);
-
-        let mut encoded = hex::decode(hex).unwrap();
-        let mut input = vec![
-            parsing::SIMULATION_TAG,
-            SIMULATION_SIMPLE_TAG,
-            VALIDATION_TAG,
-        ];
-        input.append(&mut encoded);
-
-        let parsed = Input::parse(&input);
-
-        assert_eq!(
-            Input::Simple(Box::new(Message::TxValidation(Box::new(TxValidation {
-                transaction: expected
-            })))),
-            parsed,
-            "should have been parsed as complete tx validation"
-        );
-    }
-
-    fn address_from_str(s: &str) -> Option<H160> {
-        let data = &hex::decode(s).unwrap();
-        Some(H160::from_slice(data))
-    }
-
-    #[test]
-    fn test_tx_validation_gas_price() {
-        let mut host = MockKernelHost::default();
-        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
-        let gas_price = U256::one();
-        let tx_data = vec![];
-        let tx_access_list = vec![];
-        let fee_gas = gas_for_fees(
-            block_fees.da_fee_per_byte(),
-            block_fees.minimum_base_fee_per_gas(),
-            tx_data.as_slice(),
-            tx_access_list.as_slice(),
-        )
-        .expect("Should have been able to compute gas for fee");
-
-        let transaction = EthereumTransactionCommon::new(
-            TransactionType::Eip1559,
-            Some(U256::from(1)),
-            0,
-            U256::zero(),
-            gas_price,
-            21000 + fee_gas,
-            Some(H160::zero()),
-            U256::zero(),
-            tx_data,
-            tx_access_list,
-            None,
-        );
-        let signed = transaction
-            .sign_transaction(
-                "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158"
-                    .to_string(),
-            )
-            .unwrap();
-        let simulation = TxValidation {
-            transaction: signed,
-        };
-        storage::store_chain_id(&mut host, U256::from(1))
-            .expect("should be able to store a chain id");
-        let evm_account_storage = account_storage::init_account_storage().unwrap();
-        let _account = evm_account_storage
-            .get_or_create(
-                &host,
-                &account_storage::account_path(
-                    &address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
-                        .unwrap(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-        let result = simulation.run(&mut host, false);
-        println!("{result:?}");
-        assert!(result.is_ok());
-        assert_eq!(
-            TxValidation::to_error(MAX_GAS_FEE_TOO_LOW).unwrap(),
-            result.unwrap()
-        );
-    }
-
-    #[test]
-    fn test_tx_validation_da_fees_not_covered() {
-        let mut host = MockKernelHost::default();
-        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
-
-        let transaction = EthereumTransactionCommon::new(
-            TransactionType::Eip1559,
-            Some(U256::from(1)),
-            0,
-            U256::from(0),
-            block_fees.base_fee_per_gas(),
-            21000, // not covering da_fee
-            Some(H160::zero()),
-            U256::zero(),
-            vec![],
-            vec![],
-            None,
-        );
-        let signed = transaction
-            .sign_transaction(
-                "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158"
-                    .to_string(),
-            )
-            .unwrap();
-        let simulation = TxValidation {
-            transaction: signed,
-        };
-        storage::store_chain_id(&mut host, U256::from(1))
-            .expect("should be able to store a chain id");
-        let evm_account_storage = account_storage::init_account_storage().unwrap();
-        let _account = evm_account_storage
-            .get_or_create(
-                &host,
-                &account_storage::account_path(
-                    &address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
-                        .unwrap(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-        let result = simulation.run(&mut host, false);
-
-        assert!(result.is_ok());
-        assert_eq!(
-            SimulationResult::Err(String::from(super::GAS_LIMIT_TOO_LOW)),
-            result.unwrap()
-        );
     }
 
     pub fn check_roundtrip<R: Decodable + Encodable + core::fmt::Debug + PartialEq>(

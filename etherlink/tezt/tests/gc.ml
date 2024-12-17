@@ -40,7 +40,6 @@ let register ?genesis_timestamp
   @@ fun () ->
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
-      ~node_transaction_validation:true
       ~block_storage_sqlite3:true
       ~garbage_collector
       ()

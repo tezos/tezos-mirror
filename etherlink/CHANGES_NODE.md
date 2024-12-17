@@ -18,6 +18,12 @@
   EVM node endpoint, and will instead keep waiting for a valid blueprint to be
   provided. (!15751)
 
+#### Performances
+
+- The transaction's validation is now performed in native OCaml instead of
+  using the kernel's simulation, which makes the validation of transactions
+  on `eth_sendRawTransaction` faster. (!15959)
+
 ### Bug fixes
 
 - Fixes a Wasm Runtime host function that would copy only instead of moving

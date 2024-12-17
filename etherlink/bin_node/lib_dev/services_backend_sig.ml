@@ -115,13 +115,6 @@ module type S = sig
     Ethereum_types.call ->
     Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
-  (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks
-      if the nonce is correct and returns the associated public key of
-      transaction. *)
-  val is_tx_valid :
-    string ->
-    Simulation.validation_result Simulation.simulation_result tzresult Lwt.t
-
   (** [storage_at address pos block_param] returns the value at index
       [pos] of the account [address]'s storage on block
       [block_param]. *)
