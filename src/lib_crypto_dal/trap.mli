@@ -10,8 +10,8 @@
     based on the fraction [traps_fraction] of shards that should be traps.
 
     The function computes the hash of the concatenation of [pkh] and [share],
-    denoted as `hash(pkh . share)`, where the dot represents concatenation.
-    It then checks if this hash value is less than `trap_rate * 2^n`, where
+    denoted as `hash(pkh . share)`, where the dot represents concatenation.  It
+    then checks if this hash value is less than `traps_fraction * 2^n`, where
     `n` is the (fixed) bit size of the hash.
 
     The function returns:
@@ -22,8 +22,8 @@
 
     - [Error write_error] if there is an issue encoding [pkh] or [share].
 
-    This function assumes [trap_rate] is valid (i.e., a rational number within
-    [0, 1]).
+    This function assumes [traps_fraction] is valid (i.e., a rational number
+    within [0, 1]).
 *)
 val share_is_trap :
   Tezos_crypto.Signature.Public_key_hash.t ->
