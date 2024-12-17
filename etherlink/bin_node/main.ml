@@ -1512,7 +1512,6 @@ let patch_kernel_command =
             ~store_perm:`Read_write
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
-            ~preimages_endpoint:None
             ~native_execution_policy:Never
             ~fail_on_missing_blueprint:true
             ~block_storage_sqlite3:false
@@ -2292,7 +2291,6 @@ let patch_state_command =
             ~store_perm:`Read_write
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
-            ~preimages_endpoint:None
             ~native_execution_policy:Never
             ~fail_on_missing_blueprint:true
             ~block_storage_sqlite3:false

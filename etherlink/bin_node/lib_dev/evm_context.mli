@@ -46,9 +46,6 @@ val export_store :
     [data_dir] is the path to the data-dir of the node, notably containing the
     SQLite store and the Irmin context.
 
-    [preimages_endponit] URI can be optionally provided to download missing
-    preimages when they are requested by the current kernel (during upgrades).
-
     [native_execution_policy] decides if native execution is used for supported
     kernel. In the context of the [Evm_context] worker, the native execution
     will only be used in [native_execution_policy = Always].
@@ -75,7 +72,6 @@ val start :
   configuration:Configuration.t ->
   ?kernel_path:string ->
   data_dir:string ->
-  preimages_endpoint:Uri.t option ->
   native_execution_policy:Configuration.native_execution_policy ->
   ?smart_rollup_address:string ->
   fail_on_missing_blueprint:bool ->

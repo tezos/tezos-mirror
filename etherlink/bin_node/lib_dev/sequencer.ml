@@ -67,7 +67,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~configuration
       ?kernel_path:kernel
       ~data_dir
-      ~preimages_endpoint:configuration.kernel_execution.preimages_endpoint
       ~native_execution_policy:
         configuration.kernel_execution.native_execution_policy
       ~fail_on_missing_blueprint:true

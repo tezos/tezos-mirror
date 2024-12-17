@@ -22,7 +22,6 @@ type parameters = {
   configuration : Configuration.t;
   kernel_path : string option;
   data_dir : string;
-  preimages_endpoint : Uri.t option;
   native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
@@ -51,7 +50,6 @@ type t = {
   configuration : Configuration.t;
   data_dir : string;
   index : Irmin_context.rw_index;
-  preimages_endpoint : Uri.t option;
   native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
@@ -70,7 +68,7 @@ type store_info = {
 let pvm_config ctxt =
   Config.config
     ~preimage_directory:ctxt.configuration.kernel_execution.preimages
-    ?preimage_endpoint:ctxt.preimages_endpoint
+    ?preimage_endpoint:ctxt.configuration.kernel_execution.preimages_endpoint
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
     ()
@@ -397,9 +395,9 @@ module State = struct
         []
 
   let background_preemptive_download
-      ({preimages_endpoint; configuration; _} : t)
+      (kernel_execution : Configuration.kernel_execution_config)
       Evm_events.Upgrade.{hash; timestamp = _} =
-    match preimages_endpoint with
+    match kernel_execution.preimages_endpoint with
     | None -> ()
     | Some preimages_endpoint ->
         Lwt.async @@ fun () ->
@@ -407,7 +405,7 @@ module State = struct
         let (Hash (Hex root_hash)) = hash in
         let root_hash = `Hex root_hash in
         Kernel_download.download
-          ~preimages:configuration.kernel_execution.preimages
+          ~preimages:kernel_execution.preimages
           ~preimages_endpoint
           ~root_hash
           ()
@@ -876,7 +874,9 @@ module State = struct
               kernel_upgrade = upgrade;
               injected_before = ctxt.session.next_blueprint_number;
             } ;
-        background_preemptive_download ctxt upgrade ;
+        background_preemptive_download
+          ctxt.configuration.kernel_execution
+          upgrade ;
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
         let*! evm_state =
           Evm_state.modify
@@ -1113,8 +1113,8 @@ module State = struct
 
   let init ~(configuration : Configuration.t) ?kernel_path
       ~block_storage_sqlite3 ?garbage_collector ~fail_on_missing_blueprint
-      ~data_dir ~preimages_endpoint ~native_execution_policy
-      ?smart_rollup_address ~store_perm ?sequencer_wallet () =
+      ~data_dir ~native_execution_policy ?smart_rollup_address ~store_perm
+      ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1218,7 +1218,6 @@ module State = struct
         configuration;
         index;
         data_dir;
-        preimages_endpoint;
         native_execution_policy;
         smart_rollup_address;
         session =
@@ -1498,7 +1497,6 @@ module Handlers = struct
         configuration : Configuration.t;
         kernel_path : string option;
         data_dir : string;
-        preimages_endpoint : Uri.t option;
         native_execution_policy;
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
@@ -1513,7 +1511,6 @@ module Handlers = struct
         ~configuration
         ?kernel_path
         ~data_dir
-        ~preimages_endpoint
         ~native_execution_policy
         ?smart_rollup_address
         ~fail_on_missing_blueprint
@@ -1698,9 +1695,9 @@ let export_store ~data_dir ~output_db_file =
   let* () = Evm_store.vacuum ~conn ~output_db_file in
   return {rollup_address; current_number}
 
-let start ~configuration ?kernel_path ~data_dir ~preimages_endpoint
-    ~native_execution_policy ?smart_rollup_address ~fail_on_missing_blueprint
-    ~store_perm ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
+let start ~configuration ?kernel_path ~data_dir ~native_execution_policy
+    ?smart_rollup_address ~fail_on_missing_blueprint ~store_perm
+    ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1711,7 +1708,6 @@ let start ~configuration ?kernel_path ~data_dir ~preimages_endpoint
         configuration;
         kernel_path;
         data_dir;
-        preimages_endpoint;
         native_execution_policy;
         smart_rollup_address;
         fail_on_missing_blueprint;
@@ -1900,7 +1896,6 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
     start
       ~configuration
       ~data_dir
-      ~preimages_endpoint:None
       ~native_execution_policy:Never
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
