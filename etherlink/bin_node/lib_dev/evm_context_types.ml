@@ -32,12 +32,6 @@ module Request = struct
         -> ((Ethereum_types.quantity * Blueprint_types.payload) list, tztrace) t
     | Last_known_L1_level : (int32 option, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
-    | Reconstruct : {
-        rollup_node_store : [`Read] Octez_smart_rollup_node_store.Store.t;
-        genesis_level : int32;
-        finalized_level : int32;
-      }
-        -> (unit, tztrace) t
     | Patch_state : {
         commit : bool;
         key : string;
@@ -127,21 +121,6 @@ module Request = struct
           (fun () -> View Delayed_inbox_hashes);
         case
           (Tag 6)
-          ~title:"Reconstruct"
-          (obj3
-             (req "request" (constant "reconstruct"))
-             (req "genesis_level" int32)
-             (req "finalized_level" int32))
-          (function
-            | View (Reconstruct {genesis_level; finalized_level; _}) ->
-                Some ((), genesis_level, finalized_level)
-            | _ -> None)
-          (fun _ ->
-            assert false
-            (* This case cannot be used to decode, which is acceptable because
-               the only use case for the encoding is logging (so encoding). *));
-        case
-          (Tag 7)
           ~title:"Patch_state"
           (obj5
              (req "request" (constant "patch_state"))
@@ -156,13 +135,13 @@ module Request = struct
           (fun ((), commit, key, value, block_number) ->
             View (Patch_state {commit; key; value; block_number}));
         case
-          (Tag 8)
+          (Tag 7)
           ~title:"Wasm_pvm_version"
           (obj1 (req "request" (constant "wasm_pvm_version")))
           (function View Wasm_pvm_version -> Some () | _ -> None)
           (fun () -> View Wasm_pvm_version);
         case
-          (Tag 9)
+          (Tag 8)
           ~title:"Potential_observer_reorg"
           (obj3
              (req "request" (constant "potential_observer_reorg"))

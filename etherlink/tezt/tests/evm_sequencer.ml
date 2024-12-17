@@ -2183,8 +2183,7 @@ let test_init_from_rollup_node_data_dir =
          fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
     ~history_mode:Archive
-  @@ fun {sc_rollup_node; sequencer; observer; proxy; client; boot_sector; _}
-             _protocol ->
+  @@ fun {sc_rollup_node; sequencer; observer; proxy; client; _} _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -2207,13 +2206,7 @@ let test_init_from_rollup_node_data_dir =
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-
-  let* () =
-    Evm_node.reconstruct_from_rollup_node_data_dir
-      ~boot_sector
-      evm_node'
-      sc_rollup_node
-  in
+  let* () = Evm_node.init_from_rollup_node_data_dir evm_node' sc_rollup_node in
   let* () = Evm_node.run evm_node' in
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
@@ -2224,21 +2217,6 @@ let test_init_from_rollup_node_data_dir =
   in
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
-
-  let*@ head = Rpc.block_number evm_node' in
-
-  (* If the sequencer history has been reconstructed during the init, you can
-     make requests in the past. *)
-  let* () =
-    fold (Int32.to_int head) () (fun l () ->
-        let*@ _ =
-          Rpc.get_balance
-            ~address:"0xB7A97043983f24991398E5a82f63F4C58a417185"
-            ~block:(Number l)
-            evm_node'
-        in
-        unit)
-  in
 
   unit
 

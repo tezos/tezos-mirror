@@ -456,12 +456,6 @@ val sequencer_upgrade_payload :
   unit ->
   string Lwt.t
 
-(** [reconstruct_from_rollup_node_data_dir ~boot_sector evm_node
-    rollup_node] reconstructs the history of the rollup by replaying
-    all messages. *)
-val reconstruct_from_rollup_node_data_dir :
-  boot_sector:string -> t -> Sc_rollup_node.t -> unit Lwt.t
-
 (** [init_from_rollup_node_data_dir ?omit_delayed_tx_events evm_node
     rollup_node] initialises the data dir of the evm node by importing
     the evm state from a rollup node data dir. *)

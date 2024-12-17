@@ -1282,26 +1282,6 @@ let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
   in
   Process.check process
 
-let reconstruct_from_rollup_node_data_dir ~boot_sector evm_node rollup_node =
-  let rollup_node_data_dir = Sc_rollup_node.data_dir rollup_node in
-  let process =
-    spawn_command
-      evm_node
-      ([
-         "reconstruct";
-         "from";
-         "rollup";
-         "node";
-         rollup_node_data_dir;
-         "and";
-         "boot";
-         "sector";
-         boot_sector;
-       ]
-      @ data_dir_arg evm_node)
-  in
-  Process.check process
-
 type request = {method_ : string; parameters : JSON.u}
 
 let request_to_JSON {method_; parameters} : JSON.u =

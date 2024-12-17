@@ -1264,164 +1264,6 @@ module State = struct
     in
     return hashes
 
-  let messages_of_level store level =
-    let open Lwt_result_syntax in
-    let open Octez_smart_rollup_node_store in
-    let* hash = Store.L2_levels.find store level in
-    let*? hash =
-      Option.to_result
-        ~none:[error_of_fmt "Block hash is not found for level %ld" level]
-        hash
-    in
-    let* block = Store.L2_blocks.find store hash in
-    let*? block =
-      Option.to_result
-        ~none:[error_of_fmt "Block is not found for hash %a" Block_hash.pp hash]
-        block
-    in
-    let* messages = Store.Messages.find store block.header.inbox_witness in
-    let*? messages =
-      Option.to_result
-        ~none:[error_of_fmt "No messages found for block %a" Block_hash.pp hash]
-        messages
-    in
-    return messages
-
-  (** [reconstruct_commit_blocks ~current_block_number ctxt execute
-      evm_state] loops on [execute evm_state] until no new block is
-      produced.  We cannot (easily) know how many blocks an execution
-      is supposed to make, so we execute until no block is not
-      produced. If no new block is produced by this function, no
-      commits are produced. *)
-  let rec reconstruct_commit_blocks ~current_block_number ctxt execute evm_state
-      =
-    let open Lwt_result_syntax in
-    let* evm_state = execute evm_state in
-    let*! (Qty number) = Evm_state.current_block_height evm_state in
-    if number > current_block_number then (
-      (* The kernel produced a new block, we commit the intermediate state. *)
-      let* context =
-        Evm_store.use ctxt.store @@ fun conn ->
-        commit conn ctxt.session.context evm_state (Qty number)
-      in
-      ctxt.session.context <- context ;
-      reconstruct_commit_blocks
-        ~current_block_number:number
-        ctxt
-        execute
-        evm_state)
-    else
-      (* The kernel did not produce a new block. It either means the block
-         takes more than 1000 reboots to be processed, or no blueprints are
-         found in the storage. *)
-      return (current_block_number, evm_state)
-
-  (** If we are reconstructing mainnet, the initial kernel is not
-      sufficient.  We need to override the kernel with an additional
-      patch that allows the compatibility with the reconstruct.
-
-      We determine if the replacement is needed based on the smart rollup
-      address. *)
-  let replace_mainnet_kernel_if_needed ctxt evm_state =
-    let open Lwt_result_syntax in
-    if
-      ctxt.smart_rollup_address
-      = Address.of_b58check_exn "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
-    then
-      let*! () = Evm_context_events.reconstruct_replace_mainnet_kernel () in
-      let*! evm_state =
-        Evm_state.modify
-          ~key:"/kernel/boot.wasm"
-          ~value:Evm_node_kernels.mainnet_initial_kernel_reconstruct_compatible
-          evm_state
-      in
-      return evm_state
-    else return evm_state
-
-  let reconstruct_history ctxt ~rollup_node_store ~genesis_level
-      ~finalized_level =
-    let open Lwt_result_syntax in
-    (* Smart Rollups do not process messages of genesis level. *)
-    let first_level = Int32.succ genesis_level in
-    assert (finalized_level > first_level) ;
-    let config = pvm_config ctxt in
-    let rec go ~count_progress ~current_block_number evm_state tezos_level =
-      if tezos_level > finalized_level then return_unit
-      else
-        let*! () = count_progress 1 in
-        let* messages = messages_of_level rollup_node_store tezos_level in
-        (* For now we use the mocked sol, ipl and eol of the debugger. *)
-        let messages =
-          match messages with
-          | _sol :: _ipl :: rst ->
-              List.rev (Option.value ~default:[] @@ List.tl (List.rev rst))
-          | _ -> assert false
-        in
-        (* Execute the PVM to replay the tezos level. *)
-        let* evm_state =
-          Evm_state.execute
-            ~native_execution:(ctxt.native_execution_policy = Always)
-            ~data_dir:ctxt.data_dir
-            ~log_file:"reconstruct"
-            ~config
-            evm_state
-            (List.map (fun m -> `Input m) messages)
-        in
-        let*! (Qty number) = Evm_state.current_block_height evm_state in
-        let* current_block_number, evm_state =
-          if number > current_block_number then (
-            (* The execution with messages produced a block. We commit to this block,
-               and loop in case of other blocks. *)
-            let* context =
-              Evm_store.use ctxt.store @@ fun conn ->
-              commit conn ctxt.session.context evm_state (Qty number)
-            in
-            ctxt.session.context <- context ;
-            reconstruct_commit_blocks
-              ~current_block_number:number
-              ctxt
-              (fun evm_state ->
-                Evm_state.execute
-                  ~native_execution:(ctxt.native_execution_policy = Always)
-                  ~data_dir:ctxt.data_dir
-                  ~log_file:"reconstruct"
-                  ~config
-                  evm_state
-                  [])
-              evm_state)
-          else
-            (* Otherwise just move to the next tezos level. *)
-            return (current_block_number, evm_state)
-        in
-        go
-          ~count_progress
-          ~current_block_number
-          evm_state
-          (Int32.succ tezos_level)
-    in
-    (* We perform a first reboot to reveal the kernel. *)
-    let* evm_state =
-      Evm_state.execute
-        ~native_execution:(ctxt.native_execution_policy = Always)
-        ~data_dir:ctxt.data_dir
-        ~log_file:"reconstruct"
-        ~config
-        ctxt.session.evm_state
-        []
-    in
-    let* evm_state = replace_mainnet_kernel_if_needed ctxt evm_state in
-    let*! evm_state =
-      Evm_state.modify ~key:"/__at_most_one_block" ~value:"" evm_state
-    in
-    let total =
-      Int32.sub finalized_level first_level |> Int32.to_int |> Int.succ
-    in
-    let progress_bar =
-      Progress_bar.progress_bar ~counter:`Int ~message:"Reconstructing" total
-    in
-    Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
-    go ~count_progress ~current_block_number:Z.(pred zero) evm_state first_level
-
   let wasm_pvm_version (ctxt : t) =
     let open Lwt_result_syntax in
     let*! version = Evm_state.wasm_pvm_version ctxt.session.evm_state in
@@ -1723,14 +1565,6 @@ module Handlers = struct
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
         return hashes
-    | Reconstruct {rollup_node_store; genesis_level; finalized_level} ->
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        State.reconstruct_history
-          ctxt
-          ~rollup_node_store
-          ~genesis_level
-          ~finalized_level
     | Patch_state {commit; key; value; block_number} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1767,7 +1601,6 @@ module Handlers = struct
       | Blueprints_range _ -> Eq
       | Last_known_L1_level -> Eq
       | Delayed_inbox_hashes -> Eq
-      | Reconstruct _ -> Eq
       | Patch_state _ -> Eq
       | Wasm_pvm_version -> Eq
       | Potential_observer_reorg _ -> Eq
@@ -2041,39 +1874,6 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
 
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
-
-let reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector =
-  let open Lwt_result_syntax in
-  let* () = lock_data_dir ~data_dir in
-  let open Octez_smart_rollup_node_store in
-  let* rollup_node_store =
-    Store.init Read_only ~data_dir:rollup_node_data_dir
-  in
-  let rollup_node_store = Store.Normal rollup_node_store in
-  let* finalized = Store.State.Finalized_level.get rollup_node_store in
-  let* finalized_level =
-    match finalized with
-    | Some (_block, l) -> return l
-    | None -> failwith "Rollup node has no finalized l2 block"
-  in
-  let* smart_rollup_address, genesis_level =
-    rollup_node_metadata ~rollup_node_data_dir
-  in
-  let* _loaded =
-    start
-      ~kernel_path:boot_sector
-      ~data_dir
-      ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
-      ~preimages_endpoint:None
-      ~native_execution_policy:Never
-      ~smart_rollup_address
-      ~fail_on_missing_blueprint:false
-      ~store_perm:`Read_write
-      ~block_storage_sqlite3:false
-      ()
-  in
-  worker_wait_for_request
-    (Reconstruct {rollup_node_store; genesis_level; finalized_level})
 
 let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
     ~rollup_node_data_dir () =
