@@ -90,7 +90,12 @@ let jingoo_template t agents =
       Tobj
         [
           ("activated", Tbool Env.prometheus);
-          ("uri", Tstr (Format.asprintf "http://%s:9090" (domain agents)));
+          ( "uri",
+            Tstr
+              (Format.asprintf
+                 "http://%s:%d"
+                 (domain agents)
+                 Env.prometheus_port) );
         ] );
     ( "monitoring",
       Tobj

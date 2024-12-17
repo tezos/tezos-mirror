@@ -98,7 +98,11 @@ let write_rules_file t =
 (* Prometheus can reload its configuration by first sending the POST RPC and
    then the signal SIGHUP. *)
 let reload _t =
-  let* () = Process.run "curl" ["-XPOST"; "http://localhost:9090/-/reload"] in
+  let* () =
+    Process.run
+      "curl"
+      ["-XPOST"; sf "http://localhost:%d/-/reload" Env.prometheus_port]
+  in
   Process.run "docker" ["kill"; "--signal"; "SIGHUP"; "prometheus"]
 
 let add_job t ?(metrics_path = "/metrics") ~name targets =
@@ -195,7 +199,7 @@ let start agents =
         "/dev/null";
         "-w";
         "%{http_code}";
-        "http://localhost:9090/-/ready";
+        sf "http://localhost:%d/-/ready" Env.prometheus_port;
       ]
   in
   let* _ = Env.wait_process ~is_ready ~run () in
@@ -208,7 +212,10 @@ let export_snapshot {snapshot_filename; _} =
   let* stdout =
     Process.run_and_read_stdout
       "curl"
-      ["-XPOST"; "http://localhost:9090/api/v1/admin/tsdb/snapshot"]
+      [
+        "-XPOST";
+        sf "http://localhost:%d/api/v1/admin/tsdb/snapshot" Env.prometheus_port;
+      ]
   in
   let json = JSON.parse ~origin:"Prometheus.export" stdout in
   let snapshot_name = JSON.(json |-> "data" |-> "name" |> as_string) in
@@ -244,9 +251,7 @@ let run_with_snapshot () =
            --prometheus-snapshot-filename"
     | Some file -> file
   in
-  Log.info
-    "You can find the prometheus instance at http://localhost:%d"
-    Env.prometheus_port ;
+  Log.info "You can find the prometheus instance at http://localhost:%d" port ;
   Log.info "Use Ctrl+C to end the scenario and kill the prometheus instance." ;
   let* () =
     Process.run
@@ -257,7 +262,7 @@ let run_with_snapshot () =
         "-v";
         Format.asprintf "%s:/prometheus" snapshot_filename;
         "-p";
-        Format.asprintf "%d:9090" port;
+        Format.asprintf "%d:%d" port port;
         "prom/prometheus";
         "--config.file=/etc/prometheus/prometheus.yml";
         "--storage.tsdb.path=/prometheus";

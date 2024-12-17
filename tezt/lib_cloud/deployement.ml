@@ -57,6 +57,7 @@ module Remote = struct
     let base_port = Env.vm_base_port in
     let os = configuration.os in
     let auto_approve = Env.auto_approve in
+    let prometheus_port = Env.prometheus_port in
     let* () =
       Terraform.VM.deploy
         ~auto_approve
@@ -66,6 +67,7 @@ module Remote = struct
         ~ports_per_vm
         ~number_of_vms
         ~docker_image
+        ~prometheus_port
         ~os
     in
     let names =

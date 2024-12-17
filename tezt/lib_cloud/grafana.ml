@@ -56,16 +56,18 @@ let provisioning_directory () =
   in
   let* () = Process.run "mkdir" ["-p"; provisioning_file |> Filename.dirname] in
   let content =
-    {|
+    sf
+      {|
 apiVersion: 1
 
 datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://localhost:9090
+    url: http://localhost:%d
     isDefault: true
 |}
+      Env.prometheus_port
   in
   with_open_out provisioning_file (fun oc ->
       Stdlib.seek_out oc 0 ;
