@@ -84,6 +84,8 @@ you start using them, you probably want to use `octez-evm-node check config
   `experimental_features.rpc_server = "dream"`. (!15560)
 - Added support for the WebSocket event `newHeads`, allowing clients to receive
   real-time notifications of new blocks. (!15899)
+- Added support for the WebSocket event `newPendingTransactions`, enabling clients
+  to receive real-time notifications of incoming pending transactions. (!15991)
   
 ### Bug fixes
 

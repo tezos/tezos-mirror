@@ -8367,6 +8367,31 @@ let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
       failwith "eth_unsubscribe shouldn't be callable via http requests")
     (fun _ -> unit)
 
+let check_unsubscription ~websocket ~id ~sequencer evm_node =
+  let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
+  Check.((sub_status = true) bool)
+    ~error_msg:"Unsubscription from newHeads should be successful" ;
+  (* After unsubbing to newHeads, we shouldn't receive data anymore. *)
+  let*@ _ = produce_block sequencer in
+  let* result =
+    Lwt.pick
+      [
+        (let* never_return = Websocket.recv websocket in
+         return (Error never_return));
+        (let* () = Lwt_unix.sleep 2. in
+         return (Ok ()));
+      ]
+  in
+  (match result with
+  | Ok () -> ()
+  | Error _ -> failwith "The websocket shouldn't have received any new data.") ;
+  (* If we try to unsubscribe from this event again, it should return false as
+     we were already unsubbed. *)
+  let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
+  Check.((sub_status = false) bool)
+    ~error_msg:"Unsubscribing from the same event twice should return false" ;
+  unit
+
 let test_websocket_newHeads_event =
   register_all
     ~tags:["evm"; "rpc"; "websocket"; "new_heads"]
@@ -8395,29 +8420,7 @@ let test_websocket_newHeads_event =
     in
     let* () = check_block_number ~level:lvl in
     let* () = check_block_number ~level:lvl' in
-    let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
-    Check.((sub_status = true) bool)
-      ~error_msg:"Unsubscription from newHeads should be successful" ;
-    (* After unsubbing to newHeads, we shouldn't receive data anymore. *)
-    let*@ _ = produce_block sequencer in
-    let* result =
-      Lwt.pick
-        [
-          (let* never_return = Websocket.recv websocket in
-           return (Error never_return));
-          (let* () = Lwt_unix.sleep 2. in
-           return (Ok ()));
-        ]
-    in
-    (match result with
-    | Ok () -> ()
-    | Error _ -> failwith "The websocket shouldn't have received any new data.") ;
-    (* If we try to unsubscribe from this event again, it should return false as
-       we were already unsubbed. *)
-    let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
-    Check.((sub_status = false) bool)
-      ~error_msg:"Unsubscribing from the same event twice should return false" ;
-    unit
+    check_unsubscription ~websocket ~id ~sequencer evm_node
   in
   let* () = scenario sequencer (1l, 2l) in
   scenario observer (4l, 5l)
@@ -8454,6 +8457,60 @@ let test_websocket_cleanup =
   Check.((sub_status = false) bool)
     ~error_msg:"All subscriptions should have been cleaned up from node" ;
   unit
+
+let test_websocket_newPendingTransactions_event =
+  register_all
+    ~tags:["evm"; "rpc"; "websocket"; "new_pending_transactions"]
+    ~title:
+      "Check that websocket event `newPendingTransactions` is behaving \
+       correctly"
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:
+      ((Array.to_list Eth_account.bootstrap_accounts
+       |> List.map (fun a -> a.Eth_account.address))
+      @ Eth_account.lots_of_address)
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~rpc_server:Dream (* Websockets only available in Dream *)
+    ~websockets:true
+  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
+  let* observer =
+    run_new_observer_node
+      ~finalized_view:false
+      ~sc_rollup_node
+      ~rpc_server:Dream (* Websockets only available in Dream *)
+      ~websockets:true
+      sequencer
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let scenario evm_node transaction_hash =
+    let* websocket = Evm_node.open_websocket evm_node in
+    let* id = Rpc.subscribe ~websocket ~kind:NewPendingTransactions evm_node in
+    Lwt.async (fun () ->
+        (* In observer mode, the transaction will never be mined which will cause
+           the following line to be blocking. *)
+        let* _ =
+          Eth_cli.transaction_send
+            ~source_private_key:sender.private_key
+            ~to_public_key:sender.address
+            ~value:(Wei.of_eth_int 10)
+            ~endpoint:(Evm_node.endpoint evm_node)
+            ()
+        in
+        unit) ;
+    let* tx = Websocket.recv websocket in
+    let tx_hash = JSON.(tx |-> "params" |-> "result" |> as_string) in
+    Check.((transaction_hash = tx_hash) string)
+      ~error_msg:"Received tx_hash was %R, expected %L" ;
+    check_unsubscription ~websocket ~id ~sequencer evm_node
+  in
+  let* () =
+    scenario
+      sequencer
+      "0x1b5678a27af55582f2bd6fa07223ff59ee93e16c228e40a948d09ee593560d36"
+  in
+  scenario
+    observer
+    "0xf5e6dcb59cbf260cfe04d89d07a0f270c11e489a6de4df319916c7ddb19f3a34"
 
 let protocols = Protocol.all
 
@@ -8571,4 +8628,5 @@ let () =
   test_websocket_subscription_rpcs_cant_be_called_via_http_requests
     [Protocol.Alpha] ;
   test_websocket_newHeads_event [Protocol.Alpha] ;
-  test_websocket_cleanup [Protocol.Alpha]
+  test_websocket_cleanup [Protocol.Alpha] ;
+  test_websocket_newPendingTransactions_event [Protocol.Alpha]

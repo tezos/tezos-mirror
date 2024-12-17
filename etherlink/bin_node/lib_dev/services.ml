@@ -261,10 +261,7 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
     | Logs _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7640 *)
         Stdlib.failwith "The websocket event [logs] is not implemented yet."
-    | NewPendingTransactions ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7641 *)
-        Stdlib.failwith
-          "The websocket event [newPendingTransactions] is not implemented yet."
+    | NewPendingTransactions -> Lwt_watcher.create_stream Tx_pool.txs_watcher
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."

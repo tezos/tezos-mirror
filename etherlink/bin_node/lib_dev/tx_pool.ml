@@ -731,6 +731,9 @@ let find state tx_hash =
   in
   Option.either_f res (fun () -> Pool.find state.Types.pool tx_hash)
 
+let txs_watcher : Ethereum_types.Subscription.output Lwt_watcher.input =
+  Lwt_watcher.create_input ()
+
 module Handlers = struct
   type self = worker
 
@@ -755,6 +758,10 @@ module Handlers = struct
     match request with
     | Request.Add_transaction (transaction_object, txn) ->
         protect @@ fun () ->
+        Lwt_watcher.notify
+          txs_watcher
+          (Ethereum_types.Subscription.NewPendingTransactions
+             transaction_object.hash) ;
         let* res =
           match state.mode with
           | Forward {injector} -> injector txn
