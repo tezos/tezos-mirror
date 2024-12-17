@@ -8956,8 +8956,8 @@ let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
 let check_unsubscription ~websocket ~id ~sequencer evm_node =
   let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
   Check.((sub_status = true) bool)
-    ~error_msg:"Unsubscription from newHeads should be successful" ;
-  (* After unsubbing to newHeads, we shouldn't receive data anymore. *)
+    ~error_msg:"Unsubscription should be successful" ;
+  (* After unsubbing to the event, we shouldn't receive data anymore. *)
   let*@ _ = produce_block sequencer in
   let* result =
     Lwt.pick
@@ -9098,6 +9098,121 @@ let test_websocket_newPendingTransactions_event =
     observer
     "0xf5e6dcb59cbf260cfe04d89d07a0f270c11e489a6de4df319916c7ddb19f3a34"
 
+let test_websocket_logs_event =
+  register_all
+    ~tags:["evm"; "rpc"; "websocket"; "logs"]
+    ~title:"Check that websocket event `logs` is behaving correctly"
+    ~time_between_blocks:Nothing
+    ~bootstrap_accounts:
+      ((Array.to_list Eth_account.bootstrap_accounts
+       |> List.map (fun a -> a.Eth_account.address))
+      @ Eth_account.lots_of_address)
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~rpc_server:Dream
+    ~websockets:true
+  @@ fun {sequencer; observer; _} _protocol ->
+  let scenario evm_node =
+    let* websocket = Evm_node.open_websocket evm_node in
+    let endpoint = Evm_node.endpoint evm_node in
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    let* erc20 = Solidity_contracts.erc20 () in
+    let* () = Eth_cli.add_abi ~label:erc20.label ~abi:erc20.abi () in
+    let* address, _tx =
+      send_transaction_to_sequencer
+        (Eth_cli.deploy
+           ~source_private_key:sender.private_key
+           ~endpoint
+           ~abi:erc20.label
+           ~bin:erc20.bin)
+        sequencer
+    in
+    let address = String.lowercase_ascii address in
+    let transfer_event_topic =
+      let h =
+        Tezos_crypto.Hacl.Hash.Keccak_256.digest
+          (Bytes.of_string "Transfer(address,address,uint256)")
+      in
+      "0x" ^ Hex.show (Hex.of_bytes h)
+    in
+    let zero_address = "0x" ^ String.make 64 '0' in
+    let value = 42 in
+    let* id_all_logs =
+      Rpc.subscribe
+        ~websocket
+        ~kind:(Logs (Some {address = Some (Single address); topics = None}))
+        evm_node
+    in
+    let* _tx =
+      send_transaction_to_sequencer
+        (Eth_cli.contract_send
+           ~source_private_key:sender.private_key
+           ~endpoint
+           ~abi_label:erc20.label
+           ~address
+           ~method_call:(Printf.sprintf "mint(%d)" value))
+        sequencer
+    in
+    let* json = Websocket.recv websocket in
+    let logs =
+      JSON.(json |-> "params" |-> "result" |> Transaction.logs_of_json)
+    in
+    Check.((address = logs.address) string)
+      ~error_msg:"Received logs address was %R, expected %L" ;
+    Check.(
+      ("0x000000000000000000000000000000000000000000000000000000000000002a"
+     = logs.data)
+        string)
+      ~error_msg:"Received logs data was %R, expected %L" ;
+    let* sub_status = Rpc.unsubscribe ~websocket ~id:id_all_logs evm_node in
+    Check.((sub_status = true) bool)
+      ~error_msg:"Unsubscription from logs should be successful" ;
+    let* _id_specific_topics =
+      Rpc.subscribe
+        ~websocket
+        ~kind:
+          (Logs
+             (Some
+                {
+                  address = None;
+                  topics =
+                    Some
+                      [
+                        transfer_event_topic;
+                        hex_256_of_address sender;
+                        zero_address;
+                      ];
+                }))
+        evm_node
+    in
+    let* _tx =
+      send_transaction_to_sequencer
+        (Eth_cli.contract_send
+           ~expect_failure:false
+           ~source_private_key:sender.private_key
+           ~endpoint
+           ~abi_label:erc20.label
+           ~address
+           ~method_call:(Printf.sprintf "burn(%d)" value))
+        sequencer
+    in
+    let* json = Websocket.recv websocket in
+    let sender_burn_logs =
+      JSON.(json |-> "params" |-> "result" |> Transaction.logs_of_json)
+    in
+    Check.((address = logs.address) string)
+      ~error_msg:"Received logs address was %R, expected %L" ;
+    Check.(("0x" ^ Helpers.hex_256_of_int value = logs.data) string)
+      ~error_msg:"Received logs data was %R, expected %L" ;
+    Check.(
+      (sender_burn_logs.topics
+      = [transfer_event_topic; hex_256_of_address sender; zero_address])
+        (list string))
+      ~error_msg:"Expected topics %R, got %L" ;
+    unit
+  in
+  let* () = scenario sequencer in
+  scenario observer
+
 let protocols = Protocol.all
 
 let () =
@@ -9219,4 +9334,5 @@ let () =
     [Protocol.Alpha] ;
   test_websocket_newHeads_event [Protocol.Alpha] ;
   test_websocket_cleanup [Protocol.Alpha] ;
-  test_websocket_newPendingTransactions_event [Protocol.Alpha]
+  test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
+  test_websocket_logs_event [Protocol.Alpha]
