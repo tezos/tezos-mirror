@@ -1,5 +1,6 @@
 octez-*.html
 octez-*.txt
+octezdoc.txt
 /alpha/rpc.rst
 /shell/rpc.rst
 

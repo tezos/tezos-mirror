@@ -6,6 +6,7 @@ SPHINXBUILD   = poetry run sphinx-build
 SOURCEDIR     = .
 TMPDOCDIR     = /tmp/octezdoc
 BUILDDIR      = _build
+BUILDDIRTXT   = _build_txt
 TOPBUILDDIR   = ../_build
 TOPBUILDDIR_ABS  = $(abspath $(CURDIR)/$(TOPBUILDDIR))
 
@@ -48,6 +49,14 @@ full: odoc
 .PHONY: html
 html: octez-gen docexes-gen
 	${MAKE} sphinx
+
+# Make all the doc in a single text file
+octezdoc.txt: octez-gen docexes-gen
+	rm -fr $(BUILDDIRTXT)
+	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
+	touch CHANGES-dev.rst
+	@$(SPHINXBUILD) --builder text "$(SOURCEDIR)" $(BUILDDIRTXT) $(SPHINXOPTS)
+	find $(BUILDDIRTXT)	 -name "*.txt" | xargs cat >$@
 
 # Build the manuals for a given protocol
 %/octez-client.html:
@@ -305,6 +314,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
 	@-rm -Rf api/octez-*.html api/octez-*.txt paris/octez-*.html alpha/octez-*.html quebec/octez-*.html
 	@-rm -Rf ../openapi-tmp
