@@ -16,6 +16,11 @@
     "block_storage_sqlite3": true,
     "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
+    "garbage_collector_parameters": {
+      "split_frequency_in_seconds": 86400,
+      "number_of_chunks": 14
+    },
+    "history_mode": "archive",
     "rpc_server": "resto",
     "enable_websocket": false
   },
@@ -67,6 +72,11 @@
     "block_storage_sqlite3": true,
     "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
+    "garbage_collector_parameters": {
+      "split_frequency_in_seconds": 86400,
+      "number_of_chunks": 14
+    },
+    "history_mode": "archive",
     "rpc_server": "resto",
     "enable_websocket": false
   },
@@ -111,6 +121,11 @@
     "block_storage_sqlite3": true,
     "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
+    "garbage_collector_parameters": {
+      "split_frequency_in_seconds": 86400,
+      "number_of_chunks": 14
+    },
+    "history_mode": "archive",
     "rpc_server": "resto",
     "enable_websocket": false
   },

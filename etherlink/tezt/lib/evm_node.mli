@@ -254,10 +254,12 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
-type garbage_collector = {
+type garbage_collector_parameters = {
   split_frequency_in_seconds : int;
   number_of_chunks : int;
 }
+
+type history_mode = Archive | Rolling
 
 type rpc_server = Resto | Dream
 
@@ -270,7 +272,8 @@ val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
   ?block_storage_sqlite3:bool ->
   ?next_wasm_runtime:bool ->
-  ?garbage_collector:garbage_collector ->
+  ?garbage_collector_parameters:garbage_collector_parameters ->
+  ?history_mode:history_mode ->
   ?rpc_server:rpc_server ->
   ?enable_websocket:bool ->
   unit ->
