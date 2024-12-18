@@ -272,7 +272,11 @@ let rps_perf ~configuration_path ~testnet =
 
   let* () = Locust.write_config_file config_locust in
 
-  let* () = Locust.run ~spawn_rate:10000 ~users:100 endpoint ~time:"20s" in
+  let* output = Locust.run ~spawn_rate:10000 ~users:100 endpoint ~time:"20s" in
+
+  let rps = Locust.read_csv output in
+
+  Format.printf "=========== %s RPS ===========@." rps ;
 
   stop_or_keep_going ~config ~node
 

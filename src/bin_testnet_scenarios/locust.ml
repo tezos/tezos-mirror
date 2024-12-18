@@ -90,26 +90,30 @@ let run ?(output = "perf") ?(file = "locustfile.py") ?(spawn_rate = 1)
     ?(users = 1) ?(time = "5s") endpoint =
   let ptime = Client.Time.now () in
   let string_time = Ptime.to_rfc3339 ptime in
-  Process.run
-    "locust"
-    [
-      "--skip-log";
-      "--autostart";
-      "--autoquit";
-      "1";
-      "-t";
-      time;
-      "--users";
-      Int.to_string users;
-      "--spawn-rate";
-      Int.to_string spawn_rate;
-      "-H";
-      endpoint;
-      "-f";
-      path // file;
-      "--csv";
-      path // string_time // output;
-    ]
+  let* () =
+    Process.run
+      "locust"
+      [
+        "--skip-log";
+        "--autostart";
+        "--autoquit";
+        "1";
+        "-t";
+        time;
+        "--users";
+        Int.to_string users;
+        "--spawn-rate";
+        Int.to_string spawn_rate;
+        "-H";
+        endpoint;
+        "-f";
+        path // file;
+        "--csv";
+        path // string_time // output;
+      ]
+  in
+
+  return (path // string_time // (output ^ "_stats.csv"))
 
 let config_to_json c =
   let open Ezjsonm in
@@ -135,8 +139,9 @@ let write_config_file config_locust =
       Lwt_io.flush chan)
     chan
 
+let split_comma line = String.split_on_char ',' line
+
 let read_csv file : string list list =
-  let split_comma line = String.split_on_char ',' line in
   let ic = open_in file in
   let rec read_lines acc =
     match input_line ic with
