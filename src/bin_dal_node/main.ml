@@ -104,6 +104,18 @@ let run subcommand cli_options =
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
+  | Config_update ->
+      Lwt.Exception_filter.(set handle_all_except_runtime) ;
+      Lwt_main.run @@ wrap_with_error
+      @@
+      let open Lwt_result_syntax in
+      let data_dir =
+        Option.value
+          ~default:Configuration_file.default.data_dir
+          cli_options.data_dir
+      in
+      let* configuration = Configuration_file.load ~data_dir in
+      Configuration_file.save (merge cli_options configuration)
   | Debug_print_store_schemas ->
       let open Lwt_result_syntax in
       Lwt_main.run @@ wrap_with_error
