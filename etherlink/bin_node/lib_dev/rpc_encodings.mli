@@ -65,11 +65,11 @@ module JSONRPC : sig
       }
     ]}
   *)
-  type 'data error = {code : int; message : string; data : 'data option}
+  type error = {code : int; message : string; data : Data_encoding.json option}
 
-  val error_encoding : 'a Data_encoding.t -> 'a error Data_encoding.t
+  val error_encoding : error Data_encoding.t
 
-  type value = (Data_encoding.json, Data_encoding.json error) result
+  type value = (Data_encoding.json, error) result
 
   (** JSON-RPC Response object:
   {@js[
@@ -106,16 +106,6 @@ module Subscription : sig
 
   val response_encoding : response Data_encoding.t
 end
-
-(* Errors returned by the RPC server, to be embedded as data to the JSON-RPC
-   error object. *)
-module Error : sig
-  type t = unit
-
-  val encoding : unit Data_encoding.t
-end
-
-type 'result rpc_result = ('result, Error.t JSONRPC.error) result
 
 type ('input, 'output) method_ = ..
 
