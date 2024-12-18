@@ -104,7 +104,7 @@ Contract memorized as tickets_blackhole.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg 'Pair "[PUBLIC_KEY_HASH]" 1'
 Node is bootstrapped.
-Estimated gas: 1858.410 units (will add 100 for safety)
+Estimated gas: 3858.410 units (will add 100 for safety)
 Estimated storage: 66 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -115,13 +115,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000494
+    Fee to the baker: ꜩ0.000694
     Expected counter: 3
-    Gas limit: 1959
+    Gas limit: 3959
     Storage limit: 86 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000494
-      payload fees(the block proposer) ....... +ꜩ0.000494
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000694
+      payload fees(the block proposer) ....... +ꜩ0.000694
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -142,7 +142,7 @@ This sequence of operations was run:
           To: [PUBLIC_KEY_HASH]
           Parameter: (Ticket 0x01fca241ad513615858a813a6019c5a5b3977c27dc00 string "Ticket" 1)
           This transaction was successfully applied
-          Consumed gas: 100.398
+          Consumed gas: 2100.398
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string

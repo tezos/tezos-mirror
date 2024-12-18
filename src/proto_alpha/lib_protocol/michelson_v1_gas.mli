@@ -40,6 +40,14 @@ module Cost_of : sig
      the production of operation results). *)
   val manager_operation : Gas.cost
 
+  (* The [transfer_operation] cost is consumed each time a transfer
+     operation (internal or external alike) is applied. This cost is
+     meant to cover the I/O accesses required to fetch and modify the
+     spendable balance storage. Hence this cost doesn't apply for calls.
+     It is also not used for the staking operations, since their cost is already
+     covered by those defined in [adaptive_issuance_costs.ml]. *)
+  val transfer_operation : Gas.cost
+
   module Interpreter : sig
     val drop : Gas.cost
 

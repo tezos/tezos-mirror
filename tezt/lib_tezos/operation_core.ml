@@ -786,7 +786,7 @@ module Manager = struct
     match payload with
     | Transfer _ ->
         let fee = Option.value fee ~default:1_000 in
-        let gas_limit = Option.value gas_limit ~default:1_040 in
+        let gas_limit = Option.value gas_limit ~default:3_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
     | Dal_publish_commitment _ ->
