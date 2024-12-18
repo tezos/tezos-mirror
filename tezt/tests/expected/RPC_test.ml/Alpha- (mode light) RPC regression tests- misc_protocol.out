@@ -44,6 +44,7 @@
       "minimal_participation_ratio":
         { "numerator": "16", "denominator": "25" },
       "rewards_ratio": { "numerator": "0", "denominator": "1" },
+      "traps_fraction": { "numerator": "1", "denominator": "10000" },
       "redundancy_factor": 8, "page_size": 3967, "slot_size": 126944,
       "number_of_shards": 256 }, "smart_rollup_arith_pvm_enable": false,
   "smart_rollup_origination_size": 6314,
