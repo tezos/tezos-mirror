@@ -90,6 +90,8 @@ module Transport_layer = struct
         return_unit)
       additional_points
 
+  let shutdown p2p = P2p.shutdown p2p
+
   let connect p2p ?timeout point =
     let open Lwt_result_syntax in
     match P2p.connect_handler p2p with
