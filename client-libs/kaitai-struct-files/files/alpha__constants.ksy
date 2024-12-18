@@ -53,6 +53,8 @@ types:
       type: minimal_participation_ratio_0
     - id: rewards_ratio
       type: rewards_ratio
+    - id: traps_fraction
+      type: traps_fraction
     - id: redundancy_factor
       type: u1
     - id: page_size
@@ -179,6 +181,12 @@ types:
       type: s4be
     - id: dal_attested_slots_validity_lag
       type: int31
+  traps_fraction:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   z:
     seq:
     - id: has_tail
