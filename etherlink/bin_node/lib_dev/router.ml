@@ -107,7 +107,7 @@ let respond_error ?status ?code ?headers media err =
     ?code
     ?headers
     media
-    (encode media (Rpc_encodings.JSONRPC.error_encoding Data_encoding.json) err)
+    (encode media Rpc_encodings.JSONRPC.error_encoding err)
 
 let get_params :
     type params.
@@ -273,10 +273,7 @@ let send_error media websocket error =
   Dream.send
     ~text_or_binary
     websocket
-    (encode
-       media
-       (Rpc_encodings.JSONRPC.error_encoding Data_encoding.json)
-       error)
+    (encode media Rpc_encodings.JSONRPC.error_encoding error)
 
 let make_jsonrpc_websocket_route path
     (handler : Rpc_encodings.websocket_handler) =

@@ -1084,8 +1084,6 @@ let call (type input output)
   | Singleton {value = Error err; _} | Batch [{value = Error err; _}] ->
       failwith
         "Request failed with error %s"
-        Data_encoding.Json.(
-          to_string
-            (construct (JSONRPC.error_encoding Data_encoding.Json.encoding) err))
+        Data_encoding.Json.(to_string (construct JSONRPC.error_encoding err))
   | Batch l ->
       failwith "request: unexpected number of responses (%d)" List.(length l)

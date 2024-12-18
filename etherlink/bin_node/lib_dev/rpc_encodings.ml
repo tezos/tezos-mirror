@@ -71,9 +71,9 @@ module JSONRPC = struct
            (opt "params" Data_encoding.json)
            (opt "id" id_repr_encoding)))
 
-  type 'data error = {code : int; message : string; data : 'data option}
+  type error = {code : int; message : string; data : Data_encoding.json option}
 
-  let error_encoding data_encoding =
+  let error_encoding =
     Data_encoding.(
       conv
         (fun {code; message; data} -> (code, message, data))
@@ -81,9 +81,9 @@ module JSONRPC = struct
         (obj3
            (req "code" int31)
            (req "message" string)
-           (opt "data" data_encoding)))
+           (opt "data" Data_encoding.json)))
 
-  type value = (Data_encoding.json, Data_encoding.json error) result
+  type value = (Data_encoding.json, error) result
 
   type response = {value : value; id : id}
 
@@ -108,7 +108,7 @@ module JSONRPC = struct
         (obj4
            (req "jsonrpc" (constant version))
            (opt "result" Data_encoding.json)
-           (opt "error" (error_encoding Data_encoding.json))
+           (opt "error" error_encoding)
            (req "id" (option id_repr_encoding))))
 end
 
@@ -143,14 +143,6 @@ module Subscription = struct
            (req "method" (constant method_))
            (req "params" result_encoding)))
 end
-
-module Error = struct
-  type t = unit
-
-  let encoding = Data_encoding.unit
-end
-
-type 'result rpc_result = ('result, Error.t JSONRPC.error) result
 
 type ('input, 'output) method_ = ..
 

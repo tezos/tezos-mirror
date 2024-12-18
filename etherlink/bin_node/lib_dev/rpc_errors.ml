@@ -27,7 +27,7 @@
 
 open Rpc_encodings
 
-type t = Data_encoding.json JSONRPC.error
+type t = JSONRPC.error
 
 let parse_error msg =
   JSONRPC.{code = -32700; message = "Parse error: " ^ msg; data = None}
