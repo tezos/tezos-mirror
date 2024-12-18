@@ -518,7 +518,7 @@
   "self_00.tzt": true,
   "self_01.tzt": false,
   "self_in_lambda.tc.tzt": true,
-  "sender_00.tzt": false,
+  "sender_00.tzt": true,
   "setdelegate_00.tc.tzt": true,
   "setdelegate_00.tzt": false,
   "sha256_00.tzt": true,
