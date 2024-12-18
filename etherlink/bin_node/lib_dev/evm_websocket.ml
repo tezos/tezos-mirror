@@ -245,7 +245,12 @@ let handle_subscription
             | Ok elt ->
                 output_media_type.construct Subscription.response_encoding elt
             | Error exn ->
-                Rpc_errors.internal_error (Printexc.exn_slot_name exn)
+                let msg =
+                  match exn with
+                  | Failure msg -> msg
+                  | _ -> Printexc.to_string exn
+                in
+                Rpc_errors.internal_error msg
                 |> output_media_type.construct JSONRPC.error_encoding
           in
           push_frame (Some (Websocket.Frame.create ~opcode ~content ())))
