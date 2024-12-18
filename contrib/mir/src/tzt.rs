@@ -171,7 +171,6 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         use TztEntity::*;
         use TztOutput::*;
         let mut m_code: Option<Micheline> = None;
-        let mut m_input: Option<TestStack> = None;
         let mut m_amount: Option<i64> = None;
         let mut m_balance: Option<i64> = None;
         let mut m_chain_id: Option<Micheline> = None;
@@ -185,11 +184,17 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         // output stack expectation.
         let mut m_output_inter: Option<TztOutput> = None;
 
+        let mut input_stk_backup: Option<Vec<(Micheline, Micheline)>> = None;
+
         for e in tzt {
             match e {
                 Code(ib) => set_tzt_field("code", &mut m_code, ib)?,
                 Input(stk) => {
-                    set_tzt_field("input", &mut m_input, typecheck_stack(stk, None, None)?)?
+                    // Save input to treat it last, after we have self_param and other_contracts
+                    if input_stk_backup != None {
+                        return Err("Duplicate field 'input' in test".into());
+                    }
+                    input_stk_backup = Some(stk);
                 }
                 Output(tzt_output) => set_tzt_field("output", &mut m_output_inter, tzt_output)?,
                 Amount(m) => set_tzt_field("amount", &mut m_amount, m)?,
@@ -257,6 +262,19 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             },
             None => None,
         };
+
+        // Now we can set the input stack.
+        let m_input =
+            match input_stk_backup {
+                Some(stk) => {
+                    Some(typecheck_stack(
+                        stk,
+                        self_addr.clone().map(|x| (x, parameter.clone())),
+                        other_contracts.clone(),
+                    )?)
+                },
+                None => None,
+            };
 
         Ok(TztTest {
             code: m_code.ok_or("code section not found in test")?,
