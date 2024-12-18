@@ -46,6 +46,7 @@ extern {
         "self" => Tok::Noun(TztPrim(TzP::self_)),
         "other_contracts" => Tok::Noun(TztPrim(TzP::other_contracts)),
         "now" => Tok::Noun(TztPrim(TzP::now)),
+        "source" => Tok::Noun(TztPrim(TzP::source)),
         number => Tok::Number(<BigInt>),
         string => Tok::String(<String>),
         bytes => Tok::Bytes(<Vec<u8>>),
@@ -191,6 +192,7 @@ tztEntity : TztEntity<'a> = {
   "self" <Micheline> => TztEntity::SelfAddr(<>),
   "other_contracts" <otherContracts> => TztEntity::OtherContracts(<>),
   "now" <t:timestamp> => TztEntity::Now(t),
+  "source" <Micheline> => TztEntity::Source(<>),
 }
 
 pub(crate) tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;
