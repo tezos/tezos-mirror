@@ -1410,35 +1410,6 @@ let init_from_rollup_node_command =
         ~rollup_node_data_dir
         ())
 
-let reconstruct_from_rollup_node_command =
-  let open Tezos_clic in
-  let rollup_node_data_dir_param =
-    Tezos_clic.param
-      ~name:"rollup-node-data-dir"
-      ~desc:(Format.sprintf "The path to the rollup node data directory.")
-      Params.string
-  in
-  let boot_sector_param =
-    Tezos_clic.param
-      ~name:"boot_sector"
-      ~desc:
-        "WASM boot sector that was used during the origination of the \
-         reconstructed rollup"
-      Params.string
-  in
-  command
-    ~desc:"Reconstruct block history from a rollup node directory"
-    (args1 data_dir_arg)
-    (prefixes ["reconstruct"; "from"; "rollup"; "node"]
-    @@ rollup_node_data_dir_param
-    @@ prefixes ["and"; "boot"; "sector"]
-    @@ boot_sector_param @@ stop)
-    (fun data_dir rollup_node_data_dir boot_sector () ->
-      Evm_node_lib_dev.Evm_context.reconstruct
-        ~data_dir
-        ~rollup_node_data_dir
-        ~boot_sector)
-
 let dump_to_rlp_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -2557,7 +2528,7 @@ let debug_print_store_schemas_command =
       return_unit)
 
 (* List of commands not ready to be used by our end-users *)
-let in_development_commands = [reconstruct_from_rollup_node_command]
+let in_development_commands = []
 
 (* List of program commands *)
 let commands =

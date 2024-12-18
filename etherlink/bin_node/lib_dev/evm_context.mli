@@ -100,15 +100,6 @@ val init_from_rollup_node :
   unit ->
   unit tzresult Lwt.t
 
-(** [reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector] replays all
-    L1 blocks of [rollup_node_data_dir] since the genesis. Populates the
-    new [data_dir] with a full history. *)
-val reconstruct :
-  data_dir:string ->
-  rollup_node_data_dir:string ->
-  boot_sector:string ->
-  unit tzresult Lwt.t
-
 (** [reset ~data_dir ~l2_level] reset the sequencer storage to
     [l2_level]. {b Warning: b} Data will be lost ! *)
 val reset :
