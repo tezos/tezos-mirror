@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 use super::{Stepper, StepperStatus};
+use crate::state_backend::{ManagerBase, ManagerReadWrite};
 use crate::{
     kernel_loader,
     machine_state::{
@@ -16,7 +18,7 @@ use crate::{
     state_backend::{
         hash::{Hash, RootHashable},
         owned_backend::Owned,
-        proof_backend::proof::Proof,
+        proof_backend::{merkle::Merkleisable, proof::Proof, ProofGen},
         verify_backend::Verifier,
         AllocatedOf, FnManagerIdent, ProofLayout, ProofTree, Ref,
     },
@@ -37,8 +39,13 @@ pub enum PvmStepperError {
 }
 
 /// Wrapper over a PVM that lets you step through it
-pub struct PvmStepper<'hooks, ML: MainMemoryLayout = M1G, CL: CacheLayouts = DefaultCacheLayouts> {
-    pvm: Pvm<ML, CL, Owned>,
+pub struct PvmStepper<
+    'hooks,
+    ML: MainMemoryLayout = M1G,
+    CL: CacheLayouts = DefaultCacheLayouts,
+    M: ManagerBase = Owned,
+> {
+    pvm: Pvm<ML, CL, M>,
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
@@ -135,10 +142,16 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
         RootHashable::hash(&refs).unwrap()
     }
 
-    /// Produce the Merkle proof for evaluating one step on the given PVM state.
-    pub fn produce_proof(&mut self) -> Proof {
-        // TODO RV-338 PVM stepper can produce a proof
-        todo!()
+    /// Create a new stepper in which the existing PVM is managed by
+    /// the proof-generating backend.
+    pub fn start_proof_mode<'a>(&'a self) -> PvmStepper<'hooks, ML, CL, ProofGen<Ref<'a, Owned>>> {
+        PvmStepper::<'hooks, ML, CL, ProofGen<Ref<'a, Owned>>> {
+            pvm: self.pvm.start_proof(),
+            hooks: PvmHooks::none(),
+            inbox: self.inbox.clone(),
+            rollup_address: self.rollup_address,
+            origination_level: self.origination_level,
+        }
     }
 
     /// Verify a Merkle proof. The [`PvmStepper`] is used for inbox information.
@@ -188,6 +201,41 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
         };
 
         self.pvm = Pvm::bind(space);
+    }
+}
+
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
+    PvmStepper<'hooks, ML, CL, M>
+{
+    /// Perform one evaluation step.
+    pub fn eval_one(&mut self) {
+        self.pvm.eval_one(&mut self.hooks)
+    }
+}
+
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL>
+where
+    for<'a, 'b> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, ProofGen<Ref<'b, Owned>>>>: Merkleisable,
+    for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: RootHashable,
+{
+    /// Produce the Merkle proof for evaluating one step on the given PVM state.
+    /// The given stepper takes one step.
+    pub fn produce_proof(&mut self) -> Option<Proof> {
+        // Step using the proof mode stepper in order to obtain the proof
+        let mut proof_stepper = self.start_proof_mode();
+        proof_stepper.eval_one();
+        let merkle_proof = proof_stepper
+            .pvm
+            .struct_ref::<crate::state_backend::FnManagerIdent>()
+            .to_merkle_tree()
+            .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
+            .to_merkle_proof()
+            .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
+
+        // TODO RV-373 : Proof-generating backend should also compute final state hash
+        // Currently, the proof and the initial state hash are valid,
+        // but the final state hash is not.
+        Some(Proof::new(merkle_proof, self.hash()))
     }
 }
 

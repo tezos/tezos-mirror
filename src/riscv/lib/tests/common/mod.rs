@@ -40,15 +40,15 @@ pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M100M, Default
     }
 }
 
-pub fn dissect_steps(mut max_steps: usize) -> Vec<usize> {
+pub fn dissect_steps(mut max_steps: usize, min_step_size: usize) -> Vec<usize> {
     let mut rng = rand::thread_rng();
     let mut steps: Vec<usize> = std::iter::from_fn(|| {
         if max_steps == 0 {
             return None;
         }
 
-        let steps = max_steps.div_euclid(2).max(1);
-        let steps = rng.gen_range(0..=steps);
+        let steps = max_steps.div_euclid(2).max(min_step_size + 1);
+        let steps = rng.gen_range(min_step_size..=steps);
 
         max_steps = max_steps.saturating_sub(steps);
 

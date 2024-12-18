@@ -25,7 +25,9 @@ fn test_jstz_proofs() {
     let steps = base_result.steps();
     let base_hash = base_stepper.hash();
 
-    let ladder = dissect_steps(steps);
+    // For each step `s`, the stepper will initially step `s-1` steps, then
+    // produce a proof of the `s` step. The minimum step size thus needs to be 1.
+    let ladder = dissect_steps(steps, 1);
     run_steps_ladder(&make_stepper, &ladder, base_hash);
 }
 
@@ -38,19 +40,39 @@ where
 
     let mut steps_done = 0;
     for &steps in ladder {
+        // Run one step short of `steps`, then produce a proof of the following step.
+        let steps = steps.checked_sub(1).expect("minimum step size is 1");
         eprintln!("> Running {} steps ...", steps);
-        let StepperStatus::Running { .. } = stepper.step_max(Bound::Included(steps)) else {
-            panic!("Unexpected stepper result")
-        };
+        let result = stepper.step_max(Bound::Included(steps));
         steps_done += steps;
+
+        if steps_done != expected_steps {
+            assert!(matches!(result, StepperStatus::Running { .. }));
+
+            eprintln!("> Producing proof");
+            let proof = stepper.produce_proof().unwrap();
+
+            assert_eq!(proof.initial_state_hash(), stepper.hash());
+
+            // Run one final step, which is the step proven by `proof`, and check that its
+            // state hash matches the final state hash of `proof`.
+            eprintln!("> Running 1 step ...");
+            stepper.eval_one();
+            steps_done += 1;
+            // TODO RV-373 : Proof-generating backend should also compute final state hash
+            assert_eq!(proof.final_state_hash(), &stepper.hash());
+
+            assert!(stepper.verify_proof(proof))
+        } else {
+            // Can't generate a proof on the next step if execution has ended
+            assert!(matches!(result, StepperStatus::Exited { .. }));
+            assert!(ladder.is_empty())
+        };
 
         eprintln!(
             "> Done {:.2}%",
             (steps_done as f64 / expected_steps as f64) * 100.0
         );
-
-        let proof = stepper.produce_proof();
-        assert!(stepper.verify_proof(proof))
     }
 
     assert_eq!(stepper.hash(), expected_hash);

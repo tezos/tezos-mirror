@@ -6,7 +6,11 @@ use crate::{
     default::ConstDefault,
     machine_state::{self, main_memory},
     pvm::sbi,
-    state_backend::{self, Atom, Cell},
+    state_backend::{
+        self,
+        proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
+        Atom, Cell,
+    },
     traps::EnvironException,
 };
 use std::{
@@ -132,6 +136,35 @@ impl<
             self.machine_state.struct_ref::<F>(),
             self.status.struct_ref::<F>(),
         )
+    }
+
+    /// Generate a proof-generating version of this PVM.
+    pub fn start_proof(&self) -> Pvm<ML, CL, ProofGen<state_backend::Ref<'_, M>>> {
+        enum ProofWrapper {}
+
+        impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
+            type Output = ProofGen<M>;
+
+            fn map_region<E: 'static, const LEN: usize>(
+                input: <M as state_backend::ManagerBase>::Region<E, LEN>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::Region<E, LEN> {
+                ProofRegion::bind(input)
+            }
+
+            fn map_dyn_region<const LEN: usize>(
+                input: <M as state_backend::ManagerBase>::DynRegion<LEN>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::DynRegion<LEN> {
+                ProofDynRegion::bind(input)
+            }
+
+            fn map_enriched_cell<V: state_backend::EnrichedValue>(
+                input: <M as state_backend::ManagerBase>::EnrichedCell<V>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::EnrichedCell<V> {
+                ProofEnrichedCell::bind(input)
+            }
+        }
+
+        Pvm::bind(self.struct_ref::<ProofWrapper>())
     }
 
     /// Reset the PVM state.
