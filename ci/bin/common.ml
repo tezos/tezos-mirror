@@ -537,9 +537,6 @@ let changeset_semgrep_files =
 (** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
 let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
 
-(** Set of Grafazos files *)
-let changeset_grafazos = Changeset.(make ["grafazos/**/*"])
-
 (* We only need to run the [oc.script:snapshot_alpha_and_link] job if
    protocol Alpha or if the scripts changed. *)
 let changeset_script_snapshot_alpha_and_link =
@@ -1015,29 +1012,6 @@ let job_datadog_pipeline_trace : tezos_job =
       "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
-
-(* Job that builds the Grafazos dashboards *)
-let job_build_grafazos ?rules () =
-  job
-    ~__POS__
-    ~name:"build_grafazos_dashboards"
-    ~image:Images.jsonnet
-    ~stage:Stages.build
-    ?rules
-    ~artifacts:
-      (artifacts
-         ~name:"grafazos-dashboards"
-         ~expire_in:(Duration (Days 1))
-         ~when_:On_success
-         ["grafazos/output/**/*.json"])
-    ~before_script:
-      [
-        "cd grafazos/";
-        (* For security, we explicitly install v11.1.0
-           which corresponds to commit [1ce5aec]. *)
-        "jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
-      ]
-    ["make"]
 
 let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
   job

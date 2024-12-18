@@ -6,6 +6,7 @@
  (libraries
   gitlab_ci
   tezos_ci
+  grafazos_ci
   yaml
   unix
   tezt.core)

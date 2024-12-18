@@ -50,7 +50,7 @@ let monitoring_child_pipeline =
     ~jobs:
       [
         job_datadog_pipeline_trace;
-        job_build_grafazos ();
+        Grafazos_ci.job_build_grafazos ();
         job_build_layer1_profiling ~expire_in:Never ();
       ]
 
