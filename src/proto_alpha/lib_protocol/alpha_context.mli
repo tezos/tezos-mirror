@@ -82,6 +82,8 @@ module Slot : sig
 
   val to_int : t -> int
 
+  val of_int : int -> t tzresult
+
   val of_int_do_not_use_except_for_parameters : int -> t
 
   val encoding : t Data_encoding.encoding
@@ -103,10 +105,6 @@ module Slot : sig
   module Map : Map.S with type key = t
 
   module Set : Set.S with type elt = t
-
-  module Internal_for_tests : sig
-    val of_int : int -> t tzresult
-  end
 end
 
 (** This module re-exports definitions from {!Tez_repr}. *)
@@ -263,14 +261,14 @@ module Raw_level : sig
 
   val of_int32_exn : int32 -> raw_level
 
+  val sub : raw_level -> int -> raw_level option
+
   module Set : Set.S with type elt = raw_level
 
   module Map : Map.S with type key = raw_level
 
   module Internal_for_tests : sig
     val add : raw_level -> int -> raw_level
-
-    val sub : raw_level -> int -> raw_level option
 
     val from_repr : Raw_level_repr.t -> raw_level
 
@@ -836,6 +834,7 @@ module Constants : sig
       cryptobox_parameters : Dal.parameters;
       minimal_participation_ratio : Q.t;
       rewards_ratio : Q.t;
+      traps_fraction : Q.t;
     }
 
     type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level.t}

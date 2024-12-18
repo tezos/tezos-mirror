@@ -1016,6 +1016,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  cryptobox_parameters;
                  minimal_participation_ratio;
                  rewards_ratio;
+                 traps_fraction;
                }
                 : Previous.dal) =
             c.dal
@@ -1029,6 +1030,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cryptobox_parameters;
             minimal_participation_ratio;
             rewards_ratio;
+            traps_fraction;
           }
         in
         let reveal_activation_level =
@@ -1316,6 +1318,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cryptobox_parameters;
             minimal_participation_ratio = Q.(64 // 100);
             rewards_ratio = Q.zero;
+            traps_fraction = Q.(1 // 10000);
           }
         in
         let reveal_activation_level =

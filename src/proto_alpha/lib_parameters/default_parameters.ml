@@ -168,6 +168,7 @@ let default_dal =
          prime, and (a+1, b+1) are relatively prime as well. The value x = 63%
          works as well. *)
       rewards_ratio = Q.zero;
+      traps_fraction = Q.(1 // 10000);
     }
 
 let constants_mainnet : Constants.Parametric.t =

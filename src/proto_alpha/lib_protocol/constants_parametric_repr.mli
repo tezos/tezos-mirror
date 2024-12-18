@@ -81,6 +81,7 @@ type dal = {
       (* the ratio of the protocol-attested slots that need to be attested by an
          attester in order to receive rewards *)
   rewards_ratio : Q.t; (* the ratio of DAL rewards versus total rewards *)
+  traps_fraction : Q.t; (* probability that a given shard is a trap *)
 }
 
 val dal_encoding : dal Data_encoding.t

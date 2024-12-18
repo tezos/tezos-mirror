@@ -59,6 +59,8 @@ module Plugin = struct
         number_of_slots;
         attestation_lag;
         attestation_threshold;
+        traps_fraction = Q.(1 // 1000);
+        (* not used in proto_020 *)
         cryptobox_parameters;
         sc_rollup_challenge_window_in_blocks =
           parametric.sc_rollup.challenge_window_in_blocks;

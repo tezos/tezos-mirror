@@ -50,6 +50,7 @@ module Plugin = struct
       attestation_threshold;
       minimal_participation_ratio = _;
       rewards_ratio = _;
+      traps_fraction;
       cryptobox_parameters;
     } =
       parametric.dal
@@ -61,6 +62,7 @@ module Plugin = struct
         number_of_slots;
         attestation_lag;
         attestation_threshold;
+        traps_fraction;
         cryptobox_parameters;
         sc_rollup_challenge_window_in_blocks =
           parametric.sc_rollup.challenge_window_in_blocks;

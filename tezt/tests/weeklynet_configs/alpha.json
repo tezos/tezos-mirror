@@ -82,6 +82,10 @@
             "numerator": "0",
             "denominator": "1"
         },
+        "traps_fraction": {
+            "numerator": "1",
+            "denominator": "10000"
+        },
         "redundancy_factor": 8,
         "page_size": 3967,
         "slot_size": 126944,
