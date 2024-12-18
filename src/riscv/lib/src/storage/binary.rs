@@ -28,7 +28,7 @@ pub(crate) fn deserialise_from<T: serde::de::DeserializeOwned, R: Read>(
 }
 
 /// Serialize `T` into a vector of bytes.
-pub(crate) fn serialise<T: serde::Serialize>(value: &T) -> bincode::Result<Vec<u8>> {
+pub fn serialise<T: serde::Serialize>(value: &T) -> bincode::Result<Vec<u8>> {
     bincode_default().serialize(value)
 }
 
