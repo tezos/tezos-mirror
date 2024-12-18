@@ -558,7 +558,7 @@
   "some_int_00.tzt": true,
   "some_pairintint_00.tzt": true,
   "some_string_00.tzt": true,
-  "source_00.tzt": false,
+  "source_00.tzt": true,
   "split_ticket_00.tzt": true,
   "split_ticket_01.tzt": true,
   "split_ticket_02.tzt": true,
