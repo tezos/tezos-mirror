@@ -102,6 +102,8 @@ pub struct TztTest<'a> {
     pub now: Option<BigInt>,
     /// Address that directly or indirectly initiated the current transaction
     pub source: Option<AddressHash>,
+    /// Address that directly initiated the current transaction
+    pub sender: Option<AddressHash>,
 }
 
 fn populate_ctx_with_known_contracts(
@@ -183,6 +185,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_other_contracts: Option<Vec<(Micheline, Micheline)>> = None;
         let mut m_now : Option<BigInt> = None;
         let mut m_source : Option<Micheline> = None;
+        let mut m_sender : Option<Micheline> = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -211,6 +214,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 OtherContracts(v) => set_tzt_field("other_contracts", &mut m_other_contracts, v)?,
                 Now(n) => set_tzt_field("now", &mut m_now, n.into())?,
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
+                SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
             }
         }
 
@@ -233,6 +237,17 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         };
 
         let source = match m_source {
+            Some(s) => Some(
+                irrefutable_match!(
+                typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
+                TypedValue::Address
+                )
+                .hash,
+            ),
+            None => None,
+        };
+
+        let sender = match m_sender {
             Some(s) => Some(
                 irrefutable_match!(
                 typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
@@ -314,6 +329,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             other_contracts,
             now: m_now,
             source,
+            sender,
         })
     }
 }
@@ -409,6 +425,7 @@ pub(crate) enum TztEntity<'a> {
     OtherContracts(Vec<(Micheline<'a>, Micheline<'a>)>),
     Now(i64),
     Source(Micheline<'a>),
+    SenderAddr(Micheline<'a>),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test. This is a
@@ -471,6 +488,10 @@ pub fn run_tzt_test<'a>(
         .source
         .clone()
         .unwrap_or(Ctx::default().source);
+    ctx.sender = test
+        .sender
+        .clone()
+        .unwrap_or(Ctx::default().sender);
 
     populate_ctx_with_known_contracts(
         &mut ctx,
