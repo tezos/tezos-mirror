@@ -97,3 +97,44 @@ let setup_octez_node ~(testnet : Testnet.t) ?runner ?metrics_port () =
   let* () = Client.bootstrapped client in
   Log.info "Node bootstrapped" ;
   return (client, node)
+
+type network = Ghostnet | Weeklynet | Other
+
+let string_contains haystack needle =
+  let len_h = String.length haystack in
+  let len_n = String.length needle in
+  if len_n = 0 then true
+  else
+    let rec aux i =
+      if i > len_h - len_n then false
+      else if String.sub haystack i len_n = needle then true
+      else aux (i + 1)
+    in
+    aux 0
+
+let string_to_network network =
+  if string_contains network "weeklynet" || string_contains network "Weeklynet"
+  then Weeklynet
+  else if
+    string_contains network "ghostnet" || string_contains network "Ghostnet"
+  then Ghostnet
+  else Other
+
+let faucet ?(amount = 11_000) ~network_string address =
+  let network = string_to_network network_string in
+  let amount = string_of_int amount in
+  let npx_fun network =
+    Printf.printf "Faucet %s found" network ;
+    Process.run
+      "npx"
+      ["@tacoinfra/get-tez"; address; "--amount"; amount; "--network"; network]
+  in
+  let* () =
+    match network with
+    | Weeklynet -> npx_fun "weeklynet"
+    | Ghostnet -> npx_fun "ghostnet"
+    | Other ->
+        Printf.printf "No faucet found" ;
+        unit
+  in
+  unit

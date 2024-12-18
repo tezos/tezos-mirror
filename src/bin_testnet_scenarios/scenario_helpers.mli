@@ -43,3 +43,7 @@ val setup_octez_node :
   ?metrics_port:int ->
   unit ->
   (Client.t * Node.t) Lwt.t
+
+(** [faucet ?amount ~network_string address] Automatically found the address 
+    of the amount in tez. *)
+val faucet : ?amount:int -> network_string:string -> string -> unit Lwt.t
