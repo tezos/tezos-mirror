@@ -848,20 +848,6 @@ let dispatch_private_request (rpc : Configuration.rpc)
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in
         build ~f module_ parameters
-    | Method (Produce_proposal.Method, _)
-      when block_production <> `Threshold_encryption ->
-        unsupported ()
-    | Method (Produce_proposal.Method, module_) ->
-        let f (timestamp : Time.Protocol.t option) =
-          let open Lwt_result_syntax in
-          let timestamp = Option.value timestamp ~default:(Misc.now ()) in
-          let* _submitted =
-            Threshold_encryption_proposals_handler.submit_next_proposal
-              timestamp
-          in
-          rpc_ok ()
-        in
-        build ~f module_ parameters
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
         let f (transaction_object, raw_txn) =
