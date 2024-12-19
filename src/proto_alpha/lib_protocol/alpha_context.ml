@@ -216,6 +216,20 @@ module First_level_of_protocol = struct
   let get = Storage.Tenderbake.First_level_of_protocol.get
 end
 
+module Consecutive_round_zero = struct
+  let get = Storage.Consecutive_round_zero.get
+
+  let incr ctxt =
+    let open Lwt_result_syntax in
+    let* acc = get ctxt in
+    let acc =
+      if Int32.(equal max_int acc) then Int32.max_int else Int32.succ acc
+    in
+    Storage.Consecutive_round_zero.update ctxt acc
+
+  let reset ctxt = Storage.Consecutive_round_zero.update ctxt 0l
+end
+
 module Ratio = Ratio_repr
 
 module Raw_level = struct

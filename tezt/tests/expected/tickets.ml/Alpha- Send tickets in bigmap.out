@@ -137,7 +137,7 @@ Contract memorized as send_tickets_in_big_map.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 30 --storage-limit 1000000 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 98994.469 units (will add 100 for safety)
+Estimated gas: 98994.941 units (will add 100 for safety)
 Estimated storage: 11567 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -266,7 +266,7 @@ This sequence of operations was run:
         Set temp(1)[40] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
       Storage size: 320 bytes
       Paid storage size diff: 67 bytes
-      Consumed gas: 50082.437
+      Consumed gas: 50082.555
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.01675
         storage fees ........................... +ꜩ0.01675
@@ -283,7 +283,7 @@ This sequence of operations was run:
             Copy temp(1) to map(5)
           Storage size: 11583 bytes
           Paid storage size diff: 11500 bytes
-          Consumed gas: 48913.021
+          Consumed gas: 48913.375
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ2.875
             storage fees ........................... +ꜩ2.875

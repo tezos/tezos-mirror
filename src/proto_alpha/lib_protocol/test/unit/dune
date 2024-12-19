@@ -78,7 +78,8 @@
   test_percentage
   test_full_staking_balance_repr
   test_slashing_percentage
-  test_staking_operations))
+  test_staking_operations
+  test_consecutive_round_zero))
 
 (executable
  (name main)

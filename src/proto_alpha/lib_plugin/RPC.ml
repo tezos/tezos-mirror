@@ -4070,6 +4070,14 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Round.encoding
       RPC_path.(path / "round")
+
+  let consecutive_round_zero =
+    RPC_service.get_service
+      ~description:
+        "Returns the number of blocks consecutively baked at round zero."
+      ~query:RPC_query.empty
+      ~output:int32
+      RPC_path.(path / "consecutive_round_zero")
 end
 
 type Environment.Error_monad.error += Negative_level_offset
@@ -4123,13 +4131,20 @@ let register () =
           let first = List.last default_first rest in
           return_some (first.level, last.level)) ;
   Registration.register0 ~chunked:false S.round (fun ctxt () () ->
-      Round.get ctxt)
+      Round.get ctxt) ;
+  Registration.register0
+    ~chunked:false
+    S.consecutive_round_zero
+    (fun ctxt () () -> Consecutive_round_zero.get ctxt)
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()
 
 let levels_in_current_cycle ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.levels_in_current_cycle ctxt block {offset} ()
+
+let consecutive_round_zero ctxt block =
+  RPC_context.make_call0 S.consecutive_round_zero ctxt block () ()
 
 let rpc_services =
   register () ;

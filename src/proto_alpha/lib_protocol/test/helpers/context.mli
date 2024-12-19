@@ -155,6 +155,8 @@ val get_denunciations_for_delegate :
   Signature.Public_key_hash.t ->
   Denunciations_repr.item list tzresult Lwt.t
 
+val get_consecutive_round_zero : t -> Int32.t tzresult Lwt.t
+
 val estimated_shared_pending_slashed_amount :
   t -> public_key_hash -> Tez.t tzresult Lwt.t
 

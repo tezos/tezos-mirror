@@ -5296,6 +5296,21 @@ module First_level_of_protocol : sig
   val get : context -> Raw_level.t tzresult Lwt.t
 end
 
+(** [Consecutive_round_zero] module stores the number of consecutive
+   blocks that reached consensus at round zero.
+
+   The counter is reset at the first non-zero round encountered.
+
+   A long enough series of round zero provides some guarantee that no
+   blocks were censored. *)
+module Consecutive_round_zero : sig
+  val get : context -> Int32.t tzresult Lwt.t
+
+  val incr : context -> context tzresult Lwt.t
+
+  val reset : context -> context tzresult Lwt.t
+end
+
 (** This module re-exports definitions from {!Raw_context.Consensus}. *)
 module Consensus : sig
   include

@@ -340,6 +340,9 @@ let get_denunciations ctxt =
 let get_denunciations_for_delegate ctxt =
   Alpha_services.Delegate.pending_denunciations rpc_ctxt ctxt
 
+let get_consecutive_round_zero ctxt =
+  Plugin.RPC.consecutive_round_zero rpc_ctxt ctxt
+
 let estimated_shared_pending_slashed_amount ctxt =
   Alpha_services.Delegate.estimated_shared_pending_slashed_amount rpc_ctxt ctxt
 
