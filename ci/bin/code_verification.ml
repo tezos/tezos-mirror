@@ -1587,14 +1587,14 @@ let jobs pipeline_type =
           ~stage:Stages.build
           ~__POS__
           ~name:"check_riscv_kernels"
-          ~changes:changeset_test_riscv_kernels
+          ~changes:changeset_riscv_kernels
           ["make -C src/riscv CHECK_FEATURES= check"]
       in
       let job_test_riscv_kernels : tezos_job =
         make_job_kernel
           ~__POS__
           ~name:"test_riscv_kernels"
-          ~changes:changeset_test_riscv_kernels
+          ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_check_riscv_kernels])
           ["make -C src/riscv test"; "make -C src/riscv audit"]
       in
@@ -1602,7 +1602,7 @@ let jobs pipeline_type =
         make_job_kernel
           ~__POS__
           ~name:"test_long_riscv_kernels"
-          ~changes:changeset_test_riscv_kernels
+          ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_check_riscv_kernels])
           ["make -C src/riscv test-long"]
       in
