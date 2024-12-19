@@ -2,8 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{hash::Hash, proof_backend::tree::Tree, Cell, EnrichedValue, ManagerBase};
+use super::{Cell, EnrichedValue, ManagerBase};
 use crate::state_backend::owned_backend::Owned;
+use std::collections::BTreeMap;
 
 /// Proof verification backend
 pub struct Verifier;
@@ -21,29 +22,24 @@ impl ManagerBase for Verifier {
 /// Verifier region
 pub enum Region<E: 'static, const LEN: usize> {
     Absent,
-    Blinded(Hash),
     Present([E; LEN]),
 }
 
-/// Termination point (not necessarily a leaf) in the dynamic region tree
-pub enum DynRegionTerm {
-    /// Sub-tree is blinded
-    Blinded(Hash),
-
-    /// Leaf in the memory tree
-    Present(Box<[u8]>),
+/// Verifier dynamic region
+pub struct DynRegion<const LEN: usize> {
+    _pages: BTreeMap<usize, Box<[u8]>>,
 }
 
-/// Verifier dynamic region
-pub enum DynRegion<const LEN: usize> {
-    Absent,
-    Present(Tree<DynRegionTerm>),
+impl<const LEN: usize> DynRegion<LEN> {
+    /// Construct a verifier dynamic region using the given known pages.
+    pub fn from_pages(pages: BTreeMap<usize, Box<[u8]>>) -> Self {
+        DynRegion { _pages: pages }
+    }
 }
 
 /// Verifier enriched cell
 pub enum EnrichedCell<V: EnrichedValue> {
     Absent,
-    Blinded(Hash),
     Present(V::E),
 }
 

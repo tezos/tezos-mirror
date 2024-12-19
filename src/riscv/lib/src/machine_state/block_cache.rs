@@ -83,9 +83,7 @@ use super::main_memory::MainMemoryLayout;
 use super::MachineCoreState;
 use super::{main_memory::Address, ProgramCounterUpdate};
 use crate::cache_utils::Sizes;
-use crate::default::ConstDefault;
 use crate::machine_state::address_translation::PAGE_SIZE;
-use crate::machine_state::instruction::Args;
 use crate::parser::instruction::InstrWidth;
 use crate::state_backend::{
     self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
@@ -93,6 +91,8 @@ use crate::state_backend::{
 };
 use crate::traps::{EnvironException, Exception};
 use crate::{cache_utils::FenceCounter, state_backend::FnManager};
+use crate::{default::ConstDefault, state_backend::verify_backend};
+use crate::{machine_state::instruction::Args, storage::binary};
 use std::marker::PhantomData;
 use std::u64;
 
@@ -103,7 +103,7 @@ const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
 const CACHE_INSTR: usize = 20;
 
 /// Layout for an [`ICallPlaced`].
-pub struct ICallLayout<ML: MainMemoryLayout> {
+pub struct ICallLayout<ML> {
     _pd: PhantomData<ML>,
 }
 
@@ -113,6 +113,22 @@ impl<ML: MainMemoryLayout> crate::state_backend::Layout for ICallLayout<ML> {
     fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let value = backend.allocate_enriched_cell(Instruction::DEFAULT);
         EnrichedCell::bind(value)
+    }
+}
+
+impl<ML: MainMemoryLayout> crate::state_backend::ProofLayout for ICallLayout<ML> {
+    fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {
+        let leaf = proof.into_leaf()?;
+
+        let cell = match leaf {
+            state_backend::ProofPart::Present(data) => {
+                let value = binary::deserialise(data)?;
+                verify_backend::EnrichedCell::Present(value)
+            }
+            state_backend::ProofPart::Absent => verify_backend::EnrichedCell::Absent,
+        };
+
+        Ok(EnrichedCell::bind(cell))
     }
 }
 
@@ -169,6 +185,12 @@ impl state_backend::Layout for AddressCellLayout {
 
     fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         Cell::bind(backend.allocate_region([!0]))
+    }
+}
+
+impl state_backend::ProofLayout for AddressCellLayout {
+    fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {
+        <Atom<Address> as state_backend::ProofLayout>::from_proof(proof)
     }
 }
 
@@ -332,7 +354,7 @@ impl<M: ManagerBase> PartialBlock<M> {
 
 /// Trait for capturing the different possible layouts of the instruction cache (i.e.
 /// controlling the number of cache entries present).
-pub trait BlockCacheLayout: state_backend::Layout {
+pub trait BlockCacheLayout: state_backend::ProofLayout {
     type MainMemoryLayout: MainMemoryLayout;
     type Entries<M: ManagerBase>;
     type Sizes;

@@ -18,7 +18,7 @@ use crate::{
         owned_backend::Owned,
         proof_backend::proof::Proof,
         verify_backend::Verifier,
-        AllocatedOf, FnManagerIdent, Ref,
+        AllocatedOf, FnManagerIdent, ProofLayout, ProofTree, Ref,
     },
     storage::binary,
 };
@@ -151,8 +151,11 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
             clippy::diverging_sub_expression
         )]
 
-        // TODO: RV-360: Instantiate the PVM from a Merkle proof
-        let space = todo!("Can't parse the merkle proof yet");
+        let proof_tree = ProofTree::Present(proof.tree());
+        let Some(space) = PvmLayout::<ML, CL>::from_proof(proof_tree).ok() else {
+            return false;
+        };
+
         let pvm = Pvm::<ML, CL, Verifier>::bind(space);
 
         // TODO: RV-361: Exercise the PVM

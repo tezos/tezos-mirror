@@ -134,14 +134,13 @@ impl<T: RootHashable> RootHashable for [T] {
 
 impl<T: RootHashable> RootHashable for Vec<T> {
     fn hash(&self) -> Result<Hash, HashError> {
-        let values: &[T] = self.as_ref();
-        values.hash()
+        self.as_slice().hash()
     }
 }
 
 impl<T: RootHashable, const N: usize> RootHashable for [T; N] {
     fn hash(&self) -> Result<Hash, HashError> {
-        self.as_ref().hash()
+        self.as_slice().hash()
     }
 }
 

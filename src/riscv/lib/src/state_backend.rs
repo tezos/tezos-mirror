@@ -62,6 +62,7 @@ pub mod hash;
 mod layout;
 pub mod owned_backend;
 pub mod proof_backend;
+mod proof_layout;
 mod region;
 mod trans;
 pub mod verify_backend;
@@ -69,6 +70,7 @@ pub mod verify_backend;
 pub use effects::*;
 pub use elems::*;
 pub use layout::*;
+pub use proof_layout::*;
 pub use region::*;
 pub use trans::*;
 

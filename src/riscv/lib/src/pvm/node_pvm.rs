@@ -15,7 +15,7 @@ use crate::{
             proof::MerkleProof, ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion,
         },
         verify_backend::Verifier,
-        AllocatedOf, Ref,
+        AllocatedOf, ProofLayout, ProofTree, Ref,
     },
     storage::{self, Hash, Repo},
 };
@@ -93,14 +93,6 @@ impl<M: state_backend::ManagerBase> State<M> {
     }
 }
 
-impl State<Verifier> {
-    /// Construct a PVM state from a Merkle proof.
-    pub fn from_proof(_proof: &MerkleProof) -> Option<Self> {
-        // TODO: RV-348: Parse the Merkle proof to obtain a PVM state
-        todo!("Can't parse the merkle proof yet")
-    }
-}
-
 impl<M: state_backend::ManagerClone> Clone for State<M> {
     fn clone(&self) -> Self {
         Self {
@@ -132,9 +124,22 @@ pub enum PvmError {
     SerializationError(String),
 }
 
-#[derive(Debug, Clone)]
-pub struct NodePvm {
-    state: Box<State<Owned>>,
+pub struct NodePvm<M: state_backend::ManagerBase = Owned> {
+    state: Box<State<M>>,
+}
+
+impl<M: state_backend::ManagerSerialise> fmt::Debug for NodePvm<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.state.fmt(f)
+    }
+}
+
+impl<M: state_backend::ManagerClone> Clone for NodePvm<M> {
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state.clone(),
+        }
+    }
 }
 
 impl PartialEq for NodePvm {
@@ -146,38 +151,63 @@ impl PartialEq for NodePvm {
 
 impl Eq for NodePvm {}
 
-impl NodePvm {
-    fn with_backend_mut<T, F>(&mut self, f: F) -> T
-    where
-        F: FnOnce(&mut State<Owned>) -> T,
-    {
-        f(&mut self.state)
-    }
-
-    fn with_backend<T, F>(&self, f: F) -> T
-    where
-        F: FnOnce(&State<Owned>) -> T,
-    {
-        f(&self.state)
-    }
-
-    pub fn empty() -> Self {
+impl NodePvm<Owned> {
+    /// Construct an empty PVM state.
+    pub fn empty() -> Self
+where {
         let space = Owned::allocate::<StateLayout>();
         let state = State::bind(space);
         Self {
             state: Box::new(state),
         }
     }
+}
 
-    pub fn get_status(&self) -> PvmStatus {
+impl NodePvm<Verifier> {
+    /// Construct a PVM state from a Merkle proof.
+    pub fn from_proof(proof: &MerkleProof) -> Option<Self> {
+        let space = <StateLayout as ProofLayout>::from_proof(ProofTree::Present(proof)).ok()?;
+        let state = State::bind(space);
+        let state = Self {
+            state: Box::new(state),
+        };
+        Some(state)
+    }
+}
+
+impl<M: state_backend::ManagerBase> NodePvm<M> {
+    fn with_backend_mut<T, F>(&mut self, f: F) -> T
+    where
+        F: FnOnce(&mut State<M>) -> T,
+    {
+        f(&mut self.state)
+    }
+
+    fn with_backend<T, F>(&self, f: F) -> T
+    where
+        F: FnOnce(&State<M>) -> T,
+    {
+        f(&self.state)
+    }
+
+    pub fn get_status(&self) -> PvmStatus
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| state.pvm.status())
     }
 
-    pub fn get_tick(&self) -> u64 {
+    pub fn get_tick(&self) -> u64
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| state.tick.read())
     }
 
-    pub fn get_current_level(&self) -> Option<u32> {
+    pub fn get_current_level(&self) -> Option<u32>
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| {
             if state.level_is_set.read() {
                 Some(state.level.read())
@@ -187,11 +217,17 @@ impl NodePvm {
         })
     }
 
-    pub fn get_message_counter(&self) -> u64 {
+    pub fn get_message_counter(&self) -> u64
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| state.message_counter.read())
     }
 
-    pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8]) {
+    pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8])
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             let program =
                 Program::<M100M>::from_elf(loader).expect("Could not parse Hermit loader");
@@ -203,14 +239,20 @@ impl NodePvm {
         })
     }
 
-    pub fn compute_step(&mut self, pvm_hooks: &mut PvmHooks) {
+    pub fn compute_step(&mut self, pvm_hooks: &mut PvmHooks)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             state.pvm.eval_one(pvm_hooks);
             state.tick.write(state.tick.read() + 1);
         })
     }
 
-    pub fn compute_step_many(&mut self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> i64 {
+    pub fn compute_step_many(&mut self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> i64
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             let steps = state.pvm.eval_max(pvm_hooks, Bound::Included(max_steps));
             state.tick.write(state.tick.read() + steps as u64);
@@ -218,7 +260,10 @@ impl NodePvm {
         })
     }
 
-    pub fn hash(&self) -> Hash {
+    pub fn hash(&self) -> Hash
+    where
+        M: state_backend::ManagerSerialise + state_backend::ManagerRead,
+    {
         self.with_backend(|state| {
             state
                 .struct_ref::<state_backend::FnManagerIdent>()
@@ -227,7 +272,10 @@ impl NodePvm {
         })
     }
 
-    pub fn set_input_message(&mut self, level: u32, message_counter: u64, input: Vec<u8>) {
+    pub fn set_input_message(&mut self, level: u32, message_counter: u64, input: Vec<u8>)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             assert!(
                 state
@@ -243,7 +291,10 @@ impl NodePvm {
         })
     }
 
-    pub fn set_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) {
+    pub fn set_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             assert!(
                 state

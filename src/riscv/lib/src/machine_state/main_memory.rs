@@ -12,11 +12,12 @@ use crate::{
             merkle::{MerkleTree, Merkleisable},
             ProofGen,
         },
-        ManagerDeserialise, ManagerRead, ManagerSerialise,
+        verify_backend, ManagerDeserialise, ManagerRead, ManagerSerialise,
     },
+    storage::binary,
 };
 use serde::{Deserialize, Serialize};
-use std::mem;
+use std::{collections::BTreeMap, mem};
 use tezos_smart_rollup_constants::riscv::SbiError;
 use thiserror::Error;
 
@@ -67,7 +68,7 @@ gen_memory_layout!(M4G = 4 GiB);
 // XXX: We can't associate these region types directly with [Sizes] because
 // inherent associated types are unstable. Hence we must go through a dummy
 // trait.
-pub trait MainMemoryLayout: backend::Layout + 'static {
+pub trait MainMemoryLayout: backend::ProofLayout + 'static {
     type Data<M: backend::ManagerBase>;
 
     const BYTES: usize;
@@ -215,6 +216,53 @@ impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
         let data = backend.allocate_dyn_region();
         let data = backend::DynCells::bind(data);
         MainMemory { data }
+    }
+}
+
+impl<const BYTES: usize> backend::ProofLayout for Sizes<BYTES> {
+    fn from_proof(proof: backend::ProofTree) -> backend::FromProofResult<Self> {
+        let mut pipeline = vec![(0usize, BYTES, proof)];
+        let mut pages = BTreeMap::new();
+
+        while let Some((start, length, tree)) = pipeline.pop() {
+            if length <= backend::MERKLE_LEAF_SIZE.get() {
+                // Must be a leaf.
+
+                let backend::ProofPart::Present(data) = tree.into_leaf()? else {
+                    // No point in doing anything if the leaf isn't present.
+                    continue;
+                };
+
+                let data: Box<[u8]> = binary::deserialise(data)?;
+
+                // TODO: Check data is the right length.
+                assert_eq!(data.len(), length);
+
+                pages.insert(start, data);
+            } else {
+                // Expecting a branching point.
+
+                let branches = tree.into_branches::<{ backend::MERKLE_ARITY }>()?;
+                let branch_max_length = length.div_ceil(backend::MERKLE_ARITY);
+
+                let mut branch_start = start;
+                let mut length_left = length;
+                for branch in branches {
+                    let this_branch_length = branch_max_length.min(length_left);
+
+                    if this_branch_length > 0 {
+                        pipeline.push((branch_start, this_branch_length, branch));
+                    }
+
+                    branch_start = branch_start.saturating_add(this_branch_length);
+                    length_left = length_left.saturating_sub(this_branch_length);
+                }
+            }
+        }
+
+        let region = verify_backend::DynRegion::from_pages(pages);
+        let data = backend::DynCells::bind(region);
+        Ok(MainMemory { data })
     }
 }
 

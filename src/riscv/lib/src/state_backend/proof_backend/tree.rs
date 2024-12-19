@@ -7,6 +7,8 @@
 //! All the traversals implemented in this module should be the same to maintain consistency,
 //! which is required for serialisation / deserialisation
 
+use std::convert::Infallible;
+
 /// Generic tree structure used to model the [`super::proof::MerkleProof`],
 /// as well as the full & partial shapes of a [`super::merkle::MerkleTree`].
 #[derive(Clone, Debug, PartialEq)]
@@ -71,6 +73,24 @@ impl<A> Tree<A> {
             map,
             |(), children| Ok(Tree::Node(children)),
         )
+    }
+
+    /// Borrows each leaf in the tree.
+    pub fn each_ref(&self) -> Tree<&A> {
+        impl_modify_map_collect::<_, _, _, Infallible, _, _, _, _, _>(
+            self,
+            |subtree| match subtree {
+                Tree::Node(vec) => Ok(ModifyResult::NodeContinue(
+                    (),
+                    // Obtain references to each sub tree.
+                    vec.iter().collect::<Vec<_>>(),
+                )),
+                Tree::Leaf(data) => Ok(ModifyResult::LeafStop(data)),
+            },
+            Ok,
+            |(), children| Ok(Tree::Node(children)),
+        )
+        .unwrap()
     }
 }
 

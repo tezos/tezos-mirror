@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Cell, Cells};
 use crate::default::ConstDefault;
 use std::marker::PhantomData;
 
@@ -36,7 +35,7 @@ impl<T: ConstDefault + 'static> Layout for Atom<T> {
 
     fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let region = backend.allocate_region([T::DEFAULT; 1]);
-        Cell::bind(region)
+        super::Cell::bind(region)
     }
 }
 
@@ -50,11 +49,11 @@ impl<T: 'static, const LEN: usize> Layout for Array<T, LEN>
 where
     [T; LEN]: ConstDefault,
 {
-    type Allocated<M: super::ManagerBase> = Cells<T, LEN, M>;
+    type Allocated<M: super::ManagerBase> = super::Cells<T, LEN, M>;
 
     fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let region = backend.allocate_region(<[T; LEN]>::DEFAULT);
-        Cells::bind(region)
+        super::Cells::bind(region)
     }
 }
 
@@ -76,18 +75,18 @@ where
 #[macro_export]
 macro_rules! struct_layout {
     ($vis:vis struct $layout_t:ident {
-        $($field_name:ident: $cell_repr:ty),+
+        $($field_vis:vis $field_name:ident: $cell_repr:ty),+
         $( , )?
     }) => {
         paste::paste! {
-            #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+            #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, Eq)]
             $vis struct [<$layout_t F>]<
                 $(
                     [<$field_name:upper>]
                 ),+
             > {
                 $(
-                    $field_name: [<$field_name:upper>]
+                    $field_vis $field_name: [<$field_name:upper>]
                 ),+
             }
 
@@ -151,6 +150,60 @@ macro_rules! struct_layout {
                         ),+
                     ];
                     AccessInfo::fold(&children)
+                }
+            }
+
+            impl $crate::state_backend::ProofLayout for $layout_t {
+                fn from_proof(proof: $crate::state_backend::ProofTree) -> Result<Self::Allocated<$crate::state_backend::verify_backend::Verifier>, $crate::state_backend::FromProofError> {
+                    if let $crate::state_backend::ProofTree::Present(proof) = proof {
+                        match proof {
+                            $crate::state_backend::proof_backend::tree::Tree::Leaf(_) => {
+                                Err($crate::state_backend::FromProofError::UnexpectedLeaf)
+                            }
+
+                            $crate::state_backend::proof_backend::tree::Tree::Node(branches) => {
+                                let mut branches = branches.iter();
+
+                                let expected_branches = 0 $(
+                                    + { let $field_name = 1; $field_name }
+                                )+;
+                                let successful_branches = 0;
+
+                                $(
+                                    let $field_name = branches.next().ok_or($crate::state_backend::FromProofError::BadNumberOfBranches {
+                                        got: successful_branches,
+                                        expected: expected_branches,
+                                    })?;
+                                    let $field_name = <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Present($field_name))?;
+                                    let successful_branches = successful_branches + 1;
+                                )+
+
+                                if branches.last().is_some() {
+                                    // There were more branches, this is bad.
+                                    return Err($crate::state_backend::FromProofError::BadNumberOfBranches {
+                                        got: successful_branches + 1,
+                                        expected: expected_branches,
+                                    });
+                                }
+
+                                Ok(
+                                    Self::Allocated {
+                                        $(
+                                            $field_name
+                                        ),+
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Ok(
+                            Self::Allocated {
+                                $(
+                                    $field_name: <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Absent)?
+                                ),+
+                            }
+                        )
+                    }
                 }
             }
         }

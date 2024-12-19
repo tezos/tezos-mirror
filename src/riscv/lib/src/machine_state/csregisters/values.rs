@@ -12,15 +12,17 @@ use super::{
     CSRegisters,
 };
 use crate::state_backend::proof_backend::merkle::{AccessInfo, AccessInfoAggregatable};
-use crate::storage::binary;
 use crate::{
     bits::Bits64,
     state_backend::{
         hash::{Hash, HashError, RootHashable},
+        owned_backend::Owned,
         proof_backend::merkle::{MerkleTree, Merkleisable},
-        AllocatedOf, EffectCell, EffectCellLayout, FnManager, Layout, ManagerAlloc, ManagerBase,
-        ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+        verify_backend, AllocatedOf, Cell, EffectCell, EffectCellLayout, FnManager,
+        FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
+        ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref,
     },
+    storage::binary,
 };
 use mstatus::MStatusLayout;
 pub(super) use mstatus::MStatusValue;
@@ -151,6 +153,73 @@ impl Layout for CSRValuesLayout {
             || XipCellLayout::allocate(*backend.borrow_mut()),
             || EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut()),
         )
+    }
+}
+
+impl ProofLayout for CSRValuesLayout {
+    fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
+        fn make_absent() -> AllocatedOf<CSRValuesLayout, verify_backend::Verifier> {
+            CSRValuesF::new(
+                || mstatus::MStatusLayoutF {
+                    sie: Cell::absent(),
+                    mie: Cell::absent(),
+                    spie: Cell::absent(),
+                    ube: Cell::absent(),
+                    mpie: Cell::absent(),
+                    spp: Cell::absent(),
+                    mpp: Cell::absent(),
+                    fs: Cell::absent(),
+                    xs: Cell::absent(),
+                    mprv: Cell::absent(),
+                    sum: Cell::absent(),
+                    mxr: Cell::absent(),
+                    tvm: Cell::absent(),
+                    tw: Cell::absent(),
+                    tsr: Cell::absent(),
+                    uxl: Cell::absent(),
+                    sxl: Cell::absent(),
+                    sbe: Cell::absent(),
+                    mbe: Cell::absent(),
+                },
+                || (),
+                || Cell::bind(verify_backend::Region::Absent),
+            )
+        }
+
+        let leaf = proof.into_leaf()?;
+        let cell = match leaf {
+            ProofPart::Absent => make_absent(),
+            ProofPart::Present(data) => {
+                let values: AllocatedOf<CSRValuesLayout, Owned> = binary::deserialise(data)?;
+                values.map(
+                    |mstatus| mstatus::MStatusLayoutF {
+                        sie: Cell::from_owned(mstatus.sie),
+                        mie: Cell::from_owned(mstatus.mie),
+                        spie: Cell::from_owned(mstatus.spie),
+                        ube: Cell::from_owned(mstatus.ube),
+                        mpie: Cell::from_owned(mstatus.mpie),
+                        spp: Cell::from_owned(mstatus.spp),
+                        mpp: Cell::from_owned(mstatus.mpp),
+                        fs: Cell::from_owned(mstatus.fs),
+                        xs: Cell::from_owned(mstatus.xs),
+                        mprv: Cell::from_owned(mstatus.mprv),
+                        sum: Cell::from_owned(mstatus.sum),
+                        mxr: Cell::from_owned(mstatus.mxr),
+                        tvm: Cell::from_owned(mstatus.tvm),
+                        tw: Cell::from_owned(mstatus.tw),
+                        tsr: Cell::from_owned(mstatus.tsr),
+                        uxl: Cell::from_owned(mstatus.uxl),
+                        sxl: Cell::from_owned(mstatus.sxl),
+                        sbe: Cell::from_owned(mstatus.sbe),
+                        mbe: Cell::from_owned(mstatus.mbe),
+                    },
+                    |()| (),
+                    Cell::from_owned,
+                )
+            }
+        };
+
+        Ok(cell)
     }
 }
 
