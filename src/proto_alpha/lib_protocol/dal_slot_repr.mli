@@ -434,11 +434,14 @@ module History : sig
     cell_content ->
     Commitment.t option
 
-  (** [produce_proof dal_parameters page_id page_info ~get_history slots_hist]
+  (** [produce_proof dal_parameters page_id ~attestation_threshold_percent
+      ~restricted_commitments_publishers page_info ~get_history slots_hist]
       produces a proof that either:
+
       - there exists a confirmed slot in the skip list that contains
         the page identified by [page_id] whose data and slot inclusion proof
         are given by [page_info], or
+
       - there cannot exist a confirmed slot in the skip list (whose head is
         given by [slots_hist]) containing the page identified by [page_id].
 
@@ -458,9 +461,16 @@ module History : sig
 
       [dal_parameters] is used when verifying that/if the page is part of
       the candidate slot (if any).
-  *)
+
+      In case [attestation_threshold_percent] is set to some threshold, the
+      attestation threshold of the commitment is used instead of the Protocol's
+      flag to decide if the page's slot is attested. Furthermore, in case some
+      publishers are provided in [restricted_commitments_publishers], we also
+      check if the commitment's publisher is whitelisted in that list. *)
   val produce_proof :
     parameters ->
+    attestation_threshold_percent:int option ->
+    restricted_commitments_publishers:Contract_repr.t list option ->
     Page.t ->
     page_info:(Page.content * Page.proof) option ->
     get_history:(hash -> t option Lwt.t) ->

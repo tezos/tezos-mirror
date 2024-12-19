@@ -1240,8 +1240,9 @@ module History = struct
         Under these assumptions, we recall that we maintain an invariant
         ensuring that we a have a cell per slot index in the skip list at every level
         after DAL activation. *)
-    let produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
-        =
+    let produce_proof_repr dal_params ~attestation_threshold_percent
+        ~restricted_commitments_publishers page_id ~page_info ~get_history
+        slots_hist =
       let open Lwt_result_syntax in
       let Page.{slot_id = target_slot_id; page_index = _} = page_id in
       (* We first search for the slots attested at level [published_level]. *)
@@ -1273,11 +1274,14 @@ module History = struct
                 produce proofs are supposed to be in the skip list."
       | Found target_cell -> (
           let inc_proof = List.rev search_result.Skip_list.rev_path in
-          match (page_info, Skip_list.content target_cell) with
-          | ( Some (page_data, page_proof),
-              Published
-                {header = {commitment; id = _}; is_proto_attested = true; _} )
-            ->
+          let is_commitment_attested =
+            Skip_list.content target_cell
+            |> is_commitment_attested
+                 ~attestation_threshold_percent
+                 ~restricted_commitments_publishers
+          in
+          match (page_info, is_commitment_attested) with
+          | Some (page_data, page_proof), Some commitment ->
               (* The case where the slot to which the page is supposed to belong
                  is found and the page's information are given. *)
               let*? () =
@@ -1293,21 +1297,20 @@ module History = struct
               return
                 ( Page_confirmed {target_cell; inc_proof; page_data; page_proof},
                   Some page_data )
-          | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
+          | None, None ->
               (* The slot corresponding to the given page's index is not found in
                  the attested slots of the page's level, and no information is
                  given for that page. So, we produce a proof that the page is not
                  attested. *)
               return (Page_unconfirmed {target_cell; inc_proof}, None)
-          | None, Published {is_proto_attested = true; _} ->
+          | None, Some _ ->
               (* Mismatch: case where no page information are given, but the
                  slot is attested. *)
               tzfail
               @@ dal_proof_error
                    "The page ID's slot is confirmed, but no page content and \
                     proof are provided."
-          | Some _, (Unpublished _ | Published {is_proto_attested = false; _})
-            ->
+          | Some _, None ->
               (* Mismatch: case where page information are given, but the slot
                  is not attested. *)
               tzfail
@@ -1315,11 +1318,19 @@ module History = struct
                    "The page ID's slot is not confirmed, but page content and \
                     proof are provided.")
 
-    let produce_proof dal_params page_id ~page_info ~get_history slots_hist :
-        (proof * Page.content option) tzresult Lwt.t =
+    let produce_proof dal_params ~attestation_threshold_percent
+        ~restricted_commitments_publishers page_id ~page_info ~get_history
+        slots_hist : (proof * Page.content option) tzresult Lwt.t =
       let open Lwt_result_syntax in
       let* proof_repr, page_data =
-        produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
+        produce_proof_repr
+          dal_params
+          ~attestation_threshold_percent
+          ~restricted_commitments_publishers
+          page_id
+          ~page_info
+          ~get_history
+          slots_hist
       in
       let*? serialized_proof = serialize_proof proof_repr in
       return (serialized_proof, page_data)
