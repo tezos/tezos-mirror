@@ -299,6 +299,13 @@ module Q = struct
       @@ {|SELECT root_hash, activation_timestamp
            FROM kernel_upgrades WHERE injected_before = ?|}
 
+    let find_latest_injected_after =
+      (level ->? upgrade)
+      @@ {|SELECT root_hash, activation_timestamp
+           FROM kernel_upgrades WHERE injected_before > ?
+           ORDER BY injected_before DESC
+           LIMIT 1|}
+
     let record_apply =
       (level ->. unit)
       @@ {|
@@ -673,6 +680,10 @@ module Kernel_upgrades = struct
   let find_injected_before store level =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Kernel_upgrades.find_injected_before level
+
+  let find_latest_injected_after store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Kernel_upgrades.find_latest_injected_after level
 
   let record_apply store level =
     with_connection store @@ fun conn ->

@@ -22,21 +22,14 @@ open Ethereum_types
     starts submitting blocks from the new branch.
 *)
 let on_new_blueprint evm_node_endpoint next_blueprint_number
-    (({delayed_transactions; kernel_upgrade; blueprint} :
-       Blueprint_types.with_events) as blueprint_with_events) =
+    (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
+     blueprint_with_events) =
   let open Lwt_result_syntax in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
     let events =
-      List.map
-        (fun delayed_transaction ->
-          Evm_events.New_delayed_transaction delayed_transaction)
-        delayed_transactions
-      @
-      match kernel_upgrade with
-      | Some kernel_upgrade -> [Evm_events.Upgrade_event kernel_upgrade]
-      | None -> []
+      Blueprint_types.events_of_blueprint_with_events blueprint_with_events
     in
     (* Apply blueprint is allowed to fail. *)
     let*! res =

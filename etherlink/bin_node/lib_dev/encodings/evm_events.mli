@@ -74,3 +74,5 @@ val pp : Format.formatter -> t -> unit
 val encoding : t Data_encoding.t
 
 val of_bytes : bytes -> t option Lwt.t
+
+val of_parts : Delayed_transaction.t list -> Upgrade.t option -> t list

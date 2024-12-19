@@ -416,3 +416,11 @@ let encoding =
           | Flush_delayed_inbox blueprint -> Some blueprint | _ -> None)
         ~inj:(fun blueprint -> Flush_delayed_inbox blueprint);
     ]
+
+let of_parts delayed_transactions kernel_upgrade =
+  let delayed_transactions =
+    List.map (fun txs -> New_delayed_transaction txs) delayed_transactions
+  in
+  match kernel_upgrade with
+  | Some u -> Upgrade_event u :: delayed_transactions
+  | None -> delayed_transactions

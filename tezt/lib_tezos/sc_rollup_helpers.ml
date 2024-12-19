@@ -1019,11 +1019,9 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
             (current_level + delay)
         in
         let* () = Sc_rollup_node.terminate sc_rollup_node in
-        let sc_rollup_node =
-          match restart_mode with
-          | Some mode -> Sc_rollup_node.change_node_mode sc_rollup_node mode
-          | None -> sc_rollup_node
-        in
+        (match restart_mode with
+        | Some mode -> Sc_rollup_node.change_node_mode sc_rollup_node mode
+        | None -> ()) ;
         let* _ = run_honest_node sc_rollup_node in
         unit)
       reset_honest_on

@@ -1012,13 +1012,19 @@ module State = struct
          {transactions = delayed_transactions; timestamp; level = flushed_level}
        as flushed_blueprint) =
     let open Lwt_result_syntax in
+    let before_flushed_level =
+      Ethereum_types.Qty.pred
+        flushed_blueprint.Evm_events.Flushed_blueprint.level
+    in
+    (* save upgrades before reset *)
+    let* lost_upgrade =
+      Evm_store.Kernel_upgrades.find_latest_injected_after
+        conn
+        before_flushed_level
+    in
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
     let* (_ : Evm_state.t) =
-      let before_flushed_level =
-        Ethereum_types.Qty.pred
-          flushed_blueprint.Evm_events.Flushed_blueprint.level
-      in
       let* checkpoint =
         Evm_store.Context_hashes.find conn before_flushed_level
       in
@@ -1029,13 +1035,10 @@ module State = struct
       | Some checkpoint ->
           reset_to_level ctxt conn before_flushed_level checkpoint
     in
-    (* Reapply lost events on current head *)
+    (* Clean unreliable delayed inbox *)
     let* () = clear_head_delayed_inbox ctxt in
-    let events =
-      List.map
-        (fun tx -> Evm_events.New_delayed_transaction tx)
-        delayed_transactions
-    in
+    (* Prepare an event list to be reapplied on current head *)
+    let events = Evm_events.of_parts delayed_transactions lost_upgrade in
     (* Prepare a blueprint payload signed by the sequencer to execute locally. *)
     let* parent_hash = Evm_state.current_block_hash ctxt.session.evm_state in
     let* payload =
@@ -1394,10 +1397,7 @@ module State = struct
         in
         (* Apply the blueprint. *)
         let events =
-          List.map
-            (fun delayed_transaction ->
-              Evm_events.New_delayed_transaction delayed_transaction)
-            blueprint_with_events.Blueprint_types.delayed_transactions
+          Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
         let* () =
           apply_blueprint
