@@ -1323,7 +1323,17 @@ let init_from_rollup_node_command =
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
     (fun (data_dir, omit_delayed_tx_events) rollup_node_data_dir () ->
+      let open Lwt_result_syntax in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ~keep_alive:false
+          ~verbose:false
+          ~finalized_view:false
+          ()
+      in
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
+        ~configuration
         ~omit_delayed_tx_events
         ~data_dir
         ~rollup_node_data_dir
@@ -1486,18 +1496,23 @@ let patch_kernel_command =
         let config = make_with_defaults ~verbosity:Warning () in
         init ~config ()
       in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ~keep_alive:false
+          ~verbose:false
+          ~finalized_view:false
+          ()
+      in
       if force then
         let* _status =
           Evm_context.start
+            ~configuration
             ~data_dir
-            ~preimages:Filename.Infix.(data_dir // "wasm_2_0_0")
             ~store_perm:`Read_write
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
-            ~preimages_endpoint:None
-            ~native_execution_policy:Never
             ~fail_on_missing_blueprint:true
-            ~block_storage_sqlite3:false
             ()
         in
         Evm_context.patch_kernel ?block_number kernel_path
@@ -2258,18 +2273,23 @@ let patch_state_command =
         let config = make_with_defaults ~verbosity:Warning () in
         init ~config ()
       in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ~keep_alive:false
+          ~verbose:false
+          ~finalized_view:false
+          ()
+      in
       if force then
         let* _status =
           Evm_context.start
+            ~configuration
             ~data_dir
-            ~preimages:Filename.Infix.(data_dir // "wasm_2_0_0")
             ~store_perm:`Read_write
               (* Since we won’t execute anything, we don’t care about the following
                  argument. *)
-            ~preimages_endpoint:None
-            ~native_execution_policy:Never
             ~fail_on_missing_blueprint:true
-            ~block_storage_sqlite3:false
             ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()

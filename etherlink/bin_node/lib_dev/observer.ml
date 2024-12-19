@@ -109,18 +109,14 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
   in
   let* _loaded =
     Evm_context.start
+      ~configuration:config
       ~data_dir
       ?kernel_path
-      ~preimages:config.kernel_execution.preimages
-      ~preimages_endpoint:config.kernel_execution.preimages_endpoint
-      ~native_execution_policy:config.kernel_execution.native_execution_policy
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
-      ~block_storage_sqlite3:config.experimental_features.block_storage_sqlite3
-      ?garbage_collector:config.experimental_features.garbage_collector
       ()
   in
   let* ro_ctxt = Evm_ro_context.load ~smart_rollup_address ~data_dir config in

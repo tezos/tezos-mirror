@@ -46,14 +46,6 @@ val export_store :
     [data_dir] is the path to the data-dir of the node, notably containing the
     SQLite store and the Irmin context.
 
-    [preimages] is the path to the preimages directory, while a
-    [preimages_endponit] URI can be optionally provided to download missing
-    preimages when they are requested by the current kernel (during upgrades).
-
-    [native_execution_policy] decides if native execution is used for supported
-    kernel. In the context of the [Evm_context] worker, the native execution
-    will only be used in [native_execution_policy = Always].
-
     [smart_rollup_address] can be provided either when starting from a
     non-existing data-dir, or when starting a sandbox.
 
@@ -66,23 +58,14 @@ val export_store :
     (it is most certainly an artifact of the past, made outdated by the
     [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
     to use [Evm_ro_context] instead.
-
-    [block_storage_sqlite3] decides whether or not the blocks are stored in the
-    SQLite store or not.
-
-    [garbage_collector] can be optionally provided to enable the garbage
-    collector of the node with a given configuration. *)
+*)
 val start :
+  configuration:Configuration.t ->
   ?kernel_path:string ->
   data_dir:string ->
-  preimages:string ->
-  preimages_endpoint:Uri.t option ->
-  native_execution_policy:Configuration.native_execution_policy ->
   ?smart_rollup_address:string ->
   fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->
-  block_storage_sqlite3:bool ->
-  ?garbage_collector:Configuration.garbage_collector ->
   ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
@@ -94,6 +77,7 @@ val start :
     [omit_delayed_tx_events] dont populate the delayed tx event from
     the state into the db. *)
 val init_from_rollup_node :
+  configuration:Configuration.t ->
   omit_delayed_tx_events:bool ->
   data_dir:string ->
   rollup_node_data_dir:string ->

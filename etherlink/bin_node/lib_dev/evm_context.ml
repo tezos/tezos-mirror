@@ -19,16 +19,12 @@ type head = {
 }
 
 type parameters = {
+  configuration : Configuration.t;
   kernel_path : string option;
   data_dir : string;
-  preimages : string;
-  preimages_endpoint : Uri.t option;
-  native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
-  block_storage_sqlite3 : bool;
-  garbage_collector : Configuration.garbage_collector option;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
 
@@ -48,16 +44,13 @@ type history =
   | Archive
 
 type t = {
+  configuration : Configuration.t;
   data_dir : string;
   index : Irmin_context.rw_index;
-  preimages : string;
-  preimages_endpoint : Uri.t option;
-  native_execution_policy : Configuration.native_execution_policy;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
   fail_on_missing_blueprint : bool;
-  block_storage_sqlite3 : bool;
   history : history;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
@@ -69,8 +62,8 @@ type store_info = {
 
 let pvm_config ctxt =
   Config.config
-    ~preimage_directory:ctxt.preimages
-    ?preimage_endpoint:ctxt.preimages_endpoint
+    ~preimage_directory:ctxt.configuration.kernel_execution.preimages
+    ?preimage_endpoint:ctxt.configuration.kernel_execution.preimages_endpoint
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
     ()
@@ -396,16 +389,21 @@ module State = struct
         evm_state
         []
 
-  let background_preemptive_download ({preimages_endpoint; preimages; _} : t)
+  let background_preemptive_download
+      (kernel_execution : Configuration.kernel_execution_config)
       Evm_events.Upgrade.{hash; timestamp = _} =
-    match preimages_endpoint with
+    match kernel_execution.preimages_endpoint with
     | None -> ()
     | Some preimages_endpoint ->
         Lwt.async @@ fun () ->
         Misc.unwrap_error_monad @@ fun () ->
         let (Hash (Hex root_hash)) = hash in
         let root_hash = `Hex root_hash in
-        Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ()
+        Kernel_download.download
+          ~preimages:kernel_execution.preimages
+          ~preimages_endpoint
+          ~root_hash
+          ()
 
   let reset_to_level ctxt conn l2_level checkpoint =
     let open Lwt_result_syntax in
@@ -447,7 +445,7 @@ module State = struct
        level). *)
     let latest_finalized_level = Z.max latest_finalized_level number in
     let* block_hash_opt =
-      if ctxt.block_storage_sqlite3 then
+      if ctxt.configuration.experimental_features.block_storage_sqlite3 then
         Evm_store.Blocks.find_hash_of_number conn (Qty number)
       else
         let*! bytes =
@@ -648,7 +646,8 @@ module State = struct
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
           Evm_state.apply_blueprint
-            ~native_execution_policy:ctxt.native_execution_policy
+            ~native_execution_policy:
+              ctxt.configuration.kernel_execution.native_execution_policy
             ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
             ~data_dir
             ~config
@@ -724,7 +723,7 @@ module State = struct
         in
 
         let* evm_state =
-          if ctxt.block_storage_sqlite3 then
+          if ctxt.configuration.experimental_features.block_storage_sqlite3 then
             let* () = store_block_unsafe conn evm_state block in
             let*! evm_state = Evm_state.clear_block_storage block evm_state in
             return evm_state
@@ -871,7 +870,9 @@ module State = struct
               kernel_upgrade = upgrade;
               injected_before = ctxt.session.next_blueprint_number;
             } ;
-        background_preemptive_download ctxt upgrade ;
+        background_preemptive_download
+          ctxt.configuration.kernel_execution
+          upgrade ;
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
         let*! evm_state =
           Evm_state.modify
@@ -904,7 +905,9 @@ module State = struct
     | New_delayed_transaction delayed_transaction ->
         let* evm_state =
           on_new_delayed_transaction
-            ~native_execution:(ctxt.native_execution_policy = Always)
+            ~native_execution:
+              (ctxt.configuration.kernel_execution.native_execution_policy
+             = Always)
             ~delayed_transaction
             evm_state
         in
@@ -1106,15 +1109,16 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ?kernel_path ~block_storage_sqlite3 ?garbage_collector
-      ~fail_on_missing_blueprint ~data_dir ~preimages ~preimages_endpoint
-      ~native_execution_policy ?smart_rollup_address ~store_perm
+  let init ~(configuration : Configuration.t) ?kernel_path
+      ~fail_on_missing_blueprint ~data_dir ?smart_rollup_address ~store_perm
       ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
     in
-    let*! () = Lwt_utils_unix.create_dir preimages in
+    let*! () =
+      Lwt_utils_unix.create_dir configuration.kernel_execution.preimages
+    in
     let* index =
       Irmin_context.load
         ~cache_size:100_000
@@ -1199,7 +1203,7 @@ module State = struct
     in
 
     let* history, last_split_block =
-      match garbage_collector with
+      match configuration.experimental_features.garbage_collector with
       | Some parameters ->
           let* last_split_opt = Evm_store.Irmin_chunks.latest conn in
           return (Full {parameters}, last_split_opt)
@@ -1208,11 +1212,9 @@ module State = struct
 
     let ctxt =
       {
+        configuration;
         index;
         data_dir;
-        preimages;
-        preimages_endpoint;
-        native_execution_policy;
         smart_rollup_address;
         session =
           {
@@ -1226,7 +1228,6 @@ module State = struct
           };
         store;
         fail_on_missing_blueprint;
-        block_storage_sqlite3;
         history;
         sequencer_wallet;
       }
@@ -1426,8 +1427,8 @@ module State = struct
           *)
           let (Qty pred_number) = Ethereum_types.Qty.pred blueprint_number in
           let* local_parent_block_hash =
-            if ctxt.block_storage_sqlite3 then
-              Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
+            if ctxt.configuration.experimental_features.block_storage_sqlite3
+            then Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
             else
               let*! bytes =
                 Evm_state.inspect
@@ -1488,31 +1489,23 @@ module Handlers = struct
 
   let on_launch _self ()
       {
+        configuration : Configuration.t;
         kernel_path : string option;
         data_dir : string;
-        preimages : string;
-        preimages_endpoint : Uri.t option;
-        native_execution_policy;
         smart_rollup_address : string option;
         fail_on_missing_blueprint;
         store_perm;
-        block_storage_sqlite3;
-        garbage_collector;
         sequencer_wallet;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
       State.init
+        ~configuration
         ?kernel_path
         ~data_dir
-        ~preimages
-        ~preimages_endpoint
-        ~native_execution_policy
         ?smart_rollup_address
         ~fail_on_missing_blueprint
         ~store_perm
-        ~block_storage_sqlite3
-        ?garbage_collector
         ?sequencer_wallet
         ()
     in
@@ -1691,9 +1684,8 @@ let export_store ~data_dir ~output_db_file =
   let* () = Evm_store.vacuum ~conn ~output_db_file in
   return {rollup_address; current_number}
 
-let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ~native_execution_policy ?smart_rollup_address ~fail_on_missing_blueprint
-    ~store_perm ~block_storage_sqlite3 ?garbage_collector ?sequencer_wallet () =
+let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
+    ~fail_on_missing_blueprint ~store_perm ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1701,16 +1693,12 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       table
       ()
       {
+        configuration;
         kernel_path;
         data_dir;
-        preimages;
-        preimages_endpoint;
-        native_execution_policy;
         smart_rollup_address;
         fail_on_missing_blueprint;
         store_perm;
-        block_storage_sqlite3;
-        garbage_collector;
         sequencer_wallet;
       }
       (module Handlers)
@@ -1875,7 +1863,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
-let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
+let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
     ~rollup_node_data_dir () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
@@ -1891,14 +1879,11 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
   in
   let* _loaded =
     start
+      ~configuration
       ~data_dir
-      ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
-      ~preimages_endpoint:None
-      ~native_execution_policy:Never
       ~smart_rollup_address
       ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
-      ~block_storage_sqlite3:false
       ()
   in
   worker_wait_for_request
