@@ -39,6 +39,7 @@ module VM : sig
     number_of_vms:int ->
     docker_image:string ->
     os:string ->
+    prometheus_port:int ->
     unit Lwt.t
 
   val points : unit -> string list Lwt.t

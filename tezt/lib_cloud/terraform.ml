@@ -154,7 +154,7 @@ module VM = struct
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
   let deploy ~auto_approve ~max_run_duration ~machine_type ~base_port
-      ~ports_per_vm ~number_of_vms ~docker_image ~os =
+      ~ports_per_vm ~number_of_vms ~docker_image ~os ~prometheus_port =
     let* project_id = Gcloud.project_id () in
     let max_run_duration =
       match max_run_duration with
@@ -178,6 +178,8 @@ module VM = struct
           Format.asprintf "docker_image=%s" docker_image;
           "--var";
           Format.asprintf "os=%s" os;
+          "--var";
+          Format.asprintf "prometheus_port=%d" prometheus_port;
         ]
     in
     if auto_approve then

@@ -62,6 +62,13 @@ variable "os" {
   }
 }
 
+variable "prometheus_port" {
+  type        = number
+  description = "Port used by the Prometheus instance."
+  default     = 9090
+}
+
+
 # Those values should not be modified
 locals {
   artifact_registry = "europe-west1-docker.pkg.dev"
@@ -260,7 +267,7 @@ resource "google_compute_firewall" "default" {
   # Rule to enable prometheus access
   allow {
     protocol = "tcp"
-    ports    = ["9090"]
+    ports    = ["${var.prometheus_port}"]
   }
 
   # Rule to enable grafana access
