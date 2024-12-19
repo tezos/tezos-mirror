@@ -1108,6 +1108,42 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
+  let enable_replay_block_storage ~keep_alive evm_node_endpoint =
+    let open Lwt_syntax in
+    let get_block n =
+      let* (answer : (Ethereum_types.block, tztrace) result) =
+        Batch.call
+          (module Rpc_encodings.Get_block_by_number)
+          ~keep_alive
+          ~evm_node_endpoint
+          (Ethereum_types.Block_parameter.(Number n), false)
+      in
+      match answer with
+      | Error err ->
+          let* () = Evm_context_events.get_block_failed n err in
+          Stdlib.failwith "Failed to retrieve the block"
+      | Ok block -> return block
+    in
+    let store_get_hash tree key =
+      if key = "/tmp/evm/world_state/transactions_receipts" then
+        Lwt_preemptive.run_in_main @@ fun () ->
+        let* pred = Evm_state.current_block_height tree in
+        let n = Ethereum_types.Qty.next pred in
+        let+ block = get_block n in
+        let s = Ethereum_types.hash_to_bytes block.receiptRoot in
+        Ok (Bytes.unsafe_of_string s)
+      else if key = "/tmp/evm/world_state/transactions_objects" then
+        Lwt_preemptive.run_in_main @@ fun () ->
+        let* pred = Evm_state.current_block_height tree in
+        let n = Ethereum_types.Qty.next pred in
+        let+ block = get_block n in
+        let s = Ethereum_types.hash_to_bytes block.transactionRoot in
+        Ok (Bytes.unsafe_of_string s)
+      else Wasm_runtime_callbacks.store_get_hash tree key
+    in
+    Callback.register "layer2_store__store_get_hash" store_get_hash ;
+    Evm_context_events.replace_store_get_hash ()
+
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
@@ -1230,6 +1266,25 @@ module State = struct
         history;
         sequencer_wallet;
       }
+    in
+
+    let* () =
+      when_
+        configuration.experimental_features.replay_block_storage_sqlite3
+        (fun () ->
+          match configuration.observer with
+          | (None | Some _) when is_sequencer ctxt ->
+              failwith "Replay block storage is not available for sequencer"
+          | Some observer ->
+              let*! () =
+                enable_replay_block_storage
+                  ~keep_alive:configuration.keep_alive
+                  observer.evm_node_endpoint
+              in
+              return_unit
+          | None ->
+              (* If it's not a sequencer it must be an observer. *)
+              assert false)
     in
 
     let*! () =
