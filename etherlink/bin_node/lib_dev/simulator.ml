@@ -148,51 +148,6 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let da_fee = Fees.gas_for_fees ~da_fee_per_byte ~gas_price tx_data in
     return da_fee
 
-  let check_node_da_fees ~timestamp ~execution_gas ~node_da_fees
-      ~simulation_version simulation_state call =
-    let open Lwt_result_syntax in
-    let* kernel_da_fees =
-      let* res =
-        call_estimate_gas
-          (simulation_input
-             ~timestamp
-             ~simulation_version
-             ~with_da_fees:true
-             call)
-          simulation_state
-      in
-      let* (Qty total_gas) =
-        match res with
-        | Ok (Ok {gas_used = Some gas; _}) -> return gas
-        | _ -> failwith "The gas estimation simulation with DA fees failed."
-      in
-      (* DA fees computed by the kernel is the difference between total gas
-         and previous gas call. *)
-      return (Z.sub total_gas execution_gas)
-    in
-
-    unless (node_da_fees = kernel_da_fees) (fun () ->
-        Prometheus.Counter.inc_one
-          Metrics.metrics.simulation.inconsistent_da_fees ;
-        let read_qty path =
-          let+ bytes = SimulationBackend.read simulation_state path in
-          Option.map Ethereum_types.decode_number_le bytes
-        in
-        let* block_number =
-          read_qty Durable_storage_path.Block.current_number
-        in
-        let call =
-          Data_encoding.Json.construct Ethereum_types.call_encoding call
-        in
-        let*! () =
-          Events.invalid_node_da_fees
-            ~node_da_fees
-            ~kernel_da_fees
-            ~call
-            ~block_number
-        in
-        return_unit)
-
   let rec confirm_gas ~timestamp ~maximum_gas_per_transaction
       ~simulation_version (call : Ethereum_types.call) gas simulation_state =
     let open Ethereum_types in
@@ -237,7 +192,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
               call
               new_gas
               simulation_state
-    | Ok (Ok {gas_used = Some gas_used; _}) ->
+    | Ok (Ok {gas_used = Some _; _}) ->
         (* The gas returned by confirm gas can be ignored. What we care about
            is only knowing if the gas provided in {!new_call} is enough. The
            gas used returned when confirming may remove the "safe" amount
@@ -255,25 +210,6 @@ module Make (SimulationBackend : SimulationBackend) = struct
             | None -> Bytes.empty
           in
           let* da_fees = gas_for_fees simulation_state tx_data in
-          (* As computing the DA fees in the node directly is an
-             experimental feature, we check the locally computed value
-             against the one computed by the kernel.
-
-             We aim to deloy this checks for a couple weeks, then remove
-             the kernel call. We could also keep the check if the node
-             is in a debug like mode to make sure the two implementations
-             are consistent.
-          *)
-          let* () =
-            let (Qty gas_used) = gas_used in
-            check_node_da_fees
-              ~timestamp
-              ~execution_gas:gas_used
-              ~node_da_fees:da_fees
-              ~simulation_version
-              simulation_state
-              call
-          in
           let (Qty gas) = gas in
           return @@ quantity_of_z @@ Z.add gas da_fees
     | Ok (Ok {gas_used = None; _}) ->

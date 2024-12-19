@@ -25,6 +25,9 @@ you start using them, you probably want to use `octez-evm-node check config
 
 ### Internals
 
+- Removes an internal check about DA fees in the node, improving the 
+  performances of gas estimations. (todo)
+
 ## Version 0.12 (2024-12-17)
 
 This release notably addresses a bug introduced in the previous release,
