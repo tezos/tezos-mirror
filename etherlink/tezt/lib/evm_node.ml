@@ -1177,17 +1177,19 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
 
 let endpoint = rpc_endpoint ?local:None
 
-type garbage_collector = {
+type garbage_collector_parameters = {
   split_frequency_in_seconds : int;
   number_of_chunks : int;
 }
+
+type history_mode = Archive | Rolling
 
 type rpc_server = Resto | Dream
 
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false) ?(block_storage_sqlite3 = true)
-    ?(next_wasm_runtime = true) ?garbage_collector ?rpc_server
-    ?(enable_websocket = false) () =
+    ?(next_wasm_runtime = true) ?garbage_collector_parameters ?history_mode
+    ?rpc_server ?(enable_websocket = false) () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1223,8 +1225,8 @@ let patch_config_with_experimental_feature
        ~name:"next_wasm_runtime"
        (`Bool true)
   |> optional_json_put
-       ~name:"garbage_collector"
-       garbage_collector
+       ~name:"garbage_collector_parameters"
+       garbage_collector_parameters
        (fun {split_frequency_in_seconds; number_of_chunks} ->
          `O
            [
@@ -1232,6 +1234,9 @@ let patch_config_with_experimental_feature
                `Float (Int.to_float split_frequency_in_seconds) );
              ("number_of_chunks", `Float (Int.to_float number_of_chunks));
            ])
+  |> optional_json_put ~name:"history_mode" history_mode (function
+         | Archive -> `String "archive"
+         | Rolling -> `String "rolling")
   |> optional_json_put ~name:"rpc_server" rpc_server (function
          | Resto -> `String "resto"
          | Dream -> `String "dream")

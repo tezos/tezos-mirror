@@ -38,10 +38,6 @@ type session_state = {
       (** Garbage collector session related information. *)
 }
 
-type history =
-  | Full of {parameters : Configuration.garbage_collector}
-  | Archive
-
 type t = {
   configuration : Configuration.t;
   data_dir : string;
@@ -49,7 +45,6 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
-  history : history;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
 
@@ -293,9 +288,9 @@ module State = struct
 
   let maybe_split_context ctxt conn timestamp level =
     let open Lwt_result_syntax in
-    match ctxt.history with
+    match ctxt.configuration.experimental_features.history_mode with
     | Archive -> return_none
-    | Full {parameters} ->
+    | Rolling ->
         let split =
           match ctxt.session.last_split_block with
           | None -> true
@@ -309,7 +304,10 @@ module State = struct
                 >= Int64.(
                      add
                        last_split_timestamp
-                       (of_int parameters.split_frequency_in_seconds)))
+                       (of_int
+                          ctxt.configuration.experimental_features
+                            .garbage_collector_parameters
+                            .split_frequency_in_seconds)))
         in
         if split then (
           Irmin_context.split ctxt.index ;
@@ -317,7 +315,9 @@ module State = struct
           let*! () = Evm_context_events.gc_split level timestamp in
           let* number_of_chunks = Evm_store.Irmin_chunks.count conn in
           let max_number_of_chunks =
-            parameters.Configuration.number_of_chunks
+            ctxt.configuration.experimental_features
+              .garbage_collector_parameters
+              .number_of_chunks
           in
           let* () =
             if number_of_chunks > max_number_of_chunks then
@@ -1246,12 +1246,10 @@ module State = struct
                initial kernel"
     in
 
-    let* history, last_split_block =
-      match configuration.experimental_features.garbage_collector with
-      | Some parameters ->
-          let* last_split_opt = Evm_store.Irmin_chunks.latest conn in
-          return (Full {parameters}, last_split_opt)
-      | None -> return (Archive, None)
+    let* last_split_block =
+      match configuration.experimental_features.history_mode with
+      | Rolling -> Evm_store.Irmin_chunks.latest conn
+      | Archive -> return_none
     in
 
     let ctxt =
@@ -1271,7 +1269,6 @@ module State = struct
             last_split_block;
           };
         store;
-        history;
         sequencer_wallet;
       }
     in

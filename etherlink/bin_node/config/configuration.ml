@@ -32,10 +32,12 @@ type kernel_execution_config = {
   native_execution_policy : native_execution_policy;
 }
 
-type garbage_collector = {
+type garbage_collector_parameters = {
   split_frequency_in_seconds : int;
   number_of_chunks : int;
 }
+
+type history_mode = Archive | Rolling
 
 type rpc_server = Resto | Dream
 
@@ -45,7 +47,8 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   replay_block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
-  garbage_collector : garbage_collector option;
+  garbage_collector_parameters : garbage_collector_parameters;
+  history_mode : history_mode;
   rpc_server : rpc_server;
   enable_websocket : bool;
 }
@@ -131,6 +134,9 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
 
 let default_enable_send_raw_transaction = true
 
+let default_garbage_collector_parameters =
+  {split_frequency_in_seconds = 86_400; number_of_chunks = 14}
+
 let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
@@ -138,7 +144,8 @@ let default_experimental_features =
     block_storage_sqlite3 = false;
     replay_block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
-    garbage_collector = None;
+    garbage_collector_parameters = default_garbage_collector_parameters;
+    history_mode = Archive;
     rpc_server = Resto;
     enable_websocket = false;
   }
@@ -668,7 +675,7 @@ let observer_encoding =
           bool
           default_rollup_node_tracking))
 
-let garbage_collector_encoding =
+let garbage_collector_parameters_encoding =
   let open Data_encoding in
   conv
     (fun {split_frequency_in_seconds; number_of_chunks} ->
@@ -691,6 +698,10 @@ let rpc_server_encoding =
   let open Data_encoding in
   string_enum [("resto", Resto); ("dream", Dream)]
 
+let history_mode_encoding =
+  let open Data_encoding in
+  string_enum [("archive", Archive); ("rolling", Rolling)]
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -700,29 +711,32 @@ let experimental_features_encoding =
            block_storage_sqlite3;
            replay_block_storage_sqlite3;
            overwrite_simulation_tick_limit;
-           garbage_collector;
+           garbage_collector_parameters;
+           history_mode;
            rpc_server;
            enable_websocket;
          } ->
-      ( drop_duplicate_on_injection,
-        enable_send_raw_transaction,
-        None,
-        block_storage_sqlite3,
-        replay_block_storage_sqlite3,
-        overwrite_simulation_tick_limit,
-        garbage_collector,
-        None,
-        rpc_server,
+      ( ( drop_duplicate_on_injection,
+          enable_send_raw_transaction,
+          None,
+          block_storage_sqlite3,
+          replay_block_storage_sqlite3,
+          overwrite_simulation_tick_limit,
+          garbage_collector_parameters,
+          history_mode,
+          None,
+          rpc_server ),
         enable_websocket ))
-    (fun ( drop_duplicate_on_injection,
-           enable_send_raw_transaction,
-           _node_transaction_validation,
-           block_storage_sqlite3,
-           replay_block_storage_sqlite3,
-           overwrite_simulation_tick_limit,
-           garbage_collector,
-           _next_wasm_runtime,
-           rpc_server,
+    (fun ( ( drop_duplicate_on_injection,
+             enable_send_raw_transaction,
+             _node_transaction_validation,
+             block_storage_sqlite3,
+             replay_block_storage_sqlite3,
+             overwrite_simulation_tick_limit,
+             garbage_collector_parameters,
+             history_mode,
+             _next_wasm_runtime,
+             rpc_server ),
            enable_websocket ) ->
       {
         drop_duplicate_on_injection;
@@ -730,80 +744,90 @@ let experimental_features_encoding =
         block_storage_sqlite3;
         replay_block_storage_sqlite3;
         overwrite_simulation_tick_limit;
-        garbage_collector;
+        garbage_collector_parameters;
+        history_mode;
         rpc_server;
         enable_websocket;
       })
-    (obj10
-       (dft
-          ~description:
-            "Request the rollup node to filter messages it has already \
-             forwarded to the Layer 1 network. Require an unreleased version \
-             of the Smart Rollup node."
-          "drop_duplicate_on_injection"
-          bool
-          default_experimental_features.drop_duplicate_on_injection)
-       (dft
-          ~description:
-            "Enable or disable the `eth_sendRawTransaction` method. \
-             DEPRECATED:  You should use \"rpc.restricted_rpcs\" instead."
-          "enable_send_raw_transaction"
-          bool
-          default_experimental_features.enable_send_raw_transaction)
-       (opt
-          ~description:
-            "DEPRECATED: You should remove this option from your configuration \
-             file."
-          "node_transaction_validation"
-          bool)
-       (dft
-          "block_storage_sqlite3"
-          ~description:
-            "Store the blocks and transactions in a sqlite3 database and \
-             removes them from the durable storage"
-          bool
-          default_experimental_features.block_storage_sqlite3)
-       (dft
-          "replay_block_storage_sqlite3"
-          ~description:
-            "Replace internal callbacks to support Mainnet's replay with block \
-             storage enabled"
-          bool
-          false)
-       (dft
-          "overwrite_simulation_tick_limit"
-          ~description:
-            "When enabled, the eth_call method is not subject to the tick \
-             limit. This can be useful to execute calls that will not be \
-             injected in transactions (similarly to what the Uniswap V3 \
-             frontend does to prepare swaps). However, it can lead to \
-             confusing UX for users, where eth_estimateGas fails when eth_call \
-             succeeded."
-          bool
-          default_experimental_features.overwrite_simulation_tick_limit)
-       (opt
-          "garbage_collector"
-          ~description:"Enables garbage collector in the node."
-          garbage_collector_encoding)
-       (opt
-          "next_wasm_runtime"
-          ~description:
-            "Enable or disable the experimental WASM runtime that is expected \
-             to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You \
-             should remove this option from your configuration file."
-          bool)
-       (dft
-          "rpc_server"
-          ~description:
-            "Choose the RPC server implementation, \'dream\' or \'resto\', the \
-             latter being the default one."
-          rpc_server_encoding
-          default_experimental_features.rpc_server)
-       (dft
-          "enable_websocket"
-          ~description:"Enable or disable the experimental websocket server"
-          bool
-          default_experimental_features.enable_websocket))
+    (merge_objs
+       (obj10
+          (dft
+             ~description:
+               "Request the rollup node to filter messages it has already \
+                forwarded to the Layer 1 network. Require an unreleased \
+                version of the Smart Rollup node."
+             "drop_duplicate_on_injection"
+             bool
+             default_experimental_features.drop_duplicate_on_injection)
+          (dft
+             ~description:
+               "Enable or disable the `eth_sendRawTransaction` method. \
+                DEPRECATED:  You should use \"rpc.restricted_rpcs\" instead."
+             "enable_send_raw_transaction"
+             bool
+             default_experimental_features.enable_send_raw_transaction)
+          (opt
+             ~description:
+               "DEPRECATED: You should remove this option from your \
+                configuration file."
+             "node_transaction_validation"
+             bool)
+          (dft
+             "block_storage_sqlite3"
+             ~description:
+               "Store the blocks and transactions in a sqlite3 database and \
+                removes them from the durable storage"
+             bool
+             default_experimental_features.block_storage_sqlite3)
+          (dft
+             "replay_block_storage_sqlite3"
+             ~description:
+               "Replace internal callbacks to support Mainnet's replay with \
+                block storage enabled"
+             bool
+             false)
+          (dft
+             "overwrite_simulation_tick_limit"
+             ~description:
+               "When enabled, the eth_call method is not subject to the tick \
+                limit. This can be useful to execute calls that will not be \
+                injected in transactions (similarly to what the Uniswap V3 \
+                frontend does to prepare swaps). However, it can lead to \
+                confusing UX for users, where eth_estimateGas fails when \
+                eth_call succeeded."
+             bool
+             default_experimental_features.overwrite_simulation_tick_limit)
+          (dft
+             "garbage_collector_parameters"
+             ~description:"Garbage collector parameterse."
+             garbage_collector_parameters_encoding
+             default_experimental_features.garbage_collector_parameters)
+          (dft
+             "history_mode"
+             ~description:"History mode."
+             history_mode_encoding
+             default_experimental_features.history_mode)
+          (opt
+             "next_wasm_runtime"
+             ~description:
+               "Enable or disable the experimental WASM runtime that is \
+                expected to replace the Smart Rollup’s Fast Exec runtime. \
+                DEPRECATED: You should remove this option from your \
+                configuration file."
+             bool)
+          (dft
+             "rpc_server"
+             ~description:
+               "Choose the RPC server implementation, \'dream\' or \'resto\', \
+                the latter being the default one."
+             rpc_server_encoding
+             default_experimental_features.rpc_server))
+       (obj1
+          (dft
+             "enable_websocket"
+             ~description:"Enable or disable the experimental websocket server"
+             bool
+             default_experimental_features.enable_websocket)))
 
 let proxy_encoding =
   let open Data_encoding in

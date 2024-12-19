@@ -21,7 +21,7 @@
 open Rpc.Syntax
 
 let register ?genesis_timestamp
-    ?(garbage_collector =
+    ?(garbage_collector_parameters =
       Evm_node.{split_frequency_in_seconds = 100; number_of_chunks = 5}) ~title
     ~tags f =
   Test.register
@@ -41,7 +41,8 @@ let register ?genesis_timestamp
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~block_storage_sqlite3:true
-      ~garbage_collector
+      ~garbage_collector_parameters
+      ~history_mode:Rolling
       ()
   in
   let* sequencer =
@@ -53,12 +54,12 @@ let test_gc_boundaries () =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
-  let garbage_collector =
+  let garbage_collector_parameters =
     Evm_node.{split_frequency_in_seconds = 1; number_of_chunks = 3}
   in
   register
     ~genesis_timestamp
-    ~garbage_collector
+    ~garbage_collector_parameters
     ~title:"GC boundaries"
     ~tags:["boundaries"; "earliest"]
   @@ fun sequencer ->

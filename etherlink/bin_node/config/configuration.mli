@@ -54,10 +54,16 @@ type blueprints_publisher_config = {
           is not allowed to use the DAL. *)
 }
 
-type garbage_collector = {
+type garbage_collector_parameters = {
   split_frequency_in_seconds : int;
   number_of_chunks : int;
 }
+
+type history_mode =
+  | Archive  (** Keeps all blocks, operations and states. *)
+  | Rolling
+      (** Keep blocks, operations and states for a period defined by
+          {!type-garbage_collector_parameters}. *)
 
 (** RPC server implementation. *)
 type rpc_server =
@@ -72,7 +78,8 @@ type experimental_features = {
   block_storage_sqlite3 : bool;
   replay_block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
-  garbage_collector : garbage_collector option;
+  garbage_collector_parameters : garbage_collector_parameters;
+  history_mode : history_mode;
   rpc_server : rpc_server;
   enable_websocket : bool;
 }
