@@ -76,6 +76,8 @@ let clean_tmp_dir =
   Command.Shell.create ~__LOC__ (fun _state ->
       "rm -rf " ^ tmp_proto_snapshot_dir)
 
+(** Copy src/proto_<source> to src/proto_<target> and remove auto-generated
+    dune files. *)
 let raw_copy =
   let commands =
     Command.FIFO.empty
@@ -145,6 +147,7 @@ let raw_copy =
       state)
     commands
 
+(** Update the version value of target protocol. *)
 let set_current_version =
   let commands =
     (* set current version
@@ -203,6 +206,7 @@ let set_current_version =
       state)
     commands
 
+(** Add the predecessor of target protocol. *)
 let add_predecessor =
   let commands =
     let raw_context_file state =
@@ -219,7 +223,7 @@ let add_predecessor =
     |> Command.register
          (Command.create
             ~desc:(fun state ->
-              Log.printfln "add add_predecessor" ;
+              Log.printfln "add predecessor of target protocol" ;
               state)
             (fun state ->
               let by =
@@ -278,6 +282,7 @@ let add_predecessor =
       state)
     commands
 
+(** Hash the target protocol and use this hash to update TEZOS_PROTOCOL file. *)
 let compute_and_replace_hash =
   let commands =
     Command.FIFO.empty
@@ -359,6 +364,7 @@ let compute_and_replace_hash =
       state)
     commands
 
+(** Rename binaries of target protocol (baker and accuser). *)
 let rename_binaries =
   let commands =
     Command.FIFO.empty
@@ -420,13 +426,14 @@ let rename_binaries =
       state)
     commands
 
+(** Replace protocol references of source protocol in target protocol. *)
 let replace_protocol_occurences =
   let commands =
     Command.FIFO.empty
     |> Command.register
          (Command.create
             ~desc:(fun state ->
-              Log.eprintfln "replace protocol occurences in lib_protocol code" ;
+              Log.eprintfln "replace protocol references in lib_protocol code" ;
               state)
             (fun state ->
               let files =
@@ -460,7 +467,7 @@ let replace_protocol_occurences =
               in
               Utils.File.Content.(
                 check_modif_count_all
-                  ~warn:(Msg "No protocol referencies has been updated.")
+                  ~warn:(Msg "No protocol references has been updated.")
                   (replace_assoc_all
                      ~error:(error ~__LOC__ state)
                      ~regex
@@ -497,10 +504,11 @@ let replace_protocol_occurences =
   in
   Command.of_fifo
     ~desc:(fun state ->
-      Log.printfln "Replace protocol occurences in ocaml source files" ;
+      Log.printfln "Replace protocol references in protocol source files" ;
       state)
     commands
 
+(** Add target protocol hash to protocol compiler lib. *)
 let add_to_final_protocol_versions =
   let commands =
     Command.FIFO.empty
@@ -530,6 +538,7 @@ let add_to_final_protocol_versions =
       state)
     commands
 
+(** Update target protocol README file. *)
 let update_readme =
   let commands =
     Command.FIFO.empty
@@ -557,6 +566,7 @@ let update_readme =
       state)
     commands
 
+(** Link target protocol in the manifest. *)
 let link =
   let commands =
     let file (state : State.t) =
@@ -615,6 +625,7 @@ let link =
       state)
     commands
 
+(** Execute make -C manifest. *)
 let make_manifest =
   let commands =
     Command.FIFO.empty
@@ -652,7 +663,9 @@ let copy_source =
     |> Command.register
          (Command.Log.printfln (fun state -> State.Source.get_name state))
     |> Command.register add_predecessor
-    |> Command.register compute_and_replace_hash
+    |> (* All modifications that impact target protocol hash has been done, it
+          is time to compute the target protocol hash. *)
+    Command.register compute_and_replace_hash
     |> Command.register rename_binaries
     |> Command.register replace_protocol_occurences
     |> Command.register add_to_final_protocol_versions
