@@ -226,26 +226,38 @@ module Request = struct
 
   let coinbase = {method_ = "eth_coinbase"; parameters = `Null}
 
-  type logs_input_param = {address : string; topics : string list}
+  type address = Single of string | Multi of string list
+
+  type logs_input_param = {
+    address : address option;
+    topics : string list option;
+  }
+
+  let address_to_param = function
+    | None -> ("address", `A [])
+    | Some (Single address) -> ("address", `String address)
+    | Some (Multi addresses) ->
+        ("address", `A (List.map (fun address -> `String address) addresses))
+
+  let topics_to_param = function
+    | None -> ("topics", `A [])
+    | Some topics ->
+        ("topics", `A (List.map (fun topic -> `String topic) topics))
 
   type subscription_kind =
     | NewHeads
-    | Logs of logs_input_param
+    | Logs of logs_input_param option
     | NewPendingTransactions
     | Syncing
 
   let param_of_sub_kind = function
     | NewHeads -> `A [`String "newHeads"]
-    | Logs {address; topics} ->
+    | Logs (Some {address; topics}) ->
         `A
           [
-            `String "logs";
-            `O
-              [
-                ("address", `String address);
-                ("topics", `A (List.map (fun topic -> `String topic) topics));
-              ];
+            `String "logs"; `O [address_to_param address; topics_to_param topics];
           ]
+    | Logs None -> `A [`String "logs"]
     | NewPendingTransactions -> `A [`String "newPendingTransactions"]
     | Syncing -> `A [`String "syncing"]
 

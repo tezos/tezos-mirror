@@ -304,7 +304,7 @@ let make_jsonrpc_websocket_route path
               send_error
                 output_media
                 websocket
-                (Rpc_errors.internal_error (Printexc.exn_slot_name exn)))
+                (Rpc_errors.internal_error (Printexc.to_string exn)))
         (Lwt_stream.wrap_exn stream)
     in
     stopper () ;

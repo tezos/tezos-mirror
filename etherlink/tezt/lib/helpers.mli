@@ -54,6 +54,9 @@ val hex_string_to_int : string -> int
 (** [hex_256_of_int n] returns the H256 of [n]. *)
 val hex_256_of_int : int -> string
 
+(** [hex_256_of_address address] returns the H256 of [address]. *)
+val hex_256_of_address : Eth_account.t -> string
+
 (** [next_rollup_node_level ~sc_rollup_node ~client] moves
     [sc_rollup_node] to the next level l1. *)
 val next_rollup_node_level :

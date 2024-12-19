@@ -690,13 +690,14 @@ module Web3_sha3 = struct
 end
 
 module Get_logs = struct
-  type input = Filter.t
+  type input = Ethereum_types.Filter.t
 
-  type output = Filter.changes list
+  type output = Ethereum_types.Filter.changes list
 
-  let input_encoding = Data_encoding.tup1 Filter.encoding
+  let input_encoding = Data_encoding.tup1 Ethereum_types.Filter.encoding
 
-  let output_encoding = Data_encoding.list Filter.changes_encoding
+  let output_encoding =
+    Data_encoding.list Ethereum_types.Filter.changes_encoding
 
   let method_ = "eth_getLogs"
 

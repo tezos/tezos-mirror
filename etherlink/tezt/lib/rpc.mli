@@ -60,11 +60,16 @@ module Request : sig
 
   val coinbase : Evm_node.request
 
-  type logs_input_param = {address : string; topics : string list}
+  type address = Single of string | Multi of string list
+
+  type logs_input_param = {
+    address : address option;
+    topics : string list option;
+  }
 
   type subscription_kind =
     | NewHeads
-    | Logs of logs_input_param
+    | Logs of logs_input_param option
     | NewPendingTransactions
     | Syncing
 

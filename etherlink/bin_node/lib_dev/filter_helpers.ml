@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Ethereum_types
 
 (**
@@ -49,11 +50,17 @@ type valid_filter = {
   address : address list;
 }
 
+type bloom_filter = {
+  bloom : Ethbloom.t;
+  topics : Filter.topic option list;
+  address : address list;
+}
+
 type error +=
   | Incompatible_block_params
   | Block_range_too_large of {limit : int}
   | Topic_list_too_large
-  | Receipt_not_found of Ethereum_types.hash
+  | Receipt_not_found of hash
   | Too_many_logs of {limit : int}
 
 (** [height_from_param (module Rollup_node_rpc) from to_] returns the
@@ -129,6 +136,17 @@ let validate_topics (filter : Filter.t) =
       tzfail Topic_list_too_large
   | _ -> return_unit
 
+let validate_bloom_filter (filter : Filter.t) =
+  let open Lwt_result_syntax in
+  let* () = validate_topics filter in
+  let bloom = make_bloom filter in
+  let topics = Option.value ~default:[] filter.topics in
+  let address =
+    Option.map (function Filter.Single a -> [a] | Vec l -> l) filter.address
+    |> Option.value ~default:[]
+  in
+  return {bloom; topics; address}
+
 (* Parsing a filter into a simpler representation, this is the
    input validation step *)
 let validate_filter log_filter_config
@@ -158,7 +176,7 @@ let hex_to_bytes h = hex_to_bytes h |> Bytes.of_string
 
 (* Checks if a filter's topics matches a log's topics, as specified in
    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getfilterchanges *)
-let match_filter_topics (filter : valid_filter) (log_topics : hash list) : bool
+let match_filter_topics (filter : bloom_filter) (log_topics : hash list) : bool
     =
   let match_one_topic (filter_topic : Filter.topic option) (log_topic : hash) =
     match (filter_topic, log_topic) with
@@ -179,11 +197,11 @@ let match_filter_topics (filter : valid_filter) (log_topics : hash list) : bool
   go filter.topics log_topics
 
 (* Checks if a filter's address matches a log's address *)
-let match_filter_address (filter : valid_filter) (address : address) : bool =
+let match_filter_address (filter : bloom_filter) (address : address) : bool =
   List.is_empty filter.address || List.mem ~equal:( = ) address filter.address
 
 (* Apply a filter on one log *)
-let filter_one_log : valid_filter -> transaction_log -> Filter.changes option =
+let filter_one_log : bloom_filter -> transaction_log -> Filter.changes option =
  fun filter log ->
   if
     match_filter_address filter log.address
@@ -191,17 +209,19 @@ let filter_one_log : valid_filter -> transaction_log -> Filter.changes option =
   then Some (Log log)
   else None
 
+let filter_receipt (filter : bloom_filter) (receipt : Transaction_receipt.t) =
+  if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom then
+    Some (List.filter_map (filter_one_log filter) receipt.logs)
+  else None
+
 (* Apply a filter on one transaction *)
 let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
-    valid_filter -> hash -> Filter.changes list option tzresult Lwt.t =
+    bloom_filter -> hash -> Filter.changes list option tzresult Lwt.t =
  fun filter tx_hash ->
   let open Lwt_result_syntax in
   let* receipt = Rollup_node_rpc.Block_storage.transaction_receipt tx_hash in
   match receipt with
-  | Some receipt ->
-      if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom
-      then return_some @@ List.filter_map (filter_one_log filter) receipt.logs
-      else return_none
+  | Some receipt -> return @@ filter_receipt filter receipt
   | None -> tzfail (Receipt_not_found tx_hash)
 
 (* Apply a filter on one block *)
@@ -221,6 +241,9 @@ let filter_one_block (module Rollup_node_rpc : Services_backend_sig.S) :
         (* Impossible:
            The block is requested without tx objects *)
         assert false
+  in
+  let filter =
+    {bloom = filter.bloom; topics = filter.topics; address = filter.address}
   in
   if Ethbloom.contains_bloom (hex_to_bytes block.logsBloom) filter.bloom then
     let+ changes =
@@ -333,7 +356,7 @@ let () =
     ~id:"evm_node_dev_receipt_not_found"
     ~title:"Receipt not found"
     ~description:"Could not found requested receipt"
-    Data_encoding.(obj1 (req "receipt_not_found" Ethereum_types.hash_encoding))
+    Data_encoding.(obj1 (req "receipt_not_found" hash_encoding))
     (function Receipt_not_found hash -> Some hash | _ -> None)
     (fun hash -> Receipt_not_found hash) ;
   register_error_kind
