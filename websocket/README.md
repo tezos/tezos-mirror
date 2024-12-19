@@ -17,3 +17,9 @@ Copy the meaningful files
 ```sh
 rsync -am  --exclude='_opam' --include='core/**.ml*' --include='lwt/**.ml*' --include='*/' --exclude='*' /tmp/ocaml-websocket/ $(git rev-parse --show-toplevel)/websocket/
 ```
+
+Apply patches
+
+```bash
+git am -3 $(git rev-parse --show-toplevel)/websocket/patches/*
+```
