@@ -14,14 +14,18 @@ module Node = struct
   include Tezt_tezos.Node
 
   module Agent = struct
-    let create ?(arguments = []) ?data_dir
+    let create ?(metadata_size_limit = true) ?(arguments = []) ?data_dir
         ?(path = Uses.path Constant.octez_node) ?name agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
-      let arguments = Metadata_size_limit (Some 10_000) :: arguments in
+      let arguments =
+        if metadata_size_limit then
+          Metadata_size_limit (Some 10_000) :: arguments
+        else arguments
+      in
       create
         ?data_dir
         ?name
@@ -33,14 +37,18 @@ module Node = struct
         arguments
       |> Lwt.return
 
-    let init ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
-        ?name agent =
+    let init ?(metadata_size_limit = true) ?(arguments = []) ?data_dir
+        ?(path = Uses.path Constant.octez_node) ?name agent =
       let runner = Agent.runner agent in
       let* path = Agent.copy agent ~source:path in
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
-      let arguments = Metadata_size_limit (Some 10_000) :: arguments in
+      let arguments =
+        if metadata_size_limit then
+          Metadata_size_limit (Some 10_000) :: arguments
+        else arguments
+      in
       init
         ?name
         ?data_dir
