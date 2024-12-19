@@ -1506,14 +1506,7 @@ let patch_kernel_command =
       in
       if force then
         let* _status =
-          Evm_context.start
-            ~configuration
-            ~data_dir
-            ~store_perm:`Read_write
-              (* Since we won’t execute anything, we don’t care about the following
-                 argument. *)
-            ~fail_on_missing_blueprint:true
-            ()
+          Evm_context.start ~configuration ~data_dir ~store_perm:`Read_write ()
         in
         Evm_context.patch_kernel ?block_number kernel_path
       else
@@ -2283,14 +2276,7 @@ let patch_state_command =
       in
       if force then
         let* _status =
-          Evm_context.start
-            ~configuration
-            ~data_dir
-            ~store_perm:`Read_write
-              (* Since we won’t execute anything, we don’t care about the following
-                 argument. *)
-            ~fail_on_missing_blueprint:true
-            ()
+          Evm_context.start ~configuration ~data_dir ~store_perm:`Read_write ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()
       else

@@ -23,7 +23,6 @@ type parameters = {
   kernel_path : string option;
   data_dir : string;
   smart_rollup_address : string option;
-  fail_on_missing_blueprint : bool;
   store_perm : [`Read_only | `Read_write];
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
@@ -50,7 +49,6 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
-  fail_on_missing_blueprint : bool;
   history : history;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
 }
@@ -59,6 +57,8 @@ type store_info = {
   rollup_address : Address.t;
   current_number : Ethereum_types.quantity;
 }
+
+let is_sequencer t = Option.is_some t.sequencer_wallet
 
 let pvm_config ctxt =
   Config.config
@@ -477,14 +477,14 @@ module State = struct
                 must_exit = true;
               }
           in
-          if ctxt.fail_on_missing_blueprint then
+          if is_sequencer ctxt then
             (* Sequencer must fail in case of divergence. *)
             tzfail exit_error
           else
             (* Observers needs to reset at finalized level. *)
             let* evm_state = reset_to_finalized_level exit_error ctxt conn in
             return (evm_state, latest_finalized_level)
-    | None when ctxt.fail_on_missing_blueprint ->
+    | None when is_sequencer ctxt ->
         let*! () =
           Evm_events_follower_events.missing_blueprint
             (number, expected_block_hash)
@@ -658,8 +658,7 @@ module State = struct
     match try_apply with
     | Apply_success {evm_state; block} ->
         let* () =
-          (* A dirty way to avoid doing this in sequencer mode, to refine. *)
-          if ctxt.fail_on_missing_blueprint then return_unit
+          if is_sequencer ctxt then return_unit
           else
             let* finalized_hash =
               Evm_store.Pending_confirmations.find_with_level conn block.number
@@ -747,7 +746,7 @@ module State = struct
         return (evm_state, context, block, applied_kernel_upgrade, split_info)
     | Apply_failure (* Did not produce a block *) ->
         let*! () =
-          if ctxt.fail_on_missing_blueprint then
+          if is_sequencer ctxt then
             Blueprint_events.invalid_blueprint_produced next
           else Blueprint_events.invalid_blueprint_applied next
         in
@@ -1109,9 +1108,8 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let init ~(configuration : Configuration.t) ?kernel_path
-      ~fail_on_missing_blueprint ~data_dir ?smart_rollup_address ~store_perm
-      ?sequencer_wallet () =
+  let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
+      ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1132,7 +1130,9 @@ module State = struct
     Evm_store.use store @@ fun conn ->
     let* () =
       let* is_empty = Evm_store.Pending_confirmations.is_empty conn in
-      when_ (fail_on_missing_blueprint && not is_empty) (fun () ->
+      when_
+        (Option.is_some sequencer_wallet && not is_empty)
+        (fun () ->
           failwith "Store has pending confirmation, state is not final")
     in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
@@ -1227,7 +1227,6 @@ module State = struct
             last_split_block;
           };
         store;
-        fail_on_missing_blueprint;
         history;
         sequencer_wallet;
       }
@@ -1493,7 +1492,6 @@ module Handlers = struct
         kernel_path : string option;
         data_dir : string;
         smart_rollup_address : string option;
-        fail_on_missing_blueprint;
         store_perm;
         sequencer_wallet;
       } =
@@ -1504,7 +1502,6 @@ module Handlers = struct
         ?kernel_path
         ~data_dir
         ?smart_rollup_address
-        ~fail_on_missing_blueprint
         ~store_perm
         ?sequencer_wallet
         ()
@@ -1685,7 +1682,7 @@ let export_store ~data_dir ~output_db_file =
   return {rollup_address; current_number}
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
-    ~fail_on_missing_blueprint ~store_perm ?sequencer_wallet () =
+    ~store_perm ?sequencer_wallet () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1697,7 +1694,6 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         kernel_path;
         data_dir;
         smart_rollup_address;
-        fail_on_missing_blueprint;
         store_perm;
         sequencer_wallet;
       }
@@ -1882,7 +1878,6 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
       ~configuration
       ~data_dir
       ~smart_rollup_address
-      ~fail_on_missing_blueprint:false
       ~store_perm:`Read_write
       ()
   in

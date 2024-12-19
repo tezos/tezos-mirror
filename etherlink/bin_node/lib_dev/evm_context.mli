@@ -49,11 +49,6 @@ val export_store :
     [smart_rollup_address] can be provided either when starting from a
     non-existing data-dir, or when starting a sandbox.
 
-    [fail_on_missing_blueprint] will decide the behavior of the worker when a
-    blueprint is confirmed by a rollup node before it is applied by the EVM
-    node. A sequencer will typically set it to true, while observers set it to
-    [false] for now.
-
     [store_perm] decides whether or not the worker can modify the Irmin context
     (it is most certainly an artifact of the past, made outdated by the
     [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
@@ -64,7 +59,6 @@ val start :
   ?kernel_path:string ->
   data_dir:string ->
   ?smart_rollup_address:string ->
-  fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->
   ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
   unit ->
