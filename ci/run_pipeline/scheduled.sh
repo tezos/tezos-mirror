@@ -25,10 +25,6 @@ DATA="$(
     {
       "key": "TZ_SCHEDULE_KIND",
       "value": "$TZ_SCHEDULE_KIND"
-    },
-    {
-      "key": "CI_PIPELINE__TYPE",
-      "value": "$CI_PIPELINE__TYPE"
     }
   ]
 }
@@ -42,7 +38,6 @@ Will run a schedule_extended_test pipeline for:
   CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
                 BRANCH = $BRANCH
       TZ_SCHEDULE_KIND = $TZ_SCHEDULE_KIND
-     CI_PIPELINE__TYPE = $CI_PIPELINE__TYPE
 EOF
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
