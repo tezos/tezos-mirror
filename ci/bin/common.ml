@@ -1339,7 +1339,7 @@ let job_build_layer1_profiling =
          ~source_version:true
          ~eval_opam:true
          [])
-    ~variables:[("TEZOS_PPX_PROFILER", "profiling")]
+    ~variables:[("TEZOS_PPX_PROFILER", "profiling"); ("PROFILE", "static")]
     ["make octez-layer1"]
   |> enable_cargo_cache |> enable_sccache
 

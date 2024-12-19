@@ -1219,6 +1219,7 @@ build-layer1-profiling:
   - ./scripts/ci/sccache-stop.sh
   variables:
     TEZOS_PPX_PROFILER: profiling
+    PROFILE: static
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
