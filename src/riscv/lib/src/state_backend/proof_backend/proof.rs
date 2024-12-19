@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -13,8 +14,11 @@
 //!
 //! - Convert [`MerkleTree`] to [`MerkleProof`]
 
-use super::tree::{ModifyResult, Tree};
-use crate::{state_backend::hash::Hash, storage::DIGEST_SIZE};
+use super::tree::{impl_modify_map_collect, ModifyResult, Tree};
+use crate::{
+    state_backend::hash::{Hash, RootHashable},
+    storage::{HashError, DIGEST_SIZE},
+};
 use itertools::Itertools;
 
 /// Structure of a proof transitioning from state A to state B.
@@ -43,6 +47,13 @@ impl Proof {
     /// Get the proof tree.
     pub fn tree(&self) -> &MerkleProof {
         &self.partial_tree
+    }
+
+    /// Get the initial state hash of the proof.
+    pub fn initial_state_hash(&self) -> Hash {
+        self.partial_tree
+            .hash()
+            .expect("Computing the root hash of the Merkle proof should not fail")
     }
 
     /// Get the final state hash of the proof.
@@ -96,6 +107,25 @@ impl MerkleProof {
             MerkleProof::Leaf(MerkleProofLeaf::Blind(_)) => Tag::Leaf(LeafTag::Blind),
             MerkleProof::Leaf(MerkleProofLeaf::Read(_)) => Tag::Leaf(LeafTag::Read),
         }
+    }
+}
+
+impl RootHashable for MerkleProof {
+    fn hash(&self) -> Result<Hash, HashError> {
+        impl_modify_map_collect(
+            self,
+            |subtree| {
+                Ok(match subtree {
+                    Tree::Node(vec) => ModifyResult::NodeContinue((), vec.iter().collect()),
+                    Tree::Leaf(data) => ModifyResult::LeafStop(data),
+                })
+            },
+            |leaf| match leaf {
+                MerkleProofLeaf::Blind(hash) => Ok(*hash),
+                MerkleProofLeaf::Read(data) => Hash::blake2b_hash_bytes(data.as_slice()),
+            },
+            |(), leaves| leaves.hash(),
+        )
     }
 }
 
