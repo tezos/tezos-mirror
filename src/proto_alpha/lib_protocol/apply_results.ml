@@ -1016,15 +1016,13 @@ let equal_manager_kind :
   | Kind.Zk_rollup_update_manager_kind, _ -> None
 
 module Encoding = struct
-  let consensus_result_encoding power_name =
+  let consensus_result_encoding =
     let open Data_encoding in
     obj4
       (dft "balance_updates" Receipt.balance_updates_encoding [])
       (req "delegate" Signature.Public_key_hash.encoding)
-      (req (Format.asprintf "%s_power" power_name) int31)
+      (req "consensus_power" int31)
       (req "consensus_key" Signature.Public_key_hash.encoding)
-
-  let consensus_result_encoding = consensus_result_encoding "consensus"
 
   type case =
     | Case : {
