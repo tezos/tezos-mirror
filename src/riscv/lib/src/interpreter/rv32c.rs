@@ -8,6 +8,7 @@
 //! U:C-16
 
 use crate::{
+    interpreter::i,
     machine_state::{
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
@@ -147,7 +148,7 @@ where
     /// Copies the value in register `rs2` into register `rd_rs1`.
     pub fn run_cmv(&mut self, rd_rs1: XRegister, rs2: XRegister) {
         debug_assert!(rd_rs1 != x0 && rs2 != x0);
-        self.run_add(rs2, x0, rd_rs1)
+        i::run_add(self, rs2, x0, rd_rs1)
     }
 
     /// `C.ADD` CR-type compressed instruction
@@ -156,7 +157,7 @@ where
     /// back to register `rd_rs1`.
     pub fn run_cadd(&mut self, rd_rs1: XRegister, rs2: XRegister) {
         debug_assert!(rd_rs1 != x0 && rs2 != x0);
-        self.run_add(rd_rs1, rs2, rd_rs1)
+        i::run_add(self, rd_rs1, rs2, rd_rs1)
     }
 
     /// `C.AND` CA-type compressed instruction
