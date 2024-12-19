@@ -1582,12 +1582,21 @@ let jobs pipeline_type =
           ~dependencies:(Dependent [Job job_build_kernels])
           ["make -C etherlink/firehose check"]
       in
+      let job_audit_riscv_deps : tezos_job =
+        make_job_kernel
+          ~stage:Stages.sanity
+          ~__POS__
+          ~name:"audit_riscv_deps"
+          ~changes:changeset_riscv_kernels
+          ["make -C src/riscv audit"]
+      in
       let job_check_riscv_kernels : tezos_job =
         make_job_kernel
           ~stage:Stages.build
           ~__POS__
           ~name:"check_riscv_kernels"
           ~changes:changeset_riscv_kernels
+          ~dependencies:(Dependent [Job job_audit_riscv_deps])
           ["make -C src/riscv CHECK_FEATURES= check"]
       in
       let job_test_riscv_kernels : tezos_job =
@@ -1596,7 +1605,7 @@ let jobs pipeline_type =
           ~name:"test_riscv_kernels"
           ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          ["make -C src/riscv test"; "make -C src/riscv audit"]
+          ["make -C src/riscv test"]
       in
       let job_test_long_riscv_kernels : tezos_job =
         make_job_kernel
@@ -1625,6 +1634,7 @@ let jobs pipeline_type =
         job_test_kernels;
         job_test_etherlink_kernel;
         job_test_etherlink_firehose;
+        job_audit_riscv_deps;
         job_check_riscv_kernels;
         job_test_riscv_kernels;
         job_test_long_riscv_kernels;

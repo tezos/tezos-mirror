@@ -3072,6 +3072,44 @@ test_etherlink_firehose:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
+audit_riscv_deps:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - images/**/*
+    - src/kernel_sdk/**/*
+    - src/riscv/**/*
+    when: on_success
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C src/riscv audit
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
@@ -3085,6 +3123,9 @@ check_riscv_kernels:
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - audit_riscv_deps
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -3142,7 +3183,6 @@ test_riscv_kernels:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv test
-  - make -C src/riscv audit
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
