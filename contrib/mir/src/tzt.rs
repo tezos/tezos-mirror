@@ -98,6 +98,8 @@ pub struct TztTest<'a> {
     pub self_addr: Option<AddressHash>,
     /// Other known contracts, as defined by `other_contracts` field.
     pub other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
+    /// Initial value for "now" in the context.
+    pub now: Option<BigInt>,
 }
 
 fn populate_ctx_with_known_contracts(
@@ -177,6 +179,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_parameter: Option<Micheline> = None;
         let mut m_self: Option<Micheline> = None;
         let mut m_other_contracts: Option<Vec<(Micheline, Micheline)>> = None;
+        let mut m_now : Option<BigInt> = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -203,6 +206,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 Parameter(ty) => set_tzt_field("parameter", &mut m_parameter, ty)?,
                 SelfAddr(v) => set_tzt_field("self", &mut m_self, v)?,
                 OtherContracts(v) => set_tzt_field("other_contracts", &mut m_other_contracts, v)?,
+                Now(n) => set_tzt_field("now", &mut m_now, n.into())?,
             }
         }
 
@@ -293,6 +297,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             parameter,
             self_addr,
             other_contracts,
+            now: m_now,
         })
     }
 }
@@ -386,6 +391,7 @@ pub(crate) enum TztEntity<'a> {
     Parameter(Micheline<'a>),
     SelfAddr(Micheline<'a>),
     OtherContracts(Vec<(Micheline<'a>, Micheline<'a>)>),
+    Now(i64),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test. This is a
@@ -450,6 +456,8 @@ pub fn run_tzt_test<'a>(
         test.self_addr.clone().map(|x| (x, test.parameter.clone())),
         test.other_contracts.clone(),
     );
+
+    ctx.now = test.now.clone().unwrap_or(Ctx::default().now);
 
     let execution_result =
         execute_tzt_test_code(test.code, &mut ctx, arena, test.parameter, test.input);

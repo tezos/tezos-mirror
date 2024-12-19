@@ -147,6 +147,7 @@ defprim! {
     Contract,
     #[token("Gas_exhaustion")]
     OutOfGas,
+    now,
 }
 
 /// Either a Micheline primitive, TZT primitive, or a macro lexeme.
