@@ -20,6 +20,11 @@ type pending_kernel_upgrade = {
   injected_before : Ethereum_types.quantity;
 }
 
+type metadata = {
+  smart_rollup_address : Address.t;
+  history_mode : Configuration.history_mode;
+}
+
 module Q = struct
   open Caqti_request.Infix
   open Caqti_type.Std
@@ -154,6 +159,16 @@ module Q = struct
         @@ Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt bytes)
       string
 
+  let history_mode =
+    custom
+      ~encode:(function
+        | Configuration.Archive -> Ok "archive" | Rolling -> Ok "rolling")
+      ~decode:(function
+        | "archive" -> Ok Archive
+        | "rolling" -> Ok Rolling
+        | s -> Error (Format.sprintf "Cannot decode %S" s))
+      string
+
   let levels =
     custom
       ~encode:(fun {current_number; l1_level; finalized} ->
@@ -211,16 +226,16 @@ module Q = struct
           (with leading 0s) followed by the name of the migration (e.g.
           [005_create_blueprints_table.sql])
         - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
+        - Increment [version]
         - Regenerate the schemas, using [[
               dune exec -- etherlink/tezt/tests/main.exe --file evm_sequencer.ml \
                 evm store schemas regression --reset-regressions
           ]]
-        - Increment [version]
 
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 15
+    let version = 16
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -366,13 +381,29 @@ module Q = struct
   end
 
   module Metadata = struct
-    let insert =
+    let insert_smart_rollup_address =
       (smart_rollup_address ->. unit)
-      @@ {|INSERT INTO metadata (smart_rollup_address) VALUES (?)|}
+      @@ {|
+INSERT INTO metadata (key, value) VALUES ('smart_rollup_address', ?)
+ON CONFLICT(key)
+DO UPDATE SET value = excluded.value
+|}
 
-    let get =
+    let get_smart_rollup_address =
       (unit ->! smart_rollup_address)
-      @@ {|SELECT smart_rollup_address from metadata|}
+      @@ {|SELECT value from metadata WHERE key = 'smart_rollup_address'|}
+
+    let insert_history_mode =
+      (history_mode ->. unit)
+      @@ {|
+INSERT INTO metadata (key, value) VALUES ('history_mode', ?)
+ON CONFLICT(key)
+DO UPDATE SET value = excluded.value
+|}
+
+    let get_history_mode =
+      (unit ->! history_mode)
+      @@ {|SELECT value from metadata WHERE key = 'history_mode'|}
   end
 
   module Transactions = struct
@@ -810,15 +841,34 @@ module L1_l2_levels_relationships = struct
 end
 
 module Metadata = struct
-  let store store smart_rollup_address =
+  let store store {smart_rollup_address; history_mode} =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Metadata.insert smart_rollup_address
+    let* () =
+      Db.exec conn Q.Metadata.insert_smart_rollup_address smart_rollup_address
+    in
+    Db.exec conn Q.Metadata.insert_history_mode history_mode
 
   let get store =
-    with_connection store @@ fun conn -> Db.find conn Q.Metadata.get ()
+    with_connection store @@ fun conn ->
+    let open Lwt_result_syntax in
+    let* smart_rollup_address =
+      Db.find conn Q.Metadata.get_smart_rollup_address ()
+    in
+    let* history_mode = Db.find conn Q.Metadata.get_history_mode () in
+    return {smart_rollup_address; history_mode}
 
   let find store =
-    with_connection store @@ fun conn -> Db.find_opt conn Q.Metadata.get ()
+    with_connection store @@ fun conn ->
+    let open Lwt_result_syntax in
+    let* smart_rollup_address =
+      Db.find_opt conn Q.Metadata.get_smart_rollup_address ()
+    in
+    let* history_mode = Db.find_opt conn Q.Metadata.get_history_mode () in
+    match (smart_rollup_address, history_mode) with
+    | Some smart_rollup_address, Some history_mode ->
+        return_some {smart_rollup_address; history_mode}
+    | _ -> return_none
 end
 
 module Transactions = struct

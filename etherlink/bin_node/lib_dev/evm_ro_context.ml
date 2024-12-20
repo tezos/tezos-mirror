@@ -89,7 +89,9 @@ let load ?network ?smart_rollup_address ~data_dir configuration =
   in
   let* smart_rollup_address =
     match smart_rollup_address with
-    | None -> Evm_store.(use store Metadata.get)
+    | None ->
+        let* metadata = Evm_store.(use store Metadata.get) in
+        return metadata.smart_rollup_address
     | Some smart_rollup_address -> return smart_rollup_address
   in
 

@@ -228,14 +228,17 @@ module L1_l2_levels_relationships : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+type metadata = {
+  smart_rollup_address : Address.t;
+  history_mode : Configuration.history_mode;
+}
+
 module Metadata : sig
-  val store :
-    conn -> Tezos_crypto.Hashed.Smart_rollup_address.t -> unit tzresult Lwt.t
+  val store : conn -> metadata -> unit tzresult Lwt.t
 
-  val get : conn -> Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
+  val get : conn -> metadata tzresult Lwt.t
 
-  val find :
-    conn -> Tezos_crypto.Hashed.Smart_rollup_address.t option tzresult Lwt.t
+  val find : conn -> metadata option tzresult Lwt.t
 end
 
 (** [reset_after conn ~l2_level] clear the table that has information related to l2

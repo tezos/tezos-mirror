@@ -1201,6 +1201,19 @@ module State = struct
         *)
         return Tezos_crypto.Hashed.Smart_rollup_address.zero
 
+  let check_metadata ~store_metadata ~smart_rollup_address ~history_mode =
+    let open Lwt_result_syntax in
+    let* smart_rollup_address =
+      check_smart_rollup_address
+        ~store_smart_rollup_address:
+          (Option.map
+             (fun (metadata : Evm_store.metadata) ->
+               metadata.smart_rollup_address)
+             store_metadata)
+        ~smart_rollup_address
+    in
+    return ({smart_rollup_address; history_mode} : Evm_store.metadata)
+
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
@@ -1241,17 +1254,18 @@ module State = struct
           Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
           smart_rollup_address
       in
-      let* store_smart_rollup_address = Evm_store.Metadata.find conn in
-      let* smart_rollup_address =
-        check_smart_rollup_address
-          ~store_smart_rollup_address
+      let* store_metadata = Evm_store.Metadata.find conn in
+      let* metadata =
+        check_metadata
+          ~store_metadata
           ~smart_rollup_address
+          ~history_mode:configuration.experimental_features.history_mode
       in
       let* () =
-        when_ (Option.is_none store_smart_rollup_address) (fun () ->
-            Evm_store.Metadata.store conn smart_rollup_address)
+        when_ (Option.is_none store_metadata) (fun () ->
+            Evm_store.Metadata.store conn metadata)
       in
-      return smart_rollup_address
+      return metadata.smart_rollup_address
     in
     let* evm_state, context =
       match kernel_path with
@@ -1762,10 +1776,10 @@ let export_store ~data_dir ~output_db_file =
   let open Lwt_result_syntax in
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   Evm_store.use store @@ fun conn ->
-  let* rollup_address = Evm_store.Metadata.get conn in
+  let* metadata = Evm_store.Metadata.get conn in
   let* current_number, _ = Evm_store.Context_hashes.get_latest conn in
   let* () = Evm_store.vacuum ~conn ~output_db_file in
-  return {rollup_address; current_number}
+  return {rollup_address = metadata.smart_rollup_address; current_number}
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
     ~store_perm ?sequencer_wallet () =
