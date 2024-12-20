@@ -221,6 +221,7 @@ let etherlink_upgrade () =
           (* The protocol is not used to setup an octez node. *)
           data_dir = None;
           client_dir = None;
+          operator = None;
         }
       ()
   in
