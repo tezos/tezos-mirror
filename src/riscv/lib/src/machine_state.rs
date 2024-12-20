@@ -655,7 +655,10 @@ pub enum MachineError {
 #[cfg(test)]
 mod tests {
     use super::{
-        instruction::{Args, Instruction, OpCode},
+        instruction::{
+            tagged_instruction::{TaggedArgs, TaggedInstruction},
+            Instruction, OpCode,
+        },
         main_memory::tests::T1K,
         MachineState, MachineStateLayout,
     };
@@ -1235,15 +1238,17 @@ mod tests {
         let mut state = create_state!(MachineState, MachineStateLayout<M8K, TestCacheLayouts>, F, M8K, TestCacheLayouts);
 
         let uncompressed_bytes = 0x5307b3;
-        let uncompressed = Instruction {
+
+        let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Add,
-            args: Args {
-                rd: a5,
-                rs1: t1,
-                rs2: t0,
-                ..Args::DEFAULT
+            args: TaggedArgs {
+                rd: a5.into(),
+                rs1: t1.into(),
+                rs2: t0.into(),
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let start_ram = main_memory::FIRST_ADDRESS;
 
@@ -1301,21 +1306,23 @@ mod tests {
 
         let block_a = [
             // Store current instruction counter
-            Instruction {
+            Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::Auipc,
-                args: Args {
-                    rd: a0,
+                args: TaggedArgs {
+                    rd: a0.into(),
                     imm: 0,
-                    ..Args::DEFAULT
+                    ..TaggedArgs::DEFAULT
                 },
-            },
-            Instruction {
+            })
+            .unwrap(),
+            Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::CJ,
-                args: Args {
+                args: TaggedArgs {
                     imm: 128 - 4,
-                    ..Args::DEFAULT
+                    ..TaggedArgs::DEFAULT
                 },
-            },
+            })
+            .unwrap(),
         ];
 
         // InstrCacheable::CJ(CJTypeArgs { imm: 1024 })
@@ -1326,41 +1333,45 @@ mod tests {
         let csw_bytes: u16 = 0xc10c;
         let jalr_bytes: u32 = 0x50067;
         let block_b = [
-            Instruction {
+            Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::CLui,
-                args: Args {
-                    rd: a1,
+                args: TaggedArgs {
+                    rd: a1.into(),
                     imm: (u16::bits_subset(overwrite_bytes, 15, 12) as i64) << 12,
-                    ..Args::DEFAULT
+                    ..TaggedArgs::DEFAULT
                 },
-            },
-            Instruction {
+            })
+            .unwrap(),
+            Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::Addiw,
-                args: Args {
-                    rd: a1,
-                    rs1: a1,
+                args: TaggedArgs {
+                    rd: a1.into(),
+                    rs1: a1.into(),
                     imm: u16::bits_subset(overwrite_bytes, 11, 0) as i64,
-                    ..Args::DEFAULT
+                    ..TaggedArgs::DEFAULT
                 },
-            },
-            Instruction {
+            })
+            .unwrap(),
+            Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::CSw,
-                args: Args {
-                    rs1: a0,
-                    rs2: a1,
+                args: TaggedArgs {
+                    rs1: a0.into(),
+                    rs2: a1.into(),
                     imm: 0,
-                    ..Args::DEFAULT
+                    ..TaggedArgs::DEFAULT
                 },
-            },
-            Instruction {
+            })
+            .unwrap(),
+            Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::Jalr,
-                args: Args {
-                    rd: zero,
-                    rs1: a0,
+                args: TaggedArgs {
+                    rd: zero.into(),
+                    rs1: a0.into(),
                     imm: 0,
-                    ..Args::DEFAULT
+                    ..TaggedArgs::DEFAULT
                 },
-            },
+            })
+            .unwrap(),
         ];
 
         let phys_addr = main_memory::FIRST_ADDRESS;

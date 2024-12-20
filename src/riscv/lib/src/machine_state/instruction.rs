@@ -12,6 +12,8 @@
 //! when blocks are built in the block cache. This avoids the runtime overhead caused by
 //! dispatching every time an instruction is run.
 
+pub mod tagged_instruction;
+
 use super::{
     csregisters::CSRegister,
     main_memory::MainMemoryLayout,
@@ -33,20 +35,83 @@ use crate::{
     traps::Exception,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::{self, Debug, Formatter};
+use tagged_instruction::{opcode_to_argsshape, ArgsShape, TaggedInstruction};
 
 /// An instruction formed of an opcode and flat arguments.
 ///
 /// This is preferred within the caches, as it enables 'pre-dispatch' of functions
-/// at block construction, rather than during block execution.
 ///
 /// Instructions are constructable from [`InstrCacheable`] instructions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(try_from = "TaggedInstruction", into = "TaggedInstruction")]
 pub struct Instruction {
     /// The operation (over the machine state) that this instruction represents.
     pub opcode: OpCode,
     /// Arguments that are passed to the opcode-function. As a flat structure, it contains
     /// all possible arguments. Each instruction will only use a subset.
-    pub args: Args,
+    args: Args,
+}
+
+impl Debug for Instruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        struct DebugArgs<'a>(&'a dyn Fn(&mut Formatter<'_>) -> fmt::Result);
+
+        impl<'a> Debug for DebugArgs<'a> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                (self.0)(f)
+            }
+        }
+
+        let debug_args = |f: &mut Formatter<'_>| {
+            let mut debug_struct = f.debug_struct("Args");
+            // SAFETY: The variants used are validated on construction and deserialisation
+            // to be the opcode's associated register types, so this is safe.
+            unsafe {
+                match opcode_to_argsshape(&self.opcode) {
+                    ArgsShape::XSrcXDest => {
+                        debug_struct.field("rd", &self.args.rd.x);
+                        debug_struct.field("rs1", &self.args.rs1.x);
+                        debug_struct.field("rs2", &self.args.rs2.x);
+                    }
+                    ArgsShape::FSrcFDest => {
+                        debug_struct.field("rd", &self.args.rd.f);
+                        debug_struct.field("rs1", &self.args.rs1.f);
+                        debug_struct.field("rs2", &self.args.rs2.f);
+                    }
+                    ArgsShape::XSrcFDest => {
+                        debug_struct.field("rd", &self.args.rd.f);
+                        debug_struct.field("rs1", &self.args.rs1.x);
+                        debug_struct.field("rs2", &self.args.rs2.x);
+                    }
+                    ArgsShape::FSrcXDest => {
+                        debug_struct.field("rd", &self.args.rd.x);
+                        debug_struct.field("rs1", &self.args.rs1.f);
+                        debug_struct.field("rs2", &self.args.rs2.f);
+                    }
+                    ArgsShape::XSrcFSrc => {
+                        debug_struct.field("rd", &self.args.rd.x);
+                        debug_struct.field("rs1", &self.args.rs1.x);
+                        debug_struct.field("rs2", &self.args.rs2.f);
+                    }
+                }
+            }
+            debug_struct
+                .field("imm", &self.args.imm)
+                .field("csr", &self.args.csr)
+                .field("rs3f", &self.args.rs3f)
+                .field("rm", &self.args.rm)
+                .field("aq", &self.args.aq)
+                .field("rl", &self.args.rl)
+                .finish()
+        };
+        let debug_args = DebugArgs(&debug_args);
+
+        f.debug_struct("Instruction")
+            .field("opcode", &self.opcode)
+            .field("args", &debug_args)
+            .finish()
+    }
 }
 
 impl Instruction {
@@ -76,6 +141,11 @@ impl Instruction {
             | CXor | CSub | CAddw | CSubw | CNop | CLd | CLdsp | CSd | CSdsp | CAddiw | CFld
             | CFldsp | CFsd | CFsdsp | UnknownCompressed => InstrWidth::Compressed,
         }
+    }
+
+    /// Returns a reference to the arguments of an instruction.
+    pub fn args(&self) -> &Args {
+        &self.args
     }
 }
 
@@ -312,10 +382,15 @@ pub enum OpCode {
 
 impl OpCode {
     /// Dispatch an opcode to the function that will run over the machine state.
+    ///
+    /// # SAFETY
+    /// Calling the returned function **must** correspond to an `Args` belonging to an
+    /// instruction where the `OpCode` is the same as the `OpCode` of the current instruction.
     #[inline(always)]
     pub(super) fn to_run<ML: MainMemoryLayout, M: ManagerReadWrite>(
         self,
-    ) -> fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> unsafe fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception>
+    {
         match self {
             Self::Add => Args::run_add,
             Self::Sub => Args::run_sub,
@@ -517,23 +592,50 @@ impl Instruction {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        (self.opcode.to_run())(&self.args, core)
+        // SAFETY: Unsafe accesses in this function are due to using the [Register] union,
+        // which is safe as the registers used are validated against the opcode.
+        unsafe { (self.opcode.to_run())(&self.args, core) }
     }
 }
+
+/// A union of the X and F registers, which are both represented as u8.
+#[derive(Clone, Copy)]
+pub union Register {
+    pub x: XRegister,
+    pub f: FRegister,
+}
+
+impl From<XRegister> for Register {
+    fn from(x: XRegister) -> Self {
+        Self { x }
+    }
+}
+
+impl From<FRegister> for Register {
+    fn from(f: FRegister) -> Self {
+        Self { f }
+    }
+}
+
+impl PartialEq for Register {
+    fn eq(&self, other: &Self) -> bool {
+        // SAFETY: XRegister and FRegister are the same size as u8 and directly mappable to it.
+        unsafe { std::mem::transmute::<_, &u8>(self) == std::mem::transmute::<_, &u8>(other) }
+    }
+}
+
+impl Eq for Register {}
 
 /// Contains all possible arguments used by opcode-functions.
 ///
 /// Each opcode will only touch a subset of these.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Args {
-    pub rd: XRegister,
-    pub rs1: XRegister,
-    pub rs2: XRegister,
+    pub rd: Register,
+    pub rs1: Register,
+    pub rs2: Register,
     pub imm: i64,
     pub csr: CSRegister,
-    pub rdf: FRegister,
-    pub rs1f: FRegister,
-    pub rs2f: FRegister,
     pub rs3f: FRegister,
     pub rm: InstrRoundingMode,
     pub aq: bool,
@@ -542,14 +644,11 @@ pub struct Args {
 
 impl ConstDefault for Args {
     const DEFAULT: Self = Self {
-        rd: XRegister::x0,
-        rs1: XRegister::x0,
-        rs2: XRegister::x0,
+        rd: Register { x: XRegister::x0 },
+        rs1: Register { x: XRegister::x0 },
+        rs2: Register { x: XRegister::x0 },
         imm: 0,
         csr: CSRegister::fflags,
-        rdf: FRegister::f0,
-        rs1f: FRegister::f0,
-        rs2f: FRegister::f0,
         rs3f: FRegister::f0,
         rm: InstrRoundingMode::Dynamic,
         aq: false,
@@ -559,21 +658,24 @@ impl ConstDefault for Args {
 
 macro_rules! impl_r_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.hart.xregisters.$fn(self.rs1, self.rs2, self.rd);
-
+            core.hart.xregisters.$fn(self.rs1.x, self.rs2.x, self.rd.x);
             Ok(Next(InstrWidth::Uncompressed))
         }
     };
     ($impl: path, $fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            $impl(&mut core.hart.xregisters, self.rs1, self.rs2, self.rd);
+            $impl(&mut core.hart.xregisters, self.rs1.x, self.rs2.x, self.rd.x);
 
             Ok(Next(InstrWidth::Uncompressed))
         }
@@ -582,12 +684,13 @@ macro_rules! impl_r_type {
 
 macro_rules! impl_i_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.hart.xregisters.$fn(self.imm, self.rs1, self.rd);
-
+            core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.x);
             Ok(Next(InstrWidth::Uncompressed))
         }
     };
@@ -595,60 +698,74 @@ macro_rules! impl_i_type {
 
 macro_rules! impl_fload_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rdf)
+            core.$fn(self.imm, self.rs1.x, self.rd.f)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
     ($fn: ident, $width: expr) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rdf).map(|_| Next($width))
+            core.$fn(self.imm, self.rs1.x, self.rd.f)
+                .map(|_| Next($width))
         }
     };
 }
 macro_rules! impl_load_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rd)
+            core.$fn(self.imm, self.rs1.x, self.rd.x)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
     ($fn: ident, $width: expr) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rd).map(|_| Next($width))
+            core.$fn(self.imm, self.rs1.x, self.rd.x)
+                .map(|_| Next($width))
         }
     };
 }
 macro_rules! impl_cload_sp_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rd)
+            core.$fn(self.imm, self.rd.x)
                 .map(|_| Next(InstrWidth::Compressed))
         }
     };
 }
 macro_rules! impl_cfload_sp_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rdf)
+            core.$fn(self.imm, self.rd.f)
                 .map(|_| Next(InstrWidth::Compressed))
         }
     };
@@ -656,39 +773,48 @@ macro_rules! impl_cfload_sp_type {
 
 macro_rules! impl_store_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rs2)
+            core.$fn(self.imm, self.rs1.x, self.rs2.x)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
     ($fn: ident, $width: expr) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rs2).map(|_| Next($width))
+            core.$fn(self.imm, self.rs1.x, self.rs2.x)
+                .map(|_| Next($width))
         }
     };
 }
 macro_rules! impl_fstore_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rs2f)
+            core.$fn(self.imm, self.rs1.x, self.rs2.f)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
     ($fn: ident, $width: expr) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1, self.rs2f)
+            core.$fn(self.imm, self.rs1.x, self.rs2.f)
                 .map(|_| Next($width))
         }
     };
@@ -696,22 +822,26 @@ macro_rules! impl_fstore_type {
 
 macro_rules! impl_b_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rs1, self.rs2))
+            Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x))
         }
     };
 }
 
 macro_rules! impl_amo_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.rs1, self.rs2, self.rd, self.rl, self.aq)
+            core.$fn(self.rs1.x, self.rs2.x, self.rd.x, self.rl, self.aq)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
@@ -719,11 +849,13 @@ macro_rules! impl_amo_type {
 
 macro_rules! impl_ci_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.hart.xregisters.$fn(self.imm, self.rd);
+            core.hart.xregisters.$fn(self.imm, self.rd.x);
             Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
         }
     };
@@ -731,11 +863,13 @@ macro_rules! impl_ci_type {
 
 macro_rules! impl_cr_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.hart.xregisters.$fn(self.rd, self.rs2);
+            core.hart.xregisters.$fn(self.rd.x, self.rs2.x);
             Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
         }
     };
@@ -743,22 +877,26 @@ macro_rules! impl_cr_type {
 
 macro_rules! impl_cb_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rd))
+            Ok(core.hart.$fn(self.imm, self.rd.x))
         }
     };
 }
 
 macro_rules! impl_css_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs2)
+            core.$fn(self.imm, self.rs2.x)
                 .map(|_| Next(InstrWidth::Compressed))
         }
     };
@@ -766,11 +904,13 @@ macro_rules! impl_css_type {
 
 macro_rules! impl_fcss_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs2f)
+            core.$fn(self.imm, self.rs2.f)
                 .map(|_| Next(InstrWidth::Compressed))
         }
     };
@@ -778,12 +918,14 @@ macro_rules! impl_fcss_type {
 
 macro_rules! impl_csr_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
-                .$fn(self.csr, self.rs1, self.rd)
+                .$fn(self.csr, self.rs1.x, self.rd.x)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
@@ -791,12 +933,14 @@ macro_rules! impl_csr_type {
 
 macro_rules! impl_csr_imm_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
-                .$fn(self.csr, self.imm as u64, self.rd)
+                .$fn(self.csr, self.imm as u64, self.rd.x)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
@@ -804,23 +948,27 @@ macro_rules! impl_csr_imm_type {
 
 macro_rules! impl_f_x_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
-                .$fn(self.rs1, self.rdf)
+                .$fn(self.rs1.x, self.rd.f)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
 
     ($fn:ident, rm) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
-                .$fn(self.rs1, self.rm, self.rdf)
+                .$fn(self.rs1.x, self.rm, self.rd.f)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
@@ -828,23 +976,27 @@ macro_rules! impl_f_x_type {
 
 macro_rules! impl_x_f_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
-                .$fn(self.rs1f, self.rd)
+                .$fn(self.rs1.f, self.rd.x)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
 
     ($fn:ident, rm) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
-                .$fn(self.rs1f, self.rm, self.rd)
+                .$fn(self.rs1.f, self.rm, self.rd.x)
                 .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
@@ -852,29 +1004,54 @@ macro_rules! impl_x_f_type {
 
 macro_rules! impl_f_r_type {
     ($fn: ident) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
-            ) -> Result<ProgramCounterUpdate, Exception> {
-            core.hart.$fn(self.rs1f, self.rs2f, self.rdf).map(|_| Next(InstrWidth::Uncompressed))
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart
+                .$fn(self.rs1.f, self.rs2.f, self.rd.f)
+                .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
 
-    ($fn: ident, rd) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    ($fn: ident, (rd, x)) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
-            ) -> Result<ProgramCounterUpdate, Exception> {
-            core.hart.$fn(self.rs1f, self.rs2f, self.rd).map(|_| Next(InstrWidth::Uncompressed))
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart
+                .$fn(self.rs1.f, self.rs2.f, self.rd.x)
+                .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
 
-    ($fn:ident, $($field: ident),+) => {
-        fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    ($fn: ident, rm) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
-            ) -> Result<ProgramCounterUpdate, Exception> {
-            core.hart.$fn(self.rs1f, $(self.$field,)* self.rdf).map(|_| Next(InstrWidth::Uncompressed))
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart
+                .$fn(self.rs1.f, self.rm, self.rd.f)
+                .map(|_| Next(InstrWidth::Uncompressed))
+        }
+    };
+
+    ($fn: ident, (rs2, f), $($field: ident),+) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart
+                .$fn(self.rs1.f, self.rs2.f, $(self.$field,)* self.rd.f)
+                .map(|_| Next(InstrWidth::Uncompressed))
         }
     };
 }
@@ -934,35 +1111,45 @@ impl Args {
     impl_b_type!(run_bgeu);
 
     // RV64I U-type instructions
-    fn run_lui<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    //
+    // SAFETY: This function must only be called on an `Args` belonging
+    // to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_lui<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        core.hart.xregisters.run_lui(self.imm, self.rd);
+        core.hart.xregisters.run_lui(self.imm, self.rd.x);
         Ok(Next(InstrWidth::Uncompressed))
     }
 
-    fn run_auipc<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    // SAFETY: This function must only be called on an `Args` belonging
+    // to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_auipc<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        core.hart.run_auipc(self.imm, self.rd);
+        core.hart.run_auipc(self.imm, self.rd.x);
         Ok(Next(InstrWidth::Uncompressed))
     }
 
     // RV64I jump instructions
-    fn run_jal<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    //
+    // SAFETY: This function must only be called on an `Args` belonging
+    // to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_jal<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_jal(self.imm, self.rd)))
+        Ok(Set(core.hart.run_jal(self.imm, self.rd.x)))
     }
 
-    fn run_jalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    // SAFETY: This function must only be called on an `Args` belonging
+    // to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_jalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_jalr(self.imm, self.rs1, self.rd)))
+        Ok(Set(core.hart.run_jalr(self.imm, self.rs1.x, self.rd.x)))
     }
 
     // RV64A atomic instructions
@@ -1007,23 +1194,23 @@ impl Args {
     // RV64F instructions
     impl_fload_type!(run_flw);
     impl_fstore_type!(run_fsw);
-    impl_f_r_type!(run_feq_s, rd);
-    impl_f_r_type!(run_fle_s, rd);
-    impl_f_r_type!(run_flt_s, rd);
-    impl_f_r_type!(run_fadd_s, rs2f, rm);
-    impl_f_r_type!(run_fsub_s, rs2f, rm);
-    impl_f_r_type!(run_fmul_s, rs2f, rm);
-    impl_f_r_type!(run_fdiv_s, rs2f, rm);
+    impl_f_r_type!(run_feq_s, (rd, x));
+    impl_f_r_type!(run_fle_s, (rd, x));
+    impl_f_r_type!(run_flt_s, (rd, x));
+    impl_f_r_type!(run_fadd_s, (rs2, f), rm);
+    impl_f_r_type!(run_fsub_s, (rs2, f), rm);
+    impl_f_r_type!(run_fmul_s, (rs2, f), rm);
+    impl_f_r_type!(run_fdiv_s, (rs2, f), rm);
     impl_f_r_type!(run_fsqrt_s, rm);
     impl_f_r_type!(run_fmin_s);
     impl_f_r_type!(run_fmax_s);
     impl_f_r_type!(run_fsgnj_s);
     impl_f_r_type!(run_fsgnjn_s);
     impl_f_r_type!(run_fsgnjx_s);
-    impl_f_r_type!(run_fmadd_s, rs2f, rs3f, rm);
-    impl_f_r_type!(run_fmsub_s, rs2f, rs3f, rm);
-    impl_f_r_type!(run_fnmsub_s, rs2f, rs3f, rm);
-    impl_f_r_type!(run_fnmadd_s, rs2f, rs3f, rm);
+    impl_f_r_type!(run_fmadd_s, (rs2, f), rs3f, rm);
+    impl_f_r_type!(run_fmsub_s, (rs2, f), rs3f, rm);
+    impl_f_r_type!(run_fnmsub_s, (rs2, f), rs3f, rm);
+    impl_f_r_type!(run_fnmadd_s, (rs2, f), rs3f, rm);
     impl_x_f_type!(run_fclass_s);
     impl_x_f_type!(run_fmv_x_w);
     impl_f_x_type!(run_fmv_w_x);
@@ -1039,13 +1226,13 @@ impl Args {
     // RV64D instructions
     impl_fload_type!(run_fld);
     impl_fstore_type!(run_fsd);
-    impl_f_r_type!(run_feq_d, rd);
-    impl_f_r_type!(run_fle_d, rd);
-    impl_f_r_type!(run_flt_d, rd);
-    impl_f_r_type!(run_fadd_d, rs2f, rm);
-    impl_f_r_type!(run_fsub_d, rs2f, rm);
-    impl_f_r_type!(run_fmul_d, rs2f, rm);
-    impl_f_r_type!(run_fdiv_d, rs2f, rm);
+    impl_f_r_type!(run_feq_d, (rd, x));
+    impl_f_r_type!(run_fle_d, (rd, x));
+    impl_f_r_type!(run_flt_d, (rd, x));
+    impl_f_r_type!(run_fadd_d, (rs2, f), rm);
+    impl_f_r_type!(run_fsub_d, (rs2, f), rm);
+    impl_f_r_type!(run_fmul_d, (rs2, f), rm);
+    impl_f_r_type!(run_fdiv_d, (rs2, f), rm);
     impl_f_r_type!(run_fsqrt_d, rm);
     impl_f_r_type!(run_fmin_d);
     impl_f_r_type!(run_fmax_d);
@@ -1054,10 +1241,10 @@ impl Args {
     impl_f_r_type!(run_fsgnjx_d);
     impl_f_r_type!(run_fcvt_d_s, rm);
     impl_f_r_type!(run_fcvt_s_d, rm);
-    impl_f_r_type!(run_fmadd_d, rs2f, rs3f, rm);
-    impl_f_r_type!(run_fmsub_d, rs2f, rs3f, rm);
-    impl_f_r_type!(run_fnmsub_d, rs2f, rs3f, rm);
-    impl_f_r_type!(run_fnmadd_d, rs2f, rs3f, rm);
+    impl_f_r_type!(run_fmadd_d, (rs2, f), rs3f, rm);
+    impl_f_r_type!(run_fmsub_d, (rs2, f), rs3f, rm);
+    impl_f_r_type!(run_fnmsub_d, (rs2, f), rs3f, rm);
+    impl_f_r_type!(run_fnmadd_d, (rs2, f), rs3f, rm);
     impl_x_f_type!(run_fclass_d);
     impl_f_x_type!(run_fcvt_d_w, rm);
     impl_f_x_type!(run_fcvt_d_wu, rm);
@@ -1100,7 +1287,9 @@ impl Args {
     impl_cr_type!(run_csub);
     impl_css_type!(run_cswsp);
 
-    fn run_caddi16spn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    // SAFETY: This function must only be called on an `Args` belonging
+    // to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_caddi16spn<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
@@ -1115,18 +1304,22 @@ impl Args {
         Ok(Set(core.hart.run_cj(self.imm)))
     }
 
-    fn run_cjr<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    // SAFETY: This function must only be called on an `Args` belonging
+    // to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_cjr<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjr(self.rs1)))
+        Ok(Set(core.hart.run_cjr(self.rs1.x)))
     }
 
-    fn run_cjalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    // SAFETY: This function must only be called on an `Args` belonging
+    // to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_cjalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjalr(self.rs1)))
+        Ok(Set(core.hart.run_cjalr(self.rs1.x)))
     }
 
     fn run_cnop<ML: MainMemoryLayout, M: ManagerReadWrite>(
@@ -1958,9 +2151,9 @@ impl From<&InstrCacheable> for Instruction {
 impl From<&RTypeArgs> for Args {
     fn from(value: &RTypeArgs) -> Self {
         Self {
-            rd: value.rd,
-            rs1: value.rs1,
-            rs2: value.rs2,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             ..Self::DEFAULT
         }
     }
@@ -1969,8 +2162,11 @@ impl From<&RTypeArgs> for Args {
 impl From<&ITypeArgs> for Args {
     fn from(value: &ITypeArgs) -> Self {
         Self {
-            rd: value.rd,
-            rs1: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // We are adding a default value for rs2 as X0 to be explicit
+            // that it is of XRegister type.
+            rs2: XRegister::x0.into(),
             imm: value.imm,
             ..Self::DEFAULT
         }
@@ -1980,8 +2176,11 @@ impl From<&ITypeArgs> for Args {
 impl From<&SBTypeArgs> for Args {
     fn from(value: &SBTypeArgs) -> Self {
         Self {
-            rs1: value.rs1,
-            rs2: value.rs2,
+            // We are adding a default value for rd as X0 to be explicit
+            // that it is of XRegister type.
+            rd: XRegister::x0.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             imm: value.imm,
             ..Self::DEFAULT
         }
@@ -1991,7 +2190,11 @@ impl From<&SBTypeArgs> for Args {
 impl From<&UJTypeArgs> for Args {
     fn from(value: &UJTypeArgs) -> Self {
         Self {
-            rd: value.rd,
+            rd: value.rd.into(),
+            // We are adding a default value for rs1 and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rs1: XRegister::x0.into(),
+            rs2: XRegister::x0.into(),
             imm: value.imm,
             ..Self::DEFAULT
         }
@@ -2001,9 +2204,9 @@ impl From<&UJTypeArgs> for Args {
 impl From<&AmoArgs> for Args {
     fn from(value: &AmoArgs) -> Self {
         Self {
-            rd: value.rd,
-            rs1: value.rs1,
-            rs2: value.rs2,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             aq: value.aq,
             rl: value.rl,
             ..Self::DEFAULT
@@ -2014,8 +2217,12 @@ impl From<&AmoArgs> for Args {
 impl From<&CIBTypeArgs> for Args {
     fn from(value: &CIBTypeArgs) -> Self {
         Self {
-            rd: value.rd_rs1,
+            rd: value.rd_rs1.into(),
             imm: value.imm,
+            // We are adding a default value for rs1 and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rs1: XRegister::x0.into(),
+            rs2: XRegister::x0.into(),
             ..Self::DEFAULT
         }
     }
@@ -2024,8 +2231,11 @@ impl From<&CIBTypeArgs> for Args {
 impl From<&CRTypeArgs> for Args {
     fn from(value: &CRTypeArgs) -> Self {
         Self {
-            rd: value.rd_rs1,
-            rs2: value.rs2,
+            rd: value.rd_rs1.into(),
+            // We are adding a default value for rs1 and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rs1: XRegister::x0.into(),
+            rs2: value.rs2.into(),
             ..Self::DEFAULT
         }
     }
@@ -2034,6 +2244,11 @@ impl From<&CRTypeArgs> for Args {
 impl From<&CJTypeArgs> for Args {
     fn from(value: &CJTypeArgs) -> Self {
         Self {
+            // We are adding a default value for rd, rs1 and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rd: XRegister::x0.into(),
+            rs1: XRegister::x0.into(),
+            rs2: XRegister::x0.into(),
             imm: value.imm,
             ..Self::DEFAULT
         }
@@ -2043,7 +2258,11 @@ impl From<&CJTypeArgs> for Args {
 impl From<&CRJTypeArgs> for Args {
     fn from(value: &CRJTypeArgs) -> Self {
         Self {
-            rs1: value.rs1,
+            // We are adding a default value for rd and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rd: XRegister::x0.into(),
+            rs1: value.rs1.into(),
+            rs2: XRegister::x0.into(),
             ..Self::DEFAULT
         }
     }
@@ -2052,7 +2271,11 @@ impl From<&CRJTypeArgs> for Args {
 impl From<&CSSTypeArgs> for Args {
     fn from(value: &CSSTypeArgs) -> Self {
         Self {
-            rs2: value.rs2,
+            // We are adding a default value for rd and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rd: XRegister::x0.into(),
+            rs1: XRegister::x0.into(),
+            rs2: value.rs2.into(),
             imm: value.imm,
             ..Self::DEFAULT
         }
@@ -2062,8 +2285,11 @@ impl From<&CSSTypeArgs> for Args {
 impl From<&CsrArgs> for Args {
     fn from(value: &CsrArgs) -> Self {
         Self {
-            rd: value.rd,
-            rs1: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // We are adding a default value for rs2 as X0 to be explicit
+            // that it is of XRegister type.
+            rs2: XRegister::x0.into(),
             csr: value.csr,
             ..Self::DEFAULT
         }
@@ -2073,7 +2299,11 @@ impl From<&CsrArgs> for Args {
 impl From<&CsriArgs> for Args {
     fn from(value: &CsriArgs) -> Self {
         Self {
-            rd: value.rd,
+            rd: value.rd.into(),
+            // We are adding a default value for rs1 and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rs1: XRegister::x0.into(),
+            rs2: XRegister::x0.into(),
             imm: value.imm,
             csr: value.csr,
             ..Self::DEFAULT
@@ -2085,8 +2315,11 @@ impl From<&FLoadArgs> for Args {
     fn from(value: &FLoadArgs) -> Self {
         Self {
             imm: value.imm,
-            rdf: value.rd,
-            rs1: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // as these arguments associate with the XSrcFDst ArgsShape,
+            // we are adding a default value for rs2 as X0 to be explicit.
+            rs2: XRegister::x0.into(),
             ..Self::DEFAULT
         }
     }
@@ -2096,8 +2329,11 @@ impl From<&FStoreArgs> for Args {
     fn from(value: &FStoreArgs) -> Self {
         Self {
             imm: value.imm,
-            rs1: value.rs1,
-            rs2f: value.rs2,
+            // as these arguments associate with the XSrcFSrc ArgsShape,
+            // we are adding a default value for rd as X0 to be explicit.
+            rd: XRegister::x0.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             ..Self::DEFAULT
         }
     }
@@ -2107,7 +2343,12 @@ impl From<&CSSDTypeArgs> for Args {
     fn from(value: &CSSDTypeArgs) -> Self {
         Self {
             imm: value.imm,
-            rs2f: value.rs2,
+            // as these arguments associate with the XSrcFSrc ArgsShape,
+            // we are adding a default value for rd and rs1 as X0
+            // to be explicit.
+            rd: XRegister::x0.into(),
+            rs1: XRegister::x0.into(),
+            rs2: value.rs2.into(),
             ..Self::DEFAULT
         }
     }
@@ -2117,7 +2358,12 @@ impl From<&CIBDTypeArgs> for Args {
     fn from(value: &CIBDTypeArgs) -> Self {
         Self {
             imm: value.imm,
-            rdf: value.rd_rs1,
+            rd: value.rd_rs1.into(),
+            // as these arguments associate with the XSrcFDst ArgsShape,
+            // we are adding a default value for rs1 and rs2 as X0
+            // to be explicit.
+            rs1: XRegister::x0.into(),
+            rs2: XRegister::x0.into(),
             ..Self::DEFAULT
         }
     }
@@ -2126,8 +2372,11 @@ impl From<&CIBDTypeArgs> for Args {
 impl From<&XRegToFRegArgs> for Args {
     fn from(value: &XRegToFRegArgs) -> Self {
         Self {
-            rdf: value.rd,
-            rs1: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // as these arguments associate with the XSrcFDst ArgsShape,
+            // we are adding a default value for rs2 as X0 to be explicit.
+            rs2: XRegister::x0.into(),
             ..Self::DEFAULT
         }
     }
@@ -2136,8 +2385,11 @@ impl From<&XRegToFRegArgs> for Args {
 impl From<&XRegToFRegArgsWithRounding> for Args {
     fn from(value: &XRegToFRegArgsWithRounding) -> Self {
         Self {
-            rdf: value.rd,
-            rs1: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // as these arguments associate with the XSrcFDst ArgsShape,
+            // we are adding a default value for rs2 as X0 to be explicit.
+            rs2: XRegister::x0.into(),
             rm: value.rm,
             ..Self::DEFAULT
         }
@@ -2147,8 +2399,11 @@ impl From<&XRegToFRegArgsWithRounding> for Args {
 impl From<&FRegToXRegArgs> for Args {
     fn from(value: &FRegToXRegArgs) -> Self {
         Self {
-            rd: value.rd,
-            rs1f: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // as these arguments associate with the FSrcXDst ArgsShape,
+            // we are adding a default value for rs2 as F0.
+            rs2: FRegister::f0.into(),
             ..Self::DEFAULT
         }
     }
@@ -2157,8 +2412,11 @@ impl From<&FRegToXRegArgs> for Args {
 impl From<&FRegToXRegArgsWithRounding> for Args {
     fn from(value: &FRegToXRegArgsWithRounding) -> Self {
         Self {
-            rd: value.rd,
-            rs1f: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // as these arguments associate with the FSrcXDst ArgsShape,
+            // we are adding a default value for rs2 as F0.
+            rs2: FRegister::f0.into(),
             rm: value.rm,
             ..Self::DEFAULT
         }
@@ -2168,9 +2426,9 @@ impl From<&FRegToXRegArgsWithRounding> for Args {
 impl From<&FR3ArgsWithRounding> for Args {
     fn from(value: &FR3ArgsWithRounding) -> Self {
         Self {
-            rdf: value.rd,
-            rs1f: value.rs1,
-            rs2f: value.rs2,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             rs3f: value.rs3,
             rm: value.rm,
             ..Self::DEFAULT
@@ -2181,9 +2439,9 @@ impl From<&FR3ArgsWithRounding> for Args {
 impl From<&FRArgs> for Args {
     fn from(value: &FRArgs) -> Self {
         Self {
-            rdf: value.rd,
-            rs1f: value.rs1,
-            rs2f: value.rs2,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             ..Self::DEFAULT
         }
     }
@@ -2192,8 +2450,11 @@ impl From<&FRArgs> for Args {
 impl From<&FR1ArgWithRounding> for Args {
     fn from(value: &FR1ArgWithRounding) -> Self {
         Self {
-            rdf: value.rd,
-            rs1f: value.rs1,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            // as these arguments associate with the FSrcFDst ArgsShape,
+            // we are adding a default value for rs2 as F0 to be explicit.
+            rs2: FRegister::f0.into(),
             rm: value.rm,
             ..Self::DEFAULT
         }
@@ -2203,9 +2464,9 @@ impl From<&FR1ArgWithRounding> for Args {
 impl From<&FR2ArgsWithRounding> for Args {
     fn from(value: &FR2ArgsWithRounding) -> Self {
         Self {
-            rdf: value.rd,
-            rs1f: value.rs1,
-            rs2f: value.rs2,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             rm: value.rm,
             ..Self::DEFAULT
         }
@@ -2215,9 +2476,9 @@ impl From<&FR2ArgsWithRounding> for Args {
 impl From<&FCmpArgs> for Args {
     fn from(value: &FCmpArgs) -> Self {
         Self {
-            rd: value.rd,
-            rs1f: value.rs1,
-            rs2f: value.rs2,
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
             ..Self::DEFAULT
         }
     }

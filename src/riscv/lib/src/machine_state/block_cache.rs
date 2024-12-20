@@ -148,7 +148,10 @@ impl<ML: MainMemoryLayout> EnrichedValue for ICallPlaced<ML> {
 /// This allows static dispatch of this function during block construction,
 /// rather than for each instruction, during each block execution.
 pub struct ICall<ML: MainMemoryLayout, M: ManagerBase> {
-    run_instr: fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception>,
+    // SAFETY: This function must be called with an `Args` belonging to the same `OpCode` as
+    // the one used to dispatch this function.
+    run_instr:
+        unsafe fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception>,
 }
 
 impl<ML: MainMemoryLayout, M: ManagerBase> Clone for ICall<ML, M> {
@@ -160,8 +163,10 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Clone for ICall<ML, M> {
 impl<ML: MainMemoryLayout, M: ManagerBase> Copy for ICall<ML, M> {}
 
 impl<ML: MainMemoryLayout, M: ManagerReadWrite> ICall<ML, M> {
+    // SAFETY: This function must be called with an `Args` belonging to the same `OpCode` as
+    // the one used to dispatch this function.
     #[inline(always)]
-    fn run(
+    unsafe fn run(
         &self,
         args: &Args,
         core: &mut MachineCoreState<ML, M>,
@@ -868,10 +873,13 @@ fn run_instr<ML: MainMemoryLayout, M: ManagerReadWrite>(
     instr: &EnrichedCell<ICallPlaced<ML>, M>,
     core: &mut MachineCoreState<ML, M>,
 ) -> Result<ProgramCounterUpdate, Exception> {
-    let args = &instr.read_ref_stored().args;
+    let args = instr.read_ref_stored().args();
     let icall = instr.read_derived();
 
-    icall.run(args, core)
+    // SAFETY: This is safe, as the function we are calling is derived directly from the
+    // same instruction as the `Args` we are calling with. Therefore `args` will be of the
+    // required shape.
+    unsafe { icall.run(args, core) }
 }
 
 #[cfg(test)]
@@ -881,9 +889,11 @@ mod tests {
         backend_test, create_state,
         machine_state::{
             address_translation::PAGE_SIZE,
-            instruction::{Args, Instruction, OpCode},
-            main_memory,
-            main_memory::tests::T1K,
+            instruction::{
+                tagged_instruction::{TaggedArgs, TaggedInstruction},
+                Instruction, OpCode,
+            },
+            main_memory::{self, tests::T1K},
             mode::Mode,
             registers::{a0, a1, a2, t0, t1},
             MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
@@ -898,15 +908,16 @@ mod tests {
     backend_test!(test_writing_full_block_fetchable_uncompressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let uncompressed = Instruction {
+        let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
-            args: Args {
-                rs1: t1,
-                rs2: t0,
+            args: TaggedArgs {
+                rs1: t1.into(),
+                rs2: t0.into(),
                 imm: 8,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let phys_addr = 10;
 
@@ -922,14 +933,15 @@ mod tests {
     backend_test!(test_writing_full_block_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = Instruction {
+        let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
-            args: Args {
-                rd: a0,
+            args: TaggedArgs {
+                rd: a0.into(),
                 imm: 1,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let phys_addr = 10;
 
@@ -946,14 +958,15 @@ mod tests {
     backend_test!(test_writing_half_block_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = Instruction {
+        let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
-            args: Args {
-                rd: a0,
+            args: TaggedArgs {
+                rd: a0.into(),
                 imm: 1,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let phys_addr = 10;
 
@@ -969,14 +982,15 @@ mod tests {
     backend_test!(test_writing_two_blocks_fetchable_compressed, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = Instruction {
+        let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
-            args: Args {
-                rd: a0,
+            args: TaggedArgs {
+                rd: a0.into(),
                 imm: 1,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let phys_addr = 10;
 
@@ -997,14 +1011,15 @@ mod tests {
     backend_test!(test_crossing_page_exactly_creates_new_block, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let compressed = Instruction {
+        let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
-            args: Args {
-                rd: a0,
+            args: TaggedArgs {
+                rd: a0.into(),
                 imm: 1,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let phys_addr = PAGE_SIZE - 10;
 
@@ -1025,15 +1040,16 @@ mod tests {
         let mut core_state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let mut block_state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let addiw = Instruction {
+        let addiw = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Addiw,
-            args: Args {
-                rd: a1,
-                rs1: a1,
+            args: TaggedArgs {
+                rd: a1.into(),
+                rs1: a1.into(),
                 imm: 257,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let block_addr = main_memory::FIRST_ADDRESS;
 
@@ -1095,15 +1111,16 @@ mod tests {
     backend_test!(test_concat_blocks_suitable, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let uncompressed = Instruction {
+        let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
-            args: Args {
-                rs1: t1,
-                rs2: t0,
+            args: TaggedArgs {
+                rs1: t1.into(),
+                rs2: t0.into(),
                 imm: 8,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let phys_addr = 30;
         let preceding_num_instr: u64 = 5;
@@ -1131,15 +1148,16 @@ mod tests {
     backend_test!(test_concat_blocks_too_big, F, {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
-        let uncompressed = Instruction {
+        let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
-            args: Args {
-                rs1: t1,
-                rs2: t0,
+            args: TaggedArgs {
+                rs1: t1.into(),
+                rs2: t0.into(),
                 imm: 8,
-                ..Args::DEFAULT
+                ..TaggedArgs::DEFAULT
             },
-        };
+        })
+        .unwrap();
 
         let phys_addr = 30;
         let preceding_num_instr: u64 = 5;
@@ -1188,15 +1206,16 @@ mod tests {
             for i in 0..TEST_CACHE_SIZE {
                 block.push_instr_uncompressed(
                     i as Address,
-                    Instruction {
+                    Instruction::try_from(TaggedInstruction {
                         opcode: OpCode::Add,
-                        args: Args {
-                            rd: a1,
-                            rs1: a1,
-                            rs2: a2,
-                            ..Args::DEFAULT
+                        args: TaggedArgs {
+                            rd: a1.into(),
+                            rs1: a1.into(),
+                            rs2: a2.into(),
+                            ..TaggedArgs::DEFAULT
                         },
-                    },
+                    })
+                    .unwrap(),
                 );
             }
         };
