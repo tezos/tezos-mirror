@@ -180,6 +180,14 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- **Feature** The DAL node stores now a peers.json file in its
+  directory when it is shutdown with SIGINT. This file is read if it
+  exists when starting the DAL node to restore previous known
+  connections quickly.
+
+- **Bugfix** When shutting down the DAL node using SIGINT, it does a
+  best effort to shutdown properly its running P2P connections
+
 - The DAL node supports a ``config update`` command to update an
   existing configuration. It takes the same arguments as for the other
   commands. (MR :gl:`!15759`)
@@ -212,6 +220,7 @@ Protocol
   https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
 - A warning has been introduced in case it is observed that the DAL node lags
   behind the L1 node. (MR :gl:`!15756`)
+
 - **Change** The DAL node store version has been upgraded from 1 to 2.
   The DAL node store will automatically upgrade without requiring any
   user action. For users running the DAL node with the

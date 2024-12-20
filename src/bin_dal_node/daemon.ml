@@ -1277,6 +1277,11 @@ let run ~data_dir ~configuration_override =
       p2p_limits
       ~network_name
   in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    (* This is important to prevent stall connections. *)
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
+        Gossipsub.Transport_layer.shutdown transport_layer)
+  in
   (* Get the current L1 head and its DAL plugin and parameters. *)
   let* header = Shell_services.Blocks.Header.shell_header cctxt () in
   let head_level = header.Block_header.level in
