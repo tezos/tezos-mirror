@@ -81,8 +81,8 @@ If the :ref:`adaptive issuance <adaptive_issuance_alpha>`
 feature is activated, it grants delegators the ability to become
 'stakers' by placing security deposits. These deposits would contribute to their
 delegate's stake and could be subject to slashing penalties if their delegate
-misbehaves.  The staking power of funds placed by stakers and delegates is twice
-that of delegated funds.
+misbehaves.  The staking power of funds placed by stakers and delegates is three
+times that of delegated funds.
 
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
