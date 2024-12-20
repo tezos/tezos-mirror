@@ -1214,6 +1214,8 @@ build-layer1-profiling:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make octez-layer1
+  - mkdir -p octez-binaries/x86_64/
+  - mv octez-node octez-binaries/x86_64/
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -1225,7 +1227,7 @@ build-layer1-profiling:
   artifacts:
     expire_in: 1 day
     paths:
-    - ./octez-node
+    - ./octez-binaries/x86_64/octez-node
 
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
