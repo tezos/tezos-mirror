@@ -1,0 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name websocket_cohttp_lwt)
+ (public_name octez-evm-node-libs.websocket_cohttp_lwt)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.cohttp-lwt-unix
+  octez-evm-node-libs.websocket)
+ (modules websocket_cohttp_lwt))

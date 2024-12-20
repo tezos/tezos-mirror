@@ -42,6 +42,8 @@ let astring = external_lib "astring" V.True
 
 let bam_ppx = external_lib "bam-ppx" V.(at_least "0.3")
 
+let base64 = external_lib "base64" V.(at_least "3.3.0")
+
 let bheap = external_lib "bheap" V.(at_least "2.0.0")
 
 let bigarray_compat = external_lib "bigarray-compat" V.True
@@ -78,6 +80,8 @@ let checkseum_ocaml = external_sublib checkseum "checkseum.ocaml"
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
 let cohttp = external_lib "cohttp" V.(at_least "5.3.1")
+
+let conduit = external_lib "conduit-lwt" V.(at_least "7.1.0")
 
 let conduit_lwt = external_lib "conduit-lwt" V.(at_least "7.1.0")
 
@@ -169,6 +173,8 @@ let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
 let magic_mime = external_lib "magic-mime" V.(at_least "1.3.1")
 
 let memtrace = external_lib "memtrace" V.True
+
+let mirage_crypto_rng = external_lib "mirage-crypto-rng" V.(at_least "1.0.0")
 
 let mtime = external_lib "mtime" V.(at_least "2.0.0")
 

@@ -109,7 +109,7 @@ odoc-raw:
 	mkdir -p $(TMPDOCDIR)/
 	cd ..; rsync --recursive --links --perms --exclude=target \
 		$$(cat script-inputs/octez-source-content) \
-		client-libs etherlink $(TMPDOCDIR)/
+		client-libs etherlink websocket $(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/slim-mode.sh $$slim_mode
 	ODOC_WARN_ERROR=$$odoc_errors dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(CURDIR)/odoc.log 2>&1; \
 		RESULT=$$?; \
