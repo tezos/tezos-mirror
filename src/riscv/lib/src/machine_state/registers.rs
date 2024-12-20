@@ -160,6 +160,15 @@ impl XRegister {
     }
 }
 
+impl From<NonZeroXRegister> for XRegister {
+    fn from(r: NonZeroXRegister) -> Self {
+        // SAFETY: XRegister is a superset of NonZeroXRegister,
+        // so any value of NonZeroXRegister is known to be
+        // a valid value of XRegister.
+        unsafe { std::mem::transmute(r) }
+    }
+}
+
 /// Integer register value
 pub type XValue = u64;
 
@@ -211,6 +220,24 @@ impl<M: backend::ManagerBase> XRegisters<M> {
         self.registers.write(reg as usize, val)
     }
 
+    /// Read an integer from the registers without checking if it is 0 first.
+    #[inline]
+    pub fn read_nz(&self, reg: NonZeroXRegister) -> XValue
+    where
+        M: backend::ManagerRead,
+    {
+        self.registers.read(reg as usize)
+    }
+
+    /// Write an integer to the registers without checking if it is 0 first.
+    #[inline]
+    pub fn write_nz(&mut self, reg: NonZeroXRegister, val: XValue)
+    where
+        M: backend::ManagerWrite,
+    {
+        self.registers.write(reg as usize, val)
+    }
+
     /// Reset the integer registers.
     pub fn reset(&mut self)
     where
@@ -227,6 +254,66 @@ impl<M: backend::ManagerClone> Clone for XRegisters<M> {
         Self {
             registers: self.registers.clone(),
         }
+    }
+}
+
+/// Register index for integer registers known from the opcode to be `!=x0`.
+#[allow(non_camel_case_types)] // To make names consistent with specification
+#[repr(u8)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::EnumIter,
+)]
+pub enum NonZeroXRegister {
+    // This enum represents XRegisters known from the opcode to be `!=x0`, hence omitting
+    // x0 from the list.
+    // The `usize` representation of these constructors shall be used as an
+    // index into the 31-element array holding the XRegisters.
+    x1 = 0,
+    x2,
+    x3,
+    x4,
+    x5,
+    x6,
+    x7,
+    x8,
+    x9,
+    x10,
+    x11,
+    x12,
+    x13,
+    x14,
+    x15,
+    x16,
+    x17,
+    x18,
+    x19,
+    x20,
+    x21,
+    x22,
+    x23,
+    x24,
+    x25,
+    x26,
+    x27,
+    x28,
+    x29,
+    x30,
+    x31,
+}
+
+impl fmt::Display for NonZeroXRegister {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", XRegister::from(*self))
     }
 }
 
@@ -544,5 +631,16 @@ mod tests {
     fn fregister_bounds() {
         assert_eq!(FRegister::f0 as usize, u5::new(0).value() as usize);
         assert_eq!(FRegister::f31 as usize, u5::MAX.value() as usize);
+    }
+
+    #[test]
+    fn test_nonzeroxregister_to_xregister_conversion() {
+        let nzreg = NonZeroXRegister::iter().collect::<Vec<_>>();
+        let reg = XRegister::iter().filter(|r| r != &x0).collect::<Vec<_>>();
+
+        assert_eq!(nzreg.len(), reg.len());
+        for i in 0..nzreg.len() {
+            assert_eq!(nzreg[i] as u8, reg[i] as u8)
+        }
     }
 }
