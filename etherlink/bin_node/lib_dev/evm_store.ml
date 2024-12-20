@@ -539,6 +539,8 @@ DO UPDATE SET value = excluded.value
 
     let count = (unit ->! int) @@ {|SELECT COUNT(*) FROM irmin_chunks|}
 
+    let clear = (unit ->. unit) @@ {|DELETE FROM irmin_chunks|}
+
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level > ?|}
 
@@ -1040,6 +1042,9 @@ module Irmin_chunks = struct
     with_connection conn @@ fun conn ->
     let* count = Db.find_opt conn Q.Irmin_chunks.count () in
     return (Option.value ~default:0 count)
+
+  let clear store =
+    with_connection store @@ fun conn -> Db.exec conn Q.Irmin_chunks.clear ()
 
   let clear_after store level =
     with_connection store @@ fun conn ->

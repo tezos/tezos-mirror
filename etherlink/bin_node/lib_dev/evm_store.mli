@@ -190,6 +190,8 @@ module Irmin_chunks : sig
     conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
 
   val count : conn -> int tzresult Lwt.t
+
+  val clear : conn -> unit tzresult Lwt.t
 end
 
 module Pending_confirmations : sig

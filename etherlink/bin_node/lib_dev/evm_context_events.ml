@@ -220,6 +220,20 @@ let get_block_failed =
     ("level", Ethereum_types.quantity_encoding)
     ("trace", trace_encoding)
 
+let rolling_to_archive_incomplete_history =
+  declare_1
+    ~section
+    ~name:"evm_context_rolling_to_archive_incomplete_history"
+    ~level:Warning
+    ~msg:
+      "Switching history mode from Rolling to Archive, but be aware that \
+       history is incomplete, earliest level is {earliest_level}"
+    ~pp1:
+      ((Format.pp_print_option ~none:(fun fmt () ->
+            Format.pp_print_string fmt "unknown"))
+         Ethereum_types.pp_quantity)
+    ("earliest_level", Data_encoding.option Ethereum_types.quantity_encoding)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -271,3 +285,6 @@ let observer_reorg_cannot_find_state Ethereum_types.(Qty level) =
 let replace_store_get_hash () = emit replace_store_get_hash ()
 
 let get_block_failed n err = emit get_block_failed (n, err)
+
+let rolling_to_archive_incomplete_history earliest_level =
+  emit rolling_to_archive_incomplete_history earliest_level

@@ -1201,7 +1201,31 @@ module State = struct
         *)
         return Tezos_crypto.Hashed.Smart_rollup_address.zero
 
-  let check_metadata ~store_metadata ~smart_rollup_address ~history_mode =
+  let check_history_mode ~store_history_mode ~history_mode conn =
+    let open Lwt_result_syntax in
+    match store_history_mode with
+    | None -> return_unit
+    | Some store_history_mode -> (
+        match (store_history_mode, history_mode) with
+        | Configuration.Archive, Configuration.Archive
+        | Rolling, Rolling
+        | Archive, Rolling ->
+            return_unit
+        | Rolling, Archive ->
+            (* Switching from rolling to archive is possible, however it does
+               not necessarily mean all information are stored, it will just
+               stop garbage collecting data. *)
+            let* () = Evm_store.Irmin_chunks.clear conn in
+            let* earliest = Evm_store.Context_hashes.find_earliest conn in
+            let earliest_level = Option.map fst earliest in
+            unless (earliest_level = Some Ethereum_types.Qty.zero) (fun () ->
+                let*! () =
+                  Evm_context_events.rolling_to_archive_incomplete_history
+                    earliest_level
+                in
+                return_unit))
+
+  let check_metadata ~store_metadata ~smart_rollup_address ~history_mode conn =
     let open Lwt_result_syntax in
     let* smart_rollup_address =
       check_smart_rollup_address
@@ -1211,6 +1235,15 @@ module State = struct
                metadata.smart_rollup_address)
              store_metadata)
         ~smart_rollup_address
+    in
+    let* () =
+      check_history_mode
+        ~store_history_mode:
+          (Option.map
+             (fun (metadata : Evm_store.metadata) -> metadata.history_mode)
+             store_metadata)
+        ~history_mode
+        conn
     in
     return ({smart_rollup_address; history_mode} : Evm_store.metadata)
 
@@ -1260,6 +1293,7 @@ module State = struct
           ~store_metadata
           ~smart_rollup_address
           ~history_mode:configuration.experimental_features.history_mode
+          conn
       in
       let* () =
         when_ (Option.is_none store_metadata) (fun () ->
