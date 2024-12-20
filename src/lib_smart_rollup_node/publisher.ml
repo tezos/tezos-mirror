@@ -346,7 +346,7 @@ let publish_single_commitment (node_ctxt : _ Node_context.t)
 
 let recover_bond node_ctxt =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Recovering in
+  let operator = Node_context.get_operator node_ctxt Operating in
   match operator with
   | None ->
       (* No known operator to recover bond for. *)

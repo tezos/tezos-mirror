@@ -65,6 +65,10 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- In the bailout mode there was a bug where the wrong key was used
+  when recovering the bond. The node uses the ``cementing`` key and not
+  the ``operating`` key. (MR :gl:`!16016`).
+
 - Updated batcher with a new order structure. The RPC
   ``/local/batcher/injection`` now has a new query argument
   possibility ``"order": <int>``. The batcher will batch the
