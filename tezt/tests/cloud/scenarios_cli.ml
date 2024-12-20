@@ -276,6 +276,19 @@ let bootstrap_dal_node_identity_file =
        removed in a future release."
     ()
 
+let refresh_binaries =
+  Clap.flag
+    ~section
+    ~set_long:"refresh-binaries"
+    ~description:
+      "In proxy mode, when one wants to reuse an already existing VM, binaries \
+       are not updated. That's the desired default behaviour, but if the user \
+       wants to update them, this option provides a possibility to do so.\n\
+       Furthermore, it is not the recommended way to do so, but this option \
+       also allows to use a docker image without binaries (like the provided \
+       debian one) and to copy the local binaries to the proxy."
+    false
+
 module Alerts = struct
   let section =
     Clap.section

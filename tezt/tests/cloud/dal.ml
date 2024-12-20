@@ -2551,10 +2551,22 @@ let benchmark () =
          Format.asprintf
            "src/%s/parameters/mainnet-parameters.json"
            (Protocol.directory configuration.protocol);
-         "evm_kernel.wasm";
          "octez-node";
-         "octez-dal-node";
        ]
+      @ (if Cli.refresh_binaries then
+           [
+             "octez-dal-node";
+             "octez-client";
+             Tezt_wrapper.Uses.path (Protocol.baker configuration.protocol);
+           ]
+           @ (if Cli.etherlink then
+                ["evm_kernel.wasm"; "octez-evm-node"; "octez-smart-rollup-node"]
+              else [])
+           @
+           if Cli.teztale then
+             ["octez-teztale-archiver"; "octez-teztale-server"]
+           else []
+         else [])
       @ Option.fold
           ~none:[]
           ~some:(fun x -> [x])
