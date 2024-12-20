@@ -43,4 +43,7 @@ include
     mode. If allowed, adds it to the pending operation. Returns [None] when the
     operation is not allowed in the mode. *)
 val check_and_add_pending_operation :
-  Configuration.mode -> L1_operation.t -> Inj_operation.id option tzresult Lwt.t
+  Configuration.mode ->
+  ?order:Z.t ->
+  L1_operation.t ->
+  Inj_operation.id option tzresult Lwt.t

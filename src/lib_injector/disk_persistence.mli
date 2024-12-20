@@ -118,8 +118,9 @@ module Make_table (H : H) : sig
     t tzresult Lwt.t
 end
 
-(** Create an on-disk persistent version of the {!Hash_queue} data structure. *)
-module Make_queue
+(** Create an on-disk persistent version of the {!Bounded_min_heap}
+    data structure. *)
+module Make_heap
     (N : sig
       (** Name used to derive a path (relative to [data_dir] in [load_from_disk]) of where
       to store the persistent information for this queue. *)
@@ -129,38 +130,50 @@ module Make_queue
     (V : sig
       type t
 
+      val id : t -> K.t
+
+      val compare : t -> t -> int
+
       val persist : t -> bool
 
       val encoding : t Data_encoding.t
     end) : sig
   type t
 
-  (** [remove q k] removes the binding from [k] in [q]. If [k] is not bound in
+  (** [remove h k] removes the binding from [k] in [h]. If [k] is not bound in
       [c], it does nothing. The removal is persisted on disk. *)
   val remove : t -> K.t -> unit tzresult Lwt.t
 
-  (** [replace q k v] binds the key [k] to the value [v] in the queue [q]. This
-      may or may not cause another binding to be removed, depending on the
-      number of bindings already present in [q]. The addition (or replacement)
-      is persisted on disk. *)
-  val replace : t -> K.t -> V.t -> unit tzresult Lwt.t
+  (** [remove_predicate f h] removes the binding in [h] where [f elt =
+      true]. The removal is persisted on disk. *)
+  val remove_predicate : (V.t -> bool) -> t -> unit tzresult Lwt.t
 
-  (** [fold f q init] folds the function [f] over the bindings
-      of [q] (in memory). The elements are iterated from oldest to newest. *)
-  val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
+  (** [insert h K.t v] binds the key [k] to the value [v] in the queue [h]. This
+        may or may not cause another binding to be removed, depending on the
+        number of bindings already present in [h]. The addition (or replacement)
+        is persisted on disk. *)
+  val insert : t -> K.t -> V.t -> unit tzresult Lwt.t
 
-  (** [find_opt q k] is [Some v] if [k] is bound to [v] in [q]. It is [None]
+  (** [peek_min h] return, without removing, the smallest element from
+      the heap [h], [None] if empty. *)
+  val peek_min : t -> V.t option
+
+  (** [pop h] remove the smallest element from the heap [h],
+      [None] if empty. *)
+  val pop : t -> V.t option tzresult Lwt.t
+
+  (** [find_opt h k] is [Some v] if [k] is bound to [v] in [h]. It is [None]
       otherwise. *)
   val find_opt : t -> K.t -> V.t option
 
-  (** [elemets q] returns the elements of the queue [q] from oldest to
+  (** [elemets h] returns the elements of the queue [h] from oldest to
       newest. *)
   val elements : t -> V.t list
 
-  (** [length q] is the number of bindings held by [q]. *)
+  (** [length h] is the number of bindings held by [h]. *)
   val length : t -> int
 
-  (** [clear q] empties the queue [q] and removes its persistent content on
+  (** [clear h] empties the queue [h] and removes its persistent content on
       disk. *)
   val clear : t -> unit Lwt.t
 

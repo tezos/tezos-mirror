@@ -106,3 +106,5 @@ let compare msg1 msg2 =
   | None, None -> counter_cmp ()
   | Some _p, _ -> -1
   | _, Some _p -> 1
+
+let order {order; _} = order

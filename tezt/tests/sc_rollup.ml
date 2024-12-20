@@ -423,9 +423,13 @@ let wait_for_included_successful_operation node ~operation_kind =
 
 let wait_until_n_batches_are_injected rollup_node ~nb_batches =
   let nb_injected = ref 0 in
-  Sc_rollup_node.wait_for rollup_node "injected_ops.v0" @@ fun _json ->
-  nb_injected := !nb_injected + 1 ;
-  if !nb_injected >= nb_batches then Some () else None
+  Sc_rollup_node.wait_for rollup_node "injected_ops.v0" @@ fun json ->
+  JSON.(
+    json |-> "operations" |> as_list
+    |> List.iter (fun json ->
+           let kind = json |-> "kind" |> as_string in
+           if kind = "add_messages" then nb_injected := !nb_injected + 1)) ;
+  if !nb_injected = nb_batches then Some () else None
 
 let send_message_batcher_aux ?rpc_hooks client sc_node msgs =
   let batched =
@@ -5922,10 +5926,12 @@ let test_batcher_order_msgs ~kind =
     unit
   in
 
-  let bake_then_check_included_msgs ~__LOC__ ~nb_batches ~expected_messages =
+  let bake_then_check_included_msgs ~__LOC__ ~expected_messages =
     let* level = Node.get_level node in
     let wait_for_injected =
-      wait_until_n_batches_are_injected rollup_node ~nb_batches
+      wait_until_n_batches_are_injected
+        rollup_node
+        ~nb_batches:(List.length expected_messages)
     in
     let* () = Client.bake_for_and_wait client
     and* () = wait_for_injected
@@ -5981,7 +5987,6 @@ let test_batcher_order_msgs ~kind =
   let* () =
     bake_then_check_included_msgs
       ~__LOC__
-      ~nb_batches:1
       ~expected_messages:[expected_messages]
   in
 
@@ -6019,8 +6024,139 @@ let test_batcher_order_msgs ~kind =
       List.init min_batch_elements (fun i -> (max_batch_elements + i) * 10);
     ]
   in
-  let* () =
-    bake_then_check_included_msgs ~__LOC__ ~nb_batches:1 ~expected_messages
+  let* () = bake_then_check_included_msgs ~__LOC__ ~expected_messages in
+
+  Log.info
+    "Injecting multiple time the mimimal batches element in reverse order of \
+     priority to make sure the injector order them correctly" ;
+  (* [0; 1; ... 9] *)
+  let messages_no_order = List.init min_batch_elements Fun.id in
+  let* _hashes = inject_int_of_string messages_no_order in
+  (* [10; 11; ... 19] *)
+  let messages_order_2 =
+    List.init min_batch_elements (fun i -> min_batch_elements + i)
+  in
+  let* _hashes = inject_int_of_string ~order:2 messages_order_2 in
+  (* [20; 21; ... 29] *)
+  let messages_order_1 =
+    List.init min_batch_elements (fun i -> (2 * min_batch_elements) + i)
+  in
+  let* _hashes = inject_int_of_string ~order:1 messages_order_1 in
+  let expected_messages =
+    [messages_order_1; messages_order_2; messages_no_order]
+  in
+  let* () = bake_then_check_included_msgs ~__LOC__ ~expected_messages in
+  unit
+
+let test_injector_order_operations_by_kind ~kind =
+  let commitment_period = 5 in
+  let challenge_window = 5 in
+  test_full_scenario
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6650
+
+     cf multiple_batcher_test comment. *)
+    ~rpc_external:false
+    ~kind
+    ~commitment_period
+    ~challenge_window
+    ~mode:Operator
+    {
+      variant = None;
+      tags = ["injector"; "operations"; "order"];
+      description = "Injector order operations by kind";
+    }
+  @@ fun _protocol rollup_node rollup_addr _node client ->
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
+  let* _ = Client.bake_for_and_wait client in
+  (* to be 1 block after the origination, otherwise it fails for
+     something we don't care *)
+  let check_sr_ops_are_ordered () =
+    let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+    let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+    let ops_kind =
+      let open JSON in
+      let filter_sr_op json =
+        let kind = json |-> "kind" |> as_string in
+        if String.starts_with ~prefix:"smart_rollup" kind then Some kind
+        else None
+      in
+      List.map
+        (fun op -> op |-> "contents" |> as_list |> List.filter_map filter_sr_op)
+        ops
+      |> List.flatten
+    in
+    let all =
+      [
+        ["smart_rollup_timeout"];
+        ["smart_rollup_refute"];
+        ["smart_rollup_publish"; "smart_rollup_cement"];
+        ["smart_rollup_recover"];
+        ["smart_rollup_add_messages"];
+        ["smart_rollup_execute_outbox_message"];
+      ]
+    in
+    let is_sorted =
+      let rec aux all l =
+        match (all, l) with
+        | _, hd :: rest when not (String.starts_with ~prefix:"smart_rollup" hd)
+          ->
+            (*skip op not smart rollup*)
+            aux all rest
+        | current :: all_rest, hd :: rest ->
+            if List.mem hd current then aux all rest else aux all_rest l
+        | _, [] -> (* all element of l appeared in all in the same order *) true
+        | [], _ ->
+            (* There is still at least an element of L but the
+               sorted list is empty. L was not correctly
+               ordered. *)
+            false
+      in
+      aux all
+    in
+    Check.is_true
+      ~__LOC__
+      ~error_msg:
+        (Format.asprintf
+           "injected operations are not sorted, [%a]"
+           Format.(
+             pp_print_list
+               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+               pp_print_string)
+           ops_kind)
+    @@ is_sorted ops_kind ;
+    unit
+  in
+
+  let hook i =
+    let* () =
+      (* check done at each block so we don't miss any *)
+      check_sr_ops_are_ordered ()
+    in
+    let* _ =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.post_local_batcher_injection
+           ~messages:[string_of_int i]
+           ()
+    in
+    unit
+  in
+  (* We only check add_messages, publish and cement operations
+     order. We could do more but test becomes more involved and I
+     think it's not necessary. *)
+  let* level =
+    bake_until_lpc_updated
+      ~at_least:(commitment_period + 2)
+      ~hook
+      client
+      rollup_node
+  in
+  let* _ =
+    bake_until_lcc_updated
+      ~at_least:(challenge_window + 2)
+      ~hook
+      client
+      rollup_node
+      ~level
   in
   unit
 
@@ -6681,6 +6817,7 @@ let register_protocol_independent () =
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;
   test_injector_uses_available_keys protocols ~kind ;
+  test_injector_order_operations_by_kind protocols ~kind ;
   test_batcher_dont_reinject_already_injected_messages protocols ~kind ;
   test_private_rollup_node_publish_in_whitelist protocols ;
   test_private_rollup_node_publish_not_in_whitelist protocols ;

@@ -59,7 +59,21 @@ module Parameters :
     let encoding : t Data_encoding.t = Operation_kind.encoding
   end
 
-  module Operation = L1_operation
+  module Operation = struct
+    include L1_operation
+
+    let tag : t -> Tag.t = function
+      | Add_messages _ -> Add_messages
+      | Cement _ -> Cement
+      | Publish _ -> Publish
+      | Timeout _ -> Timeout
+      | Refute _ -> Refute
+      | Recover_bond _ -> Recover
+      | Execute_outbox_message _ -> Execute_outbox_message
+      | Publish_dal_commitment _ -> Publish_dal_commitment
+
+    let compare op1 op2 = Operation_kind.compare_priority (tag op1) (tag op2)
+  end
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
      Very coarse approximation for the number of operation we
@@ -74,15 +88,7 @@ module Parameters :
     | Execute_outbox_message -> 1
     | Publish_dal_commitment -> 1
 
-  let operation_tag : Operation.t -> Tag.t = function
-    | Add_messages _ -> Add_messages
-    | Cement _ -> Cement
-    | Publish _ -> Publish
-    | Timeout _ -> Timeout
-    | Refute _ -> Refute
-    | Recover_bond _ -> Recover
-    | Execute_outbox_message _ -> Execute_outbox_message
-    | Publish_dal_commitment _ -> Publish_dal_commitment
+  let operation_tag = Operation.tag
 
   let fee_parameter {fee_parameters; _} operation =
     let operation_kind = operation_tag operation in
@@ -165,10 +171,10 @@ end
 
 include Injector_functor.Make (Parameters)
 
-let check_and_add_pending_operation (mode : Configuration.mode)
+let check_and_add_pending_operation (mode : Configuration.mode) ?order
     (operation : L1_operation.t) =
   let open Lwt_result_syntax in
   if Configuration.(can_inject mode (Parameters.operation_tag operation)) then
-    let* hash = add_pending_operation operation in
+    let* hash = add_pending_operation ?order operation in
     return (Some hash)
   else return None

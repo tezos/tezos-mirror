@@ -79,3 +79,15 @@ let map_encoding value_encoding =
        ~string_of_key:to_string
        ~key_of_string:of_string_exn
        ~value_encoding)
+
+let priority_order = function
+  | Timeout -> 0
+  | Refute -> 1
+  | Publish -> 2
+  | Publish_dal_commitment -> 2
+  | Cement -> 2
+  | Recover -> 3
+  | Add_messages -> 4
+  | Execute_outbox_message -> 5
+
+let compare_priority k1 k2 = compare (priority_order k1) (priority_order k2)
