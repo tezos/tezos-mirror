@@ -9,7 +9,8 @@ TZ_SCHEDULE_KIND="${TZ_SCHEDULE_KIND:-EXTENDED_TESTS}"
 CI_PIPELINE__TYPE="${CI_PIPELINE__TYPE:-schedule_extended_test}"
 
 # Compile parameters into a JSON input for GitLab's API.
-DATA="$(cat <<EOF
+DATA="$(
+  cat << EOF
 {
   "ref": "$BRANCH",
   "variables": [
@@ -24,10 +25,6 @@ DATA="$(cat <<EOF
     {
       "key": "TZ_SCHEDULE_KIND",
       "value": "$TZ_SCHEDULE_KIND"
-    },
-    {
-      "key": "CI_PIPELINE__TYPE",
-      "value": "$CI_PIPELINE__TYPE"
     }
   ]
 }
@@ -35,13 +32,12 @@ EOF
 )"
 
 # Tell the user what is going to happen.
-cat <<EOF
+cat << EOF
 Will run a schedule_extended_test pipeline for:
 
   CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
                 BRANCH = $BRANCH
       TZ_SCHEDULE_KIND = $TZ_SCHEDULE_KIND
-     CI_PIPELINE__TYPE = $CI_PIPELINE__TYPE
 EOF
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"

@@ -14,11 +14,15 @@ DATA="$(
   "variables": [
     {
       "key": "CI_PIPELINE_SOURCE",
-      "value": "merge_request_event"
+      "value": "push"
     },
     {
       "key": "CI_PROJECT_NAMESPACE",
       "value": "$CI_PROJECT_NAMESPACE"
+    },
+    {
+      "key": "CI_COMMIT_BRANCH",
+      "value": "master"
     }
   ]
 }
@@ -27,7 +31,7 @@ EOF
 
 # Tell the user what is going to happen.
 cat << EOF
-Will run a before_merging pipeline for:
+Will run a master_branch pipeline for:
 
   CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
                 BRANCH = $BRANCH
