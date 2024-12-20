@@ -3,6 +3,8 @@
 //! Collections of functions exposed from OCaml and allowing Rust functions to interact with the
 //! state manipulated by the kernel.
 
+use log::trace;
+
 use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString};
 use std::{
     error::Error,
@@ -71,6 +73,11 @@ pub fn fetch_preimage_from_remote(
     preimages_endpoint: &str,
     hash_hex: &str,
 ) -> Result<OCamlString, BindingsError> {
+    trace!(
+        "fetch_preimage_from_remote({}, {})",
+        preimages_endpoint,
+        hash_hex
+    );
     unsafe {
         ocaml_imports::fetch_preimage_from_remote(&gc(), preimages_endpoint, hash_hex)
             .map_err(BindingsError::OCamlError)
@@ -81,6 +88,7 @@ pub fn store_get_hash<K>(evm_tree: &EvmTree, key: K) -> Result<ContextHash, Bind
 where
     K: Key,
 {
+    trace!("store_get_hash({})", key.as_str());
     let res = unsafe {
         ocaml_imports::layer2_store__store_get_hash(&gc(), evm_tree.clone(), key.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -93,6 +101,7 @@ pub fn read_value<K>(evm_tree: &EvmTree, key: K) -> Result<OCamlBytes, BindingsE
 where
     K: Key,
 {
+    trace!("read_value({})", key.as_str());
     let code = unsafe {
         ocaml_imports::layer2_store__read_durable_value(&gc(), evm_tree.clone(), key.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -105,6 +114,7 @@ pub fn mem_tree<K>(evm_tree: &EvmTree, key: K) -> Result<bool, BindingsError>
 where
     K: Key,
 {
+    trace!("mem_tree({})", key.as_str());
     let mem = unsafe {
         ocaml_imports::layer2_store__mem_tree(&gc(), evm_tree.clone(), key.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -117,6 +127,7 @@ pub fn store_has<K>(evm_tree: &EvmTree, key: K) -> Result<isize, BindingsError>
 where
     K: Key,
 {
+    trace!("store_has({})", key.as_str());
     let mem = unsafe {
         ocaml_imports::layer2_store__store_has(&gc(), evm_tree.clone(), key.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -129,6 +140,7 @@ pub fn store_delete<K>(evm_tree: &EvmTree, key: K, is_value: bool) -> Result<Evm
 where
     K: Key,
 {
+    trace!("store_delete({}, is_value:{})", key.as_str(), is_value);
     let mem = unsafe {
         ocaml_imports::layer2_store__store_delete(&gc(), evm_tree.clone(), key.as_str(), is_value)
             .map_err(BindingsError::OCamlError)?
@@ -141,6 +153,7 @@ pub fn store_copy<K>(evm_tree: &EvmTree, from: K, to: K) -> Result<EvmTree, Bind
 where
     K: Key,
 {
+    trace!("store_copy({}, {})", from.as_str(), to.as_str());
     let res = unsafe {
         ocaml_imports::layer2_store__store_copy(&gc(), evm_tree.clone(), from.as_str(), to.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -153,6 +166,7 @@ pub fn store_move<K>(evm_tree: &EvmTree, from: K, to: K) -> Result<EvmTree, Bind
 where
     K: Key,
 {
+    trace!("store_move({}, {})", from.as_str(), to.as_str());
     let res = unsafe {
         ocaml_imports::layer2_store__store_move(&gc(), evm_tree.clone(), from.as_str(), to.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -165,6 +179,7 @@ pub fn store_list_size<K>(evm_tree: &EvmTree, key: K) -> Result<isize, BindingsE
 where
     K: Key,
 {
+    trace!("store_list_size({})", key.as_str());
     let res = unsafe {
         ocaml_imports::layer2_store__store_list_size(&gc(), evm_tree.clone(), key.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -177,6 +192,7 @@ pub fn store_value_size<K>(evm_tree: &EvmTree, key: K) -> Result<isize, Bindings
 where
     K: Key,
 {
+    trace!("store_value_size({})", key.as_str());
     let res = unsafe {
         ocaml_imports::layer2_store__store_value_size(&gc(), evm_tree.clone(), key.as_str())
             .map_err(BindingsError::OCamlError)?
@@ -194,6 +210,12 @@ pub fn store_read<K>(
 where
     K: Key,
 {
+    trace!(
+        "store_read({}, offset:{}, num_bytes:{})",
+        key.as_str(),
+        offset,
+        num_bytes
+    );
     let res = unsafe {
         ocaml_imports::layer2_store__store_read(
             &gc(),
@@ -217,6 +239,7 @@ pub fn store_write<K>(
 where
     K: Key,
 {
+    trace!("store_write({}, offset:{})", key.as_str(), offset);
     let res = unsafe {
         ocaml_imports::layer2_store__store_write(
             &gc(),
@@ -232,6 +255,7 @@ where
 }
 
 pub fn check_reboot_flag(evm_tree: &EvmTree) -> Result<(bool, EvmTree), BindingsError> {
+    trace!("check_reboot_flag()");
     unsafe {
         ocaml_imports::layer2_store__check_reboot_flag(&gc(), evm_tree.clone())
             .map_err(BindingsError::OCamlError)
@@ -246,6 +270,7 @@ pub fn store_write_all<K>(
 where
     K: Key,
 {
+    trace!("store_write_all({})", key.as_str());
     let res = unsafe {
         ocaml_imports::layer2_store__store_write_all(&gc(), evm_tree.clone(), key.as_str(), bytes)
             .map_err(BindingsError::OCamlError)?
