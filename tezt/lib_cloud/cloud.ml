@@ -445,6 +445,41 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   in
   if Env.destroy then Deployement.terminate deployement else Lwt.return_unit
 
+(* Set the [FAKETIME] environment variable so that all the ssh sessions have it
+   defined if [Env.faketime] is defined. *)
+let set_faketime faketime agent =
+  match Agent.runner agent with
+  | None -> Lwt.return_unit (* ? *)
+  | Some runner ->
+      let open Runner.Shell in
+      let* home =
+        (* Get the directory where you can (hopefully) find .ssh *)
+        let cmd = cmd [] "pwd" [] in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run_and_read_stdout cmd args
+      in
+      let env_file = Filename.concat (String.trim home) ".ssh/environment" in
+      let* () =
+        (* Avoid error if the environment file does not exist *)
+        let cmd = cmd [] "touch" [env_file] in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run cmd args
+      in
+      let* contents =
+        (* Read the environment file content
+           and append FAKETIME definition to the result *)
+        let process, stdin =
+          Process.spawn_with_stdin ~runner "cat" [env_file; "-"]
+        in
+        let* () = Lwt_io.write_line stdin (sf "FAKETIME=%s" faketime) in
+        let* () = Lwt_io.close stdin in
+        Process.check_and_read_stdout process
+      in
+      (* Write the final environment content *)
+      let cmd = redirect_stdout (cmd [] "echo" [contents]) env_file in
+      let cmd, args = Runner.wrap_with_ssh runner cmd in
+      Process.run cmd args
+
 let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
     ?alert_collection f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
@@ -488,6 +523,19 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
         }
   | Some configurations -> (
       let tezt_cloud = Env.tezt_cloud in
+      let ensure_ready =
+        let wait_and_faketime =
+          match Env.faketime with
+          | None -> wait_ssh_server_running
+          | Some faketime ->
+              fun agent ->
+                let* () = wait_ssh_server_running agent in
+                set_faketime faketime agent
+        in
+        fun deployement ->
+          Deployement.agents deployement
+          |> List.map wait_and_faketime |> Lwt.join
+      in
       match Env.mode with
       | `Orchestrator ->
           (* The scenario is executed locally on the proxy VM. *)
@@ -497,32 +545,20 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
             Data_encoding.Json.destruct (Data_encoding.list Agent.encoding) json
             |> Deployement.of_agents
           in
-          let* () =
-            Deployement.agents deployement
-            |> List.map wait_ssh_server_running
-            |> Lwt.join
-          in
+          let* () = ensure_ready deployement in
           orchestrator ?alert_collection deployement f
       | `Localhost ->
           (* The scenario is executed locally and the VM are on the host machine. *)
           let* () = Jobs.docker_build ~push:false () in
           let* deployement = Deployement.deploy ~configurations in
-          let* () =
-            Deployement.agents deployement
-            |> List.map wait_ssh_server_running
-            |> Lwt.join
-          in
+          let* () = ensure_ready deployement in
           orchestrator ?alert_collection deployement f
       | `Cloud ->
           (* The scenario is executed locally and the VMs are on the cloud. *)
           let* () = Jobs.deploy_docker_registry () in
           let* () = Jobs.docker_build ~push:Env.push_docker () in
           let* deployement = Deployement.deploy ~configurations in
-          let* () =
-            Deployement.agents deployement
-            |> List.map wait_ssh_server_running
-            |> Lwt.join
-          in
+          let* () = ensure_ready deployement in
           orchestrator ?alert_collection deployement f
       | `Host ->
           (* The scenario is executed remotely. *)
@@ -531,11 +567,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
             let* () = Jobs.deploy_docker_registry () in
             let* () = Jobs.docker_build ~push:Env.push_docker () in
             let* deployement = Deployement.deploy ~configurations in
-            let* () =
-              Deployement.agents deployement
-              |> List.map wait_ssh_server_running
-              |> Lwt.join
-            in
+            let* () = ensure_ready deployement in
             init_proxy ?proxy_files ?proxy_args deployement
           else Lwt.return_unit)
 

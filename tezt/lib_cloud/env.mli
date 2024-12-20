@@ -123,6 +123,9 @@ val auto_approve : bool
 (** Equivalent to [Gcloud.project_id]. *)
 val project_id : unit -> string Lwt.t
 
+(** Equivalent to [Cli.faketime]. *)
+val faketime : string option
+
 (** [init ()] initialises and deploys a Docker registry using Terraform, only when the
     [mode] is either [`Host] or [`Cloud]. *)
 val init : unit -> unit Lwt.t

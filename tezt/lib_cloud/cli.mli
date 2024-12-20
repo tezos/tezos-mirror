@@ -119,3 +119,6 @@ val push_docker : bool
 
 (** Auto approve the deployment plan. *)
 val auto_approve : bool
+
+(** Value used to set the [FAKETIME] environment variable on VMs. *)
+val faketime : string option
