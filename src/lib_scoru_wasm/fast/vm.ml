@@ -80,7 +80,7 @@ let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug pvm_state
 
   Lwt.return pvm_state
 
-let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
+let rec compute_step_many accum_ticks ~(hooks : Hooks.t) ?reveal_builtins
     ?(write_debug = Builtins.Noop) ?(stop_at_snapshot = false) ~wasm_entrypoint
     ~max_steps pvm_state =
   let open Lwt.Syntax in
@@ -134,6 +134,7 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
             if may_compute_more && max_steps > 0L then
               (compute_step_many [@tailcall])
                 ~wasm_entrypoint
+                ~hooks
                 accum_ticks
                 ~reveal_builtins
                 ~write_debug
@@ -166,6 +167,7 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
         then
           (compute_step_many [@tailcall])
             ~wasm_entrypoint
+            ~hooks
             accum_ticks
             ~max_steps
             ~reveal_builtins
@@ -198,4 +200,5 @@ let compute_step_many = compute_step_many 0L
 
 let get_wasm_version = Wasm_vm.get_wasm_version
 
-let compute_step_many = compute_step_many
+let compute_step_many ?reveal_builtins ?(hooks = Hooks.no_hooks) =
+  compute_step_many ?reveal_builtins ~hooks
