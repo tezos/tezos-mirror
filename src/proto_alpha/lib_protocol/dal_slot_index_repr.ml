@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -88,3 +88,29 @@ let slots_range_opt ~number_of_slots ~lower ~upper =
   Option.of_result @@ slots_range ~number_of_slots ~lower ~upper
 
 let is_succ t ~succ = Compare.Int.(t + 1 = succ)
+
+module Index = struct
+  type t = int
+
+  let path_length = 1
+
+  let to_path slot_index l = string_of_int slot_index :: l
+
+  let of_path = function [s] -> int_of_string_opt s | _ -> None
+
+  let rpc_arg =
+    let construct slot_index = string_of_int slot_index in
+    let destruct str =
+      int_of_string_opt str |> Option.to_result ~none:"Cannot parse slot index"
+    in
+    RPC_arg.make
+      ~descr:"A slot index"
+      ~name:"dal_slot_index"
+      ~construct
+      ~destruct
+      ()
+
+  let encoding = encoding
+
+  let compare = compare
+end

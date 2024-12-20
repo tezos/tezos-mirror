@@ -506,13 +506,21 @@ type denounced = {
 (** {!denounced} with all fields set to [false]. *)
 val default_denounced : denounced
 
-(** Set used to avoid slashing multiple times the same event *)
+(** Set used to avoid slashing multiple times for the same double-signing event *)
 module Already_denounced :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
      and type key =
       (Raw_level_repr.t * Round_repr.t) * Signature.Public_key_hash.t
      and type value = denounced
+
+(** Set used to avoid slashing multiple times for the same DAL entrapment event *)
+module Dal_already_denounced :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key =
+      (Raw_level_repr.t * Dal_slot_index_repr.t) * Signature.Public_key_hash.t
+     and type value = unit
 
 module Pending_staking_parameters :
   Indexed_data_storage

@@ -216,6 +216,9 @@ Protocol
 - A new antonymous operation "DAL entrapment evidence" was added. This operation
   is not valid when the feature flag for DAL incentives is turned off. (MR
   :gl:`!15677`)
+- A new anonymous operation "DAL entrapment evidence" was added. This operation
+  is not valid when the feature flag for DAL incentives is turned off. (MRs
+  :gl:`!15677`, :gl:`!15832`, :gl:`!15836`)
 - Set the message validation function at node startup, fixing
   https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
 - A warning has been introduced in case it is observed that the DAL node lags

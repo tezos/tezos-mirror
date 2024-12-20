@@ -1310,13 +1310,23 @@ module Anonymous = struct
     let* () =
       error_unless
         Cycle.(given_cycle <= current_cycle)
-        (Too_early_denunciation
-           {kind; level = given_level; current = vi.current_level.level})
+        (match kind with
+        | `Consensus_denounciation kind ->
+            Too_early_denunciation
+              {kind; level = given_level; current = vi.current_level.level}
+        | `Dal_denounciation ->
+            Too_early_dal_denunciation
+              {level = given_level; current = vi.current_level.level})
     in
     error_unless
       Cycle.(last_slashable_cycle >= current_cycle)
-      (Outdated_denunciation
-         {kind; level = given_level; last_cycle = last_slashable_cycle})
+      (match kind with
+      | `Consensus_denounciation kind ->
+          Outdated_denunciation
+            {kind; level = given_level; last_cycle = last_slashable_cycle}
+      | `Dal_denounciation ->
+          Outdated_dal_denunciation
+            {level = given_level; last_cycle = last_slashable_cycle})
 
   let check_double_attesting_evidence (type kind) vi
       (op1 : kind Kind.consensus Operation.t)
@@ -1365,7 +1375,9 @@ module Anonymous = struct
     in
     (* Disambiguate: levels are equal *)
     let level = Level.from_raw vi.ctxt e1.level in
-    let*? () = check_denunciation_age vi kind level.level in
+    let*? () =
+      check_denunciation_age vi (`Consensus_denounciation kind) level.level
+    in
     let* ctxt, consensus_key1 =
       Stake_distribution.slot_owner vi.ctxt level e1.slot
     in
@@ -1524,7 +1536,12 @@ module Anonymous = struct
         (Invalid_double_baking_evidence
            {hash1; level1; round1; hash2; level2; round2})
     in
-    let*? () = check_denunciation_age vi Double_baking level1 in
+    let*? () =
+      check_denunciation_age
+        vi
+        (`Consensus_denounciation Misbehaviour.Double_baking)
+        level1
+    in
     let level = Level.from_raw vi.ctxt level1 in
     let committee_size = Constants.consensus_committee_size vi.ctxt in
     let*? slot1 = Round.to_slot round1 ~committee_size in
@@ -1627,9 +1644,149 @@ module Anonymous = struct
     in
     {vs with anonymous_state}
 
+  let check_shard_index_is_in_range ~number_of_shards shard_index =
+    error_unless
+      Compare.Int.(shard_index >= 0 && shard_index < number_of_shards)
+      (Invalid_shard_index
+         {given = shard_index; min = 0; max = number_of_shards - 1})
+
+  (* This function validates an entrapment evidence by doing the following checks:
+     - the included slot index and shard index are within bounds
+     - the included attestation contains a DAL attestation
+     - the slot was attested by the attester
+     - the level of the faulty attestation is within the slashing period
+     - the included shard is a trap
+     - the delegate has not already been denounced for the same level and slot index
+     - the delegate that signed the included attestation is assigned to the included shard
+     - the signature verification of the included attestation succeeds
+  *)
   let check_dal_entrapment_evidence vi
-      (_operation : Kind.dal_entrapment_evidence operation) =
-    Dal.assert_incentives_enabled vi.ctxt |> Lwt.return
+      (operation : Kind.dal_entrapment_evidence operation) =
+    let open Lwt_result_syntax in
+    let (Single
+          (Dal_entrapment_evidence {attestation; slot_index; shard_with_proof}))
+        =
+      operation.protocol_data.contents
+    in
+    let consensus_content, dal_content =
+      match attestation.protocol_data.contents with
+      | Single (Attestation {consensus_content; dal_content}) ->
+          (consensus_content, dal_content)
+    in
+    match dal_content with
+    | None ->
+        (* TODO: return error *)
+        failwith "Wrong evidence: the attester did not DAL attest"
+    | Some dal_content -> (
+        let number_of_slots = Constants.dal_number_of_slots vi.ctxt in
+        let*? () =
+          Dal.Slot_index.check_is_in_range ~number_of_slots slot_index
+        in
+        let number_of_shards = Constants.dal_number_of_shards vi.ctxt in
+        let shard_index = shard_with_proof.shard.index in
+        let*? () =
+          check_shard_index_is_in_range ~number_of_shards shard_index
+        in
+        assert (
+          (* TODO: check and return error *)
+          Dal.Attestation.is_attested
+            dal_content.attestation
+            slot_index) ;
+        let level = Level.from_raw vi.ctxt consensus_content.level in
+        let*? () = check_denunciation_age vi `Dal_denounciation level.level in
+        let* ctxt, consensus_key =
+          Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
+        in
+        let delegate = consensus_key.delegate in
+        let*! already_denounced =
+          Dal.Delegate.is_already_denounced ctxt delegate level slot_index
+        in
+        let*? () =
+          error_unless
+            (not already_denounced)
+            (Dal_already_denounced {delegate; level})
+        in
+        let traps_fraction = (Constants.parametric ctxt).dal.traps_fraction in
+        let*? is_trap =
+          Dal.Shard_with_proof.share_is_trap
+            delegate
+            shard_with_proof.shard.share
+            ~traps_fraction
+        in
+        assert (* TODO: check and return error *)
+               is_trap ;
+        let* _ctxt, shard_owner =
+          let*? tb_slot = Slot.of_int shard_index in
+          Stake_distribution.slot_owner vi.ctxt level tb_slot
+        in
+        assert (
+          (* TODO: check and return error *)
+          Signature.Public_key_hash.equal
+            delegate
+            shard_owner.delegate) ;
+        let attestation_lag =
+          (Constants.parametric vi.ctxt).dal.attestation_lag
+        in
+        let published_level =
+          match Raw_level.(sub (succ level.level) attestation_lag) with
+          | None ->
+              failwith
+                "SHOULD NOT HAPPEN ON MAINNET. It can in theory happen on test \
+                 networks (but it is very unlikely)"
+          | Some level -> level
+        in
+        let* slot_headers_opt =
+          Dal.Slot.find_slot_headers ctxt published_level
+        in
+        match slot_headers_opt with
+        | None ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
+               Can also fail if `attestation_lag` changes. *)
+            failwith (* TODO: return error *)
+              "SHOULD NOT HAPPEN IF 1) the denunciation age is correct, and 2) \
+               the storage is updated correctly"
+        | Some headers -> (
+            let slot_header_opt =
+              List.find
+                (fun (Dal.Slot.Header.{id; _}, _publisher) ->
+                  Dal.Slot_index.equal id.index slot_index)
+                headers
+            in
+            match slot_header_opt with
+            | Some (header, _publisher)
+              when Raw_level.equal header.id.published_level published_level ->
+                let*? _ctxt, cryptobox = Dal.make ctxt in
+                let*? () =
+                  Dal.Shard_with_proof.verify
+                    cryptobox
+                    header.commitment
+                    shard_with_proof
+                in
+                let*? () =
+                  Operation.check_signature
+                    consensus_key.consensus_pk
+                    vi.chain_id
+                    attestation
+                in
+                return_unit
+            | Some _ ->
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
+                   Can also fail if `attestation_lag` changes. *)
+                (* TODO: return error *)
+                failwith
+                  "SHOULD NOT HAPPEN: mismatch between published levels in \
+                   storage versus in evidence"
+            | None ->
+                (* TODO: return error *)
+                failwith
+                  "Wrong evidence: no slot was published at the mentioned \
+                   level and index"))
+
+  let check_dal_entrapment_evidence vi
+      (operation : Kind.dal_entrapment_evidence operation) =
+    if (Constants.parametric vi.ctxt).dal.incentives_enable then
+      check_dal_entrapment_evidence vi operation
+    else tzfail Dal_errors.Dal_incentives_disabled
 
   let dal_entrapment_evidence_info
       (operation : Kind.dal_entrapment_evidence operation) =

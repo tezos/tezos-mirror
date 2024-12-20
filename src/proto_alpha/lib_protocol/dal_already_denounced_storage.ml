@@ -1,0 +1,34 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2022 G.B. Fefe, <gb.fefe@protonmail.com>                    *)
+(*                                                                           *)
+(*****************************************************************************)
+
+let is_already_denounced ctxt delegate (level : Level_repr.t) slot_index =
+  Storage.Dal_already_denounced.mem
+    (ctxt, level.cycle)
+    ((level.level, slot_index), delegate)
+
+let add_denunciation ctxt delegate (level : Level_repr.t) slot_index =
+  let open Lwt_syntax in
+  let* already_denounced =
+    is_already_denounced ctxt delegate level slot_index
+  in
+  let* ctxt =
+    if already_denounced then Lwt.return ctxt
+    else
+      Storage.Dal_already_denounced.add
+        (ctxt, level.cycle)
+        ((level.level, slot_index), delegate)
+        ()
+  in
+  return (ctxt, already_denounced)
+
+let clear_outdated_cycle ctxt ~new_cycle =
+  match Cycle_repr.(sub new_cycle Constants_repr.max_slashing_period) with
+  | None -> Lwt.return ctxt
+  | Some outdated_cycle ->
+      Storage.Dal_already_denounced.clear (ctxt, outdated_cycle)

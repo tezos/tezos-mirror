@@ -71,3 +71,5 @@ val slots_range_opt :
 val is_succ : t -> succ:t -> bool
 
 include Compare.S with type t := t
+
+module Index : Storage_description.INDEX with type t = t

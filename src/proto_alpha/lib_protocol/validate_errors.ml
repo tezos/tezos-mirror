@@ -842,12 +842,12 @@ module Anonymous = struct
       `Temporary
       ~id:"validate.operation.block.too_early_denunciation"
       ~title:"Too early denunciation"
-      ~description:"A denunciation is too far in the future"
+      ~description:"A denunciation is for a future level"
       ~pp:(fun ppf (kind, level, current) ->
         Format.fprintf
           ppf
-          "A double-%a denunciation is too far in the future (current level: \
-           %a, given level: %a)"
+          "A double-%a denunciation is for a future level (current level: %a, \
+           given level: %a)"
           pp_denunciation_kind
           kind
           Raw_level.pp
@@ -893,9 +893,97 @@ module Anonymous = struct
       (fun (kind, level, last_cycle) ->
         Outdated_denunciation {kind; level; last_cycle})
 
-  type error += Conflicting_dal_entrapment of operation_conflict
+  type error +=
+    | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}
+    | Outdated_dal_denunciation of {level : Raw_level.t; last_cycle : Cycle.t}
+    | Invalid_shard_index of {given : int; min : int; max : int}
+    | Dal_already_denounced of {
+        delegate : Signature.Public_key_hash.t;
+        level : Level.t;
+      }
+    | Conflicting_dal_entrapment of operation_conflict
 
   let () =
+    let open Data_encoding in
+    register_error_kind
+      `Temporary
+      ~id:"validate.operation.block.too_early_dal_denunciation"
+      ~title:"Too early DAL denunciation"
+      ~description:"A DAL denunciation is for a future level"
+      ~pp:(fun ppf (level, current) ->
+        Format.fprintf
+          ppf
+          "A DAL entrapment denunciation is for a future level (current level: \
+           %a, given level: %a)"
+          Raw_level.pp
+          current
+          Raw_level.pp
+          level)
+      (obj2 (req "level" Raw_level.encoding) (req "current" Raw_level.encoding))
+      (function
+        | Too_early_dal_denunciation {level; current} -> Some (level, current)
+        | _ -> None)
+      (fun (level, current) -> Too_early_dal_denunciation {level; current}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.block.outdated_dal_denunciation"
+      ~title:"Outdated DAL denunciation"
+      ~description:"A DAL denunciation is outdated."
+      ~pp:(fun ppf (level, last_cycle) ->
+        Format.fprintf
+          ppf
+          "A DAL entrapment denunciation is outdated (last acceptable cycle: \
+           %a, given level: %a)."
+          Cycle.pp
+          last_cycle
+          Raw_level.pp
+          level)
+      (obj2 (req "level" Raw_level.encoding) (req "last" Cycle.encoding))
+      (function
+        | Outdated_dal_denunciation {level; last_cycle} ->
+            Some (level, last_cycle)
+        | _ -> None)
+      (fun (level, last_cycle) -> Outdated_dal_denunciation {level; last_cycle}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.block.invalid_dal_shard_index"
+      ~title:"Invalid DAL shard index"
+      ~description:
+        "The given shard index is out of range of representable shard indices"
+      ~pp:(fun ppf (given, min, max) ->
+        Format.fprintf
+          ppf
+          "The given shard index %d is out of range of representable shard \
+           indices [%d, %d]"
+          given
+          min
+          max)
+      (obj3 (req "given" int31) (req "min" int31) (req "max" int31))
+      (function
+        | Invalid_shard_index {given; min; max} -> Some (given, min, max)
+        | _ -> None)
+      (fun (given, min, max) -> Invalid_shard_index {given; min; max}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate.operation.already_dal_denounced"
+      ~title:"Already denounced for DAL entrapement"
+      ~description:"The same DAL denunciation has already been validated."
+      ~pp:(fun ppf (delegate, level) ->
+        Format.fprintf
+          ppf
+          "Delegate %a at level %a has already been denounced for a DAL \
+           entrapment."
+          Signature.Public_key_hash.pp
+          delegate
+          Level.pp
+          level)
+      (obj2
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Level.encoding))
+      (function
+        | Dal_already_denounced {delegate; level} -> Some (delegate, level)
+        | _ -> None)
+      (fun (delegate, level) -> Dal_already_denounced {delegate; level}) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.conflicting_dal_entrapment"
@@ -911,7 +999,7 @@ module Anonymous = struct
            entrapment evidence %a"
           Operation_hash.pp
           existing)
-      Data_encoding.(obj1 (req "conflict" operation_conflict_encoding))
+      (obj1 (req "conflict" operation_conflict_encoding))
       (function
         | Conflicting_dal_entrapment conflict -> Some conflict | _ -> None)
       (fun conflict -> Conflicting_dal_entrapment conflict)
