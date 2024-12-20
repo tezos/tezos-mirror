@@ -8,6 +8,11 @@
 
 open Rpc_encodings
 
+(* Maximum message size accepted by the websocket server, hardcoded to 4MB.
+   This should be enough for messages we expect to receive in the ethereum
+   JSONRPC protocol. *)
+let max_message_length = 4096 * 1024
+
 type parameters = {
   push_frame : Websocket.Frame.t option -> unit;
   http_request : Cohttp.Request.t;
@@ -16,11 +21,18 @@ type parameters = {
   handler : websocket_handler;
 }
 
+type close_status = Normal_closure | Message_too_big
+
+(* https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.1 *)
+let code_of_close_status = function
+  | Normal_closure -> 1000
+  | Message_too_big -> 1009
+
 module Types = struct
   type subscriptions_table =
     (Ethereum_types.Subscription.id, unit -> unit) Stdlib.Hashtbl.t
 
-  type close_info = {reason : string; code : int}
+  type close_info = {reason : string; status : close_status}
 
   type state = {
     push_frame : Websocket.Frame.t option -> unit;
@@ -216,20 +228,20 @@ type worker = Worker.infinite Worker.queue Worker.t
 
 let table = Worker.create_table Queue
 
-let default_close_info = {Types.reason = ""; code = 1000}
+let default_close_info = {Types.reason = ""; status = Normal_closure}
 
-let shutdown_worker ~reason ?(code = default_close_info.code) w =
+let shutdown_worker ~reason ?(status = default_close_info.status) w =
   let st = Worker.state w in
   (match st.close_info with
   | Some _ -> ()
-  | None -> st.close_info <- Some {code; reason}) ;
+  | None -> st.close_info <- Some {status; reason}) ;
   Worker.shutdown w
 
-let shutdown ~reason ?code conn =
+let shutdown ~reason ?status conn =
   let open Lwt_syntax in
   match Worker.find_opt table conn with
   | None -> return_unit
-  | Some w -> shutdown_worker ~reason ?code w
+  | Some w -> shutdown_worker ~reason ?status w
 
 let handle_subscription
     {Types.push_frame; conn_descr; output_media_type; subscriptions; _} opcode
@@ -330,6 +342,18 @@ let on_frame worker fr =
       (* Client has sent a close frame, we shut everything down for this
          worker *)
       shutdown_worker ~reason:"Received close frame" worker
+  | {opcode = Text | Binary; content; _}
+    when String.length content > max_message_length ->
+      (* We are receiving a message too big for the server *)
+      shutdown_worker ~reason:"Message too big" ~status:Message_too_big worker
+  | {opcode = Continuation; content; _}
+    when Buffer.length state.message_buffer + String.length content
+         > max_message_length ->
+      (* We are receiving a message too big for the server *)
+      shutdown_worker
+        ~reason:"Fragmented message too big"
+        ~status:Message_too_big
+        worker
   | {opcode = Text | Binary; content; final = false; _} ->
       (* New fragmented message *)
       Buffer.clear state.message_buffer ;
@@ -428,13 +452,13 @@ module Handlers = struct
       Worker.state w
     in
     let nb_sub = Stdlib.Hashtbl.length subscriptions in
-    let {Types.reason; code} =
+    let {Types.reason; status} =
       Option.value close_info ~default:default_close_info
     in
     let* () = Event.(emit shutdown) (conn_descr, reason, nb_sub) in
     let () =
       try
-        push_frame (Some (Websocket.Frame.close code)) ;
+        push_frame (Some (Websocket.Frame.close (code_of_close_status status))) ;
         push_frame None
       with _ -> (* Websocket already closed *) ()
     in
