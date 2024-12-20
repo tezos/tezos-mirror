@@ -960,7 +960,9 @@ let job_build_static_binaries ~__POS__ ~arch
       @ version_executable)
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
-  |> enable_cargo_cache |> enable_sccache |> enable_octez_rust_deps_target_dir
+  |> enable_cargo_cache
+  |> enable_sccache ~cache_size:"2G"
+  |> enable_octez_rust_deps_target_dir
 
 (** Type of Docker build jobs.
 
