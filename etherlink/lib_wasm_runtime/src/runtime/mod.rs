@@ -10,6 +10,7 @@ use crate::{
     api::{Kernel, KernelsCache},
     bindings,
     constants::KERNEL,
+    host::RuntimeVersion,
     types::{ContextHash, EvmTree},
 };
 pub use env::Env;
@@ -108,6 +109,16 @@ enum NativeKernel {
     Bifrost,
 }
 
+impl NativeKernel {
+    fn runtime_version(&self) -> RuntimeVersion {
+        // TODO: When adding support for the kernel adding Bifrost, the expected version should be
+        // `V1`.
+        match self {
+            Self::Bifrost => RuntimeVersion::V0,
+        }
+    }
+}
+
 const BIFROST_ROOT_HASH_HEX: &'static str =
     "7ff257e4f6ddb11766ec2266857c8fc75bd00e73230a7b598fec2bd9a68b6908";
 
@@ -158,17 +169,20 @@ impl Runtime for NativeRuntime {
 pub fn load_runtime(
     engine: &Engine,
     kernels_cache: &mut KernelsCache,
-    host: Host,
+    mut host: Host,
     entrypoint: &str,
     native_execution: bool,
 ) -> Result<Box<dyn Runtime>, Error> {
     let root_hash = bindings::store_get_hash(host.tree(), KERNEL)?;
     match NativeKernel::of_root_hash(&root_hash) {
-        Some(kernel) if native_execution => Ok(Box::new(NativeRuntime {
-            variant: kernel,
-            host,
-            entrypoint: entrypoint.to_owned(),
-        })),
+        Some(kernel) if native_execution => {
+            host.version = kernel.runtime_version();
+            Ok(Box::new(NativeRuntime {
+                variant: kernel,
+                host,
+                entrypoint: entrypoint.to_owned(),
+            }))
+        }
         Some(_) | None => {
             let kernel = kernels_cache.load(&engine, host.tree())?;
             let runtime = WasmRuntime::new(&engine, host, kernel, entrypoint)?;
