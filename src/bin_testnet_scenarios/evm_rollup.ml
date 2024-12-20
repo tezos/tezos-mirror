@@ -180,12 +180,26 @@ let rps_perf ~configuration_path ~testnet =
   let testnet = testnet () in
   let* client, node = Scenario_helpers.setup_octez_node ~testnet () in
 
-  let* operator = Client.gen_and_show_keys client in
-  let* () =
-    Scenario_helpers.faucet
-      ~network_string:testnet.network
-      operator.public_key_hash
+  let* operator =
+    match testnet.operator with
+    | Some operator ->
+        let* () =
+          Client.import_secret_key
+            client
+            operator.secret_key
+            ~alias:operator.alias
+        in
+        return operator
+    | None ->
+        let* operator = Client.gen_and_show_keys client in
+        let* () =
+          Scenario_helpers.faucet
+            ~network_string:testnet.network
+            operator.public_key_hash
+        in
+        return operator
   in
+
   let* () = check_operator_balance ~node ~client ~mode:config.mode ~operator in
   let* _rollup_address, _sc_rollup_node, evm_node =
     setup_evm_infra ~config ~operator node client
