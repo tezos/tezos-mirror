@@ -151,7 +151,7 @@ let wait_ssh_server_running agent =
         let* _ = Env.wait_process ~is_ready ~run () in
         Lwt.return_unit
 
-let orchestrator ?alert_collection deployement f =
+let orchestrator ?(alerts = []) deployement f =
   let agents = Deployement.agents deployement in
   let* website =
     if Env.website then
@@ -159,23 +159,15 @@ let orchestrator ?alert_collection deployement f =
       Lwt.return_some website
     else Lwt.return_none
   in
-  let* prometheus, alert_manager =
-    match (Env.prometheus, alert_collection) with
-    | false, _ ->
-        (* No prometheus implies no alert-manager. *)
-        Lwt.return (None, None)
-    | true, None ->
-        (* Prometheus enabled but no alert collection provided. *)
-        let* prometheus = Prometheus.start agents in
-        Lwt.return (Some prometheus, None)
-    | true, Some collection ->
-        (* Activation of prometheus and alert-manager. *)
-        let* prometheus = Prometheus.start agents in
-        let alerts = Alert_manager.Collection.alerts collection in
-        let* () = Prometheus.add_alerts alerts prometheus in
-        let* alert_manager = Alert_manager.run collection Env.alert_handlers in
-        Lwt.return (Some prometheus, Some alert_manager)
+  let* prometheus =
+    if Env.prometheus then
+      (* Alerts requires to update prometheus configuration. *)
+      let alerts = List.map (fun Alert_manager.{alert; _} -> alert) alerts in
+      let* prometheus = Prometheus.start ~alerts agents in
+      Lwt.return_some prometheus
+    else Lwt.return_none
   in
+  let* alert_manager = Alert_manager.run alerts in
   let* grafana =
     if Env.grafana then
       let* grafana = Grafana.run () in
@@ -480,8 +472,8 @@ let set_faketime faketime agent =
       let cmd, args = Runner.wrap_with_ssh runner cmd in
       Process.run cmd args
 
-let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
-    ?alert_collection f =
+let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
+    f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let vms =
@@ -546,20 +538,20 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed
             |> Deployement.of_agents
           in
           let* () = ensure_ready deployement in
-          orchestrator ?alert_collection deployement f
+          orchestrator ?alerts deployement f
       | `Localhost ->
           (* The scenario is executed locally and the VM are on the host machine. *)
           let* () = Jobs.docker_build ~push:false () in
           let* deployement = Deployement.deploy ~configurations in
           let* () = ensure_ready deployement in
-          orchestrator ?alert_collection deployement f
+          orchestrator ?alerts deployement f
       | `Cloud ->
           (* The scenario is executed locally and the VMs are on the cloud. *)
           let* () = Jobs.deploy_docker_registry () in
           let* () = Jobs.docker_build ~push:Env.push_docker () in
           let* deployement = Deployement.deploy ~configurations in
           let* () = ensure_ready deployement in
-          orchestrator ?alert_collection deployement f
+          orchestrator ?alerts deployement f
       | `Host ->
           (* The scenario is executed remotely. *)
           let* proxy_running = try_reattach () in

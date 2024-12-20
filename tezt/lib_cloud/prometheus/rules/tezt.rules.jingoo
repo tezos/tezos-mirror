@@ -1,21 +1,32 @@
 groups:
-  - name: tezt
-  {% for alert in alerts %}
+  {%- for group in groups %}
+  - name: {{ group.name }}
+  {%- if group.interval %}
+    interval: {{ group.interval }}
+  {%- endif %}
     rules:
-      - alert: {{ alert.name }}
-        expr: {{ alert.expr }}
-        {% if alert.for_ %}
-        for: {{ alert.for_ }}
-        {% endif %}
+    {%- for rule in group.rules %}
+      {%- if rule.alert %}
+      - alert: {{ rule.alert.name }}
+        expr: {{ rule.alert.expr }}
+        {%- if rule.alert.for_ %}
+        for: {{ rule.alert.for_ }}
+        {%- endif %}
         labels:
-          severity:  {{ alert.severity }}
-        {% if (alert.summary or alert.description) %}
+          severity:  {{ rule.alert.severity }}
+        {%- if (rule.alert.summary or rule.alert.description) %}
         annotations:
-          {% if alert.summary %}
-          summary: {{ alert.summary }}
-          {% endif %}
-          {% if alert.description %}
-          description: {{ alert.description }}
-          {% endif %}
-        {% endif %}
-  {% endfor %}
+          {%- if rule.alert.summary %}
+          summary: {{ rule.alert.summary }}
+          {%- endif %}
+          {%- if rule.alert.description %}
+          description: {{ rule.alert.description }}
+          {%- endif %}
+        {%- endif %}
+      {%- endif %}
+      {%- if rule.record %}
+      - record: {{ rule.record.name }}
+        expr: {{ rule.record.expr }}
+      {%- endif %}
+    {%- endfor %}
+  {%- endfor %}

@@ -6,7 +6,31 @@
 (*****************************************************************************)
 
 module Agent = Agent
-module Alert_manager = Alert_manager
+
+module Alert = struct
+  include Alert_manager
+
+  type t = Alert_manager.alert
+
+  type severity = Prometheus.severity = Critical | Warning | Info
+
+  let make ?route ?for_ ?description ?summary ?severity ?group_name ?interval
+      ~name ~expr () =
+    let alert =
+      Prometheus.make_alert
+        ?for_
+        ?description
+        ?summary
+        ?severity
+        ?group_name
+        ?interval
+        ~name
+        ~expr
+        ()
+    in
+
+    Alert_manager.alert ?route alert
+end
 
 module Configuration = struct
   include Env

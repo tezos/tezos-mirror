@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 module Agent = Agent
-module Alert_manager = Alert_manager
 
 module Configuration : sig
   type docker_image =
@@ -41,6 +40,71 @@ module Configuration : sig
     t
 end
 
+module Alert : sig
+  (* A receiver of an alert. *)
+  type receiver
+
+  (* A slack receiver can be configured via a webhook. *)
+  val slack_receiver :
+    ?channel:string -> name:string -> api_url:string -> unit -> receiver
+
+  (* This is a dummy receiver. *)
+  val null_receiver : receiver
+
+  (* A route explains when an alert should be issued to the receiver. *)
+  type route
+
+  (** [route ?group_wait ?group_interval ?repeat_interval receiver]
+      creates a fresh route whose receiver is [receiver] and where:
+
+    - [group_wait] defines how long to wait before sending a
+    notification about new alerts. If omitted, inherit the
+    [group_wait] of the default route.
+
+    - [group_interval] defines how long to wait before sending
+    notification about new alerts for a group. If omitted, inherit the
+    [group_interval] of the default route.
+
+    - [repeat_interval] defines the minimum time interval between
+    sending two notifications about the same alert. If omitted,
+    inherit the [repeat_interval] of the default route.  The
+    [repeat_interval] value should be a multiple of
+    [group_interval]. *)
+  val route :
+    ?group_wait:string ->
+    ?group_interval:string ->
+    ?repeat_interval:string ->
+    receiver ->
+    route
+
+  (** Severity of an alert. *)
+  type severity = Critical | Warning | Info
+
+  (** Type of an alert. *)
+  type t
+
+  (** [make ?route ?for_ ?description ?summary ?severity ~name ~expr]
+      defines a new Prometheus alert with name [name] and promQL
+      [expr]. Optionally a severity, summary and description of the
+      alert can be defined. 
+
+      If [route] is provided, the alert can be routed to a receiver
+      (Slack, webhook, ...).
+*)
+  val make :
+    ?route:route ->
+    ?for_:string ->
+    ?description:string ->
+    ?summary:string ->
+    ?severity:severity ->
+    ?group_name:string ->
+    ?interval:string ->
+    name:string ->
+    expr:string ->
+    unit ->
+    t
+end
+
 module Cloud : sig
   type t
 
@@ -64,7 +128,7 @@ module Cloud : sig
     title:string ->
     tags:string list ->
     ?seed:Test.seed ->
-    ?alert_collection:Alert_manager.Collection.t ->
+    ?alerts:Alert.t list ->
     (t -> unit Lwt.t) ->
     unit
 

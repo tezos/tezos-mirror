@@ -258,13 +258,6 @@ let memtrace =
     ~description:"Use memtrace on all the services"
     false
 
-let slack_api_url =
-  Clap.optional_string
-    ~section
-    ~long:"slack-api-url"
-    ~description:"The slack webhook url to send the alerts on"
-    ()
-
 let bootstrap_node_identity_file =
   Clap.optional_string
     ~section
@@ -282,3 +275,17 @@ let bootstrap_dal_node_identity_file =
       "The bootstrap DAL node identity file. Warning: this argument may be \
        removed in a future release."
     ()
+
+module Alerts = struct
+  let section =
+    Clap.section
+      ~description:"CLI arguments defining alert managing options"
+      "Cloud alerting"
+
+  let dal_slack_webhook =
+    Clap.optional_string
+      ~section
+      ~long:"dal-slack-webhook"
+      ~description:"The slack webhook url to send the alerts on"
+      ()
+end
