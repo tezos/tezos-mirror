@@ -173,6 +173,15 @@ val initial_kernel : t -> string
     do not wait for it to be ready. *)
 val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
 
+(** [wait_for_event ?timeout evm_node ~event f] waits for event [event] until
+    [timeout] on node [evm_node].
+
+    The wait is resolved if an event with name [event] is seen and [f] returns
+    [Some _].
+*)
+val wait_for_event :
+  ?timeout:float -> t -> event:string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
 (** [wait_for_ready evm_node] waits until [evm_node] is ready. *)
 val wait_for_ready : ?timeout:float -> t -> unit Lwt.t
 
@@ -394,11 +403,15 @@ val wait_for_shutdown_event : ?can_terminate:bool -> t -> int option Lwt.t
     splitting its irmin context at level [level] if provided. *)
 val wait_for_split : ?level:int -> t -> int Lwt.t
 
-(** [wait_for_gc_finished ?gc_level ?head_level evm_node] waits untils
+(** [wait_for_gc_finished ?gc_level ?head_level evm_node] waits until
     the node terminates garbage collecting its context on head
     [head_level] at gc level [gc_level] if provided. *)
 val wait_for_gc_finished :
   ?gc_level:int -> ?head_level:int -> t -> (int * int) Lwt.t
+
+(** [wait_for_start_history_mode ?history_mode evm_node] waits until
+    the start history mode event is emitted with [history_mode] if provided. *)
+val wait_for_start_history_mode : ?history_mode:string -> t -> string Lwt.t
 
 (** [rpc_endpoint ?local ?private_ evm_node] returns the endpoint to communicate with the
     [evm_node]. If [private_] is true, the endpoint for the private
