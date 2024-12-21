@@ -721,8 +721,6 @@ let websocket_checks config =
   match config.experimental_features with
   | {enable_websocket = true; rpc_server = Dream; _} ->
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
-  | {enable_websocket = true; rpc_server = Resto; _} ->
-      failwith "Resto RPC server backend does not support websockets"
   | _ -> Lwt_result_syntax.return_unit
 
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit

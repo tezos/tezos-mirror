@@ -8791,7 +8791,6 @@ let test_websocket_rpcs =
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~rpc_server:Dream (* Websockets only available in Dream *)
     ~websockets:true
   @@ fun {sequencer; _} _protocol ->
   Log.info "Opening a websocket connection with the node" ;
@@ -8866,7 +8865,6 @@ let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~rpc_server:Dream (* Websockets only available in Dream *)
     ~websockets:true
   @@ fun {sequencer; _} _protocol ->
   let* () =
@@ -8917,7 +8915,6 @@ let test_websocket_newHeads_event =
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~rpc_server:Dream (* Websockets only available in Dream *)
     ~websockets:true
   @@ fun {sequencer; observer; _} _protocol ->
   let scenario evm_node (lvl, lvl') =
@@ -8944,7 +8941,7 @@ let test_websocket_newHeads_event =
    connections closed by the client. *)
 let test_websocket_cleanup =
   register_all
-    ~tags:["evm"; "rpc"; "websocket"; "cleanup"; Tag.flaky]
+    ~tags:["evm"; "rpc"; "websocket"; "cleanup"]
     ~title:"Check that websocket subscriptions are cleaned up on close"
     ~time_between_blocks:Nothing
     ~bootstrap_accounts:
@@ -8952,7 +8949,7 @@ let test_websocket_cleanup =
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~rpc_server:Dream (* Websockets only available in Dream *)
+    ~rpc_server:Resto (* Websockets disconnection is flaky in Dream *)
     ~websockets:true
   @@ fun {sequencer; _} _protocol ->
   let* websocket = Evm_node.open_websocket sequencer in
@@ -8985,14 +8982,12 @@ let test_websocket_newPendingTransactions_event =
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~rpc_server:Dream (* Websockets only available in Dream *)
     ~websockets:true
   @@ fun {sequencer; sc_rollup_node; _} _protocol ->
   let* observer =
     run_new_observer_node
       ~finalized_view:false
       ~sc_rollup_node
-      ~rpc_server:Dream (* Websockets only available in Dream *)
       ~websockets:true
       sequencer
   in
@@ -9037,7 +9032,6 @@ let test_websocket_logs_event =
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~rpc_server:Dream
     ~websockets:true
   @@ fun {sequencer; observer; _} _protocol ->
   let scenario evm_node =

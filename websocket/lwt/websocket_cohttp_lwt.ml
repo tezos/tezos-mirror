@@ -34,7 +34,7 @@ let read_frames ic oc handler_fn =
   let rec inner () = read_frame () >>= Lwt.wrap1 handler_fn >>= inner in
   inner ()
 
-let upgrade_connection request incoming_handler =
+let upgrade_connection request incoming_handler io_error_handler =
   let headers = Cohttp.Request.headers request in
   (match Cohttp.Header.get headers "sec-websocket-key" with
   | None ->
@@ -67,4 +67,5 @@ let upgrade_connection request incoming_handler =
         send_frames frames_out_stream oc;
       ]
   in
+  let f ic oc = Lwt.catch (fun () -> f ic oc) io_error_handler in
   Lwt.return (`Expert (resp, f), frames_out_fn)

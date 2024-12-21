@@ -1,0 +1,23 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>              *)
+(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Callback to use for a websocket endpoint in a Cohttp server.
+    [cohttp_callback handler conn req body] upgrades the connection for request
+    [req] to the websocket protocol and starts worker that processes incoming
+    frames and writes in return in the websocket. *)
+val cohttp_callback :
+  Rpc_encodings.websocket_handler ->
+  Cohttp_lwt_unix.Server.conn ->
+  Cohttp.Request.t ->
+  'body ->
+  Cohttp_lwt_unix.Server.response_action Lwt.t
+
+(** Callback to be called by Cohttp when it detects a closed connection before
+    any read/write happens. [on_conn_closed conn] stops the websocket worker and
+    cleans resources associated to connection [conn], if it exists. *)
+val on_conn_closed : Cohttp_lwt_unix.Server.conn -> unit

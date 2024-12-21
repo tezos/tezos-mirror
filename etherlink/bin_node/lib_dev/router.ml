@@ -301,10 +301,12 @@ let make_jsonrpc_websocket_route path
                  https://github.com/aantron/dream/issues/230). *)
               Dream.send ~text_or_binary websocket output
           | Error exn ->
-              send_error
-                output_media
-                websocket
-                (Rpc_errors.internal_error (Printexc.to_string exn)))
+              let msg =
+                match exn with
+                | Failure msg -> msg
+                | _ -> Printexc.to_string exn
+              in
+              send_error output_media websocket (Rpc_errors.internal_error msg))
         (Lwt_stream.wrap_exn stream)
     in
     stopper () ;

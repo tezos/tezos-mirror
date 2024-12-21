@@ -88,16 +88,16 @@ let register_metrics path dir =
         let+ response = Metrics.Metrics_server.callback conn req body in
         `Response response
       in
-      Resto {dir; extra = EndpointMap.add (`GET, "/metrics") callback extra}
+      Resto {dir; extra = EndpointMap.add (`GET, path) callback extra}
   | Dream routes ->
       let route = Router.make_metrics_route path in
       Dream (route :: routes)
 
 let jsonrpc_websocket_register dir path handler =
   match dir with
-  | Resto dir ->
-      (* No support for websockets in Resto. *)
-      Resto dir
+  | Resto {dir; extra} ->
+      let callback = Evm_websocket.cohttp_callback handler in
+      Resto {dir; extra = EndpointMap.add (`GET, path) callback extra}
   | Dream routes ->
       let route = Router.make_jsonrpc_websocket_route path handler in
       Dream (route :: routes)

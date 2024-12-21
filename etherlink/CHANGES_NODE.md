@@ -13,7 +13,7 @@ you start using them, you probably want to use `octez-evm-node check config
 
 - Experimental support for websockets on endpoints (`/ws` and `/private/ws`) for
   JSON-RPC requests with feature flag `experimental_features.enable_websocket =
-  true`. (!15566)
+  true`. (!15566, !16015)
   - Added support for the WebSocket event `newHeads`, allowing clients to receive
     real-time notifications of new blocks. (!15899)
   - Added support for the WebSocket event `newPendingTransactions`, enabling clients
