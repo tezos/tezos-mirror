@@ -339,11 +339,8 @@ let () =
   List.iter
     (add_dep_to_profile "octez-dev-deps")
     [
-      (* ocaml-lsp-server-1.18 is not compatible with version above 4.16.x of merlin.
-         Selected versions of those 2 should be kept in sync
-         (opam should handle this constraint for us) *)
-      external_lib "merlin" V.(at_least "4.14" && less_than "4.17");
-      external_lib "ocaml-lsp-server" V.(at_least "1.18.0");
+      external_lib "merlin" V.(at_least "4.18");
+      external_lib "ocaml-lsp-server" V.(exactly "1.20.1-4.14");
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7085
          remove constraint on odoc version when odoc bug is solved *)
       external_lib "odoc" V.(at_least "2.4.2");
