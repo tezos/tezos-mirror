@@ -496,6 +496,7 @@ let cohttp_callback handler (conn : Cohttp_lwt_unix.Server.conn) req _body =
   let* response_action, push_frame =
     Websocket_cohttp_lwt.upgrade_connection
       req
+      ~max_frame_length:max_message_length
       (new_frame conn_name)
       (fun io_exn ->
         let reason =
