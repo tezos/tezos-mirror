@@ -420,8 +420,11 @@ module History : sig
       print the serialized version of the proof (i.e. a sequence of bytes). *)
   val pp_proof : serialized:bool -> Format.formatter -> proof -> unit
 
-  (** This function returns some commitment if and only if the skip list cell
-      whose content is given is supposed to be attested.
+  (** This function returns a commitment and its publisher (wrapped in
+      Either.Right if and only if the skip list cell whose content is given is
+      attested. In case the commitment is not attested, the
+      function returns the publisher if the slot is published or None otherwise
+      (wrapped in Either.Left).
 
       Attestation status is either checked by inspecting the protocol's boolean
       flag stored in the content if [attestation_threshold_percent] is None
@@ -432,7 +435,7 @@ module History : sig
     attestation_threshold_percent:int option ->
     restricted_commitments_publishers:Contract_repr.t list option ->
     cell_content ->
-    Commitment.t option
+    (Contract_repr.t option, Commitment.t * Contract_repr.t) Either.t
 
   (** [produce_proof dal_parameters page_id ~attestation_threshold_percent
       ~restricted_commitments_publishers page_info ~get_history slots_hist]

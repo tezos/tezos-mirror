@@ -1210,9 +1210,12 @@ module History = struct
         ~restricted_commitments_publishers cell_content =
       let open Content_v2 in
       match (cell_content, attestation_threshold_percent) with
-      | Unpublished _, _ -> None
-      | Published {header = {commitment; id = _}; is_proto_attested; _}, None ->
-          if is_proto_attested then Some commitment else None
+      | Unpublished _, _ -> Either.Left None
+      | ( Published
+            {header = {commitment; id = _}; is_proto_attested; publisher; _},
+          None ) ->
+          if is_proto_attested then Either.Right (commitment, publisher)
+          else Either.Left (Some publisher)
       | ( Published
             {
               header = {commitment; id = _};
@@ -1230,8 +1233,8 @@ module History = struct
             && allowed_commitments_publisher
                  publisher
                  restricted_commitments_publishers
-          then Some commitment
-          else None
+          then Either.Right (commitment, publisher)
+          else Either.Left (Some publisher)
 
     (** The [produce_proof_repr] function assumes that some invariants hold, such as:
         - The DAL has been activated,
