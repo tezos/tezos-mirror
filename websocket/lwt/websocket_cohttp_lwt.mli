@@ -19,6 +19,7 @@
 open Websocket
 
 val upgrade_connection :
+  ?max_frame_length:int ->
   Cohttp.Request.t ->
   (Frame.t -> unit) ->
   (exn -> unit Lwt.t) ->
