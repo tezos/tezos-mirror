@@ -129,11 +129,9 @@ Relocating Data
 Serokell stores node data in network-specific subdirectories, while NL uses ``.octez-node`` for all networks:
 
 - **Serokell**: Custom scripts support multiple nodes and networks per machine. Data resides in ``/var/lib/tezos/<network>``.
-- **NL**: Standardized approach supports one network per node, using ``/var/tezos`` for storage.
+- **NL**: The unique directory for node data ``/var/tezos`` allows to run the node only on a single network at a time.
 
-Adjust your data migration to fit this structure::
-
-    sudo cp -a /var/lib/tezos/<network> /var/tezos/.octez-node
+Copy your node data into this new structure.
 
 Also copy the client data (which is presumably not network-dependent).
 
