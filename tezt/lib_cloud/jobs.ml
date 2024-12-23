@@ -64,7 +64,7 @@ let docker_build =
               ("SSH_PUBLIC_KEY", ssh_public_key);
               ("ZCASH_PARAMS_PATH", Path.zcash_params);
               ("DAL_TRUSTED_SETUP_PATH", Path.dal_trusted_setup);
-              ("BINARIES_DESTINATION_PATH", Path.default_binaries_path ());
+              ("BINARIES_DESTINATION_PATH", Env.binaries_path);
             ]
         | Octez_release {tag} ->
             [("SSH_PUBLIC_KEY", ssh_public_key); ("RELEASE_TAG", tag)]

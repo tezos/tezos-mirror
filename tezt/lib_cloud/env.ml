@@ -91,6 +91,8 @@ let project_id = Gcloud.project_id
 
 let faketime = Cli.faketime
 
+let binaries_path = Cli.binaries_path
+
 let init () =
   if tezt_cloud = "" then
     Test.fail
