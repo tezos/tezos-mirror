@@ -80,8 +80,8 @@ let pp_content ppf {content; _} =
 let pp ppf t =
   Format.fprintf
     ppf
-    "%s %s %a"
+    "@[<v 0>verbosity: %s;@,profiler_module: %s;@,content: %a@]"
     (Option.value ~default:"No verbosity" t.verbosity)
-    (Option.value ~default:"No Profiler module" t.profiler_module)
+    (Option.value ~default:"No profiler module" t.profiler_module)
     pp_content
     t
