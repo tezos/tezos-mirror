@@ -10,8 +10,9 @@
   expected to join (with the `--network` CLI argument), prompting the node to
   perform additional sanity checks. (!16073)
 - If `--network` is set, the EVM node will use default values for the upstream
-  EVM node if it has not been set either through the configuration file or a
-  CLI argument (with `init config` and `run observer` commands). (!16074)
+  EVM node and the preimages endpoint if they have not been set either through
+  the configuration file or a CLI argument (with `init config` and `run
+  observer` commands). (!16074 !16075)
 
 #### Experimental
 

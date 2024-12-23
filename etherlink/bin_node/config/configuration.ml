@@ -196,6 +196,12 @@ let default_max_active_connections =
 
 let default_preimages data_dir = Filename.Infix.(data_dir // "wasm_2_0_0")
 
+let default_preimages_endpoint = function
+  | Mainnet ->
+      Uri.of_string "https://snapshots.tzinit.org/etherlink-mainnet/wasm_2_0_0"
+  | Testnet ->
+      Uri.of_string "https://snapshots.tzinit.org/etherlink-ghostnet/wasm_2_0_0"
+
 let default_time_between_blocks = Time_between_blocks 5.
 
 let hard_maximum_number_of_chunks =
@@ -912,8 +918,18 @@ let native_execution_policy_encoding =
     @@ string_enum
          [("never", Never); ("rpcs_only", Rpcs_only); ("always", Always)])
 
-let kernel_execution_encoding data_dir =
+let kernel_execution_encoding ?network data_dir =
   Data_encoding.(
+    let preimages_endpoint_field ~description name encoding =
+      match network with
+      | Some network ->
+          dft
+            ~description
+            name
+            (option encoding)
+            (Some (default_preimages_endpoint network))
+      | None -> opt ~description name encoding
+    in
     conv
       (fun {preimages; preimages_endpoint; native_execution_policy} ->
         (preimages, preimages_endpoint, native_execution_policy))
@@ -927,7 +943,7 @@ let kernel_execution_encoding data_dir =
             "preimages"
             string
             (default_preimages data_dir))
-         (opt
+         (preimages_endpoint_field
             ~description:
               "Endpoint for downloading the preimages that cannot be found in \
                the preimages directory. These preimages are downloaded by the \
@@ -1149,8 +1165,12 @@ let encoding ?network data_dir : t Data_encoding.t =
           (obj4
              (dft
                 "kernel_execution"
-                (kernel_execution_encoding data_dir)
-                (kernel_execution_config_dft ~data_dir ()))
+                (kernel_execution_encoding ?network data_dir)
+                (kernel_execution_config_dft
+                   ?preimages_endpoint:
+                     (Option.map default_preimages_endpoint network)
+                   ~data_dir
+                   ()))
              (dft "public_rpc" rpc_encoding (default_rpc ()))
              (opt "private_rpc" rpc_encoding)
              (dft
@@ -1278,6 +1298,11 @@ let evm_node_endpoint_resolved network evm_node_endpoint =
        (fun network -> Uri.of_string (observer_evm_node_endpoint network))
        network)
 
+let preimages_endpoint_resolved network preimages_endpoint =
+  Option.either
+    preimages_endpoint
+    (Option.map default_preimages_endpoint network)
+
 module Cli = struct
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
@@ -1365,7 +1390,8 @@ module Cli = struct
       kernel_execution_config_dft
         ~data_dir
         ?preimages
-        ?preimages_endpoint
+        ?preimages_endpoint:
+          (preimages_endpoint_resolved network preimages_endpoint)
         ?native_execution_policy
         ()
     in
