@@ -169,8 +169,11 @@ type t = {
 
 val native_execution_policy_encoding : native_execution_policy Data_encoding.t
 
-(** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir]. *)
-val encoding : string -> t Data_encoding.t
+(** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir].
+
+    If [encoding] is passed, some default values are set according to the
+    selected network, for a more straightforward UX. *)
+val encoding : ?network:supported_network -> string -> t Data_encoding.t
 
 (** Encoding for {!type-rpc_server}. *)
 val rpc_server_encoding : rpc_server Data_encoding.t
@@ -187,10 +190,12 @@ val config_filename : data_dir:string -> string
     are overwritten. *)
 val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
 
-val load_file : data_dir:string -> string -> t tzresult Lwt.t
+val load_file :
+  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
 (** [load ~data_dir] loads a proxy configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+val load :
+  ?network:supported_network -> data_dir:string -> unit -> t tzresult Lwt.t
 
 (** [sequencer_config_exn config] returns the sequencer config of
     [config] or fails *)
@@ -281,6 +286,7 @@ module Cli : sig
     finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
+    ?network:supported_network ->
     unit ->
     t
 
@@ -356,6 +362,7 @@ module Cli : sig
     finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
+    ?network:supported_network ->
     unit ->
     t tzresult Lwt.t
 end

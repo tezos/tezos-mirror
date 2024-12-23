@@ -1108,6 +1108,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?restricted_rpcs
       ?dal_slots:None
       ~finalized_view
+      ?network
       ()
   in
   let*! () =
@@ -1560,7 +1561,7 @@ If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (merge_options
        common_config_args
-       (args18
+       (args19
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1584,7 +1585,12 @@ mode.|}
              ~short:'f'
              ~doc:"Overwrites the configuration file when it exists."
              ())
-          dal_slots_arg))
+          dal_slots_arg
+          (supported_network_arg
+             ~why:
+               "If set, some configuration options defaults to well-known \
+                values for the selected network."
+             ())))
     (prefixes ["init"; "config"] @@ stop)
     (fun ( ( data_dir,
              rpc_addr,
@@ -1622,7 +1628,8 @@ mode.|}
              dont_track_rollup_node,
              wallet_dir,
              force,
-             dal_slots ) )
+             dal_slots,
+             network ) )
          () ->
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
@@ -1673,6 +1680,7 @@ mode.|}
           ~verbose
           ?dal_slots
           ~finalized_view
+          ?network
           ()
       in
       let*! () =
@@ -1690,14 +1698,26 @@ let check_config_command =
     ~desc:
       "Read and validate configuration files. By default, look for config.json \
        in the data-dir. If --filename is used, check this config file instead."
-    (args3 data_dir_arg config_path_arg print_config_arg)
+    (args4
+       data_dir_arg
+       config_path_arg
+       print_config_arg
+       (supported_network_arg
+          ~why:
+            "If set, check as if `--network N` is set when running the node \
+             (as it turns some required configuration fields into optional \
+             ones)."
+          ()))
     (prefixes ["check"; "config"] @@ stop)
-    (fun (data_dir, config_path, print_config) () ->
+    (fun (data_dir, config_path, print_config, network) () ->
       let* config =
         match config_path with
         | Some config_path ->
-            load_file ~data_dir:Configuration.default_data_dir config_path
-        | None -> load ~data_dir
+            load_file
+              ?network
+              ~data_dir:Configuration.default_data_dir
+              config_path
+        | None -> load ?network ~data_dir ()
       in
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in

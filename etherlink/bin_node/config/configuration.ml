@@ -416,6 +416,10 @@ let threshold_encryption_sequencer_config_dft ?time_between_blocks
           sidecar_endpoint;
     }
 
+let observer_evm_node_endpoint = function
+  | Mainnet -> "https://relay.mainnet.etherlink.com"
+  | Testnet -> "https://relay.ghostnet.etherlink.com"
+
 let observer_config_dft ~evm_node_endpoint
     ?threshold_encryption_bundler_endpoint ?rollup_node_tracking () =
   {
@@ -641,8 +645,14 @@ let threshold_encryption_sequencer_encoding =
           Tezos_rpc.Encoding.uri_encoding
           default_sequencer_sidecar_endpoint))
 
-let observer_encoding =
+let observer_encoding ?network () =
   let open Data_encoding in
+  let evm_node_endpoint_field ~description name encoding =
+    match network with
+    | Some network ->
+        dft ~description name encoding (observer_evm_node_endpoint network)
+    | None -> req ~description name encoding
+  in
   conv
     (fun {
            evm_node_endpoint;
@@ -661,7 +671,7 @@ let observer_encoding =
         rollup_node_tracking;
       })
     (obj3
-       (req
+       (evm_node_endpoint_field
           ~description:
             "Upstream EVM node endpoint used to fetch speculative blueprints \
              and forward incoming transactions."
@@ -1004,8 +1014,21 @@ let rpc_encoding =
             Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.encoding
             default_max_active_connections)))
 
-let encoding data_dir : t Data_encoding.t =
+let encoding ?network data_dir : t Data_encoding.t =
   let open Data_encoding in
+  let observer_field name encoding =
+    match network with
+    | Some network ->
+        dft
+          name
+          (option encoding)
+          (Some
+             (observer_config_dft
+                ~evm_node_endpoint:
+                  (Uri.of_string (observer_evm_node_endpoint network))
+                ()))
+    | None -> opt name encoding
+  in
   conv
     (fun {
            public_rpc;
@@ -1077,7 +1100,7 @@ let encoding data_dir : t Data_encoding.t =
           (opt
              "threshold_encryption_sequencer"
              threshold_encryption_sequencer_encoding)
-          (opt "observer" observer_encoding))
+          (observer_field "observer" (observer_encoding ?network ())))
        (merge_objs
           (obj9
              (dft
@@ -1224,14 +1247,15 @@ let precheck json =
       return_unit)
     (fun _exn -> failwith "Syntax error in the configuration file")
 
-let load_file ~data_dir path =
+let load_file ?network ~data_dir path =
   let open Lwt_result_syntax in
   let* json = Lwt_utils_unix.Json.read_file path in
   let* () = precheck json in
-  let config = Data_encoding.Json.destruct (encoding data_dir) json in
+  let config = Data_encoding.Json.destruct (encoding ?network data_dir) json in
   return config
 
-let load ~data_dir = load_file ~data_dir (config_filename ~data_dir)
+let load ?network ~data_dir () =
+  load_file ?network ~data_dir (config_filename ~data_dir)
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
@@ -1247,6 +1271,13 @@ let threshold_encryption_sequencer_config_exn
 let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
 
+let evm_node_endpoint_resolved network evm_node_endpoint =
+  Option.either
+    evm_node_endpoint
+    (Option.map
+       (fun network -> Uri.of_string (observer_evm_node_endpoint network))
+       network)
+
 module Cli = struct
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
@@ -1258,7 +1289,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
-      ?proxy_ignore_block_param ?dal_slots () =
+      ?proxy_ignore_block_param ?dal_slots ?network () =
     let public_rpc =
       default_rpc
         ?rpc_port
@@ -1312,7 +1343,7 @@ module Cli = struct
             ?threshold_encryption_bundler_endpoint
             ?rollup_node_tracking
             ())
-        evm_node_endpoint
+        (evm_node_endpoint_resolved network evm_node_endpoint)
     in
     let proxy =
       default_proxy
@@ -1663,7 +1694,7 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
-      ?proxy_ignore_block_param ?dal_slots () =
+      ?proxy_ignore_block_param ?dal_slots ?network () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1683,7 +1714,7 @@ module Cli = struct
     if exists_config then
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
-      let* configuration = load ~data_dir in
+      let* configuration = load ?network ~data_dir () in
       let configuration =
         patch_configuration_from_args
           ?rpc_addr
@@ -1759,6 +1790,7 @@ module Cli = struct
           ~finalized_view
           ?proxy_ignore_block_param
           ?dal_slots
+          ?network
           ()
       in
       return config
