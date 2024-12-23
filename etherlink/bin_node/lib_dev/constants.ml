@@ -1,0 +1,19 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+open Ethereum_types
+
+let chain_id network =
+  (match network with Configuration.Mainnet -> 0xa729 | Testnet -> 0x1f47b)
+  |> Z.of_int |> quantity_of_z
+
+let rollup_address network =
+  Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn
+  @@
+  match network with
+  | Configuration.Mainnet -> "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
+  | Testnet -> "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg"

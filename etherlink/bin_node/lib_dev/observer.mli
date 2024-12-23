@@ -9,6 +9,7 @@
     event-loop of the Observer, consuming the blueprints received from
     the EVM node endpoint, unless [no_sync] is true. *)
 val main :
+  ?network:Configuration.supported_network ->
   ?kernel_path:string ->
   data_dir:string ->
   config:Configuration.t ->

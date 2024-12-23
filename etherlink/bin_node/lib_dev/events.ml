@@ -165,6 +165,14 @@ let event_kernel_log kind level =
     ~level
     ("msg", Data_encoding.string)
 
+let missing_chain_id =
+  Internal_event.Simple.declare_0
+    ~level:Warning
+    ~section
+    ~name:"missing_chain_id"
+    ~msg:"Missing chain id: skipping consistency check with selected network"
+    ()
+
 let event_kernel_log_application_debug = event_kernel_log Application Debug
 
 let event_kernel_log_simulation_debug = event_kernel_log Simulation Debug
@@ -314,3 +322,5 @@ let invalid_node_da_fees ~node_da_fees ~kernel_da_fees ~block_number ~call =
 let deprecation_note msg = emit event_deprecation_note msg
 
 let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
+
+let missing_chain_id () = emit missing_chain_id ()
