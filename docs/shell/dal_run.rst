@@ -23,7 +23,7 @@ Running the DAL node
 
 Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
-#. Install the DAL trusted setup as described in :ref:`Install DAL trusted setup <setup_dal_crypto_params>`.
+#. **If** you plan to run the DAL node in **operator or observer** :ref:`profiles <dal_profiles>`, install the DAL trusted setup as described in section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).
 
 #. Initialize the DAL node by running its ``config init`` command, passing the address of a local ``octez-node`` instance and your attester's address.
    For example, this command initializes the DAL node with the address of a local ``octez-node`` instance on port 8732 and stores data in the default DAL node directory (``~/.tezos-dal-node``):

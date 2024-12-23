@@ -58,7 +58,7 @@ The DAL node has two modes:
       }
     }
 
-  .. _dal_profiles:
+.. _dal_profiles:
 
 Profiles
 ~~~~~~~~
@@ -188,14 +188,11 @@ Both commands have the same arguments, which can be seen by executing, e.g., ``o
 See the :ref:`DAL node manual <dal_node_manual>` for more details.
 
 The concrete operational steps for participating in the DAL network are described in page :doc:`./dal_run`.
-In order to run a DAL node with an operator profile, one first needs to
-install some cryptographic parameters, see the section on :ref:`Install DAL
-trusted setup<setup_dal_crypto_params>`.
 
 DAL configuration of the L1 node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All DAL nodes should use the same initialization parameters of the cryptographic primitives used by the DAL. These parameters are provided by running the script :src:`scripts/install_dal_trusted_setup.sh`, which downloads and installs them, and which should be run once by any DAL node operator. However, for simplicity, on some test networks the initialization parameters are mocked-up and built-in.
+All operator and observer DAL nodes should use the same initialization parameters of the cryptographic primitives used by the DAL. These parameters are provided by running the script :src:`scripts/install_dal_trusted_setup.sh`, which downloads and installs them, and which should be run once by any operator running the DAL node in **operator or observer** :ref:`profiles <dal_profiles>`. However, for simplicity, on some test networks the initialization parameters are mocked-up and built-in.
 
 Also, in order for the nodes to be able to join the P2P network, a set of bootstrap nodes can be provided using the ``network.dal_config.bootstrap_peers`` configuration parameter of the L1 node (thus using the same mechanism as for L1 nodes, see :doc:`../user/multinetwork` and :ref:`configure_p2p`).
 

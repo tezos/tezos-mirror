@@ -664,7 +664,7 @@ Note that the script ``fetch-params.sh`` downloads a third file containing param
 Install DAL trusted setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Users running :doc:`DAL<../shell/dal>` as :ref:`slot producers<dal_profiles>`
+Users running :doc:`DAL<../shell/dal>` in **operator or observer** :ref:`profiles<dal_profiles>`
 need to have a set of cryptographic parameters (known as an SRS) installed in
 order to run their :doc:`DAL node<../shell/dal_node>`. The parameters can be
 retrieved via the following script::
