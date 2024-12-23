@@ -5,9 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Constants = Rewriter.Constants
-module Rewriter = Rewriter.Rewriter
-
 (** [with_metadata ~loc e metadata] turns [e] into a tuple [(e, metadata)],
     using empty list as metadata if none is provided.
     This is used by ppx in order to transform both [ {metadata} expr ] and

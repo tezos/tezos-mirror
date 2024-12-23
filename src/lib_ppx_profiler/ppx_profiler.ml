@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Rewriter = Rewriter.Rewriter
-
 (** Checks that this ppx should be handled at compile time.
 
     To use it at compile time, do [TEZOS_PPX_PROFILER=... make] *)
