@@ -55,8 +55,11 @@ extensions:
     jaeger
 
 let run ~jaeger =
+  let* () =
+    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "otel"]
+  in
   let configuration_file =
-    Filename.get_temp_dir_name () // "otel-config.yaml"
+    Filename.get_temp_dir_name () // "otel" // "otel-config.yaml"
   in
   let contents = configuration ~jaeger in
   write_file configuration_file ~contents ;

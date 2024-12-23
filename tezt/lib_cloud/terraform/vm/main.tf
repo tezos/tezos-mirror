@@ -161,6 +161,12 @@ module "gce-container" {
         mountPath = "/tmp/alert_manager"
         name      = "alert-manager"
         readOnly  = false
+      },
+      {
+        # Same for OpenTelemetry
+        mountPath = "/tmp/otel"
+        name      = "otel"
+        readOnly  = false
       }
     ]
   }
@@ -188,6 +194,12 @@ module "gce-container" {
       name = "alert-manager"
       hostPath = {
         path = "/tmp/alert_manager"
+      }
+    },
+    {
+      name = "otel"
+      hostPath = {
+        path = "/tmp/otel"
       }
     },
     {
@@ -256,6 +268,16 @@ resource "google_compute_firewall" "default" {
   allow {
     protocol = "tcp"
     ports    = ["19999"]
+  }
+
+  # Enable access to Opentelemetry/Jaeger if enabled
+  # 4317 used by Otel collector to receive observability data via gRPC
+  # 55681 used by Otel collector to receive observability data via JSON
+  # 14250 used by Jaeger to accept data over  gRPC. 
+  # 16686 Provides access to the Jaeger web UI for tracing visualization.
+  allow {
+    protocol = "tcp"
+    ports    = ["4317", "14250", "16686","55681"]
   }
 
   # Rule to enable static page web access

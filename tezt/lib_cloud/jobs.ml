@@ -124,20 +124,27 @@ let clean_up_vms () =
                     String.split_on_char '\n' output
                     |> List.filter (fun str -> str <> "")
                   in
-                  let main_image, other_images =
-                    List.partition
-                      (fun str ->
-                        str <> "netdata" && str <> "grafana"
-                        && str <> "prometheus")
-                      images_name
+                  let is_main_image image_name =
+                    (* The main image created by Terraform at the
+                       moment contains "--" in its name. This enables
+                       to identify this image uniquely. While this is
+                       not very robust, it should work for now. *)
+                    let re = Str.regexp_string "--" in
+                    try
+                      ignore (Str.search_forward re image_name 0) ;
+                      true
+                    with Not_found -> false
                   in
-                  if List.length main_image <> 1 then
+                  let main_images, other_images =
+                    List.partition is_main_image images_name
+                  in
+                  if List.length main_images <> 1 then
                     Test.fail
                       "Unexpected setting. All the docker images found: %s. \
-                       There should only be one image which is not 'netdata' \
-                       in this list"
+                       There should only be one image which contains '--' in \
+                       the list"
                       (String.concat ";" images_name) ;
-                  let main_image = List.hd main_image in
+                  let main_image = List.hd main_images in
                   let* _ =
                     Gcloud.compute_ssh
                       ~zone
