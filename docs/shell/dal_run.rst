@@ -5,8 +5,8 @@ To attest the data published on the :doc:`DAL<./dal_overview>`, you need an acti
 While you can run a DAL node without an active baker, when you do so, your account is not assigned DAL attestation rights and therefore your node can distribute data among other DAL nodes but cannot attest that it is available.
 Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DAL greatly expands the amount of data that Tezos can distribute without causing congestion on layer 1.
 
-Before you begin, make sure that you have an instance of the ``octez-node`` binary running in operator mode.
-For instructions on setting up the ``octez-node`` binary, see :doc:`Running Octez <../introduction/howtorun>`.
+Therefore, we assume here you have installed Octez, see :doc:`../introduction/howtoget`.
+Make also sure that you have an instance of the ``octez-node`` binary running in operator mode, as explained in :doc:`../user/setup-node`.
 
 Connecting to other nodes
 -------------------------
