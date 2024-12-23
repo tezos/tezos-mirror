@@ -21,10 +21,6 @@ If the ``octez-node`` binary was not started with the ``--network <network>`` ar
 Running the DAL node
 --------------------
 
-.. warning::
-
-   For the most secure setup, run the DAL node and layer 1 node on different IP addresses; for more information, see :doc:`Bakers & the DAL <./dal_bakers>`.
-
 Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
 #. Install the DAL trusted setup as described in :ref:`Install DAL trusted setup <setup_dal_crypto_params>`.
