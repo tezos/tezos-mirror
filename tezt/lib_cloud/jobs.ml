@@ -57,6 +57,13 @@ let docker_build =
           "Could not find the dal_trusted_setup in %s. See README for more \
            information why such files are necessary."
           Path.dal_trusted_setup ;
+      (* For some docker images such as the one for Mac OS/X, it may
+         be useful to get access to the commit of the current
+         branch. *)
+      let* commit =
+        let* output = Process.run_and_read_stdout "git" ["rev-parse"; "HEAD"] in
+        Lwt.return (String.trim output)
+      in
       let args =
         match docker_image with
         | Gcp _ ->
@@ -65,6 +72,7 @@ let docker_build =
               ("ZCASH_PARAMS_PATH", Path.zcash_params);
               ("DAL_TRUSTED_SETUP_PATH", Path.dal_trusted_setup);
               ("BINARIES_DESTINATION_PATH", Env.binaries_path);
+              ("COMMIT", commit);
             ]
         | Octez_release {tag} ->
             [("SSH_PUBLIC_KEY", ssh_public_key); ("RELEASE_TAG", tag)]
