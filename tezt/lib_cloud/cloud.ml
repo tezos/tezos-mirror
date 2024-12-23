@@ -167,7 +167,13 @@ let orchestrator ?(alerts = []) deployement f =
       Lwt.return_some prometheus
     else Lwt.return_none
   in
-  let* alert_manager = Alert_manager.run alerts in
+  let* alert_manager =
+    match alerts with
+    | [] -> Lwt.return_none
+    | _ ->
+        let* alert_manager = Alert_manager.run alerts in
+        Lwt.return alert_manager
+  in
   let* grafana =
     if Env.grafana then
       let* grafana = Grafana.run () in
