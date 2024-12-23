@@ -192,7 +192,7 @@ The concrete operational steps for participating in the DAL network are describe
 DAL configuration of the L1 node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All operator and observer DAL nodes should use the same initialization parameters of the cryptographic primitives used by the DAL. These parameters are provided by running the script :src:`scripts/install_dal_trusted_setup.sh`, which downloads and installs them, and which should be run once by any operator running the DAL node in **operator or observer** :ref:`profiles <dal_profiles>`. However, for simplicity, on some test networks the initialization parameters are mocked-up and built-in.
+All operator and observer DAL nodes should use the same initialization parameters of the cryptographic primitives used by the DAL, see section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).
 
 Also, in order for the nodes to be able to join the P2P network, a set of bootstrap nodes can be provided using the ``network.dal_config.bootstrap_peers`` configuration parameter of the L1 node (thus using the same mechanism as for L1 nodes, see :doc:`../user/multinetwork` and :ref:`configure_p2p`).
 

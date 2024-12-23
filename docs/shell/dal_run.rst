@@ -6,7 +6,7 @@ While you can run a DAL node without an active baker, when you do so, your accou
 Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DAL greatly expands the amount of data that Tezos can distribute without causing congestion on layer 1.
 
 Therefore, we assume here you have installed Octez, see :doc:`../introduction/howtoget`.
-Make also sure that you have an instance of the ``octez-node`` binary running in operator mode, as explained in :doc:`../user/setup-node`.
+Make also sure that you have an instance of the ``octez-node`` binary running, as explained in :doc:`../user/setup-node`.
 
 Connecting to other nodes
 -------------------------
