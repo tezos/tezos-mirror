@@ -13,6 +13,10 @@
   EVM node and the preimages endpoint if they have not been set either through
   the configuration file or a CLI argument (with `init config` and `run
   observer` commands). (!16074 !16075)
+- If `--network mainnet` is set, the EVM node no longer requires the initial
+  kernel used to originate Etherlink on Tezos mainnet to initialize the
+  data-dir of an observer node, though an initial kernel can still be provided.
+  (!16076)
 
 #### Experimental
 

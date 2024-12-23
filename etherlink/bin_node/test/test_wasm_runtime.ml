@@ -30,7 +30,9 @@ let test_wasm_runtime_id () =
   Log.info "Initialize the tree" ;
   let* tree =
     Evm_state.init
-      ~kernel:"../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm"
+      ~kernel:
+        (On_disk
+           "../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm")
   in
   let tree = expect_ok "Should be able to create an initial state" tree in
   Log.info "Run kernel_run" ;

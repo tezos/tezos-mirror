@@ -377,13 +377,19 @@ let kernel_arg =
     Params.string
 
 let initial_kernel_arg =
-  Tezos_clic.arg
-    ~long:"initial-kernel"
-    ~placeholder:"evm_installer.wasm"
-    ~doc:
-      "Path to the EVM kernel used to launch the PVM, it will be loaded from \
-       storage afterward"
-    Params.string
+  let open Tezos_clic in
+  map_arg ~f:(fun () str ->
+      Lwt_result.return
+      @@ Option.map
+           (fun path -> Evm_node_lib_dev.Wasm_debugger.On_disk path)
+           str)
+  @@ arg
+       ~long:"initial-kernel"
+       ~placeholder:"evm_installer.wasm"
+       ~doc:
+         "Path to the EVM kernel used to launch the PVM, it will be loaded \
+          from storage afterward"
+       Params.string
 
 let force_arg ~doc = Tezos_clic.switch ~long:"force" ~short:'f' ~doc ()
 
@@ -2184,6 +2190,15 @@ let observer_command =
       let open Lwt_result_syntax in
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
+      let kernel =
+        let open Evm_node_lib_dev.Wasm_debugger in
+        Option.either
+          kernel
+          (Option.bind network (function
+              | Mainnet ->
+                  Some (In_memory Evm_node_supported_installers.mainnet)
+              | Testnet -> None))
       in
       start_observer
         ~data_dir

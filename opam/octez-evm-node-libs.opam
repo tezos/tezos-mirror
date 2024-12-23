@@ -19,8 +19,8 @@ depends: [
   "octez-libs"
   "octez-shell-libs"
   "octez-l2-libs"
-  "caqti-lwt" { >= "2.0.1" }
   "crunch" { >= "3.3.0" }
+  "caqti-lwt" { >= "2.0.1" }
   "re" { >= "1.10.0" }
   "octez-smart-rollup-wasm-debugger-plugin"
   "uuidm" { >= "0.9.9" }

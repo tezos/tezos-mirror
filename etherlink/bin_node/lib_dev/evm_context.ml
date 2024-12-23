@@ -20,7 +20,7 @@ type head = {
 
 type parameters = {
   configuration : Configuration.t;
-  kernel_path : string option;
+  kernel_path : Wasm_debugger.kernel option;
   data_dir : string;
   smart_rollup_address : string option;
   store_perm : [`Read_only | `Read_write];
@@ -1564,7 +1564,7 @@ module Handlers = struct
   let on_launch _self ()
       {
         configuration : Configuration.t;
-        kernel_path : string option;
+        kernel_path;
         data_dir : string;
         smart_rollup_address : string option;
         store_perm;

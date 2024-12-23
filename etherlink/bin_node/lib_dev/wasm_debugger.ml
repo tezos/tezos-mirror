@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type kernel = In_memory of string | On_disk of string
+
 module Bare_context = struct
   module Tree = Irmin_context.Tree
 
@@ -50,7 +52,10 @@ let profile = Wasm.Commands.profile
 
 let set_durable_value = Wasm.set_durable_value
 
-let start = Wasm.start
+let start ~tree version = function
+  | On_disk kernel -> Wasm.start ~tree version kernel
+  | In_memory kernel ->
+      Wasm.handle_module ~tree version true "installer.wasm" kernel
 
 let find_key_in_durable = Wasm.Commands.find_key_in_durable
 
