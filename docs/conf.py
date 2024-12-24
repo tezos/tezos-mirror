@@ -154,12 +154,6 @@ html_extra_path = [
     '_redirects',
     '_redirects.s3',
     # manually copy images that are only included in raw HTML directives:
-    'images/building_on_tezos_5.png',
-    'images/contributing_to_octez_6.png',
-    'images/discover_tezos_1.png',
-    'images/getting_started_2.png',
-    'images/understanding_octez_4.png',
-    'images/using_octez_3.png',
 ]
 
 # Custom sidebar templates, must be a dictionary that maps document names

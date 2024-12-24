@@ -9,12 +9,22 @@
 Welcome to the Octez and Protocol Documentation!
 ================================================
 
-To start browsing, either follow one of the guided paths below, or directly pick any topics in the documentation menu.
+This documentation describes an implementation of the `Tezos blockchain <https://tezos.com>`__ consisting of the **Octez toolsuite** and the **Tezos protocol**, for technical users of various kinds, including Tezos application developers, bakers, and Octez/protocol developers.
+
+.. note::
+
+  For documentation of the whole Tezos ecosystem, including software beyond the Octez & protocol platform, such as smart contracts languages, developer tools, or web3 libraries, see https://docs.tezos.com.
+
+.. Uncomment the following when OpenTezos is updated:
+
+  Learning material about the Tezos ecosystem, consisting of training modules with exercises, can be found at https://opentezos.tezos.com.
+
+To start browsing the Octez & Protocol documentation, directly pick any topics in the menu on the left, or click one of the guided paths below:
 
 .. raw:: html
 
     <details>
-    <summary><img alt="Discover Octez & the Tezos protocol" class="normal" src="discover_tezos_1.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Discover Octez & the Tezos protocol</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Never heard of Octez?** Let's get acquainted!
@@ -37,7 +47,7 @@ To learn more about how Octez & the protocol fit into Tezos and its ecosystem, s
     </div></details><br/>
 
     <details>
-    <summary><img alt="Getting started" class="normal" src="getting_started_2.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Getting started with Octez</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Newcomer to Octez?** Start participating in Tezos using Octez!
@@ -57,7 +67,7 @@ and more.
     </div></details><br/>
 
     <details>
-    <summary><img alt="Using Octez" class="normal" src="using_octez_3.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Using Octez</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Already a user?** Here is everything you need to know!
@@ -75,7 +85,7 @@ If you intend to participate to Tezos not just as a user, but rather as a baker,
     </div></details><br/>
 
     <details>
-    <summary><img alt="Understanding" class="normal" src="understanding_octez_4.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Understanding Octez & the protocol</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Want to know how it works?** It's no secret, let us explain!
@@ -95,7 +105,7 @@ If you want to know more about the *technology* underlying Octez and the Tezos p
     </div></details><br/>
 
     <details>
-    <summary><img alt="Developer reference" class="normal" src="building_on_tezos_5.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Developer reference</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Are you a Tezos developer?** Find here some useful reference pages!
@@ -114,7 +124,7 @@ This website complements those resources with reference documentation, mostly in
     </div></details><br/>
 
     <details>
-    <summary><img alt="Contributing" class="normal" src="contributing_to_octez_6.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Contributing to Octez & the protocol</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Are you a platform developer?** Here are the nuts and bolts!
