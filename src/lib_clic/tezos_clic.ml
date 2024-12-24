@@ -479,6 +479,7 @@ let setup_formatter ppf format verbosity =
            | "details" -> push_level (Details, op)
            | "short" -> push_level (Short, op)
            | "terse" -> push_level (Terse, op)
+           | tag when Pretty_printing.handles tag -> ()
            | tag ->
                Stdlib.failwith
                  ("Tezos_clic: invalid semantic string tag <" ^ tag ^ ">")
@@ -504,6 +505,7 @@ let setup_formatter ppf format verbosity =
      | Format.String_tag "=short"
      | Format.String_tag "=terse" ->
          pop_level ()
+     | Format.String_tag tag when Pretty_printing.handles tag -> ()
      | Format.String_tag tag ->
          Stdlib.failwith
            ("Tezos_clic: invalid semantic string tag <" ^ tag ^ ">")
