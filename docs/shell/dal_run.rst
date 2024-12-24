@@ -5,8 +5,8 @@ To attest the data published on the :doc:`DAL<./dal_overview>`, you need an acti
 While you can run a DAL node without an active baker, when you do so, your account is not assigned DAL attestation rights and therefore your node can distribute data among other DAL nodes but cannot attest that it is available.
 Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DAL greatly expands the amount of data that Tezos can distribute without causing congestion on layer 1.
 
-Before you begin, make sure that you have an instance of the ``octez-node`` binary running in operator mode.
-For instructions on setting up the ``octez-node`` binary, see :doc:`Running Octez <../introduction/howtorun>`.
+Therefore, we assume here you have installed Octez, see :doc:`../introduction/howtoget`.
+Make also sure that you have an instance of the ``octez-node`` binary running, as explained in :doc:`../user/setup-node`.
 
 Connecting to other nodes
 -------------------------
@@ -21,13 +21,9 @@ If the ``octez-node`` binary was not started with the ``--network <network>`` ar
 Running the DAL node
 --------------------
 
-.. warning::
-
-   For the most secure setup, run the DAL node and layer 1 node on different IP addresses; for more information, see :doc:`Bakers & the DAL <./dal_bakers>`.
-
 Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
-#. Install the DAL trusted setup as described in :ref:`Install DAL trusted setup <setup_dal_crypto_params>`.
+#. **If** you plan to run the DAL node in **operator or observer** :ref:`profiles <dal_profiles>`, install the DAL trusted setup as described in section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).
 
 #. Initialize the DAL node by running its ``config init`` command, passing the address of a local ``octez-node`` instance and your attester's address.
    For example, this command initializes the DAL node with the address of a local ``octez-node`` instance on port 8732 and stores data in the default DAL node directory (``~/.tezos-dal-node``):

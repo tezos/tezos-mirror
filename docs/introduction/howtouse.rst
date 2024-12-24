@@ -85,6 +85,8 @@ Note that you can get the list of protocols known to the client with::
 The full command line documentation of the Octez binaries supporting the ``man`` command is also available
 online: :doc:`../shell/cli-commands`.
 
+.. _start_node:
+
 Node
 ----
 

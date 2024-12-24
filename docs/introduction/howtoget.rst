@@ -664,13 +664,15 @@ Note that the script ``fetch-params.sh`` downloads a third file containing param
 Install DAL trusted setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Users running :doc:`DAL<../shell/dal>` as :ref:`slot producers<dal_profiles>`
+Users running :doc:`DAL<../shell/dal>` in **operator or observer** :ref:`profiles<dal_profiles>`
 need to have a set of cryptographic parameters (known as an SRS) installed in
-order to run their :doc:`DAL node<../shell/dal_node>`. The parameters can be
-retrieved via the following script::
+order to run their :doc:`DAL node<../shell/dal_node>`.
+In particular, these are needed when executing the Octez test suite, which involves DAL nodes running in various profiles.
+However, for simplicity, on some test networks the initialization parameters are mocked-up and built-in.
+
+The cryptographic parameters can be retrieved via the following script::
 
   scripts/install_dal_trusted_setup.sh
-
 
 Get the sources
 ~~~~~~~~~~~~~~~
