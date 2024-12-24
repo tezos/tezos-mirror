@@ -286,6 +286,8 @@ let lambda_term = external_lib "lambda-term" V.(at_least "3.3.1")
 
 let utop = external_lib "utop" V.(at_least "2.8")
 
+let uuidm = external_lib "uuidm" V.(at_least "0.9.9")
+
 let uutf = external_lib "uutf" V.True
 
 let vector = external_lib "vector" V.True

@@ -18,7 +18,7 @@ let send_raw_transaction_method txn =
           (Data_encoding.Json.construct
              Send_raw_transaction.input_encoding
              message);
-      id = None;
+      id = Some (random_id ());
     }
 
 let send_raw_transaction ~keep_alive ~base raw_txn =

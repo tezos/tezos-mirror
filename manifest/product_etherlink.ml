@@ -219,6 +219,7 @@ let evm_node_lib_dev_encoding =
         octez_base |> open_ ~m:"TzPervasives";
         octez_scoru_wasm_debugger_plugin;
         re;
+        uuidm;
       ]
 
 let evm_node_lib_dev =

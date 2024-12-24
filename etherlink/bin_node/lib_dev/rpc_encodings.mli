@@ -36,6 +36,8 @@ module JSONRPC : sig
       that only fit in 64 bits, which is not supported by Data_encoding. *)
   type id_repr = Id_string of string | Id_float of float
 
+  val random_id : unit -> id_repr
+
   val id_repr_encoding : id_repr Data_encoding.t
 
   type id = id_repr option

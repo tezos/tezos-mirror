@@ -198,7 +198,7 @@ struct
               (Data_encoding.Json.construct
                  Send_raw_transaction.input_encoding
                  message);
-          id = None;
+          id = Some (random_id ());
         }
 
     let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages =

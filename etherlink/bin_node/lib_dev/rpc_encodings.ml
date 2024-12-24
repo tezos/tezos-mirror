@@ -34,6 +34,10 @@ module JSONRPC = struct
       (which is represented by the option type). *)
   type id_repr = Id_string of string | Id_float of float
 
+  let random_id () =
+    let uuid = Uuidm.v4_gen Random.(get_state ()) () in
+    Id_string Uuidm.(to_string ~upper:false uuid)
+
   let id_repr_encoding =
     let open Data_encoding in
     union
@@ -69,7 +73,7 @@ module JSONRPC = struct
            (req "jsonrpc" (constant version))
            (req "method" string)
            (opt "params" Data_encoding.json)
-           (opt "id" id_repr_encoding)))
+           (dft "id" (option id_repr_encoding) None)))
 
   type error = {code : int; message : string; data : Data_encoding.json option}
 
