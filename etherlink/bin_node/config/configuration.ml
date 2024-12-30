@@ -43,6 +43,7 @@ type rpc_server = Resto | Dream
 
 type experimental_features = {
   drop_duplicate_on_injection : bool;
+  blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
   block_storage_sqlite3 : bool;
   replay_block_storage_sqlite3 : bool;
@@ -141,6 +142,7 @@ let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
+    blueprints_publisher_order_enabled = false;
     block_storage_sqlite3 = false;
     replay_block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
@@ -707,6 +709,7 @@ let experimental_features_encoding =
   conv
     (fun {
            drop_duplicate_on_injection;
+           blueprints_publisher_order_enabled;
            enable_send_raw_transaction;
            block_storage_sqlite3;
            replay_block_storage_sqlite3;
@@ -717,6 +720,7 @@ let experimental_features_encoding =
            enable_websocket;
          } ->
       ( ( drop_duplicate_on_injection,
+          blueprints_publisher_order_enabled,
           enable_send_raw_transaction,
           None,
           block_storage_sqlite3,
@@ -724,10 +728,10 @@ let experimental_features_encoding =
           overwrite_simulation_tick_limit,
           garbage_collector_parameters,
           history_mode,
-          None,
-          rpc_server ),
-        enable_websocket ))
+          None ),
+        (rpc_server, enable_websocket) ))
     (fun ( ( drop_duplicate_on_injection,
+             blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
              _node_transaction_validation,
              block_storage_sqlite3,
@@ -735,11 +739,11 @@ let experimental_features_encoding =
              overwrite_simulation_tick_limit,
              garbage_collector_parameters,
              history_mode,
-             _next_wasm_runtime,
-             rpc_server ),
-           enable_websocket ) ->
+             _next_wasm_runtime ),
+           (rpc_server, enable_websocket) ) ->
       {
         drop_duplicate_on_injection;
+        blueprints_publisher_order_enabled;
         enable_send_raw_transaction;
         block_storage_sqlite3;
         replay_block_storage_sqlite3;
@@ -759,6 +763,13 @@ let experimental_features_encoding =
              "drop_duplicate_on_injection"
              bool
              default_experimental_features.drop_duplicate_on_injection)
+          (dft
+             ~description:
+               "Request the rollup node to prioritize messages by level when \
+                publishing blueprints in the layer 1."
+             "blueprints_publisher_order_enabled"
+             bool
+             default_experimental_features.blueprints_publisher_order_enabled)
           (dft
              ~description:
                "Enable or disable the `eth_sendRawTransaction` method. \
@@ -814,15 +825,15 @@ let experimental_features_encoding =
                 expected to replace the Smart Rollup’s Fast Exec runtime. \
                 DEPRECATED: You should remove this option from your \
                 configuration file."
-             bool)
+             bool))
+       (obj2
           (dft
              "rpc_server"
              ~description:
                "Choose the RPC server implementation, \'dream\' or \'resto\', \
                 the latter being the default one."
              rpc_server_encoding
-             default_experimental_features.rpc_server))
-       (obj1
+             default_experimental_features.rpc_server)
           (dft
              "enable_websocket"
              ~description:"Enable or disable the experimental websocket server"

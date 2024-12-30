@@ -12,6 +12,7 @@
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
+    "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
     "block_storage_sqlite3": true,
     "replay_block_storage_sqlite3": false,
@@ -68,6 +69,7 @@
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
+    "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
     "block_storage_sqlite3": true,
     "replay_block_storage_sqlite3": false,
@@ -117,6 +119,7 @@
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
+    "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
     "block_storage_sqlite3": true,
     "replay_block_storage_sqlite3": false,

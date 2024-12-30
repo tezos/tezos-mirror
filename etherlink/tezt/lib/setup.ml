@@ -198,7 +198,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
-    ?history_mode ~enable_dal ?dal_slots ?rpc_server ?websockets protocol =
+    ?(blueprints_publisher_order_enabled = true) ?history_mode ~enable_dal
+    ?dal_slots ?rpc_server ?websockets protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -279,6 +280,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
+      ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?block_storage_sqlite3
       ?rpc_server

@@ -118,6 +118,10 @@
         /* Request the rollup node to filter messages it has already
            forwarded to the Layer 1 network. Require an unreleased version of
            the Smart Rollup node. */,
+      "blueprints_publisher_order_enabled"?:
+        boolean
+        /* Request the rollup node to prioritize messages by level when
+           publishing blueprints in the layer 1. */,
       "enable_send_raw_transaction"?:
         boolean
         /* Enable or disable the `eth_sendRawTransaction` method. DEPRECATED:

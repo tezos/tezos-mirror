@@ -27,6 +27,13 @@ you start using them, you probably want to use `octez-evm-node check config
   and `rolling`. If the mode is `rolling` it will use the field
   `garbage_collect_parameters` to prune blocks, operations and states. (!16044)
 
+- Experimental support of ordering blueprints by they level for the
+  smart rollup node batcher. Activates the feature with the flag
+  `exprimental_features.blueprints_publisher_order_enabled`.
+  **Requires Octez Smart Rollup Node built from master.**. The
+  necessary feature on the Octez Smart Rollup node is not yet
+  released. (!15877)
+
 ### Bug fixes
 
 ### Internals

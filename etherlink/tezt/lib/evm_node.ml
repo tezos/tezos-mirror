@@ -590,6 +590,22 @@ let wait_for_processed_l1_level ?timeout ?level evm_node =
   | None -> Some res
   | Some level -> if level = l1_level then Some res else None
 
+let wait_for_blueprint_catchup ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"blueprint_catchup.v0" @@ fun json ->
+  let open JSON in
+  let min = json |-> "min" |> as_int in
+  let max = json |-> "max" |> as_int in
+  Some (min, max)
+
+let wait_for_blueprint_injection_failure ?timeout ?level evm_node =
+  wait_for_event ?timeout evm_node ~event:"blueprint_injection_failure.v0"
+  @@ fun json ->
+  match level with
+  | Some expected_level ->
+      let open JSON in
+      if json |-> "level" |> as_int = expected_level then Some () else None
+  | None -> Some ()
+
 let mode_with_new_private_rpc (mode : mode) =
   match mode with
   | Observer
@@ -1191,9 +1207,11 @@ type history_mode = Archive | Rolling
 type rpc_server = Resto | Dream
 
 let patch_config_with_experimental_feature
-    ?(drop_duplicate_when_injection = false) ?(block_storage_sqlite3 = true)
-    ?(next_wasm_runtime = true) ?garbage_collector_parameters ?history_mode
-    ?rpc_server ?(enable_websocket = false) () =
+    ?(drop_duplicate_when_injection = false)
+    ?(blueprints_publisher_order_enabled = false)
+    ?(block_storage_sqlite3 = true) ?(next_wasm_runtime = true)
+    ?garbage_collector_parameters ?history_mode ?rpc_server
+    ?(enable_websocket = false) () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1220,6 +1238,10 @@ let patch_config_with_experimental_feature
     ~name:"drop_duplicate_on_injection"
     (`Bool true)
     json
+  |> conditional_json_put
+       blueprints_publisher_order_enabled
+       ~name:"blueprints_publisher_order_enabled"
+       (`Bool true)
   |> conditional_json_put
        block_storage_sqlite3
        ~name:"block_storage_sqlite3"

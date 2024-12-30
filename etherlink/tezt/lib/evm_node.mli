@@ -242,6 +242,11 @@ type processed_l1_level = {l1_level : int; finalized_blueprint : int}
 val wait_for_processed_l1_level :
   ?timeout:float -> ?level:int -> t -> processed_l1_level Lwt.t
 
+val wait_for_blueprint_catchup : ?timeout:float -> t -> (int * int) Lwt.t
+
+val wait_for_blueprint_injection_failure :
+  ?timeout:float -> ?level:int -> t -> unit Lwt.t
+
 module Config_file : sig
   (** Node configuration files. *)
 
@@ -279,6 +284,7 @@ type rpc_server = Resto | Dream
     correspondent experimental feature. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
+  ?blueprints_publisher_order_enabled:bool ->
   ?block_storage_sqlite3:bool ->
   ?next_wasm_runtime:bool ->
   ?garbage_collector_parameters:garbage_collector_parameters ->
