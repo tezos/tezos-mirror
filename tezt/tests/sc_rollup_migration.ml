@@ -529,11 +529,8 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
            ~block:(string_of_int (migration_level - 1))
            ()
     in
-    let* l2_head =
+    let* {previous_commitment_hash = last_l2_commitment; _} =
       Sc_rollup_node.RPC.call rollup_node @@ Sc_rollup_rpc.get_global_block ()
-    in
-    let last_l2_commitment =
-      JSON.(l2_head |-> "previous_commitment_hash" |> as_string)
     in
     (* Bake blocks for commitment inclusion *)
     let* () = Sc_rollup_helpers.send_messages 4 tezos_client in

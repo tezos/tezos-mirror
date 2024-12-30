@@ -38,9 +38,21 @@ val get_global_block_outbox :
     address of the node. *)
 val get_global_smart_rollup_address : unit -> string RPC_core.t
 
+type outbox = Transactions of JSON.t list
+
+(** Rollup node block type. Incomplete type, to be completed when
+    needs arise. *)
+type block = {
+  block_hash : string;
+  previous_commitment_hash : string;
+  level : int;
+  inbox : RPC.smart_rollup_inbox;
+  messages : string list;
+  outbox : outbox list;
+}
+
 (** RPC: [GET global/block/<block>?outbox]. *)
-val get_global_block :
-  ?block:string -> ?outbox:bool -> unit -> JSON.t RPC_core.t
+val get_global_block : ?block:string -> ?outbox:bool -> unit -> block RPC_core.t
 
 (** RPC: [GET global/block/<block>/inbox]. *)
 val get_global_block_inbox :

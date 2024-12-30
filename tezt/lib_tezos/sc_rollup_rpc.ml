@@ -36,9 +36,41 @@ let get_global_smart_rollup_address () =
 let get_global_block_aux ?(block = "head") ?(path = []) ?query_string () =
   make ?query_string GET (["global"; "block"; block] @ path) Fun.id
 
+type outbox = Transactions of JSON.t list
+
+(* Incomplete type, to be completed when needs arise. *)
+type block = {
+  block_hash : string;
+  previous_commitment_hash : string;
+  level : int;
+  inbox : RPC.smart_rollup_inbox;
+  messages : string list;
+  outbox : outbox list;
+}
+
 let get_global_block ?block ?(outbox = false) () =
   let query_string = if outbox then Some [("outbox", "true")] else None in
-  get_global_block_aux ?block ~path:[] ?query_string ()
+  let rpc = get_global_block_aux ?block ~path:[] ?query_string () in
+  let decode json =
+    let open JSON in
+    let block_hash = json |-> "block_hash" |> as_string in
+    let previous_commitment_hash =
+      json |-> "previous_commitment_hash" |> as_string
+    in
+    let level = json |-> "level" |> as_int in
+    let inbox = json |-> "inbox" |> RPC.smart_rollup_inbox_from_json in
+    let messages =
+      json |-> "messages" |> as_list |> List.map (fun j -> j |> as_string)
+    in
+    let outbox =
+      json |-> "outbox" |> as_list
+      |> List.map (fun j ->
+             j |-> "transactions" |> as_list |> fun txs -> Transactions txs)
+    in
+
+    {block_hash; previous_commitment_hash; level; inbox; messages; outbox}
+  in
+  {rpc with decode}
 
 let get_global_block_inbox ?(block = "head") () =
   make GET ["global"; "block"; block; "inbox"] RPC.smart_rollup_inbox_from_json
