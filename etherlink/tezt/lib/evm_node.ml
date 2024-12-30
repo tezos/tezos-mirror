@@ -578,13 +578,17 @@ let wait_for_gc_finished ?gc_level ?head_level evm_node =
       else None
   | None, None -> Some (event_gc_level, event_gc_level)
 
-let wait_for_processed_l1_level ?level evm_node =
-  wait_for_event evm_node ~event:"evm_context_processed_l1_level.v0"
+type processed_l1_level = {l1_level : int; finalized_blueprint : int}
+
+let wait_for_processed_l1_level ?timeout ?level evm_node =
+  wait_for_event ?timeout evm_node ~event:"evm_context_processed_l1_level.v0"
   @@ fun json ->
-  let event_level = JSON.(json |> as_int) in
+  let l1_level = JSON.(json |-> "level" |> as_int) in
+  let finalized_blueprint = JSON.(json |-> "finalized_blueprint" |> as_int) in
+  let res = {l1_level; finalized_blueprint} in
   match level with
-  | None -> Some ()
-  | Some level -> if level = event_level then Some () else None
+  | None -> Some res
+  | Some level -> if level = l1_level then Some res else None
 
 let mode_with_new_private_rpc (mode : mode) =
   match mode with

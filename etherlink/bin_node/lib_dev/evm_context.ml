@@ -992,21 +992,22 @@ module State = struct
         let* () =
           Option.iter_es
             (fun l1_level ->
-              Evm_store.L1_l2_levels_relationships.store
-                conn
-                ~l1_level
-                ~latest_l2_level:(current_blueprint_number ctxt)
-                ~finalized_l2_level:(Qty latest_finalized_number))
+              let* () =
+                Evm_store.L1_l2_levels_relationships.store
+                  conn
+                  ~l1_level
+                  ~latest_l2_level:(current_blueprint_number ctxt)
+                  ~finalized_l2_level:(Qty latest_finalized_number)
+              in
+              Metrics.set_l1_level ~level:l1_level ;
+              let*! () =
+                Evm_context_events.processed_l1_level
+                  (l1_level, latest_finalized_number)
+              in
+              return_unit)
             finalized_level
         in
         return (context, evm_state)
-      in
-      let*! () =
-        Option.iter_s
-          (fun l1_level ->
-            Metrics.set_l1_level ~level:l1_level ;
-            Evm_context_events.processed_l1_level l1_level)
-          finalized_level
       in
       on_modified_head ctxt evm_state context ;
       return_unit)

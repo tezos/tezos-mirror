@@ -231,7 +231,16 @@ val wait_for_rollup_node_follower_connection_acquired :
 
 val wait_for_rollup_node_follower_disabled : ?timeout:float -> t -> unit Lwt.t
 
-val wait_for_processed_l1_level : ?level:int -> t -> unit Lwt.t
+type processed_l1_level = {l1_level : int; finalized_blueprint : int}
+
+(** [wait_for_processed_l1_level ?timeout ?level evm_node] waits until
+    a (finalized) layer1 level has been processed and returns the
+    layer1 level and it's latest corresponding blueprints. If [level =
+    Some level] then it waits until that specific layer1 level is
+    processed. It returns the tuple [(layer1_level,
+    finalized_blueprint]). *)
+val wait_for_processed_l1_level :
+  ?timeout:float -> ?level:int -> t -> processed_l1_level Lwt.t
 
 module Config_file : sig
   (** Node configuration files. *)

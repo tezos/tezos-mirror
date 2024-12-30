@@ -3318,7 +3318,7 @@ let test_delayed_inbox_flushing_event =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -3409,7 +3409,7 @@ let test_flushed_blueprint_reorg =
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   (* A new block will make the {!add_delayed_tx_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for_add_delayed_inbox in
+  let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
      item but refuses to include it. *)
@@ -3427,7 +3427,7 @@ let test_flushed_blueprint_reorg =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -3572,7 +3572,7 @@ let test_multiple_flushed_blueprints =
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
   and* _ = wait_for_first_flush
   and* _ = wait_for_second_flush
-  and* () = wait_for_processed_l1_level in
+  and* _ = wait_for_processed_l1_level in
 
   let* () =
     check_head_consistency
@@ -3683,7 +3683,7 @@ let test_observer_reorg_on_blueprint_stream =
   let wait_for_observer_reset = Evm_node.wait_for_reset observer in
   (* A new block will make the {!add_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for_add_delayed_inbox in
+  let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
      item but refuses to include it. *)
@@ -3701,7 +3701,7 @@ let test_observer_reorg_on_blueprint_stream =
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
   let* _ = wait_for_flush
-  and* () = wait_for_processed_l1_level
+  and* _ = wait_for_processed_l1_level
   and* () = wait_for_observer_reset in
 
   let* () =
@@ -3799,7 +3799,7 @@ let test_observer_reorg_on_blueprint_catchup =
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   (* A new block will make the {!add_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for_add_delayed_inbox in
+  let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
      item but refuses to include it. *)
@@ -3822,7 +3822,7 @@ let test_observer_reorg_on_blueprint_catchup =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
 
   let* () =
     check_head_consistency
@@ -3921,7 +3921,7 @@ let test_flushed_blueprint_reorg_late =
 
   (* A new block will make the add delayed inbox event final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
@@ -3938,7 +3938,7 @@ let test_flushed_blueprint_reorg_late =
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     (* Wait until the event is completely processed. Head of sequencer and proxy
        should be in sync. *)
     Evm_node.wait_for_processed_l1_level
@@ -4063,7 +4063,7 @@ let test_flushed_blueprint_reorg_done_late =
 
   (* A new block will make the add delayed event. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
@@ -4085,7 +4085,7 @@ let test_flushed_blueprint_reorg_done_late =
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     (* Wait until the event is completely processed. Head of sequencer and proxy
        should be in sync. *)
     Evm_node.wait_for_processed_l1_level
@@ -4681,7 +4681,7 @@ let test_flushed_blueprint_reorg_upgrade =
         unit)
   in
 
-  let* () =
+  let* _ =
     Evm_node.wait_for_processed_l1_level
       ~level:add_delayed_inbox_level
       sequencer
@@ -4690,7 +4690,7 @@ let test_flushed_blueprint_reorg_upgrade =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* () =
+  let* _ =
     Evm_node.wait_for_processed_l1_level
       ~level:flushed_delayed_inbox_level
       sequencer
@@ -8772,7 +8772,7 @@ let test_produce_block_with_no_delayed_transactions =
   in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for in
+  let* _ = wait_for in
 
   let*@ n = Rpc.produce_block ~with_delayed_transactions:false sequencer in
   Check.((n = 0) int) ~error_msg:"Block should be empty but got %L transactions" ;
