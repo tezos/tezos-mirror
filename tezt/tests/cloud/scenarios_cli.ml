@@ -289,6 +289,14 @@ let refresh_binaries =
        debian one) and to copy the local binaries to the proxy."
     false
 
+let node_external_rpc_server =
+  Clap.flag
+    ~section
+    ~set_long:"node-external-rpc-server"
+    ~unset_long:"no-node-external-rpc-server"
+    ~description:"Use the external RPC server on the L1 nodes"
+    true
+
 module Alerts = struct
   let section =
     Clap.section
