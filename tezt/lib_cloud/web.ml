@@ -61,9 +61,7 @@ let agent_jingo_template agent =
   in
   Tobj
     [
-      (* This will simplified in a future commit. *)
-      ("configuration_vm_name", Tstr name);
-      ("name", Tstr (Agent.name agent));
+      ("name", Tstr name);
       ("machine_type", Tstr machine_type);
       ("docker_image", Tstr (Format.asprintf "%a" pp_docker_image docker_image));
       ( "max_run_duration",

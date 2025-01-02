@@ -10,7 +10,6 @@ open Types
 type t = {
   (* The name initially is the same as [vm_name] and can be changed dynamically by the scenario. *)
   name : string;
-  vm_name : string;
   zone : string option;
   point : (string * int) option;
   runner : Runner.t option;
@@ -64,17 +63,9 @@ let configuration_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {
-           name;
-           vm_name;
-           zone;
-           point;
-           runner = _;
-           next_available_port;
-           configuration;
-         } ->
-      (name, vm_name, zone, point, next_available_port (), configuration))
-    (fun (name, vm_name, zone, point, next_available_port, configuration) ->
+    (fun {name; zone; point; runner = _; next_available_port; configuration} ->
+      (name, zone, point, next_available_port (), configuration))
+    (fun (name, zone, point, next_available_port, configuration) ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -89,10 +80,9 @@ let encoding =
             Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
             |> Option.some
       in
-      {name; vm_name; zone; point; runner; next_available_port; configuration})
-    (obj6
+      {name; zone; point; runner; next_available_port; configuration})
+    (obj5
        (req "name" string)
-       (req "vm_name" string)
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
@@ -101,8 +91,6 @@ let encoding =
 (* Getters *)
 
 let name {name; _} = name
-
-let vm_name {vm_name; _} = vm_name
 
 let point {point; _} = point
 
@@ -122,17 +110,9 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
     | Some (address, ssh_port), Some ssh_id ->
         Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () |> Option.some
   in
-  {
-    point;
-    runner;
-    name;
-    vm_name = name;
-    next_available_port;
-    configuration;
-    zone;
-  }
+  {point; runner; name; next_available_port; configuration; zone}
 
-let cmd_wrapper {zone; vm_name; _} =
+let cmd_wrapper {zone; name; _} =
   match zone with
   | None -> None
   | Some zone ->
@@ -141,7 +121,7 @@ let cmd_wrapper {zone; vm_name; _} =
           Env.ssh_private_key_filename ~home:"$HOME" ()
         else Env.ssh_private_key_filename ()
       in
-      Some (Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename)
+      Some (Gcloud.cmd_wrapper ~zone ~vm_name:name ~ssh_private_key_filename)
 
 let path_of agent binary = agent.configuration.binaries_path // binary
 

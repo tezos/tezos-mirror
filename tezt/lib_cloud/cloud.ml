@@ -589,10 +589,9 @@ let agents t =
   match Env.mode with
   | `Orchestrator -> (
       let proxy_agent = Proxy.get_agent t.agents in
-      let proxy_vm_name = Agent.vm_name proxy_agent in
+      let proxy_name = Agent.name proxy_agent in
       match
-        t.agents
-        |> List.filter (fun agent -> Agent.vm_name agent <> proxy_vm_name)
+        t.agents |> List.filter (fun agent -> Agent.name agent <> proxy_name)
       with
       | [] ->
           let default_agent =

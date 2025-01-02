@@ -28,11 +28,9 @@ val make :
 (** Encode an agent configuration. *)
 val encoding : t Data_encoding.t
 
-(** [name agent] returns the name of the agent. *)
+(** [name agent] returns the name of the agent. This is the same as
+    the name provided in the agent configuration. *)
 val name : t -> string
-
-(** [vm_name agent] returns the vm name of the agent. *)
-val vm_name : t -> string
 
 (** [point agent] returns the point asociated with the agent. *)
 val point : t -> (string * int) option
