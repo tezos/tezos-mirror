@@ -63,7 +63,7 @@ let call (type input output)
              method_ = R.method_;
              parameters =
                Some (Data_encoding.Json.construct R.input_encoding input);
-             id = None;
+             id = Some (random_id ());
            })
   in
   match response with
