@@ -243,7 +243,9 @@ let handle_subscription
           let content =
             match elt with
             | Ok elt ->
-                output_media_type.construct Subscription.response_encoding elt
+                output_media_type.construct
+                  Subscription.notification_encoding
+                  elt
             | Error exn ->
                 let msg =
                   match exn with

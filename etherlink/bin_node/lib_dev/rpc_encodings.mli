@@ -104,9 +104,9 @@ module Subscription : sig
 
   val result_encoding : result Data_encoding.t
 
-  type response = {params : result}
+  type notification = {params : result}
 
-  val response_encoding : response Data_encoding.t
+  val notification_encoding : notification Data_encoding.t
 end
 
 type ('input, 'output) method_ = ..
@@ -352,7 +352,7 @@ val map_method_name :
 
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;
-  stream : Subscription.response Lwt_stream.t;
+  stream : Subscription.notification Lwt_stream.t;
   stopper : unit -> unit;
 }
 
