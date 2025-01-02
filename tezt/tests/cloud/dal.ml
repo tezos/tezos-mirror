@@ -103,7 +103,10 @@ module Node = struct
     | (`Mainnet | `Ghostnet | `Weeklynet _) as network -> (
         match data_dir with
         | Some data_dir ->
-            let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let rpc_external = Cli.node_external_rpc_server in
+            let* node =
+              Node.Agent.create ~rpc_external ~arguments ~data_dir ~name agent
+            in
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               Node.run node [Network (Network.to_octez_network_options network)]
@@ -115,8 +118,10 @@ module Node = struct
               "No data dir given, we will attempt to bootstrap the node from a \
                rolling snapshot." ;
             toplog "Creating the agent." ;
+            let rpc_external = Cli.node_external_rpc_server in
             let* node =
               Node.Agent.create
+                ~rpc_external
                 ~arguments:
                   [
                     Network (Network.to_octez_network_options network);
@@ -178,7 +183,8 @@ module Node = struct
     | `Sandbox -> (
         match data_dir with
         | None ->
-            let* node = Node.Agent.create ~name agent in
+            let rpc_external = Cli.node_external_rpc_server in
+            let* node = Node.Agent.create ~rpc_external ~name agent in
             let* () = Node.config_init node [Cors_origin "*"] in
             let* () =
               match dal_config with
@@ -203,11 +209,14 @@ module Node = struct
             let* () = wait_for_ready node in
             Lwt.return node
         | Some data_dir ->
+            let rpc_external = Cli.node_external_rpc_server in
             let arguments =
               [No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
               @ arguments
             in
-            let* node = Node.Agent.create ~arguments ~data_dir ~name agent in
+            let* node =
+              Node.Agent.create ~rpc_external ~arguments ~data_dir ~name agent
+            in
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () = Node.run node [] in
             let* () = Node.wait_for_ready node in
@@ -1890,6 +1899,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
 let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   let* node =
     Node.Agent.init
+      ~rpc_external:Cli.node_external_rpc_server
       ~name:(Format.asprintf "etherlink-%s-node" name)
       ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       agent
