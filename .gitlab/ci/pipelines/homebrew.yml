@@ -61,3 +61,19 @@ oc.build-homebrew:
   - ./scripts/packaging/homebrew_release.sh
   variables:
     CARGO_NET_OFFLINE: "false"
+
+oc.install-homebrew-macosx:
+  image: macos-14-xcode-15
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.build-homebrew
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./scripts/packaging/homebrew_install.sh
+  - eval $(/opt/homebrew/bin/brew shellenv)
+  - ./scripts/packaging/test_homebrew_install.sh
+  variables:
+    TAGS: saas-macos-medium-m1

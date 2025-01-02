@@ -1350,6 +1350,11 @@ module Images_external = struct
      Last update: 2022-01-03 *)
   let semgrep_agent =
     Image.mk_external ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
+
+  (* Image provided by GitLab. More details in the doc:
+     - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images
+     - https://gitlab-org.gitlab.io/ci-cd/shared-runners/images/macos-image-inventory/macos-14-xcode-15/ *)
+  let macosx_14 = Image.mk_external ~image_path:"macos-14-xcode-15"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
