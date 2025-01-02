@@ -10,9 +10,12 @@ type mode =
   | Proxy
   | Sequencer
   | Relay
+      (** Relays the transactions when they are valid w.r.t. the local state. *)
   | Forward of {
       injector : string -> (Ethereum_types.hash, string) result tzresult Lwt.t;
     }
+      (** Forwards the transactions without checking the
+          transaction validity. *)
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
