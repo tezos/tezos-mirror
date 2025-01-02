@@ -14,8 +14,6 @@ module Pool = struct
   type transaction = {
     index : int64; (* Global index of the transaction. *)
     raw_tx : string; (* Current transaction. *)
-    gas_price : Z.t; (* The maximum price the user can pay for fees. *)
-    gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
     inclusion_timestamp : Time.Protocol.t;
     (* Time of inclusion in the transaction pool. *)
     transaction_object : Ethereum_types.transaction_object;
@@ -85,19 +83,11 @@ module Pool = struct
       (transaction_object : Ethereum_types.transaction_object) =
     let (Qty nonce) = transaction_object.nonce in
     let (Qty gas_price) = transaction_object.gasPrice in
-    let (Qty gas_limit) = transaction_object.gas in
     let inclusion_timestamp = Misc.now () in
 
     (* Add the transaction to the user's transaction map *)
     let transaction =
-      {
-        index = global_index;
-        raw_tx;
-        gas_price;
-        gas_limit;
-        inclusion_timestamp;
-        transaction_object;
-      }
+      {index = global_index; raw_tx; inclusion_timestamp; transaction_object}
     in
     let add_transaction transactions =
       let replaced = ref false in
@@ -115,7 +105,11 @@ module Pool = struct
                      (function
                        | None -> Some transaction
                        | Some user_transaction ->
-                           if gas_price > user_transaction.gas_price then (
+                           if
+                             gas_price
+                             > Ethereum_types.Qty.to_z
+                                 user_transaction.transaction_object.gasPrice
+                           then (
                              replaced := true ;
                              Some transaction)
                            else Some user_transaction)
@@ -582,19 +576,18 @@ let pop_transactions state ~maximum_cumulative_size =
                pkey
                (fun nonce
                     {
-                      gas_limit;
-                      gas_price;
                       inclusion_timestamp;
-                      transaction_object;
+                      transaction_object =
+                        {
+                          gasPrice = Qty gas_price;
+                          gas = Qty gas_limit;
+                          value;
+                          _;
+                        };
                       _;
                     } ->
                  nonce < current_nonce
-                 || (not
-                       (can_prepay
-                          ~value:transaction_object.value
-                          ~balance
-                          ~gas_price
-                          ~gas_limit))
+                 || (not (can_prepay ~value ~balance ~gas_price ~gas_limit))
                  || transaction_timed_out
                       ~current_timestamp
                       ~inclusion_timestamp
@@ -616,7 +609,12 @@ let pop_transactions state ~maximum_cumulative_size =
              let selected, pool =
                Pool.partition
                  pkey
-                 (fun nonce {gas_price; raw_tx; _} ->
+                 (fun nonce
+                      {
+                        transaction_object = {gasPrice = Qty gas_price; _};
+                        raw_tx;
+                        _;
+                      } ->
                    let check_nonce = nonce = current_nonce in
                    let can_fit =
                      !accumulated_size + String.length raw_tx
