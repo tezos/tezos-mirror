@@ -191,8 +191,6 @@ let subscriptions :
      to be sent multiple times. *)
   Stdlib.Hashtbl.create 10
 
-let () = Random.self_init ()
-
 let encode_id bytes =
   let id_hex = Hex.of_bytes bytes |> Hex.show in
   let buf = Buffer.create (String.length id_hex) in

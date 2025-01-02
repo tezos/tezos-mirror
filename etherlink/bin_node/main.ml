@@ -2425,6 +2425,7 @@ let handle_error = function
       Stdlib.exit 1
 
 let () =
+  Random.self_init () ;
   let _ =
     Tezos_clic.(
       setup_formatter
