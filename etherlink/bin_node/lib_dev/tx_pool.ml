@@ -760,7 +760,8 @@ module Handlers = struct
         let* res =
           match state.mode with
           | Forward {injector} -> injector txn
-          | _ -> insert_valid_transaction state txn transaction_object
+          | Proxy | Sequencer | Relay ->
+              insert_valid_transaction state txn transaction_object
         in
         let* () = relay_self_inject_request w in
         return res
