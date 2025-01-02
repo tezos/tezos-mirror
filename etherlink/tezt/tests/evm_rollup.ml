@@ -4758,6 +4758,10 @@ let test_l2_timestamp_opcode =
     test
 
 let test_migrate_proxy_to_sequencer_future =
+  (* Note: If this test starts to fail, change the default value of
+     [max_blueprint_lookahead_in_seconds] optional argument of
+     [Evm_node.make_kernel_installer_config]. Congratulations, Tezos made it
+     this far. *)
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "rollup_node"; "init"; "migration"; "sequencer"]

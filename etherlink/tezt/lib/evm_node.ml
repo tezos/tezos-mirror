@@ -1540,6 +1540,8 @@ let wait_termination (evm_node : t) =
       let* _status = Process.wait process in
       unit
 
+let ten_years_in_seconds = 3600 * 24 * 365 * 10 |> Int64.of_int
+
 let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
     ?(mainnet_compat = false) ?(remove_whitelist = false) ?kernel_root_hash
     ?chain_id ?bootstrap_balance ?bootstrap_accounts ?sequencer ?delayed_bridge
@@ -1548,7 +1550,7 @@ let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
     ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
     ?maximum_gas_per_transaction
-    ?(max_blueprint_lookahead_in_seconds = 157_680_000L)
+    ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_dal = false)
     ?dal_slots ~output () =
   let set_account_code =
