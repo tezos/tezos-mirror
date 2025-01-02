@@ -2599,9 +2599,10 @@ let benchmark () =
   let docker_image =
     Option.map (fun tag -> Configuration.Octez_release {tag}) Cli.octez_release
   in
-  let default_vm_configuration = Configuration.make ?docker_image () in
-  (* To be used in the next commit. *)
-  let _names_of = function
+  let default_vm_configuration ~name =
+    Configuration.make ?docker_image ~name ()
+  in
+  let name_of = function
     | Bootstrap -> "bootstrap"
     | Baker i -> Format.asprintf "attester-%d" i
     | Producer i -> Format.asprintf "dal-producer-%d" i
@@ -2618,25 +2619,27 @@ let benchmark () =
   in
   let vms =
     vms
-    |> List.map (function
-           | Bootstrap -> default_vm_configuration
+    |> List.map (fun agent_kind ->
+           let name = name_of agent_kind in
+           match agent_kind with
+           | Bootstrap -> default_vm_configuration ~name
            | Baker i -> (
                match configuration.stake_machine_type with
-               | None -> default_vm_configuration
+               | None -> default_vm_configuration ~name
                | Some list -> (
                    try
                      let machine_type = List.nth list i in
-                     Configuration.make ?docker_image ~machine_type ()
-                   with _ -> default_vm_configuration))
+                     Configuration.make ?docker_image ~machine_type ~name ()
+                   with _ -> default_vm_configuration ~name))
            | Producer _ | Observer _ | Etherlink_dal_operator
            | Etherlink_dal_observer _ -> (
                match configuration.producer_machine_type with
                | None -> Configuration.make ?docker_image ()
                | Some machine_type ->
                    Configuration.make ?docker_image ~machine_type ())
-           | Etherlink_operator -> default_vm_configuration
-           | Etherlink_producer _ -> default_vm_configuration
-           | Reverse_proxy -> default_vm_configuration)
+           | Etherlink_operator -> default_vm_configuration ~name
+           | Etherlink_producer _ -> default_vm_configuration ~name
+           | Reverse_proxy -> default_vm_configuration ~name)
   in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
