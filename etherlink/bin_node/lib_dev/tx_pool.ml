@@ -79,7 +79,7 @@ module Pool = struct
       (Ethereum_types.AddressMap.empty, Ethereum_types.AddressMap.empty)
 
   (** Add a transaction to the pool. *)
-  let add ~must_replace {transactions; global_index} pkey raw_tx
+  let add ~must_replace {transactions; global_index} raw_tx
       (transaction_object : Ethereum_types.transaction_object) =
     let (Qty nonce) = transaction_object.nonce in
     let (Qty gas_price) = transaction_object.gasPrice in
@@ -93,7 +93,7 @@ module Pool = struct
       let replaced = ref false in
       let transactions =
         Pkey_map.update
-          pkey
+          transaction_object.from
           (function
             | None ->
                 (* User has no transactions in the pool *)
@@ -133,7 +133,7 @@ module Pool = struct
     | `Replace_shift max_nonce ->
         let transactions =
           Pkey_map.update
-            pkey
+            transaction_object.from
             (function
               | None ->
                   (* The list of user transactions cannot be empty,
@@ -449,14 +449,7 @@ let insert_valid_transaction state tx_raw
   else
     let add_transaction ~must_replace =
       (* Add the transaction to the pool *)
-      match
-        Pool.add
-          ~must_replace
-          pool
-          transaction_object.from
-          tx_raw
-          transaction_object
-      with
+      match Pool.add ~must_replace pool tx_raw transaction_object with
       | Ok pool ->
           let*! () =
             Tx_pool_events.add_transaction
