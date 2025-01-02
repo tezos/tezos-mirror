@@ -553,71 +553,65 @@ let pop_transactions state ~maximum_cumulative_size =
     let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
     let current_timestamp = Misc.now () in
     let pool =
-      addr_with_nonces
-      |> List.fold_left
-           (fun pool (pkey, balance, current_nonce) ->
-             Pool.remove
-               pkey
-               (fun nonce
-                    {
-                      inclusion_timestamp;
-                      transaction_object =
-                        {
-                          gasPrice = Qty gas_price;
-                          gas = Qty gas_limit;
-                          value;
-                          _;
-                        };
-                      _;
-                    } ->
-                 nonce < current_nonce
-                 || (not (can_prepay ~value ~balance ~gas_price ~gas_limit))
-                 || transaction_timed_out
-                      ~current_timestamp
-                      ~inclusion_timestamp
-                      ~tx_timeout_limit)
-               pool)
-           pool
+      List.fold_left
+        (fun pool (pkey, balance, current_nonce) ->
+          Pool.remove
+            pkey
+            (fun nonce
+                 {
+                   inclusion_timestamp;
+                   transaction_object =
+                     {gasPrice = Qty gas_price; gas = Qty gas_limit; value; _};
+                   _;
+                 } ->
+              nonce < current_nonce
+              || (not (can_prepay ~value ~balance ~gas_price ~gas_limit))
+              || transaction_timed_out
+                   ~current_timestamp
+                   ~inclusion_timestamp
+                   ~tx_timeout_limit)
+            pool)
+        pool
+        addr_with_nonces
     in
     (* Select transaction with nonce equal to user's nonce, that can be prepaid
        and selects a sum of transactions that wouldn't go above the size limit
        of the blueprint.
        Also removes the transactions from the pool. *)
     let txs, pool, _ =
-      addr_with_nonces
-      |> List.fold_left
-           (fun (txs, pool, cumulative_size) (pkey, _, current_nonce) ->
-             (* This mutable counter is purely local and used only for the
-                partition. *)
-             let accumulated_size = ref cumulative_size in
-             let selected, pool =
-               Pool.partition
-                 pkey
-                 (fun nonce
-                      {
-                        transaction_object = {gasPrice = Qty gas_price; _};
-                        raw_tx;
-                        _;
-                      } ->
-                   let check_nonce = nonce = current_nonce in
-                   let can_fit =
-                     !accumulated_size + String.length raw_tx
-                     <= maximum_cumulative_size
-                   in
-                   let can_pay =
-                     can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas
-                   in
-                   let selected = check_nonce && can_pay && can_fit in
-                   (* If the transaction is selected, this means it will fit *)
-                   if selected then
-                     accumulated_size :=
-                       !accumulated_size + String.length raw_tx ;
-                   selected)
-                 pool
-             in
-             let txs = List.append txs selected in
-             (txs, pool, !accumulated_size))
-           ([], pool, 0)
+      List.fold_left
+        (fun (txs, pool, cumulative_size) (pkey, _, current_nonce) ->
+          (* This mutable counter is purely local and used only for the
+             partition. *)
+          let accumulated_size = ref cumulative_size in
+          let selected, pool =
+            Pool.partition
+              pkey
+              (fun nonce
+                   {
+                     transaction_object = {gasPrice = Qty gas_price; _};
+                     raw_tx;
+                     _;
+                   } ->
+                let check_nonce = nonce = current_nonce in
+                let can_fit =
+                  !accumulated_size + String.length raw_tx
+                  <= maximum_cumulative_size
+                in
+                let can_pay =
+                  can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas
+                in
+                let selected = check_nonce && can_pay && can_fit in
+                (* If the transaction is selected, this means it will fit *)
+                if selected then
+                  accumulated_size := !accumulated_size + String.length raw_tx ;
+                selected)
+              pool
+          in
+          let txs = List.append txs selected in
+          (txs, pool, !accumulated_size))
+        ([], pool, 0)
+        addr_with_nonces
     in
     (* Store popped tx. *)
     let*? () =
