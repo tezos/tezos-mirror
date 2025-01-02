@@ -327,6 +327,14 @@ let clear_delayed_inbox evm_state =
 
 let wasm_pvm_version state = Wasm_debugger.get_wasm_version state
 
+let storage_version state =
+  let open Lwt_result_syntax in
+  let read key =
+    let*! res = inspect state key in
+    return res
+  in
+  Durable_storage.storage_version read
+
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
 let preload_kernel evm_state =

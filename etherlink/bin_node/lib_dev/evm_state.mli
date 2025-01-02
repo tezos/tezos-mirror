@@ -128,3 +128,8 @@ val get_delayed_inbox_item :
    durable storage information stored for [block], if this function is called
    they need to be store elsewhere, mainly it consists in transactions. *)
 val clear_block_storage : Ethereum_types.block -> t -> t Lwt.t
+
+(** [storage_version tree] returns the current storage version set by the
+    kernel. This storage version is used by the EVM node to determine whether a
+    given feature is implemented by the kernel or not. *)
+val storage_version : t -> int tzresult Lwt.t

@@ -1134,14 +1134,31 @@ module State = struct
       | Ok block -> return block
     in
     let store_get_hash tree key =
-      if key = "/tmp/evm/world_state/transactions_receipts" then
+      let enable_fallback =
+        match
+          Lwt_preemptive.run_in_main @@ fun () -> Evm_state.storage_version tree
+        with
+        | Ok storage_version ->
+            (* See case [StorageVersion::V17] in [migration::migrate_to] *)
+            storage_version < 17
+        | Error _ ->
+            (* This should not be possible. Etherlink kernel is designed such
+               that it always write its storage version in the durable storage.
+               We default to [false] (default behavior) because we cannot make
+               any assumption on the running kernel. *)
+            false
+      in
+      if enable_fallback && key = "/tmp/evm/world_state/transactions_receipts"
+      then
         Lwt_preemptive.run_in_main @@ fun () ->
         let* pred = Evm_state.current_block_height tree in
         let n = Ethereum_types.Qty.next pred in
         let+ block = get_block n in
         let s = Ethereum_types.hash_to_bytes block.receiptRoot in
         Ok (Bytes.unsafe_of_string s)
-      else if key = "/tmp/evm/world_state/transactions_objects" then
+      else if
+        enable_fallback && key = "/tmp/evm/world_state/transactions_objects"
+      then
         Lwt_preemptive.run_in_main @@ fun () ->
         let* pred = Evm_state.current_block_height tree in
         let n = Ethereum_types.Qty.next pred in
