@@ -150,8 +150,6 @@ module Pool = struct
         in
         Ok {transactions; global_index = Int64.(add global_index one)}
 
-  (* return {transactions; global_index = Int64.(add global_index one)} *)
-
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
     Pkey_map.bindings transactions |> List.map fst
