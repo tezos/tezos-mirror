@@ -85,6 +85,13 @@ module Params = struct
               "'%s' is not a valid native execution policy"
               invalid_policy)
 
+  let supported_network =
+    Tezos_clic.parameter (fun _ -> function
+      | "mainnet" -> Lwt.return_ok Mainnet
+      | "testnet" -> Lwt.return_ok Testnet
+      | invalid_network ->
+          failwith "'%s' is not a supported network" invalid_network)
+
   let rollup_node_endpoint = endpoint
 
   let evm_node_endpoint = endpoint
@@ -406,6 +413,19 @@ let native_execution_policy_arg =
       "Policy regarding the use of native execution for supported kernels. Can \
        be `never`, `rpcs_only` or `always`."
     Params.native_execution_policy
+
+let supported_network_arg ?why () =
+  Tezos_clic.arg
+    ~long:"network"
+    ~placeholder:"network"
+    ~doc:
+      Format.(
+        asprintf
+          "The network the EVM node will be connecting to. Can be `mainnet` or \
+           `testnet`.%a"
+          (pp_print_option (fun fmt why -> fprintf fmt " %s" why))
+          why)
+    Params.supported_network
 
 let rollup_node_endpoint_arg =
   Tezos_clic.arg
@@ -1055,7 +1075,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
-    ~no_sync ~finalized_view () =
+    ~no_sync ~finalized_view ?network () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1114,6 +1134,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   let* () = websocket_checks config in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   Evm_node_lib_dev.Observer.main
+    ?network
     ~no_sync
     ?kernel_path:kernel
     ~data_dir
@@ -2091,7 +2112,7 @@ let sandbox_command =
         ())
 
 let observer_run_args =
-  Tezos_clic.args8
+  Tezos_clic.args9
     evm_node_endpoint_arg
     bundler_node_endpoint_arg
     preimages_arg
@@ -2100,6 +2121,10 @@ let observer_run_args =
     initial_kernel_arg
     dont_track_rollup_node_arg
     no_sync_arg
+    (supported_network_arg
+       ~why:
+         "If set, additional sanity checks are performed on the node’s startup."
+       ())
 
 let observer_command =
   let open Tezos_clic in
@@ -2133,7 +2158,8 @@ let observer_command =
              native_execution_policy,
              kernel,
              dont_track_rollup_node,
-             no_sync ) )
+             no_sync,
+             network ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2165,6 +2191,7 @@ let observer_command =
         ?kernel
         ~no_sync
         ~finalized_view
+        ?network
         ())
 
 let export_snapshot (data_dir, snapshot_file, compress_on_the_fly, uncompressed)

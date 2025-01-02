@@ -17,31 +17,10 @@ type t = {
   block_storage_sqlite3 : bool;
 }
 
-let load ?smart_rollup_address ~data_dir configuration =
-  let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
-  let* index =
-    Irmin_context.(
-      load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
-  in
-  let+ smart_rollup_address =
-    match smart_rollup_address with
-    | None -> Evm_store.(use store Metadata.get)
-    | Some smart_rollup_address -> return smart_rollup_address
-  in
-  {
-    store;
-    index;
-    data_dir;
-    preimages = configuration.Configuration.kernel_execution.preimages;
-    preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
-    native_execution_policy =
-      configuration.kernel_execution.native_execution_policy;
-    smart_rollup_address;
-    block_storage_sqlite3 =
-      configuration.experimental_features.block_storage_sqlite3;
-    finalized_view = configuration.finalized_view;
-  }
+let pp_network fmt (network : Configuration.supported_network) =
+  Format.pp_print_string
+    fmt
+    (match network with Mainnet -> "mainnet" | Testnet -> "testnet")
 
 let get_evm_state ctxt hash =
   let open Lwt_result_syntax in
@@ -49,6 +28,94 @@ let get_evm_state ctxt hash =
   let*! context = Irmin_context.checkout_exn ctxt.index hash in
   let*! res = Irmin_context.PVMState.get context in
   return res
+
+let read state path =
+  let open Lwt_result_syntax in
+  let*! res = Evm_state.inspect state path in
+  return res
+
+let network_sanity_check ~network ctxt =
+  let open Lwt_result_syntax in
+  let expected_smart_rollup_address = Constants.rollup_address network in
+  let (Qty expected_chain_id) = Constants.chain_id network in
+
+  let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
+  let* evm_state = get_evm_state ctxt hash in
+  let*! chain_id = Durable_storage.chain_id (read evm_state) in
+
+  let* () =
+    match chain_id with
+    | Ok (Qty chain_id) ->
+        unless Compare.Z.(chain_id = expected_chain_id) @@ fun () ->
+        failwith
+          "Local state is inconsistent with selected network %a: incorrect \
+           chain id (%a instead of %a)"
+          pp_network
+          network
+          Z.pp_print
+          chain_id
+          Z.pp_print
+          expected_chain_id
+    | Error _ ->
+        (* The chain id was not already set, which necessarily means we are
+           bootstrapping a chain from scratch. The smart rollup address check
+           will be enough. *)
+        let*! () = Events.missing_chain_id () in
+        return_unit
+  in
+
+  let* () =
+    unless Address.(ctxt.smart_rollup_address = expected_smart_rollup_address)
+    @@ fun () ->
+    failwith
+      "Smart rollup address is inconsistent with selected network %a: %a \
+       instead of %a"
+      pp_network
+      network
+      Address.pp
+      ctxt.smart_rollup_address
+      Address.pp
+      expected_smart_rollup_address
+  in
+
+  return_unit
+
+let load ?network ?smart_rollup_address ~data_dir configuration =
+  let open Lwt_result_syntax in
+  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  let* index =
+    Irmin_context.(
+      load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
+  in
+  let* smart_rollup_address =
+    match smart_rollup_address with
+    | None -> Evm_store.(use store Metadata.get)
+    | Some smart_rollup_address -> return smart_rollup_address
+  in
+
+  let ctxt =
+    {
+      store;
+      index;
+      data_dir;
+      preimages = configuration.Configuration.kernel_execution.preimages;
+      preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
+      native_execution_policy =
+        configuration.kernel_execution.native_execution_policy;
+      smart_rollup_address;
+      block_storage_sqlite3 =
+        configuration.experimental_features.block_storage_sqlite3;
+      finalized_view = configuration.finalized_view;
+    }
+  in
+
+  let+ () =
+    match network with
+    | Some network -> network_sanity_check ~network ctxt
+    | None -> return_unit
+  in
+
+  ctxt
 
 let find_latest_hash ctxt =
   let open Lwt_result_syntax in
@@ -143,10 +210,7 @@ struct
       let* hash = find_irmin_hash Ctxt.ctxt block in
       get_evm_state Ctxt.ctxt hash
 
-    let read state path =
-      let open Lwt_result_syntax in
-      let*! res = Evm_state.inspect state path in
-      return res
+    let read = read
 
     let subkeys state path =
       let open Lwt_result_syntax in

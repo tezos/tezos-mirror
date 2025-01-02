@@ -82,7 +82,8 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
+let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync ()
+    =
   let open Lwt_result_syntax in
   let*? {
           evm_node_endpoint;
@@ -111,7 +112,9 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync () =
       ~store_perm:`Read_write
       ()
   in
-  let* ro_ctxt = Evm_ro_context.load ~smart_rollup_address ~data_dir config in
+  let* ro_ctxt =
+    Evm_ro_context.load ?network ~smart_rollup_address ~data_dir config
+  in
 
   let evm_node_endpoint =
     match threshold_encryption_bundler_endpoint with

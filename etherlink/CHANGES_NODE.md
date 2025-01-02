@@ -6,6 +6,9 @@
 
 - The event `evm_context_processed_l1_level` now contains the latest finalized
   blueprint in the event. (!15877)
+- It is now possible to specify the network an EVM node in observer mode is
+  expected to join (with the `--network` CLI argument), prompting the node to
+  perform additional sanity checks. (!16073)
 
 #### Experimental
 
@@ -26,7 +29,6 @@ you start using them, you probably want to use `octez-evm-node check config
 - History mode can now be selected with the parameter `history_mode`, `archive`
   and `rolling`. If the mode is `rolling` it will use the field
   `garbage_collect_parameters` to prune blocks, operations and states. (!16044)
-
 - Experimental support of ordering blueprints by they level for the
   smart rollup node batcher. Activates the feature with the flag
   `exprimental_features.blueprints_publisher_order_enabled`.

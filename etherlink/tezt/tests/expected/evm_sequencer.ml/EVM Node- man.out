@@ -185,7 +185,7 @@ Miscellaneous commands:
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--initial-kernel <evm_installer.wasm>] [--dont-track-rollup-node]
-      [--no-sync]
+      [--no-sync] [--network <network>]
     Start the EVM node in observer mode
     --data-dir <data-dir>: The path to the EVM node data directory
     --rpc-addr <ADDR>: The EVM node server rpc address.
@@ -214,6 +214,7 @@ Miscellaneous commands:
     --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
     --no-sync: Disable tracking the head of the EVM node endpoint
+    --network <network>: The network the EVM node will be connecting to. Can be `mainnet` or `testnet`. If set, additional sanity checks are performed on the node’s startup.
   
   experimental run rpc [--data-dir <data-dir>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]

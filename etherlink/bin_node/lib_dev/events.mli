@@ -111,3 +111,7 @@ val deprecation_note : string -> unit Lwt.t
 (** [wasm_pvm_fallback ()] advertises that the node has to fallback to the PVM
     to execute a block, which is slow. *)
 val wasm_pvm_fallback : unit -> unit Lwt.t
+
+(** [missing_chain_id ()] advertises that the node could not check the
+    consistency of the stored chain id with the selected network. *)
+val missing_chain_id : unit -> unit Lwt.t

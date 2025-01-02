@@ -22,8 +22,12 @@ type t = {
     over as many processes.
 
     If [smart_rollup_address] is omitted, the argument is fetched from the
-    store. *)
+    store.
+
+    If [network] is set, the function performs additional sanity checks to
+    ensure its local context is consistent with the expected network. *)
 val load :
+  ?network:Configuration.supported_network ->
   ?smart_rollup_address:Address.t ->
   data_dir:string ->
   Configuration.t ->

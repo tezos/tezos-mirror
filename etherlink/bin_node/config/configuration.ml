@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type supported_network = Mainnet | Testnet
+
 let strictly_positive_encoding = Data_encoding.ranged_int 1 ((1 lsl 30) - 1)
 
 type log_filter_config = {
