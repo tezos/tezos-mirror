@@ -9,7 +9,7 @@ open Types
 
 type t = {
   (* The name initially is the same as [vm_name] and can be changed dynamically by the scenario. *)
-  mutable name : string;
+  name : string;
   vm_name : string;
   zone : string option;
   point : (string * int) option;
@@ -111,10 +111,6 @@ let next_available_port t = t.next_available_port ()
 let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
-
-(* Setters *)
-
-let set_name agent name = agent.name <- name
 
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in

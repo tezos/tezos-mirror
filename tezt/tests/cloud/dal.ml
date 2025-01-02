@@ -2693,22 +2693,8 @@ let benchmark () =
            DAL deactivated for bakers. DAL network can't work properly. This \
            is probably a configuration issue." ;
       let agents = Cloud.agents cloud in
-      (* We give to the [init] function a sequence of agents (and cycle if
-         they were all consumed). We set their name only if the number of
-         agents is the computed one. Otherwise, the user has mentioned
-         explicitely a reduced number of agents and it is not clear how to give
-         them proper names. *)
-      let set_name agent name =
-        if List.length agents = List.length vms then
-          Cloud.set_agent_name cloud agent name
-        else Lwt.return_unit
-      in
-      let next_agent =
-        let f = List.to_seq agents |> Seq.cycle |> Seq.to_dispenser in
-        fun ~name ->
-          let agent = f () |> Option.get in
-          let* () = set_name agent name in
-          Lwt.return agent
+      let next_agent ~name =
+        List.find (fun agent -> Agent.name agent = name) agents |> Lwt.return
       in
       let* t = init ~configuration etherlink_configuration cloud next_agent in
       toplog "Starting main loop" ;

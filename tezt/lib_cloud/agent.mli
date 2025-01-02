@@ -47,9 +47,6 @@ val runner : t -> Runner.t option
 (** [configuration t] the configuration of the agent. *)
 val configuration : t -> Configuration.t
 
-(** [set_name agent name] sets the name of the agent to [name]. *)
-val set_name : t -> string -> unit
-
 (** A wrapper to run a command on the VM of the agent. *)
 val cmd_wrapper : t -> Gcloud.cmd_wrapper option
 

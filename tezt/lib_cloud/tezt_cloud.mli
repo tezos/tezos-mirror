@@ -156,10 +156,6 @@ module Cloud : sig
   (** [agents t] returns the list of agents deployed. *)
   val agents : t -> Agent.t list
 
-  (** [set_agent_name t agent name] sets the name of the agent [agent] to
-      [name]. *)
-  val set_agent_name : t -> Agent.t -> string -> unit Lwt.t
-
   type target = {agent : Agent.t; port : int; app_name : string}
 
   (** [add_prometheus_source t ?metrics_path ~name targets] allows to add a new

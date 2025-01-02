@@ -617,13 +617,6 @@ let write_website t =
   | None -> Lwt.return_unit
   | Some website -> Web.write website ~agents:t.agents
 
-let set_agent_name t agent name =
-  Agent.set_name agent name ;
-  let* () = write_website t in
-  match t.prometheus with
-  | None -> Lwt.return_unit
-  | Some prometheus -> Prometheus.reload prometheus
-
 let push_metric t ?help ?typ ?labels ~name value =
   match t.website with
   | None -> ()
