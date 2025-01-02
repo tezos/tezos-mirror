@@ -11,6 +11,7 @@ type parameters = {
   config : Configuration.blueprints_publisher_config;
   keep_alive : bool;
   drop_duplicate : bool;
+  order_enabled : bool;
 }
 
 type state = {
@@ -21,6 +22,7 @@ type state = {
   max_blueprints_catchup : Z.t;
   catchup_cooldown : int;
   keep_alive : bool;
+  order_enabled : bool;
   mutable latest_level_confirmed : Z.t;
       (** The current head of the EVM chain as seen by the rollup node *)
   mutable latest_level_seen : Z.t;
@@ -110,6 +112,7 @@ module Worker = struct
     in
     Rollup_services.publish
       ~drop_duplicate:state.drop_duplicate
+      ?order:(if state.order_enabled then Some level else None)
       ~keep_alive:false
       ~rollup_node_endpoint:state.rollup_node_endpoint
       payload
@@ -246,6 +249,7 @@ module Handlers = struct
          latest_level_seen;
          keep_alive;
          drop_duplicate;
+         order_enabled;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -273,6 +277,7 @@ module Handlers = struct
         catchup_cooldown;
         keep_alive;
         enable_dal = Option.is_some dal_slots;
+        order_enabled;
       }
 
   let on_request :
@@ -330,7 +335,7 @@ let table = Worker.create_table Queue
 let worker_promise, worker_waker = Lwt.task ()
 
 let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive
-    ~drop_duplicate () =
+    ~drop_duplicate ~order_enabled () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -342,6 +347,7 @@ let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive
         latest_level_seen;
         keep_alive;
         drop_duplicate;
+        order_enabled;
       }
       (module Handlers)
   in

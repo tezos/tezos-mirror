@@ -3318,7 +3318,7 @@ let test_delayed_inbox_flushing_event =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -3409,7 +3409,7 @@ let test_flushed_blueprint_reorg =
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   (* A new block will make the {!add_delayed_tx_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for_add_delayed_inbox in
+  let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
      item but refuses to include it. *)
@@ -3427,7 +3427,7 @@ let test_flushed_blueprint_reorg =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -3572,7 +3572,7 @@ let test_multiple_flushed_blueprints =
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
   and* _ = wait_for_first_flush
   and* _ = wait_for_second_flush
-  and* () = wait_for_processed_l1_level in
+  and* _ = wait_for_processed_l1_level in
 
   let* () =
     check_head_consistency
@@ -3683,7 +3683,7 @@ let test_observer_reorg_on_blueprint_stream =
   let wait_for_observer_reset = Evm_node.wait_for_reset observer in
   (* A new block will make the {!add_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for_add_delayed_inbox in
+  let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
      item but refuses to include it. *)
@@ -3701,7 +3701,7 @@ let test_observer_reorg_on_blueprint_stream =
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
   let* _ = wait_for_flush
-  and* () = wait_for_processed_l1_level
+  and* _ = wait_for_processed_l1_level
   and* () = wait_for_observer_reset in
 
   let* () =
@@ -3799,7 +3799,7 @@ let test_observer_reorg_on_blueprint_catchup =
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   (* A new block will make the {!add_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for_add_delayed_inbox in
+  let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
      item but refuses to include it. *)
@@ -3822,7 +3822,7 @@ let test_observer_reorg_on_blueprint_catchup =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* _ = wait_for_flush and* () = wait_for_processed_l1_level in
+  let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
 
   let* () =
     check_head_consistency
@@ -3921,7 +3921,7 @@ let test_flushed_blueprint_reorg_late =
 
   (* A new block will make the add delayed inbox event final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
@@ -3938,7 +3938,7 @@ let test_flushed_blueprint_reorg_late =
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     (* Wait until the event is completely processed. Head of sequencer and proxy
        should be in sync. *)
     Evm_node.wait_for_processed_l1_level
@@ -4063,7 +4063,7 @@ let test_flushed_blueprint_reorg_done_late =
 
   (* A new block will make the add delayed event. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
@@ -4085,7 +4085,7 @@ let test_flushed_blueprint_reorg_done_late =
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client
-  and* () =
+  and* _ =
     (* Wait until the event is completely processed. Head of sequencer and proxy
        should be in sync. *)
     Evm_node.wait_for_processed_l1_level
@@ -4681,7 +4681,7 @@ let test_flushed_blueprint_reorg_upgrade =
         unit)
   in
 
-  let* () =
+  let* _ =
     Evm_node.wait_for_processed_l1_level
       ~level:add_delayed_inbox_level
       sequencer
@@ -4690,7 +4690,7 @@ let test_flushed_blueprint_reorg_upgrade =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* () =
+  let* _ =
     Evm_node.wait_for_processed_l1_level
       ~level:flushed_delayed_inbox_level
       sequencer
@@ -8772,7 +8772,7 @@ let test_produce_block_with_no_delayed_transactions =
   in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = wait_for in
+  let* _ = wait_for in
 
   let*@ n = Rpc.produce_block ~with_delayed_transactions:false sequencer in
   Check.((n = 0) int) ~error_msg:"Block should be empty but got %L transactions" ;
@@ -9136,6 +9136,168 @@ let test_websocket_logs_event =
   let* () = scenario sequencer in
   scenario observer
 
+let test_node_correctly_uses_batcher_heap =
+  let max_blueprints_lag = 10 in
+  let max_blueprints_catchup = 10 in
+  let catchup_cooldown = 4 in
+  register_test
+    ~__FILE__
+    ~kernel:Kernel.Latest
+    ~enable_dal:false
+    ~max_blueprints_lag
+    ~max_blueprints_catchup
+    ~catchup_cooldown
+    ~tags:["blueprint"; "injection"; "batcher"]
+    ~title:"EVM node uses batcher heap ordering when injecting blueprints."
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; sc_rollup_node; proxy; client; sc_rollup_address; node; _}
+             _protocol ->
+  let*@ _ = produce_block sequencer in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* l1_level = Node.get_level node in
+  let wait_for_level_processed =
+    Lwt.join
+      [
+        (* l1_level + 2 is seen, so l1_level is finalized *)
+        (let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (l1_level + 2) in
+         unit);
+        (* l1_level is finalized and processed. *)
+        (let* _ =
+           Evm_node.wait_for_processed_l1_level sequencer ~level:l1_level
+         in
+         unit);
+      ]
+  in
+  let* () =
+    (* So the EVM node see the level as finalized *)
+    repeat 2 (fun () ->
+        let* _ = Client.bake_for_and_wait client in
+        unit)
+  and* () = wait_for_level_processed in
+
+  let*@ before_level = Rpc.block_number sequencer in
+  let before_level = Int32.to_int before_level in
+  Log.info
+    "Stop the rollup node then produce a first block than won't be in the \
+     rollup inbox." ;
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () =
+    Evm_node.wait_for_blueprint_injection_failure
+      ~level:(before_level + 1)
+      sequencer
+  in
+  Log.info "Produce more blocks to create a blueprints lag." ;
+  let* () =
+    (* Produces L2 blocks to grow the blueprint lag. *)
+    repeat (2 * max_blueprints_lag) (fun () ->
+        let*@ _txn = produce_block sequencer in
+        unit)
+  in
+  Log.info "Restart the rollup node." ;
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup_address []
+  in
+  Log.info "Continue to produce blocks to fills the batcher queue." ;
+  let* () =
+    (* 2 * max_blueprints_lag: just a random number to have a lot of
+       blueprints injected. *)
+    repeat (2 * max_blueprints_lag) (fun () ->
+        let*@ _txn = produce_block sequencer in
+        let*@ level = Rpc.block_number sequencer in
+        Evm_node.wait_for_blueprint_injected sequencer (Int32.to_int level))
+  in
+  Log.info "Produce an L1 block that triggers the catchup." ;
+  let wait_for_catchup = Evm_node.wait_for_blueprint_catchup sequencer in
+  let wait_for_last_blueprint_catchup_injected =
+    Evm_node.wait_for_blueprint_injected
+      sequencer
+      (before_level + max_blueprints_catchup)
+  in
+  (* Bake L1 blocks to trigger catchup. *)
+  let* _ = Client.bake_for_and_wait client
+  and* min, max = wait_for_catchup
+  and* () =
+    (* last blueprint of catchup injected *)
+    wait_for_last_blueprint_catchup_injected
+  in
+  Check.(
+    (min = before_level + 1)
+      ~__LOC__
+      int
+      ~error_msg:
+        "Blueprint catchup check \"from\" failed, found %L, expected %R") ;
+  Check.(
+    (max = before_level + max_blueprints_catchup)
+      ~__LOC__
+      int
+      ~error_msg:"Blueprint catchup check \"to\" failed, found %L, expected %R") ;
+  Log.info
+    "Catchup is correct, baking 2 l1 blocks to let the rollup node process the \
+     inbox." ;
+  (* Bake first block to trigger blueprints injection. *)
+  let* l1_level = Node.get_level node in
+  let l1_level_blueprints_in_inbox = l1_level + 1 in
+  let* _ = Client.bake_for_and_wait client
+  and* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node l1_level_blueprints_in_inbox
+  in
+
+  let l1_level_blueprints_processed = l1_level + 2 in
+  (* Bake second block so the rollup node eval blueprints. *)
+  let* _ = Client.bake_for_and_wait client
+  and* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node l1_level_blueprints_processed
+  in
+
+  let*@ rollup_level = Rpc.block_number proxy in
+  Check.(
+    (Int32.to_int rollup_level = before_level + max_blueprints_catchup)
+      ~__LOC__
+      int
+      ~error_msg:"Check proxy head failed. Found %L, expected %R") ;
+
+  let l1_level_blueprints_processed_finalized =
+    l1_level_blueprints_processed + 2
+  in
+  let finalized_blueprint_ref = ref None in
+  let wait_for_catchup_l1_level_finalized =
+    Lwt.join
+      [
+        (* l1_level + 2 is seen, so l1_level is finalized. *)
+        (let* _ =
+           Sc_rollup_node.wait_for_level
+             sc_rollup_node
+             l1_level_blueprints_processed_finalized
+         in
+         unit);
+        (* l1_level is finalized and processed. *)
+        (let* {l1_level = _; finalized_blueprint} =
+           Evm_node.wait_for_processed_l1_level
+             sequencer
+             ~level:l1_level_blueprints_processed
+         in
+         finalized_blueprint_ref := Some finalized_blueprint ;
+         unit);
+      ]
+  in
+  (* 2 block so catchup blueprints processed by the rollup node are
+     marked as finalized *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = Client.bake_for_and_wait client in
+        unit)
+  and* _ = wait_for_catchup_l1_level_finalized in
+
+  Check.(
+    (!finalized_blueprint_ref = Some (before_level + max_blueprints_catchup))
+      ~__LOC__
+      (option int)
+      ~error_msg:"Finalized blueprint check failed. Found %L, expected %R") ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -9257,4 +9419,5 @@ let () =
   test_websocket_newHeads_event [Protocol.Alpha] ;
   test_websocket_cleanup [Protocol.Alpha] ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
-  test_websocket_logs_event [Protocol.Alpha]
+  test_websocket_logs_event [Protocol.Alpha] ;
+  test_node_correctly_uses_batcher_heap [Protocol.Alpha]

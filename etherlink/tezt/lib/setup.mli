@@ -172,6 +172,7 @@ val setup_sequencer :
   ?enable_fa_bridge:bool ->
   ?threshold_encryption:bool ->
   ?drop_duplicate_when_injection:bool ->
+  ?blueprints_publisher_order_enabled:bool ->
   ?history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list ->

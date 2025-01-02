@@ -4229,14 +4229,12 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           Client.bake_for_and_wait client
     in
     let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
-    let* outbox_l2_block =
+    let* {outbox; _} =
       Sc_rollup_node.RPC.call rollup_node
       @@ Sc_rollup_rpc.get_global_block ~outbox:true ()
     in
     let nb_outbox_transactions_in_block =
-      let open JSON in
-      outbox_l2_block |-> "outbox" |> as_list
-      |> List.map @@ fun x -> x |-> "transactions" |> as_list |> List.length
+      outbox |> List.map @@ fun (Sc_rollup_rpc.Transactions j) -> List.length j
     in
     Check.((nb_outbox_transactions_in_block = [1]) (list int))
       ~error_msg:"Block has %L outbox transactions but expected %R" ;
@@ -4777,10 +4775,9 @@ let test_rpcs ~kind
     Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_tezos_level ()
   in
-  let* l2_block =
+  let* {block_hash = l2_block_hash'; _} =
     Sc_rollup_node.RPC.call sc_rollup_node @@ Sc_rollup_rpc.get_global_block ()
   in
-  let l2_block_hash' = JSON.(l2_block |-> "block_hash" |> as_string) in
   Check.((l2_block_hash' = l2_block_hash) string)
     ~error_msg:"L2 head is from full block is %L but should be %R" ;
   if Protocol.number protocol >= 018 then (

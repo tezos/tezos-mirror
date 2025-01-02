@@ -11,6 +11,7 @@ val start :
   latest_level_seen:Z.t ->
   keep_alive:bool ->
   drop_duplicate:bool ->
+  order_enabled:bool ->
   unit ->
   unit tzresult Lwt.t
 

@@ -4,6 +4,9 @@
 
 ### Features
 
+- The event `evm_context_processed_l1_level` now contains the latest finalized
+  blueprint in the event. (!15877)
+
 #### Experimental
 
 *No guarantees are provided regarding backward compatibility of experimental
@@ -24,11 +27,18 @@ you start using them, you probably want to use `octez-evm-node check config
   and `rolling`. If the mode is `rolling` it will use the field
   `garbage_collect_parameters` to prune blocks, operations and states. (!16044)
 
+- Experimental support of ordering blueprints by they level for the
+  smart rollup node batcher. Activates the feature with the flag
+  `exprimental_features.blueprints_publisher_order_enabled`.
+  **Requires Octez Smart Rollup Node built from master.**. The
+  necessary feature on the Octez Smart Rollup node is not yet
+  released. (!15877)
+
 ### Bug fixes
 
 ### Internals
 
-- Removes an internal check about DA fees in the node, improving the 
+- Removes an internal check about DA fees in the node, improving the
   performances of gas estimations. (todo)
 
 ## Version 0.12 (2024-12-17)
@@ -118,7 +128,7 @@ you start using them, you probably want to use `octez-evm-node check config
 - Experimental support for alternative RPC server backend
   [Dream](https://aantron.github.io/dream) with feature flag
   `experimental_features.rpc_server = "dream"`. (!15560)
-  
+
 ### Bug fixes
 
 #### RPCs

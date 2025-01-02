@@ -100,6 +100,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~keep_alive
       ~drop_duplicate:
         configuration.experimental_features.drop_duplicate_on_injection
+      ~order_enabled:
+        configuration.experimental_features.blueprints_publisher_order_enabled
       ()
   in
   let* () =

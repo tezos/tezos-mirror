@@ -98,12 +98,15 @@ let unexpected_l1_block =
     ("provided_level", Data_encoding.int32)
 
 let processed_l1_level =
-  declare_1
+  declare_2
     ~section
     ~name:"evm_context_processed_l1_level"
     ~level:Info
-    ~msg:"Processed L1 level {level}"
+    ~msg:
+      "Processed L1 level {level}. Last finalized blueprint is: \
+       {finalized_blueprint}."
     ("level", Data_encoding.int32)
+    ("finalized_blueprint", Data_encoding.n)
 
 let reset_impossible_missing_finalized_state =
   declare_0
@@ -237,7 +240,8 @@ let gc_waiter_failed exn =
 let unexpected_l1_block ~expected_level ~provided_level =
   emit unexpected_l1_block (expected_level, provided_level)
 
-let processed_l1_level level = emit processed_l1_level level
+let processed_l1_level (level, finalized_blueprint) =
+  emit processed_l1_level (level, finalized_blueprint)
 
 let reset_impossible_missing_finalized_state =
   emit reset_impossible_missing_finalized_state
