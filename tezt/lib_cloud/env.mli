@@ -126,6 +126,9 @@ val project_id : unit -> string Lwt.t
 (** Equivalent to [Cli.faketime]. *)
 val faketime : string option
 
+(** Equivalent to [Cli.binaries_path]. *)
+val binaries_path : string
+
 (** [init ()] initialises and deploys a Docker registry using Terraform, only when the
     [mode] is either [`Host] or [`Cloud]. *)
 val init : unit -> unit Lwt.t

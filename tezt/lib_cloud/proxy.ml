@@ -99,11 +99,9 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
      This requires the docker image to contain all the binaries used by the
      proxy agent.
   *)
+  let Configuration.{binaries_path; _} = Agent.configuration proxy_agent in
   let* output =
-    Process.spawn
-      ?runner:(Agent.runner proxy_agent)
-      "ls"
-      [Path.default_binaries_path ()]
+    Process.spawn ?runner:(Agent.runner proxy_agent) "ls" [binaries_path]
     |> Process.check_and_read_stdout
   in
   let files = String.trim output |> String.split_on_char '\n' in
@@ -113,7 +111,7 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
            Process.spawn
              ?runner:(Agent.runner proxy_agent)
              "ln"
-             ["-s"; Path.default_binaries_path () // file; file; "-f"]
+             ["-s"; binaries_path // file; file; "-f"]
            |> Process.check)
     |> Lwt.join
   in

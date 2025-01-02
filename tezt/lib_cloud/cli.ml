@@ -297,3 +297,12 @@ let faketime =
        set your experminent 10 days in the past. See [libfaketime] for a \
        complete overview about the [FAKETIME] available formats."
     ()
+
+let binaries_path =
+  Clap.default_string
+    ~section
+    ~long:"binaries-path"
+    ~description:
+      "Where to find binaries in the docker image by default (default is: \
+       '/tmp/tezt-runners')"
+    (Filename.get_temp_dir_name () // "tezt-runners")

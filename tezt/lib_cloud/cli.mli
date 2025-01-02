@@ -122,3 +122,6 @@ val auto_approve : bool
 
 (** Value used to set the [FAKETIME] environment variable on VMs. *)
 val faketime : string option
+
+(** Where to find binaries path by default in the docker image. *)
+val binaries_path : string
