@@ -487,7 +487,7 @@ let insert_valid_transaction state tx_raw
              the limit. *)
           add_transaction ~must_replace:`Replace_existing
         else if nonce < max_nonce then
-          (* If the nonce is smaller than the mmax nonce, we must shift the
+          (* If the nonce is smaller than the max nonce, we must shift the
              list and drop one transaction. *)
           add_transaction ~must_replace:(`Replace_shift max_nonce)
         else
