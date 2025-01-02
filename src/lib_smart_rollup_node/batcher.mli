@@ -75,3 +75,8 @@ val message_status : L2_message.id -> (status * string) option tzresult
 
 (** Returns the status of the publisher worker  *)
 val worker_status : unit -> [`Running | `Not_running | `Crashed of exn]
+
+val clean_queue :
+  ?order_request:Batcher_worker_types.order_request ->
+  unit ->
+  unit tzresult Lwt.t
