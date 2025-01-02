@@ -140,9 +140,10 @@ let register get_next_blueprint_number find_blueprint smart_rollup_address
   |> register_get_time_between_block_service time_between_blocks
   |> register_broadcast_service find_blueprint get_next_blueprint_number
 
-let get_smart_rollup_address ~evm_node_endpoint =
-  Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-    [Media_type.octet_stream]
+let get_smart_rollup_address ~keep_alive ~evm_node_endpoint =
+  Rollup_services.call_service
+    ~keep_alive
+    ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_smart_rollup_address_service
     ()
