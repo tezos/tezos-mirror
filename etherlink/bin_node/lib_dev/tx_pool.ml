@@ -449,11 +449,6 @@ let insert_valid_transaction state tx_raw
   else
     let add_transaction ~must_replace =
       (* Add the transaction to the pool *)
-      (* Compute the hash *)
-      let hash = Ethereum_types.hash_raw_tx tx_raw in
-      (* This is a temporary fix until the hash computation is fixed on the
-         kernel side. *)
-      let transaction_object = {transaction_object with hash} in
       match
         Pool.add
           ~must_replace
@@ -465,10 +460,11 @@ let insert_valid_transaction state tx_raw
       | Ok pool ->
           let*! () =
             Tx_pool_events.add_transaction
-              ~transaction:(Ethereum_types.hash_to_string hash)
+              ~transaction:
+                (Ethereum_types.hash_to_string transaction_object.hash)
           in
           state.pool <- pool ;
-          return (Ok hash)
+          return (Ok transaction_object.hash)
       | Error msg -> return (Error msg)
     in
     let*! res_boundaries =
