@@ -509,9 +509,6 @@ let insert_valid_transaction state tx_raw
                 rejected.")
     | Ok () -> add_transaction ~must_replace:`No
 
-let on_normal_transaction state transaction_object tx_raw =
-  insert_valid_transaction state tx_raw transaction_object
-
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
 let can_prepay ~balance ~gas_price ~gas_limit ~value:Ethereum_types.(Qty value)
@@ -763,7 +760,7 @@ module Handlers = struct
         let* res =
           match state.mode with
           | Forward {injector} -> injector txn
-          | _ -> on_normal_transaction state transaction_object txn
+          | _ -> insert_valid_transaction state txn transaction_object
         in
         let* () = relay_self_inject_request w in
         return res
