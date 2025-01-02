@@ -168,7 +168,10 @@ let run () =
     @@ Dream.router
          [
            Dream.get "/metrics" (fun _ ->
-               let content = read_file (dir // "metrics.txt") in
+               let file = dir // "metrics.txt" in
+               let content =
+                 if Sys.file_exists file then read_file file else ""
+               in
                let response = Dream.response content in
                Dream.add_header
                  response
