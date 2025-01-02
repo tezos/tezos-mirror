@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 type t = private {
+  name : string;
   machine_type : string;
   docker_image : Env.docker_image;
   max_run_duration : int option;
@@ -19,5 +20,6 @@ val make :
   ?max_run_duration:int ->
   ?machine_type:string ->
   ?docker_image:Env.docker_image ->
+  ?name:string ->
   unit ->
   t

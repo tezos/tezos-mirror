@@ -44,11 +44,18 @@ let configuration_encoding =
   let open Data_encoding in
   let open Configuration in
   conv
-    (fun {machine_type; binaries_path; docker_image; max_run_duration = _; os} ->
-      (machine_type, binaries_path, docker_image, os))
-    (fun (machine_type, binaries_path, docker_image, os) ->
-      make ~os ~machine_type ~binaries_path ~docker_image ())
-    (obj4
+    (fun {
+           name;
+           machine_type;
+           binaries_path;
+           docker_image;
+           max_run_duration = _;
+           os;
+         } -> (name, machine_type, binaries_path, docker_image, os))
+    (fun (name, machine_type, binaries_path, docker_image, os) ->
+      make ~os ~machine_type ~binaries_path ~docker_image ~name ())
+    (obj5
+       (req "name" string)
        (req "machine_type" string)
        (req "binaries_path" string)
        (req "docker_image" docker_image_encoding)
