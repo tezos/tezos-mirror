@@ -17,6 +17,9 @@
   kernel used to originate Etherlink on Tezos mainnet to initialize the
   data-dir of an observer node, though an initial kernel can still be provided.
   (!16076)
+- If both `--network` and `--init-from-snapshot` are set, the EVM node in
+  observer mode will download and import a recent snapshot from a trusted
+  source for fresh data directories. (!16093)
 
 #### Experimental
 

@@ -650,7 +650,14 @@ let post_export_checks ~snapshot_file =
     if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
   in
   let* snapshot_header, () =
-    extract reader stdlib_writer (fun _ -> return_unit) ~snapshot_file ~dest
+    extract
+      reader
+      stdlib_writer
+      (fun _ -> return_unit)
+      ~display_progress:true
+      ~cancellable:false
+      ~snapshot_file
+      ~dest
   in
   post_checks
     ~action:`Export
@@ -985,6 +992,8 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
       reader
       stdlib_writer
       (pre_import_checks cctxt ~no_checks ~data_dir)
+      ~display_progress:true
+      ~cancellable:false
       ~snapshot_file
       ~dest:data_dir
   in

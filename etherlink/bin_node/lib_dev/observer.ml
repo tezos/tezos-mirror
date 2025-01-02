@@ -82,8 +82,8 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync ()
-    =
+let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
+    ~init_from_snapshot () =
   let open Lwt_result_syntax in
   let*? {
           evm_node_endpoint;
@@ -103,6 +103,12 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync ()
       ~evm_node_endpoint
       ()
   in
+  let snapshot_url =
+    match network with
+    | Some network when init_from_snapshot ->
+        Some Constants.(latest_snapshot_url network)
+    | _ -> None
+  in
   let* _loaded =
     Evm_context.start
       ~configuration:config
@@ -112,6 +118,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync ()
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
       ~store_perm:`Read_write
+      ?snapshot_url
       ()
   in
   let* ro_ctxt =

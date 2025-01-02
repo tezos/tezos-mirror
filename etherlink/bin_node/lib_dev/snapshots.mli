@@ -45,11 +45,17 @@ val export :
   unit ->
   string tzresult Lwt.t
 
-(** [import ~force ~data_dir ~snapshot_file] imports the snapshot at
-    path [snapshot_file] into the data directory [data_dir]. Import will fail
-    if [data_dir] is already populated unless [force] is set to [true]. *)
+(** [import ~display_progress ~force ~data_dir ~snapshot_file] imports the
+    snapshot at path [snapshot_file] into the data directory [data_dir]. Import
+    will fail if [data_dir] is already populated unless [force] is set to
+    [true]. Set [cancellable] if you want to be able to cancel the resulting
+    promise cleanly. *)
 val import :
-  force:bool -> data_dir:string -> snapshot_file:string -> unit tzresult Lwt.t
+  cancellable:bool ->
+  force:bool ->
+  data_dir:string ->
+  snapshot_file:string ->
+  unit tzresult Lwt.t
 
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)

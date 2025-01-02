@@ -1,0 +1,53 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type store_info = {
+  rollup_address : Address.t;
+  current_number : Ethereum_types.quantity;
+}
+
+let store_path ~data_dir = Filename.Infix.(data_dir // "store")
+
+let global_lockfile_path ~data_dir = Filename.Infix.(data_dir // "lock")
+
+type error += Data_dir_locked of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.datadir_is_locked"
+    ~title:"Data directory of EVM node is locked"
+    ~description:"Data directory of EVM node is locked by another process."
+    ~pp:(fun ppf dir ->
+      Format.fprintf
+        ppf
+        "The data directory %s of the EVM node is locked by another process."
+        dir)
+    Data_encoding.(obj1 (req "data_dir" string))
+    (function Data_dir_locked dir -> Some dir | _ -> None)
+    (fun dir -> Data_dir_locked dir)
+
+let lock ~data_dir =
+  let open Lwt_result_syntax in
+  let*! () = Lwt_utils_unix.create_dir data_dir in
+  let filename = global_lockfile_path ~data_dir in
+  (* It's okay not to release the lock because once you have taken it,
+     you don't want the data directory to be overwritten while the node
+     is running. The lock will be released once the node stops. *)
+  let* _fd =
+    Lwt_lock_file.lock ~when_locked:(`Fail (Data_dir_locked data_dir)) ~filename
+  in
+  return_unit
+
+let export_store ~data_dir ~output_db_file =
+  let open Lwt_result_syntax in
+  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  Evm_store.use store @@ fun conn ->
+  let* metadata = Evm_store.Metadata.get conn in
+  let* current_number, _ = Evm_store.Context_hashes.get_latest conn in
+  let* () = Evm_store.vacuum ~conn ~output_db_file in
+  return {rollup_address = metadata.smart_rollup_address; current_number}
