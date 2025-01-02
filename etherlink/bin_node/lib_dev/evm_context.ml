@@ -1170,6 +1170,37 @@ module State = struct
     Callback.register "layer2_store__store_get_hash" store_get_hash ;
     Evm_context_events.replace_store_get_hash ()
 
+  let check_smart_rollup_address ~store_smart_rollup_address
+      ~smart_rollup_address =
+    let open Lwt_result_syntax in
+    match (store_smart_rollup_address, smart_rollup_address) with
+    | Some store_smart_rollup_address, Some smart_rollup_address ->
+        let* () =
+          fail_unless
+            (Tezos_crypto.Hashed.Smart_rollup_address.equal
+               smart_rollup_address
+               store_smart_rollup_address)
+            (Invalid_rollup_node
+               {
+                 smart_rollup_address = store_smart_rollup_address;
+                 rollup_node_smart_rollup_address = smart_rollup_address;
+               })
+        in
+        return smart_rollup_address
+    | None, Some smart_rollup_address -> return smart_rollup_address
+    | Some store_smart_rollup_address, None -> return store_smart_rollup_address
+    | None, None ->
+        (* Ok. This is dirty. In normal condition it does not make sense that
+           the sr1 is missing from the local storage and not provided by
+           the caller.
+
+           However, it can happen if the node is ran in sandbox mode
+           on a non existing context. Returning the zero address here is
+           so much convenient for a case that's really not supposed to happen,
+           ever. An error that would be detected relatively fast as well.
+        *)
+        return Tezos_crypto.Hashed.Smart_rollup_address.zero
+
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
@@ -1204,43 +1235,23 @@ module State = struct
       | None -> (Ethereum_types.Qty Z.zero, None)
       | Some {finalized; l1_level; _} -> (finalized, Some l1_level)
     in
-    let smart_rollup_address =
-      Option.map
-        Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
-        smart_rollup_address
-    in
     let* smart_rollup_address =
-      let* found_smart_rollup_address = Evm_store.Metadata.find conn in
-      match (found_smart_rollup_address, smart_rollup_address) with
-      | Some found_smart_rollup_address, Some smart_rollup_address ->
-          let* () =
-            fail_unless
-              (Tezos_crypto.Hashed.Smart_rollup_address.equal
-                 smart_rollup_address
-                 found_smart_rollup_address)
-              (Invalid_rollup_node
-                 {
-                   smart_rollup_address = found_smart_rollup_address;
-                   rollup_node_smart_rollup_address = smart_rollup_address;
-                 })
-          in
-          return smart_rollup_address
-      | None, Some smart_rollup_address ->
-          let* () = Evm_store.Metadata.store conn smart_rollup_address in
-          return smart_rollup_address
-      | Some found_smart_rollup_address, None ->
-          return found_smart_rollup_address
-      | None, None ->
-          (* Ok. This is dirty. In normal condition it does not make sense that
-             the sr1 is missing from the local storage and not provided by
-             the caller.
-
-             However, it can happen if the node is ran in sandbox mode
-             on a non existing context. Returning the zero address here is
-             so much convenient for a case that's really not supposed to happen,
-             ever. An error that would be detected relatively fast as well.
-          *)
-          return Tezos_crypto.Hashed.Smart_rollup_address.zero
+      let smart_rollup_address =
+        Option.map
+          Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
+          smart_rollup_address
+      in
+      let* store_smart_rollup_address = Evm_store.Metadata.find conn in
+      let* smart_rollup_address =
+        check_smart_rollup_address
+          ~store_smart_rollup_address
+          ~smart_rollup_address
+      in
+      let* () =
+        when_ (Option.is_none store_smart_rollup_address) (fun () ->
+            Evm_store.Metadata.store conn smart_rollup_address)
+      in
+      return smart_rollup_address
     in
     let* evm_state, context =
       match kernel_path with
