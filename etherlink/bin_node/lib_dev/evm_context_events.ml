@@ -242,6 +242,15 @@ let rolling_to_archive_incomplete_history =
          Ethereum_types.pp_quantity)
     ("earliest_level", Data_encoding.option Ethereum_types.quantity_encoding)
 
+let switching_history_mode =
+  declare_2
+    ~section
+    ~name:"evm_context_switch_history_mode"
+    ~level:Warning
+    ~msg:"Switching history mode from {from} to {to_}."
+    ("from", Configuration.history_mode_encoding)
+    ("to_", Configuration.history_mode_encoding)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -298,3 +307,5 @@ let start_history_mode history_mode = emit start_history_mode history_mode
 
 let rolling_to_archive_incomplete_history earliest_level =
   emit rolling_to_archive_incomplete_history earliest_level
+
+let switching_history_mode ~from ~to_ = emit switching_history_mode (from, to_)

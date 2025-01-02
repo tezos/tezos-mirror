@@ -1207,9 +1207,14 @@ module State = struct
     | None -> return_unit
     | Some store_history_mode -> (
         match (store_history_mode, history_mode) with
-        | Configuration.Archive, Configuration.Archive
-        | Rolling, Rolling
+        | Configuration.Archive, Configuration.Archive | Rolling, Rolling ->
+            return_unit
         | Archive, Rolling ->
+            let*! () =
+              Evm_context_events.switching_history_mode
+                ~from:Archive
+                ~to_:Rolling
+            in
             return_unit
         | Rolling, Archive ->
             (* Switching from rolling to archive is possible, however it does
