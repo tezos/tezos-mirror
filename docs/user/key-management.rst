@@ -287,11 +287,11 @@ The operation is signed by the manager key and does not require the consensus pr
 
 However the public key must be known by the client. It can be imported with the command::
 
-   octez-client import public key consensus unencrypted:edpk...
+   octez-client import public key <consensus_key> unencrypted:edpk...
 
 The command to update the consensus key is::
 
-   octez-client set consensus key for <mgr> to consensus
+   octez-client set consensus key for <manager_key> to <consensus_key>
 
 The update becomes active after ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. We therefore distinguish
 the active consensus key and the pending consensus keys.
@@ -299,7 +299,7 @@ The active consensus key is by default the delegate’s manager key, which canno
 
 However, it is also possible to register as a delegate and immediately set the consensus key::
 
-   octez-client register key <mgr> as delegate with consensus key <key>
+   octez-client register key <mananger_key> as delegate with consensus key <consensus_key>
 
 There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
 A subsequent update within the same cycle takes precedences over the initial one.
