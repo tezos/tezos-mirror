@@ -2503,4 +2503,4 @@ let () =
         Short)
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Lwt_main.run (dispatch (argv ())) |> handle_error
+  Lwt_main.run (Lwt_exit.wrap_and_exit (dispatch (argv ()))) |> handle_error
