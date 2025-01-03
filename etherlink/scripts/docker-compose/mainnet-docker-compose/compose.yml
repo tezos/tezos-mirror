@@ -29,7 +29,7 @@ services:
     ports:
       - ${EVM_OCTEZ_PORT}:8545
     entrypoint: /usr/local/bin/octez-evm-node
-    command: run observer $FINALIZED_VIEW --evm-node-endpoint $EVM_NODE_ENDPOINT
+    command: run observer $EVM_NODE_RUN_ARGS --evm-node-endpoint $EVM_NODE_ENDPOINT
 
   curl-runner:
     container_name: curl-runner
