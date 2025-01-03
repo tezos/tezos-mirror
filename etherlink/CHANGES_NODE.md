@@ -9,6 +9,9 @@
 - It is now possible to specify the network an EVM node in observer mode is
   expected to join (with the `--network` CLI argument), prompting the node to
   perform additional sanity checks. (!16073)
+- If `--network` is set, the EVM node will use default values for the upstream
+  EVM node if it has not been set either through the configuration file or a
+  CLI argument (with `init config` and `run observer` commands). (!16074)
 
 #### Experimental
 

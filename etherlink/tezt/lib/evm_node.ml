@@ -929,6 +929,12 @@ module Config_file = struct
     write node config
 end
 
+let spawn_init_config_minimal ~data_dir
+    ?(path = Uses.(path Constant.octez_evm_node)) ?(extra_arguments = []) () =
+  Process.spawn ~name:"evm_node_init_config" path
+  @@ ["init"; "config"; "--data-dir"; data_dir]
+  @ extra_arguments
+
 let spawn_init_config ?(extra_arguments = []) evm_node =
   let shared_args =
     data_dir_arg evm_node @ evm_node.persistent_state.arguments

@@ -268,6 +268,17 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
+(** [spawn_init_config_minimal ~data_dir ?path ?extra_arguments ()] creates a
+    minimal config with no cli argument populated as [spawn_init_config].
+
+    Unlike [spawn_init_config], does not require a [Evm_node.t] instance. *)
+val spawn_init_config_minimal :
+  data_dir:string ->
+  ?path:string ->
+  ?extra_arguments:string list ->
+  unit ->
+  Process.t
+
 type garbage_collector_parameters = {
   split_frequency_in_seconds : int;
   number_of_chunks : int;

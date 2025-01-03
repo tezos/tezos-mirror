@@ -9298,6 +9298,28 @@ let test_node_correctly_uses_batcher_heap =
       ~error_msg:"Finalized blueprint check failed. Found %L, expected %R") ;
   unit
 
+let test_init_config_mainnet network =
+  Regression.register
+    ~__FILE__
+    ~title:(sf "EVM Node: init config --network %s" network)
+    ~tags:["evm"; "init"; "config"]
+    ~uses:[Constant.octez_evm_node]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let data_dir = Temp.dir "fake-evm-node" in
+  let* () =
+    Process.check
+    @@ Evm_node.spawn_init_config_minimal
+         ~data_dir
+         ~extra_arguments:["--network"; network]
+         ()
+  in
+  let config = read_file (data_dir // "config.json") in
+  Regression.capture config ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -9420,4 +9442,6 @@ let () =
   test_websocket_cleanup [Protocol.Alpha] ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
-  test_node_correctly_uses_batcher_heap [Protocol.Alpha]
+  test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
+  test_init_config_mainnet "mainnet" ;
+  test_init_config_mainnet "testnet"
