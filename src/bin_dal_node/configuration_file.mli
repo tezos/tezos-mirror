@@ -66,6 +66,8 @@ type t = {
       (** Name of the service provided by this node. *)
   service_namespace : string option;  (** Namespace for the service. *)
   experimental_features : experimental_features;  (** Experimental features.  *)
+  install_trusted_setup : bool;
+      (** Should the trusted setup be installed if not yet valid. *)
 }
 
 (** [default] is the default configuration. *)
