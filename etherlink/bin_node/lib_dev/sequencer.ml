@@ -142,7 +142,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let* () =
     Tx_pool.start
       {
-        rollup_node = backend;
+        backend;
         smart_rollup_address = smart_rollup_address_b58;
         mode = Sequencer;
         tx_timeout_limit = configuration.tx_pool_timeout_limit;

@@ -142,7 +142,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync ()
   let* () =
     Tx_pool.start
       {
-        rollup_node = observer_backend;
+        backend = observer_backend;
         smart_rollup_address =
           Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
             smart_rollup_address;

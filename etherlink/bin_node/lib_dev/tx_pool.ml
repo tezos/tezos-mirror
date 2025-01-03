@@ -14,8 +14,6 @@ module Pool = struct
   type transaction = {
     index : int64; (* Global index of the transaction. *)
     raw_tx : string; (* Current transaction. *)
-    gas_price : Z.t; (* The maximum price the user can pay for fees. *)
-    gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
     inclusion_timestamp : Time.Protocol.t;
     (* Time of inclusion in the transaction pool. *)
     transaction_object : Ethereum_types.transaction_object;
@@ -81,29 +79,21 @@ module Pool = struct
       (Ethereum_types.AddressMap.empty, Ethereum_types.AddressMap.empty)
 
   (** Add a transaction to the pool. *)
-  let add ~must_replace {transactions; global_index} pkey raw_tx
+  let add ~must_replace {transactions; global_index} raw_tx
       (transaction_object : Ethereum_types.transaction_object) =
     let (Qty nonce) = transaction_object.nonce in
     let (Qty gas_price) = transaction_object.gasPrice in
-    let (Qty gas_limit) = transaction_object.gas in
     let inclusion_timestamp = Misc.now () in
 
     (* Add the transaction to the user's transaction map *)
     let transaction =
-      {
-        index = global_index;
-        raw_tx;
-        gas_price;
-        gas_limit;
-        inclusion_timestamp;
-        transaction_object;
-      }
+      {index = global_index; raw_tx; inclusion_timestamp; transaction_object}
     in
     let add_transaction transactions =
       let replaced = ref false in
       let transactions =
         Pkey_map.update
-          pkey
+          transaction_object.from
           (function
             | None ->
                 (* User has no transactions in the pool *)
@@ -115,7 +105,11 @@ module Pool = struct
                      (function
                        | None -> Some transaction
                        | Some user_transaction ->
-                           if gas_price > user_transaction.gas_price then (
+                           if
+                             gas_price
+                             > Ethereum_types.Qty.to_z
+                                 user_transaction.transaction_object.gasPrice
+                           then (
                              replaced := true ;
                              Some transaction)
                            else Some user_transaction)
@@ -139,7 +133,7 @@ module Pool = struct
     | `Replace_shift max_nonce ->
         let transactions =
           Pkey_map.update
-            pkey
+            transaction_object.from
             (function
               | None ->
                   (* The list of user transactions cannot be empty,
@@ -155,8 +149,6 @@ module Pool = struct
             transactions
         in
         Ok {transactions; global_index = Int64.(add global_index one)}
-
-  (* return {transactions; global_index = Int64.(add global_index one)} *)
 
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
@@ -229,7 +221,7 @@ type mode =
     }
 
 type parameters = {
-  rollup_node : (module Services_backend_sig.S);
+  backend : (module Services_backend_sig.S);
   smart_rollup_address : string;
   mode : mode;
   tx_timeout_limit : int64;
@@ -240,7 +232,7 @@ type parameters = {
 
 module Types = struct
   type state = {
-    rollup_node : (module Services_backend_sig.S);
+    backend : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable pool : Pool.t;
     mutable popped_txs : Pool.transaction list;
@@ -437,7 +429,7 @@ let insert_valid_transaction state tx_raw
   let open Lwt_result_syntax in
   let open Types in
   let {
-    rollup_node = (module Rollup_node);
+    backend = (module Backend);
     pool;
     tx_pool_addr_limit;
     tx_pool_tx_per_addr_limit;
@@ -455,26 +447,15 @@ let insert_valid_transaction state tx_raw
   else
     let add_transaction ~must_replace =
       (* Add the transaction to the pool *)
-      (* Compute the hash *)
-      let hash = Ethereum_types.hash_raw_tx tx_raw in
-      (* This is a temporary fix until the hash computation is fixed on the
-         kernel side. *)
-      let transaction_object = {transaction_object with hash} in
-      match
-        Pool.add
-          ~must_replace
-          pool
-          transaction_object.from
-          tx_raw
-          transaction_object
-      with
+      match Pool.add ~must_replace pool tx_raw transaction_object with
       | Ok pool ->
           let*! () =
             Tx_pool_events.add_transaction
-              ~transaction:(Ethereum_types.hash_to_string hash)
+              ~transaction:
+                (Ethereum_types.hash_to_string transaction_object.hash)
           in
           state.pool <- pool ;
-          return (Ok hash)
+          return (Ok transaction_object.hash)
       | Error msg -> return (Error msg)
     in
     let*! res_boundaries =
@@ -504,7 +485,7 @@ let insert_valid_transaction state tx_raw
              the limit. *)
           add_transaction ~must_replace:`Replace_existing
         else if nonce < max_nonce then
-          (* If the nonce is smaller than the mmax nonce, we must shift the
+          (* If the nonce is smaller than the max nonce, we must shift the
              list and drop one transaction. *)
           add_transaction ~must_replace:(`Replace_shift max_nonce)
         else
@@ -514,9 +495,6 @@ let insert_valid_transaction state tx_raw
                "Limit of transaction for a user was reached. Transaction is \
                 rejected.")
     | Ok () -> add_transaction ~must_replace:`No
-
-let on_normal_transaction state transaction_object tx_raw =
-  insert_valid_transaction state tx_raw transaction_object
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
@@ -539,7 +517,7 @@ let pop_transactions state ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let Types.
         {
-          rollup_node = (module Rollup_node : Services_backend_sig.S);
+          backend = (module Backend : Services_backend_sig.S);
           pool;
           locked;
           tx_timeout_limit;
@@ -556,13 +534,13 @@ let pop_transactions state ~maximum_cumulative_size =
       Lwt_list.map_p
         (fun address ->
           let* nonce =
-            Rollup_node.nonce
+            Backend.nonce
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
           let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
           let* (Qty balance) =
-            Rollup_node.balance
+            Backend.balance
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
@@ -572,70 +550,68 @@ let pop_transactions state ~maximum_cumulative_size =
     let addr_with_nonces = List.filter_ok addr_with_nonces in
     (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
-    let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
+    let* (Qty base_fee_per_gas) = Backend.base_fee_per_gas () in
     let current_timestamp = Misc.now () in
     let pool =
-      addr_with_nonces
-      |> List.fold_left
-           (fun pool (pkey, balance, current_nonce) ->
-             Pool.remove
-               pkey
-               (fun nonce
-                    {
-                      gas_limit;
-                      gas_price;
-                      inclusion_timestamp;
-                      transaction_object;
-                      _;
-                    } ->
-                 nonce < current_nonce
-                 || (not
-                       (can_prepay
-                          ~value:transaction_object.value
-                          ~balance
-                          ~gas_price
-                          ~gas_limit))
-                 || transaction_timed_out
-                      ~current_timestamp
-                      ~inclusion_timestamp
-                      ~tx_timeout_limit)
-               pool)
-           pool
+      List.fold_left
+        (fun pool (pkey, balance, current_nonce) ->
+          Pool.remove
+            pkey
+            (fun nonce
+                 {
+                   inclusion_timestamp;
+                   transaction_object =
+                     {gasPrice = Qty gas_price; gas = Qty gas_limit; value; _};
+                   _;
+                 } ->
+              nonce < current_nonce
+              || (not (can_prepay ~value ~balance ~gas_price ~gas_limit))
+              || transaction_timed_out
+                   ~current_timestamp
+                   ~inclusion_timestamp
+                   ~tx_timeout_limit)
+            pool)
+        pool
+        addr_with_nonces
     in
     (* Select transaction with nonce equal to user's nonce, that can be prepaid
        and selects a sum of transactions that wouldn't go above the size limit
        of the blueprint.
        Also removes the transactions from the pool. *)
     let txs, pool, _ =
-      addr_with_nonces
-      |> List.fold_left
-           (fun (txs, pool, cumulative_size) (pkey, _, current_nonce) ->
-             (* This mutable counter is purely local and used only for the
-                partition. *)
-             let accumulated_size = ref cumulative_size in
-             let selected, pool =
-               Pool.partition
-                 pkey
-                 (fun nonce {gas_price; raw_tx; _} ->
-                   let check_nonce = nonce = current_nonce in
-                   let can_fit =
-                     !accumulated_size + String.length raw_tx
-                     <= maximum_cumulative_size
-                   in
-                   let can_pay =
-                     can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas
-                   in
-                   let selected = check_nonce && can_pay && can_fit in
-                   (* If the transaction is selected, this means it will fit *)
-                   if selected then
-                     accumulated_size :=
-                       !accumulated_size + String.length raw_tx ;
-                   selected)
-                 pool
-             in
-             let txs = List.append txs selected in
-             (txs, pool, !accumulated_size))
-           ([], pool, 0)
+      List.fold_left
+        (fun (txs, pool, cumulative_size) (pkey, _, current_nonce) ->
+          (* This mutable counter is purely local and used only for the
+             partition. *)
+          let accumulated_size = ref cumulative_size in
+          let selected, pool =
+            Pool.partition
+              pkey
+              (fun nonce
+                   {
+                     transaction_object = {gasPrice = Qty gas_price; _};
+                     raw_tx;
+                     _;
+                   } ->
+                let check_nonce = nonce = current_nonce in
+                let can_fit =
+                  !accumulated_size + String.length raw_tx
+                  <= maximum_cumulative_size
+                in
+                let can_pay =
+                  can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas
+                in
+                let selected = check_nonce && can_pay && can_fit in
+                (* If the transaction is selected, this means it will fit *)
+                if selected then
+                  accumulated_size := !accumulated_size + String.length raw_tx ;
+                selected)
+              pool
+          in
+          let txs = List.append txs selected in
+          (txs, pool, !accumulated_size))
+        ([], pool, 0)
+        addr_with_nonces
     in
     (* Store popped tx. *)
     let*? () =
@@ -680,9 +656,9 @@ let pop_and_inject_transactions state =
   in
   let* txs = pop_transactions state ~maximum_cumulative_size in
   if not (List.is_empty txs) then
-    let (module Rollup_node : Services_backend_sig.S) = state.rollup_node in
+    let (module Backend : Services_backend_sig.S) = state.backend in
     let*! hashes =
-      Rollup_node.inject_transactions
+      Backend.inject_transactions
       (* The timestamp is ignored in observer and proxy mode, it's just for
          compatibility with sequencer mode. *)
         ~timestamp:(Misc.now ())
@@ -765,7 +741,8 @@ module Handlers = struct
         let* res =
           match state.mode with
           | Forward {injector} -> injector txn
-          | _ -> on_normal_transaction state transaction_object txn
+          | Proxy | Sequencer | Relay ->
+              insert_valid_transaction state txn transaction_object
         in
         let* () = relay_self_inject_request w in
         return res
@@ -787,7 +764,7 @@ module Handlers = struct
 
   let on_launch _w ()
       ({
-         rollup_node;
+         backend;
          smart_rollup_address;
          mode;
          tx_timeout_limit;
@@ -799,7 +776,7 @@ module Handlers = struct
     let state =
       Types.
         {
-          rollup_node;
+          backend;
           smart_rollup_address;
           pool = Pool.empty;
           popped_txs = [];
@@ -882,11 +859,9 @@ let add transaction_object raw_tx =
 let nonce pkey =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
+  let Types.{backend = (module Backend); pool; _} = Worker.state w in
   let* current_nonce =
-    Rollup_node.nonce
-      pkey
-      Ethereum_types.Block_parameter.(Block_parameter Latest)
+    Backend.nonce pkey Ethereum_types.Block_parameter.(Block_parameter Latest)
   in
   let next_nonce =
     match current_nonce with
@@ -960,19 +935,19 @@ let size_info () =
 let get_tx_pool_content () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
+  let Types.{backend = (module Backend); pool; _} = Worker.state w in
   let addresses = Pool.addresses pool in
   let*! addr_with_balance_nonces =
     Lwt_list.map_p
       (fun address ->
         let* nonce =
-          Rollup_node.nonce
+          Backend.nonce
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
         let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
         let* (Qty balance) =
-          Rollup_node.balance
+          Backend.balance
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
