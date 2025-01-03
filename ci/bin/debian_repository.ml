@@ -20,6 +20,10 @@ let build_debian_packages_image =
   Image.mk_external
     ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
+(* the name of the image depends on the variables in the parallel matrix.
+   we delcare it once, but we use it in two different contexts *)
+let systemd_test_debian_packages_image = build_debian_packages_image
+
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job
     [job_build_debian_package]. A dependency image will be built once
@@ -78,16 +82,40 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs pipeline_type =
-  let variables add =
-    ( "DEP_IMAGE",
-      "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE"
-    )
-    (* this second variable is for a read only registry and we want it to be
-       tezos/tezos *)
+  let variables ?(kind = "build") add =
+    ("FLAVOUR", kind)
+    :: ( "DEP_IMAGE",
+         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+       )
+       (* this second variable is for a read only registry and we want it to be
+          tezos/tezos *)
     :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE" )
+         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+       )
     :: add
   in
+  let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution =
+    job_docker_authenticated
+      ~__POS__
+      ~name
+      ~stage:Stages.images
+      ~variables:
+        (variables ~kind:"systemd-tests" [("DISTRIBUTION", distribution)])
+      ~parallel:(Matrix matrix)
+      ~tag:Dynamic
+      [
+        "./scripts/ci/build-packages-dependencies.sh \
+         debian-systemd-tests.Dockerfile";
+      ]
+  in
+  let job_docker_systemd_test_debian_dependencies : tezos_job =
+    make_job_docker_systemd_tests
+      ~__POS__
+      ~name:"oc.docker-systemd_tests-debian"
+      ~distribution:"debian"
+      ~matrix:(debian_package_release_matrix pipeline_type)
+  in
+
   let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
       ~distribution =
     job_docker_authenticated
@@ -405,10 +433,25 @@ let jobs pipeline_type =
           (Dependent [Job job_apt_repo_debian_current; Job job_apt_repo_debian])
         ~image:Images.debian_bookworm
         ["./docs/introduction/upgrade-bin-deb.sh debian bookworm"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_debian_bookworm-systemd"
+        ~dependencies:(Dependent [Job job_apt_repo_debian])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [
+               ("PREFIX", "next");
+               ("DISTRIBUTION", "debian");
+               ("RELEASE", "bookworm");
+             ])
+        ~image:systemd_test_debian_packages_image
+        ["./docs/introduction/install-bin-deb.sh debian bookworm"];
     ]
   in
   let debian_jobs =
     [
+      job_docker_systemd_test_debian_dependencies;
       job_docker_build_debian_dependencies;
       job_build_debian_package;
       job_build_debian_package_current_a;
