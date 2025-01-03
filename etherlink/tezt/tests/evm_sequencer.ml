@@ -7749,9 +7749,6 @@ let test_miner =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
   in
   register_all
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
     ~tags:["evm"; "miner"; "coinbase"]
     ~title:"Sequencer pool address is the block's miner"
     ~sequencer_pool_address
@@ -7808,6 +7805,24 @@ let test_miner =
   Check.((rpc_coinbase = sequencer_pool_address) string)
     ~error_msg:
       "eth_coinbase should be the sequencer pool address, expected %R got %L" ;
+
+  (*
+     Regression test:
+
+     Custom RPC call parameters to make sure we support it correctly. A bug
+     made the node consider `"params" : []` to be invalid.
+  *)
+  let* r1 =
+    Evm_node.jsonrpc sequencer {method_ = "eth_coinbase"; parameters = `Null}
+  in
+  let r1 = JSON.(r1 |-> "result" |> as_string) in
+  let* r2 =
+    Evm_node.jsonrpc sequencer {method_ = "eth_coinbase"; parameters = `A []}
+  in
+  let r2 = JSON.(r2 |-> "result" |> as_string) in
+  Check.is_true
+    (r1 = r2 && r2 = rpc_coinbase)
+    ~error_msg:"Expected all coinbase adresses to be equal" ;
 
   unit
 
