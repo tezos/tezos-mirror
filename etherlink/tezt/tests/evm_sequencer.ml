@@ -8677,23 +8677,12 @@ let test_tx_pool_pending_nonce () =
   let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
   let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx_1 sequencer in
   let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx_2 sequencer in
-  (* Ask the nonce, it should be 3 as we have 3 pending transactions. But the
-     transaction pool has a bug, therefore it answers 0*)
-  let*@ nonce =
-    Rpc.get_transaction_count ~block:"pending" ~address:sender.address sequencer
-  in
-  Check.((nonce = 0L) int64)
-    ~error_msg:
-      "Nonce is 0 if the account is unknown, even if it has pending \
-       transactions" ;
-  (* Produce a block so the account now "exist", pending nonce changes. *)
-  let*@ _ = Rpc.produce_block sequencer in
-  (* Recheck the nonce. *)
+  (* Ask the nonce, it should be 3 as we have 3 pending transactions. *)
   let*@ nonce =
     Rpc.get_transaction_count ~block:"pending" ~address:sender.address sequencer
   in
   Check.((nonce = 3L) int64)
-    ~error_msg:"Nonce is correct now that the account exists" ;
+    ~error_msg:"Nonce should be 3 as we have 3 pending transactions, but got %L" ;
   unit
 
 let test_da_fees_after_execution =

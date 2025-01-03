@@ -49,11 +49,13 @@ you start using them, you probably want to use `octez-evm-node check config
 - Observers will comply with the `keep_alive` configuration option when trying
   to fetch the rollup address from their upstream EVM node. Before, it
   would exit with an error even if `keep_alive` was set to `true`. (!16094)
+- Fixes invalid pending nonce for fresh accounts with pending transactions
+  in the transaction pool. (!16099)
 
 ### Internals
 
 - Removes an internal check about DA fees in the node, improving the
-  performances of gas estimations. (todo)
+  performances of gas estimations. (!16055)
 
 ## Version 0.12 (2024-12-17)
 

@@ -860,15 +860,13 @@ let nonce pkey =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   let Types.{backend = (module Backend); pool; _} = Worker.state w in
-  let* current_nonce =
+  let+ current_nonce =
     Backend.nonce pkey Ethereum_types.Block_parameter.(Block_parameter Latest)
   in
-  let next_nonce =
-    match current_nonce with
-    | None -> Ethereum_types.Qty Z.zero
-    | Some current_nonce -> Pool.next_nonce pkey current_nonce pool
+  let current_nonce =
+    Option.value ~default:Ethereum_types.Qty.zero current_nonce
   in
-  return next_nonce
+  Pool.next_nonce pkey current_nonce pool
 
 let pop_transactions ~maximum_cumulative_size =
   let open Lwt_result_syntax in
