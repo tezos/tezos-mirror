@@ -41,6 +41,10 @@ you start using them, you probably want to use `octez-evm-node check config
 
 ### Bug fixes
 
+- Observers will comply with the `keep_alive` configuration option when trying
+  to fetch the rollup address from their upstream EVM node. Before, it
+  would exit with an error even if `keep_alive` was set to `true`. (!16094)
+
 ### Internals
 
 - Removes an internal check about DA fees in the node, improving the

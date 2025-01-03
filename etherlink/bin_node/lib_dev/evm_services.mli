@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 val get_smart_rollup_address :
+  keep_alive:bool ->
   evm_node_endpoint:Uri.t ->
   Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
 

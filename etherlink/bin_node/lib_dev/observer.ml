@@ -93,7 +93,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync ()
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =
-    Evm_services.get_smart_rollup_address ~evm_node_endpoint
+    Evm_services.get_smart_rollup_address
+      ~keep_alive:config.keep_alive
+      ~evm_node_endpoint
   in
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
