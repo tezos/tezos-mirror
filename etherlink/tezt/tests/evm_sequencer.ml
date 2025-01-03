@@ -8929,12 +8929,21 @@ let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
       failwith "eth_unsubscribe shouldn't be callable via http requests")
     (fun _ -> unit)
 
+let produce_block_and_wait_for_sync ~sequencer evm_node =
+  let*@ head = Rpc.block_number sequencer in
+  let wait_for =
+    Evm_node.wait_for_blueprint_applied evm_node Int32.(succ head |> to_int)
+  in
+  let*@ _ = produce_block sequencer in
+  let* _ = wait_for in
+  unit
+
 let check_unsubscription ~websocket ~id ~sequencer evm_node =
   let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
   Check.((sub_status = true) bool)
     ~error_msg:"Unsubscription should be successful" ;
   (* After unsubbing to the event, we shouldn't receive data anymore. *)
-  let*@ _ = produce_block sequencer in
+  let* () = produce_block_and_wait_for_sync ~sequencer evm_node in
   let* result =
     Lwt.pick
       [
@@ -8956,7 +8965,7 @@ let check_unsubscription ~websocket ~id ~sequencer evm_node =
 
 let test_websocket_newHeads_event =
   register_all
-    ~tags:["evm"; "rpc"; "websocket"; "new_heads"; Tag.flaky]
+    ~tags:["evm"; "rpc"; "websocket"; "new_heads"]
     ~title:"Check that websocket event `newHeads` is behaving correctly"
     ~time_between_blocks:Nothing
     ~bootstrap_accounts:
@@ -8966,25 +8975,25 @@ let test_websocket_newHeads_event =
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
   @@ fun {sequencer; observer; _} _protocol ->
-  let scenario evm_node (lvl, lvl') =
+  let scenario evm_node =
     let* websocket = Evm_node.open_websocket evm_node in
     let* id = Rpc.subscribe ~websocket ~kind:NewHeads evm_node in
-    let check_block_number ~level =
-      let*@ _ = produce_block sequencer in
+    let check_block_number () =
+      let* () = produce_block_and_wait_for_sync ~sequencer evm_node in
       let* block = Websocket.recv websocket in
       let Block.{number; _} =
         JSON.(block |-> "params" |-> "result" |> Block.of_json)
       in
+      let*@ level = Rpc.block_number evm_node in
       Check.((number = level) int32)
         ~error_msg:"Received block level was %L, expected %R" ;
       unit
     in
-    let* () = check_block_number ~level:lvl in
-    let* () = check_block_number ~level:lvl' in
+    let* () = repeat 2 check_block_number in
     check_unsubscription ~websocket ~id ~sequencer evm_node
   in
-  let* () = scenario sequencer (1l, 2l) in
-  scenario observer (4l, 5l)
+  let* () = scenario sequencer in
+  scenario observer
 
 (* This test is flaky because Dream may not correctly detect websocket
    connections closed by the client. *)
