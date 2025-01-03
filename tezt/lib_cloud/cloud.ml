@@ -483,16 +483,32 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let vms =
-    (* The Cli arguments by-pass the argument given here. This enable the user
-       to always have decide precisely the number of vms to be run. *)
     match (vms, Env.vms) with
-    | None, None | None, Some 0 -> None
-    | Some _, Some 0 when Env.mode = `Localhost || Env.mode = `Cloud ->
-        (* We don't want to go here when using the proxy mode. *)
-        None
-    | None, Some i | Some _, Some i ->
-        let vms = List.init i (fun _ -> Configuration.make ()) in
-        Some vms
+    | None, None | None, Some _ -> None
+    | Some _vms, Some 0 -> (
+        Log.warn
+          "The legacy behaviour with '--vms-limit 0' may be removed in the \
+           future." ;
+        match Env.mode with
+        | `Localhost | `Cloud -> None
+        | `Host | `Orchestrator ->
+            (* In Host mode, we want to run a deployment deploying the
+               Proxy VM. In orchestrator mode, there is few
+               initialisation steps needed. By using [Some []], we
+               ensure they will be done. When the scenario asks for an
+               agent and do not find it there is fallback to a default
+               agent. This works but this is hackish and should be
+               removed in the near future (famous last words). *)
+            Some [])
+    | Some vms, Some vms_limit ->
+        let number_of_vms = List.length vms in
+        if vms_limit < number_of_vms then
+          Test.fail
+            "The number limits of VM '%d' is less than the number of VMs \
+             specified by the scenario: '%d'"
+            vms_limit
+            number_of_vms
+        else Some vms
     | Some vms, None -> Some vms
   in
   match vms with
