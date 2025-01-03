@@ -88,7 +88,9 @@ init_rollup_node() {
 init_evm_node() {
   trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node, .tezos-evm-node}"' ERR
   echo "creating evm node config"
-  run_in_docker_compose evm-node init config --evm-node-endpoint https://relay.mainnet.etherlink.com --rollup-node-endpoint http://rollup-node:8932 --cors-origins '*' --cors-headers '*' --rpc-addr 0.0.0.0 --rpc-port 8545 --keep-alive
+  # here we do "eval" + ${EVM_NODE_CONFIG_ARGS[*]} else the command
+  # fails (or shellcheck is unhappy).
+  eval "run_in_docker_compose evm-node init config ${EVM_NODE_CONFIG_ARGS[*]}"
   # download snapshot and import it.
   if [[ -n ${EVM_NODE_SNAPSHOT_URL} ]]; then
     # Do not download the snapshot if it already exists.
