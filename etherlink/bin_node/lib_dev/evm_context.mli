@@ -108,9 +108,6 @@ val head_info : unit -> head Lwt.t
 
 val next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t
 
-val blueprint :
-  Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t
-
 val blueprints_range :
   Ethereum_types.quantity ->
   Ethereum_types.quantity ->

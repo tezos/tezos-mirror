@@ -21,10 +21,6 @@ module Request = struct
         delayed_transactions : Evm_events.Delayed_transaction.t list;
       }
         -> (unit, tztrace) t
-    | Blueprint : {
-        level : Ethereum_types.quantity;
-      }
-        -> (Blueprint_types.with_events option, tztrace) t
     | Blueprints_range : {
         from : Ethereum_types.quantity;
         to_ : Ethereum_types.quantity;
@@ -90,14 +86,6 @@ module Request = struct
                  {events; timestamp; payload; delayed_transactions}));
         case
           (Tag 2)
-          ~title:"Blueprint"
-          (obj2
-             (req "request" (constant "blueprint"))
-             (req "level" Ethereum_types.quantity_encoding))
-          (function View (Blueprint {level}) -> Some ((), level) | _ -> None)
-          (fun ((), level) -> View (Blueprint {level}));
-        case
-          (Tag 3)
           ~title:"Blueprints_range"
           (obj3
              (req "request" (constant "Blueprints_range"))
@@ -108,19 +96,19 @@ module Request = struct
             | _ -> None)
           (fun ((), from, to_) -> View (Blueprints_range {from; to_}));
         case
-          (Tag 4)
+          (Tag 3)
           ~title:"Last_known_L1_level"
           (obj1 (req "request" (constant "last_known_l1_level")))
           (function View Last_known_L1_level -> Some () | _ -> None)
           (fun () -> View Last_known_L1_level);
         case
-          (Tag 5)
+          (Tag 4)
           ~title:"Delayed_inbox_hashes"
           (obj1 (req "request" (constant "Delayed_inbox_hashes")))
           (function View Delayed_inbox_hashes -> Some () | _ -> None)
           (fun () -> View Delayed_inbox_hashes);
         case
-          (Tag 6)
+          (Tag 5)
           ~title:"Patch_state"
           (obj5
              (req "request" (constant "patch_state"))
@@ -135,13 +123,13 @@ module Request = struct
           (fun ((), commit, key, value, block_number) ->
             View (Patch_state {commit; key; value; block_number}));
         case
-          (Tag 7)
+          (Tag 6)
           ~title:"Wasm_pvm_version"
           (obj1 (req "request" (constant "wasm_pvm_version")))
           (function View Wasm_pvm_version -> Some () | _ -> None)
           (fun () -> View Wasm_pvm_version);
         case
-          (Tag 8)
+          (Tag 7)
           ~title:"Potential_observer_reorg"
           (obj3
              (req "request" (constant "potential_observer_reorg"))
