@@ -30,17 +30,7 @@ Uninstall Serokell packages while preserving data::
 
 If you were using RPM packages, use ``dnf`` instead of ``apt``.
 
-3. Reconfigure ``dpkg``
------------------------
-
-**If using Debian**, reconfigure ``dpkg``:
-
-- if needed, install the Dialog interface with ``sudo apt install dialog``
-- reconfigure debconf to force it to ask few interactive questions with ``sudo dpkg-reconfigure debconf``, by setting the priority to *medium*.
-  This gives you a chance to disable automatic configuration, so as to reuse your existing data.
-
-
-4. Add NL Repository
+3. Add NL Repository
 --------------------
 **If using Debian**, add the NL package repository and install the ``octez-node`` package:
 
@@ -54,17 +44,20 @@ If you were using RPM packages, use ``dnf`` instead of ``apt``.
    :start-after: [add repository]
    :end-before: [end add repository]
 
-5. Install NL Packages
+4. Install NL Packages
 ----------------------
+
 **If using Debian packages**, install them so::
 
     sudo apt install octez-node
 
 When prompted, answer **Yes** to skip automatic configuration.
 
+If needed, install the Dialog interface with ``sudo apt install dialog``.
+
 **If using RPM packages** rather then Debian ones, refer to :ref:`installing_rpm`.
 
-6. Relocate Data
+5. Relocate Data
 ----------------
 Copy your node and client data to the NL directory structure::
 
@@ -74,14 +67,14 @@ Copy your node and client data to the NL directory structure::
 
 where ``<network>`` is the network you choose for running Octez.
 
-7. Update User Configuration
+6. Update User Configuration
 ----------------------------
 Change the ``tezos`` user’s home directory and shell::
 
     sudo usermod -d /var/tezos tezos
     sudo chsh -s /bin/bash tezos
 
-8. Start Node Service
+7. Start Node Service
 ---------------------
 First, check the configuration file inherited from the old packages::
 
@@ -100,7 +93,7 @@ You may then inspect its trace with::
 
     sudo tail -f /var/log/tezos/node.log
 
-9. Migrate the Baker
+8. Migrate the Baker
 --------------------
 Install the baker::
 
