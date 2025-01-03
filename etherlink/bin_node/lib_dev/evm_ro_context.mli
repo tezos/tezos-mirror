@@ -61,3 +61,5 @@ val replay :
 
 val evm_services_methods :
   t -> Configuration.time_between_blocks -> Rpc_server.evm_services_methods
+
+val blueprints_range : t -> Blueprints_publisher.blueprints_range

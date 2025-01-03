@@ -1677,11 +1677,6 @@ module Handlers = struct
           timestamp
           payload
           delayed_transactions
-    | Blueprints_range {from; to_} ->
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        Evm_store.use ctxt.store @@ fun conn ->
-        Evm_store.Blueprints.find_range conn ~from ~to_
     | Last_known_L1_level -> (
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -1725,7 +1720,6 @@ module Handlers = struct
     let request : type a b. (a, b) Request.t -> (b, tztrace) eq = function
       | Apply_evm_events _ -> Eq
       | Apply_blueprint _ -> Eq
-      | Blueprints_range _ -> Eq
       | Last_known_L1_level -> Eq
       | Delayed_inbox_hashes -> Eq
       | Patch_state _ -> Eq
@@ -2035,9 +2029,6 @@ let next_blueprint_number () =
   let open Lwt_syntax in
   let+ head_info = head_info () in
   head_info.next_blueprint_number
-
-let blueprints_range from to_ =
-  worker_wait_for_request (Blueprints_range {from; to_})
 
 let last_known_l1_level () = worker_wait_for_request Last_known_L1_level
 
