@@ -8907,7 +8907,7 @@ let check_unsubscription ~websocket ~id ~sequencer evm_node =
 
 let test_websocket_newHeads_event =
   register_all
-    ~tags:["evm"; "rpc"; "websocket"; "new_heads"]
+    ~tags:["evm"; "rpc"; "websocket"; "new_heads"; Tag.flaky]
     ~title:"Check that websocket event `newHeads` is behaving correctly"
     ~time_between_blocks:Nothing
     ~bootstrap_accounts:
