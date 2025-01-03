@@ -8651,6 +8651,51 @@ let test_tx_pool_replacing_transactions_on_limit () =
   let*@ _new_tx_0 = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
   unit
 
+let test_tx_pool_pending_nonce () =
+  register_sandbox
+    ~tags:["evm"; "tx_pool"]
+    ~title:"Transaction pool pending nonce"
+  @@ fun sequencer ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let craft_tx ?(gas = 21_000) ?(gas_price = gas_price) nonce =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price
+      ~gas
+      ~value:(Wei.of_eth_int 10)
+      ~address:"0x0000000000000000000000000000000000000000"
+      ()
+  in
+  (* Send 3 transactions, but don't produce a block. *)
+  let* tx_0 = craft_tx 0 in
+  let* tx_1 = craft_tx 1 in
+  let* tx_2 = craft_tx 2 in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx_1 sequencer in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx:tx_2 sequencer in
+  (* Ask the nonce, it should be 3 as we have 3 pending transactions. But the
+     transaction pool has a bug, therefore it answers 0*)
+  let*@ nonce =
+    Rpc.get_transaction_count ~block:"pending" ~address:sender.address sequencer
+  in
+  Check.((nonce = 0L) int64)
+    ~error_msg:
+      "Nonce is 0 if the account is unknown, even if it has pending \
+       transactions" ;
+  (* Produce a block so the account now "exist", pending nonce changes. *)
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Recheck the nonce. *)
+  let*@ nonce =
+    Rpc.get_transaction_count ~block:"pending" ~address:sender.address sequencer
+  in
+  Check.((nonce = 3L) int64)
+    ~error_msg:"Nonce is correct now that the account exists" ;
+  unit
+
 let test_da_fees_after_execution =
   register_all
     ~time_between_blocks:Nothing
@@ -9429,6 +9474,7 @@ let () =
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
   test_tx_pool_replacing_transactions protocols ;
   test_tx_pool_replacing_transactions_on_limit () ;
+  test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
