@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Describe where the kernel code can be found: either in-memory from a
+    buffer, or on-disk using a given path. *)
+type kernel = In_memory of string | On_disk of string
+
 val read_kernel_from_file :
   Lwt_io.file_name -> (string * bool, tztrace) result Lwt.t
 
@@ -35,10 +39,9 @@ val set_durable_value :
   Irmin_context.tree Lwt.t
 
 val start :
-  ?installer_config:Installer_config.instr trace ->
-  ?tree:Irmin_context.tree ->
+  tree:Irmin_context.tree ->
   Tezos_scoru_wasm.Wasm_pvm_state.version ->
-  Lwt_io.file_name ->
+  kernel ->
   Irmin_context.tree tzresult Lwt.t
 
 val find_key_in_durable :

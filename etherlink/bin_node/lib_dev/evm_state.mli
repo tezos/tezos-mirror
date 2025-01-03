@@ -33,7 +33,7 @@ val execute :
   t tzresult Lwt.t
 
 (** [init ~kernel] initializes the local [evm_state] with [kernel]. *)
-val init : kernel:string -> t tzresult Lwt.t
+val init : kernel:Wasm_debugger.kernel -> t tzresult Lwt.t
 
 (** [modify ~key ~value evm_state] sets [value] at [key] in the local EVM
     state. *)

@@ -5,14 +5,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main ?kernel_path ~data_dir ~config ~no_sync ()] starts the main
-    event-loop of the Observer, consuming the blueprints received from
-    the EVM node endpoint, unless [no_sync] is true. *)
-val main :
-  ?network:Configuration.supported_network ->
-  ?kernel_path:Wasm_debugger.kernel ->
-  data_dir:string ->
-  config:Configuration.t ->
-  no_sync:bool ->
-  unit ->
-  unit tzresult Lwt.t
+(** The installer kernel used to originate Etherlink on Mainnet *)
+val mainnet : string

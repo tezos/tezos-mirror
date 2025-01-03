@@ -56,7 +56,7 @@ val export_store :
 *)
 val start :
   configuration:Configuration.t ->
-  ?kernel_path:string ->
+  ?kernel_path:Wasm_debugger.kernel ->
   data_dir:string ->
   ?smart_rollup_address:string ->
   store_perm:[`Read_only | `Read_write] ->
