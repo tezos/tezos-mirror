@@ -1,87 +1,38 @@
-=========================================
-Serokell -> Nomadic-lab package migration
-=========================================
+===================================================
+Migrating from Serokell's to Nomadic Labs' packages
+===================================================
 
-This page explains the process for migrating your Octez installation and setup
-from the legacy Serokell packages to the Nomadic-Labs Debian packages.
+This guide explains how to migrate your Octez setup from the legacy packages provided by Serokell to the packages provided by Nomadic Labs (abbreviated as NL packages hereafter).
 
-TL;DR
-=====
+Why Backups Are Crucial
+=======================
+The migration involves removing old packages, relocating data, and reconfiguring services. Mistakes during this process can result in irreversible data loss. **Always back up your node and client data before proceeding.**
 
+How This Guide is Structured
+=============================
+1. **Step-by-Step Procedure**: A simple guide for users with standard setups. Follow this if you just want instructions.
+2. **Context and Explanations**: Additional details to understand the migration process or adapt it to customized setups.
 
-The typical key steps for migration are:
+Step-by-Step Procedure
+======================
 
-- Remove Serokell Packages: Use ``sudo apt autoremove tezos-baking`` to remove
-  Serokell-specific packages while retaining the data and configuration files.
+1. Backup Data
+--------------
+Save a complete backup of your node and client data::
 
-- Install Nomadic Labs Packages: Add the Nomadic Labs repository and install
-  the **octez-node** package. Reconfigure the system to ensure minimal interaction
-  during installation.
+    sudo cp -a /var/lib/tezos /backup/tezos-data
 
-- Data Backup and Relocation: Move the existing node data from
-  ``/var/lib/tezos/<network>`` to ``/var/tezos/.octez-node`` and update the
-  user directories for a smooth transition.
-
-- Configure and Start Services: Enable and start the **octez-node** service,
-  ensuring the node is properly configured and running.
-
-- Migrate Baker Configuration: Install the **octez-baker** package, update baker
-  keys, and enable the baker services (octez-baker-active and octez-baker-next).
-
-Details of Serokell packages installation
-=========================================
-
-The Octez node installed by the legacy Serokell keeps data under
-``/var/lib/tezos/<network>``.
-
-Serokell packages use a configuration file and a service file for each network
-under ``/etc/default``.
-
-The service file uses a ``prestart`` script ``/usr/bin/tezos-node-prestart`` to do
-an unconditional ``octez-node upgrade storage`` before starting the node.
-
-Logs are stored in ``/var/lib/tezos/<network>/daily_logs``
-
-The user ``tezos`` is created and owns the data.
-
-While installing Serokell **tezos-baking**, the following additional packages (+
-sys dependencies) are installed:
-
-- tezos-node
-- tezos-client
-- tezos-baker
-
-The **tezos-baking** post-installation script also sets up the baker, offering
-different configuration options (ledger, remote, local). The package also
-provides a script ``/usr/bin/tezos-baker-proxford-start`` to start the baker
-according to the configuration.
-
-The keys are stored in ``$TEZOS_CLIENT_DIR/config``, by default in
-``/var/lib/tezos/.tezos-client/config``
-
-Upgrade to Nomadic-Labs Debian packages
-=======================================
-
-The Serokell packages and Nomadic-Labs packages follow two different
-philosophies. The Serokell packages provide a custom script to configure the
-node and the baker that is tightly coupled with their Debian packages and
-scripts. It also allows running multiple nodes on the same machine at the same
-time (on distinct networks), each with a different systemd service and
-dedicated configuration.
-
-The Nomadic-Labs packages are more minimalistic. They provide
-the infrastructure to run on only one network at a time. Instead of using a
-custom script, they use ``debconf``, the standard Debian configuration system,
-and make it easy for the user to configure the node using the Octez documentation.
-
-Migration of the octez-node
+2. Remove Serokell Packages
 ---------------------------
+Uninstall Serokell packages while preserving data::
 
-First, we need to remove all Serokell packages using ``sudo apt autoremove
-tezos-client tezos-node tezos-baking``. This command removes only the packages,
-leaving the data and configuration files intact.
+    sudo apt autoremove tezos-client tezos-node tezos-baking
 
-We install the octez packages (e.g., debian/bookworm):
+If you were using RPM packages, use ``dnf`` instead of ``apt``.
+
+3. Add NL Repository
+--------------------
+**If using Debian**, add the NL package repository and install the ``octez-node`` package:
 
 .. code:: shell
 
@@ -93,78 +44,105 @@ We install the octez packages (e.g., debian/bookworm):
    :start-after: [add repository]
    :end-before: [end add repository]
 
-Refer to the :doc:`howtoget` for more details.
+4. Install NL Packages
+----------------------
 
-Notice that in some systems, we need to install the Dialog interface with
-``sudo apt install dialog`` and reconfigure debconf to force it to ask few
-interactive questions with ``sudo dpkg-reconfigure debconf``, and set the
-priority to **medium**. The *priority* decides when debconf should ask
-configuration questions to the user, or rather use the maintainer default
-values.
+**If using Debian packages**, install them so::
 
-Now we can install the **octez-node** package with ``sudo apt install
-octez-node`` and answer **yes** when asked if we want to skip the node
-configuration. This will provide a clean installation of the package and allow
-us to proceed with the migration.
+    sudo apt install octez-node
 
-We need to make sure to keep a backup of all the data of the node from the
-previous Serokell installation, and copy it to the new location (``/var/tezos``
-is the default datadir for Nomadic-Labs' **octez-node** package).
+When prompted, answer **Yes** to skip automatic configuration.
 
-We also have to copy the data maintained by the client.
+If needed, install the Dialog interface with ``sudo apt install dialog``.
 
-.. code:: shell
+**If using RPM packages** rather then Debian ones, refer to :ref:`installing_rpm`.
 
-  sudo mkdir -p /var/tezos
-  sudo cp -a /var/lib/tezos/node-ghostnet /var/tezos/.tezos-node
-  sudo cp -a /var/lib/tezos/.tezos-client /var/tezos/
+5. Relocate Data
+----------------
+Copy your node and client data to the NL directory structure::
 
-Now we have to change the home directory and shell for the user tezos. This is
-necessary to allow for a smooth transition and configuration of the octez
-packages.
+    sudo mkdir -p /var/tezos
+    sudo cp -a /var/lib/tezos/<network> /var/tezos/.tezos-node
+    sudo cp -a /var/lib/tezos/.tezos-client /var/tezos/
 
-.. code:: shell
+where ``<network>`` is the network you choose for running Octez.
 
-  sudo usermod -d /var/tezos tezos
-  sudo chsh -s /bin/bash tezos
-  # to verify
-  cat /etc/passwd | grep tezos
-  tezos:x:994:993::/var/tezos:/bin/bash
+6. Update User Configuration
+----------------------------
+Change the ``tezos`` user’s home directory and shell::
 
-Now we have to enable the service for the octez node.
+    sudo usermod -d /var/tezos tezos
+    sudo chsh -s /bin/bash tezos
 
-.. code:: shell
+7. Start Node Service
+---------------------
+First, check the configuration file inherited from the old packages::
 
-  sudo systemctl enable octez-node
+    sudo -u tezos octez-node config show
 
-If everything went according to plan, we can restart the node.
+If the RPC port is not defined (no field ``listen-addrs``), open it, e.g.::
 
-.. code:: shell
+    sudo -u tezos octez-node config update --rpc-addr=127.0.0.1:8732
 
-  sudo systemctl start octez-node
-  sudo systemctl status octez-node
+Now enable and start the ``octez-node`` service::
 
-Migration for the octez-baker
------------------------------
+    sudo systemctl enable octez-node
+    sudo systemctl start octez-node
 
-Install the baker package:
+You may then inspect its trace with::
 
-.. code:: shell
+    sudo tail -f /var/log/tezos/node.log
 
-  sudo apt install octez-baker
+8. Migrate the Baker
+--------------------
+Install the baker::
 
-The installation procedure will ask a couple of questions. Since the
-configuration of the baker keys lives in the octez client data in
-``/var/tezos/.tezos-client``, we can directly enable and restart the baker.
+    sudo apt install octez-baker
 
-.. code:: shell
+If you want to install RPM packages rather then Debian ones, refer to :ref:`installing_rpm`.
 
-  sudo systemctl enable octez-baker-active
-  sudo systemctl start octez-baker-active
+Then enable and start the baking service::
 
-Note that the octez baker package offers two services: the **octez-baker-active**
-and **octez-baker-next**. The protocol associated with these two services can be
-changed by reconfiguring the octez baker package with ``sudo dpkg-reconfigure
-octez-baker`` or manually editing the env files in ``/etc/default/octez-baker*``
+    sudo systemctl enable octez-baker-active
+    sudo systemctl start octez-baker-active
 
-For further guidance on configuring the Octez services, check :doc:`services`.
+You may then inspect its trace with::
+
+    sudo tail -f /var/log/tezos/baker-active.log
+
+Context and Explanations
+========================
+
+The migration transitions from Serokell packages, which use custom scripts and configurations, to NL packages, which adhere to standard tools such as ``systemd``. This change simplifies configuration and improves maintainability but requires adapting your existing setup.
+
+Understanding the differences between the legacy packages and the new packages helps adjusting the procedure for edge cases, such as multi-network setups.
+
+Relocating Data
+---------------
+Serokell stores node data in network-specific subdirectories, while NL uses ``.octez-node`` for all networks:
+
+- **Serokell**: Custom scripts support multiple nodes and networks per machine. Data resides in ``/var/lib/tezos/<network>``.
+- **NL**: The unique directory for node data ``/var/tezos`` allows to run the node only on a single network at a time.
+
+Copy your node data into this new structure.
+
+Also copy the client data (which is presumably not network-dependent).
+
+Baker Configuration
+-------------------
+
+The installation procedure of ``octez-baker`` will ask a few questions.
+Since the configuration of the baker keys lives in the Octez client data, we don't have to migrate these, but check that the keys are still relevant.
+
+The ``octez-baker`` package manages two services:
+
+- ``octez-baker-active``: For the current protocol.
+- ``octez-baker-next``: For the upcoming protocol.
+
+The protocol associated with these two services can be changed by reconfiguring the package::
+
+    sudo dpkg-reconfigure octez-baker
+
+or manually editing the files in ``/etc/default/octez-baker*``.
+
+After the migration is complete, if you are using Debian packages consider removing all leftover configuration files from the Serokell packages, by doing ``apt purge tezos-client tezos-node tezos-baking``.

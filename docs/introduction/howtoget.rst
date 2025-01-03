@@ -155,6 +155,8 @@ as explained in :doc:`./services`.
 If migrating from Serokell packages you can check out migration documentation
 :doc:`./serokell`.
 
+.. _installing_rpm:
+
 Fedora Octez packages
 ~~~~~~~~~~~~~~~~~~~~~
 
