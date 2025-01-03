@@ -1,8 +1,8 @@
-===========================================
-Serokell to Nomadic Labs packages Migration
-===========================================
+===================================================
+Migrating from Serokell's to Nomadic Labs' packages
+===================================================
 
-This guide explains how to migrate your Octez setup from the legacy Serokell packages to the Nomadic Labs packages (abbreviated as NL packages hereafter).
+This guide explains how to migrate your Octez setup from the legacy packages provided by Serokell to the packages provided by Nomadic Labs (abbreviated as NL packages hereafter).
 
 Why Backups Are Crucial
 =======================
