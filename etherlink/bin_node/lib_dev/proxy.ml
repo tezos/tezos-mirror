@@ -76,7 +76,7 @@ let main
     else
       Tx_pool.start
         {
-          rollup_node = (module Rollup_node_rpc);
+          backend = (module Rollup_node_rpc);
           smart_rollup_address;
           mode;
           tx_timeout_limit = config.tx_pool_timeout_limit;

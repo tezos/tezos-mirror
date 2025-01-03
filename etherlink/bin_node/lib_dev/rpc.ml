@@ -43,7 +43,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let* () =
     Tx_pool.start
       {
-        rollup_node = rpc_backend;
+        backend = rpc_backend;
         smart_rollup_address =
           Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
             ctxt.smart_rollup_address;

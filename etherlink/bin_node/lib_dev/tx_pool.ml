@@ -221,7 +221,7 @@ type mode =
     }
 
 type parameters = {
-  rollup_node : (module Services_backend_sig.S);
+  backend : (module Services_backend_sig.S);
   smart_rollup_address : string;
   mode : mode;
   tx_timeout_limit : int64;
@@ -232,7 +232,7 @@ type parameters = {
 
 module Types = struct
   type state = {
-    rollup_node : (module Services_backend_sig.S);
+    backend : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable pool : Pool.t;
     mutable popped_txs : Pool.transaction list;
@@ -429,7 +429,7 @@ let insert_valid_transaction state tx_raw
   let open Lwt_result_syntax in
   let open Types in
   let {
-    rollup_node = (module Rollup_node);
+    backend = (module Backend);
     pool;
     tx_pool_addr_limit;
     tx_pool_tx_per_addr_limit;
@@ -517,7 +517,7 @@ let pop_transactions state ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let Types.
         {
-          rollup_node = (module Rollup_node : Services_backend_sig.S);
+          backend = (module Backend : Services_backend_sig.S);
           pool;
           locked;
           tx_timeout_limit;
@@ -534,13 +534,13 @@ let pop_transactions state ~maximum_cumulative_size =
       Lwt_list.map_p
         (fun address ->
           let* nonce =
-            Rollup_node.nonce
+            Backend.nonce
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
           let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
           let* (Qty balance) =
-            Rollup_node.balance
+            Backend.balance
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
@@ -550,7 +550,7 @@ let pop_transactions state ~maximum_cumulative_size =
     let addr_with_nonces = List.filter_ok addr_with_nonces in
     (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
-    let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
+    let* (Qty base_fee_per_gas) = Backend.base_fee_per_gas () in
     let current_timestamp = Misc.now () in
     let pool =
       List.fold_left
@@ -656,9 +656,9 @@ let pop_and_inject_transactions state =
   in
   let* txs = pop_transactions state ~maximum_cumulative_size in
   if not (List.is_empty txs) then
-    let (module Rollup_node : Services_backend_sig.S) = state.rollup_node in
+    let (module Backend : Services_backend_sig.S) = state.backend in
     let*! hashes =
-      Rollup_node.inject_transactions
+      Backend.inject_transactions
       (* The timestamp is ignored in observer and proxy mode, it's just for
          compatibility with sequencer mode. *)
         ~timestamp:(Misc.now ())
@@ -764,7 +764,7 @@ module Handlers = struct
 
   let on_launch _w ()
       ({
-         rollup_node;
+         backend;
          smart_rollup_address;
          mode;
          tx_timeout_limit;
@@ -776,7 +776,7 @@ module Handlers = struct
     let state =
       Types.
         {
-          rollup_node;
+          backend;
           smart_rollup_address;
           pool = Pool.empty;
           popped_txs = [];
@@ -859,11 +859,9 @@ let add transaction_object raw_tx =
 let nonce pkey =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
+  let Types.{backend = (module Backend); pool; _} = Worker.state w in
   let* current_nonce =
-    Rollup_node.nonce
-      pkey
-      Ethereum_types.Block_parameter.(Block_parameter Latest)
+    Backend.nonce pkey Ethereum_types.Block_parameter.(Block_parameter Latest)
   in
   let next_nonce =
     match current_nonce with
@@ -937,19 +935,19 @@ let size_info () =
 let get_tx_pool_content () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
+  let Types.{backend = (module Backend); pool; _} = Worker.state w in
   let addresses = Pool.addresses pool in
   let*! addr_with_balance_nonces =
     Lwt_list.map_p
       (fun address ->
         let* nonce =
-          Rollup_node.nonce
+          Backend.nonce
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
         let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
         let* (Qty balance) =
-          Rollup_node.balance
+          Backend.balance
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
