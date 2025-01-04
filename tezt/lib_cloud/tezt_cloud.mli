@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 module Agent = Agent
+module Types = Types
 
 module Configuration : sig
   type docker_image =
@@ -17,7 +18,7 @@ module Configuration : sig
     docker_image : docker_image;
     max_run_duration : int option;
     binaries_path : string;
-    os : string;
+    os : Types.Os.t;
   }
 
   (** [make ?machine_type ()] is a smart-constructor to make a VM
@@ -31,7 +32,7 @@ module Configuration : sig
     is the value provided by the environement variable [$TEZT_CLOUD].
     *)
   val make :
-    ?os:string ->
+    ?os:Types.Os.t ->
     ?binaries_path:string ->
     ?max_run_duration:int ->
     ?machine_type:string ->

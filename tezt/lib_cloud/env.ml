@@ -62,8 +62,6 @@ let max_run_duration = Cli.max_run_duration
 
 let no_max_run_duration = Cli.no_max_run_duration
 
-let os = Cli.os
-
 let open_telemetry = Cli.open_telemetry
 
 let alert_handlers = Cli.alert_handlers

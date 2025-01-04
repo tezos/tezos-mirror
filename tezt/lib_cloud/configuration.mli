@@ -10,11 +10,11 @@ type t = private {
   docker_image : Env.docker_image;
   max_run_duration : int option;
   binaries_path : string;
-  os : string;
+  os : Types.Os.t;
 }
 
 val make :
-  ?os:string ->
+  ?os:Types.Os.t ->
   ?binaries_path:string ->
   ?max_run_duration:int ->
   ?machine_type:string ->

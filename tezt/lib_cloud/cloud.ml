@@ -134,7 +134,7 @@ let shutdown ?exn t =
 
 (* This function is used to ensure we can connect to the docker image on the VM. *)
 let wait_ssh_server_running agent =
-  if (Agent.configuration agent).os = "debian" then Lwt.return_unit
+  if (Agent.configuration agent).os = Debian then Lwt.return_unit
   else
     match Agent.runner agent with
     | None -> Lwt.return_unit

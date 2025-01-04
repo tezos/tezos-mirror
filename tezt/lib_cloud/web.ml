@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Types
+
 type service = {name : string; url : string}
 
 type t = {
@@ -68,7 +70,7 @@ let agent_jingo_template agent =
              ~some:(fun time -> string_of_int time ^ "s")
              max_run_duration) );
       ("binaries_path", Tstr binaries_path);
-      ("os", Tstr os);
+      ("os", Tstr (Os.to_string os));
       ("vm_command", Tstr (string_vm_command agent));
       ("docker_command", Tstr (string_docker_command agent));
     ]

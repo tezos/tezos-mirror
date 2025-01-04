@@ -87,9 +87,6 @@ val max_run_duration : int
 (** Equivalent to [Cli.no_max_run_duration]. *)
 val no_max_run_duration : bool
 
-(** Equivalent to [Cli.os]. *)
-val os : string
-
 (** Equivalent to [Cli.open_telemetry]. *)
 val open_telemetry : bool
 
