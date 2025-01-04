@@ -147,6 +147,13 @@ module Params = struct
       ~desc:"Snapshot archive file"
       string
       next
+
+  let snapshot_file_or_url next =
+    Tezos_clic.param
+      ~name:"snapshot"
+      ~desc:"Snapshot archive file or URL"
+      string
+      next
 end
 
 let wallet_dir_arg =
@@ -2283,9 +2290,32 @@ let import_snapshot_command =
           ~doc:
             "Allow importing snapshot in already populated data dir (previous \
              contents is removed first, even if the snapshot is corrupted)"))
-    (prefixes ["snapshot"; "import"] @@ Params.snapshot_file @@ stop)
+    (prefixes ["snapshot"; "import"] @@ Params.snapshot_file_or_url @@ stop)
     (fun (data_dir, force) snapshot_file () ->
+      let open Lwt_result_syntax in
+      let with_snapshot k =
+        if
+          String.starts_with ~prefix:"http://" snapshot_file
+          || String.starts_with ~prefix:"https://" snapshot_file
+        then
+          Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".download_"
+          @@ fun working_dir ->
+          let* snapshot_file =
+            Evm_node_lib_dev.Misc.download_file
+              ~keep_alive:false
+              ~working_dir
+              snapshot_file
+          in
+          k snapshot_file
+        else k snapshot_file
+      in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config = make_with_defaults ~verbosity:Notice () in
+        init ~config ()
+      in
       Evm_node_lib_dev.Data_dir.use ~data_dir @@ fun () ->
+      with_snapshot @@ fun snapshot_file ->
       Evm_node_lib_dev.Snapshots.import
         ~cancellable:true
         ~force
