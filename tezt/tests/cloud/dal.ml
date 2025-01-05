@@ -376,6 +376,7 @@ type etherlink_configuration = {
 }
 
 type configuration = {
+  with_dal : bool;
   stake : int list;
   stake_machine_type : string list option;
   dal_node_producers : int list; (* slot indices *)
@@ -403,13 +404,13 @@ type bootstrap = {
   dal_node : Dal_node.t option;
   node_p2p_endpoint : string;
   node_rpc_endpoint : Endpoint.t;
-  dal_node_p2p_endpoint : string;
+  dal_node_p2p_endpoint : string option;
   client : Client.t;
 }
 
 type baker = {
   node : Node.t;
-  dal_node : Dal_node.t;
+  dal_node : Dal_node.t option;
   baker : Baker.t;
   account : Account.key;
   stake : int;
@@ -1102,7 +1103,9 @@ let init_public_network cloud (configuration : configuration)
         let node = None in
         let dal_node = None in
         let node_p2p_endpoint = Network.default_bootstrap network in
-        let dal_node_p2p_endpoint = Network.default_dal_bootstrap network in
+        let dal_node_p2p_endpoint =
+          Some (Network.default_dal_bootstrap network)
+        in
         let node_rpc_endpoint = Network.public_rpc_endpoint network in
         let () = toplog "Creating the client" in
         let client =
@@ -1130,31 +1133,37 @@ let init_public_network cloud (configuration : configuration)
             agent
         in
         let* dal_node =
-          Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node
+          if not configuration.with_dal then Lwt.return_none
+          else
+            let* dal_node =
+              Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node
+            in
+
+            let* () =
+              Dal_node.init_config
+                ~expected_pow:26.
+                ~bootstrap_profile:true
+                dal_node
+            in
+            let* () =
+              may_copy_dal_node_identity_file
+                agent
+                dal_node
+                configuration.bootstrap_dal_node_identity_file
+            in
+            let* () = Node.wait_for_ready node in
+            let otel = Cloud.open_telemetry_endpoint cloud in
+            let* () =
+              Dal_node.Agent.run
+                ?otel
+                ~memtrace:configuration.memtrace
+                ~event_level:`Notice
+                dal_node
+            in
+            Lwt.return_some dal_node
         in
         let* () =
-          Dal_node.init_config
-            ~expected_pow:26.
-            ~bootstrap_profile:true
-            dal_node
-        in
-        let* () =
-          may_copy_dal_node_identity_file
-            agent
-            dal_node
-            configuration.bootstrap_dal_node_identity_file
-        in
-        let* () = Node.wait_for_ready node in
-        let* () =
-          add_prometheus_source cloud agent "bootstrap" ~dal_node ~node
-        in
-        let otel = Cloud.open_telemetry_endpoint cloud in
-        let* () =
-          Dal_node.Agent.run
-            ?otel
-            ~memtrace:configuration.memtrace
-            ~event_level:`Notice
-            dal_node
+          add_prometheus_source cloud agent "bootstrap" ?dal_node ~node
         in
         let client = Client.create ~endpoint:(Node node) () in
         let node_rpc_endpoint =
@@ -1171,10 +1180,10 @@ let init_public_network cloud (configuration : configuration)
         let bootstrap =
           {
             node = Some node;
-            dal_node = Some dal_node;
+            dal_node;
             node_p2p_endpoint = Node.point_str node;
             node_rpc_endpoint;
-            dal_node_p2p_endpoint = Dal_node.point_str dal_node;
+            dal_node_p2p_endpoint = Option.map Dal_node.point_str dal_node;
             client;
           }
         in
@@ -1301,15 +1310,27 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       configuration.network
       agent
   in
-  let* dal_bootstrap_node =
-    Dal_node.Agent.create
-      ~net_port:dal_bootstrap_node_net_port
-      ~name:"bootstrap-dal-node"
-      agent
-      ~node:bootstrap_node
-  in
   let* () = Node.wait_for_ready bootstrap_node in
   let* () = init_explorus cloud bootstrap_node in
+  let* dal_bootstrap_node =
+    if configuration.with_dal then
+      let* dal_node =
+        Dal_node.Agent.create
+          ~net_port:dal_bootstrap_node_net_port
+          ~name:"bootstrap-dal-node"
+          agent
+          ~node:bootstrap_node
+      in
+      Lwt.return_some dal_node
+    else Lwt.return_none
+  in
+  let* () =
+    Cloud.add_service
+      cloud
+      ~name:"Explorus"
+      ~url:
+        (sf "http://explorus.io?network=%s" (Node.rpc_endpoint bootstrap_node))
+  in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
   let* baker_accounts =
     Client.stresstest_gen_keys
@@ -1360,33 +1381,37 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       client
   in
   let* () =
-    Dal_node.init_config
-      ~expected_pow:0.
-      ~bootstrap_profile:true
-      dal_bootstrap_node
-  in
-  let otel = Cloud.open_telemetry_endpoint cloud in
-  let* () =
-    may_copy_dal_node_identity_file
-      agent
-      dal_bootstrap_node
-      configuration.bootstrap_dal_node_identity_file
-  in
-  let* () =
-    Dal_node.Agent.run
-      ?otel
-      ~memtrace:configuration.memtrace
-      ~event_level:`Notice
-      dal_bootstrap_node
+    match dal_bootstrap_node with
+    | None -> Lwt.return_unit
+    | Some dal_bootstrap_node ->
+        let* () =
+          Dal_node.init_config
+            ~expected_pow:0.
+            ~bootstrap_profile:true
+            dal_bootstrap_node
+        in
+        let otel = Cloud.open_telemetry_endpoint cloud in
+        let* () =
+          may_copy_dal_node_identity_file
+            agent
+            dal_bootstrap_node
+            configuration.bootstrap_dal_node_identity_file
+        in
+        Dal_node.Agent.run
+          ?otel
+          ~memtrace:configuration.memtrace
+          ~event_level:`Notice
+          dal_bootstrap_node
   in
   let* () =
     add_prometheus_source
       ~node:bootstrap_node
-      ~dal_node:dal_bootstrap_node
+      ?dal_node:dal_bootstrap_node
       cloud
       agent
       "bootstrap"
   in
+
   let node_rpc_endpoint =
     Endpoint.
       {
@@ -1401,10 +1426,10 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   let (bootstrap : bootstrap) =
     {
       node = Some bootstrap_node;
-      dal_node = Some dal_bootstrap_node;
+      dal_node = dal_bootstrap_node;
       node_p2p_endpoint = Node.point_str bootstrap_node;
       node_rpc_endpoint;
-      dal_node_p2p_endpoint = Dal_node.point_str dal_bootstrap_node;
+      dal_node_p2p_endpoint = Option.map Dal_node.point_str dal_bootstrap_node;
       client;
     }
   in
@@ -1427,28 +1452,31 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
       agent
   in
   let* dal_node =
-    let* dal_node =
-      Dal_node.Agent.create
-        ~name:(Format.asprintf "baker-dal-node-%d" i)
-        ~node
-        agent
-    in
-    let* () =
-      Dal_node.init_config
-        ~expected_pow:(Network.expected_pow configuration.network)
-        ~attester_profiles:[account.Account.public_key_hash]
-        ~peers:[bootstrap.dal_node_p2p_endpoint] (* no need for peer *)
-        dal_node
-    in
-    let otel = Cloud.open_telemetry_endpoint cloud in
-    let* () =
-      Dal_node.Agent.run
-        ?otel
-        ~memtrace:configuration.memtrace
-        ~event_level:`Notice
-        dal_node
-    in
-    Lwt.return dal_node
+    if not configuration.with_dal then Lwt.return_none
+    else
+      let* dal_node =
+        Dal_node.Agent.create
+          ~name:(Format.asprintf "baker-dal-node-%d" i)
+          ~node
+          agent
+      in
+      let* () =
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow configuration.network)
+          ~attester_profiles:[account.Account.public_key_hash]
+          ~peers:[bootstrap.dal_node_p2p_endpoint |> Option.get]
+          (* Invariant: Option.get don't fail because t.configuration.dal is true *)
+          dal_node
+      in
+      let otel = Cloud.open_telemetry_endpoint cloud in
+      let* () =
+        Dal_node.Agent.run
+          ?otel
+          ~memtrace:configuration.memtrace
+          ~event_level:`Notice
+          dal_node
+      in
+      Lwt.return_some dal_node
   in
   let* () =
     match teztale with
@@ -1479,14 +1507,14 @@ let init_baker cloud (configuration : configuration) ~bootstrap teztale account
       ~delegates:[account.Account.alias]
       ~protocol:configuration.protocol
       ~client
-      ~dal_node
+      ?dal_node
       node
       agent
   in
   let* () =
     add_prometheus_source
       ~node
-      ~dal_node
+      ?dal_node
       cloud
       agent
       (Format.asprintf "baker-%d" i)
@@ -1535,7 +1563,10 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
     Dal_node.init_config
       ~expected_pow:(Network.expected_pow configuration.network)
       ~observer_profiles:[slot_index]
-      ~peers:[bootstrap.dal_node_p2p_endpoint]
+      ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
+      (* If `--no-dal` is given with `--producers 2`, then DAL nodes
+         are run for the producers. While this is weird in sandboxed
+         mode, it can make sense on ghostnet for example. *)
       dal_node
   in
   let () = toplog "Init producer: add DAL node metrics" in
@@ -1605,13 +1636,13 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow configuration.network)
           ~observer_profiles:[slot_index]
-          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           dal_node
     | `Pkh pkh ->
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow configuration.network)
           ~attester_profiles:[pkh]
-          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           dal_node
   in
   let* () =
@@ -1668,7 +1699,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
           ~producer_profiles:dal_slots
-          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           dal_node
       in
       let* () = Dal_node.Agent.run ?otel dal_node in
@@ -1701,7 +1732,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
-          ~peers:[bootstrap.dal_node_p2p_endpoint]
+          ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           default_dal_node
       in
       let* () = Dal_node.Agent.run ?otel ~memtrace default_dal_node in
@@ -1726,7 +1757,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
                  Dal_node.init_config
                    ~expected_pow:(Network.expected_pow network)
                    ~observer_profiles:[slot_index]
-                   ~peers:[bootstrap.dal_node_p2p_endpoint]
+                   ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
                    dal_node
                in
                let* () = Dal_node.Agent.run ?otel ~memtrace dal_node in
@@ -2318,27 +2349,27 @@ let on_new_level t ?etherlink level =
   Hashtbl.replace t.metrics level metrics ;
   let* t =
     match t.disconnection_state with
-    | None -> Lwt.return t
-    | Some disconnection_state ->
+    | Some disconnection_state when t.configuration.with_dal ->
         let nb_bakers = List.length t.bakers in
         let* disconnection_state =
           Disconnect.disconnect disconnection_state level (fun b ->
-              let baker_to_disconnect =
-                (List.nth t.bakers (b mod nb_bakers)).dal_node
-              in
-              Dal_node.terminate baker_to_disconnect)
+              let baker_to_disconnect = List.nth t.bakers (b mod nb_bakers) in
+              (* Invariant: Option.get don't fail because t.configuration.dal is true *)
+              let dal_node = baker_to_disconnect.dal_node |> Option.get in
+              Dal_node.terminate dal_node)
         in
         let* disconnection_state =
           Disconnect.reconnect disconnection_state level (fun b ->
-              let baker_to_reconnect =
-                (List.nth t.bakers (b mod nb_bakers)).dal_node
-              in
+              let baker_to_reconnect = List.nth t.bakers (b mod nb_bakers) in
+              (* Invariant: Option.get don't fail because t.configuration.dal is true *)
+              let dal_node = baker_to_reconnect.dal_node |> Option.get in
               Dal_node.Agent.run
                 ?otel:t.otel
                 ~memtrace:t.configuration.memtrace
-                baker_to_reconnect)
+                dal_node)
         in
         Lwt.return {t with disconnection_state = Some disconnection_state}
+    | _ -> Lwt.return t
   in
   toplog "Level processed" ;
   Lwt.return t
@@ -2503,8 +2534,10 @@ let configuration, etherlink_configuration =
   let metrics_retention = Cli.metrics_retention in
   let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
   let bootstrap_dal_node_identity_file = Cli.bootstrap_dal_node_identity_file in
+  let with_dal = Cli.with_dal in
   let t =
     {
+      with_dal;
       stake;
       stake_machine_type;
       dal_node_producers;
@@ -2617,6 +2650,15 @@ let benchmark () =
     ~alerts:Alert.alerts
     (fun cloud ->
       toplog "Creating the agents" ;
+      if
+        (not configuration.with_dal)
+        && List.length configuration.dal_node_producers > 0
+        && configuration.network = `Sandbox
+      then
+        Log.warn
+          "You are running in sandboxed mode with some DAL producers but with \
+           DAL deactivated for bakers. DAL network can't work properly. This \
+           is probably a configuration issue." ;
       let agents = Cloud.agents cloud in
       (* We give to the [init] function a sequence of agents (and cycle if
          they were all consumed). We set their name only if the number of

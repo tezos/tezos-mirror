@@ -22,7 +22,7 @@ end
 let section =
   Clap.section
     ~description:
-      "All the options related to running DAL scenarions onto the cloud"
+      "All the options related to running DAL scenarios onto the cloud"
     "Cloud DAL"
 
 let blocks_history =
@@ -295,6 +295,17 @@ let node_external_rpc_server =
     ~set_long:"node-external-rpc-server"
     ~unset_long:"no-node-external-rpc-server"
     ~description:"Use the external RPC server on the L1 nodes"
+    true
+
+let with_dal =
+  Clap.flag
+    ~section
+    ~set_long:"dal"
+    ~unset_long:"no-dal"
+    ~description:
+      "No bootstrap DAL node is run and bakers do not run a DAL node (default \
+       is 'false'). DAL nodes can be activated via other options such as \
+       [--producers]."
     true
 
 module Alerts = struct
