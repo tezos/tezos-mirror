@@ -12,7 +12,8 @@ Tezos :doc:`governance <voting>`.
 
 If one does not have enough stake to participate on its own or does not want to
 set up the needed infrastructure, (s)he can use :ref:`delegation
-<delegating_coins>`. Therefore, in Tezos, it is the :ref:`delegates<def_delegate_alpha>`
+<delegating_coins>`, possibly complemented with :ref:`staking
+<staking_coins>`. Indeed, in Tezos, it is the :ref:`delegates<def_delegate_alpha>`
 that may participate in consensus.
 However, at each level, not all delegates necessarily participate, and their participation weight may differ.
 The selection of the delegates' participation rights at a level is done by running a

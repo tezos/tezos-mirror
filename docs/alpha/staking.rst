@@ -60,6 +60,8 @@ This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
 4 cycles (cf. :ref:`Staked funds management <staked_funds_management_alpha>`).
 
+.. _pseudo_operations_alpha:
+
 A user interface is provided for delegates and stakers to interact
 with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.

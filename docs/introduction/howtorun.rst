@@ -73,6 +73,7 @@ When a delegator spends their tokens, the delegated balance of their delegate de
 Since the activation of the :ref:`new staking mechanism <new_staking>`,
 50% of your total funds count towards your delegator's baking power (before the staking mechanism, 100% of your total funds counted towards your delegator baking power). The delegated funds still count for 100% for the voting power, just like before the activation of the new staking mechanism.
 
+.. _staking_coins:
 
 Staking your coins
 ------------------
