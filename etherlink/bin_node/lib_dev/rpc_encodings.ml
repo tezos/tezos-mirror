@@ -135,9 +135,9 @@ module Subscription = struct
            (req "result" Data_encoding.json)
            (req "subscription" Ethereum_types.Subscription.id_encoding)))
 
-  type response = {params : result}
+  type notification = {params : result}
 
-  let response_encoding =
+  let notification_encoding =
     Data_encoding.(
       conv
         (fun {params} -> ((), (), params))
@@ -1058,7 +1058,7 @@ let map_method_name ~restrict method_name =
 
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;
-  stream : Subscription.response Lwt_stream.t;
+  stream : Subscription.notification Lwt_stream.t;
   stopper : unit -> unit;
 }
 

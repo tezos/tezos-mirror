@@ -294,7 +294,7 @@ let make_jsonrpc_websocket_route path
         (function
           | Ok output ->
               let output =
-                encode output_media Subscription.response_encoding output
+                encode output_media Subscription.notification_encoding output
               in
               (* WARNING: https://gitlab.com/tezos/tezos/-/issues/7645
                  Dream.send can 100% cpu on closed connections (see
