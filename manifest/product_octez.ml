@@ -1494,6 +1494,7 @@ let octez_stdlib_unix =
         data_encoding |> open_;
         aches_lwt;
         lwt_unix;
+        lwt_exit;
         ipaddr_unix;
         re;
         ezjsonm;

@@ -325,11 +325,50 @@ module Json = struct
             return (Ezjsonm.from_string str :> Data_encoding.json)))
 end
 
+(* This module is used by [safe_cancel_on_exit] to register and unregister
+   callbacks. Following the recommendation of [Lwt_exit] library, we prefer
+   this approach over unregistering a [Lwt_exit] callback.
+
+   See https://ocaml.org/p/lwt-exit/1.0/doc/Lwt_exit/index.html#registering,-unregistering,-and-loops. *)
+module Callbacks : sig
+  val next : unit -> (unit Lwt.t -> unit) * (unit -> unit)
+end = struct
+  include Map.Make (Int)
+
+  let callbacks = ref empty
+
+  let _ =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        iter_p (fun _ callback -> callback) !callbacks)
+
+  let register id was_finalized = callbacks := add id was_finalized !callbacks
+
+  let unregister id () = callbacks := remove id !callbacks
+
+  let counter = ref 0
+
+  let next () =
+    let res = !counter in
+    incr counter ;
+    (register res, unregister res)
+end
+
+let safe_cancel_on_exit f =
+  let open Lwt_syntax in
+  let register, unregister = Callbacks.next () in
+  let was_finalized, wf_waker = Lwt.task () in
+  register was_finalized ;
+  Lwt.finalize f (fun () ->
+      Lwt.wakeup wf_waker () ;
+      unregister () ;
+      return_unit)
+
 let with_tempdir ?temp_dir name f =
   let open Lwt_syntax in
   let base_dir = Filename.temp_file ?temp_dir name "" in
   let* () = Lwt_unix.unlink base_dir in
   let* () = Lwt_unix.mkdir base_dir 0o700 in
+  safe_cancel_on_exit @@ fun () ->
   Lwt.finalize (fun () -> f base_dir) (fun () -> remove_dir base_dir)
 
 let rec retry ?(log = fun _ -> Lwt.return_unit) ?(n = 5) ?(sleep = 1.) f =

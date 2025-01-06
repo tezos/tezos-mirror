@@ -14,6 +14,7 @@
   octez-libs.data-encoding
   aches-lwt
   lwt.unix
+  lwt-exit
   ipaddr.unix
   re
   ezjsonm
