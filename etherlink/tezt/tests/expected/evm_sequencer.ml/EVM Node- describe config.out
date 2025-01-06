@@ -163,7 +163,11 @@
       "rpc_server"?: "dream" | "resto",
       "enable_websocket"?:
         boolean
-        /* Enable or disable the experimental websocket server */ },
+        /* Enable or disable the experimental websocket server */,
+      "max_websocket_message_length"?:
+        integer ∈ [-2^30, 2^30]
+        /* Maximum message size accepted by the websocket server (only for
+           Resto backend) */ },
   "proxy"?:
     { "finalized_view"?:
         boolean
