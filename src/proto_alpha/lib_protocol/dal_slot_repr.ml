@@ -997,8 +997,28 @@ module History = struct
                   [page_data] is actually the [page_id.page_index]th page of
                   the slot stored in [target_cell] and identified by
                   [page_id.slot_id]. *)
+          attestation_threshold_percent : int option;
+              (** In case of Adjustable DAL, [attestation_threshold_percent] is set
+                  to some attestation threshold defined by the rollup kernel. For
+                  regular DAL, it's set to None. *)
+          commitment_publisher : Contract_repr.t;
+              (** In case of confirmation proof, we also remember the
+                  commitment publisher. It will be needed in case of Adjustable DAL
+                  to check that the publisher is whitelised, if needed. *)
         }  (** The case where the slot's page is confirmed/attested on L1. *)
-      | Page_unconfirmed of {target_cell : history; inc_proof : inclusion_proof}
+      | Page_unconfirmed of {
+          target_cell : history;
+          inc_proof : inclusion_proof;
+          attestation_threshold_percent : int option;
+              (** In case of Adjustable DAL, [attestation_threshold_percent] is set
+                  to some attestation threshold defined by the rollup kernel. For
+                  regular DAL, it's set to None. *)
+          commitment_publisher_opt : Contract_repr.t option;
+              (** In case of an unconfirmation proof, we remember the commitment
+                  publisher if the slot is published. It will be needed in case of
+                  Adjustable DAL to check that the publisher is whitelisted, if
+                  needed. *)
+        }
           (** The case where the slot's page doesn't exist or is not confirmed
               on L1. The fields are similar to {!Page_confirmed} case except
               that we don't have a page data or proof to check.
@@ -1015,32 +1035,86 @@ module History = struct
         case
           ~title:"confirmed dal page proof representation"
           (Tag 0)
-          (obj5
+          (obj7
              (req "kind" (constant "confirmed"))
              (req "target_cell" history_encoding)
              (req "inc_proof" (list history_encoding))
              (req "page_data" (bytes Hex))
-             (req "page_proof" Page.proof_encoding))
+             (req "page_proof" Page.proof_encoding)
+             (opt "attestation_threshold_percent" uint8)
+             (req "commitment_publisher" Contract_repr.encoding))
           (function
-            | Page_confirmed {target_cell; inc_proof; page_data; page_proof} ->
-                Some ((), target_cell, inc_proof, page_data, page_proof)
+            | Page_confirmed
+                {
+                  target_cell;
+                  inc_proof;
+                  page_data;
+                  page_proof;
+                  attestation_threshold_percent;
+                  commitment_publisher;
+                } ->
+                Some
+                  ( (),
+                    target_cell,
+                    inc_proof,
+                    page_data,
+                    page_proof,
+                    attestation_threshold_percent,
+                    commitment_publisher )
             | _ -> None)
-          (fun ((), target_cell, inc_proof, page_data, page_proof) ->
-            Page_confirmed {target_cell; inc_proof; page_data; page_proof})
+          (fun ( (),
+                 target_cell,
+                 inc_proof,
+                 page_data,
+                 page_proof,
+                 attestation_threshold_percent,
+                 commitment_publisher ) ->
+            Page_confirmed
+              {
+                target_cell;
+                inc_proof;
+                page_data;
+                page_proof;
+                attestation_threshold_percent;
+                commitment_publisher;
+              })
       and case_page_unconfirmed =
         case
           ~title:"unconfirmed dal page proof representation"
           (Tag 1)
-          (obj3
+          (obj5
              (req "kind" (constant "unconfirmed"))
              (req "target_cell" history_encoding)
-             (req "inc_proof" (list history_encoding)))
+             (req "inc_proof" (list history_encoding))
+             (opt "attestation_threshold_percent" uint8)
+             (opt "commitment_publisher" Contract_repr.encoding))
           (function
-            | Page_unconfirmed {target_cell; inc_proof} ->
-                Some ((), target_cell, inc_proof)
+            | Page_unconfirmed
+                {
+                  target_cell;
+                  inc_proof;
+                  attestation_threshold_percent;
+                  commitment_publisher_opt;
+                } ->
+                Some
+                  ( (),
+                    target_cell,
+                    inc_proof,
+                    attestation_threshold_percent,
+                    commitment_publisher_opt )
             | _ -> None)
-          (fun ((), target_cell, inc_proof) ->
-            Page_unconfirmed {target_cell; inc_proof})
+          (fun ( (),
+                 target_cell,
+                 inc_proof,
+                 attestation_threshold_percent,
+                 commitment_publisher_opt ) ->
+            Page_unconfirmed
+              {
+                target_cell;
+                inc_proof;
+                attestation_threshold_percent;
+                commitment_publisher_opt;
+              })
       in
 
       union [case_page_confirmed; case_page_unconfirmed]
@@ -1101,11 +1175,20 @@ module History = struct
         | Error msg -> Error_monad.pp_trace fmt msg
         | Ok proof -> (
             match proof with
-            | Page_confirmed {target_cell; inc_proof; page_data; page_proof} ->
+            | Page_confirmed
+                {
+                  target_cell;
+                  inc_proof;
+                  page_data;
+                  page_proof;
+                  attestation_threshold_percent;
+                  commitment_publisher;
+                } ->
                 Format.fprintf
                   fmt
                   "Page_confirmed (target_cell=%a, data=%s,@ \
-                   inc_proof:[size=%d |@ path=%a]@ page_proof:%a)"
+                   inc_proof:[size=%d |@ path=%a]@ page_proof:%a@ \
+                   attestation_threshold_percent:%a@ commitment_publisher:%a)"
                   pp_history
                   target_cell
                   (Bytes.to_string page_data)
@@ -1114,16 +1197,31 @@ module History = struct
                   inc_proof
                   Page.pp_proof
                   page_proof
-            | Page_unconfirmed {target_cell; inc_proof} ->
+                  (Format.pp_print_option Format.pp_print_int)
+                  attestation_threshold_percent
+                  Contract_repr.pp_short
+                  commitment_publisher
+            | Page_unconfirmed
+                {
+                  target_cell;
+                  inc_proof;
+                  attestation_threshold_percent;
+                  commitment_publisher_opt;
+                } ->
                 Format.fprintf
                   fmt
                   "Page_unconfirmed (target_cell = %a | inc_proof:[size=%d@ | \
-                   path=%a])"
+                   path=%a]@ attestation_threshold_percent:%a@ \
+                   commitment_publisher:%a)"
                   pp_history
                   target_cell
                   (List.length inc_proof)
                   pp_inclusion_proof
-                  inc_proof)
+                  inc_proof
+                  (Format.pp_print_option Format.pp_print_int)
+                  attestation_threshold_percent
+                  (Format.pp_print_option Contract_repr.pp_short)
+                  commitment_publisher_opt)
 
     type error +=
       | Dal_page_proof_error of string
@@ -1284,7 +1382,8 @@ module History = struct
                  ~restricted_commitments_publishers
           in
           match (page_info, is_commitment_attested) with
-          | Some (page_data, page_proof), Some commitment ->
+          | ( Some (page_data, page_proof),
+              Either.Right (commitment, commitment_publisher) ) ->
               (* The case where the slot to which the page is supposed to belong
                  is found and the page's information are given. *)
               let*? () =
@@ -1298,22 +1397,38 @@ module History = struct
               in
               (* All checks succeeded. We return a `Page_confirmed` proof. *)
               return
-                ( Page_confirmed {target_cell; inc_proof; page_data; page_proof},
+                ( Page_confirmed
+                    {
+                      target_cell;
+                      inc_proof;
+                      page_data;
+                      page_proof;
+                      attestation_threshold_percent;
+                      commitment_publisher;
+                    },
                   Some page_data )
-          | None, None ->
+          | None, Either.Left commitment_publisher_opt ->
               (* The slot corresponding to the given page's index is not found in
                  the attested slots of the page's level, and no information is
                  given for that page. So, we produce a proof that the page is not
                  attested. *)
-              return (Page_unconfirmed {target_cell; inc_proof}, None)
-          | None, Some _ ->
+              return
+                ( Page_unconfirmed
+                    {
+                      target_cell;
+                      inc_proof;
+                      attestation_threshold_percent;
+                      commitment_publisher_opt;
+                    },
+                  None )
+          | None, Either.Right _ ->
               (* Mismatch: case where no page information are given, but the
                  slot is attested. *)
               tzfail
               @@ dal_proof_error
                    "The page ID's slot is confirmed, but no page content and \
                     proof are provided."
-          | Some _, None ->
+          | Some _, Either.Left _ ->
               (* Mismatch: case where page information are given, but the slot
                  is not attested. *)
               tzfail
@@ -1368,7 +1483,16 @@ module History = struct
       in
       let* target_cell, inc_proof, page_proof_check =
         match proof with
-        | Page_confirmed {target_cell; inc_proof; page_data; page_proof} ->
+        | Page_confirmed
+            {
+              target_cell;
+              inc_proof;
+              page_data;
+              page_proof;
+              attestation_threshold_percent = _;
+              commitment_publisher = _;
+            (* TODO: Will be handled in the next MR *)
+            } ->
             let page_proof_check =
               Some
                 (fun commitment ->
@@ -1387,7 +1511,14 @@ module History = struct
                   return page_data)
             in
             return (target_cell, inc_proof, page_proof_check)
-        | Page_unconfirmed {target_cell; inc_proof} ->
+        | Page_unconfirmed
+            {
+              target_cell;
+              inc_proof;
+              attestation_threshold_percent = _;
+              commitment_publisher_opt = _;
+            (* TODO: Will be handled in the next MR *)
+            } ->
             return (target_cell, inc_proof, None)
       in
       let cell_content = Skip_list.content target_cell in
