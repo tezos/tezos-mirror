@@ -87,6 +87,9 @@ init_rollup_node() {
 
 init_evm_node() {
   trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node, .tezos-evm-node}"' ERR
+  if [ "$TRACK_SMART_ROLLUP_NODE" = "false" ]; then
+    EVM_NODE_CONFIG_ARGS+=("--dont-track-rollup-node")
+  fi
   echo "creating evm node config"
   # here we do "eval" + ${EVM_NODE_CONFIG_ARGS[*]} else the command
   # fails (or shellcheck is unhappy).
@@ -106,22 +109,25 @@ init_evm_node() {
 
 init() {
   docker_update_images
-  init_octez_node
-  docker_compose up octez-node -d
-  echo "waiting for the octez-node to be bootstrapped"
-  # The while loop allows to ignore the possible first iteration where
-  # the endpoint is not up yet (while the container starts).
-  while ! run_in_docker_compose curl-runner --max-time 1200 http://octez-node:8732/monitor/bootstrapped; do
-    sleep 5.
-  done
-  init_rollup_node
-  OCTEZ_NODE_ENDPOINT="${ARCHIVE_OCTEZ_NODE_ENDPOINT}" docker_compose up rollup-node -d
-  echo "waiting for the rollup-node to be bootstrapped"
-  # The while loop allows to ignore the possible first iteration where
-  # the endpoint is not up yet (while the container starts).
-  while ! run_in_docker_compose curl-runner --max-time 1200 http://rollup-node:8932/local/synchronized; do
-    sleep 5.
-  done
+  if [ "$TRACK_SMART_ROLLUP_NODE" = "true" ]; then
+    init_octez_node
+    docker_compose up octez-node -d
+    echo "waiting for the octez-node to be bootstrapped"
+    # The while loop allows to ignore the possible first iteration where
+    # the endpoint is not up yet (while the container starts).
+    while ! run_in_docker_compose curl-runner --max-time 1200 http://octez-node:8732/monitor/bootstrapped; do
+      sleep 5.
+    done
+    init_rollup_node
+    OCTEZ_NODE_ENDPOINT="${ARCHIVE_OCTEZ_NODE_ENDPOINT}" docker_compose up rollup-node -d
+    echo "waiting for the rollup-node to be bootstrapped"
+    # The while loop allows to ignore the possible first iteration where
+    # the endpoint is not up yet (while the container starts).
+    while ! run_in_docker_compose curl-runner --max-time 1200 http://rollup-node:8932/local/synchronized; do
+      sleep 5.
+    done
+  fi
+
   init_evm_node
   docker_compose stop
 }
@@ -147,7 +153,11 @@ init)
   init
   ;;
 run)
-  docker_compose up -d
+  if [ "$TRACK_SMART_ROLLUP_NODE" = "true" ]; then
+    docker_compose up -d
+  else
+    docker_compose up evm-node -d
+  fi
   ;;
 restart)
   docker_compose restart
