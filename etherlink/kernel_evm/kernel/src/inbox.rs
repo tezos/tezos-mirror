@@ -16,6 +16,7 @@ use crate::parsing::{
     SequencerParsingContext, MAX_SIZE_PER_CHUNK,
 };
 
+use crate::fees::tx_execution_gas_limit;
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
@@ -23,16 +24,18 @@ use crate::storage::{
     read_last_info_per_level_timestamp, remove_chunked_transaction, remove_sequencer,
     store_l1_level, store_last_info_per_level_timestamp, store_transaction_chunk,
 };
-use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
+use crate::tick_model::constants::{BASE_GAS, TICKS_FOR_BLUEPRINT_INTERCEPT};
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
-use evm_execution::fa_bridge::deposit::FaDeposit;
+use evm_execution::fa_bridge::{deposit::FaDeposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
+use evm_execution::EthereumError;
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionType, TRANSACTION_HASH_SIZE,
@@ -136,6 +139,17 @@ impl Transaction {
             | TransactionContent::EthereumDelayed(_)
             | TransactionContent::FaDeposit(_) => true,
             TransactionContent::Ethereum(_) => false,
+        }
+    }
+
+    pub fn execution_gas_limit(&self, fees: &BlockFees) -> Result<u64, EthereumError> {
+        match &self.content {
+            TransactionContent::Deposit(_) => Ok(BASE_GAS),
+            TransactionContent::Ethereum(e) => tx_execution_gas_limit(e, fees, false),
+            TransactionContent::EthereumDelayed(e) => {
+                tx_execution_gas_limit(e, fees, true)
+            }
+            TransactionContent::FaDeposit(_) => Ok(FA_DEPOSIT_PROXY_GAS_LIMIT),
         }
     }
 }

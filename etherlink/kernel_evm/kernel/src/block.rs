@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::apply::{
-    apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
+    apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::block_storage;
 use crate::blueprint_storage::{drop_blueprint, read_next_blueprint};
@@ -15,6 +15,7 @@ use crate::configuration::Limits;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
+use crate::inbox::Transaction;
 use crate::storage;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
@@ -72,6 +73,25 @@ pub enum ComputationResult {
     Finished,
 }
 
+fn on_invalid_transaction<Host: Runtime>(
+    host: &mut Host,
+    transaction: &Transaction,
+    block_in_progress: &mut BlockInProgress,
+    data_size: u64,
+) {
+    if transaction.is_delayed() {
+        block_in_progress.register_delayed_transaction(transaction.tx_hash);
+    }
+
+    block_in_progress.account_for_invalid_transaction(data_size);
+    log!(
+        host,
+        Benchmarking,
+        "Estimated ticks after tx: {}",
+        block_in_progress.estimated_ticks_in_run
+    );
+}
+
 #[allow(clippy::too_many_arguments)]
 fn compute<Host: Runtime>(
     host: &mut Host,
@@ -123,8 +143,23 @@ fn compute<Host: Runtime>(
                     be allocated enough ticks even alone in a kernel run."
                 );
             }
+
             return Ok(BlockComputationResult::RebootNeeded);
         }
+
+        let execution_gas_limit =
+            transaction.execution_gas_limit(&block_constants.block_fees)?;
+        if execution_gas_limit > limits.maximum_gas_limit {
+            log!(
+                host,
+                Debug,
+                "Reason of invalidity: {:?}",
+                Validity::InvalidGasLimitTooHigh
+            );
+            log!(host, Benchmarking, "Transaction type: INVALID");
+            on_invalid_transaction(host, &transaction, block_in_progress, data_size);
+            continue;
+        };
 
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
@@ -139,7 +174,6 @@ fn compute<Host: Runtime>(
             allocated_ticks,
             retriable,
             sequencer_pool_address,
-            limits,
             tracer_input,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
@@ -180,17 +214,7 @@ fn compute<Host: Runtime>(
                 return Ok(BlockComputationResult::RebootNeeded);
             }
             ExecutionResult::Invalid => {
-                if transaction.is_delayed() {
-                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
-                }
-
-                block_in_progress.account_for_invalid_transaction(data_size);
-                log!(
-                    host,
-                    Benchmarking,
-                    "Estimated ticks after tx: {}",
-                    block_in_progress.estimated_ticks_in_run
-                );
+                on_invalid_transaction(host, &transaction, block_in_progress, data_size)
             }
         };
         is_first_transaction = false;
