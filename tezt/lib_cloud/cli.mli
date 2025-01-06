@@ -42,7 +42,7 @@ val ports_per_vm : int
 val proxy : bool
 
 (** OS used by the VM. *)
-val os : string
+val os : Types.Os.t
 
 (** Flag which indicates whether Grafana should be run or not. *)
 val grafana : bool

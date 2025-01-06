@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Types
+
 type t = {
   (* The name initially is the same as [vm_name] and can be changed dynamically by the scenario. *)
   mutable name : string;
@@ -50,7 +52,7 @@ let configuration_encoding =
        (req "machine_type" string)
        (req "binaries_path" string)
        (req "docker_image" docker_image_encoding)
-       (req "os" string))
+       (req "os" Os.encoding))
 
 let encoding =
   let open Data_encoding in

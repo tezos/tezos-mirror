@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Tezt
+open Types
 
 let color = Log.Color.FG.magenta
 
@@ -177,7 +178,7 @@ module VM = struct
           "--var";
           Format.asprintf "docker_image=%s" docker_image;
           "--var";
-          Format.asprintf "os=%s" os;
+          Format.asprintf "os=%s" (Os.to_string os);
           "--var";
           Format.asprintf "prometheus_port=%d" prometheus_port;
         ]

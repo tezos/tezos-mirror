@@ -38,7 +38,7 @@ module VM : sig
     ports_per_vm:int ->
     number_of_vms:int ->
     docker_image:string ->
-    os:string ->
+    os:Types.Os.t ->
     prometheus_port:int ->
     unit Lwt.t
 

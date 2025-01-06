@@ -76,7 +76,7 @@ module Remote = struct
     in
     let* zone = Env.zone () in
     let* () =
-      if configuration.os = "cos" then
+      if configuration.os = Cos then
         List.map (fun vm_name -> wait_docker_running ~vm_name ()) names
         |> Lwt.join
       else Lwt.return_unit

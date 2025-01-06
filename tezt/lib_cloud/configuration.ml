@@ -5,16 +5,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Types
+
 type t = {
   machine_type : string;
   docker_image : Env.docker_image;
   max_run_duration : int option;
   binaries_path : string;
-  os : string;
+  os : Os.t;
 }
 
 let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image () =
-  let os = Option.value ~default:Env.os os in
+  let os = Option.value ~default:Os.default os in
   let docker_image = Option.value ~default:Env.docker_image docker_image in
   let machine_type = Option.value ~default:Env.machine_type machine_type in
   let default_binaries_path =

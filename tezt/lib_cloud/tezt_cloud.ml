@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 module Agent = Agent
+module Types = Types
 
 module Alert = struct
   include Alert_manager

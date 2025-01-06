@@ -1,23 +1,23 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = private {
-  machine_type : string;
-  docker_image : Env.docker_image;
-  max_run_duration : int option;
-  binaries_path : string;
-  os : Types.Os.t;
-}
+module Os : sig
+  type t = Cos | Debian
 
-val make :
-  ?os:Types.Os.t ->
-  ?binaries_path:string ->
-  ?max_run_duration:int ->
-  ?machine_type:string ->
-  ?docker_image:Env.docker_image ->
-  unit ->
-  t
+  (** [default] is [Cos]. *)
+  val default : t
+
+  val of_string_exn : string -> t
+
+  val of_string_opt : string -> t option
+
+  val to_string : t -> string
+
+  val typ : t Clap.typ
+
+  val encoding : t Data_encoding.encoding
+end

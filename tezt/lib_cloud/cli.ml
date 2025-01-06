@@ -7,6 +7,7 @@
 
 open Tezt
 include Cli
+include Types
 
 let section =
   Clap.section
@@ -87,13 +88,14 @@ let proxy =
     false
 
 let os =
-  Clap.default_string
+  Clap.default
+    Os.typ
     ~section
     ~long:"os"
     ~description:
       "The OS to be used for the VM (default is cos). Other possible value is \
        'debian'."
-    "cos"
+    Os.Cos
 
 let grafana =
   Clap.flag
@@ -101,7 +103,7 @@ let grafana =
     ~set_long:"grafana"
     ~unset_long:"no-grafana"
     ~description:"Flag to set whether to run grafana"
-    (((not localhost) || proxy) && os = "cos")
+    (((not localhost) || proxy) && os = Os.Cos)
 
 let alert_handlers =
   Clap.list_string
@@ -203,7 +205,7 @@ let no_max_run_duration =
     ~description:"Ensure the VM can only be destroyed manually."
     (* If the proxy mode is active, we don't want to use [max_run_duration]
        since it aims to run long running tests. *)
-    (proxy || os <> "cos")
+    (proxy || os <> Os.Cos)
 
 let tezt_cloud =
   Clap.optional_string
