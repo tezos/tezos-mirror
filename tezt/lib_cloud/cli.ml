@@ -61,8 +61,8 @@ let project_id =
 let vms =
   Clap.optional_int
     ~section
-    ~long:"vms"
-    ~description:"Number of VMs running for the test."
+    ~long:"vms-limit"
+    ~description:"Maximum number of VMs running during the test."
     ()
 
 let vm_base_port =
