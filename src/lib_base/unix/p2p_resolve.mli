@@ -25,7 +25,7 @@
 
 type error += Failed_to_parse_address of (string * string)
 
-(** [resolve_addr_with_peer_id ~default_addr ~default_port ?passive
+(** [resolve_addr_with_peer_id ~default_addr ~default_port ?passive ?warn
     addr] parses [addr] to return the corresponding points.
 
     The format of [addr] can be either an IP address (v4 or v6) or a
@@ -35,13 +35,15 @@ type error += Failed_to_parse_address of (string * string)
     Moreover, a peer id can be provided by postfixing the addr with
     [#<peer_id>]. The peer id should be provided using the b58 format.
 
-    An event is emitted if the DNS lookup returned 0 points.
+    An event is emitted if the DNS lookup returned 0 points and [warn] is true.
+    If [warn] is false, no event is emitted. The default is true.
 
     The error [Failed_to_parse_address] is returned if the parsing failed.  *)
 val resolve_addr_with_peer_id :
   default_addr:string ->
   default_port:int ->
   ?passive:bool ->
+  ?warn:bool ->
   string ->
   (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t
 
@@ -54,5 +56,6 @@ val resolve_addr :
   default_addr:string ->
   default_port:int ->
   ?passive:bool ->
+  ?warn:bool ->
   string ->
   P2p_point.Id.t list tzresult Lwt.t
