@@ -888,7 +888,7 @@ module Coinbase = struct
 
   type output = Ethereum_types.address
 
-  let input_encoding = Data_encoding.null
+  let input_encoding = Data_encoding.unit
 
   let output_encoding = Ethereum_types.address_encoding
 

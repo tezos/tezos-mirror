@@ -51,6 +51,7 @@ you start using them, you probably want to use `octez-evm-node check config
   would exit with an error even if `keep_alive` was set to `true`. (!16094)
 - Fixes invalid pending nonce for fresh accounts with pending transactions
   in the transaction pool. (!16099)
+- Fixes invalid error on RPC `eth_coinbase` when `"params": []` was provided. (!16109)
 
 ### Internals
 
