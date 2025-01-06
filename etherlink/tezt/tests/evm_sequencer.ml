@@ -9028,6 +9028,49 @@ let test_websocket_cleanup =
     ~error_msg:"All subscriptions should have been cleaned up from node" ;
   unit
 
+let test_websocket_max_message_length () =
+  let max_websocket_message_length = 512 in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~rpc_server:Resto (* The limit is not implemented for Dream *)
+      ~enable_websocket:true
+      ~max_websocket_message_length
+      ()
+  in
+  register_sandbox
+    ~tags:["evm"; "rpc"; "websocket"; "max"]
+    ~title:"Websocket server does not accept messages larger than maximum"
+    ~patch_config
+  @@ fun sequencer ->
+  let* websocket = Evm_node.open_websocket sequencer in
+  let shutdown =
+    Lwt.pick
+      [
+        ( Evm_node.wait_for sequencer "websocket_shutdown.v0" @@ fun json ->
+          Some JSON.(json |-> "reason" |> as_string) );
+        (let* () = Lwt_unix.sleep 5. in
+         Test.fail ~__LOC__ "Websocket worker did not close.");
+      ]
+  in
+  let* () =
+    Websocket.send_raw
+      websocket
+      (String.make (max_websocket_message_length + 1) '\000')
+  in
+  let* reason = shutdown in
+  Log.info "Websocket shutdown reason: %S." reason ;
+  Check.(reason =~ rex "too big")
+    ~error_msg:"Expected reason to match %R, got %L" ;
+  Lwt.catch
+    (fun () ->
+      let* _ = Websocket.recv websocket in
+      Test.fail ~__LOC__ "Connection was not closed.")
+    (function
+      | Websocket.Connection_closed ->
+          Log.info "Connection was closed on client end." ;
+          unit
+      | e -> Lwt.reraise e)
+
 let test_websocket_newPendingTransactions_event =
   register_all
     ~tags:["evm"; "rpc"; "websocket"; "new_pending_transactions"]
@@ -9499,6 +9542,7 @@ let () =
     [Protocol.Alpha] ;
   test_websocket_newHeads_event [Protocol.Alpha] ;
   test_websocket_cleanup [Protocol.Alpha] ;
+  test_websocket_max_message_length () ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;

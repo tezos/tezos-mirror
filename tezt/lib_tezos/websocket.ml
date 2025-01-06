@@ -10,6 +10,8 @@ type t = {process : Process.t; stdin : Lwt_io.output_channel}
 
 exception Could_not_connect
 
+exception Connection_closed
+
 let get_unique_name =
   let name_counts = ref String_map.empty in
   fun name ->
@@ -35,7 +37,7 @@ let connect ?runner ?hooks ?name url =
   in
   return {process; stdin}
 
-let send_msg {stdin; _} msg =
+let send_raw {stdin; _} msg =
   let* () = Lwt_io.write stdin (msg ^ "\n") in
   unit
 
@@ -46,7 +48,7 @@ let read_json ~origin {process; _} =
   let rec loop () =
     let* line = Lwt_io.read_line_opt ch in
     match line with
-    | None -> failwith "No response on websocket"
+    | None -> raise Connection_closed
     | Some line -> (
         Buffer.add_string buff line ;
         match JSON.parse_opt ~origin (Buffer.contents buff) with
@@ -77,7 +79,7 @@ let send =
       (Process.name ws.process)
       !cpt
       msg ;
-    send_msg ws msg
+    send_raw ws msg
 
 let recv =
   let cpt = ref 0 in

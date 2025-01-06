@@ -1226,7 +1226,7 @@ let patch_config_with_experimental_feature
     ?(blueprints_publisher_order_enabled = false)
     ?(block_storage_sqlite3 = true) ?(next_wasm_runtime = true)
     ?garbage_collector_parameters ?history_mode ?rpc_server
-    ?(enable_websocket = false) () =
+    ?(enable_websocket = false) ?max_websocket_message_length () =
   let conditional_json_put ~name cond value_json json =
     if cond then
       JSON.put
@@ -1282,6 +1282,10 @@ let patch_config_with_experimental_feature
          | Resto -> `String "resto"
          | Dream -> `String "dream")
   |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
+  |> optional_json_put
+       max_websocket_message_length
+       ~name:"max_websocket_message_length"
+       (fun max -> `Float (float_of_int max))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     ?restricted_rpcs ?websockets rollup_node =
