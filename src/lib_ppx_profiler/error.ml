@@ -34,10 +34,13 @@ let error loc err =
     | Invalid_action action ->
         ( "Invalid action.",
           Format.asprintf
-            "@[<v 2>Accepted actions are aggregate, aggregate_s, aggregate_f, \
-             mark, record, record_f, record_s, reset_block_section, span, \
-             span_f, span_s, stamp and stop]@,\
-             Found: %s@."
+            "@[<v 2>Accepted actions are %a@,Found: %s@."
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+                (fun ppf constant ->
+                  Format.fprintf ppf "%s" (Constants.get_action constant)))
+            Constants.constants
             action )
     | Invalid_payload ->
         ( "Invalid or empty attribute payload.",
@@ -100,6 +103,7 @@ let error loc err =
              it. Possible options are:@,\
              - the verbosity@,\
              - the profiler_module@,\
+             - the metadata@,\
              Found: { @[<v 2>%a@] }@."
             Format.(
               pp_print_list
@@ -112,6 +116,7 @@ let error loc err =
             "@[<v 2>Expecting a field specifying either:@,\
              - the verbosity@,\
              - the profiler_module@,\
+             - the metadata@,\
              Found: @[<v 0>%a@]@."
             pp_field
             field )
