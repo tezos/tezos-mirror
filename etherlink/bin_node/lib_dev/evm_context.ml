@@ -1170,9 +1170,95 @@ module State = struct
     Callback.register "layer2_store__store_get_hash" store_get_hash ;
     Evm_context_events.replace_store_get_hash ()
 
+  let check_smart_rollup_address ~store_smart_rollup_address
+      ~smart_rollup_address =
+    let open Lwt_result_syntax in
+    match (store_smart_rollup_address, smart_rollup_address) with
+    | Some store_smart_rollup_address, Some smart_rollup_address ->
+        let* () =
+          fail_unless
+            (Tezos_crypto.Hashed.Smart_rollup_address.equal
+               smart_rollup_address
+               store_smart_rollup_address)
+            (Invalid_rollup_node
+               {
+                 smart_rollup_address = store_smart_rollup_address;
+                 rollup_node_smart_rollup_address = smart_rollup_address;
+               })
+        in
+        return smart_rollup_address
+    | None, Some smart_rollup_address -> return smart_rollup_address
+    | Some store_smart_rollup_address, None -> return store_smart_rollup_address
+    | None, None ->
+        (* Ok. This is dirty. In normal condition it does not make sense that
+           the sr1 is missing from the local storage and not provided by
+           the caller.
+
+           However, it can happen if the node is ran in sandbox mode
+           on a non existing context. Returning the zero address here is
+           so much convenient for a case that's really not supposed to happen,
+           ever. An error that would be detected relatively fast as well.
+        *)
+        return Tezos_crypto.Hashed.Smart_rollup_address.zero
+
+  let check_history_mode ~store_history_mode ~history_mode conn =
+    let open Lwt_result_syntax in
+    match store_history_mode with
+    | None -> return_unit
+    | Some store_history_mode -> (
+        match (store_history_mode, history_mode) with
+        | Configuration.Archive, Configuration.Archive | Rolling, Rolling ->
+            return_unit
+        | Archive, Rolling ->
+            let*! () =
+              Evm_context_events.switching_history_mode
+                ~from:Archive
+                ~to_:Rolling
+            in
+            return_unit
+        | Rolling, Archive ->
+            (* Switching from rolling to archive is possible, however it does
+               not necessarily mean all information are stored, it will just
+               stop garbage collecting data. *)
+            let* () = Evm_store.Irmin_chunks.clear conn in
+            let* earliest = Evm_store.Context_hashes.find_earliest conn in
+            let earliest_level = Option.map fst earliest in
+            unless (earliest_level = Some Ethereum_types.Qty.zero) (fun () ->
+                let*! () =
+                  Evm_context_events.rolling_to_archive_incomplete_history
+                    earliest_level
+                in
+                return_unit))
+
+  let check_metadata ~store_metadata ~smart_rollup_address ~history_mode conn =
+    let open Lwt_result_syntax in
+    let* smart_rollup_address =
+      check_smart_rollup_address
+        ~store_smart_rollup_address:
+          (Option.map
+             (fun (metadata : Evm_store.metadata) ->
+               metadata.smart_rollup_address)
+             store_metadata)
+        ~smart_rollup_address
+    in
+    let* () =
+      check_history_mode
+        ~store_history_mode:
+          (Option.map
+             (fun (metadata : Evm_store.metadata) -> metadata.history_mode)
+             store_metadata)
+        ~history_mode
+        conn
+    in
+    return ({smart_rollup_address; history_mode} : Evm_store.metadata)
+
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?sequencer_wallet () =
     let open Lwt_result_syntax in
+    let*! () =
+      Evm_context_events.start_history_mode
+        configuration.experimental_features.history_mode
+    in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
     in
@@ -1204,43 +1290,25 @@ module State = struct
       | None -> (Ethereum_types.Qty Z.zero, None)
       | Some {finalized; l1_level; _} -> (finalized, Some l1_level)
     in
-    let smart_rollup_address =
-      Option.map
-        Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
-        smart_rollup_address
-    in
     let* smart_rollup_address =
-      let* found_smart_rollup_address = Evm_store.Metadata.find conn in
-      match (found_smart_rollup_address, smart_rollup_address) with
-      | Some found_smart_rollup_address, Some smart_rollup_address ->
-          let* () =
-            fail_unless
-              (Tezos_crypto.Hashed.Smart_rollup_address.equal
-                 smart_rollup_address
-                 found_smart_rollup_address)
-              (Invalid_rollup_node
-                 {
-                   smart_rollup_address = found_smart_rollup_address;
-                   rollup_node_smart_rollup_address = smart_rollup_address;
-                 })
-          in
-          return smart_rollup_address
-      | None, Some smart_rollup_address ->
-          let* () = Evm_store.Metadata.store conn smart_rollup_address in
-          return smart_rollup_address
-      | Some found_smart_rollup_address, None ->
-          return found_smart_rollup_address
-      | None, None ->
-          (* Ok. This is dirty. In normal condition it does not make sense that
-             the sr1 is missing from the local storage and not provided by
-             the caller.
-
-             However, it can happen if the node is ran in sandbox mode
-             on a non existing context. Returning the zero address here is
-             so much convenient for a case that's really not supposed to happen,
-             ever. An error that would be detected relatively fast as well.
-          *)
-          return Tezos_crypto.Hashed.Smart_rollup_address.zero
+      let smart_rollup_address =
+        Option.map
+          Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
+          smart_rollup_address
+      in
+      let* store_metadata = Evm_store.Metadata.find conn in
+      let* metadata =
+        check_metadata
+          ~store_metadata
+          ~smart_rollup_address
+          ~history_mode:configuration.experimental_features.history_mode
+          conn
+      in
+      let* () =
+        when_ (Option.is_none store_metadata) (fun () ->
+            Evm_store.Metadata.store conn metadata)
+      in
+      return metadata.smart_rollup_address
     in
     let* evm_state, context =
       match kernel_path with
@@ -1751,10 +1819,10 @@ let export_store ~data_dir ~output_db_file =
   let open Lwt_result_syntax in
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   Evm_store.use store @@ fun conn ->
-  let* rollup_address = Evm_store.Metadata.get conn in
+  let* metadata = Evm_store.Metadata.get conn in
   let* current_number, _ = Evm_store.Context_hashes.get_latest conn in
   let* () = Evm_store.vacuum ~conn ~output_db_file in
-  return {rollup_address; current_number}
+  return {rollup_address = metadata.smart_rollup_address; current_number}
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
     ~store_perm ?sequencer_wallet () =

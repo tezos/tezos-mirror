@@ -29,10 +29,6 @@ CREATE TABLE "l1_l2_levels_relationships" (
   l1_level INT NOT NULL UNIQUE ON CONFLICT ABORT
 , finalized_l2_level INT DEFAULT 0);
 
-CREATE TABLE metadata (
-  smart_rollup_address TEXT NOT NULL
-);
-
 CREATE UNIQUE INDEX unapplied_upgrade
 ON kernel_upgrades (
   COALESCE(applied_before, -1)
@@ -65,4 +61,9 @@ CREATE TABLE pending_confirmations (
 CREATE TABLE irmin_chunks (
   level INTEGER,
   timestamp TIMESTAMP
+);
+
+CREATE TABLE metadata (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT null
 )

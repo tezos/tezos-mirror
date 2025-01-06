@@ -124,4 +124,65 @@ let test_gc_boundaries () =
 
   unit
 
-let () = test_gc_boundaries ()
+let test_switch_history_mode () =
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let garbage_collector_parameters =
+    Evm_node.{split_frequency_in_seconds = 1; number_of_chunks = 2}
+  in
+  register
+    ~genesis_timestamp
+    ~garbage_collector_parameters
+    ~title:"Switch history mode (rolling -> archive)"
+    ~tags:["history_mode"]
+  @@ fun sequencer ->
+  let* () = Evm_node.terminate sequencer in
+  let wait_for_rolling =
+    Evm_node.wait_for_start_history_mode ~history_mode:"rolling" sequencer
+  in
+  let* () = Evm_node.run sequencer and* _ = wait_for_rolling in
+  (* We want the evm-node to trigger at least one garbage collector to
+     have only partial history. *)
+  let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
+  let* _ =
+    fold 3 () (fun i () ->
+        let* _ =
+          Rpc.produce_block
+            ~timestamp:(sf "2020-01-01T00:00:0%dZ" (i + 1))
+            sequencer
+        in
+        unit)
+  and* _ = wait_for_gc in
+  let*@ earliest_block = Rpc.get_block_by_number ~block:"earliest" sequencer in
+  Check.((earliest_block.number > 0l) int32)
+    ~error_msg:"Garbage collector should have removed genesis block" ;
+  (* Restart the node in archive mode. *)
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.Config_file.update
+      sequencer
+      JSON.(
+        update
+          "experimental_features"
+          (put
+             ( "history_mode",
+               annotate ~origin:"history_mode" (`String "archive") )))
+  in
+  let wait_for_archive =
+    Evm_node.wait_for_start_history_mode ~history_mode:"archive" sequencer
+  in
+  let wait_for_incomplete_history =
+    Evm_node.wait_for_event
+      sequencer
+      ~event:"evm_context_rolling_to_archive_incomplete_history.v0"
+      (fun _json -> Some ())
+  in
+  let* () = Evm_node.run sequencer
+  and* () = wait_for_incomplete_history
+  and* _ = wait_for_archive in
+  unit
+
+let () =
+  test_gc_boundaries () ;
+  test_switch_history_mode ()

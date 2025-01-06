@@ -590,6 +590,15 @@ let wait_for_processed_l1_level ?timeout ?level evm_node =
   | None -> Some res
   | Some level -> if level = l1_level then Some res else None
 
+let wait_for_start_history_mode ?history_mode evm_node =
+  wait_for_event evm_node ~event:"evm_context_start_history_mode.v0"
+  @@ fun json ->
+  let event_history_mode = JSON.as_string json in
+  match history_mode with
+  | Some history_mode ->
+      if history_mode = event_history_mode then Some history_mode else None
+  | None -> Some event_history_mode
+
 let wait_for_blueprint_catchup ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"blueprint_catchup.v0" @@ fun json ->
   let open JSON in

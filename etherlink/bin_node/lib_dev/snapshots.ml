@@ -255,11 +255,11 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   Evm_store.use store @@ fun conn ->
-  let* rollup_address = Evm_store.Metadata.find conn in
+  let* metadata = Evm_store.Metadata.find conn in
   let* () =
-    match rollup_address with
+    match metadata with
     | None -> return_unit
-    | Some r ->
+    | Some {smart_rollup_address = r; history_mode = _} ->
         fail_unless
           Address.(header.rollup_address = r)
           (Incorrect_rollup (header.rollup_address, r))
