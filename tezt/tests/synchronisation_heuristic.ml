@@ -531,7 +531,7 @@ let test_many_nodes_bootstrap =
             Connections num_nodes;
             Synchronisation_threshold 0;
             Sync_latency 3;
-            History_mode (Full None);
+            History_mode default_full;
           ]
       `Client
       ~protocol

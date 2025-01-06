@@ -308,7 +308,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   in
   (* Start a node and activate [from_protocol]. *)
   let* node =
-    Node.init [Synchronisation_threshold 0; History_mode (Full None)]
+    Node.init [Synchronisation_threshold 0; Node.(History_mode default_full)]
   in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () =

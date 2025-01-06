@@ -9,6 +9,10 @@ open Cli_arg
 
 type history_mode = Archive | Full of int option | Rolling of int option
 
+let default_full = Full None
+
+let default_rolling = Rolling None
+
 type media_type = Json | Binary | Any
 
 let string_of_media_type = function

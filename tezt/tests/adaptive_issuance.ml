@@ -523,7 +523,11 @@ let test_staking =
   Log.info "Starting second node" ;
   let* node_2 =
     Node.init
-      [Synchronisation_threshold 0; Private_mode; History_mode (Full None)]
+      [
+        Synchronisation_threshold 0;
+        Private_mode;
+        Node.(History_mode default_full);
+      ]
   in
   let* () = Node.wait_for_ready node_2 in
   let* client_2 = Client.init ~endpoint:(Node node_2) () in

@@ -201,7 +201,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   @@ fun () ->
   let* client0, node0 =
     perform_protocol_migration
-      ~more_node_args:[Node.History_mode (Full None)]
+      ~more_node_args:[Node.(History_mode default_full)]
       ~node_name:"node0"
       ~client_name:"client0"
       ~blocks_per_cycle

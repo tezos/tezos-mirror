@@ -55,6 +55,14 @@
     parameters). *)
 type history_mode = Archive | Full of int option | Rolling of int option
 
+(** Default values for [Full] and [Rolling] history modes *)
+
+(** The default value for the [Full] history mode *)
+val default_full : history_mode
+
+(** The default value for the [Rolling] history mode *)
+val default_rolling : history_mode
+
 (** Values that can be passed to the node's [--media-type] argument *)
 type media_type = Json | Binary | Any
 

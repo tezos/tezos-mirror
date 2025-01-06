@@ -138,7 +138,7 @@ let test_storage_reconstruction =
   let* node, client =
     Client.init_with_protocol
       ~name:"node"
-      ~nodes_args:(node_arguments @ Node.[History_mode (Full None)])
+      ~nodes_args:(node_arguments @ Node.[History_mode default_full])
       ~protocol
       `Client
       ()
