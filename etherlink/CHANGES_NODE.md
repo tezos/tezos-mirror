@@ -39,6 +39,7 @@ you start using them, you probably want to use `octez-evm-node check config
     to receive real-time notifications of incoming pending transactions. (!15991)
   - Added support for the WebSocket event `logs`, enabling clients to receive real-time
     notifications for contract events filtered by address and topics. (!16011)
+- Configurable maximum websocket message length (defaults to 4MB). (!16070)
 - History mode can now be selected with the parameter `history_mode`, `archive`
   and `rolling`. If the mode is `rolling` it will use the field
   `garbage_collect_parameters` to prune blocks, operations and states. (!16044)
