@@ -27,7 +27,6 @@ use storage::{
     STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
@@ -189,6 +188,7 @@ fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(
     }
 }
 
+#[cfg(test)]
 fn retrieve_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     minimum_base_fee_per_gas: U256,
@@ -217,11 +217,18 @@ fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
+#[cfg(test)]
+fn retrieve_block_fees<Host: Runtime>(
+    host: &mut Host,
+) -> Result<tezos_ethereum::block::BlockFees, Error> {
     let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)?;
     let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
     let da_fee = retrieve_da_fee(host)?;
-    let block_fees = BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee);
+    let block_fees = tezos_ethereum::block::BlockFees::new(
+        minimum_base_fee_per_gas,
+        base_fee_per_gas,
+        da_fee,
+    );
 
     Ok(block_fees)
 }

@@ -16,8 +16,7 @@ use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{
-    current_timestamp, parsable, parsing, retrieve_block_fees, retrieve_chain_id,
-    tick_model, CONFIG,
+    current_timestamp, parsable, parsing, retrieve_chain_id, tick_model, CONFIG,
 };
 
 use evm_execution::account_storage::account_path;
@@ -30,7 +29,7 @@ use evm_execution::{
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
-use tezos_ethereum::block::BlockConstants;
+use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
     decode_timestamp, next, VersionedEncoding,
@@ -372,7 +371,8 @@ impl Evaluation {
         enable_fa_withdrawals: bool,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
-        let block_fees = retrieve_block_fees(host)?;
+        let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
+        let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
         let mut evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
@@ -403,6 +403,11 @@ impl Evaluation {
                     .map(|timestamp| U256::from(timestamp.as_u64()))
                     .unwrap_or_else(|| U256::from(block.timestamp.as_u64()));
 
+                let block_fees = BlockFees::new(
+                    minimum_base_fee_per_gas,
+                    block.base_fee_per_gas,
+                    da_fee,
+                );
                 BlockConstants {
                     number: block.number + 1,
                     coinbase,
@@ -422,6 +427,9 @@ impl Evaluation {
                     .map(|timestamp| U256::from(timestamp.as_u64()))
                     .unwrap_or_else(|| U256::from(current_timestamp(host).as_u64()));
 
+                let base_fee_per_gas = minimum_base_fee_per_gas;
+                let block_fees =
+                    BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee);
                 BlockConstants::first_block(
                     timestamp,
                     chain_id,
@@ -445,7 +453,7 @@ impl Evaluation {
         let gas_price = if let Some(gas_price) = self.gas_price {
             U256::from(gas_price)
         } else {
-            block_fees.base_fee_per_gas()
+            constants.block_fees.base_fee_per_gas()
         };
 
         match run_transaction(
@@ -475,9 +483,12 @@ impl Evaluation {
                 Ok(result)
             }
             Ok(Some(outcome)) => {
-                let outcome =
-                    simulation_add_gas_for_fees(outcome, &block_fees, &self.data)
-                        .map_err(Error::Simulation)?;
+                let outcome = simulation_add_gas_for_fees(
+                    outcome,
+                    &constants.block_fees,
+                    &self.data,
+                )
+                .map_err(Error::Simulation)?;
 
                 let result: SimulationResult<CallResult, String> =
                     Result::Ok(Some(outcome)).into();
