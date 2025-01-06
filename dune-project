@@ -8,6 +8,7 @@
 (package (name dal_node_migrations))
 (package (name efunc_core))
 (package (name etherlink-governance-observer))
+(package (name floodgate))
 (package (name gitlab_ci))
 (package (name internal-devtools))
 (package (name internal-devtools_proto-context-du))

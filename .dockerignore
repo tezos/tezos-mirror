@@ -79,6 +79,8 @@ _coverage_report
 
 # etherlink
 /etherlink/kernels-*
+etherlink-governance-observer
+floodgate
 
 # Rust
 **/target
