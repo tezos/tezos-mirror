@@ -22,6 +22,9 @@
 - Transaction validation support in simulation is dropped, the
   validation must be done outside of the kernel. (!15958)
 - Parsing a DAL slot is now resumed after invalid inputs. (!15926)
+- Current block's gas price is not stored on its own anymore but the
+  information is still available as part of the current
+  block. (!15609)
 
 ### Bug fixes
 
