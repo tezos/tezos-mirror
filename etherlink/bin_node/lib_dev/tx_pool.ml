@@ -6,6 +6,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Checks that [balance] is enough to pay up to the maximum [gas_limit]
+    the sender defined parametrized by the [gas_price]. *)
+let can_prepay ~balance ~gas_price ~gas_limit ~value:Ethereum_types.(Qty value)
+    =
+  balance >= Z.((gas_limit * gas_price) + value)
+
 module Pool = struct
   module Pkey_map = Ethereum_types.AddressMap
   module Nonce_map = Tezos_base.Sized.MakeSizedMap (Ethereum_types.NonceMap)
@@ -39,7 +45,11 @@ module Pool = struct
       let (Qty gas_limit) = transaction_object.gas in
       let (Qty gas_price) = transaction_object.gasPrice in
       transaction_object.nonce == Ethereum_types.quantity_of_z address_nonce
-      && address_balance >= Z.(gas_limit * gas_price)
+      && can_prepay
+           ~balance:address_balance
+           ~gas_price
+           ~gas_limit
+           ~value:transaction_object.value
     in
     let add_transaction_object_to_map nonce transaction_object pending_map
         queued_map address_balance address_nonce =
@@ -496,13 +506,7 @@ let insert_valid_transaction state tx_raw
                 rejected.")
     | Ok () -> add_transaction ~must_replace:`No
 
-(** Checks that [balance] is enough to pay up to the maximum [gas_limit]
-    the sender defined parametrized by the [gas_price]. *)
-let can_prepay ~balance ~gas_price ~gas_limit ~value:Ethereum_types.(Qty value)
-    =
-  balance >= Z.((gas_limit * gas_price) + value)
-
-(** Checks that the transaction can be payed given the [gas_price] that was set
+(** Checks that the transaction can be paid given the [gas_price] that was set
     and the current [base_fee_per_gas]. *)
 let can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas =
   gas_price >= base_fee_per_gas
