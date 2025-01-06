@@ -14,7 +14,9 @@ type error =
   | Invalid_record of Key.t
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
+  | Invalid_list_of_driver_ids of Ppxlib.expression list
   | Improper_field of (Longident.t Location.loc * Ppxlib.expression)
+  | Improper_list_field of (Longident.t Location.loc * Ppxlib.expression)
   | Improper_let_binding of Ppxlib.expression
   | Improper_record of (Ppxlib.Ast.longident_loc * Ppxlib.expression) list
   | Malformed_attribute of Ppxlib.expression
@@ -95,6 +97,19 @@ let error loc err =
              Found: @[<v 0>%a@]@."
             Key.pp
             key )
+    | Invalid_list_of_driver_ids expr_list ->
+        ( "Invalid list of modules.",
+          Format.asprintf
+            "@[<v 2>It looks like you tried to provide a list of opt-in \
+             drivers through the `driver_ids` field but no drivers could be \
+             parsed out of it. A list of opt-in drivers should be a list of \
+             modules or idents like `[Opentelemetry; prometheus]@,\
+             Found: { @[<v 2>%a@] }@."
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@,")
+                Ppxlib.Pprintast.expression)
+            expr_list )
     | Improper_record record ->
         ( "Improper record.",
           Format.asprintf
@@ -104,6 +119,7 @@ let error loc err =
              - the verbosity@,\
              - the profiler_module@,\
              - the metadata@,\
+             - the opt-in drivers_ids@,\
              Found: { @[<v 2>%a@] }@."
             Format.(
               pp_print_list
@@ -117,7 +133,14 @@ let error loc err =
              - the verbosity@,\
              - the profiler_module@,\
              - the metadata@,\
+             - the opt-in drivers_ids@,\
              Found: @[<v 0>%a@]@."
+            pp_field
+            field )
+    | Improper_list_field field ->
+        ( "Improper list field.",
+          Format.asprintf
+            "@[<v 2>Expecting a list field@,Found: @[<v 0>%a@]@."
             pp_field
             field )
     | Improper_let_binding expr ->

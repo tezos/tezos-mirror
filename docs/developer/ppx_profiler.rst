@@ -40,9 +40,10 @@ used by devs hence the use of a PPX that is controlled by an environment variabl
 
 .. code-block:: OCaml
 
-   TEZOS_PPX_PROFILER=<anything> make
+   TEZOS_PPX_PROFILER=<value> make
 
-Will preprocess the code before compiling (It should be noted that this is temporary and the content of this environment variable will be parsed and used in a near future to allow finer control over what PPX should be activated or not).
+Will preprocess the code before compiling. The ``value`` field is described
+:ref:`enabled-drivers`.
 
 This will allow to preprocess
 
@@ -213,6 +214,7 @@ The payload is made of two parts, the first one being optional:
      | verbosity = (Notice | Info | Debug)
      | profiler_module = module_ident
      | metadata = <(string * string) list>
+     | driver_ids = <(Prometheus | OpenTelemetry | Text | Json) list>
 
    args ::= <string> | <string list> | <function application> | ident | empty
 
@@ -231,6 +233,23 @@ will be preprocessed as
    Profiler.aggregate_s ~verbosity:Info (g y z) @@ f x ;
    Prof.span_f ~verbosity:Debug ("label", []) @@ g x
    ...
+
+.. _enabled-drivers:
+
+Enabled drivers
+^^^^^^^^^^^^^^^
+
+When enabling the ppx with ``TEZOS_PPX_PROFILER=<value>``, ``value`` can have
+two possible types:
+
+- A dummy one, all attributes will be preprocessed except the ones with a
+  non-empty ``driver_ids`` field
+- A list of driver ids like ``prometheus; opentelemetry`` that will allow to
+  preprocess attributes:
+
+  - with an empty ``driver_ids`` field
+  - with a ``driver_ids`` field where one of the driver ids is also present in
+    ``value``
 
 Adding functionalities
 ----------------------
