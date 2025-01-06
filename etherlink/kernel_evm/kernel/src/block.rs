@@ -620,13 +620,14 @@ mod tests {
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::current_timestamp;
+    use crate::fees::DA_FEE_PER_BYTE;
+    use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
     use crate::inbox::TransactionContent::EthereumDelayed;
     use crate::storage::read_block_in_progress;
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
-    use crate::tick_model;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
@@ -688,8 +689,8 @@ mod tests {
     }
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
-    const DUMMY_BASE_FEE_PER_GAS: u64 = 21000u64;
-    const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
+    const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
+    const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
     fn dummy_block_fees() -> BlockFees {
         BlockFees::new(
@@ -704,7 +705,7 @@ mod tests {
         type_: TransactionType,
     ) -> EthereumTransactionCommon {
         let chain_id = Some(DUMMY_CHAIN_ID);
-        let gas_price = U256::from(40000000u64);
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
         let gas_limit = 21000u64;
 
         let gas_for_fees = crate::fees::gas_for_fees(
@@ -773,7 +774,7 @@ mod tests {
         nonce: u64,
         private_key: &str,
     ) -> EthereumTransactionCommon {
-        let gas_price = U256::from(21000u64);
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
         // gas limit was estimated using Remix on Shanghai network (256,842)
         // plus a safety margin for gas accounting discrepancies
         let gas_limit = 300_000u64;
@@ -971,11 +972,6 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
         let mut host = MockKernelHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx = dummy_eth_transaction_deploy();
@@ -1105,7 +1101,6 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let base_gas = U256::from(21000);
-        crate::storage::store_minimum_base_fee_per_gas(&mut host, base_gas).unwrap();
         let dummy_block_fees = dummy_block_fees();
         let gas_for_fees = crate::fees::gas_for_fees(
             dummy_block_fees.da_fee_per_byte(),
@@ -1178,11 +1173,6 @@ mod tests {
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
         let mut host = MockKernelHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
@@ -1224,10 +1214,7 @@ mod tests {
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
         let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[]);
-        let rounding_amount = 6000;
-        let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas
-            + da_fee
-            + rounding_amount;
+        let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas + da_fee;
         let expected_sender_balance =
             initial_sender_balance - expected_dest_balance - expected_fees;
 
