@@ -54,6 +54,10 @@ val trace_operation :
   (unit -> 'a) ->
   'a
 
+(** [update_scope s f] updates the Opentelemetry scope in the ambient context
+    before calling [f]. *)
+val update_scope : Opentelemetry.Scope.t option -> (unit -> 'a) -> 'a
+
 type config = {service_name : string; verbosity : Profiler.verbosity}
 
 (** Mocked driver, that serves only to register the opentelemetry as a valid
