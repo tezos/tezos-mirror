@@ -192,6 +192,20 @@ let create_listening_socket ?(reuse_port = false) ~backlog
                {reason = err; address = addr; port})
       | exn -> Lwt.reraise exn)
 
+(* Taken from [Lwt_io] but is not exported. *)
+let close_socket fd =
+  Lwt.finalize
+    (fun () ->
+      (Lwt.catch
+         (fun () ->
+           Lwt_unix.shutdown fd Unix.SHUTDOWN_ALL ;
+           Lwt.return_unit)
+         (function
+           (* Occurs if the peer closes the connection first. *)
+           | Unix.Unix_error (Unix.ENOTCONN, _, _) -> Lwt.return_unit
+           | exn -> Lwt.reraise exn) [@ocaml.warning "-4"]))
+    (fun () -> Lwt_unix.close fd)
+
 let close ?reason t =
   let open Lwt_syntax in
   Option.iter (fun reason -> add_closing_reason ~reason t) reason ;
@@ -206,7 +220,7 @@ let close ?reason t =
   Lwt.catch
     (fun () ->
       (* Guarantee idempotency. *)
-      if Lwt_unix.state t.fd = Closed then return_unit else Lwt_unix.close t.fd)
+      if Lwt_unix.state t.fd = Closed then return_unit else close_socket t.fd)
     (function
       (* From [man 2 close] [close] can fail with [EBADF, EINTR, EIO, ENOSPC,
          EDQUOT] Unix errors.
