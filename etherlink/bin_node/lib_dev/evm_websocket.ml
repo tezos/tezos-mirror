@@ -8,16 +8,12 @@
 
 open Rpc_encodings
 
-(* Maximum message size accepted by the websocket server, hardcoded to 4MB.
-   This should be enough for messages we expect to receive in the ethereum
-   JSONRPC protocol. *)
-let max_message_length = 4096 * 1024
-
 type parameters = {
   push_frame : Websocket.Frame.t option -> unit;
   http_request : Cohttp.Request.t;
   conn : Cohttp_lwt_unix.Server.conn;
   medias : Media_type.t list;
+  max_message_length : int;
   handler : websocket_handler;
 }
 
@@ -39,6 +35,7 @@ module Types = struct
     conn_descr : string;
     input_media_type : Media_type.t;
     output_media_type : Media_type.t;
+    max_message_length : int;
     handler : websocket_handler;
     message_buffer : Buffer.t;
     subscriptions : subscriptions_table;
@@ -296,7 +293,14 @@ let opcode_of_media media =
 let on_frame worker fr =
   let open Lwt_syntax in
   let state = Worker.state worker in
-  let {Types.push_frame; input_media_type; output_media_type; handler; _} =
+  let {
+    Types.push_frame;
+    input_media_type;
+    output_media_type;
+    max_message_length;
+    handler;
+    _;
+  } =
     state
   in
   let push_frame f = push_frame (Some f) in
@@ -390,7 +394,8 @@ module Handlers = struct
   type launch_error = [`Not_acceptable | `Unsupported_media_type of string]
 
   let on_launch _w _name
-      ({push_frame; http_request; conn; medias; handler} : Types.parameters) =
+      ({push_frame; http_request; conn; medias; max_message_length; handler} :
+        Types.parameters) =
     let open Lwt_result_syntax in
     let headers = Cohttp.Request.headers http_request in
     let medias =
@@ -421,6 +426,7 @@ module Handlers = struct
           conn_descr;
           input_media_type;
           output_media_type;
+          max_message_length;
           handler;
           message_buffer = Buffer.create 256;
           subscriptions = Stdlib.Hashtbl.create 3;
@@ -468,14 +474,14 @@ module Handlers = struct
 end
 
 let start (conn : Cohttp_lwt_unix.Server.conn) (http_request : Cohttp.Request.t)
-    medias handler push_frame =
+    medias ~max_message_length handler push_frame =
   let open Lwt_result_syntax in
   let name = Cohttp.Connection.to_string (snd conn) in
   let* (_worker : _ Worker.t) =
     Worker.launch
       table
       name
-      {push_frame; http_request; conn; medias; handler}
+      {push_frame; http_request; conn; medias; max_message_length; handler}
       (module Handlers)
   in
   return_unit
@@ -489,7 +495,8 @@ let new_frame conn fr =
          cases. In this case we could lose frames. *)
       Worker.Queue.push_request_now w (Request.Frame fr)
 
-let cohttp_callback handler (conn : Cohttp_lwt_unix.Server.conn) req _body =
+let cohttp_callback ~max_message_length handler
+    (conn : Cohttp_lwt_unix.Server.conn) req _body =
   let open Lwt_syntax in
   let media_types = Supported_media_types.all in
   let conn_name = conn |> snd |> Cohttp.Connection.to_string in
@@ -504,7 +511,9 @@ let cohttp_callback handler (conn : Cohttp_lwt_unix.Server.conn) req _body =
         in
         shutdown ~reason conn_name)
   in
-  let+ res = start conn req media_types handler push_frame in
+  let+ res =
+    start conn req media_types ~max_message_length handler push_frame
+  in
   match res with
   | Ok () -> response_action
   | Error err ->

@@ -70,7 +70,7 @@ val register_metrics : string -> t -> t
     JSONRPC response and optionally produce output elements in a stream for
     subscription services. *)
 val jsonrpc_websocket_register :
-  t -> string -> Rpc_encodings.websocket_handler -> t
+  max_message_length:int -> t -> string -> Rpc_encodings.websocket_handler -> t
 
 (** {2 Curried functions with respect to service parameters} *)
 

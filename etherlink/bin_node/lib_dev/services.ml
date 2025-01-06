@@ -995,6 +995,8 @@ let generic_websocket_dispatch (rpc : Configuration.rpc)
     (config : Configuration.t) ctx dir path dispatch_websocket =
   if config.experimental_features.enable_websocket then
     Evm_directory.jsonrpc_websocket_register
+      ~max_message_length:
+        config.experimental_features.max_websocket_message_length
       dir
       path
       (dispatch_websocket rpc config ctx)

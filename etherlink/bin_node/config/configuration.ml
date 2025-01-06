@@ -54,6 +54,7 @@ type experimental_features = {
   history_mode : history_mode;
   rpc_server : rpc_server;
   enable_websocket : bool;
+  max_websocket_message_length : int;
 }
 
 type sequencer = {
@@ -140,6 +141,10 @@ let default_enable_send_raw_transaction = true
 let default_garbage_collector_parameters =
   {split_frequency_in_seconds = 86_400; number_of_chunks = 14}
 
+(* This should be enough for messages we expect to receive in the ethereum
+   JSONRPC protocol. *)
+let default_max_socket_message_length = 4096 * 1024
+
 let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
@@ -152,6 +157,7 @@ let default_experimental_features =
     history_mode = Archive;
     rpc_server = Resto;
     enable_websocket = false;
+    max_websocket_message_length = default_max_socket_message_length;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -736,6 +742,7 @@ let experimental_features_encoding =
            history_mode;
            rpc_server;
            enable_websocket;
+           max_websocket_message_length;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -747,7 +754,7 @@ let experimental_features_encoding =
           garbage_collector_parameters,
           history_mode,
           None ),
-        (rpc_server, enable_websocket) ))
+        (rpc_server, enable_websocket, max_websocket_message_length) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -758,7 +765,7 @@ let experimental_features_encoding =
              garbage_collector_parameters,
              history_mode,
              _next_wasm_runtime ),
-           (rpc_server, enable_websocket) ) ->
+           (rpc_server, enable_websocket, max_websocket_message_length) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -770,6 +777,7 @@ let experimental_features_encoding =
         history_mode;
         rpc_server;
         enable_websocket;
+        max_websocket_message_length;
       })
     (merge_objs
        (obj10
@@ -844,7 +852,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj2
+       (obj3
           (dft
              "rpc_server"
              ~description:
@@ -856,7 +864,14 @@ let experimental_features_encoding =
              "enable_websocket"
              ~description:"Enable or disable the experimental websocket server"
              bool
-             default_experimental_features.enable_websocket)))
+             default_experimental_features.enable_websocket)
+          (dft
+             "max_websocket_message_length"
+             ~description:
+               "Maximum message size accepted by the websocket server (only \
+                for Resto backend)"
+             int31
+             default_max_socket_message_length)))
 
 let proxy_encoding =
   let open Data_encoding in

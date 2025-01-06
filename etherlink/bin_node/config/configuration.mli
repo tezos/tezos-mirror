@@ -86,6 +86,7 @@ type experimental_features = {
   history_mode : history_mode;
   rpc_server : rpc_server;
   enable_websocket : bool;
+  max_websocket_message_length : int;
 }
 
 type sequencer = {
