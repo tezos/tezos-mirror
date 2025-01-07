@@ -2345,6 +2345,10 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         cached_storage_access(self, address, index, layer)
     }
 
+    fn transient_storage(&self, address: H160, index: H256) -> H256 {
+        todo!()
+    }
+
     fn original_storage(&mut self, address: H160, index: H256) -> H256 {
         let key = StorageKey { address, index };
         if let Some(value) = self.original_storage_cache.get(&key) {
@@ -2494,6 +2498,15 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         let layer = self.evm_account_storage.stack_depth();
         update_cache(self, address, index, CacheStorageValue::Write(value), layer);
         Ok(())
+    }
+
+    fn set_transient_storage(
+        &mut self,
+        address: H160,
+        index: H256,
+        value: H256,
+    ) -> Result<(), ExitError> {
+        todo!()
     }
 
     fn log(

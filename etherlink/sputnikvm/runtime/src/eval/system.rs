@@ -244,6 +244,35 @@ pub fn sstore<H: Handler>(runtime: &mut Runtime, handler: &mut H) -> Control<H> 
 	}
 }
 
+pub fn tload<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
+	pop!(runtime, index);
+	let value = handler.transient_storage(runtime.context.address, index);
+	push!(runtime, value);
+
+	event!(TLoad {
+		address: runtime.context.address,
+		index,
+		value
+	});
+
+	Control::Continue
+}
+
+pub fn tstore<H: Handler>(runtime: &mut Runtime, handler: &mut H) -> Control<H> {
+	pop!(runtime, index, value);
+
+	event!(TStore {
+		address: runtime.context.address,
+		index,
+		value
+	});
+
+	match handler.set_transient_storage(runtime.context.address, index, value) {
+		Ok(()) => Control::Continue,
+		Err(e) => Control::Exit(e.into()),
+	}
+}
+
 pub fn gas<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	push_u256!(runtime, handler.gas_left());
 
