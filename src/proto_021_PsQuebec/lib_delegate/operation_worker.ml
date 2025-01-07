@@ -250,6 +250,7 @@ type t = {
   qc_event_stream : quorum_event_stream;
   lock : Lwt_mutex.t;
   monitor_node_operations : bool; (* Keep on monitoring node operations *)
+  committee_size : int;
 }
 
 let monitor_operations (cctxt : #Protocol_client_context.full) =
@@ -283,10 +284,13 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
   in
   return ((shell_header.level, round), operation_stream, stream_stopper)
 
-let make_initial_state ?(monitor_node_operations = true) () =
+let make_initial_state ?(monitor_node_operations = true) ~constants () =
   let qc_event_stream =
     let stream, push = Lwt_stream.create () in
     {stream; push}
+  in
+  let committee_size =
+    constants.Constants.parametric.consensus_committee_size
   in
   let canceler = Lwt_canceler.create () in
   let operation_pool = Operation_pool.empty in
@@ -298,6 +302,7 @@ let make_initial_state ?(monitor_node_operations = true) () =
     qc_event_stream;
     lock;
     monitor_node_operations;
+    committee_size;
   }
 
 let is_valid_consensus_content (candidate : candidate) consensus_content =
@@ -578,11 +583,12 @@ let update_operations_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let create ?(monitor_node_operations = true)
+let create ?(monitor_node_operations = true) ~constants
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
     (make_initial_state
+       ~constants
        ~monitor_node_operations
        () [@profiler.record_f {verbosity = Notice} "make initial state"])
   in
