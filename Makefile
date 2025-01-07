@@ -495,6 +495,11 @@ build-octogram: all
 	@dune build ./src/bin_octogram
 	@cp -f ./_build/default/src/bin_octogram/octogram_main.exe octogram
 
+.PHONY: build-floodgate
+build-floodgate: all
+	@dune build ./etherlink/bin_floodgate
+	@cp -f ./_build/default/etherlink/bin_floodgate/main.exe floodgate
+
 .PHONY: build-unreleased
 build-unreleased: all
 	@echo 'Note: "make build-unreleased" is deprecated. Just use "make".'

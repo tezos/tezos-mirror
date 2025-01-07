@@ -15,6 +15,7 @@ open Product_cohttp
 open Product_octez
 open Product_prometheus
 open Product_websocket
+open Product_efunc_core
 
 include Product (struct
   let name = "etherlink"
@@ -441,3 +442,21 @@ let () =
     registered_octez_evm_node_libs
     ~target:"!module-Websocket_cohttp_lwt"
     ~text:"Websocket_cohttp_lwt"
+
+let _floodgate_bin =
+  public_exe
+    "floodgate"
+    ~path:"etherlink/bin_floodgate"
+    ~internal_name:"main"
+    ~release_status:Unreleased
+    ~opam:"floodgate"
+    ~synopsis:"Tool to flood an EVM chain with transaction batches"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        efunc_core;
+        octez_rpc_http_client_unix;
+        octez_clic;
+      ]
