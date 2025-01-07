@@ -11,8 +11,7 @@ use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::{execute_fa_deposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
 use evm_execution::handler::{
-    ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult, FastWithdrawalInterface,
-    RouterInterface,
+    ExecutionOutcome, FastWithdrawalInterface, RouterInterface,
 };
 use evm_execution::precompiles::{self, PrecompileBTreeMap};
 use evm_execution::run_transaction;
@@ -299,6 +298,46 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
     }
 }
 
+fn execution_result_from_outcome<Host: Runtime>(
+    host: &mut Host,
+    execution_outcome: Option<ExecutionOutcome>,
+    caller: H160,
+    retriable: bool,
+) -> ExecutionResult<TransactionResult> {
+    let (gas_used, estimated_ticks_used, should_be_retried) = match &execution_outcome {
+        Some(execution_outcome) => {
+            log!(
+                host,
+                Benchmarking,
+                "Transaction status: OK_{}.",
+                execution_outcome.is_success()
+            );
+            (
+                execution_outcome.gas_used.into(),
+                execution_outcome.estimated_ticks_used,
+                execution_outcome.should_be_retried(retriable),
+            )
+        }
+        None => {
+            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
+            (U256::zero(), 0, false)
+        }
+    };
+
+    let transaction_result = TransactionResult {
+        caller,
+        execution_outcome,
+        gas_used,
+        estimated_ticks_used,
+    };
+
+    if should_be_retried {
+        ExecutionResult::Retriable(transaction_result)
+    } else {
+        ExecutionResult::Valid(transaction_result)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
@@ -355,38 +394,12 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let (gas_used, estimated_ticks_used, out_of_ticks) = match &execution_outcome {
-        Some(execution_outcome) => {
-            log!(
-                host,
-                Benchmarking,
-                "Transaction status: OK_{}.",
-                execution_outcome.is_success()
-            );
-            (
-                execution_outcome.gas_used.into(),
-                execution_outcome.estimated_ticks_used,
-                execution_outcome.result == ExecutionOutcomeResult::OutOfTicks,
-            )
-        }
-        None => {
-            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
-            (U256::zero(), 0, false)
-        }
-    };
-
-    let transaction_result = TransactionResult {
-        caller,
+    Ok(execution_result_from_outcome(
+        host,
         execution_outcome,
-        gas_used,
-        estimated_ticks_used,
-    };
-
-    if out_of_ticks && retriable {
-        Ok(ExecutionResult::Retriable(transaction_result))
-    } else {
-        Ok(ExecutionResult::Valid(transaction_result))
-    }
+        caller,
+        retriable,
+    ))
 }
 
 fn trace_deposit<Host: Runtime>(
@@ -457,6 +470,7 @@ fn apply_fa_deposit<Host: Runtime>(
     allocated_ticks: u64,
     transaction: &Transaction,
     tracer_input: Option<TracerInput>,
+    retriable: bool,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let caller = H160::zero();
     // Prevent inner calls to XTZ/FA withdrawal precompiles
@@ -472,6 +486,7 @@ fn apply_fa_deposit<Host: Runtime>(
         allocated_ticks,
         tracer_input,
         FA_DEPOSIT_PROXY_GAS_LIMIT,
+        retriable,
     )
     .map_err(Error::InvalidRunTransaction)?;
 
@@ -481,22 +496,24 @@ fn apply_fa_deposit<Host: Runtime>(
         "Transaction status: OK_{}.",
         outcome.is_success()
     );
+    // If transaction will be retried, we shouldn't trace yet
+    if !outcome.should_be_retried(retriable) {
+        trace_deposit(
+            host,
+            transaction.value(),
+            transaction.to(),
+            outcome.gas_used,
+            &outcome.logs,
+            tracer_input,
+        );
+    }
 
-    trace_deposit(
+    Ok(execution_result_from_outcome(
         host,
-        transaction.value(),
-        transaction.to(),
-        outcome.gas_used,
-        &outcome.logs,
-        tracer_input,
-    );
-
-    Ok(ExecutionResult::Valid(TransactionResult {
+        Some(outcome),
         caller,
-        gas_used: outcome.gas_used.into(),
-        estimated_ticks_used: outcome.estimated_ticks_used,
-        execution_outcome: Some(outcome),
-    }))
+        retriable,
+    ))
 }
 
 pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
@@ -650,6 +667,7 @@ pub fn apply_transaction<Host: Runtime>(
                 allocated_ticks,
                 transaction,
                 tracer_input,
+                retriable,
             )?
         }
     };

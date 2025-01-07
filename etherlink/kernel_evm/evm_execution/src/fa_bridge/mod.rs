@@ -34,12 +34,12 @@
 use std::borrow::Cow;
 
 use deposit::FaDeposit;
-use evm::{Config, ExitReason};
+use evm::{CallScheme, Capture, Config, ExitReason};
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{
     log,
-    Level::{Debug, Info},
+    Level::{Debug, Error, Info},
 };
 use tezos_evm_runtime::runtime::Runtime;
 use ticket_table::TicketTable;
@@ -47,7 +47,7 @@ use withdrawal::FaWithdrawal;
 
 use crate::{
     account_storage::EthereumAccountStorage,
-    handler::{CreateOutcome, EvmHandler, ExecutionOutcome, Withdrawal},
+    handler::{trace_call, CreateOutcome, EvmHandler, ExecutionOutcome, Withdrawal},
     precompiles::{PrecompileBTreeMap, PrecompileOutcome, SYSTEM_ACCOUNT_ADDRESS},
     trace::TracerInput,
     transaction::TransactionContext,
@@ -135,6 +135,7 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     allocated_ticks: u64,
     tracer_input: Option<TracerInput>,
     gas_limit: u64,
+    retriable: bool,
 ) -> Result<ExecutionOutcome, EthereumError> {
     log!(host, Info, "Going to execute a {}", deposit.display());
 
@@ -156,20 +157,91 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
 
     // It's ok if internal proxy call fails, we will update the ticket table anyways.
     let ticket_owner = if let Some(proxy) = deposit.proxy {
-        let (exit_reason, _, _) =
-            inner_execute_proxy(&mut handler, caller, proxy, deposit.calldata())?;
-        // If proxy contract call succeeded, proxy becomes the owner,
-        // otherwise we fall back and set the receiver as the owner instead.
-        if exit_reason.is_succeed() {
-            proxy
-        } else {
+        // We create an intermediate transaction layer to be able to revert what's
+        // done inside the proxy if it's meant to revert.
+        // The rest of the FA deposit logic remains the same.
+
+        // Create a new transaction layer with 63/64 of the remaining gas.
+        let gas_limit = handler.nested_call_gas_limit(Some(gas_limit));
+
+        if let Err(err) = handler.record_cost(gas_limit.unwrap_or_default()) {
             log!(
-                handler.borrow_host(),
-                Info,
-                "FA deposit: proxy call failed w/ {:?}",
-                exit_reason
+                handler.host,
+                Debug,
+                "Not enough gas for the proxy call. Returned with error {:?}. \
+                 Required at least: {:?}",
+                err,
+                gas_limit
             );
+
             deposit.receiver
+        } else {
+            handler.begin_inter_transaction(false, gas_limit)?;
+
+            let gas_before = handler.gas_used();
+            let inner_result =
+                inner_execute_proxy(&mut handler, caller, proxy, deposit.calldata());
+            let gas_after = handler.gas_used();
+
+            // If proxy contract call succeeded, proxy becomes the owner, otherwise we fall back and
+            // set the receiver as the owner instead—except if the proxy ran out of ticks and the
+            // transaction is retriable.
+            let ticket_owner = match &inner_result {
+                Ok((exit_reason, _, _)) if exit_reason.is_succeed() => proxy,
+                Ok((exit_reason, _, _)) => {
+                    log!(
+                        handler.borrow_host(),
+                        Debug,
+                        "FA deposit: proxy call failed w/ {:?}",
+                        exit_reason
+                    );
+                    deposit.receiver
+                }
+                Err(EthereumError::OutOfTicks) if retriable => {
+                    // We ran out of ticks, and the execution is retriable: we shortcut the rest of the
+                    // call, and return early. This will trigger a reboot request.
+                    log!(
+                    handler.borrow_host(),
+                    Debug,
+                    "FA deposit: proxy call hard failed w/ OutOfTicks but is retriable"
+                );
+
+                    let _ = handler.end_inter_transaction::<EthereumError>(Err(
+                        EthereumError::OutOfTicks,
+                    ));
+                    return handler
+                        .end_initial_transaction(Err(EthereumError::OutOfTicks));
+                }
+                Err(err) => {
+                    log!(
+                    handler.borrow_host(),
+                    Error,
+                    "FA deposit: proxy call hard failed w/ {:?}, fallback to receiver: {}",
+                    err,
+                    deposit.receiver
+                );
+                    deposit.receiver
+                }
+            };
+
+            let proxy_res = handler.end_inter_transaction::<EthereumError>(inner_result);
+
+            if let Capture::Exit((ref reason, _, ref output)) = proxy_res {
+                trace_call(
+                    &mut handler,
+                    CallScheme::Call,
+                    proxy,
+                    U256::zero(),
+                    gas_after - gas_before,
+                    deposit.calldata(),
+                    proxy,
+                    gas_limit,
+                    output,
+                    reason,
+                );
+            }
+
+            ticket_owner
         }
     } else {
         // Proxy contract is not specified
@@ -179,6 +251,19 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     // Deposit execution might fail because of the balance overflow
     // so we need to rollback the entire transaction in that case.
     let deposit_res = inner_execute_deposit(&mut handler, ticket_owner, deposit);
+
+    // Even if the proxy fails, we can't revert the transaction: we need the
+    // tickets to be moved in the ticket table.
+    if let Err(ref ticket_err) = deposit_res {
+        // This is really problematic: the ticket has been lost. Will need
+        // an update to unlock.
+        log!(
+            handler.borrow_host(),
+            Error,
+            "FA deposit failed: couldn't even move the tickets into the \
+                ticket table {ticket_err:?}"
+        );
+    }
 
     let mut outcome = handler.end_initial_transaction(deposit_res)?;
 

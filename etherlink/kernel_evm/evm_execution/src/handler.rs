@@ -167,6 +167,9 @@ impl ExecutionOutcome {
     pub const fn new_address(&self) -> Option<H160> {
         self.result.new_address()
     }
+    pub fn should_be_retried(&self, retriable: bool) -> bool {
+        retriable && self.result == ExecutionResult::OutOfTicks
+    }
 }
 
 /// The result of calling a contract as expected by the SputnikVM EVM implementation.
@@ -2252,6 +2255,74 @@ fn cached_storage_access<Host: Runtime>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn trace_call<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    call_scheme: CallScheme,
+    caller: H160,
+    value: U256,
+    gas_used: u64,
+    input: Vec<u8>,
+    address: H160,
+    target_gas: Option<u64>,
+    output: &[u8],
+    reason: &ExitReason,
+) {
+    if let Some(CallTracer(CallTracerInput {
+        transaction_hash,
+        config:
+            CallTracerConfig {
+                with_logs,
+                only_top_call: false,
+            },
+    })) = handler.tracer
+    {
+        let mut call_trace = CallTrace::new_minimal_trace(
+            match call_scheme {
+                CallScheme::Call => "CALL",
+                CallScheme::CallCode => "CALLCODE",
+                CallScheme::DelegateCall => "DELEGATECALL",
+                CallScheme::StaticCall => "STATICCALL",
+            }
+            .into(),
+            caller,
+            value,
+            gas_used,
+            input,
+            // We need to make the distinction between the initial call (depth 0)
+            // and the other subcalls
+            (handler.stack_depth() + 1).try_into().unwrap_or_default(),
+        );
+
+        call_trace.add_to(Some(address));
+        call_trace.add_gas(target_gas);
+        call_trace.add_output(Some(output.to_owned()));
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+        // For errors and revert reasons, find the appropriate values
+        // to return for tracing. The following values are kind of placeholders.
+        match reason {
+            ExitReason::Succeed(_) => (),
+            ExitReason::Error(e) => call_trace.add_error(Some(format!("{:?}", e).into())),
+            ExitReason::Revert(r) => {
+                call_trace.add_error(Some(format!("{:?}", r).into()))
+            }
+            ExitReason::Fatal(f) => call_trace.add_error(Some(format!("{:?}", f).into())),
+        };
+
+        if with_logs {
+            call_trace.add_logs(
+                handler
+                    .transaction_data
+                    .last()
+                    .map(|tx_layer| tx_layer.logs.clone()),
+            )
+        }
+
+        let _ = tracer::store_call_trace(handler.host, call_trace, &transaction_hash);
+    }
+}
+
 #[allow(unused_variables)]
 impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     type CreateInterrupt = Infallible;
@@ -2743,66 +2814,18 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                         log!(self.host, Debug, "Call ended with reason: {:?}", reason);
 
                         // TRACING
-                        if let Some(CallTracer(CallTracerInput {
-                            transaction_hash,
-                            config:
-                                CallTracerConfig {
-                                    with_logs,
-                                    only_top_call: false,
-                                },
-                        })) = self.tracer
-                        {
-                            let mut call_trace = CallTrace::new_minimal_trace(
-                                match call_scheme {
-                                    CallScheme::Call => "CALL",
-                                    CallScheme::CallCode => "CALLCODE",
-                                    CallScheme::DelegateCall => "DELEGATECALL",
-                                    CallScheme::StaticCall => "STATICCALL",
-                                }
-                                .into(),
-                                caller,
-                                value,
-                                gas_after - gas_before,
-                                input,
-                                // We need to make the distinction between the initial call (depth 0)
-                                // and the other subcalls
-                                (self.stack_depth() + 1).try_into().unwrap_or_default(),
-                            );
-
-                            call_trace.add_to(Some(address));
-                            call_trace.add_gas(target_gas);
-                            call_trace.add_output(Some(output.to_owned()));
-
-                            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
-                            // For errors and revert reasons, find the appropriate values
-                            // to return for tracing. The following values are kind of placeholders.
-                            match &reason {
-                                ExitReason::Succeed(_) => (),
-                                ExitReason::Error(e) => {
-                                    call_trace.add_error(Some(format!("{:?}", e).into()))
-                                }
-                                ExitReason::Revert(r) => {
-                                    call_trace.add_error(Some(format!("{:?}", r).into()))
-                                }
-                                ExitReason::Fatal(f) => {
-                                    call_trace.add_error(Some(format!("{:?}", f).into()))
-                                }
-                            };
-
-                            if with_logs {
-                                call_trace.add_logs(
-                                    self.transaction_data
-                                        .last()
-                                        .map(|tx_layer| tx_layer.logs.clone()),
-                                )
-                            }
-
-                            let _ = tracer::store_call_trace(
-                                self.host,
-                                call_trace,
-                                &transaction_hash,
-                            );
-                        }
+                        trace_call(
+                            self,
+                            call_scheme,
+                            caller,
+                            value,
+                            gas_after - gas_before,
+                            input,
+                            address,
+                            target_gas,
+                            &output,
+                            &reason,
+                        );
 
                         Capture::Exit((reason, output))
                     }
