@@ -8,12 +8,14 @@
 (* This file is sourced from the efunc library, licensed under the MIT License:
    https://gitlab.com/functori/dev/efunc. *)
 
+(** This library relies on the [Random] module, and users should make sure to
+    properly initialize its state in a way which fits their use case (e.g.,
+    with [Random.self_init ()]. *)
+
 open Types
 open Libsecp256k1.External
 
 let keccak s = Digestif.KECCAK_256.(to_raw_string @@ digest_string s)
-
-let () = Random.self_init ()
 
 let context =
   let c = ref None in
@@ -34,7 +36,9 @@ let to_address pk =
   in
   a (Hex.show @@ Hex.of_string @@ String.sub pkh 12 20)
 
-let generate ?(seed = rand 32) () =
+(** [generate ~seed ()] can be used to generate a new EOA. [seed] is expected
+    to be at least {!Libsecp256k1.External.Key.secret_bytes}-byte long (32). *)
+let generate ~seed () =
   let sk = Key.read_sk_exn (context ()) (Bigstring.of_string seed) in
   let pk = to_pk sk in
   let address = to_address pk in
