@@ -7907,16 +7907,17 @@ let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
   let source = Constant.bootstrap2 in
   let slot = Helpers.make_slot ~slot_size "some data" in
   let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
-  (* Keep track of the counter to avoid an additional RPC call. *)
-  let counter = ref 1 in
   let rec loop current_level =
     if current_level > into then unit
     else
       let* level = Node.wait_for_level l1_node current_level in
-      (* We expected to advance level by level. *)
+      (* Warn when we don't advance level by level, because this means we
+         couldn't publish at each level. Also, we force the injection because
+         when a level is missed then probably there will be two injection
+         attempts at the same level later. *)
       if current_level < level then
-        Log.info
-          "Missed some levels (expected level is %d, got %d)"
+        Log.warn
+          "[slot_producer] missed some levels (expected level is %d, got %d)"
           current_level
           level ;
       Log.info
@@ -7925,14 +7926,13 @@ let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
         level ;
       let* _op_hash =
         publish_commitment
-          ~counter:!counter
+          ~force:true
           ~source
           ~index:slot_index
           ~commitment
           ~proof
           l1_client
       in
-      incr counter ;
       loop (level + 1)
   in
   let* () = loop from in
