@@ -20,6 +20,8 @@
 - If both `--network` and `--init-from-snapshot` are set, the EVM node in
   observer mode will download and import a recent snapshot from a trusted
   source for fresh data directories. (!16093)
+- The `snapshot import` command can now download a snapshot if provided with a
+  URL instead of a path. (!16112)
 
 #### Experimental
 
