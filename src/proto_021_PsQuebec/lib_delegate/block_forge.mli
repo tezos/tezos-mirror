@@ -29,6 +29,7 @@ open Alpha_context
 type unsigned_block = {
   unsigned_block_header : Block_header.t;
   operations : Tezos_base.Operation.t list list;
+  manager_operations_infos : Baking_state.manager_operations_infos option;
 }
 
 (** The simulation kind specifies whether the baker should first filter (and
