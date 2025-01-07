@@ -1069,7 +1069,9 @@ let empty_args_dict = StringMap.empty
 
 let rec make_arities_dict :
     type a b.
-    (a, b) arg -> (int * string) StringMap.t -> (int * string) StringMap.t =
+    (a, b) arg ->
+    (int list * string) StringMap.t ->
+    (int list * string) StringMap.t =
  fun arg acc ->
   let add {long; short} num =
     (match short with
@@ -1079,10 +1081,10 @@ let rec make_arities_dict :
     |> StringMap.add ("--" ^ long) (num, long)
   in
   match arg with
-  | Arg {label; _} -> add label 1
-  | MultipleArg {label; _} -> add label 1
-  | DefArg {label; _} -> add label 1
-  | Switch {label; _} -> add label 0
+  | Arg {label; _} -> add label [1]
+  | MultipleArg {label; _} -> add label [1]
+  | DefArg {label; _} -> add label [1]
+  | Switch {label; _} -> add label [0]
   | Constant _c -> acc
   | Pair (speca, specb) ->
       let acc = make_arities_dict speca acc in
@@ -1124,20 +1126,20 @@ let make_args_dict_consume ?command spec args =
           | Some (arity, long) -> (
               let* () = check_help_flag ?command tl in
               match (arity, tl) with
-              | 0, tl' ->
+              | [0], tl' ->
                   make_args_dict
                     completing
                     arities
                     (add_occurrence long "" acc)
                     tl'
-              | 1, value :: tl' ->
+              | [1], value :: tl' ->
                   make_args_dict
                     completing
                     arities
                     (add_occurrence long value acc)
                     tl'
-              | 1, [] when completing -> return (acc, [])
-              | 1, [] -> tzfail (Option_expected_argument (arg, None))
+              | [1], [] when completing -> return (acc, [])
+              | [1], [] -> tzfail (Option_expected_argument (arg, None))
               | _, _ ->
                   Stdlib.failwith
                     "cli_entries: Arguments with arity not equal to 1 or 0 \
@@ -1162,17 +1164,17 @@ let make_args_dict_filter ?command spec args =
         | Some (arity, long) -> (
             let* () = check_help_flag ?command tl in
             match (arity, tl) with
-            | 0, tl ->
+            | [0], tl ->
                 make_args_dict
                   arities
                   (add_occurrence long "" dict, other_args)
                   tl
-            | 1, value :: tl' ->
+            | [1], value :: tl' ->
                 make_args_dict
                   arities
                   (add_occurrence long value dict, other_args)
                   tl'
-            | 1, [] -> tzfail (Option_expected_argument (arg, command))
+            | [1], [] -> tzfail (Option_expected_argument (arg, command))
             | _, _ ->
                 Stdlib.failwith
                   "cli_entries: Arguments with arity not equal to 1 or 0 \
@@ -1604,14 +1606,14 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         | Some (arity, long) -> (
             let seen = StringSet.add long seen in
             match (arity, tl) with
-            | 0, args when ind = 0 ->
+            | [0], args when ind = 0 ->
                 let+ cont_args = continuation args 0 in
                 remaining_spec seen args_spec @ cont_args
-            | 0, args -> help args (ind - 1) seen
-            | 1, _ when ind = 1 ->
+            | [0], args -> help args (ind - 1) seen
+            | [1], _ when ind = 1 ->
                 let* res = complete_spec arg args_spec in
                 return (Option.value ~default:[] res)
-            | 1, _ :: tl -> help tl (ind - 2) seen
+            | [1], _ :: tl -> help tl (ind - 2) seen
             | _ -> Stdlib.failwith "cli_entries internal error, invalid arity")
         | None -> continuation args ind)
   in
