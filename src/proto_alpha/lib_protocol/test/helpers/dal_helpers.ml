@@ -200,6 +200,20 @@ struct
     | Some check_verify ->
         let*? proof, _input_opt = res in
         let@ res = Hist.verify_proof params page_id skip_list proof in
+        let res =
+          match res with
+          | Error e -> Error e
+          | Ok
+              Dal_slot_repr.History.
+                {
+                  page_content_opt;
+                  attestation_threshold_percent;
+                  commitment_publisher_opt = _;
+                } ->
+              (* These tests don't cover Adjustable DAL currently. *)
+              assert (Option.is_none attestation_threshold_percent) ;
+              Ok page_content_opt
+        in
         check_verify res page_info
 
   (* Some check functions. *)

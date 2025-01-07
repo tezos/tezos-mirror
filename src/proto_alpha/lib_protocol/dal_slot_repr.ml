@@ -1594,10 +1594,7 @@ module History = struct
         serialized_proof =
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
-      let* res =
-        verify_proof_repr ?with_migration dal_params page_id snapshot proof_repr
-      in
-      return res.page_content_opt
+      verify_proof_repr ?with_migration dal_params page_id snapshot proof_repr
 
     let hash = hash ?with_migration:None
 

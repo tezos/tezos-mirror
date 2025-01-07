@@ -480,6 +480,23 @@ module History : sig
     t ->
     (proof * Page.content option) tzresult Lwt.t
 
+  (** The [verify_proof] function below returns three results:
+
+      - A page content, which is [None] in case the slot related to the target
+      page is not attested;
+
+      - Some attestation threshold percent in case the rollup uses Adjustable
+      DAL, or [None] otherwise;
+
+      - Some contract address in case the slot related to the target page is
+      published, or [None] otherwise.
+  *)
+  type verify_proof_result = {
+    page_content_opt : Page.content option;
+    attestation_threshold_percent : int option;
+    commitment_publisher_opt : Contract_repr.t option;
+  }
+
   (** [verify_proof ?with_migration dal_params page_id snapshot proof] verifies
       that the given [proof] is a valid proof to show that either:
 
@@ -501,7 +518,7 @@ module History : sig
     Page.t ->
     t ->
     proof ->
-    Page.content option tzresult
+    verify_proof_result tzresult
 
   type error += Add_element_in_slots_skip_list_violates_ordering
 
