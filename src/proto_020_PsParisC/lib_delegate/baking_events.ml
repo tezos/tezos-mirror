@@ -1010,21 +1010,33 @@ module Actions = struct
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let block_injected =
-    declare_4
+    declare_5
       ~alternative_color:Internal_event.Blue
       ~section
       ~name:"block_injected"
       ~level:Notice
       ~msg:
-        "block {block} at level {level}, round {round} injected for {delegate}"
+        "block {block} at level {level}, round {round} injected for \
+         {delegate}{manager_operations_infos}"
       ~pp1:Block_hash.pp
       ~pp2:pp_int32
       ~pp3:Round.pp
       ~pp4:Baking_state.pp_consensus_key_and_delegate
+      ~pp5:
+        (Format.pp_print_option
+           (fun fmt Baking_state.{manager_operation_number; total_fees} ->
+             Format.fprintf
+               fmt
+               " with %d manager operations summing %a μtz in fees"
+               manager_operation_number
+               pp_int64
+               total_fees))
       ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ( "manager_operations_infos",
+        Data_encoding.option Baking_state.manager_operations_infos_encoding )
 
   let block_injection_failed =
     declare_2

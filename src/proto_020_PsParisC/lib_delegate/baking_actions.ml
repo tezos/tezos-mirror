@@ -785,7 +785,14 @@ let inject_consensus_votes state signed_consensus_vote_batch =
 let inject_block ?(force_injection = false) ?(asynchronous = true) state
     prepared_block =
   let open Lwt_result_syntax in
-  let {signed_block_header; round; delegate; operations; baking_votes; _} =
+  let {
+    signed_block_header;
+    round;
+    delegate;
+    operations;
+    manager_operations_infos;
+    baking_votes;
+  } =
     prepared_block
   in
   (* Cache last per-block votes to use in case of vote file errors *)
@@ -825,7 +832,11 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
       Events.(
         emit
           block_injected
-          (bh, signed_block_header.shell.level, round, delegate))
+          ( bh,
+            signed_block_header.shell.level,
+            round,
+            delegate,
+            manager_operations_infos ))
     in
     return_unit
   in
