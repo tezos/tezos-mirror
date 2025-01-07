@@ -35,6 +35,16 @@ end
 
 module Decode = struct
   let mutez json = json |> JSON.as_int |> Tez.of_mutez_int
+
+  (* - Returns [Some <n>] if the input is an integer.
+     - Returns [None] if the input is [`Null].
+     - Raises an exception in all other cases.
+
+     The difference with {!JSON.as_int_opt} is that {!JSON.as_int_opt}
+     never fails, but instead returns [None] whenever the input is
+     anything else than an integer. *)
+  let int_option json =
+    if JSON.is_null json then None else Some (JSON.as_int json)
 end
 
 type 'result t = 'result RPC_core.t
@@ -1654,7 +1664,7 @@ let get_chain_block_context_adaptive_issuance_launch_cycle ?(chain = "main")
       "context";
       "adaptive_issuance_launch_cycle";
     ]
-    Fun.id
+    Decode.int_option
 
 let get_chain_block_context_issuance_expected_issuance ?(chain = "main")
     ?(block = "head") () =

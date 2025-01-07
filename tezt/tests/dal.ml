@@ -7283,7 +7283,7 @@ let scenario_tutorial_dal_baker =
         @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
       in
       Check.(
-        (JSON.as_int adaptive_issuance_launch_cycle = 0)
+        (Option.get adaptive_issuance_launch_cycle = 0)
           ~__LOC__
           Check.int
           ~error_msg:
