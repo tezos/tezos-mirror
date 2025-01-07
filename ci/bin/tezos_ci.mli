@@ -42,7 +42,10 @@ module Cli : sig
   (** Action the binary should perform. *)
   type action =
     | Write  (** Write the CI configuration *)
+    | Overview_pipelines  (** Print pipelines as table. *)
     | List_pipelines  (** List registered pipelines. *)
+    | Describe_pipeline of {name : string}
+        (** Describe a registered pipeline. *)
 
   (** Type of the command-line configuration for the generator binary. *)
   type config = {
@@ -152,8 +155,17 @@ module Pipeline : sig
     unit ->
     unit
 
-  (** Pretty prints the set of registered pipelines. *)
+  (** Outputs the set of registered pipelines with their description. *)
   val list_pipelines : unit -> unit
+
+  (** Pretty prints the set of registered pipelines as a table. *)
+  val overview_pipelines : unit -> unit
+
+  (** Describe the registered pipeline of a given name.
+
+      If no such pipeline is registered, [exit 1] is called and an
+      error message is printed. *)
+  val describe_pipeline : string -> unit
 end
 
 (** A facility for registering images for [image:] keywords.
@@ -362,6 +374,7 @@ val job :
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
+  ?description:string ->
   __POS__:string * int * int * int ->
   image:Image.t ->
   stage:Stage.t ->
@@ -375,6 +388,7 @@ val job :
 val trigger_job :
   ?dependencies:dependencies ->
   ?rules:Gitlab_ci.Types.job_rule list ->
+  ?description:string ->
   __POS__:string * int * int * int ->
   stage:Stage.t ->
   Pipeline.child_pipeline ->
