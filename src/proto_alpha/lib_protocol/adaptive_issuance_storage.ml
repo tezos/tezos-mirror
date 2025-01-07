@@ -365,10 +365,12 @@ let update_stored_rewards_at_cycle_end ctxt ~new_cycle =
 let load_reward_coeff ctxt =
   load_reward_coeff ctxt ~cycle:(Raw_context.current_level ctxt).cycle
 
-let init ctxt =
+let init_from_genesis ctxt =
   let open Lwt_result_syntax in
   let* ctxt = Storage.Adaptive_issuance.Launch_ema.init ctxt 0l in
-  Storage.Adaptive_issuance.Activation.init ctxt None
+  let ctxt = Raw_context.set_adaptive_issuance_enable ctxt in
+  let current_cycle = (Level_storage.current ctxt).cycle in
+  Storage.Adaptive_issuance.Activation.init ctxt (Some current_cycle)
 
 let set_adaptive_issuance_enable ctxt =
   let open Lwt_result_syntax in

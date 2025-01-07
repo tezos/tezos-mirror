@@ -48,9 +48,14 @@ val load_reward_coeff : Raw_context.t -> Raw_context.t tzresult Lwt.t
 val update_stored_rewards_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [init ctxt] adds into the context an adaptive issuance vote EMA
-    at 0, and adaptive issuance launch cycle at None. *)
-val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+(** Initializes the adaptive issuance vote EMA at 0, and the adaptive
+    issuance launch cycle at the current cycle, and sets
+    the [adaptive_issuance_enable] internal field to true.
+
+    To be called only when stitching from Genesis. Indeed, when
+    migrating from the predecessor or current protocol, the EMA and
+    launch cycle are already set in the context. *)
+val init_from_genesis : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [update_ema ctxt ~vote] returns the new context with the new EMA *)
 val update_ema :
