@@ -112,16 +112,18 @@ let create_bounded ?on_completion =
 let create_dropbox ?on_completion =
   let table =
     let open Worker in
-    let merge _w (Any_request neu) (old : _ option) =
-      let (Any_request r) =
+    let merge _w (Any_request (neu, neu_metadata)) (old : _ option) =
+      let (Any_request (r, metadata)) =
         match (neu, old) with
-        | RqA i1, Some (Any_request (RqA i2)) -> Any_request (RqA (i1 + i2))
-        | (RqA _ as rqa), _ -> Any_request rqa
-        | _, Some (Any_request (RqA _ as rqa)) -> Any_request rqa
-        | RqB, _ -> Any_request neu
-        | RqErr _, _ -> Any_request neu
+        | RqA i1, Some (Any_request (RqA i2, i2_metadata)) ->
+            Any_request (RqA (i1 + i2), i2_metadata)
+        | (RqA _ as rqa), _ -> Any_request (rqa, neu_metadata)
+        | _, Some (Any_request ((RqA _ as rqa), metadata)) ->
+            Any_request (rqa, metadata)
+        | RqB, _ -> Any_request (neu, neu_metadata)
+        | RqErr _, _ -> Any_request (neu, neu_metadata)
       in
-      Some (Worker.Any_request r)
+      Some (Worker.Any_request (r, metadata))
     in
     Worker.create_table (Dropbox {merge})
   in

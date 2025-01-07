@@ -57,6 +57,10 @@ module type T = sig
 
   type dropbox
 
+  type scope
+
+  type metadata = {scope : scope option}
+
   (** An error returned when waiting for a message pushed to the worker.
       [Closed errs] is returned if the worker is terminated or has crashed. If the
       worker is terminated, [errs] is an empty list.
@@ -77,7 +81,7 @@ module type T = sig
       }
         -> dropbox buffer_kind
 
-  and any_request = Any_request : _ Request.t -> any_request
+  and any_request = Any_request : _ Request.t * metadata -> any_request
 
   (** Create a table of workers. *)
   val create_table : 'kind buffer_kind -> 'kind table

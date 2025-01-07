@@ -51,6 +51,10 @@ module type T = sig
 
   type dropbox
 
+  type scope
+
+  type metadata = {scope : scope option}
+
   type 'a message_error =
     | Closed of error list option
     | Request_error of 'a
@@ -66,7 +70,7 @@ module type T = sig
       }
         -> dropbox buffer_kind
 
-  and any_request = Any_request : _ Request.t -> any_request
+  and any_request = Any_request : _ Request.t * metadata -> any_request
 
   (** Create a table of workers. *)
   val create_table : 'kind buffer_kind -> 'kind table
@@ -242,6 +246,10 @@ struct
 
   let base_name = String.concat "-" Name.base
 
+  type scope = Opentelemetry.Scope.t
+
+  type metadata = {scope : scope option}
+
   type 'a message_error =
     | Closed of error list option
     | Request_error of 'a
@@ -249,7 +257,9 @@ struct
 
   type message =
     | Message :
-        ('a, 'b) Request.t * ('a, 'b message_error) result Lwt.u option
+        ('a, 'b) Request.t
+        * metadata
+        * ('a, 'b message_error) result Lwt.u option
         -> message
 
   type 'a queue
@@ -269,7 +279,7 @@ struct
       }
         -> dropbox buffer_kind
 
-  and any_request = Any_request : _ Request.t -> any_request
+  and any_request = Any_request : _ Request.t * metadata -> any_request
 
   and _ buffer =
     | Queue_buffer :
@@ -306,27 +316,32 @@ struct
     | Worker_types.Launching _ | Running _ | Closing _ -> None
     | Closed (_, _, errs) -> errs
 
-  let queue_item ?u r = (Time.System.now (), Message (r, u))
+  let queue_item ~metadata ?u r = (Time.System.now (), Message (r, metadata, u))
 
-  let drop_request w merge message_box request =
+  let drop_request w merge message_box request metadata =
     try
       match
         match Lwt_dropbox.peek message_box with
-        | None -> merge w (Any_request request) None
-        | Some (_, Message (old, _)) ->
+        | None -> merge w (Any_request (request, metadata)) None
+        | Some (_, Message (old, old_metadata, _)) ->
             Lwt.ignore_result (Lwt_dropbox.take message_box) ;
-            merge w (Any_request request) (Some (Any_request old))
+            merge
+              w
+              (Any_request (request, metadata))
+              (Some (Any_request (old, old_metadata)))
       with
       | None -> ()
-      | Some (Any_request neu) ->
-          Lwt_dropbox.put message_box (Time.System.now (), Message (neu, None))
+      | Some (Any_request (neu, neu_metadata)) ->
+          Lwt_dropbox.put
+            message_box
+            (Time.System.now (), Message (neu, neu_metadata, None))
     with Lwt_dropbox.Closed -> ()
 
-  let drop_request_and_wait w message_box request =
+  let drop_request_and_wait w message_box request metadata =
     let t, u = Lwt.wait () in
     Lwt.catch
       (fun () ->
-        Lwt_dropbox.put message_box (queue_item ~u request) ;
+        Lwt_dropbox.put message_box (queue_item ~metadata ~u request) ;
         t)
       (function
         | Lwt_dropbox.Closed ->
@@ -365,11 +380,11 @@ struct
     let put_request (w : dropbox t) request =
       let (Dropbox {merge}) = w.table.buffer_kind in
       let (Dropbox_buffer message_box) = w.buffer in
-      drop_request w merge message_box request
+      drop_request w merge message_box request {scope = None}
 
     let put_request_and_wait (w : dropbox t) request =
       let (Dropbox_buffer message_box) = w.buffer in
-      drop_request_and_wait w message_box request
+      drop_request_and_wait w message_box request {scope = None}
   end
 
   module Queue = struct
@@ -378,7 +393,9 @@ struct
       | Queue_buffer message_queue ->
           if Lwt_pipe.Unbounded.is_closed message_queue then Lwt.return_false
           else (
-            Lwt_pipe.Unbounded.push message_queue (queue_item request) ;
+            Lwt_pipe.Unbounded.push
+              message_queue
+              (queue_item ~metadata:{scope = None} request) ;
             (* because pushing on an unbounded pipe is immediate, we return within
                Lwt explicitly for compatibility with the other case *)
             Lwt.return_true)
@@ -387,21 +404,28 @@ struct
           else
             let open Lwt_syntax in
             let* () =
-              Lwt_pipe.Bounded.push message_queue (queue_item request)
+              Lwt_pipe.Bounded.push
+                message_queue
+                (queue_item ~metadata:{scope = None} request)
             in
             Lwt.return_true
 
     let push_request_now (w : infinite queue t) request =
       let (Queue_buffer message_queue) = w.buffer in
       if Lwt_pipe.Unbounded.is_closed message_queue then ()
-      else Lwt_pipe.Unbounded.push message_queue (queue_item request)
+      else
+        Lwt_pipe.Unbounded.push
+          message_queue
+          (queue_item ~metadata:{scope = None} request)
 
     let push_request_and_wait (type a) (w : a queue t) request =
       match w.buffer with
       | Queue_buffer message_queue -> (
           try
             let t, u = Lwt.wait () in
-            Lwt_pipe.Unbounded.push message_queue (queue_item ~u request) ;
+            Lwt_pipe.Unbounded.push
+              message_queue
+              (queue_item ~metadata:{scope = None} ~u request) ;
             t
           with Lwt_pipe.Closed ->
             Lwt.return_error (Closed (extract_status_errors w)))
@@ -409,7 +433,9 @@ struct
           let t, u = Lwt.wait () in
           Lwt.try_bind
             (fun () ->
-              Lwt_pipe.Bounded.push message_queue (queue_item ~u request))
+              Lwt_pipe.Bounded.push
+                message_queue
+                (queue_item ~metadata:{scope = None} ~u request))
             (fun () -> t)
             (function
               | Lwt_pipe.Closed ->
@@ -426,7 +452,9 @@ struct
               Lwt_pipe.Bounded.peek_all_now message_queue
         with Lwt_pipe.Closed -> []
       in
-      List.map (function t, Message (req, _) -> (t, Request.view req)) peeked
+      List.map
+        (function t, Message (req, _, _) -> (t, Request.view req))
+        peeked
 
     let pending_requests_length (type a) (w : a queue t) =
       let pipe_length (type a) (q : a buffer) =
@@ -440,9 +468,9 @@ struct
 
   let close (type a) (w : a t) =
     let wakeup = function
-      | _, Message (_, Some u) ->
+      | _, Message (_, _, Some u) ->
           Lwt.wakeup_later u (Error (Closed (extract_status_errors w)))
-      | _, Message (_, None) -> ()
+      | _, Message (_, _, None) -> ()
     in
     let close_queue message_queue =
       let messages = Lwt_pipe.Bounded.pop_all_now message_queue in
@@ -579,7 +607,7 @@ struct
       | Ok None ->
           let* () = Handlers.on_no_request w in
           loop ()
-      | Ok (Some (pushed, Message (request, u))) -> (
+      | Ok (Some (pushed, Message (request, {scope = _scope}, u))) -> (
           let current_request = Request.view request in
           let treated = Time.System.now () in
           w.current_request <- Some (pushed, treated, current_request) ;
