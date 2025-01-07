@@ -1481,45 +1481,29 @@ module History = struct
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
         page_id
       in
-      let* target_cell, inc_proof, page_proof_check =
+      (* With the recent refactoring of the skip list shape, we always have a
+         target cell and an inclusion proof in the provided proof, because the
+         skip list contains a cell for each slot index of each level. *)
+      let target_cell, inc_proof =
         match proof with
         | Page_confirmed
             {
               target_cell;
               inc_proof;
-              page_data;
-              page_proof;
+              page_data = _;
+              page_proof = _;
               attestation_threshold_percent = _;
               commitment_publisher = _;
-            (* TODO: Will be handled in the next MR *)
             } ->
-            let page_proof_check =
-              Some
-                (fun commitment ->
-                  (* We check that the page indeed belongs to the target slot at the
-                     given page index. *)
-                  let* () =
-                    check_page_proof
-                      dal_params
-                      page_proof
-                      page_data
-                      page_id
-                      commitment
-                  in
-                  (* If the check succeeds, we return the data/content of the
-                     page. *)
-                  return page_data)
-            in
-            return (target_cell, inc_proof, page_proof_check)
+            (target_cell, inc_proof)
         | Page_unconfirmed
             {
               target_cell;
               inc_proof;
               attestation_threshold_percent = _;
               commitment_publisher_opt = _;
-            (* TODO: Will be handled in the next MR *)
             } ->
-            return (target_cell, inc_proof, None)
+            (target_cell, inc_proof)
       in
       let cell_content = Skip_list.content target_cell in
       (* We check that the target cell has the same level and index than the
@@ -1544,20 +1528,36 @@ module History = struct
           ~src:snapshot
           ~dest:target_cell
       in
-      match (page_proof_check, cell_content) with
-      | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
+      match (proof, cell_content) with
+      | ( Page_unconfirmed _,
+          (Unpublished _ | Published {is_proto_attested = false; _}) ) ->
           return_none
-      | ( Some page_proof_check,
+      | ( Page_confirmed
+            {
+              target_cell = _;
+              inc_proof = _;
+              page_data;
+              page_proof;
+              attestation_threshold_percent = _;
+              commitment_publisher = _;
+            },
           Published {header = {commitment; id = _}; is_proto_attested = true; _}
         ) ->
-          let* page_data = page_proof_check commitment in
+          (* We check that the page indeed belongs to the target slot at the
+             given page index. *)
+          let* () =
+            check_page_proof dal_params page_proof page_data page_id commitment
+          in
+          (* If the check succeeds, we return the data/content of the
+             page. *)
           return_some page_data
-      | Some _, (Unpublished _ | Published {is_proto_attested = false; _}) ->
+      | ( Page_confirmed _,
+          (Unpublished _ | Published {is_proto_attested = false; _}) ) ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the unconfirmation proof contains the \
                 target slot."
-      | None, Published {is_proto_attested = true; _} ->
+      | Page_unconfirmed _, Published {is_proto_attested = true; _} ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the confirmation proof doesn't contain the \
