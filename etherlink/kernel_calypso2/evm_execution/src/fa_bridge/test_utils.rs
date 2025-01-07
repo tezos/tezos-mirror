@@ -174,6 +174,7 @@ pub fn run_fa_deposit(
         100_000_000_000,
         None,
         gas_limit,
+        false,
     )
     .expect("Failed to execute deposit")
 }
