@@ -53,8 +53,12 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
+  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* constants =
+    Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+  in
   let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations cctxt
+    Operation_worker.run ?monitor_node_operations ~constants cctxt
   in
   Baking_scheduling.create_initial_state
     cctxt
@@ -64,6 +68,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
     config
     operation_worker
     ~current_proposal
+    ~constants
     delegates
 
 let get_current_proposal cctxt ?cache () =
