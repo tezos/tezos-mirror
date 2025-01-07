@@ -690,26 +690,19 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let base_dir_file = Filename.Infix.(cctxt#get_base_dir // default_filename) in
   when_s file_exists base_dir_file @@ fun () -> return_none
 
-(* Running a DAL node is mandatory on some networks. This function checks that
-   a DAL node endpoint was given, and that the specified DAL node is "healthy",
+(* This function checks that a DAL node endpoint was given,
+   and that the specified DAL node is "healthy",
    (the DAL's nodes 'health' RPC is used for that). *)
-let check_dal_node cctxt dal_node_rpc_ctxt =
-  let open Lwt_result_syntax in
-  let* node_config = Octez_node_config.Node_services.config cctxt () in
-  let mandatory (_chain_name : Distributed_db_version.Name.t) =
-    (* for now there's no network for which the DAL is mandatory *)
-    false
-  in
-  if mandatory node_config.blockchain_network.chain_name then
-    match dal_node_rpc_ctxt with
-    | None -> tzfail No_dal_node_endpoint
-    | Some ctxt -> (
-        let* health = Node_rpc.get_dal_health ctxt in
-        let open Tezos_dal_node_services.Types.Health in
-        match health.status with
-        | Up -> return_unit
-        | _ -> tzfail (Unhealthy_dal_node {health}))
-  else return_unit
+let check_dal_node dal_node_rpc_ctxt =
+  let open Lwt_syntax in
+  match dal_node_rpc_ctxt with
+  | None -> Events.(emit no_dal_node_running ())
+  | Some ctxt -> (
+      let* health = Node_rpc.get_dal_health ctxt in
+      match health with
+      | Ok {Tezos_dal_node_services.Types.Health.status = Up; _} -> return_unit
+      | Ok _ -> Events.(emit unhealthy_dal_node (Uri.to_string ctxt#base))
+      | Error _ -> Events.(emit unreachable_dal (Uri.to_string ctxt#base)))
 
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
@@ -773,7 +766,7 @@ let run_baker
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint
   in
-  let* () = check_dal_node cctxt dal_node_rpc_ctxt in
+  let*! () = check_dal_node dal_node_rpc_ctxt in
   let* delegates = get_delegates cctxt sources in
   let context_path =
     match baking_mode with
