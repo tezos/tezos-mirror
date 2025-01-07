@@ -170,8 +170,8 @@ let interpolate_snapshot_file current_level rollup_address filename =
 
 let export ?snapshot_file ~compression ~data_dir () =
   let open Lwt_result_syntax in
-  let* () = Evm_context.lock_data_dir ~data_dir in
-  let evm_state_path = Evm_context.State.store_path ~data_dir in
+  let* () = Data_dir.lock ~data_dir in
+  let evm_state_path = Data_dir.store_path ~data_dir in
   let* dest_file =
     let evm_context_files =
       Tezos_stdlib_unix.Utils.fold_files
@@ -186,7 +186,7 @@ let export ?snapshot_file ~compression ~data_dir () =
     Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
     let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
     let* {rollup_address; current_number = current_level} =
-      Evm_context.export_store ~data_dir ~output_db_file
+      Data_dir.export_store ~data_dir ~output_db_file
     in
     let header = Header.{version = V0; rollup_address; current_level} in
     let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
@@ -239,7 +239,7 @@ let export ?snapshot_file ~compression ~data_dir () =
 let data_dir_populated ~data_dir =
   let open Lwt_syntax in
   let store_file = Filename.concat data_dir Evm_store.sqlite_file_name in
-  let state_dir = Evm_context.State.store_path ~data_dir in
+  let state_dir = Data_dir.store_path ~data_dir in
   let* store_exists = Lwt_unix.file_exists store_file in
   let* state_exists = Lwt_utils_unix.dir_exists state_dir in
   return (store_exists || state_exists)
@@ -277,7 +277,7 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
   in
   return_unit
 
-let import ~force ~data_dir ~snapshot_file =
+let import ~cancellable ~force ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let open Filename.Infix in
   let*! populated = data_dir_populated ~data_dir in
@@ -286,15 +286,13 @@ let import ~force ~data_dir ~snapshot_file =
   in
   let* () = check_snapshot_exists snapshot_file in
   let*! () = Lwt_utils_unix.create_dir data_dir in
-  let* () = Evm_context.lock_data_dir ~data_dir in
+  let* () = Data_dir.lock ~data_dir in
   let* () =
     (* This is safe because we took the lock. This cannot be moved before
-       `Evm_context.lock_data_dir`. *)
+       `Data_dir.lock`. *)
     when_ populated @@ fun () ->
     Format.printf "Delete previous contents from the data-dir\n%!" ;
-    let*! () =
-      Lwt_utils_unix.remove_dir (Evm_context.State.store_path ~data_dir)
-    in
+    let*! () = Lwt_utils_unix.remove_dir (Data_dir.store_path ~data_dir) in
     return_unit
   in
   let reader =
@@ -309,12 +307,17 @@ let import ~force ~data_dir ~snapshot_file =
         reader
         stdlib_writer
         (check_header ~populated ~data_dir)
+        ~cancellable
+        ~display_progress:(not cancellable)
+          (* [progress] modifies the signal handlers, which are necessary for
+             [Lwt_exit] to work. As a consequence, if we want to be
+             cancellable, we cannot have display bar. *)
         ~snapshot_file
         ~dest
     in
     Unix.rename
-      (Evm_context.State.store_path ~data_dir:dest)
-      (Evm_context.State.store_path ~data_dir) ;
+      (Data_dir.store_path ~data_dir:dest)
+      (Data_dir.store_path ~data_dir) ;
     let rm f =
       try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
     in

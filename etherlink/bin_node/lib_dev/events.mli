@@ -115,3 +115,15 @@ val wasm_pvm_fallback : unit -> unit Lwt.t
 (** [missing_chain_id ()] advertises that the node could not check the
     consistency of the stored chain id with the selected network. *)
 val missing_chain_id : unit -> unit Lwt.t
+
+(** [downloading_file ?size url] advertises that the node is downloading
+    the file at [url], and explicitly mentions its [size] if provided. *)
+val downloading_file : ?size:int -> string -> unit Lwt.t
+
+type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
+
+(** [download_failed url status] advertises that the download of [url] failed
+    with the given [status] code. *)
+val download_failed : string -> download_error -> unit Lwt.t
+
+val importing_snapshot : unit -> unit Lwt.t

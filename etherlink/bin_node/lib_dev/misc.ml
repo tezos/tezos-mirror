@@ -68,3 +68,45 @@ let interpolate str vars =
   in
   assert (not look) ;
   Buffer.contents buf
+
+let rec download_file ~keep_alive ~working_dir url =
+  let open Lwt_syntax in
+  let open Filename.Infix in
+  let on_failure reason =
+    let* () = Events.download_failed url reason in
+    if keep_alive then
+      let* () = Lwt_unix.sleep 2. in
+      download_file ~keep_alive ~working_dir url
+    else failwith "Downloading %s failed" url
+  in
+  let tmp_snapshot_name = Filename.basename url in
+  let target_path = working_dir // tmp_snapshot_name in
+  let uri = Uri.of_string url in
+  Lwt.catch
+    (fun () ->
+      let* resp, body = Cohttp_lwt_unix.Client.get uri in
+      match resp.status with
+      | `OK ->
+          let stream = Cohttp_lwt.Body.to_stream body in
+          let size =
+            Option.map
+              int_of_string
+              (Cohttp.Header.get resp.headers "content-length")
+          in
+          let* () = Events.downloading_file ?size url in
+          let* () =
+            Lwt_io.with_file ~mode:Lwt_io.output target_path @@ fun out ->
+            Lwt_stream.iter_s
+              (fun chunk ->
+                (* Per observations, this iteration over the stream is very
+                   eager, and cannot be canceled easily without yielding
+                   explicitely. *)
+                let* () = Lwt.pause () in
+                Lwt_io.write out chunk)
+              stream
+          in
+          Lwt_result.return target_path
+      | #Cohttp.Code.status_code as status_code ->
+          on_failure (Http_error status_code))
+    (function
+      | Lwt.Canceled as exn -> Lwt.reraise exn | exn -> on_failure (Exn exn))

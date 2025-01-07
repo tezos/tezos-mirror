@@ -25,6 +25,7 @@ type parameters = {
   smart_rollup_address : string option;
   store_perm : [`Read_only | `Read_write];
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
+  snapshot_url : string option;
 }
 
 type session_state = {
@@ -46,11 +47,6 @@ type t = {
   store : Evm_store.t;
   session : session_state;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
-}
-
-type store_info = {
-  rollup_address : Address.t;
-  current_number : Ethereum_types.quantity;
 }
 
 let is_sequencer t = Option.is_some t.sequencer_wallet
@@ -89,36 +85,7 @@ let init_status, init_status_waker = Lwt.task ()
 
 let execution_config, execution_config_waker = Lwt.task ()
 
-let global_lockfile_path ~data_dir = Filename.Infix.(data_dir // "lock")
-
-type error += Data_dir_locked of string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"evm_node.datadir_is_locked"
-    ~title:"Data directory of EVM node is locked"
-    ~description:"Data directory of EVM node is locked by another process."
-    ~pp:(fun ppf dir ->
-      Format.fprintf
-        ppf
-        "The data directory %s of the EVM node is locked by another process."
-        dir)
-    Data_encoding.(obj1 (req "data_dir" string))
-    (function Data_dir_locked dir -> Some dir | _ -> None)
-    (fun dir -> Data_dir_locked dir)
-
-let lock_data_dir ~data_dir =
-  let open Lwt_result_syntax in
-  let*! () = Lwt_utils_unix.create_dir data_dir in
-  let filename = global_lockfile_path ~data_dir in
-  (* It's okay not to release the lock because once you have taken it,
-     you don't want the data directory to be overwritten while the node
-     is running. The lock will be released once the node stops. *)
-  let* _fd =
-    Lwt_lock_file.lock ~when_locked:(`Fail (Data_dir_locked data_dir)) ~filename
-  in
-  return_unit
+let lock_data_dir ~data_dir = Data_dir.lock ~data_dir
 
 let head_watcher : Ethereum_types.Subscription.output Lwt_watcher.input =
   Lwt_watcher.create_input ()
@@ -222,8 +189,6 @@ module State = struct
       let first_head = ref (session_to_head_info ctxt.session) in
       Lwt.wakeup head_info_waker first_head
   end
-
-  let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
   let load ~data_dir ~store_perm:perm index =
     let open Lwt_result_syntax in
@@ -1252,8 +1217,39 @@ module State = struct
     in
     return ({smart_rollup_address; history_mode} : Evm_store.metadata)
 
+  let irmin_load ?snapshot_url ~data_dir configuration =
+    let open Lwt_result_syntax in
+    let*! store_already_exists =
+      Lwt_utils_unix.dir_exists (Evm_state.irmin_store_path ~data_dir)
+    in
+    let* () =
+      match snapshot_url with
+      | Some snapshot_url when not store_already_exists ->
+          Lwt_utils_unix.with_tempdir
+            ".download_snapshot_"
+            ~temp_dir:data_dir
+            (fun tmp_dir ->
+              let* snapshot_file =
+                Misc.download_file
+                  ~keep_alive:configuration.Configuration.keep_alive
+                  ~working_dir:tmp_dir
+                  snapshot_url
+              in
+              let*! () = Events.importing_snapshot () in
+              Snapshots.import
+                ~cancellable:true
+                ~force:true
+                ~data_dir
+                ~snapshot_file)
+      | _ -> return_unit
+    in
+    Irmin_context.load
+      ~cache_size:100_000
+      Read_write
+      (Evm_state.irmin_store_path ~data_dir)
+
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
-      ?smart_rollup_address ~store_perm ?sequencer_wallet () =
+      ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url () =
     let open Lwt_result_syntax in
     let*! () =
       Evm_context_events.start_history_mode
@@ -1265,12 +1261,7 @@ module State = struct
     let*! () =
       Lwt_utils_unix.create_dir configuration.kernel_execution.preimages
     in
-    let* index =
-      Irmin_context.load
-        ~cache_size:100_000
-        Read_write
-        (Evm_state.irmin_store_path ~data_dir)
-    in
+    let* index = irmin_load ?snapshot_url ~data_dir configuration in
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
       load ~data_dir ~store_perm index
@@ -1637,6 +1628,7 @@ module Handlers = struct
         smart_rollup_address : string option;
         store_perm;
         sequencer_wallet;
+        snapshot_url;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -1647,6 +1639,7 @@ module Handlers = struct
         ?smart_rollup_address
         ~store_perm
         ?sequencer_wallet
+        ?snapshot_url
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1803,17 +1796,8 @@ let worker_wait_for_request req =
   let*! res = Worker.Queue.push_request_and_wait w req in
   return_ res
 
-let export_store ~data_dir ~output_db_file =
-  let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
-  Evm_store.use store @@ fun conn ->
-  let* metadata = Evm_store.Metadata.get conn in
-  let* current_number, _ = Evm_store.Context_hashes.get_latest conn in
-  let* () = Evm_store.vacuum ~conn ~output_db_file in
-  return {rollup_address = metadata.smart_rollup_address; current_number}
-
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
-    ~store_perm ?sequencer_wallet () =
+    ~store_perm ?sequencer_wallet ?snapshot_url () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1827,6 +1811,7 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         smart_rollup_address;
         store_perm;
         sequencer_wallet;
+        snapshot_url;
       }
       (module Handlers)
   in

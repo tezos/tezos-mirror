@@ -176,7 +176,7 @@ struct
       raise e
 
   let extract (module Reader : READER) (module Writer : WRITER) header_check
-      ~snapshot_file ~dest =
+      ~cancellable ~display_progress ~snapshot_file ~dest =
     let open Lwt_result_syntax in
     let module Writer = struct
       include Writer
@@ -204,14 +204,35 @@ struct
         let in_chan = in_chan
       end)
     in
+    let maybe_progress k =
+      if display_progress then (
+        let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
+        Progress_bar.with_reporter spinner @@ fun count_progress ->
+        Writer.count_progress := count_progress ;
+        k ())
+      else k ()
+    in
+    let run k =
+      if cancellable then
+        (* [Lwt_preemptive] does not yet provide a way to cancel a detached
+           computation.
+
+           As a temporary fix, we use [Lwt.wrap_in_cancelable]. The promise
+           created by [detach] is cancelled. The detached computation keeps
+           running, which is less than ideal, but it is reasonable because
+           our use case for cancellation leads to the program exiting. *)
+        Lwt.wrap_in_cancelable (Lwt_preemptive.detach k ())
+      else Lwt.return (k ())
+    in
     Lwt.finalize
       (fun () ->
         let header = read_snapshot_header reader_input in
         let* check_result = header_check header in
-        let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
-        Progress_bar.with_reporter spinner @@ fun count_progress ->
-        Writer.count_progress := count_progress ;
-        Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
+        maybe_progress @@ fun () ->
+        let*! () =
+          run (fun () ->
+              Archive_reader.Archive.extract_gen out_channel_of_header in_chan)
+        in
         return (header, check_result))
       (fun () ->
         Reader.close_in in_chan ;

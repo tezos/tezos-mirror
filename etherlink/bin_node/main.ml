@@ -455,6 +455,14 @@ let no_sync_arg =
     ~doc:"Disable tracking the head of the EVM node endpoint"
     ()
 
+let init_from_snapshot_arg =
+  Tezos_clic.switch
+    ~long:"init-from-snapshot"
+    ~doc:
+      "Automatically download and import a recent snapshot for supported \
+       networks on fresh data directories"
+    ()
+
 let evm_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"evm-node-endpoint"
@@ -1081,7 +1089,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
-    ~no_sync ~finalized_view ?network () =
+    ~no_sync ~init_from_snapshot ~finalized_view ?network () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1143,6 +1151,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   Evm_node_lib_dev.Observer.main
     ?network
     ~no_sync
+    ~init_from_snapshot
     ?kernel_path:kernel
     ~data_dir
     ~config
@@ -2138,7 +2147,7 @@ let sandbox_command =
         ())
 
 let observer_run_args =
-  Tezos_clic.args9
+  Tezos_clic.args10
     evm_node_endpoint_arg
     bundler_node_endpoint_arg
     preimages_arg
@@ -2147,6 +2156,7 @@ let observer_run_args =
     initial_kernel_arg
     dont_track_rollup_node_arg
     no_sync_arg
+    init_from_snapshot_arg
     (supported_network_arg
        ~why:
          "If set, additional sanity checks are performed on the node’s startup."
@@ -2185,6 +2195,7 @@ let observer_command =
              kernel,
              dont_track_rollup_node,
              no_sync,
+             init_from_snapshot,
              network ) )
          () ->
       let open Lwt_result_syntax in
@@ -2225,6 +2236,7 @@ let observer_command =
         ?restricted_rpcs
         ?kernel
         ~no_sync
+        ~init_from_snapshot
         ~finalized_view
         ?network
         ())
@@ -2272,7 +2284,11 @@ let import_snapshot_command =
              contents is removed first, even if the snapshot is corrupted)"))
     (prefixes ["snapshot"; "import"] @@ Params.snapshot_file @@ stop)
     (fun (data_dir, force) snapshot_file () ->
-      Evm_node_lib_dev.Snapshots.import ~force ~data_dir ~snapshot_file)
+      Evm_node_lib_dev.Snapshots.import
+        ~cancellable:true
+        ~force
+        ~data_dir
+        ~snapshot_file)
 
 let snapshot_info_command =
   let open Tezos_clic in

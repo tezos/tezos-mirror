@@ -18,22 +18,6 @@ type head = {
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
-(** [lock_data_dir ~data_dir] takes an exclusive lock on [data_dir] for the
-    duration of the process. It fails if there is already another evm node with
-    a lock. *)
-val lock_data_dir : data_dir:string -> unit tzresult Lwt.t
-
-type store_info = {
-  rollup_address : Address.t;
-  current_number : Ethereum_types.quantity;
-}
-
-(** [export_store ~data_dir ~output_db_file] exports the store database with
-    data from the [data_dir] into the [output_db_file] and returns the rollup
-    address and the current level. *)
-val export_store :
-  data_dir:string -> output_db_file:string -> store_info tzresult Lwt.t
-
 (** [start] creates a new worker to manage a local EVM context where it
     initializes the {!type-index}, and use a checkpoint mechanism to load the
     latest {!type-store} if any. Returns a value telling if the context was
@@ -53,7 +37,9 @@ val export_store :
     (it is most certainly an artifact of the past, made outdated by the
     [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
     to use [Evm_ro_context] instead.
-*)
+
+    [snapshot_url] can be provided to automatically fetch and import the
+    snapshot if the [data_dir] was not initialized before. *)
 val start :
   configuration:Configuration.t ->
   ?kernel_path:Wasm_debugger.kernel ->
@@ -61,6 +47,7 @@ val start :
   ?smart_rollup_address:string ->
   store_perm:[`Read_only | `Read_write] ->
   ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
+  ?snapshot_url:string ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
@@ -146,11 +133,6 @@ val potential_observer_reorg :
   Uri.t ->
   Blueprint_types.with_events ->
   Ethereum_types.quantity option tzresult Lwt.t
-
-module State : sig
-  (** Path of EVM state store. *)
-  val store_path : data_dir:string -> string
-end
 
 (** Watcher that gets notified each time a new block is produced. *)
 val head_watcher : Ethereum_types.Subscription.output Lwt_watcher.input

@@ -173,6 +173,84 @@ let missing_chain_id =
     ~msg:"Missing chain id: skipping consistency check with selected network"
     ()
 
+let downloading_file =
+  let pp_file_size fmt size =
+    let pp unit power =
+      Format.fprintf
+        fmt
+        "%d.%d%s"
+        (size / power)
+        (size / (power / 10) mod 10)
+        unit
+    in
+    if size / 1_000_000_000 > 0 then pp "GBytes" 1_000_000_000
+    else if size / 1_000_000 > 0 then pp "MBytes" 1_000_000
+    else if size / 1_000 > 0 then pp "KBytes" 1_000
+    else Format.fprintf fmt "%dbytes" size
+  in
+  Internal_event.Simple.declare_2
+    ~level:Notice
+    ~section
+    ~name:"downloading_snapshot"
+    ~msg:"Downloading {url}{size}, this might take a while."
+    ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
+    ~pp2:
+      Format.(
+        pp_print_option (fun fmt size -> fprintf fmt " (%a)" pp_file_size size))
+    ("url", Data_encoding.string)
+    ("size", Data_encoding.(option int31))
+
+let importing_snapshot =
+  Internal_event.Simple.declare_0
+    ~level:Notice
+    ~section
+    ~name:"importing_snapshot"
+    ~msg:"Importing snapshot"
+    ()
+
+type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
+
+let download_error_encoding =
+  let open Data_encoding in
+  let status_code_encoding =
+    conv Cohttp.Code.code_of_status Cohttp.Code.status_of_code int31
+  in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"http_error"
+        (obj2
+           (req "kind" (constant "http_error"))
+           (req "status_code" status_code_encoding))
+        (function Http_error code -> Some ((), code) | _ -> None)
+        (fun ((), code) -> Http_error code);
+      case
+        (Tag 1)
+        ~title:"exn"
+        (obj2 (req "kind" (constant "exception")) (req "description" string))
+        (function Exn exn -> Some ((), Printexc.to_string exn) | _ -> None)
+        (fun ((), _) -> Stdlib.failwith "encoding should not be used to decode");
+    ]
+
+let pp_download_error fmt =
+  let open Format in
+  function
+  | Http_error code ->
+      fprintf fmt "HTTP status code '%s'" (Cohttp.Code.string_of_status code)
+  | Exn exn -> fprintf fmt "'%s'" (Printexc.to_string exn)
+
+let download_failed =
+  Internal_event.Simple.declare_2
+    ~level:Error
+    ~section
+    ~name:"download_failed"
+    ~msg:"Downloading {url} failed with {error}."
+    ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
+    ~pp2:pp_download_error
+    ("url", Data_encoding.string)
+    ("error", download_error_encoding)
+
 let event_kernel_log_application_debug = event_kernel_log Application Debug
 
 let event_kernel_log_simulation_debug = event_kernel_log Simulation Debug
@@ -324,3 +402,9 @@ let deprecation_note msg = emit event_deprecation_note msg
 let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
 
 let missing_chain_id () = emit missing_chain_id ()
+
+let downloading_file ?size url = emit downloading_file (url, size)
+
+let download_failed url reason = emit download_failed (url, reason)
+
+let importing_snapshot () = emit importing_snapshot ()

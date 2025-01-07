@@ -35,3 +35,6 @@ val normalize_addr : string -> string
     character. [vars] is therefore a list of pair containing a character (the
     variable) and a string (its value). *)
 val interpolate : string -> (char * string) list -> string
+
+val download_file :
+  keep_alive:bool -> working_dir:string -> string -> string tzresult Lwt.t
