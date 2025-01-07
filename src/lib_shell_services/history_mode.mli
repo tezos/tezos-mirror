@@ -30,13 +30,13 @@
     chain history can be deleted as they are not required
     anymore. Three history modes are provided:
 
-    - Full mode (default mode): The node stores the minimal data since
+    - Full: The node stores the minimal data since
     the genesis required to reconstruct (or 'replay') the complete
     chain's ledger state.
 
-    - Rolling mode: This is the lightest mode as it only maintains a
-    minimal rolling fragment of the chain data so the node can still
-    validate new blocks and synchronize with the head.
+    - Rolling (default mode): This is the lightest mode as it only
+    maintains a minimal rolling fragment of the chain data so the node can
+    still validate new blocks and synchronize with the head.
 
     - Archive: This is the heaviest mode as it keeps the whole chain
     data to be able to query any information stored on the chain since

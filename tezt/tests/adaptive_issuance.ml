@@ -521,7 +521,14 @@ let test_staking =
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
-  let* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let* node_2 =
+    Node.init
+      [
+        Synchronisation_threshold 0;
+        Private_mode;
+        Node.(History_mode default_full);
+      ]
+  in
   let* () = Node.wait_for_ready node_2 in
   let* client_2 = Client.init ~endpoint:(Node node_2) () in
 

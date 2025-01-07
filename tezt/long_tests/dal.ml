@@ -76,7 +76,9 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
   let nodes_args =
     Node.
       [
-        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
+        Synchronisation_threshold 0;
+        History_mode default_full;
+        No_bootstrap_peers;
       ]
   in
   let* node, client =

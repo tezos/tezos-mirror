@@ -287,7 +287,7 @@ let test_export_import_snapshots =
   let full_node =
     Node.create
       ~name:"full_node"
-      (node_arguments @ Node.[History_mode (Full None)])
+      (node_arguments @ Node.[History_mode default_full])
   in
   let rolling_node =
     Node.create

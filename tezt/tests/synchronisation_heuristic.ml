@@ -527,7 +527,12 @@ let test_many_nodes_bootstrap =
     Client.init_with_protocol
       ~nodes_args:
         Node.
-          [Connections num_nodes; Synchronisation_threshold 0; Sync_latency 3]
+          [
+            Connections num_nodes;
+            Synchronisation_threshold 0;
+            Sync_latency 3;
+            History_mode default_full;
+          ]
       `Client
       ~protocol
       ~timestamp:Now
