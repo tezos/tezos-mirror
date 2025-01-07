@@ -281,11 +281,17 @@ type elected_block = {
   attestation_qc : Kind.attestation Operation.t list;
 }
 
+type manager_operations_infos = {
+  manager_operation_number : int;
+  total_fees : Int64.t;
+}
+
 type prepared_block = {
   signed_block_header : block_header;
   round : Round.t;
   delegate : consensus_key_and_delegate;
   operations : Tezos_base.Operation.t list list;
+  manager_operations_infos : manager_operations_infos option;
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
@@ -723,21 +729,55 @@ let signed_consensus_vote_encoding =
        (req "unsigned_consensus_vote" unsigned_consensus_vote_encoding)
        (req "signed_operation" (dynamic_size Operation.encoding)))
 
+let manager_operations_infos_encoding =
+  let open Data_encoding in
+  conv
+    (fun {manager_operation_number; total_fees} ->
+      (manager_operation_number, total_fees))
+    (fun (manager_operation_number, total_fees) ->
+      {manager_operation_number; total_fees})
+    (obj2 (req "manager_operation_number" int31) (req "total_fees" int64))
+
 let forge_event_encoding =
   let open Data_encoding in
   let prepared_block_encoding =
     conv
-      (fun {signed_block_header; round; delegate; operations; baking_votes} ->
-        (signed_block_header, round, delegate, operations, baking_votes))
-      (fun (signed_block_header, round, delegate, operations, baking_votes) ->
-        {signed_block_header; round; delegate; operations; baking_votes})
-      (obj5
+      (fun {
+             signed_block_header;
+             round;
+             delegate;
+             operations;
+             manager_operations_infos;
+             baking_votes;
+           } ->
+        ( signed_block_header,
+          round,
+          delegate,
+          operations,
+          manager_operations_infos,
+          baking_votes ))
+      (fun ( signed_block_header,
+             round,
+             delegate,
+             operations,
+             manager_operations_infos,
+             baking_votes ) ->
+        {
+          signed_block_header;
+          round;
+          delegate;
+          operations;
+          manager_operations_infos;
+          baking_votes;
+        })
+      (obj6
          (req "header" (dynamic_size Block_header.encoding))
          (req "round" Round.encoding)
          (req "delegate" consensus_key_and_delegate_encoding)
          (req
             "operations"
             (list (list (dynamic_size Tezos_base.Operation.encoding))))
+         (opt "operations_infos" manager_operations_infos_encoding)
          (req "baking_votes" Per_block_votes.per_block_votes_encoding))
   in
   union
