@@ -1102,6 +1102,8 @@ module Actions = struct
       ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
+
+  let no_dal_node_running = Commands.no_dal_node_running
 end
 
 module VDF = struct
