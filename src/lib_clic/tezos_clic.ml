@@ -1115,7 +1115,7 @@ let add_occurrence long value acc =
 
 let make_args_dict_consume ?command spec args =
   let open Lwt_result_syntax in
-  let rec make_args_dict completing arities acc args =
+  let rec make_args_dict arities acc args =
     let* () = check_help_flag ?command args in
     let* () = check_version_flag args in
     match args with
@@ -1127,18 +1127,9 @@ let make_args_dict_consume ?command spec args =
               let* () = check_help_flag ?command tl in
               match (arity, tl) with
               | [0], tl' ->
-                  make_args_dict
-                    completing
-                    arities
-                    (add_occurrence long "" acc)
-                    tl'
+                  make_args_dict arities (add_occurrence long "" acc) tl'
               | [1], value :: tl' ->
-                  make_args_dict
-                    completing
-                    arities
-                    (add_occurrence long value acc)
-                    tl'
-              | [1], [] when completing -> return (acc, [])
+                  make_args_dict arities (add_occurrence long value acc) tl'
               | [1], [] -> tzfail (Option_expected_argument (arg, None))
               | _, _ ->
                   Stdlib.failwith
@@ -1147,11 +1138,7 @@ let make_args_dict_consume ?command spec args =
           | None -> tzfail (Unknown_option (arg, None))
         else return (acc, args)
   in
-  make_args_dict
-    false
-    (make_arities_dict spec StringMap.empty)
-    StringMap.empty
-    args
+  make_args_dict (make_arities_dict spec StringMap.empty) StringMap.empty args
 
 let make_args_dict_filter ?command spec args =
   let open Lwt_result_syntax in
