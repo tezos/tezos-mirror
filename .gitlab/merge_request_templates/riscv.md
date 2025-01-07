@@ -77,12 +77,14 @@ make -C src/riscv all
 /assign @felix.puscasu1
 /assign @emturner
 /assign @santnr
+/assign @hantang.sun
 
 /assign_reviewer @ole.kruger
 /assign_reviewer @victor-dumitrescu
 /assign_reviewer @felix.puscasu1
 /assign_reviewer @emturner
 /assign_reviewer @santnr
+/assign_reviewer @hantang.sun
 
 /unassign me
 /unassign_reviewer me
