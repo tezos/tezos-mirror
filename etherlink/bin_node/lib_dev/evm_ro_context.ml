@@ -568,3 +568,7 @@ let evm_services_methods ctxt time_between_blocks =
       smart_rollup_address = ctxt.smart_rollup_address;
       time_between_blocks;
     }
+
+let blueprints_range ctxt ~from ~to_ =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Blueprints.find_range conn ~from ~to_

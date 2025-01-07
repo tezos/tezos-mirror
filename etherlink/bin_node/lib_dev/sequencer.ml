@@ -92,8 +92,15 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ())
       sequencer_config.blueprints_publisher_config.dal_slots
   in
+  let* ro_ctxt =
+    Evm_ro_context.load
+      ~smart_rollup_address:smart_rollup_address_typed
+      ~data_dir
+      configuration
+  in
   let* () =
     Blueprints_publisher.start
+      ~blueprints_range:(Evm_ro_context.blueprints_range ro_ctxt)
       ~rollup_node_endpoint
       ~config:sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
@@ -130,12 +137,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         (Blueprints_publisher_types.Request.Blueprint
            {chunks = genesis_chunks; inbox_payload = genesis_payload})
     else return_unit
-  in
-  let* ro_ctxt =
-    Evm_ro_context.load
-      ~smart_rollup_address:smart_rollup_address_typed
-      ~data_dir
-      configuration
   in
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in

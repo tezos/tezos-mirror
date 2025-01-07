@@ -108,14 +108,6 @@ val head_info : unit -> head Lwt.t
 
 val next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t
 
-val blueprint :
-  Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t
-
-val blueprints_range :
-  Ethereum_types.quantity ->
-  Ethereum_types.quantity ->
-  (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
-
 val last_known_l1_level : unit -> int32 option tzresult Lwt.t
 
 val shutdown : unit -> unit tzresult Lwt.t

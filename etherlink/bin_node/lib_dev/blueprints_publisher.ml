@@ -5,7 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type blueprints_range =
+  from:Ethereum_types.quantity ->
+  to_:Ethereum_types.quantity ->
+  (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
+
 type parameters = {
+  blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
   latest_level_seen : Z.t;
   config : Configuration.blueprints_publisher_config;
@@ -15,6 +21,7 @@ type parameters = {
 }
 
 type state = {
+  blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
   drop_duplicate : bool;
   max_blueprints_lag : Z.t;
@@ -175,7 +182,9 @@ module Worker = struct
     let*! () = Blueprint_events.catching_up lower_bound upper_bound in
 
     let* blueprints =
-      Evm_context.blueprints_range (Qty lower_bound) (Qty upper_bound)
+      (state worker).blueprints_range
+        ~from:(Qty lower_bound)
+        ~to_:(Qty upper_bound)
     in
 
     let expected_count = Z.(to_int (sub upper_bound lower_bound)) + 1 in
@@ -237,6 +246,7 @@ module Handlers = struct
 
   let on_launch _self ()
       ({
+         blueprints_range;
          rollup_node_endpoint;
          config =
            {
@@ -263,6 +273,7 @@ module Handlers = struct
     in
     return
       {
+        blueprints_range;
         latest_level_confirmed =
           (* Will be set at the correct value once the next L2 block is
              received from the rollup node *)
@@ -334,14 +345,15 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive
-    ~drop_duplicate ~order_enabled () =
+let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
+    ~keep_alive ~drop_duplicate ~order_enabled () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
       {
+        blueprints_range;
         rollup_node_endpoint;
         config;
         latest_level_seen;
