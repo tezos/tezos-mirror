@@ -83,6 +83,8 @@ impl Opcode {
 	pub const MSTORE: Opcode = Opcode(0x52);
 	/// `MSTORE8`
 	pub const MSTORE8: Opcode = Opcode(0x53);
+	/// `MCOPY`
+	pub const MCOPY: Opcode = Opcode(0x5e);
 	/// `JUMP`
 	pub const JUMP: Opcode = Opcode(0x56);
 	/// `JUMPI`
