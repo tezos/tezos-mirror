@@ -295,8 +295,8 @@ let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
 
 (* Push .rpm artifacts to storagecloud rpm repository. *)
 let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
-    ?(prefix = false) ?dependencies ~variables ~image ~before_script script :
-    tezos_job =
+    ?(prefix = false) ?dependencies ~variables ?id_tokens ~image ~before_script
+    script : tezos_job =
   let variables =
     variables
     @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
@@ -308,6 +308,7 @@ let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
     ~__POS__
     ~stage
     ~name
+    ?id_tokens
     ~image
     ~before_script
     ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}

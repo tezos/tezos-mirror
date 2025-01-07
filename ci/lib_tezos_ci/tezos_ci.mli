@@ -368,6 +368,7 @@ val job :
   ?artifacts:Gitlab_ci.Types.artifacts ->
   ?before_script:string list ->
   ?cache:Gitlab_ci.Types.cache list ->
+  ?id_tokens:Gitlab_ci.Types.id_tokens ->
   ?interruptible:bool ->
   ?dependencies:dependencies ->
   ?image_dependencies:Image.t list ->

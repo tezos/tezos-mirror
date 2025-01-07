@@ -871,10 +871,11 @@ let enc_git_strategy = function
   | No_strategy -> "none"
 
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
-    ?interruptible ?(dependencies = Staged []) ?(image_dependencies = [])
-    ?services ?variables ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
-    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ?image
-    ?template ~stage ~name script : tezos_job =
+    ?id_tokens ?interruptible ?(dependencies = Staged [])
+    ?(image_dependencies = []) ?services ?variables ?rules
+    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?git_strategy ?coverage ?retry
+    ?parallel ?description ~__POS__ ?image ?template ~stage ~name script :
+    tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
     match (arch, tag) with
@@ -993,6 +994,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       artifacts;
       before_script;
       cache;
+      id_tokens;
       image = Option.map Image.image image;
       interruptible;
       needs;

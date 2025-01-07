@@ -64,6 +64,7 @@ val job :
   ?artifacts:artifacts ->
   ?before_script:string list ->
   ?cache:cache list ->
+  ?id_tokens:id_tokens ->
   ?image:image ->
   ?interruptible:bool ->
   ?needs:need list ->
