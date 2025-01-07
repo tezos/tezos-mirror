@@ -420,11 +420,8 @@ module History : sig
       print the serialized version of the proof (i.e. a sequence of bytes). *)
   val pp_proof : serialized:bool -> Format.formatter -> proof -> unit
 
-  (** This function returns a commitment and its publisher (wrapped in
-      Either.Right if and only if the skip list cell whose content is given is
-      attested. In case the commitment is not attested, the
-      function returns the publisher if the slot is published or None otherwise
-      (wrapped in Either.Left).
+  (** This function returns some commitment if and only if the skip list cell
+      whose content is given is supposed to be attested.
 
       Attestation status is either checked by inspecting the protocol's boolean
       flag stored in the content if [attestation_threshold_percent] is None
@@ -435,7 +432,7 @@ module History : sig
     attestation_threshold_percent:int option ->
     restricted_commitments_publishers:Contract_repr.t list option ->
     cell_content ->
-    (Contract_repr.t option, Commitment.t * Contract_repr.t) Either.t
+    Commitment.t option
 
   (** [produce_proof dal_parameters page_id ~attestation_threshold_percent
       ~restricted_commitments_publishers page_info ~get_history slots_hist]
@@ -480,23 +477,6 @@ module History : sig
     t ->
     (proof * Page.content option) tzresult Lwt.t
 
-  (** The [verify_proof] function below returns three results:
-
-      - A page content, which is [None] in case the slot related to the target
-      page is not attested;
-
-      - Some attestation threshold percent in case the rollup uses Adjustable
-      DAL, or [None] otherwise;
-
-      - Some contract address in case the slot related to the target page is
-      published, or [None] otherwise.
-  *)
-  type verify_proof_result = {
-    page_content_opt : Page.content option;
-    attestation_threshold_percent : int option;
-    commitment_publisher_opt : Contract_repr.t option;
-  }
-
   (** [verify_proof ?with_migration dal_params page_id snapshot proof] verifies
       that the given [proof] is a valid proof to show that either:
 
@@ -518,7 +498,7 @@ module History : sig
     Page.t ->
     t ->
     proof ->
-    verify_proof_result tzresult
+    bytes option tzresult
 
   type error += Add_element_in_slots_skip_list_violates_ordering
 

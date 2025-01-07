@@ -214,7 +214,7 @@ let slot_attestation_status ?attestation_threshold_percent
       ~restricted_commitments_publishers
       cell_content
   in
-  return @@ if Either.is_right commitment_res then `Attested else `Unattested
+  return @@ if Option.is_some commitment_res then `Attested else `Unattested
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Lwt_result_syntax in

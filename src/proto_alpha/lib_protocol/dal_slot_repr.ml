@@ -1001,10 +1001,10 @@ module History = struct
               (** In case of Adjustable DAL, [attestation_threshold_percent] is set
                   to some attestation threshold defined by the rollup kernel. For
                   regular DAL, it's set to None. *)
-          commitment_publisher : Contract_repr.t;
-              (** In case of confirmation proof, we also remember the
-                  commitment publisher. It will be needed in case of Adjustable DAL
-                  to check that the publisher is whitelised, if needed. *)
+          restricted_commitments_publishers : Contract_repr.t list option;
+              (** In case of Adjustable DAL, [restricted_commitments_publishers]
+                  is set to the rollup's list of authorized addresses, if
+                  any. For regular DAL, it's set to None. *)
         }  (** The case where the slot's page is confirmed/attested on L1. *)
       | Page_unconfirmed of {
           target_cell : history;
@@ -1013,11 +1013,10 @@ module History = struct
               (** In case of Adjustable DAL, [attestation_threshold_percent] is set
                   to some attestation threshold defined by the rollup kernel. For
                   regular DAL, it's set to None. *)
-          commitment_publisher_opt : Contract_repr.t option;
-              (** In case of an unconfirmation proof, we remember the commitment
-                  publisher if the slot is published. It will be needed in case of
-                  Adjustable DAL to check that the publisher is whitelisted, if
-                  needed. *)
+          restricted_commitments_publishers : Contract_repr.t list option;
+              (** In case of Adjustable DAL, [restricted_commitments_publishers]
+                  is set to the rollup's list of authorized addresses, if
+                  any. For regular DAL, it's set to None. *)
         }
           (** The case where the slot's page doesn't exist or is not confirmed
               on L1. The fields are similar to {!Page_confirmed} case except
@@ -1042,7 +1041,9 @@ module History = struct
              (req "page_data" (bytes Hex))
              (req "page_proof" Page.proof_encoding)
              (opt "attestation_threshold_percent" uint8)
-             (req "commitment_publisher" Contract_repr.encoding))
+             (opt
+                "restricted_commitments_publishers"
+                (list Contract_repr.encoding)))
           (function
             | Page_confirmed
                 {
@@ -1051,7 +1052,7 @@ module History = struct
                   page_data;
                   page_proof;
                   attestation_threshold_percent;
-                  commitment_publisher;
+                  restricted_commitments_publishers;
                 } ->
                 Some
                   ( (),
@@ -1060,7 +1061,7 @@ module History = struct
                     page_data,
                     page_proof,
                     attestation_threshold_percent,
-                    commitment_publisher )
+                    restricted_commitments_publishers )
             | _ -> None)
           (fun ( (),
                  target_cell,
@@ -1068,7 +1069,7 @@ module History = struct
                  page_data,
                  page_proof,
                  attestation_threshold_percent,
-                 commitment_publisher ) ->
+                 restricted_commitments_publishers ) ->
             Page_confirmed
               {
                 target_cell;
@@ -1076,7 +1077,7 @@ module History = struct
                 page_data;
                 page_proof;
                 attestation_threshold_percent;
-                commitment_publisher;
+                restricted_commitments_publishers;
               })
       and case_page_unconfirmed =
         case
@@ -1087,33 +1088,35 @@ module History = struct
              (req "target_cell" history_encoding)
              (req "inc_proof" (list history_encoding))
              (opt "attestation_threshold_percent" uint8)
-             (opt "commitment_publisher" Contract_repr.encoding))
+             (opt
+                "restricted_commitments_publishers"
+                (list Contract_repr.encoding)))
           (function
             | Page_unconfirmed
                 {
                   target_cell;
                   inc_proof;
                   attestation_threshold_percent;
-                  commitment_publisher_opt;
+                  restricted_commitments_publishers;
                 } ->
                 Some
                   ( (),
                     target_cell,
                     inc_proof,
                     attestation_threshold_percent,
-                    commitment_publisher_opt )
+                    restricted_commitments_publishers )
             | _ -> None)
           (fun ( (),
                  target_cell,
                  inc_proof,
                  attestation_threshold_percent,
-                 commitment_publisher_opt ) ->
+                 restricted_commitments_publishers ) ->
             Page_unconfirmed
               {
                 target_cell;
                 inc_proof;
                 attestation_threshold_percent;
-                commitment_publisher_opt;
+                restricted_commitments_publishers;
               })
       in
 
@@ -1166,7 +1169,19 @@ module History = struct
       | None -> tzfail Dal_invalid_proof_deserialization
       | Some deserialized_proof -> return deserialized_proof
 
-    let pp_inclusion_proof = Format.pp_print_list pp_history
+    let pp_inclusion_proof =
+      Format.pp_print_list
+        ~pp_sep:(fun fmt () -> Format.fprintf fmt " ")
+        pp_history
+
+    let pp_whitelist fmt = function
+      | None -> Format.fprintf fmt "<any>"
+      | Some l ->
+          (Format.pp_print_list
+             ~pp_sep:(fun fmt () -> Format.fprintf fmt " ")
+             Contract_repr.pp_short)
+            fmt
+            l
 
     let pp_proof ~serialized fmt p =
       if serialized then Format.pp_print_string fmt (Bytes.to_string p)
@@ -1182,7 +1197,7 @@ module History = struct
                   page_data;
                   page_proof;
                   attestation_threshold_percent;
-                  commitment_publisher;
+                  restricted_commitments_publishers;
                 } ->
                 Format.fprintf
                   fmt
@@ -1199,14 +1214,14 @@ module History = struct
                   page_proof
                   (Format.pp_print_option Format.pp_print_int)
                   attestation_threshold_percent
-                  Contract_repr.pp_short
-                  commitment_publisher
+                  pp_whitelist
+                  restricted_commitments_publishers
             | Page_unconfirmed
                 {
                   target_cell;
                   inc_proof;
                   attestation_threshold_percent;
-                  commitment_publisher_opt;
+                  restricted_commitments_publishers;
                 } ->
                 Format.fprintf
                   fmt
@@ -1220,8 +1235,8 @@ module History = struct
                   inc_proof
                   (Format.pp_print_option Format.pp_print_int)
                   attestation_threshold_percent
-                  (Format.pp_print_option Contract_repr.pp_short)
-                  commitment_publisher_opt)
+                  pp_whitelist
+                  restricted_commitments_publishers)
 
     type error +=
       | Dal_page_proof_error of string
@@ -1308,12 +1323,9 @@ module History = struct
         ~restricted_commitments_publishers cell_content =
       let open Content_v2 in
       match (cell_content, attestation_threshold_percent) with
-      | Unpublished _, _ -> Either.Left None
-      | ( Published
-            {header = {commitment; id = _}; is_proto_attested; publisher; _},
-          None ) ->
-          if is_proto_attested then Either.Right (commitment, publisher)
-          else Either.Left (Some publisher)
+      | Unpublished _, _ -> None
+      | Published {header = {commitment; id = _}; is_proto_attested; _}, None ->
+          if is_proto_attested then Some commitment else None
       | ( Published
             {
               header = {commitment; id = _};
@@ -1331,8 +1343,8 @@ module History = struct
             && allowed_commitments_publisher
                  publisher
                  restricted_commitments_publishers
-          then Either.Right (commitment, publisher)
-          else Either.Left (Some publisher)
+          then Some commitment
+          else None
 
     (** The [produce_proof_repr] function assumes that some invariants hold, such as:
         - The DAL has been activated,
@@ -1382,8 +1394,7 @@ module History = struct
                  ~restricted_commitments_publishers
           in
           match (page_info, is_commitment_attested) with
-          | ( Some (page_data, page_proof),
-              Either.Right (commitment, commitment_publisher) ) ->
+          | Some (page_data, page_proof), Some commitment ->
               (* The case where the slot to which the page is supposed to belong
                  is found and the page's information are given. *)
               let*? () =
@@ -1404,10 +1415,10 @@ module History = struct
                       page_data;
                       page_proof;
                       attestation_threshold_percent;
-                      commitment_publisher;
+                      restricted_commitments_publishers;
                     },
                   Some page_data )
-          | None, Either.Left commitment_publisher_opt ->
+          | None, None ->
               (* The slot corresponding to the given page's index is not found in
                  the attested slots of the page's level, and no information is
                  given for that page. So, we produce a proof that the page is not
@@ -1418,17 +1429,17 @@ module History = struct
                       target_cell;
                       inc_proof;
                       attestation_threshold_percent;
-                      commitment_publisher_opt;
+                      restricted_commitments_publishers;
                     },
                   None )
-          | None, Either.Right _ ->
+          | None, Some _ ->
               (* Mismatch: case where no page information are given, but the
                  slot is attested. *)
               tzfail
               @@ dal_proof_error
                    "The page ID's slot is confirmed, but no page content and \
                     proof are provided."
-          | Some _, Either.Left _ ->
+          | Some _, None ->
               (* Mismatch: case where page information are given, but the slot
                  is not attested. *)
               tzfail
@@ -1476,12 +1487,6 @@ module History = struct
            path)
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
-    type verify_proof_result = {
-      page_content_opt : Page.content option;
-      attestation_threshold_percent : int option;
-      commitment_publisher_opt : Contract_repr.t option;
-    }
-
     let verify_proof_repr ?with_migration dal_params page_id snapshot proof =
       let open Result_syntax in
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
@@ -1493,7 +1498,7 @@ module History = struct
       let ( target_cell,
             inc_proof,
             attestation_threshold_percent,
-            commitment_publisher_opt ) =
+            restricted_commitments_publishers ) =
         match proof with
         | Page_confirmed
             {
@@ -1502,23 +1507,23 @@ module History = struct
               page_data = _;
               page_proof = _;
               attestation_threshold_percent;
-              commitment_publisher;
+              restricted_commitments_publishers;
             } ->
             ( target_cell,
               inc_proof,
               attestation_threshold_percent,
-              Some commitment_publisher )
+              restricted_commitments_publishers )
         | Page_unconfirmed
             {
               target_cell;
               inc_proof;
               attestation_threshold_percent;
-              commitment_publisher_opt;
+              restricted_commitments_publishers;
             } ->
             ( target_cell,
               inc_proof,
               attestation_threshold_percent,
-              commitment_publisher_opt )
+              restricted_commitments_publishers )
       in
       let cell_content = Skip_list.content target_cell in
       (* We check that the target cell has the same level and index than the
@@ -1546,49 +1551,28 @@ module History = struct
       let is_commitment_attested =
         is_commitment_attested
           ~attestation_threshold_percent
-          ~restricted_commitments_publishers:
-            (Option.map (fun e -> [e]) commitment_publisher_opt)
+          ~restricted_commitments_publishers
           cell_content
       in
       match (proof, is_commitment_attested) with
-      | Page_unconfirmed _, Either.Right _ ->
+      | Page_unconfirmed _, Some _ ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the confirmation proof doesn't contain the \
                 attested slot."
-      | Page_unconfirmed _, Either.Left validated_commitment_publisher_opt ->
-          return
-            {
-              page_content_opt = None;
-              attestation_threshold_percent;
-              commitment_publisher_opt = validated_commitment_publisher_opt;
-            }
-      | Page_confirmed _, Either.Left _ ->
+      | Page_unconfirmed _, None -> return_none
+      | Page_confirmed _, None ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the unconfirmation proof contains the \
                 target slot."
-      | ( Page_confirmed
-            {
-              target_cell = _;
-              inc_proof = _;
-              page_data;
-              page_proof;
-              attestation_threshold_percent = _;
-              commitment_publisher = _;
-            },
-          Either.Right (commitment, validated_commitment_publisher) ) ->
+      | Page_confirmed {page_data; page_proof; _}, Some commitment ->
           (* We check that the page indeed belongs to the target slot at the
              given page index. *)
           let* () =
             check_page_proof dal_params page_proof page_data page_id commitment
           in
-          return
-            {
-              page_content_opt = Some page_data;
-              attestation_threshold_percent;
-              commitment_publisher_opt = Some validated_commitment_publisher;
-            }
+          return_some page_data
 
     let verify_proof ?with_migration dal_params page_id snapshot
         serialized_proof =
