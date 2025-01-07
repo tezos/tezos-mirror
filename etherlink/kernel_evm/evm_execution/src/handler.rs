@@ -361,6 +361,10 @@ impl CacheStorageValue {
 /// address and an index (StorageKey) to a value (CacheStorageValue).
 pub type LayerCache = HashMap<StorageKey, CacheStorageValue>;
 
+/// A transient layer associates at each address and index (StorageKey)
+/// its value (H256).
+pub type TransientLayer = HashMap<StorageKey, H256>;
+
 /// The storage cache is associating at each layer (usize) its
 /// own cache (LayerCache). For each slot that is modified or
 /// read during a call it will be added to the cache in its own
@@ -371,6 +375,13 @@ pub type LayerCache = HashMap<StorageKey, CacheStorageValue>;
 // In memory it means we take at most:
 // 300_000 × 32B = 9_600_000B = 9.6MB
 pub type StorageCache = HashMap<usize, LayerCache>;
+
+/// The transient storage is a temporary data storage area within the
+/// EVM. It is associating at each layer (usize) its own storage map.
+/// For each slot that is modified it will be added to the associated
+/// layer and map. If the value did not exist, by default we return the
+/// default value as specified by EIP-1153.
+pub type TransientStorage = HashMap<usize, TransientLayer>;
 
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
@@ -409,6 +420,8 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// access storage slots before any transaction happens.
     /// See: `fn original_storage`.
     original_storage_cache: LayerCache,
+    /// Transient storage as specified by EIP-1153.
+    pub transient_storage: TransientStorage,
     /// Reentrancy guard prevents circular calls to impure precompiles
     reentrancy_guard: ReentrancyGuard,
 }
@@ -443,6 +456,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             tracer,
             storage_cache: HashMap::with_capacity(10),
             original_storage_cache: HashMap::with_capacity(10),
+            transient_storage: HashMap::with_capacity(10),
             reentrancy_guard: ReentrancyGuard::new(vec![
                 WITHDRAWAL_ADDRESS,
                 FA_BRIDGE_PRECOMPILE_ADDRESS,
@@ -1753,6 +1767,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let _ = self.transaction_data.pop();
         self.storage_cache.clear();
+        self.transient_storage.clear();
         self.original_storage_cache.clear();
 
         Ok(ExecutionOutcome {
@@ -1937,6 +1952,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let gas_refunded = self.gas_refunded();
 
         commit_storage_cache(self, number_of_tx_layer);
+        commit_transient_storage(self, number_of_tx_layer);
 
         self.evm_account_storage
             .commit_transaction(self.host)
@@ -2008,6 +2024,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         self.storage_cache.remove(&number_of_tx_layer);
+        self.transient_storage.remove(&number_of_tx_layer);
 
         self.evm_account_storage
             .rollback_transaction(self.host)
@@ -2264,6 +2281,20 @@ fn commit_storage_cache<Host: Runtime>(
     }
 }
 
+fn commit_transient_storage<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    current_layer: usize,
+) {
+    let commit_layer = current_layer - 1;
+    if let Some(t_storage) = handler.transient_storage.remove(&current_layer) {
+        if let Some(prev_t_storage) = handler.transient_storage.get_mut(&commit_layer) {
+            prev_t_storage.extend(t_storage);
+        } else {
+            handler.transient_storage.insert(commit_layer, t_storage);
+        }
+    }
+}
+
 fn cached_storage_access<Host: Runtime>(
     handler: &mut EvmHandler<'_, Host>,
     address: H160,
@@ -2346,7 +2377,15 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     }
 
     fn transient_storage(&self, address: H160, index: H256) -> H256 {
-        todo!()
+        let layer = self.evm_account_storage.stack_depth();
+        for layer in (0..=layer).rev() {
+            if let Some(t_storage) = self.transient_storage.get(&layer) {
+                if let Some(value) = t_storage.get(&StorageKey { address, index }) {
+                    return *value;
+                }
+            }
+        }
+        H256::zero()
     }
 
     fn original_storage(&mut self, address: H160, index: H256) -> H256 {
@@ -2506,7 +2545,21 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         index: H256,
         value: H256,
     ) -> Result<(), ExitError> {
-        todo!()
+        if self.is_static() {
+            return Err(ExitError::Other(Cow::from(
+                "TSTORE cannot be executed inside a static call",
+            )));
+        }
+
+        let layer = self.evm_account_storage.stack_depth();
+        if let Some(t_storage) = self.transient_storage.get_mut(&layer) {
+            t_storage.insert(StorageKey { address, index }, value);
+        } else {
+            let mut t_storage = HashMap::new();
+            t_storage.insert(StorageKey { address, index }, value);
+            self.transient_storage.insert(layer, t_storage);
+        }
+        Ok(())
     }
 
     fn log(
