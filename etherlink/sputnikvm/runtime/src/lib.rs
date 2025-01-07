@@ -288,6 +288,15 @@ pub struct Config {
 	pub has_push0: bool,
 	/// Whether the gasometer is running in estimate mode.
 	pub estimate: bool,
+	/// Whether the opcode SELFEDESTRUCT is considered deprecated.
+	/// See [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780)
+	pub selfdestruct_deprecated: bool,
+	/// Has transient storage.
+	pub has_transient_storage: bool,
+	/// Has mcopy.
+	pub has_mcopy: bool,
+	/// Has blob instructions.
+	pub has_blob_instructions: bool,
 }
 
 impl Config {
@@ -342,6 +351,10 @@ impl Config {
 			has_base_fee: false,
 			has_push0: false,
 			estimate: false,
+			selfdestruct_deprecated: false,
+			has_transient_storage: false,
+			has_mcopy: false,
+			has_blob_instructions: false,
 		}
 	}
 
@@ -396,6 +409,10 @@ impl Config {
 			has_base_fee: false,
 			has_push0: false,
 			estimate: false,
+			selfdestruct_deprecated: false,
+			has_transient_storage: false,
+			has_mcopy: false,
+			has_blob_instructions: false,
 		}
 	}
 
@@ -419,6 +436,11 @@ impl Config {
 		Self::config_with_derived_values(DerivedConfigInputs::shanghai())
 	}
 
+	/// Cancun hard fork configuration.
+	pub const fn cancun() -> Config {
+		Self::config_with_derived_values(DerivedConfigInputs::cancun())
+	}
+
 	const fn config_with_derived_values(inputs: DerivedConfigInputs) -> Config {
 		let DerivedConfigInputs {
 			gas_storage_read_warm,
@@ -430,6 +452,10 @@ impl Config {
 			disallow_executable_format,
 			warm_coinbase_address,
 			max_initcode_size,
+			selfdestruct_deprecated,
+			has_transient_storage,
+			has_mcopy,
+			has_blob_instructions,
 		} = inputs;
 
 		// See https://eips.ethereum.org/EIPS/eip-2929
@@ -493,6 +519,10 @@ impl Config {
 			has_base_fee,
 			has_push0,
 			estimate: false,
+			selfdestruct_deprecated,
+			has_transient_storage,
+			has_mcopy,
+			has_blob_instructions,
 		}
 	}
 }
@@ -509,6 +539,10 @@ struct DerivedConfigInputs {
 	disallow_executable_format: bool,
 	warm_coinbase_address: bool,
 	max_initcode_size: Option<usize>,
+	selfdestruct_deprecated: bool,
+	has_transient_storage: bool,
+	has_mcopy: bool,
+	has_blob_instructions: bool,
 }
 
 impl DerivedConfigInputs {
@@ -523,6 +557,10 @@ impl DerivedConfigInputs {
 			disallow_executable_format: false,
 			warm_coinbase_address: false,
 			max_initcode_size: None,
+			selfdestruct_deprecated: false,
+			has_transient_storage: false,
+			has_mcopy: false,
+			has_blob_instructions: false,
 		}
 	}
 
@@ -537,6 +575,10 @@ impl DerivedConfigInputs {
 			disallow_executable_format: true,
 			warm_coinbase_address: false,
 			max_initcode_size: None,
+			selfdestruct_deprecated: false,
+			has_transient_storage: false,
+			has_mcopy: false,
+			has_blob_instructions: false,
 		}
 	}
 
@@ -551,6 +593,10 @@ impl DerivedConfigInputs {
 			disallow_executable_format: true,
 			warm_coinbase_address: false,
 			max_initcode_size: None,
+			selfdestruct_deprecated: false,
+			has_transient_storage: false,
+			has_mcopy: false,
+			has_blob_instructions: false,
 		}
 	}
 
@@ -566,6 +612,21 @@ impl DerivedConfigInputs {
 			warm_coinbase_address: true,
 			// 2 * 24576 as per EIP-3860
 			max_initcode_size: Some(0xC000),
+			selfdestruct_deprecated: false,
+			has_transient_storage: false,
+			has_mcopy: false,
+			has_blob_instructions: false,
+		}
+	}
+
+	const fn cancun() -> Self {
+		let base = Self::shanghai();
+		Self {
+			selfdestruct_deprecated: true,
+			has_transient_storage: true,
+			has_mcopy: true,
+			has_blob_instructions: true,
+			..base
 		}
 	}
 }
