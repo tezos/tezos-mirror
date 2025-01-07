@@ -83,6 +83,19 @@ module Events = struct
       ~pp4:pp_int
       ("preattestations", Data_encoding.int31)
 
+  let pqc_progression =
+    declare_2
+      ~section
+      ~name:"pqc_progression"
+      ~level:Info
+      ~msg:
+        "preattesting voting power at {quorum_progression}% of the stake with \
+         {preattestations} preattestations"
+      ~pp1:pp_int
+      ("quorum_progression", Data_encoding.int31)
+      ~pp2:pp_int
+      ("preattestations", Data_encoding.int31)
+
   let qc_reached =
     declare_2
       ~section
@@ -111,6 +124,19 @@ module Events = struct
       ~pp3:pp_int
       ("voting_power", Data_encoding.int31)
       ~pp4:pp_int
+      ("attestations", Data_encoding.int31)
+
+  let qc_progression =
+    declare_2
+      ~section
+      ~name:"qc_progression"
+      ~level:Info
+      ~msg:
+        "attesting voting power at {quorum_progression}% of the stake with \
+         {attestations} attestations"
+      ~pp1:pp_int
+      ("quorum_progression", Data_encoding.int31)
+      ~pp2:pp_int
       ("attestations", Data_encoding.int31)
 
   let starting_new_monitoring =
@@ -225,6 +251,7 @@ type pqc_watched = {
   mutable current_voting_power : int;
   mutable preattestations_received : Preattestation_set.t;
   mutable preattestations_count : int;
+  mutable previous_prequorum_progression : int;
 }
 
 type qc_watched = {
@@ -234,7 +261,13 @@ type qc_watched = {
   mutable current_voting_power : int;
   mutable attestations_received : Attestation_set.t;
   mutable attestations_count : int;
+  mutable previous_quorum_progression : int;
 }
+
+(* [quorum_progression_increment] is a constant used to output an event only if
+   the quorum progression has progressed of at least
+   [quorum_progression_increment] since the last output *)
+let quorum_progression_increment = 10
 
 type watch_kind = Pqc_watch of pqc_watched | Qc_watch of qc_watched
 
@@ -324,11 +357,13 @@ let reset_monitoring state =
       pqc_watched.current_voting_power <- 0 ;
       pqc_watched.preattestations_count <- 0 ;
       pqc_watched.preattestations_received <- Preattestation_set.empty ;
+      pqc_watched.previous_prequorum_progression <- 0 ;
       return_unit
   | Some (Qc_watch qc_watched) ->
       qc_watched.current_voting_power <- 0 ;
       qc_watched.attestations_count <- 0 ;
       qc_watched.attestations_received <- Attestation_set.empty ;
+      qc_watched.previous_quorum_progression <- 0 ;
       return_unit
 
 let update_monitoring ?(should_lock = true) state ops =
@@ -407,6 +442,24 @@ let update_monitoring ?(should_lock = true) state ops =
         cancel_monitoring state ;
         return_unit)
       else
+        let* () =
+          let current_ratio =
+            proposal_watched.current_voting_power * 100 / state.committee_size
+          in
+          (* We only want to output an event if the quorum progression has
+             progressed of at least [quorum_progression_increment] *)
+          if
+            current_ratio
+            > proposal_watched.previous_prequorum_progression
+              + quorum_progression_increment
+          then (
+            proposal_watched.previous_prequorum_progression <- current_ratio ;
+            Events.(
+              emit
+                pqc_progression
+                (current_ratio, proposal_watched.preattestations_count)))
+          else return_unit
+        in
         Events.(
           emit
             preattestations_received
@@ -480,6 +533,24 @@ let update_monitoring ?(should_lock = true) state ops =
         cancel_monitoring state ;
         return_unit)
       else
+        let* () =
+          let current_ratio =
+            proposal_watched.current_voting_power * 100 / state.committee_size
+          in
+          (* We only want to output an event if the quorum progression has
+             progressed of at least [quorum_progression_increment] *)
+          if
+            current_ratio
+            > proposal_watched.previous_quorum_progression
+              + quorum_progression_increment
+          then (
+            proposal_watched.previous_quorum_progression <- current_ratio ;
+            Events.(
+              emit
+                qc_progression
+                (current_ratio, proposal_watched.attestations_count)))
+          else return_unit
+        in
         Events.(
           emit
             attestations_received
@@ -511,6 +582,7 @@ let monitor_preattestation_quorum state ~consensus_threshold
            current_voting_power = 0;
            preattestations_received = Preattestation_set.empty;
            preattestations_count = 0;
+           previous_prequorum_progression = 0;
          })
   in
   monitor_quorum state new_proposal
@@ -527,6 +599,7 @@ let monitor_attestation_quorum state ~consensus_threshold ~get_slot_voting_power
            current_voting_power = 0;
            attestations_received = Attestation_set.empty;
            attestations_count = 0;
+           previous_quorum_progression = 0;
          })
   in
   monitor_quorum state new_proposal
