@@ -28,15 +28,11 @@
     be used to perform rollup origination, {b but} cannot be used to compute
     proofs or run computations. *)
 
-type void = |
+module type S = sig
+  include Sc_rollup_PVM_sig.PROTO_ORIGINATION
 
-type t = Context_binary.t
-
-type tree = Context_binary.tree
-
-val empty_tree : unit -> tree
-
-module type S = Sc_rollup_PVM_sig.PROTO_ORIGINATION with type state = tree
+  val empty_state : unit -> state
+end
 
 module Arith : S
 

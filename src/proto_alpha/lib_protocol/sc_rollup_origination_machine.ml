@@ -33,10 +33,6 @@ let void =
       (fun _ -> Error "void has no inhabitant")
       unit)
 
-type t = Context_binary.t
-
-type tree = Context_binary.tree
-
 let empty_tree () = Context_binary.(make_empty_context () |> Tree.empty)
 
 module Context_no_proofs = struct
@@ -57,22 +53,26 @@ module Context_no_proofs = struct
   let proof_encoding = void
 end
 
-module type S = Sc_rollup_PVM_sig.PROTO_ORIGINATION with type state = tree
+module type S = sig
+  include Sc_rollup_PVM_sig.PROTO_ORIGINATION
 
-module Arith : S = Sc_rollup_arith.Make (Context_no_proofs)
+  val empty_state : unit -> state
+end
 
-module Wasm : S =
-  Sc_rollup_wasm.V2_0_0.Make (Wasm_2_0_0.Make) (Context_no_proofs)
+module Arith : S = struct
+  include Sc_rollup_arith.Make (Context_no_proofs)
+
+  let empty_state = empty_tree
+end
+
+module Wasm : S = struct
+  include Sc_rollup_wasm.V2_0_0.Make (Wasm_2_0_0.Make) (Context_no_proofs)
+
+  let empty_state = empty_tree
+end
 
 module Riscv : S = struct
-  type state = tree
+  include Sc_rollup_riscv.Protocol_implementation
 
-  type hash = Smart_rollup.State_hash.t
-
-  let state_hash _state =
-    Sc_rollup_riscv.(Protocol_implementation.state_hash (make_empty_state ()))
-
-  let initial_state ~empty = Lwt.return empty
-
-  let install_boot_sector state _bs = Lwt.return state
+  let empty_state = Sc_rollup_riscv.make_empty_state
 end
