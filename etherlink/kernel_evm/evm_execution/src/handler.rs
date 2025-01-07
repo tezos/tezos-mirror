@@ -2417,6 +2417,10 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         self.block.base_fee_per_gas()
     }
 
+    fn block_blob_base_fee(&self) -> U256 {
+        todo!()
+    }
+
     fn block_randomness(&self) -> Option<H256> {
         self.block.prevrandao // Always None
     }

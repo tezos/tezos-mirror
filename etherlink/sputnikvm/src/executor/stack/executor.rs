@@ -1123,6 +1123,9 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 	fn block_base_fee_per_gas(&self) -> U256 {
 		self.state.block_base_fee_per_gas()
 	}
+	fn block_blob_base_fee(&self) -> U256 {
+		self.state.block_blob_base_fee()
+	}
 	fn chain_id(&self) -> U256 {
 		self.state.chain_id()
 	}

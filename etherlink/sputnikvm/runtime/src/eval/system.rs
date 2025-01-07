@@ -90,6 +90,14 @@ pub fn base_fee<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	Control::Continue
 }
 
+pub fn blob_base_fee<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
+	let mut ret = H256::default();
+	handler.block_blob_base_fee().to_big_endian(&mut ret[..]);
+	push!(runtime, ret);
+
+	Control::Continue
+}
+
 pub fn extcodesize<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	pop!(runtime, address);
 	push_u256!(runtime, handler.code_size(address.into()));

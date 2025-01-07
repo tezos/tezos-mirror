@@ -72,6 +72,8 @@ pub trait Backend {
 	fn block_gas_limit(&self) -> U256;
 	/// Environmental block base fee.
 	fn block_base_fee_per_gas(&self) -> U256;
+	/// Returns the value of the blob base-fee of the current block it is executing in.
+	fn block_blob_base_fee(&self) -> U256;
 	/// Environmental chain ID.
 	fn chain_id(&self) -> U256;
 

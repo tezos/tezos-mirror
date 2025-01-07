@@ -191,6 +191,8 @@ impl Opcode {
 	pub const SELFBALANCE: Opcode = Opcode(0x47);
 	/// `BASEFEE`
 	pub const BASEFEE: Opcode = Opcode(0x48);
+	/// `BLOBBASEFEE`
+	pub const BLOBBASEFEE: Opcode = Opcode(0x4a);
 	/// `ORIGIN`
 	pub const ORIGIN: Opcode = Opcode(0x32);
 	/// `CALLER`
