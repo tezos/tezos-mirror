@@ -17,11 +17,6 @@ type t = {
   block_storage_sqlite3 : bool;
 }
 
-let pp_network fmt (network : Configuration.supported_network) =
-  Format.pp_print_string
-    fmt
-    (match network with Mainnet -> "mainnet" | Testnet -> "testnet")
-
 let get_evm_state ctxt hash =
   let open Lwt_result_syntax in
   Irmin_context.reload ctxt.index ;
@@ -50,7 +45,7 @@ let network_sanity_check ~network ctxt =
         failwith
           "Local state is inconsistent with selected network %a: incorrect \
            chain id (%a instead of %a)"
-          pp_network
+          Configuration.pp_supported_network
           network
           Z.pp_print
           chain_id
@@ -70,7 +65,7 @@ let network_sanity_check ~network ctxt =
     failwith
       "Smart rollup address is inconsistent with selected network %a: %a \
        instead of %a"
-      pp_network
+      Configuration.pp_supported_network
       network
       Address.pp
       ctxt.smart_rollup_address

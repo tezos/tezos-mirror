@@ -82,6 +82,46 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
+type error += Invalid_snapshot_provider of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_invalid_snapshot_provider"
+    ~title:"Invalid snapshot provider"
+    ~description:"The snapshot provider is invalid."
+    ~pp:(fun ppf name ->
+      Format.fprintf
+        ppf
+        "%s is not a valid snapshot provider name. It is likely because you \
+         are using an invalid string interpolation variable or have a trailing \
+         percent"
+        name)
+    Data_encoding.(obj1 (req "snapshot_provider" string))
+    (function Invalid_snapshot_provider name -> Some name | _ -> None)
+    (fun name -> Invalid_snapshot_provider name)
+
+let interpolate_snapshot_provider rollup_address network provider =
+  let open Result_syntax in
+  let percent = ('%', "%") in
+  let rollup_address_short =
+    ( 'r',
+      Tezos_crypto.Hashed.Smart_rollup_address.to_short_b58check rollup_address
+    )
+  in
+  let rollup_address_long =
+    ('R', Tezos_crypto.Hashed.Smart_rollup_address.to_b58check rollup_address)
+  in
+  let network =
+    ('n', Format.asprintf "%a" Configuration.pp_supported_network network)
+  in
+  try
+    return
+      (Misc.interpolate
+         provider
+         [percent; rollup_address_short; rollup_address_long; network])
+  with _ -> tzfail (Invalid_snapshot_provider provider)
+
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
@@ -103,11 +143,13 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~evm_node_endpoint
       ()
   in
-  let snapshot_url =
+  let*? snapshot_url =
     match network with
-    | Some network when init_from_snapshot ->
-        Some Constants.(latest_snapshot_url network)
-    | _ -> None
+    | None -> Result.return_none
+    | Some network ->
+        Option.map_e
+          (interpolate_snapshot_provider smart_rollup_address network)
+          init_from_snapshot
   in
   let* _loaded =
     Evm_context.start

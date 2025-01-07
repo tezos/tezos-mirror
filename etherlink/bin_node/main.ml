@@ -463,12 +463,20 @@ let no_sync_arg =
     ()
 
 let init_from_snapshot_arg =
-  Tezos_clic.switch
+  Tezos_clic.arg_or_switch
     ~long:"init-from-snapshot"
     ~doc:
       "Automatically download and import a recent snapshot for supported \
-       networks on fresh data directories"
-    ()
+       networks on fresh data directories. If no snapshot provider is given \
+       e.g. `--init-from-snapshot` with no argument, then it uses the default \
+       built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`.\n\
+       %r is replaced by the short form of the Smart Rollup address, %R by the \
+       complete Smart Rollup address, %n by the network (given by the argument \
+       --network), and %% by %."
+    ~default:
+      "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-%n/evm-snapshot-%r-latest.gz"
+    ~placeholder:"snapshot url"
+  @@ Params.string
 
 let evm_node_endpoint_arg =
   Tezos_clic.arg
@@ -2527,7 +2535,7 @@ let dispatch args =
   let* (), remaining_args =
     Tezos_clic.parse_global_options global_options () args
   in
-  Tezos_clic.dispatch commands () remaining_args
+  Tezos_clic.dispatch ~enable_argDefSwitch:true commands () remaining_args
 
 let handle_error = function
   | Ok _ -> ()

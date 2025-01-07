@@ -9,6 +9,8 @@
 (** A list of network officially supported by the EVM node. *)
 type supported_network = Mainnet | Testnet
 
+val pp_supported_network : Format.formatter -> supported_network -> unit
+
 type log_filter_config = {
   max_nb_blocks : int;  (** Maximum block range for [get_logs]. *)
   max_nb_logs : int;  (** Maximum number of logs that [get_logs] can return. *)
