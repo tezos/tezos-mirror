@@ -23,3 +23,7 @@ val export_store :
     duration of the process. It fails if there is already another evm node
     with a lock. *)
 val lock : data_dir:string -> unit tzresult Lwt.t
+
+(** [use ~data_dir k] creates [data_dir] if necessary before executing [k ()],
+    and deletes [data_dir] if it was created and [k ()] fails. *)
+val use : data_dir:string -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t

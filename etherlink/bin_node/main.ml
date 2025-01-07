@@ -1646,6 +1646,7 @@ mode.|}
              dal_slots,
              network ) )
          () ->
+      Evm_node_lib_dev.Data_dir.use ~data_dir @@ fun () ->
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
@@ -2284,6 +2285,7 @@ let import_snapshot_command =
              contents is removed first, even if the snapshot is corrupted)"))
     (prefixes ["snapshot"; "import"] @@ Params.snapshot_file @@ stop)
     (fun (data_dir, force) snapshot_file () ->
+      Evm_node_lib_dev.Data_dir.use ~data_dir @@ fun () ->
       Evm_node_lib_dev.Snapshots.import
         ~cancellable:true
         ~force

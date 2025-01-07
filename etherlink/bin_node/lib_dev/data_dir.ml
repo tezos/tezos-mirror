@@ -51,3 +51,22 @@ let export_store ~data_dir ~output_db_file =
   let* current_number, _ = Evm_store.Context_hashes.get_latest conn in
   let* () = Evm_store.vacuum ~conn ~output_db_file in
   return {rollup_address = metadata.smart_rollup_address; current_number}
+
+let use ~data_dir k =
+  let open Lwt_result_syntax in
+  let*! data_dir_exists = Lwt_utils_unix.dir_exists data_dir in
+  let on_failure () =
+    let open Lwt_syntax in
+    (* TODO: [remove_dir] will remove [data_dir], but not its parents
+       created by [create_dir]. For instance, if [/a/b/c] is the requested
+       data-dir, and only [/a] exists, then [/a/b] will remain. *)
+    if not data_dir_exists then Lwt_utils_unix.remove_dir data_dir
+    else return_unit
+  in
+  Lwt_utils_unix.safe_cancel_on_exit @@ fun () ->
+  let*! () = Lwt_utils_unix.create_dir data_dir in
+  protect
+    ~on_error:(fun err ->
+      let*! () = on_failure () in
+      fail err)
+    k
