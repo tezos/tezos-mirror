@@ -2418,7 +2418,7 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     }
 
     fn block_blob_base_fee(&self) -> U256 {
-        todo!()
+        self.block.blob_base_fee()
     }
 
     fn block_randomness(&self) -> Option<H256> {
