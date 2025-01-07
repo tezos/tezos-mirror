@@ -214,6 +214,12 @@ let run ?env ?event_level ?event_sections_levels (baker : t) =
       Endpoint.as_string
       baker.persistent_state.dal_node_rpc_endpoint
   in
+  let without_dal =
+    Cli_arg.optional_switch
+      "without-dal"
+      (baker.persistent_state.protocol = Protocol.Alpha
+      && Option.is_none baker.persistent_state.dal_node_rpc_endpoint)
+  in
   let dal_node_timeout_percentage =
     Cli_arg.optional_arg
       "dal-node-timeout-percentage"
@@ -247,7 +253,7 @@ let run ?env ?event_level ?event_sections_levels (baker : t) =
   let arguments =
     ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
     @ run_args @ liquidity_baking_toggle_vote @ votefile
-    @ force_apply_from_round @ operations_pool @ dal_node_endpoint
+    @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
     @ dal_node_timeout_percentage @ delegates @ minimal_nanotez_per_gas_unit
     @ state_recorder @ node_version_check_bypass @ node_version_allowed
   in

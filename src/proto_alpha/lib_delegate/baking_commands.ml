@@ -358,6 +358,14 @@ let dal_node_endpoint_arg =
     ~doc:"endpoint of the DAL node, e.g. 'http://localhost:8933'"
     (Tezos_clic.parameter (fun _ s -> return @@ Uri.of_string s))
 
+let without_dal_arg =
+  Tezos_clic.switch
+    ~long:"without-dal"
+    ~doc:
+      "If without-dal flag is set, the daemon will not try to connect to a DAL \
+       node."
+    ()
+
 let block_count_arg =
   Tezos_clic.default_arg
     ~long:"count"
@@ -693,21 +701,33 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 (* This function checks that a DAL node endpoint was given,
    and that the specified DAL node is "healthy",
    (the DAL's nodes 'health' RPC is used for that). *)
-let check_dal_node dal_node_rpc_ctxt =
-  let open Lwt_syntax in
-  match dal_node_rpc_ctxt with
-  | None -> Events.(emit no_dal_node_running ())
-  | Some ctxt -> (
-      let* health = Node_rpc.get_dal_health ctxt in
+let check_dal_node without_dal dal_node_rpc_ctxt =
+  let open Lwt_result_syntax in
+  let result_emit f x =
+    let*! () = Events.emit f x in
+    return_unit
+  in
+  match (dal_node_rpc_ctxt, without_dal) with
+  | None, true ->
+      (* The user is aware that no DAL node is running, since they explicitly
+         used the [--without-dal] option. However, we do not want to reduce the
+         exposition of bakers to warnings about DAL, so we keep it. *)
+      result_emit Events.no_dal_node_running ()
+  | None, false -> tzfail No_dal_node_endpoint
+  | Some _, true -> tzfail Incompatible_dal_options
+  | Some ctxt, false -> (
+      let*! health = Node_rpc.get_dal_health ctxt in
       match health with
-      | Ok {Tezos_dal_node_services.Types.Health.status = Up; _} -> return_unit
-      | Ok _ -> Events.(emit unhealthy_dal_node (Uri.to_string ctxt#base))
-      | Error _ -> Events.(emit unreachable_dal (Uri.to_string ctxt#base)))
+      | Ok health -> (
+          match health.status with
+          | Tezos_dal_node_services.Types.Health.Up -> return_unit
+          | _ -> result_emit Events.unhealthy_dal_node (ctxt#base, health))
+      | Error _ -> result_emit Events.unreachable_dal_node ctxt#base)
 
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args16
+  Tezos_clic.args17
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -721,6 +741,7 @@ let baker_args =
     per_block_vote_file_arg
     operations_arg
     dal_node_endpoint_arg
+    without_dal_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
@@ -739,6 +760,7 @@ let run_baker
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
+      without_dal,
       state_recorder,
       pre_emptive_forge_time,
       remote_calls_timeout ) baking_mode sources cctxt =
@@ -766,7 +788,7 @@ let run_baker
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint
   in
-  let*! () = check_dal_node dal_node_rpc_ctxt in
+  let* () = check_dal_node without_dal dal_node_rpc_ctxt in
   let* delegates = get_delegates cctxt sources in
   let context_path =
     match baking_mode with
