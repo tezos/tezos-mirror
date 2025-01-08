@@ -1598,6 +1598,21 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   in
   let rec help args ind seen =
     let open Lwt_result_syntax in
+    let arity_0_help_cont ind args seen =
+      if ind = 0 then
+        let+ cont_args = continuation args 0 in
+        remaining_spec seen args_spec @ cont_args
+      else help args (ind - 1) seen
+    in
+    let arity_1_help_cont ind arg args seen =
+      if ind = 1 then
+        let* res = complete_spec arg args_spec in
+        return (Option.value ~default:[] res)
+      else
+        match args with
+        | _ :: tl -> help tl (ind - 2) seen
+        | [] -> Stdlib.failwith "cli_entries internal error, invalid arity"
+    in
     match args with
     | _ when ind = 0 ->
         let+ cont_args = continuation args 0 in
@@ -1607,15 +1622,9 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         match StringMap.find arg arities with
         | Some (arity, long) -> (
             let seen = StringSet.add long seen in
-            match (arity, tl) with
-            | [0], args when ind = 0 ->
-                let+ cont_args = continuation args 0 in
-                remaining_spec seen args_spec @ cont_args
-            | [0], args -> help args (ind - 1) seen
-            | [1], _ when ind = 1 ->
-                let* res = complete_spec arg args_spec in
-                return (Option.value ~default:[] res)
-            | [1], _ :: tl -> help tl (ind - 2) seen
+            match arity with
+            | [0] -> arity_0_help_cont ind tl seen
+            | [1] -> arity_1_help_cont ind arg tl seen
             | _ -> Stdlib.failwith "cli_entries internal error, invalid arity")
         | None -> continuation args ind)
   in
