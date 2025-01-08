@@ -20,7 +20,7 @@ let gen_name =
   let cpt = ref (-1) in
   fun () ->
     incr cpt ;
-    Format.asprintf "agent-%3d" !cpt
+    Format.asprintf "agent-%03d" !cpt
 
 let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image
     ?(name = gen_name ()) () =
