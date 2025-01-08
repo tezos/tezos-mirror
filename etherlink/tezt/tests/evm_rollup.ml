@@ -6055,6 +6055,23 @@ let test_rpc_feeHistory_long =
     ~error_msg:"Expected list of size %R, but got %L" ;
   unit
 
+let test_rpc_feeHistory_negative_blockcount =
+  register_both
+    ~tags:["evm"; "rpc"; "fee_history"; "block_count"]
+    ~title:"RPC methods eth_feeHistory with zero or negative blockCount"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let* _ =
+    repeat 3 (fun () ->
+        let*@ _ = evm_setup.produce_block () in
+        unit)
+  in
+  (* block_count can't be 0 or negative *)
+  let*@? _ = Rpc.fee_history (Int64.to_string 0L) "latest" evm_setup.evm_node in
+  let*@? _ =
+    Rpc.fee_history (Int64.to_string (-1L)) "latest" evm_setup.evm_node
+  in
+  unit
+
 let test_rpcs_can_be_disabled =
   register_both
     ~tags:["evm"; "rpc"; "restricted"]
@@ -6293,6 +6310,7 @@ let register_evm_node ~protocols =
   test_rpc_feeHistory_past protocols ;
   test_rpc_feeHistory_future protocols ;
   test_rpc_feeHistory_long protocols ;
+  test_rpc_feeHistory_negative_blockcount protocols ;
   test_rpcs_can_be_disabled protocols ;
   test_simulation_out_of_funds protocols ;
   test_rpc_state_value_and_subkeys protocols ;
