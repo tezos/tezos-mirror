@@ -1002,12 +1002,14 @@ let args25 a b c d e f g h i j k l m n o p q r s t u v w x y =
 
 let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
+type occurrence = Occ_empty | Occ_with_value of string
+
 (* Argument parsing *)
 let rec parse_arg :
     type a ctx.
     ?command:_ command ->
     (a, ctx) arg ->
-    string list StringMap.t ->
+    occurrence list StringMap.t ->
     ctx ->
     a tzresult Lwt.t =
  fun ?command spec args_dict ctx ->
@@ -1016,12 +1018,14 @@ let rec parse_arg :
   | Arg {label = {long; short = _}; kind = {converter; _}; _} -> (
       match StringMap.find_opt long args_dict with
       | None | Some [] -> return_none
-      | Some [s] ->
+      | Some [Occ_with_value s] ->
           let+ x =
             trace_eval (fun () -> Bad_option_argument ("--" ^ long, command))
             @@ converter ctx s
           in
           Some x
+      | Some [Occ_empty] ->
+          invalid_arg (Format.sprintf "'%s' must contain a value." long)
       | Some (_ :: _) -> tzfail (Multiple_occurrences ("--" ^ long, command)))
   | MultipleArg {label = {long; short = _}; kind = {converter; _}; _} -> (
       match StringMap.find_opt long args_dict with
@@ -1029,10 +1033,16 @@ let rec parse_arg :
       | Some l ->
           let+ x =
             List.map_es
-              (fun s ->
-                trace_eval (fun () ->
-                    Bad_option_argument ("--" ^ long, command))
-                @@ converter ctx s)
+              (function
+                | Occ_empty ->
+                    invalid_arg
+                      (Format.sprintf
+                         "'%s' must contain a value for each occurrence."
+                         long)
+                | Occ_with_value s ->
+                    trace_eval (fun () ->
+                        Bad_option_argument ("--" ^ long, command))
+                    @@ converter ctx s)
               l
           in
           Some x)
@@ -1048,13 +1058,15 @@ let rec parse_arg :
       | Ok default -> (
           match StringMap.find_opt long args_dict with
           | None | Some [] -> return default
-          | Some [s] ->
+          | Some [Occ_with_value s] ->
               trace (Bad_option_argument (long, command)) (converter ctx s)
+          | Some [Occ_empty] ->
+              invalid_arg (Format.sprintf "'%s' must contain a value." long)
           | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command))))
   | Switch {label = {long; short = _}; _} -> (
       match StringMap.find_opt long args_dict with
       | None | Some [] -> return_false
-      | Some [_] -> return_true
+      | Some [Occ_empty] -> return_true
       | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command)))
   | Constant c -> return c
   | Pair (speca, specb) ->
@@ -1127,9 +1139,12 @@ let make_args_dict_consume ?command spec args =
               let* () = check_help_flag ?command tl in
               match (arity, tl) with
               | [0], tl' ->
-                  make_args_dict arities (add_occurrence long "" acc) tl'
+                  make_args_dict arities (add_occurrence long Occ_empty acc) tl'
               | [1], value :: tl' ->
-                  make_args_dict arities (add_occurrence long value acc) tl'
+                  make_args_dict
+                    arities
+                    (add_occurrence long (Occ_with_value value) acc)
+                    tl'
               | [1], [] -> tzfail (Option_expected_argument (arg, None))
               | _, _ ->
                   Stdlib.failwith
@@ -1154,12 +1169,12 @@ let make_args_dict_filter ?command spec args =
             | [0], tl ->
                 make_args_dict
                   arities
-                  (add_occurrence long "" dict, other_args)
+                  (add_occurrence long Occ_empty dict, other_args)
                   tl
             | [1], value :: tl' ->
                 make_args_dict
                   arities
-                  (add_occurrence long value dict, other_args)
+                  (add_occurrence long (Occ_with_value value) dict, other_args)
                   tl'
             | [1], [] -> tzfail (Option_expected_argument (arg, command))
             | _, _ ->
