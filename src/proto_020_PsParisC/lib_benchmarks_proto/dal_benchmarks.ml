@@ -128,7 +128,7 @@ module Publish_commitment : Benchmark.S = struct
       Lwt_main.run
       @@ Tezos_crypto_dal.Cryptobox.init_prover_dal
            ~find_srs_files:(Fun.const (Ok ("", "")))
-           ~install_trusted_setup:false
+           ~fetch_trusted_setup:false
            ()
       |> function
       | Ok () -> ()

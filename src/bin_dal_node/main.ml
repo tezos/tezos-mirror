@@ -43,6 +43,7 @@ let merge
         service_name;
         service_namespace;
         experimental_features;
+        fetch_trusted_setup;
       } configuration =
   let profile =
     match profile with
@@ -72,6 +73,10 @@ let merge
     service_name = Option.either service_name configuration.service_name;
     service_namespace =
       Option.either service_namespace configuration.service_namespace;
+    fetch_trusted_setup =
+      Option.value
+        ~default:configuration.fetch_trusted_setup
+        fetch_trusted_setup;
     experimental_features =
       merge_experimental_features
         experimental_features

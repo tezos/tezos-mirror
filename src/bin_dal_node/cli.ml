@@ -324,6 +324,17 @@ module Term = struct
       & opt (some service_namespace_arg) None
       & info ~docs ~doc ~env:service_namespace_env ["service-namespace"])
 
+  let fetch_trusted_setup =
+    let open Cmdliner in
+    let doc =
+      "Should the DAl node fetch the trusted setup when it needs it. By \
+       default, it does so."
+    in
+    Arg.(
+      value
+      & opt (some bool) None
+      & info ~docs ~doc ~docv:"true | false" ["fetch-trusted-setup"])
+
   (* Experimental features. *)
 
   let sqlite3_backend =
@@ -344,7 +355,8 @@ module Term = struct
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace $ sqlite3_backend))
+       $ history_mode $ service_name $ service_namespace $ sqlite3_backend
+       $ fetch_trusted_setup))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -501,12 +513,14 @@ type options = {
   service_name : string option;
   service_namespace : string option;
   experimental_features : experimental_features;
+  fetch_trusted_setup : bool option;
 }
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode service_name service_namespace sqlite3_backend =
+      history_mode service_name service_namespace sqlite3_backend
+      fetch_trusted_setup =
     let run profile =
       run
         subcommand
@@ -524,6 +538,7 @@ let make ~run =
           service_name;
           service_namespace;
           experimental_features = {sqlite3_backend};
+          fetch_trusted_setup;
         }
     in
     let profile = Operator_profile.make ~attesters ~producers ?observers () in

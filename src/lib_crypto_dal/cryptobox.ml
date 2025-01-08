@@ -1203,7 +1203,7 @@ module Internal_for_tests = struct
   let slot_as_polynomial_length = Parameters_check.slot_as_polynomial_length
 end
 
-let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) ~install_trusted_setup
+let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) ~fetch_trusted_setup
     () =
   let open Lwt_result_syntax in
   let load_trusted_setup_parameters srsu_g1_path srsu_g2_path =
@@ -1217,7 +1217,7 @@ let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) ~install_trusted_setup
     Lwt.return (load_parameters initialisation_parameters)
   in
   let download_trusted_setup errors =
-    if install_trusted_setup then
+    if fetch_trusted_setup then
       let*! () =
         Event.(emit installing_trusted_setup)
           Trusted_setup.dal_trusted_setup_folder

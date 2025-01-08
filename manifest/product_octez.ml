@@ -1536,43 +1536,6 @@ let octez_dal_config =
     ~path:"src/lib_crypto_dal/dal_config"
     ~deps:[data_encoding |> open_]
 
-let octez_crypto_dal =
-  octez_lib
-    "crypto-dal"
-    ~internal_name:"tezos_crypto_dal"
-    ~path:"src/lib_crypto_dal"
-    ~synopsis:"DAL cryptographic primitives"
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_stdlib_unix |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        octez_dal_config |> open_;
-        octez_bls12_381_polynomial;
-        lwt_unix;
-        octez_kzg;
-      ]
-
-let _octez_crypto_dal_tests =
-  tezt
-    ["test_dal_cryptobox"]
-    ~path:"src/lib_crypto_dal/test"
-    ~opam:"octez-libs"
-    ~dep_files:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_crypto_dal |> open_;
-        octez_dal_config |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        alcotezt;
-        qcheck_alcotest;
-        octez_bls12_381_polynomial;
-        octez_test_helpers;
-      ]
-
 let ppx_irmin =
   octez_internal_lib
     "ppx_irmin"
@@ -1968,6 +1931,47 @@ let octez_base_test_helpers =
     ~linkall:true
     ~bisect_ppx:No
     ~release_status:Released
+
+let octez_crypto_dal =
+  octez_lib
+    "crypto-dal"
+    ~internal_name:"tezos_crypto_dal"
+    ~path:"src/lib_crypto_dal"
+    ~synopsis:"DAL cryptographic primitives"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        octez_dal_config |> open_;
+        octez_bls12_381_polynomial;
+        cohttp_lwt_unix;
+        octez_lwt_result_stdlib;
+        lwt_unix;
+        octez_kzg;
+        octez_event_logging;
+        octez_base;
+      ]
+
+let _octez_crypto_dal_tests =
+  tezt
+    ["test_dal_cryptobox"]
+    ~path:"src/lib_crypto_dal/test"
+    ~opam:"octez-libs"
+    ~dep_files:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_crypto_dal |> open_;
+        octez_dal_config |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        alcotezt;
+        qcheck_alcotest;
+        octez_bls12_381_polynomial;
+        octez_test_helpers;
+      ]
 
 let ppx_profiler =
   octez_lib

@@ -827,7 +827,7 @@ module Test = struct
       Cryptobox.(
         init_prover_dal
           ~find_srs_files
-          ~install_trusted_setup:false
+          ~fetch_trusted_setup:false
           ~srs_size_log2:5
           ())
     |> function
@@ -844,7 +844,7 @@ module Test = struct
       Cryptobox.(
         init_prover_dal
           ~find_srs_files
-          ~install_trusted_setup:false
+          ~fetch_trusted_setup:false
           ~srs_size_log2:6
           ())
     |> function

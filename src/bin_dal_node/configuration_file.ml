@@ -80,7 +80,7 @@ type t = {
   service_name : string option;
   service_namespace : string option;
   experimental_features : experimental_features;
-  install_trusted_setup : bool;
+  fetch_trusted_setup : bool;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -140,7 +140,7 @@ let default =
     service_name = None;
     service_namespace = None;
     experimental_features = default_experimental_features;
-    install_trusted_setup = true;
+    fetch_trusted_setup = true;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -195,7 +195,7 @@ let encoding : t Data_encoding.t =
            service_name;
            service_namespace;
            experimental_features;
-           install_trusted_setup;
+           fetch_trusted_setup;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -213,7 +213,7 @@ let encoding : t Data_encoding.t =
           service_name,
           service_namespace,
           experimental_features,
-          install_trusted_setup ) ))
+          fetch_trusted_setup ) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -230,7 +230,7 @@ let encoding : t Data_encoding.t =
              service_name,
              service_namespace,
              experimental_features,
-             install_trusted_setup ) ) ->
+             fetch_trusted_setup ) ) ->
       {
         data_dir;
         rpc_addr;
@@ -248,7 +248,7 @@ let encoding : t Data_encoding.t =
         service_name;
         service_namespace;
         experimental_features;
-        install_trusted_setup;
+        fetch_trusted_setup;
       })
     (merge_objs
        (obj10
@@ -330,7 +330,7 @@ let encoding : t Data_encoding.t =
              experimental_features_encoding
              default_experimental_features)
           (dft
-             "install_trusted_setup"
+             "fetch_trusted_setup"
              ~description:"Install trusted setup"
              bool
              true)))
@@ -487,7 +487,7 @@ let from_v0 v0 =
     service_name = None;
     service_namespace = None;
     experimental_features = default_experimental_features;
-    install_trusted_setup = true;
+    fetch_trusted_setup = true;
   }
 
 type error += DAL_node_unable_to_write_configuration_file of string

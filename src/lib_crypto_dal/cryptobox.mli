@@ -576,16 +576,16 @@ module Internal_for_tests : sig
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
 
-(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ~install_trusted_setup ()]
+(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ~fetch_trusted_setup ()]
     initializes the DAL in "prover" mode, given the function [find_srs_files] to
     find the SRS files, installing them if they are not found and
-    [install_trusted_setup] is [true] and the optional log2 of the SRS size [srs_size_log2].
+    [fetch_trusted_setup] is [true] and the optional log2 of the SRS size [srs_size_log2].
     Note that the both proving & verifying functions can be used with this setup.
     If this function is not called only verifying functions are available. *)
 val init_prover_dal :
   find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
   ?srs_size_log2:int ->
-  install_trusted_setup:bool ->
+  fetch_trusted_setup:bool ->
   unit ->
   unit Error_monad.tzresult Lwt.t
 
