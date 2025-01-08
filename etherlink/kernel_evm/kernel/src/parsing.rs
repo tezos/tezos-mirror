@@ -131,7 +131,7 @@ pub enum SequencerInput {
 pub enum Input<Mode> {
     ModeSpecific(Mode),
     Deposit((Deposit, Option<U256>)),
-    FaDeposit(FaDeposit),
+    FaDeposit((FaDeposit, Option<U256>)),
     Upgrade(KernelUpgrade),
     SequencerUpgrade(SequencerUpgrade),
     RemoveSequencer,
@@ -650,9 +650,9 @@ impl<Mode: Parsable> InputResult<Mode> {
         // directly. We prefer to overapproximate rather than under approximate.
         Mode::on_fa_deposit(context);
         match FaDeposit::try_parse(ticket, routing_info, inbox_level, inbox_msg_id) {
-            Ok(fa_deposit) => {
+            Ok((fa_deposit, chain_id)) => {
                 log!(host, Debug, "Parsed from input: {}", fa_deposit.display());
-                InputResult::Input(Input::FaDeposit(fa_deposit))
+                InputResult::Input(Input::FaDeposit((fa_deposit, chain_id)))
             }
             Err(err) => {
                 log!(
