@@ -1248,6 +1248,8 @@ module State = struct
       Read_write
       (Evm_state.irmin_store_path ~data_dir)
 
+  let on_disk_kernel = function Wasm_debugger.On_disk _ -> true | _ -> false
+
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url () =
     let open Lwt_result_syntax in
@@ -1305,7 +1307,10 @@ module State = struct
       match kernel_path with
       | Some kernel ->
           if init_status = Loaded then
-            let*! () = Events.ignored_kernel_arg () in
+            let* () =
+              when_ (on_disk_kernel kernel) @@ fun () ->
+              Lwt_result.ok (Events.ignored_kernel_arg ())
+            in
             let*! evm_state = Irmin_context.PVMState.get context in
             return (evm_state, context)
           else
