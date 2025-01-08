@@ -227,30 +227,11 @@ pub fn ticket_hash(ticket: &FA2_1Ticket) -> Result<H256, FaBridgeError> {
 mod tests {
     use std::str::FromStr;
 
+    use crate::fa_bridge::test_utils::create_fa_ticket;
     use num_bigint::BigInt;
     use sha3::{Digest, Keccak256};
-    use tezos_crypto_rs::hash::ContractKt1Hash;
-    use tezos_smart_rollup_encoding::{
-        contract::Contract,
-        michelson::{MichelsonNat, MichelsonOption, MichelsonPair},
-    };
 
     use super::*;
-
-    fn create_fa_ticket(
-        ticketer: &str,
-        token_id: u64,
-        metadata: &[u8],
-        amount: BigInt,
-    ) -> FA2_1Ticket {
-        let creator =
-            Contract::Originated(ContractKt1Hash::from_base58_check(ticketer).unwrap());
-        let contents = MichelsonPair(
-            MichelsonNat::new(BigInt::from(token_id).into()).unwrap(),
-            MichelsonOption(Some(MichelsonBytes(metadata.to_vec()))),
-        );
-        FA2_1Ticket::new(creator, contents, amount).unwrap()
-    }
 
     #[test]
     fn fa_deposit_parsing_success_no_chain_id() {
