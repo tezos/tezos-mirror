@@ -325,14 +325,7 @@ let try_reattach () =
       |> Deployement.of_agents
     in
     let agents = Deployement.agents deployement in
-    let proxy_agent =
-      agents
-      |> List.find (fun agent ->
-             let proxy_agent_prefix =
-               Format.asprintf "%s-proxy" Env.tezt_cloud
-             in
-             String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
-    in
+    let proxy_agent = Proxy.get_agent agents in
     let* is_ssh_server_running =
       Lwt.pick
         [
@@ -373,12 +366,7 @@ let try_reattach () =
 
 let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   let agents = Deployement.agents deployement in
-  let proxy_agent =
-    agents
-    |> List.find (fun agent ->
-           let proxy_agent_prefix = Format.asprintf "%s-proxy" Env.tezt_cloud in
-           String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
-  in
+  let proxy_agent = Proxy.get_agent agents in
   let* () = wait_ssh_server_running proxy_agent in
   let destination =
     (Agent.configuration proxy_agent).binaries_path
