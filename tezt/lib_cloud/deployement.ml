@@ -357,14 +357,13 @@ module Localhost = struct
     let agents =
       configurations
       |> List.mapi (fun i configuration ->
-             let name = Format.asprintf "localhost_docker_%d" i in
              let point = get_point i in
              Agent.make
                ~ssh_id
                ~point
                ~configuration
                ~next_available_port:(fun () -> next_port point)
-               ~name
+               ~name:configuration.name
                ())
     in
     Lwt.return
