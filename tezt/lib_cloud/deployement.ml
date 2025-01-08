@@ -130,7 +130,7 @@ module Remote = struct
 
   let deploy_proxy () =
     let workspace_name = Format.asprintf "%s-proxy" Env.tezt_cloud in
-    let configuration = Configuration.make () in
+    let configuration = Proxy.make_config () in
     let tezt_cloud = Env.tezt_cloud in
     let* () = Terraform.VM.Workspace.init ~tezt_cloud [workspace_name] in
     let* agents =
