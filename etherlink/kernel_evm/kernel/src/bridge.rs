@@ -246,9 +246,11 @@ pub fn execute_deposit<Host: Runtime>(
 mod tests {
     use alloy_sol_types::SolEvent;
     use evm_execution::account_storage::init_account_storage;
+    use evm_execution::fa_bridge::test_utils::create_fa_ticket;
     use primitive_types::{H160, U256};
     use rlp::Decodable;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
     use crate::{bridge::DEPOSIT_EVENT_TOPIC, CONFIG};
 
@@ -277,6 +279,48 @@ mod tests {
     #[test]
     fn deposit_event_topic() {
         assert_eq!(events::Deposit::SIGNATURE_HASH.0, DEPOSIT_EVENT_TOPIC);
+    }
+
+    #[test]
+    fn deposit_parsing_no_chain_id() {
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let receiver = MichelsonBytes(vec![1u8; 20]);
+        let (deposit, chain_id) =
+            Deposit::try_parse(ticket, receiver, 0, 0).expect("Failed to parse");
+        pretty_assertions::assert_eq!(
+            deposit,
+            Deposit {
+                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                receiver: H160([1u8; 20]),
+                inbox_level: 0,
+                inbox_msg_id: 0,
+            }
+        );
+        pretty_assertions::assert_eq!(chain_id, None)
+    }
+
+    #[test]
+    fn deposit_parsing_chain_id() {
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let mut receiver_and_chain_id = vec![];
+        receiver_and_chain_id.extend(vec![1u8; 20]);
+        receiver_and_chain_id.extend(vec![1u8]);
+        receiver_and_chain_id.extend(vec![0u8; 31]);
+        let receiver_and_chain_id = MichelsonBytes(receiver_and_chain_id);
+        let (deposit, chain_id) = Deposit::try_parse(ticket, receiver_and_chain_id, 0, 0)
+            .expect("Failed to parse");
+        pretty_assertions::assert_eq!(
+            deposit,
+            Deposit {
+                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                receiver: H160([1u8; 20]),
+                inbox_level: 0,
+                inbox_msg_id: 0,
+            }
+        );
+        pretty_assertions::assert_eq!(chain_id, Some(U256::one()))
     }
 
     #[test]
