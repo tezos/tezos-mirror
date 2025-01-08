@@ -22,6 +22,9 @@
   source for fresh data directories. (!16093)
 - The `snapshot import` command can now download a snapshot if provided with a
   URL instead of a path. (!16112)
+- Add a default value, 1024, for the RPC `eth_feeHistory` block_count
+  parameters. Configuration can be `unlimited` if no maximum is
+  wanted. (!16150)
 
 #### Experimental
 

@@ -317,11 +317,11 @@ let get_fee_history block_count block_parameter config
   (* TODO: exclude 0 blocks *)
   let open Lwt_result_syntax in
   let open Ethereum_types in
-  (* block count can be bounded in configuration *)
+  (* block count is bounded by configuration (default to Configuration.default_fee_history.max_count *)
   let block_count =
     match Configuration.(config.fee_history.max_count) with
-    | None -> block_count
-    | Some count -> Z.(min (of_int count) block_count)
+    | Unlimited -> block_count
+    | Limit block_count_limit -> Z.(min (of_int block_count_limit) block_count)
   in
   let* nb_latest = Backend_rpc.Block_storage.current_block_number () in
   let is_reachable nb =
@@ -352,7 +352,8 @@ let get_fee_history block_count block_parameter config
 
   let rec get_fee_history_aux block_count block_parameter
       (history_acc : Fee_history.t) =
-    if block_count = Z.zero || block_parameter = Block_parameter.Number Qty.zero
+    if
+      block_count <= Z.zero || block_parameter = Block_parameter.Number Qty.zero
     then return history_acc
     else
       let* block =
@@ -755,7 +756,7 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             build_with_input ~f module_ parameters
         | Eth_fee_history.Method ->
             let f (Qty block_count, newest_block, _reward_percentile) =
-              if block_count = Z.zero then
+              if block_count <= Z.zero then
                 rpc_error
                   (Rpc_errors.invalid_params
                      "Number of block should be greater than 0.")

@@ -179,9 +179,12 @@
       "ignore_block_param"?: boolean },
   "fee_history"?:
     { "max_count"?:
-        integer ∈ [1, 2^30]
         /* The maximum number of blocks whose fee history can be retrieved at
-           once */,
+           once */
+        "unlimited"
+        || integer ∈ [1, 2^30]
+        /* limit
+           Limit the number of block allowed to be queried. */,
       "max_past"?:
         integer ∈ [1, 2^30]
         /* The maximum number of blocks in the past where the fee history is
