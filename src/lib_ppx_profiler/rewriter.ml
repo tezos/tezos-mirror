@@ -292,28 +292,29 @@ let extract_key_from_payload loc payload =
           [%e?
             {
               pexp_desc =
-                Pexp_apply
-                  ( {pexp_desc = Pexp_record (record, _); _},
-                    [(Nolabel, structure)] );
+                Pexp_apply ({pexp_desc = Pexp_record (record, _); _}, item_list);
               _;
             }]];
-      ] ->
-      (* [@ppx {<other infos>} ...] *)
-      let verbosity, profiler_module, metadata, driver_ids =
-        extract_from_record loc record
-      in
-      (match (verbosity, profiler_module, metadata) with
-      | None, None, None when Handled_drivers.is_empty driver_ids ->
-          Error.error loc Error.(Improper_record record)
-      | _ -> ()) ;
-      Key.
-        {
-          verbosity;
-          profiler_module;
-          metadata;
-          driver_ids;
-          content = extract_content_from_structure loc structure;
-        }
+      ] -> (
+      match item_list with
+      | [(Nolabel, structure)] ->
+          (* [@ppx {<other infos>} ...] *)
+          let verbosity, profiler_module, metadata, driver_ids =
+            extract_from_record loc record
+          in
+          (match (verbosity, profiler_module, metadata) with
+          | None, None, None when Handled_drivers.is_empty driver_ids ->
+              Error.error loc Error.(Improper_record record)
+          | _ -> ()) ;
+          Key.
+            {
+              verbosity;
+              profiler_module;
+              metadata;
+              driver_ids;
+              content = extract_content_from_structure loc structure;
+            }
+      | _ -> Error.error loc (Invalid_payload (false, payload)))
   | Ppxlib.PStr [[%stri [%e? structure]]] ->
       (* [@ppx ...] *)
       Key.
@@ -334,7 +335,7 @@ let extract_key_from_payload loc payload =
           driver_ids = Handled_drivers.empty;
           content = Key.Empty;
         }
-  | _ -> Error.error loc Invalid_payload
+  | _ -> Error.error loc (Invalid_payload (true, payload))
 
 let of_attribute handled_drivers
     ({Ppxlib.attr_payload; attr_loc; _} as attribute) =

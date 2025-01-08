@@ -7,7 +7,7 @@
 
 type error =
   | Invalid_action of string
-  | Invalid_payload
+  | Invalid_payload of bool * Ppxlib.payload
   | Invalid_aggregate of Key.t
   | Invalid_custom of Key.t
   | Invalid_mark of Key.t
@@ -15,18 +15,19 @@ type error =
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
   | Invalid_list_of_driver_ids of Ppxlib.expression list
-  | Improper_field of (Longident.t Location.loc * Ppxlib.expression)
-  | Improper_list_field of (Longident.t Location.loc * Ppxlib.expression)
+  | Improper_field of (Ppxlib.longident_loc * Ppxlib.expression)
+  | Improper_list_field of (Ppxlib.longident_loc * Ppxlib.expression)
   | Improper_let_binding of Ppxlib.expression
-  | Improper_record of (Ppxlib.Ast.longident_loc * Ppxlib.expression) list
+  | Improper_record of (Ppxlib.longident_loc * Ppxlib.expression) list
   | Malformed_attribute of Ppxlib.expression
   | No_verbosity of Key.t
 
 let pp_field ppf (lident, expr) =
   Format.fprintf
     ppf
-    "%s = %a"
-    (Ppxlib.Longident.name lident.Ppxlib.txt)
+    "%a = %a"
+    Ppxlib.Pprintast.longident
+    lident.Ppxlib.txt
     Ppxlib.Pprintast.expression
     expr
 
@@ -44,14 +45,28 @@ let error loc err =
                   Format.fprintf ppf "%s" (Constants.get_action constant)))
             Constants.constants
             action )
-    | Invalid_payload ->
+    | Invalid_payload (missing_record, payload) ->
         ( "Invalid or empty attribute payload.",
           Format.asprintf
             "@[<v 2>Accepted attributes payload are:@,\
-             - `[@profiler.aggregate_* <string or ident>]@,\
-             - `[@profiler.mark [<list of strings or ident>]]@,\
-             - `[@profiler.record_* <string or ident>]@,\
-             - `[@profiler.span_* <list of strings or ident>]@." )
+             - [@profiler.aggregate_* <record> <string or ident>]@,\
+             - [@profiler.mark <record> [<list of strings or ident>]]@,\
+             - [@profiler.record_* <record> <string or ident>]@,\
+             - [@profiler.span_* <record> <list of strings or ident>]@,\
+             %aFound: @[<v 0>%a@]@."
+            (fun ppf () ->
+              if missing_record then
+                Format.fprintf
+                  ppf
+                  "@[<v 2>With <record> containing the following fields:@,\
+                   - verbosity@,\
+                   - profiler_module@,\
+                   - metadata@,\
+                   - drivers_ids@]@,"
+              else ())
+            ()
+            Ppxlib.Pprintast.payload
+            payload )
     | Invalid_aggregate key ->
         ( "Invalid aggregate.",
           Format.asprintf
@@ -103,7 +118,7 @@ let error loc err =
             "@[<v 2>It looks like you tried to provide a list of opt-in \
              drivers through the `driver_ids` field but no drivers could be \
              parsed out of it. A list of opt-in drivers should be a list of \
-             modules or idents like `[Opentelemetry; prometheus]@,\
+             modules or idents like [Opentelemetry; prometheus]@,\
              Found: { @[<v 2>%a@] }@."
             Format.(
               pp_print_list
@@ -153,8 +168,8 @@ let error loc err =
         ( "Malformed attribute.",
           Format.asprintf
             "@[<v 2>Accepted attributes payload are:@,\
-             - `[@profiler.mark [<list of strings>]]'@,\
-             - `[@profiler.aggregate_* <string or ident>]@,\
+             - [@profiler.mark [<list of strings>]]@,\
+             - [@profiler.aggregate_* <string or ident>]@,\
              Found %a@.'"
             Ppxlib.Pprintast.expression
             expr )
