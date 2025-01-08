@@ -130,7 +130,7 @@ pub enum SequencerInput {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Input<Mode> {
     ModeSpecific(Mode),
-    Deposit(Deposit),
+    Deposit((Deposit, Option<U256>)),
     FaDeposit(FaDeposit),
     Upgrade(KernelUpgrade),
     SequencerUpgrade(SequencerUpgrade),
@@ -678,9 +678,9 @@ impl<Mode: Parsable> InputResult<Mode> {
         // directly. We prefer to overapproximate rather than under approximate.
         Mode::on_deposit(context);
         match Deposit::try_parse(ticket, receiver, inbox_level, inbox_msg_id) {
-            Ok(deposit) => {
+            Ok((deposit, chain_id)) => {
                 log!(host, Info, "Parsed from input: {}", deposit.display());
-                Self::Input(Input::Deposit(deposit))
+                Self::Input(Input::Deposit((deposit, chain_id)))
             }
             Err(err) => {
                 log!(

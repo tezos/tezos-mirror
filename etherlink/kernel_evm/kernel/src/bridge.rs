@@ -55,13 +55,29 @@ pub struct Deposit {
 }
 
 impl Deposit {
-    fn parse_receiver(input: MichelsonBytes) -> Result<H160, BridgeError> {
+    const RECEIVER_LENGTH: usize = std::mem::size_of::<H160>();
+
+    const RECEIVER_AND_CHAIN_ID_LENGTH: usize =
+        Self::RECEIVER_LENGTH + std::mem::size_of::<U256>();
+
+    fn parse_receiver(
+        input: MichelsonBytes,
+    ) -> Result<(H160, Option<U256>), BridgeError> {
         let input_bytes = input.0;
-        if input_bytes.len() != std::mem::size_of::<H160>() {
-            return Err(BridgeError::InvalidDepositReceiver(input_bytes));
+        let input_length = input_bytes.len();
+        if input_length == Self::RECEIVER_LENGTH {
+            // Legacy format, input is exactly the receiver EVM address
+            let receiver = H160::from_slice(&input_bytes);
+            Ok((receiver, None))
+        } else if input_length == Self::RECEIVER_AND_CHAIN_ID_LENGTH {
+            // input is receiver followed by chain id
+            let receiver = H160::from_slice(&input_bytes[..Self::RECEIVER_LENGTH]);
+            let chain_id =
+                U256::from_little_endian(&input_bytes[Self::RECEIVER_LENGTH..]);
+            Ok((receiver, Some(chain_id)))
+        } else {
+            Err(BridgeError::InvalidDepositReceiver(input_bytes))
         }
-        let receiver = H160::from_slice(&input_bytes);
-        Ok(receiver)
     }
 
     /// Parses a deposit from a ticket transfer (internal inbox message).
@@ -72,7 +88,7 @@ impl Deposit {
         receiver: MichelsonBytes,
         inbox_level: u32,
         inbox_msg_id: u32,
-    ) -> Result<Self, BridgeError> {
+    ) -> Result<(Self, Option<U256>), BridgeError> {
         // Amount
         let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
         // We use the `U256::from_little_endian` as it takes arbitrary long
@@ -82,15 +98,19 @@ impl Deposit {
         let amount_mutez: u64 = U256::from_little_endian(&amount_bytes).as_u64();
         let amount: U256 = eth_from_mutez(amount_mutez);
 
-        // EVM address
-        let receiver = Self::parse_receiver(receiver)?;
+        // EVM address of the receiver and chain id both come from the
+        // Michelson byte parameter.
+        let (receiver, chain_id) = Self::parse_receiver(receiver)?;
 
-        Ok(Self {
-            amount,
-            receiver,
-            inbox_level,
-            inbox_msg_id,
-        })
+        Ok((
+            Self {
+                amount,
+                receiver,
+                inbox_level,
+                inbox_msg_id,
+            },
+            chain_id,
+        ))
     }
 
     /// Returns log structure for an implicit deposit event.
