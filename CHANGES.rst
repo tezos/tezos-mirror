@@ -64,6 +64,9 @@ Codec
 Docker Images
 -------------
 
+- Fixed the Docker ``octez-snapshot-import`` command to properly pass
+  arguments to the snapshot import process. (MR :gl:`!11259`)
+
 Smart Rollup node
 -----------------
 
