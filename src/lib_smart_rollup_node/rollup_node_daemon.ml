@@ -906,5 +906,6 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
   in
   let state = {node_ctxt; rpc_server; configuration; plugin} in
   let* () = check_operator_balance state in
+  let* () = Node_context.save_protocols_from_l1 node_ctxt in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
   run state

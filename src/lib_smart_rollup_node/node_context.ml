@@ -858,6 +858,25 @@ let save_protocol_info node_ctxt (block : Layer1.header)
         in
         Store.Protocols.store node_ctxt.store proto_info
 
+let save_protocols_from_l1 {cctxt; store; _} =
+  let open Lwt_result_syntax in
+  let open Tezos_shell_services.Chain_services in
+  let*! protocols = Protocols.list cctxt () in
+  match protocols with
+  | Error _ ->
+      Format.eprintf
+        "Warning: did not fetch protocol activation levels from L1 node" ;
+      return_unit
+  | Ok protocols ->
+      List.iter_es
+        (fun {protocol; proto_level; activation_block = _block, level} ->
+          let proto_info =
+            Store.Protocols.
+              {protocol; proto_level; level = Activation_level level}
+          in
+          Store.Protocols.store store proto_info)
+        protocols
+
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
   Error.trace_lwt_result_with
     "Could not retrieve slot header for slot index %d published in block %a"

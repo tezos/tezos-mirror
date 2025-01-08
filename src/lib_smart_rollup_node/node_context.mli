@@ -504,6 +504,9 @@ val protocol_activation_level :
 val save_protocol_info :
   rw -> Layer1.header -> predecessor:Layer1.header -> unit tzresult Lwt.t
 
+(** Save the protocol activation levels from L1 if possible. *)
+val save_protocols_from_l1 : rw -> unit tzresult Lwt.t
+
 (** {3 DAL} *)
 
 (** [get_slot_header t ~published_in_block_hash slot_index] returns the slot
