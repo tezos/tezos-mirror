@@ -317,11 +317,11 @@ let get_fee_history block_count block_parameter config
   (* TODO: exclude 0 blocks *)
   let open Lwt_result_syntax in
   let open Ethereum_types in
-  (* block count can be bounded in configuration *)
+  (* block count is bounded by configuration (default to Configuration.default_fee_history.max_count *)
   let block_count =
     match Configuration.(config.fee_history.max_count) with
-    | None -> block_count
-    | Some count -> Z.(min (of_int count) block_count)
+    | Unlimited -> block_count
+    | Limit block_count_limit -> Z.(min (of_int block_count_limit) block_count)
   in
   let* nb_latest = Backend_rpc.Block_storage.current_block_number () in
   let is_reachable nb =

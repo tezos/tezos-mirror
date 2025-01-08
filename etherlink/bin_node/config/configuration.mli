@@ -127,7 +127,9 @@ type proxy = {
   ignore_block_param : bool;
 }
 
-type fee_history = {max_count : int option; max_past : int option}
+type fee_history_max_count = Unlimited | Limit of int
+
+type fee_history = {max_count : fee_history_max_count; max_past : int option}
 
 type restricted_rpcs =
   | Unrestricted

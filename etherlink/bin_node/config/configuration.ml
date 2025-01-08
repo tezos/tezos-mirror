@@ -86,7 +86,9 @@ type proxy = {
   ignore_block_param : bool;
 }
 
-type fee_history = {max_count : int option; max_past : int option}
+type fee_history_max_count = Unlimited | Limit of int
+
+type fee_history = {max_count : fee_history_max_count; max_past : int option}
 
 (* The regular expression is compiled at the launch of the node, and encoded
    into its raw form. *)
@@ -269,7 +271,7 @@ let default_blueprints_publisher_config_with_dal =
        significantly larger than max_blueprints_lag. *)
   }
 
-let default_fee_history = {max_count = None; max_past = None}
+let default_fee_history = {max_count = Limit 1024; max_past = None}
 
 let make_pattern_restricted_rpcs raw =
   Pattern {raw; regex = Re.Perl.compile_pat raw}
@@ -903,16 +905,38 @@ let default_proxy ?evm_node_endpoint ?(ignore_block_param = false) () =
 
 let fee_history_encoding =
   let open Data_encoding in
+  let max_count_encoding : fee_history_max_count Data_encoding.t =
+    union
+      [
+        case
+          ~title:"unlimited"
+          ~description:"Allow any number for block_count parameter request."
+          Json_only
+          (constant "unlimited")
+          (function
+            | (Unlimited : fee_history_max_count) -> Some () | _ -> None)
+          (fun () -> Unlimited);
+        case
+          ~title:"limit"
+          ~description:"Limit the number of block allowed to be queried."
+          Json_only
+          strictly_positive_encoding
+          (function
+            | (Limit limit : fee_history_max_count) -> Some limit | _ -> None)
+          (fun limit -> Limit limit);
+      ]
+  in
   conv
     (fun {max_count; max_past} -> (max_count, max_past))
     (fun (max_count, max_past) -> {max_count; max_past})
     (obj2
-       (opt
+       (dft
           ~description:
             "The maximum number of blocks whose fee history can be retrieved \
              at once"
           "max_count"
-          strictly_positive_encoding)
+          max_count_encoding
+          default_fee_history.max_count)
        (opt
           ~description:
             "The maximum number of blocks in the past where the fee history is \

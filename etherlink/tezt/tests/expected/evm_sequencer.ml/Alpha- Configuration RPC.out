@@ -29,7 +29,9 @@
   "proxy": {
     "ignore_block_param": false
   },
-  "fee_history": {},
+  "fee_history": {
+    "max_count": 1024
+  },
   "kernel_execution": {
     "preimages": "hidden",
     "native_execution_policy": "never"
@@ -87,7 +89,9 @@
   "proxy": {
     "ignore_block_param": false
   },
-  "fee_history": {},
+  "fee_history": {
+    "max_count": 1024
+  },
   "kernel_execution": {
     "preimages": "hidden",
     "native_execution_policy": "never"
@@ -139,7 +143,9 @@
     "evm_node_endpoint": "hidden",
     "ignore_block_param": false
   },
-  "fee_history": {},
+  "fee_history": {
+    "max_count": 1024
+  },
   "kernel_execution": {
     "preimages": "hidden",
     "native_execution_policy": "never"
