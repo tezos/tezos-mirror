@@ -251,3 +251,27 @@ val send_transaction_to_sequencer : (unit -> 'a Lwt.t) -> Evm_node.t -> 'a Lwt.t
     with the results of [sends]. *)
 val send_transactions_to_sequencer :
   sends:(unit -> 'a Lwt.t) list -> Evm_node.t -> (int * 'a list) Lwt.t
+
+(** Run [octez-client transfer amount from giver to bridge --entrypoint deposit --arg '(Pair "sr_address" l2_address)']. *)
+val deposit :
+  ?env:string String_map.t ->
+  ?hooks:Process.hooks ->
+  ?log_output:bool ->
+  ?endpoint:Client.endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?safety_guard:int ->
+  ?storage_limit:int ->
+  ?counter:int ->
+  ?simulation:bool ->
+  ?force:bool ->
+  ?expect_failure:bool ->
+  amount:Tez.t ->
+  giver:string ->
+  sr_address:string ->
+  bridge:string ->
+  l2_address:string ->
+  Client.t ->
+  unit Lwt.t
