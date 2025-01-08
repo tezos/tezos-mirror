@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internals
+
 ## Version 0.13 (2025-01-09)
 
 This new version notably reduces the complexity to set up a new node for
