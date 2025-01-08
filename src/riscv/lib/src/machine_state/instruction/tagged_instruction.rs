@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Args, CSRegister, FRegister, InstrRoundingMode, Instruction, OpCode, XRegister};
+use super::{
+    Args, CSRegister, FRegister, InstrRoundingMode, Instruction, NonZeroXRegister, OpCode,
+    XRegister,
+};
 use crate::default::ConstDefault;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -15,6 +18,8 @@ pub enum TaggedError {
     UnwrapX(TaggedRegister),
     #[error("Expected FRegister got {0:?}")]
     UnwrapF(TaggedRegister),
+    #[error("Expected NonZeroXRegister got {0:?}")]
+    UnwrapNZX(TaggedRegister),
 }
 
 impl TryFrom<TaggedInstruction> for Instruction {
@@ -70,6 +75,17 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rd: value.args.rd.unwrap_x()?.into(),
                 rs1: value.args.rs1.unwrap_x()?.into(),
                 rs2: value.args.rs2.unwrap_f()?.into(),
+                imm: value.args.imm,
+                csr: value.args.csr,
+                rs3f: value.args.rs3f,
+                rm: value.args.rm,
+                aq: value.args.aq,
+                rl: value.args.rl,
+            },
+            ArgsShape::NZXSrcNZXDest => Args {
+                rd: value.args.rd.unwrap_nzx()?.into(),
+                rs1: value.args.rs1.unwrap_nzx()?.into(),
+                rs2: value.args.rs2.unwrap_nzx()?.into(),
                 imm: value.args.imm,
                 csr: value.args.csr,
                 rs3f: value.args.rs3f,
@@ -152,6 +168,17 @@ impl From<Instruction> for TaggedInstruction {
                 aq: value.args.aq,
                 rl: value.args.rl,
             },
+            ArgsShape::NZXSrcNZXDest => TaggedArgs {
+                rd: unsafe { value.args.rd.nzx.into() },
+                rs1: unsafe { value.args.rs1.nzx.into() },
+                rs2: unsafe { value.args.rs2.nzx.into() },
+                imm: value.args.imm,
+                csr: value.args.csr,
+                rs3f: value.args.rs3f,
+                rm: value.args.rm,
+                aq: value.args.aq,
+                rl: value.args.rl,
+            },
         };
         TaggedInstruction {
             opcode: value.opcode,
@@ -165,6 +192,7 @@ impl From<Instruction> for TaggedInstruction {
 pub enum TaggedRegister {
     X(XRegister),
     F(FRegister),
+    NZX(NonZeroXRegister),
 }
 
 impl From<XRegister> for TaggedRegister {
@@ -176,6 +204,12 @@ impl From<XRegister> for TaggedRegister {
 impl From<FRegister> for TaggedRegister {
     fn from(value: FRegister) -> Self {
         TaggedRegister::F(value)
+    }
+}
+
+impl From<NonZeroXRegister> for TaggedRegister {
+    fn from(value: NonZeroXRegister) -> Self {
+        TaggedRegister::NZX(value)
     }
 }
 
@@ -191,6 +225,13 @@ impl TaggedRegister {
         match self {
             Self::F(f) => Ok(f),
             _ => Err(TaggedError::UnwrapF(self)),
+        }
+    }
+
+    fn unwrap_nzx(self) -> Result<NonZeroXRegister, TaggedError> {
+        match self {
+            Self::NZX(nzx) => Ok(nzx),
+            _ => Err(TaggedError::UnwrapNZX(self)),
         }
     }
 }
@@ -238,6 +279,8 @@ pub enum ArgsShape {
     FSrcXDest,
     // rd, rs1 => X | rs2 => F
     XSrcFSrc,
+    // rd, rs1, rs2 => NZX
+    NZXSrcNZXDest,
 }
 
 /// This function maps each opcode to the corresponding ArgsShape that the opcode uses

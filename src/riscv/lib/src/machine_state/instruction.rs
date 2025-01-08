@@ -17,7 +17,7 @@ pub mod tagged_instruction;
 use super::{
     csregisters::CSRegister,
     main_memory::MainMemoryLayout,
-    registers::{FRegister, XRegister},
+    registers::{FRegister, NonZeroXRegister, XRegister},
     MachineCoreState, ProgramCounterUpdate,
 };
 use crate::{
@@ -93,6 +93,11 @@ impl Debug for Instruction {
                         debug_struct.field("rd", &self.args.rd.x);
                         debug_struct.field("rs1", &self.args.rs1.x);
                         debug_struct.field("rs2", &self.args.rs2.f);
+                    }
+                    ArgsShape::NZXSrcNZXDest => {
+                        debug_struct.field("rd", &self.args.rd.nzx);
+                        debug_struct.field("rs1", &self.args.rs1.nzx);
+                        debug_struct.field("rs2", &self.args.rs2.nzx);
                     }
                 }
             }
@@ -603,6 +608,7 @@ impl Instruction {
 pub union Register {
     pub x: XRegister,
     pub f: FRegister,
+    pub nzx: NonZeroXRegister,
 }
 
 impl From<XRegister> for Register {
@@ -614,6 +620,12 @@ impl From<XRegister> for Register {
 impl From<FRegister> for Register {
     fn from(f: FRegister) -> Self {
         Self { f }
+    }
+}
+
+impl From<NonZeroXRegister> for Register {
+    fn from(nzx: NonZeroXRegister) -> Self {
+        Self { nzx }
     }
 }
 
