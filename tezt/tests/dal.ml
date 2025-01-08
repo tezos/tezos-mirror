@@ -5362,7 +5362,7 @@ module Amplification = struct
     (* Create and configure all nodes: a slot producer, an observer,
        and one attester per bootstrap baker. *)
     let make_attester index (account : Account.key) : attester Lwt.t =
-      let name = Printf.sprintf "attester%d" (index + 1) in
+      let name = Printf.sprintf "attester-%d" (index + 1) in
       let pkh = account.public_key_hash in
       let dal_node = Dal_node.create ~name ~node () in
       let* () = Dal_node.init_config ~attester_profiles:[pkh] ~peers dal_node in

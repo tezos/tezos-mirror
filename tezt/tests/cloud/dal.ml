@@ -2105,35 +2105,34 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     else Lwt.return_none
   in
   let* attesters_agents =
-    List.init (List.length configuration.stake) (fun i ->
-        let name = Format.asprintf "attester-%d" i in
-        next_agent ~name)
+    configuration.stake
+    |> List.map (fun stake ->
+           let name = Format.asprintf "attester-%d" stake in
+           next_agent ~name)
     |> Lwt.all
   in
   let* producers_agents =
     configuration.dal_node_producers
-    |> List.mapi (fun i slot_index ->
-           let name = Format.asprintf "dal-producer-%d" i in
+    |> List.map (fun slot_index ->
+           let name = Format.asprintf "dal-producer-%d" slot_index in
            let* name = next_agent ~name in
            return (name, slot_index))
     |> Lwt.all
   in
   let* observers_slot_index_agents =
-    List.map
-      (fun i ->
-        let name = Format.asprintf "dal-observer-%d" i in
-        let* agent = next_agent ~name in
-        return (`Slot_index i, agent))
-      configuration.observer_slot_indices
+    configuration.observer_slot_indices
+    |> List.map (fun slot_index ->
+           let name = Format.asprintf "dal-observer-%d" slot_index in
+           let* agent = next_agent ~name in
+           return (`Slot_index slot_index, agent))
     |> Lwt.all
   in
   let* observers_bakers_agents =
-    List.map
-      (fun pkh ->
-        let name = Format.asprintf "observer-%s" (String.sub pkh 0 8) in
-        let* agent = next_agent ~name in
-        return (`Pkh pkh, agent))
-      configuration.observer_pkhs
+    configuration.observer_pkhs
+    |> List.map (fun pkh ->
+           let name = Format.asprintf "observer-%s" (String.sub pkh 0 8) in
+           let* agent = next_agent ~name in
+           return (`Pkh pkh, agent))
     |> Lwt.all
   in
   let* teztale =
@@ -2694,7 +2693,12 @@ let benchmark () =
            is probably a configuration issue." ;
       let agents = Cloud.agents cloud in
       let next_agent ~name =
-        List.find (fun agent -> Agent.name agent = name) agents |> Lwt.return
+        let agent =
+          match List.find_opt (fun agent -> Agent.name agent = name) agents with
+          | None -> Test.fail ~__LOC__ "Agent not found: %s" name
+          | Some agent -> agent
+        in
+        Lwt.return agent
       in
       let* t = init ~configuration etherlink_configuration cloud next_agent in
       toplog "Starting main loop" ;
