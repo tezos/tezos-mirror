@@ -42,6 +42,7 @@
 - The option to limit the block production to at most one block per
   Tezos level, which was added in version
   ec7c3b349624896b269e179384d0a45cf39e1145, has been removed. (!16302)
+- Deposits can now specify a chain id, but it is currently ignored. (!16153)
 
 ### Bug fixes
 
