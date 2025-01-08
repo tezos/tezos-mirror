@@ -49,6 +49,8 @@ module Request : sig
 
   val eth_getCode : address:string -> block:block_param -> Evm_node.request
 
+  val eth_getChainId : Evm_node.request
+
   val net_version : Evm_node.request
 
   val eth_maxPriorityFeePerGas : Evm_node.request
@@ -88,6 +90,10 @@ end
 (** [net_version evm_node] calls [net_version]. *)
 val net_version :
   ?websocket:Websocket.t -> Evm_node.t -> (string, error) result Lwt.t
+
+(** [get_chain_id evm_node] calls [eth_getChainId]. *)
+val get_chain_id :
+  ?websocket:Websocket.t -> Evm_node.t -> (int, error) result Lwt.t
 
 (** [get_transaction_by_hash ~transaction_hash evm_node] calls [eth_getTransactionByHash]. *)
 val get_transaction_by_hash :
