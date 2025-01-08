@@ -1,30 +1,79 @@
 # Changelog
 
-## Unreleased
+## Version 0.13 (2025-01-09)
+
+This new version notably reduces the complexity to set up a new node for
+Etherlink Mainnet Beta and Etherlink Testnet. To give a concrete example, to
+start a new node on a fresh data dir for the Testnet is now as simple as:
+
+```
+octez-evm-node run observer --network testnet \
+    --dont-track-rollup-node \
+    --init-from-snapshot \
+    --data-dir foobar
+```
+
+If `foobar` does not exist, the Octez EVM Node will automatically download and
+import a snapshot, before starting to track the chain through the public
+endpoint. **For production deployment, you most likely need to configure
+with more care**.
+
+Additionally, the Octez EVM Node can now expose an **experimental** websocket
+endpoint. Not only does this endpoint support the same methods the HTTP
+endpoint, but it also implements the [`eth_subscribe`][eth-subscribe] method.
+
+[eth-subscribe]: https://docs.alchemy.com/reference/eth-subscribe
+
+To enable this feature, you need to modify the `config.json` file in the data
+directory of your node to enable `experimental_features.enable_websocket`. For
+instance, the following minimal `config.json` file can be used in conjunction
+with the minimal command-line example to start a node for the Testnet.
+
+```json
+{ "experimental_features": { "enable_websocket": true } }
+```
+
+The node should advertises the availibility of the websocket endpoint on
+startup.
+
+```
+Jan 08 17:33:39.911: the EVM node RPC server (resto) is listening to 127.0.0.1:8545
+Jan 08 17:33:39.911:   (websockets enabled)
+```
+
+We plan to stabilize the feature in a near future release.
+
+This release will apply one migration to the node’s store (version 16), meaning
+it is not possible to downgrade to the previous version.
+
+### Breaking Changes
+
+- Add a default value (1024) for the RPC `eth_feeHistory` `block_count`
+  parameters. Configuration can be `unlimited` if no maximum is wanted.
+  (!16150)
 
 ### Features
 
 - The event `evm_context_processed_l1_level` now contains the latest finalized
   blueprint in the event. (!15877)
 - It is now possible to specify the network an EVM node in observer mode is
-  expected to join (with the `--network` CLI argument), prompting the node to
-  perform additional sanity checks. (!16073)
-- If `--network` is set, the EVM node will use default values for the upstream
-  EVM node and the preimages endpoint if they have not been set either through
-  the configuration file or a CLI argument (with `init config` and `run
-  observer` commands). (!16074 !16075)
-- If `--network mainnet` is set, the EVM node no longer requires the initial
-  kernel used to originate Etherlink on Tezos mainnet to initialize the
-  data-dir of an observer node, though an initial kernel can still be provided.
-  (!16076)
-- If both `--network` and `--init-from-snapshot` are set, the EVM node in
-  observer mode will download and import a recent snapshot from a trusted
-  source for fresh data directories. (!16093)
+  expected to join (with the `--network` CLI argument)
+    - If `--network` is set, new sanity checks are done at startup to ensure
+      its data directory and upstream EVM node are consistent with the selected
+      network. (!16073)
+    - If `--network` is set, the EVM node will use default values for the upstream
+      EVM node and the preimages endpoint if they have not been set either through
+      the configuration file or a CLI argument (with `init config` and `run
+      observer` commands). (!16074 !16075)
+    - If `--network mainnet` is set, the EVM node no longer requires the initial
+      kernel used to originate Etherlink on Tezos mainnet to initialize the
+      data-dir of an observer node, though an initial kernel can still be provided.
+      (!16076)
+    - If both `--network` and `--init-from-snapshot` are set, the EVM node in
+      observer mode will download and import a recent snapshot from a trusted
+      source for fresh data directories. (!16093)
 - The `snapshot import` command can now download a snapshot if provided with a
   URL instead of a path. (!16112)
-- Add a default value, 1024, for the RPC `eth_feeHistory` block_count
-  parameters. Configuration can be `unlimited` if no maximum is
-  wanted. (!16150)
 
 #### Experimental
 
@@ -36,13 +85,15 @@ you start using them, you probably want to use `octez-evm-node check config
 - Experimental support for websockets on endpoints (`/ws` and `/private/ws`) for
   JSON-RPC requests with feature flag `experimental_features.enable_websocket =
   true`. (!15566, !16015)
-  - Added support for the WebSocket event `newHeads`, allowing clients to receive
-    real-time notifications of new blocks. (!15899)
-  - Added support for the WebSocket event `newPendingTransactions`, enabling clients
-    to receive real-time notifications of incoming pending transactions. (!15991)
-  - Added support for the WebSocket event `logs`, enabling clients to receive real-time
-    notifications for contract events filtered by address and topics. (!16011)
-- Configurable maximum websocket message length (defaults to 4MB). (!16070)
+    - Added support for the WebSocket event `newHeads`, allowing clients to
+      receive real-time notifications of new blocks. (!15899)
+    - Added support for the WebSocket event `newPendingTransactions`, enabling
+      clients to receive real-time notifications of incoming pending
+      transactions. (!15991)
+    - Added support for the WebSocket event `logs`, enabling clients to receive
+      real-time notifications for contract events filtered by address and
+      topics. (!16011)
+    - Configurable maximum websocket message length (defaults to 4MB). (!16070)
 - History mode can now be selected with the parameter `history_mode`, `archive`
   and `rolling`. If the mode is `rolling` it will use the field
   `garbage_collect_parameters` to prune blocks, operations and states. (!16044)
