@@ -376,26 +376,45 @@ struct
     val pending_requests_length : 'a t -> int
   end
 
+  let make_metadata () =
+    (* This pattern is equivalent to:
+       ```
+       let scope =
+         if "ppx is enabled" then
+           Opentelemetry.Scope.get_ambient_scope ()
+         else
+           None
+       ```
+    *)
+    let scope =
+      (None
+      [@profiler.custom
+        {driver_ids = [Opentelemetry]}
+          (Opentelemetry.Scope.get_ambient_scope ())])
+    in
+    {scope}
+
   module Dropbox = struct
     let put_request (w : dropbox t) request =
       let (Dropbox {merge}) = w.table.buffer_kind in
       let (Dropbox_buffer message_box) = w.buffer in
-      drop_request w merge message_box request {scope = None}
+      let metadata = make_metadata () in
+      drop_request w merge message_box request metadata
 
     let put_request_and_wait (w : dropbox t) request =
       let (Dropbox_buffer message_box) = w.buffer in
-      drop_request_and_wait w message_box request {scope = None}
+      let metadata = make_metadata () in
+      drop_request_and_wait w message_box request metadata
   end
 
   module Queue = struct
     let push_request (type a) (w : a queue t) request =
+      let metadata = make_metadata () in
       match w.buffer with
       | Queue_buffer message_queue ->
           if Lwt_pipe.Unbounded.is_closed message_queue then Lwt.return_false
           else (
-            Lwt_pipe.Unbounded.push
-              message_queue
-              (queue_item ~metadata:{scope = None} request) ;
+            Lwt_pipe.Unbounded.push message_queue (queue_item ~metadata request) ;
             (* because pushing on an unbounded pipe is immediate, we return within
                Lwt explicitly for compatibility with the other case *)
             Lwt.return_true)
@@ -404,28 +423,25 @@ struct
           else
             let open Lwt_syntax in
             let* () =
-              Lwt_pipe.Bounded.push
-                message_queue
-                (queue_item ~metadata:{scope = None} request)
+              Lwt_pipe.Bounded.push message_queue (queue_item ~metadata request)
             in
             Lwt.return_true
 
     let push_request_now (w : infinite queue t) request =
+      let metadata = make_metadata () in
       let (Queue_buffer message_queue) = w.buffer in
       if Lwt_pipe.Unbounded.is_closed message_queue then ()
-      else
-        Lwt_pipe.Unbounded.push
-          message_queue
-          (queue_item ~metadata:{scope = None} request)
+      else Lwt_pipe.Unbounded.push message_queue (queue_item ~metadata request)
 
     let push_request_and_wait (type a) (w : a queue t) request =
+      let metadata = make_metadata () in
       match w.buffer with
       | Queue_buffer message_queue -> (
           try
             let t, u = Lwt.wait () in
             Lwt_pipe.Unbounded.push
               message_queue
-              (queue_item ~metadata:{scope = None} ~u request) ;
+              (queue_item ~metadata ~u request) ;
             t
           with Lwt_pipe.Closed ->
             Lwt.return_error (Closed (extract_status_errors w)))
@@ -435,7 +451,7 @@ struct
             (fun () ->
               Lwt_pipe.Bounded.push
                 message_queue
-                (queue_item ~metadata:{scope = None} ~u request))
+                (queue_item ~metadata ~u request))
             (fun () -> t)
             (function
               | Lwt_pipe.Closed ->
@@ -608,69 +624,73 @@ struct
           let* () = Handlers.on_no_request w in
           loop ()
       | Ok (Some (pushed, Message (request, {scope = _scope}, u))) -> (
-          let current_request = Request.view request in
-          let treated = Time.System.now () in
-          w.current_request <- Some (pushed, treated, current_request) ;
-          let* r =
-            match u with
-            | None -> (
-                let open Lwt_result_syntax in
-                let*! res = Handlers.on_request w request in
-                match res with
-                | Error err -> Lwt.return_error err
-                | Ok res ->
-                    let completed = Time.System.now () in
-                    w.current_request <- None ;
-                    let status = Worker_types.{pushed; treated; completed} in
-                    let*! () = Handlers.on_completion w request res status in
-                    let*! () =
-                      Worker_events.(emit request_no_errors)
-                        (current_request, status)
-                    in
-                    return_unit)
-            | Some u -> (
-                (* [res] is a result. But the side effect [wakeup]
-                   needs to happen regardless of success (Ok) or failure
-                   (Error). To that end, we treat it locally like a regular
-                   promise (which happens to carry a [result]) within the Lwt
-                   monad. *)
-                let* res = Handlers.on_request w request in
-                match res with
-                | Error err ->
-                    Lwt.wakeup_later u (Error (Request_error err)) ;
-                    Lwt.return (Error err)
-                | Ok res ->
-                    Lwt.wakeup_later u (Ok res) ;
-                    let completed = Time.System.now () in
-                    let status = Worker_types.{pushed; treated; completed} in
-                    w.current_request <- None ;
-                    let* () = Handlers.on_completion w request res status in
-                    let* () =
-                      Worker_events.(emit request_no_errors)
-                        (current_request, status)
-                    in
-                    return (Ok ()))
-          in
-          match r with
-          | Ok () -> loop ()
-          | Error err -> (
-              let* r =
-                match w.current_request with
-                | Some (pushed, treated, _request_view) ->
-                    let completed = Time.System.now () in
-                    w.current_request <- None ;
-                    Handlers.on_error
-                      w
-                      Worker_types.{pushed; treated; completed}
-                      request
-                      err
-                | None -> assert false
-              in
-              match r with
-              | Ok () -> loop ()
-              | Error errs ->
-                  let* () = Worker_events.(emit crashed) errs in
-                  close handlers w (Some errs)))
+          (let current_request = Request.view request in
+           let treated = Time.System.now () in
+           w.current_request <- Some (pushed, treated, current_request) ;
+           let* r =
+             match u with
+             | None -> (
+                 let open Lwt_result_syntax in
+                 let*! res = Handlers.on_request w request in
+                 match res with
+                 | Error err -> Lwt.return_error err
+                 | Ok res ->
+                     let completed = Time.System.now () in
+                     w.current_request <- None ;
+                     let status = Worker_types.{pushed; treated; completed} in
+                     let*! () = Handlers.on_completion w request res status in
+                     let*! () =
+                       Worker_events.(emit request_no_errors)
+                         (current_request, status)
+                     in
+                     return_unit)
+             | Some u -> (
+                 (* [res] is a result. But the side effect [wakeup]
+                    needs to happen regardless of success (Ok) or failure
+                    (Error). To that end, we treat it locally like a regular
+                    promise (which happens to carry a [result]) within the Lwt
+                    monad. *)
+                 let* res = Handlers.on_request w request in
+                 match res with
+                 | Error err ->
+                     Lwt.wakeup_later u (Error (Request_error err)) ;
+                     Lwt.return (Error err)
+                 | Ok res ->
+                     Lwt.wakeup_later u (Ok res) ;
+                     let completed = Time.System.now () in
+                     let status = Worker_types.{pushed; treated; completed} in
+                     w.current_request <- None ;
+                     let* () = Handlers.on_completion w request res status in
+                     let* () =
+                       Worker_events.(emit request_no_errors)
+                         (current_request, status)
+                     in
+                     return (Ok ()))
+           in
+           match r with
+           | Ok () -> loop ()
+           | Error err -> (
+               let* r =
+                 match w.current_request with
+                 | Some (pushed, treated, _request_view) ->
+                     let completed = Time.System.now () in
+                     w.current_request <- None ;
+                     Handlers.on_error
+                       w
+                       Worker_types.{pushed; treated; completed}
+                       request
+                       err
+                 | None -> assert false
+               in
+               match r with
+               | Ok () -> loop ()
+               | Error errs ->
+                   let* () = Worker_events.(emit crashed) errs in
+                   close handlers w (Some errs)))
+          [@profiler.custom_f
+            {driver_ids = [Opentelemetry]}
+              (Tezos_profiler_backend.Opentelemetry_profiler.update_scope
+                 _scope)])
     in
     let* r = protect_result ~canceler:w.canceler (fun () -> loop ()) in
     match r with
