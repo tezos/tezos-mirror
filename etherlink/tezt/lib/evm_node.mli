@@ -297,11 +297,11 @@ type history_mode = Archive | Rolling
 
 type rpc_server = Resto | Dream
 
-(** [patch_config_with_experimental_feature
-    ?drop_duplicate_when_injection ?block_storage_sqlite3
-    ?next_wasm_runtime ?rpc_server ?enable_websocket json_config] patches a config to
-    add experimental feature. Each optional argument add the
-    correspondent experimental feature. *)
+(** [patch_config_with_experimental_feature ?drop_duplicate_when_injection
+    ?block_storage_sqlite3 ?next_wasm_runtime ?rpc_server ?enable_websocket
+    ?max_websocket_message_length json_config] patches a config to add
+    experimental feature. Each optional argument add the correspondent
+    experimental feature. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->
@@ -311,6 +311,7 @@ val patch_config_with_experimental_feature :
   ?history_mode:history_mode ->
   ?rpc_server:rpc_server ->
   ?enable_websocket:bool ->
+  ?max_websocket_message_length:int ->
   unit ->
   JSON.t ->
   JSON.t

@@ -8,6 +8,8 @@
 
 exception Could_not_connect
 
+exception Connection_closed
+
 (** Type of a websocket client  *)
 type t
 
@@ -25,6 +27,9 @@ val close : t -> unit Lwt.t
 
 (** Send a JSON object on the websocket. *)
 val send : t -> JSON.t -> unit Lwt.t
+
+(** Send a raw string on the websocket. *)
+val send_raw : t -> string -> unit Lwt.t
 
 (** Receive a JSON object on the websocket. *)
 val recv : t -> JSON.t Lwt.t

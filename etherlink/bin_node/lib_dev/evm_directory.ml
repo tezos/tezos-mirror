@@ -93,10 +93,12 @@ let register_metrics path dir =
       let route = Router.make_metrics_route path in
       Dream (route :: routes)
 
-let jsonrpc_websocket_register dir path handler =
+let jsonrpc_websocket_register ~max_message_length dir path handler =
   match dir with
   | Resto {dir; extra} ->
-      let callback = Evm_websocket.cohttp_callback handler in
+      let callback =
+        Evm_websocket.cohttp_callback ~max_message_length handler
+      in
       Resto {dir; extra = EndpointMap.add (`GET, path) callback extra}
   | Dream routes ->
       let route = Router.make_jsonrpc_websocket_route path handler in

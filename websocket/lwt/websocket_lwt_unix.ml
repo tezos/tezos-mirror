@@ -101,11 +101,12 @@ let write { write_frame; _ } frame = write_frame frame
 let close_transport { oc; _ } = Lwt_io.close oc
 
 let connect ?(extra_headers = Cohttp.Header.init ())
+    ?max_frame_length
     ?(random_string = Websocket.Rng.init ())
     ?(ctx = Lazy.force Conduit_lwt_unix.default_ctx) ?buf client url =
   let nonce = Base64.encode_exn (random_string 16) in
   connect ctx client url nonce extra_headers >|= fun (ic, oc) ->
-  let read_frame = make_read_frame ?buf ~mode:(Client random_string) ic oc in
+  let read_frame = make_read_frame ?max_len:max_frame_length ?buf ~mode:(Client random_string) ic oc in
   let read_frame () =
     Lwt.catch read_frame (fun exn ->
         Lwt.async (fun () -> Lwt_io.close ic);

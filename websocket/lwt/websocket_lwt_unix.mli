@@ -39,6 +39,7 @@ val close_transport : conn -> unit Lwt.t
 
 val connect :
   ?extra_headers:Cohttp.Header.t ->
+  ?max_frame_length:int ->
   ?random_string:(int -> string) ->
   ?ctx:Conduit_lwt_unix.ctx ->
   ?buf:Buffer.t ->

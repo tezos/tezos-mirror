@@ -23,7 +23,8 @@
     },
     "history_mode": "archive",
     "rpc_server": "resto",
-    "enable_websocket": false
+    "enable_websocket": false,
+    "max_websocket_message_length": 4194304
   },
   "proxy": {
     "ignore_block_param": false
@@ -80,7 +81,8 @@
     },
     "history_mode": "archive",
     "rpc_server": "resto",
-    "enable_websocket": false
+    "enable_websocket": false,
+    "max_websocket_message_length": 4194304
   },
   "proxy": {
     "ignore_block_param": false
@@ -130,7 +132,8 @@
     },
     "history_mode": "archive",
     "rpc_server": "resto",
-    "enable_websocket": false
+    "enable_websocket": false,
+    "max_websocket_message_length": 4194304
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
