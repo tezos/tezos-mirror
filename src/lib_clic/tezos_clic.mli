@@ -124,6 +124,17 @@ val default_arg :
   ('a, 'ctx) parameter ->
   ('a, 'ctx) arg
 
+(** Create an argument that will contain the [~default] value if it
+    contains no value (i.e. if it's a switch). *)
+val arg_or_switch :
+  doc:string ->
+  ?short:char ->
+  long:string ->
+  placeholder:string ->
+  default:string ->
+  ('a, 'ctx) parameter ->
+  ('a option, 'ctx) arg
+
 (** Create a boolean switch.
     The value will be set to [true] if the switch is provided and [false] if it is not. *)
 val switch :
