@@ -352,7 +352,8 @@ let get_fee_history block_count block_parameter config
 
   let rec get_fee_history_aux block_count block_parameter
       (history_acc : Fee_history.t) =
-    if block_count = Z.zero || block_parameter = Block_parameter.Number Qty.zero
+    if
+      block_count <= Z.zero || block_parameter = Block_parameter.Number Qty.zero
     then return history_acc
     else
       let* block =
@@ -755,7 +756,7 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             build_with_input ~f module_ parameters
         | Eth_fee_history.Method ->
             let f (Qty block_count, newest_block, _reward_percentile) =
-              if block_count = Z.zero then
+              if block_count <= Z.zero then
                 rpc_error
                   (Rpc_errors.invalid_params
                      "Number of block should be greater than 0.")
