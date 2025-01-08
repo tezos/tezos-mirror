@@ -55,6 +55,15 @@ pub struct Deposit {
 }
 
 impl Deposit {
+    fn parse_receiver(input: MichelsonBytes) -> Result<H160, BridgeError> {
+        let input_bytes = input.0;
+        if input_bytes.len() != std::mem::size_of::<H160>() {
+            return Err(BridgeError::InvalidDepositReceiver(input_bytes));
+        }
+        let receiver = H160::from_slice(&input_bytes);
+        Ok(receiver)
+    }
+
     /// Parses a deposit from a ticket transfer (internal inbox message).
     /// The "entrypoint" type is pair of ticket (FA2.1) and bytes (receiver address).
     #[cfg_attr(feature = "benchmark", inline(never))]
@@ -74,11 +83,7 @@ impl Deposit {
         let amount: U256 = eth_from_mutez(amount_mutez);
 
         // EVM address
-        let receiver_bytes = receiver.0;
-        if receiver_bytes.len() != std::mem::size_of::<H160>() {
-            return Err(BridgeError::InvalidDepositReceiver(receiver_bytes));
-        }
-        let receiver = H160::from_slice(&receiver_bytes);
+        let receiver = Self::parse_receiver(receiver)?;
 
         Ok(Self {
             amount,
