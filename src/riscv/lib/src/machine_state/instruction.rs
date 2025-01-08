@@ -1322,7 +1322,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjr(self.rs1.x)))
+        Ok(Set(core.hart.run_cjr(self.rs1.nzx)))
     }
 
     // SAFETY: This function must only be called on an `Args` belonging
@@ -1331,7 +1331,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjalr(self.rs1.x)))
+        Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
     }
 
     fn run_cnop<ML: MainMemoryLayout, M: ManagerReadWrite>(
@@ -2270,11 +2270,11 @@ impl From<&CJTypeArgs> for Args {
 impl From<&CRJTypeArgs> for Args {
     fn from(value: &CRJTypeArgs) -> Self {
         Self {
-            // We are adding a default value for rd and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rd: XRegister::x0.into(),
+            // Setting a default value of NonZeroXRegister::x1 for rd
+            // and rs2 to be explicit they are NonZeroXRegister type.
+            rd: NonZeroXRegister::x1.into(),
             rs1: value.rs1.into(),
-            rs2: XRegister::x0.into(),
+            rs2: NonZeroXRegister::x1.into(),
             ..Self::DEFAULT
         }
     }

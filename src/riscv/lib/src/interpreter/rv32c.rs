@@ -12,7 +12,7 @@ use crate::{
     machine_state::{
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
-        registers::{sp, x0, x1, x2, XRegister, XRegisters},
+        registers::{sp, x0, x2, NonZeroXRegister, XRegister, XRegisters},
         MachineCoreState, ProgramCounterUpdate,
     },
     parser::instruction::InstrWidth,
@@ -35,9 +35,10 @@ where
     /// `C.JR` CR-type compressed instruction
     ///
     /// Performs an unconditional control transfer to the address in register `rs1`.
-    pub fn run_cjr(&mut self, rs1: XRegister) -> Address {
-        debug_assert!(rs1 != x0);
-        self.run_jalr_impl::<2>(0, rs1, x0)
+    pub fn run_cjr(&mut self, rs1: NonZeroXRegister) -> Address {
+        // The target address is obtained by setting the
+        // least-significant bit of the address in rs1 to zero
+        self.xregisters.read_nz(rs1) & !1
     }
 
     /// `C.JALR` CR-type compressed instruction
@@ -45,9 +46,15 @@ where
     /// Performs the same operation as `C.JR`, but additionally writes the
     /// address of the instruction following the jump (pc+2) to the
     /// link register (`x1`).
-    pub fn run_cjalr(&mut self, rs1: XRegister) -> Address {
-        debug_assert!(rs1 != x0);
-        self.run_jalr_impl::<2>(0, rs1, x1)
+    pub fn run_cjalr(&mut self, rs1: NonZeroXRegister) -> Address {
+        // The return address to be saved in rd is the next instruction after this one.
+        let return_address = self.pc.read().wrapping_add(InstrWidth::Compressed as u64);
+        self.xregisters
+            .write_nz(NonZeroXRegister::x1, return_address);
+
+        // The target address is obtained by setting the
+        // least-significant bit of the address in rs1 to zero
+        self.xregisters.read_nz(rs1) & !1
     }
 
     /// `C.BEQZ` CB-type compressed instruction
@@ -275,7 +282,10 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
-            main_memory::tests::T1K, registers::a4, MachineCoreState, MachineCoreStateLayout,
+            hart_state::{HartState, HartStateLayout},
+            main_memory::tests::T1K,
+            registers::{a4, nz},
+            MachineCoreState, MachineCoreStateLayout,
         },
     };
     use proptest::{prelude::*, prop_assert_eq, proptest};
@@ -295,6 +305,47 @@ mod tests {
             let new_pc = state.hart.run_cj(imm);
 
             assert_eq!(state.hart.pc.read(), init_pc);
+            assert_eq!(new_pc, res_pc);
+        }
+    });
+
+    backend_test!(test_cjr_cjalr, F, {
+        let scenarios = [
+            (42, 2, nz::a2, 2, 44),
+            (u64::MAX - 1, -200_i64 as u64, nz::a2, -200_i64 as u64, 0),
+            (
+                1_000_000_000_000,
+                u64::MAX - 1_000_000_000_000 + 3,
+                nz::a2,
+                u64::MAX - 1_000_000_000_000 + 3,
+                1_000_000_000_002,
+            ),
+        ];
+        for (init_pc, init_rs1, rs1, res_pc, res_rd) in scenarios {
+            let mut state = create_state!(HartState, F);
+
+            // Test C.JALR
+            // save program counter and value for rs1.
+            state.pc.write(init_pc);
+            state.xregisters.write_nz(rs1, init_rs1);
+            let new_pc = state.run_cjalr(rs1);
+
+            // check the program counter hasn't changed, the returned
+            // value for the program counter is correct, and that the link
+            // register has been updated.
+            assert_eq!(state.pc.read(), init_pc);
+            assert_eq!(new_pc, res_pc);
+            assert_eq!(state.xregisters.read_nz(nz::ra), res_rd);
+
+            // Test C.JR
+            // save program counter and value for rs1.
+            state.pc.write(init_pc);
+            state.xregisters.write_nz(rs1, init_rs1);
+            let new_pc = state.run_cjr(rs1);
+
+            // check the program counter hasn't changed and the returned
+            // value for the program counter is correct.
+            assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
         }
     });

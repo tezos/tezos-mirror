@@ -297,10 +297,11 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
         | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh
         | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw
-        | CLwsp | CSw | CSwsp | CJ | CJr | CJalr | CBeqz | CBnez | CLi | CLui | CAddi
-        | CAddi16sp | CAddi4spn | CSlli | CSrli | CSrai | CAndi | CMv | CAdd | CAnd | COr
-        | CXor | CSub | CAddw | CSubw | CNop | CLd | CLdsp | CSd | CSdsp | CAddiw | Unknown
-        | UnknownCompressed => ArgsShape::XSrcXDest,
+        | CLwsp | CSw | CSwsp | CJ | CBeqz | CBnez | CLi | CLui | CAddi | CAddi16sp | CAddi4spn
+        | CSlli | CSrli | CSrai | CAndi | CMv | CAdd | CAnd | COr | CXor | CSub | CAddw | CSubw
+        | CNop | CLd | CLdsp | CSd | CSdsp | CAddiw | Unknown | UnknownCompressed => {
+            ArgsShape::XSrcXDest
+        }
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -314,6 +315,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Fcvtlus | FclassD | FmvXD | Fcvtwd | Fcvtwud | Fcvtld | Fcvtlud => ArgsShape::FSrcXDest,
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
+
+        CJr | CJalr => ArgsShape::NZXSrcNZXDest,
     }
 }
 
@@ -405,22 +408,60 @@ mod tests {
 
         assert_eq!(instr_xsrc_fsrc, instr_xsrc_fsrc_de);
 
+        let instr_nzxsrc_nzxdest = Instruction {
+            opcode: OpCode::CJr,
+            args: Args {
+                rd: NonZeroXRegister::x1.into(),
+                rs1: NonZeroXRegister::x2.into(),
+                rs2: NonZeroXRegister::x3.into(),
+                ..Args::DEFAULT
+            },
+        };
+
+        let instr_nzxsrc_nzxdest_ser = bincode::serialize(&instr_nzxsrc_nzxdest).unwrap();
+        let instr_nzxsrc_nzxdest_de: Instruction =
+            bincode::deserialize(&instr_nzxsrc_nzxdest_ser).unwrap();
+
+        assert_eq!(instr_nzxsrc_nzxdest, instr_nzxsrc_nzxdest_de);
+
         // ensure width of all serialised instructions are the same
         let ser_len = instr_xsrc_xdst_ser.len();
         assert_eq!(instr_fsrc_fdst_ser.len(), ser_len);
         assert_eq!(instr_xsrc_fdst_ser.len(), ser_len);
         assert_eq!(instr_fsrc_xdst_ser.len(), ser_len);
         assert_eq!(instr_xsrc_fsrc_ser.len(), ser_len);
+        assert_eq!(instr_nzxsrc_nzxdest_ser.len(), ser_len);
     }
 
     #[test]
-    fn test_incorrect_tagged_instructions_fail_conversion() {
+    fn test_incorrectly_tagged_instructions_fail_conversion_fx() {
         let tagged_instr = TaggedInstruction {
             opcode: OpCode::Add,
             args: TaggedArgs {
                 rd: FRegister::f0.into(),
                 rs1: FRegister::f0.into(),
                 rs2: FRegister::f0.into(),
+                imm: 0,
+                csr: CSRegister::fflags,
+                rs3f: FRegister::f0,
+                rm: InstrRoundingMode::Dynamic,
+                aq: false,
+                rl: false,
+            },
+        };
+
+        let instr = Instruction::try_from(tagged_instr);
+        assert!(instr.is_err());
+    }
+
+    #[test]
+    fn test_incorrectly_tagged_instructions_fail_conversion_nzxx() {
+        let tagged_instr = TaggedInstruction {
+            opcode: OpCode::Add,
+            args: TaggedArgs {
+                rd: XRegister::x0.into(),
+                rs1: XRegister::x0.into(),
+                rs2: NonZeroXRegister::x1.into(),
                 imm: 0,
                 csr: CSRegister::fflags,
                 rs3f: FRegister::f0,

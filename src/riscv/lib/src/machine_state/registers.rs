@@ -8,7 +8,7 @@
 
 use crate::{default::ConstDefault, machine_state::backend};
 use arbitrary_int::u5;
-use std::fmt;
+use std::{fmt, panic};
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
@@ -314,6 +314,60 @@ pub enum NonZeroXRegister {
 impl fmt::Display for NonZeroXRegister {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", XRegister::from(*self))
+    }
+}
+
+/// ABI register names for NonZeroXRegister types used in backend tests.
+#[cfg(test)]
+pub mod nz {
+    use super::NonZeroXRegister;
+
+    pub const ra: NonZeroXRegister = NonZeroXRegister::x1;
+    pub const sp: NonZeroXRegister = NonZeroXRegister::x2;
+    pub const gp: NonZeroXRegister = NonZeroXRegister::x3;
+    pub const tp: NonZeroXRegister = NonZeroXRegister::x4;
+    pub const t0: NonZeroXRegister = NonZeroXRegister::x5;
+    pub const t1: NonZeroXRegister = NonZeroXRegister::x6;
+    pub const t2: NonZeroXRegister = NonZeroXRegister::x7;
+    pub const s0: NonZeroXRegister = NonZeroXRegister::x8;
+    pub const fp: NonZeroXRegister = NonZeroXRegister::x8;
+    pub const s1: NonZeroXRegister = NonZeroXRegister::x9;
+    pub const a0: NonZeroXRegister = NonZeroXRegister::x10;
+    pub const a1: NonZeroXRegister = NonZeroXRegister::x11;
+    pub const a2: NonZeroXRegister = NonZeroXRegister::x12;
+    pub const a3: NonZeroXRegister = NonZeroXRegister::x13;
+    pub const a4: NonZeroXRegister = NonZeroXRegister::x14;
+    pub const a5: NonZeroXRegister = NonZeroXRegister::x15;
+    pub const a6: NonZeroXRegister = NonZeroXRegister::x16;
+    pub const a7: NonZeroXRegister = NonZeroXRegister::x17;
+    pub const s2: NonZeroXRegister = NonZeroXRegister::x18;
+    pub const s3: NonZeroXRegister = NonZeroXRegister::x19;
+    pub const s4: NonZeroXRegister = NonZeroXRegister::x20;
+    pub const s5: NonZeroXRegister = NonZeroXRegister::x21;
+    pub const s6: NonZeroXRegister = NonZeroXRegister::x22;
+    pub const s7: NonZeroXRegister = NonZeroXRegister::x23;
+    pub const s8: NonZeroXRegister = NonZeroXRegister::x24;
+    pub const s9: NonZeroXRegister = NonZeroXRegister::x25;
+    pub const s10: NonZeroXRegister = NonZeroXRegister::x26;
+    pub const s11: NonZeroXRegister = NonZeroXRegister::x27;
+    pub const t3: NonZeroXRegister = NonZeroXRegister::x28;
+    pub const t4: NonZeroXRegister = NonZeroXRegister::x29;
+    pub const t5: NonZeroXRegister = NonZeroXRegister::x30;
+    pub const t6: NonZeroXRegister = NonZeroXRegister::x31;
+}
+
+impl NonZeroXRegister {
+    /// Convert an `XRegister` to a `NonZeroXRegister`, provided `r != x0`.
+    ///
+    /// # Panics
+    /// Panics if `r == x0`.
+    pub const fn assert_from(r: XRegister) -> Self {
+        match r {
+            x0 => panic!("x0 is not a non-zero register"),
+            // SAFETY: Excluding x0, XRegister is a
+            // direct map to NonZeroXRegister, so safe to convert.
+            r => unsafe { std::mem::transmute(r) },
+        }
     }
 }
 
