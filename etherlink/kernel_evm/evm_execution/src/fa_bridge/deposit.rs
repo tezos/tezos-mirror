@@ -253,7 +253,7 @@ mod tests {
     }
 
     #[test]
-    fn fa_deposit_parsing_success() {
+    fn fa_deposit_parsing_success_no_chain_id() {
         let ticket =
             create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 1, &[0u8], 2.into());
         let routing_info = MichelsonBytes([[1u8; 20], [0u8; 20]].concat().to_vec());
@@ -275,6 +275,36 @@ mod tests {
             }
         );
         pretty_assertions::assert_eq!(chain_id, None)
+    }
+
+    #[test]
+    fn fa_deposit_parsing_success() {
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 1, &[0u8], 2.into());
+        let mut routing_info = vec![];
+        routing_info.extend([1u8; 20]);
+        routing_info.extend([0u8; 20]);
+        routing_info.extend([1u8]);
+        routing_info.extend([0u8; 31]);
+        let routing_info = MichelsonBytes(routing_info);
+        let (deposit, chain_id) =
+            FaDeposit::try_parse(ticket, routing_info, 1, 0).expect("Failed to parse");
+
+        pretty_assertions::assert_eq!(
+            deposit,
+            FaDeposit {
+                amount: 2.into(),
+                proxy: Some(H160([0u8; 20])),
+                receiver: H160([1u8; 20]),
+                inbox_level: 1,
+                inbox_msg_id: 0,
+                ticket_hash: H256::from_str(
+                    "e0027297584c9e4162c872e072f1cc75b527023f9c0eda44ad4c732762b0b897",
+                )
+                .unwrap(),
+            }
+        );
+        pretty_assertions::assert_eq!(chain_id, Some(U256::one()))
     }
 
     #[test]
