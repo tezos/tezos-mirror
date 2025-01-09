@@ -448,36 +448,36 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
       baking_votes;
     }
 
+let dal_checks_and_warnings state =
+  let open Lwt_syntax in
+  (* We print warning about DAL state only every 10 levels. *)
+  let current_level = state.level_state.current_level in
+  let level_with_warning = Int32.rem current_level 10l = 1l in
+  if level_with_warning then
+    match state.global_state.dal_node_rpc_ctxt with
+    | None -> Events.(emit no_dal_node_running ())
+    | Some ctxt -> (
+        let* health = Node_rpc.get_dal_health ctxt in
+        match health with
+        | Ok health -> (
+            match health.status with
+            | Tezos_dal_node_services.Types.Health.Up -> return_unit
+            | _ -> Events.(emit unhealthy_dal_node) (ctxt#base, health))
+        | Error _ -> Events.(emit unreachable_dal_node) ctxt#base)
+  else return_unit
+
 let only_if_dal_feature_enabled state ~default_value f =
   let open Lwt_syntax in
   let open Constants in
   let Parametric.{dal = {feature_enable; _}; _} =
     state.global_state.constants.parametric
   in
-  (* We print warning about DAL state only every 10 levels. *)
-  let current_level = state.level_state.current_level in
-  let level_with_warning = Int32.rem current_level 10l = 1l in
   if feature_enable then
-    if level_with_warning then
-      match state.global_state.dal_node_rpc_ctxt with
-      | None ->
-          let* () = Events.(emit no_dal_node_running ()) in
-          return default_value
-      | Some ctxt ->
-          let* health = Node_rpc.get_dal_health ctxt in
-          let* () =
-            match health with
-            | Ok {Tezos_dal_node_services.Types.Health.status = Up; _} ->
-                return_unit
-            | Ok health -> Events.(emit unhealthy_dal_node (ctxt#base, health))
-            | Error _ -> Events.(emit unreachable_dal_node ctxt#base)
-          in
-          f ctxt
-    else
-      Option.fold
-        ~none:(return default_value)
-        ~some:f
-        state.global_state.dal_node_rpc_ctxt
+    let* () = dal_checks_and_warnings state in
+    Option.fold
+      ~none:(return default_value)
+      ~some:f
+      state.global_state.dal_node_rpc_ctxt
   else return default_value
 
 let process_dal_rpc_result state delegate level round =
