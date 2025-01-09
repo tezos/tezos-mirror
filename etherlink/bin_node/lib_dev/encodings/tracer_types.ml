@@ -251,6 +251,8 @@ let config_to_string config =
 type call_input =
   (Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config
 
+type block_input = Ethereum_types.Block_parameter.t * config
+
 let input_encoding =
   Helpers.encoding_with_optional_last_param
     Ethereum_types.hash_encoding
@@ -262,6 +264,12 @@ let call_input_encoding =
     (Data_encoding.tup2
        Ethereum_types.call_encoding
        Ethereum_types.Block_parameter.extended_encoding)
+    config_encoding
+    default_config
+
+let block_input_encoding =
+  Helpers.encoding_with_optional_last_param
+    Ethereum_types.Block_parameter.encoding
     config_encoding
     default_config
 
@@ -1093,3 +1101,12 @@ let output_encoding =
         (function CallTracerOutput output -> Some output | _ -> None)
         (fun output -> CallTracerOutput output);
     ]
+
+type block_output = (Ethereum_types.hash * output) list
+
+let block_output_encoding =
+  Data_encoding.list
+    Data_encoding.(
+      obj2
+        (req "txHash" Ethereum_types.hash_encoding)
+        (req "result" output_encoding))
