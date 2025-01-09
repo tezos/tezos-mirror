@@ -5,7 +5,7 @@ Summary: L1 Octez node for the Tezos network
 License: MIT
 Requires: shadow-utils logrotate octez-zcash-params systemd
 Recommends: octez-client
-Suggests: lz4 curl
+Suggests: lz4 curl sudo
 %description
  This package serves as the core implementation for the Tezos blockchain node.
  It contains the fundamental components required for protocol execution,
