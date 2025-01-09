@@ -2633,9 +2633,9 @@ let benchmark () =
            | Producer _ | Observer _ | Etherlink_dal_operator
            | Etherlink_dal_observer _ -> (
                match configuration.producer_machine_type with
-               | None -> Configuration.make ?docker_image ()
+               | None -> Configuration.make ?docker_image ~name ()
                | Some machine_type ->
-                   Configuration.make ?docker_image ~machine_type ())
+                   Configuration.make ?docker_image ~machine_type ~name ())
            | Etherlink_operator -> default_vm_configuration ~name
            | Etherlink_producer _ -> default_vm_configuration ~name
            | Reverse_proxy -> default_vm_configuration ~name)
