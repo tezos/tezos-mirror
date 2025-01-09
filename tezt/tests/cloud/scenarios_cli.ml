@@ -321,3 +321,93 @@ module Alerts = struct
       ~description:"The slack webhook url to send the alerts on"
       ()
 end
+
+module Layer1 = struct
+  (** Keep the options optionnal without default value. CLI args consistency is checked
+      in the layer 1 scenario *)
+
+  let section =
+    Clap.section
+      ~description:
+        "All the options related to running L1 scenarios onto the cloud"
+      "Cloud L1"
+
+  let stake =
+    Clap.optional
+      ~section
+      ~long:"l1-stake"
+      ~placeholder:"<integer>,<integer>,<integer>,..."
+      ~description:
+        "By default, each delegate will run its own baker node. In that is \
+         what you want, --stake option only takes one integers that is the \
+         number of active bakers on the network (you need to know that number \
+         before starting the experiment). If you want to aggregate delegates \
+         into pools, use a comma-separated list of integers representating \
+         relative weights defining the expected stake repartition. Delegates \
+         will be distributed amongs pools in order to (approximately) respect \
+         the given stake distribution."
+      (Clap.list_of_int ~dummy:[] "stake")
+      ()
+
+  let stresstest =
+    let typ =
+      let parse string =
+        try
+          match string |> String.split_on_char '/' with
+          | [pkh; pk; n] -> Some (pkh, pk, int_of_string n, Random.int max_int)
+          | [pkh; pk; n; seed] ->
+              Some (pkh, pk, int_of_string n, int_of_string seed)
+          | _ -> None
+        with _ -> None
+      in
+      let show (pkh, pk, tps, seed) =
+        pkh ^ "/" ^ pk ^ "/" ^ string_of_int tps ^ "/" ^ string_of_int seed
+      in
+      Clap.typ ~name:"stresstest" ~dummy:("", "", 0, 0) ~parse ~show
+    in
+    Clap.optional
+      ~section
+      ~long:"l1-stresstest"
+      ~placeholder:"pkh/pk/TPS[/seed]"
+      ~description:
+        "Public key hash / public key of an account used to fund fresh \
+         accounts for reaching TPS stresstest traffic generation. A seed for \
+         stresstest initialization can also be specified."
+      typ
+      ()
+
+  let maintenance_delay =
+    Clap.optional_int
+      ~section
+      ~long:"maintenance-delay"
+      ~placeholder:"N"
+      ~description:
+        "Each baker has maintenance delayed by (position in the list * N). \
+         Default is 1. Use 0 for disabling mainteance delay"
+      ()
+
+  let snapshot =
+    Clap.optional_string
+      ~section
+      ~long:"snapshot"
+      ~description:
+        "Either a path the a local file or url of the snapshot to use for \
+         bootstrapping the experiment"
+      ()
+
+  let sync =
+    Clap.flag
+      ~section
+      ~unset_long:"no-sync"
+      ~description:"Wait for the node to be synced before continuing"
+      true
+
+  let vms_config =
+    Clap.optional_string
+      ~section
+      ~long:"vms-conf"
+      ~description:
+        "JSON file optionally describing options for each VM involved in the \
+         test"
+      ()
+end
