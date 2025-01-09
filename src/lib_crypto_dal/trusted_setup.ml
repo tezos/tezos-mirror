@@ -15,24 +15,20 @@ type download_request = {
 }
 
 let dal_trusted_setup_folder =
-  let opam_switch_prefix =
-    Option.value (Sys.getenv_opt "OPAM_SWITCH_PREFIX") ~default:"./_opam"
-  in
-  Option.value
-    (Sys.getenv_opt "DAL_TRUSTED_SETUP")
-    ~default:(Filename.concat opam_switch_prefix "share/dal-trusted-setup")
+  Tezos_base.Dal_srs.trusted_setup_preferred_directory ()
 
 let defaults =
+  let ( // ) = Filename.concat in
   let url = "https://assets.nomadic-labs.cloud/dal_trusted_setup" in
   [
     {
-      output_file = dal_trusted_setup_folder ^ "/srsu_zcash_g1";
+      output_file = dal_trusted_setup_folder // "srsu_zcash_g1";
       expected_sha =
         `Hex "c48ce4add1de2a7561108f17bf0c16bc1e93c0bff24bc7da465c24e0b4b2653e";
       uri = url ^ "/srsu_g1";
     };
     {
-      output_file = dal_trusted_setup_folder ^ "/srsu_zcash_g2";
+      output_file = dal_trusted_setup_folder // "srsu_zcash_g2";
       expected_sha =
         `Hex "e7fbe747ae3648a5b664d8f8bd7c524996f7ed07f3331f905d2e73767d580f7c";
       uri = url ^ "/srsu_g2";

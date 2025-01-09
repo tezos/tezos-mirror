@@ -16,7 +16,8 @@
   octez-libs.lwt-result-stdlib
   lwt.unix
   octez-libs.kzg
-  octez-libs.event-logging)
+  octez-libs.event-logging
+  octez-libs.base)
  (flags
   (:standard)
   -open Tezos_stdlib

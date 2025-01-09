@@ -67,7 +67,7 @@ type t = {
   service_namespace : string option;  (** Namespace for the service. *)
   experimental_features : experimental_features;  (** Experimental features.  *)
   fetch_trusted_setup : bool;
-      (** Should the trusted setup be installed if not yet valid. *)
+      (** Should the trusted setup be downloaded if not found or has invalid hash. *)
 }
 
 (** [default] is the default configuration. *)

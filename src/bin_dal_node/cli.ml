@@ -327,7 +327,7 @@ module Term = struct
   let fetch_trusted_setup =
     let open Cmdliner in
     let doc =
-      "Should the DAl node fetch the trusted setup when it needs it. By \
+      "Should the DAL node fetch the trusted setup when it needs it. By \
        default, it does so."
     in
     Arg.(

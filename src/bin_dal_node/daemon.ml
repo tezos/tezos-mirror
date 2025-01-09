@@ -66,7 +66,7 @@ let init_cryptobox config (proto_parameters : Dal_plugin.proto_parameters) =
       let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
       Cryptobox.init_prover_dal
         ~find_srs_files
-        ~fetch_trusted_setup:config.Configuration_file.fetch_trusted_setup
+        ~fetch_trusted_setup:config.fetch_trusted_setup
         ()
     else return_unit
   in

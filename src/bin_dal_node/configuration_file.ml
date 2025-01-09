@@ -122,6 +122,8 @@ let default_experimental_features =
   let default_sqlite3_backend = false in
   {sqlite3_backend = default_sqlite3_backend}
 
+let default_fetch_trusted_setup = true
+
 let default =
   {
     data_dir = default_data_dir;
@@ -140,7 +142,7 @@ let default =
     service_name = None;
     service_namespace = None;
     experimental_features = default_experimental_features;
-    fetch_trusted_setup = true;
+    fetch_trusted_setup = default_fetch_trusted_setup;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
