@@ -265,7 +265,11 @@ module Localhost = struct
     agents : Agent.t list;
   }
 
-  let vm_name i = Format.asprintf "%s-%03d" Env.tezt_cloud (i + 1)
+  let container_name configuration =
+    Format.asprintf
+      "teztcloud-%s-%s"
+      Env.tezt_cloud
+      configuration.Configuration.name
 
   let macosx_docker_network = Env.tezt_cloud ^ "-net"
 
@@ -285,7 +289,6 @@ module Localhost = struct
     let* processes =
       List.to_seq configurations
       |> Seq.mapi (fun i configuration ->
-             let name = vm_name i in
              let start = base_port + (i * ports_per_vm) |> string_of_int in
              let stop =
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
@@ -303,7 +306,7 @@ module Localhost = struct
              let process =
                Docker.run
                  ~rm:true
-                 ~name
+                 ~name:(container_name configuration)
                  ?network
                  ~publish_ports
                  docker_image
@@ -389,8 +392,11 @@ module Localhost = struct
     Log.report "Terminate test: tearing down docker containers..." ;
     let* () =
       t.agents
-      |> List.mapi (fun i _agent ->
-             let* _ = Docker.kill (vm_name i) |> Process.wait in
+      |> List.map (fun agent ->
+             let* _ =
+               Docker.kill (container_name (Agent.configuration agent))
+               |> Process.wait
+             in
              Lwt.return_unit)
       |> Lwt.join
     in
