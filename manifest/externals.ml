@@ -203,7 +203,7 @@ let optint = external_lib "optint" V.True
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
-let ppxlib = external_lib "ppxlib" V.True
+let ppxlib = external_lib "ppxlib" V.(at_least "0.34.0")
 
 let ppxlib_metaquot = external_sublib ppxlib "ppxlib.metaquot"
 

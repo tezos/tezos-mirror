@@ -197,7 +197,7 @@ depends: [
   "ppx_optcomp" {= "v0.16.0"}
   "ppx_repr" {= "0.7.0"}
   "ppx_sexp_conv" {= "v0.16.0"}
-  "ppxlib" {= "0.33.0"}
+  "ppxlib" {= "0.34.0"}
   "prbnmcn-basic-structures" {= "0.0.1"}
   "prbnmcn-linalg" {= "0.0.1"}
   "prbnmcn-stats" {= "0.0.6"}

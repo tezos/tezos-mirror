@@ -17,7 +17,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_repr" { >= "0.6.0" }
   "logs"
-  "ppxlib"
+  "ppxlib" { >= "0.34.0" }
   "bigstringaf" { >= "0.5.0" }
   "fmt" { >= "0.8.7" }
   "astring"
