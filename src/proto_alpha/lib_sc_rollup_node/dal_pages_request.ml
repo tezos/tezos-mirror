@@ -208,13 +208,13 @@ let slot_attestation_status ?attestation_threshold_percent
   let* cell_content =
     dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id
   in
-  let commitment_opt =
+  let commitment_res =
     Dal.Slots_history.is_commitment_attested
       ~attestation_threshold_percent
       ~restricted_commitments_publishers
       cell_content
   in
-  return @@ if Option.is_some commitment_opt then `Attested else `Unattested
+  return @@ if Either.is_right commitment_res then `Attested else `Unattested
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Lwt_result_syntax in
