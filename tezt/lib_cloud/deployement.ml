@@ -292,12 +292,10 @@ module Localhost = struct
              (* FIXME: The docker host networking feature is not supported on macOS.
                 We want to remove it in the future for all distributions, but it
                 requires more testing. *)
-             let network = if Env.macosx then None else Some "host" in
              let process =
                Docker.run
                  ~rm:true
                  ~name
-                 ?network
                  ~publish_ports
                  docker_image
                  ["-D"; "-p"; start; "-e"]
@@ -305,18 +303,41 @@ module Localhost = struct
              Lwt.return process)
       |> List.of_seq |> Lwt.all
     in
+    let address i =
+      let* output =
+        Process.run_and_read_stdout
+          "docker"
+          [
+            "inspect";
+            "-f";
+            "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}";
+            vm_name i;
+          ]
+      in
+      Lwt.return (String.trim output)
+    in
     (* We need to wait a little the machine is up. As for the remote case, we
        could be more robust to handle that. *)
     let* () = Lwt_unix.sleep 5. in
+    let addresses = Hashtbl.create number_of_vms in
+    let* () =
+      List.init number_of_vms Fun.id
+      |> Lwt_list.iter_s (fun i ->
+             let* addr = address i in
+             Hashtbl.replace addresses i addr ;
+             Lwt.return_unit)
+    in
     let next_port = Hashtbl.create number_of_vms in
     Seq.ints 0 |> Seq.take number_of_vms
     |> Seq.iter (fun i ->
            let port = base_port + (i * ports_per_vm) in
-           Hashtbl.replace next_port ("localhost", port) (port + 1)) ;
+           let addr = Hashtbl.find addresses i in
+           Hashtbl.replace next_port (addr, port) (port + 1)) ;
     let ssh_id = Env.ssh_private_key_filename () in
     let get_point i =
       let port = base_port + (i * ports_per_vm) in
-      ("localhost", port)
+      let addr = Hashtbl.find addresses i in
+      (addr, port)
     in
     let next_port point =
       let port = Hashtbl.find next_port point in
