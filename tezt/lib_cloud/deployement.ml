@@ -267,10 +267,21 @@ module Localhost = struct
 
   let vm_name i = Format.asprintf "%s-%03d" Env.tezt_cloud (i + 1)
 
+  let macosx_docker_network = Env.tezt_cloud ^ "-net"
+
   let deploy ~configurations () =
     let number_of_vms = List.length configurations in
     let base_port = Env.vm_base_port in
     let ports_per_vm = Env.ports_per_vm in
+    let network, start_macosx_docker_network =
+      if Env.macosx then
+        ( Some macosx_docker_network,
+          Some
+            (Docker.network
+               ~command:"create"
+               ~network_name:macosx_docker_network) )
+      else (None, None)
+    in
     let* processes =
       List.to_seq configurations
       |> Seq.mapi (fun i configuration ->
@@ -289,13 +300,11 @@ module Localhost = struct
              let* docker_image =
                Env.uri_of_docker_image configuration.docker_image
              in
-             (* FIXME: The docker host networking feature is not supported on macOS.
-                We want to remove it in the future for all distributions, but it
-                requires more testing. *)
              let process =
                Docker.run
                  ~rm:true
                  ~name
+                 ?network
                  ~publish_ports
                  docker_image
                  ["-D"; "-p"; start; "-e"]
@@ -358,7 +367,14 @@ module Localhost = struct
                ~name
                ())
     in
-    Lwt.return {number_of_vms; processes; base_port; ports_per_vm; agents}
+    Lwt.return
+      {
+        number_of_vms;
+        processes = Option.to_list start_macosx_docker_network @ processes;
+        base_port;
+        ports_per_vm;
+        agents;
+      }
 
   let agents t = t.agents
 
