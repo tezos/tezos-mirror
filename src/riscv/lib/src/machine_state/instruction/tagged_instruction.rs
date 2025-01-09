@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{Args, CSRegister, FRegister, InstrRoundingMode, Instruction, OpCode, XRegister};
+use super::{
+    Args, CSRegister, FRegister, InstrRoundingMode, Instruction, NonZeroXRegister, OpCode,
+    XRegister,
+};
 use crate::default::ConstDefault;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -15,6 +18,8 @@ pub enum TaggedError {
     UnwrapX(TaggedRegister),
     #[error("Expected FRegister got {0:?}")]
     UnwrapF(TaggedRegister),
+    #[error("Expected NonZeroXRegister got {0:?}")]
+    UnwrapNZX(TaggedRegister),
 }
 
 impl TryFrom<TaggedInstruction> for Instruction {
@@ -70,6 +75,17 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rd: value.args.rd.unwrap_x()?.into(),
                 rs1: value.args.rs1.unwrap_x()?.into(),
                 rs2: value.args.rs2.unwrap_f()?.into(),
+                imm: value.args.imm,
+                csr: value.args.csr,
+                rs3f: value.args.rs3f,
+                rm: value.args.rm,
+                aq: value.args.aq,
+                rl: value.args.rl,
+            },
+            ArgsShape::NZXSrcNZXDest => Args {
+                rd: value.args.rd.unwrap_nzx()?.into(),
+                rs1: value.args.rs1.unwrap_nzx()?.into(),
+                rs2: value.args.rs2.unwrap_nzx()?.into(),
                 imm: value.args.imm,
                 csr: value.args.csr,
                 rs3f: value.args.rs3f,
@@ -152,6 +168,17 @@ impl From<Instruction> for TaggedInstruction {
                 aq: value.args.aq,
                 rl: value.args.rl,
             },
+            ArgsShape::NZXSrcNZXDest => TaggedArgs {
+                rd: unsafe { value.args.rd.nzx.into() },
+                rs1: unsafe { value.args.rs1.nzx.into() },
+                rs2: unsafe { value.args.rs2.nzx.into() },
+                imm: value.args.imm,
+                csr: value.args.csr,
+                rs3f: value.args.rs3f,
+                rm: value.args.rm,
+                aq: value.args.aq,
+                rl: value.args.rl,
+            },
         };
         TaggedInstruction {
             opcode: value.opcode,
@@ -165,6 +192,7 @@ impl From<Instruction> for TaggedInstruction {
 pub enum TaggedRegister {
     X(XRegister),
     F(FRegister),
+    NZX(NonZeroXRegister),
 }
 
 impl From<XRegister> for TaggedRegister {
@@ -176,6 +204,12 @@ impl From<XRegister> for TaggedRegister {
 impl From<FRegister> for TaggedRegister {
     fn from(value: FRegister) -> Self {
         TaggedRegister::F(value)
+    }
+}
+
+impl From<NonZeroXRegister> for TaggedRegister {
+    fn from(value: NonZeroXRegister) -> Self {
+        TaggedRegister::NZX(value)
     }
 }
 
@@ -191,6 +225,13 @@ impl TaggedRegister {
         match self {
             Self::F(f) => Ok(f),
             _ => Err(TaggedError::UnwrapF(self)),
+        }
+    }
+
+    fn unwrap_nzx(self) -> Result<NonZeroXRegister, TaggedError> {
+        match self {
+            Self::NZX(nzx) => Ok(nzx),
+            _ => Err(TaggedError::UnwrapNZX(self)),
         }
     }
 }
@@ -238,6 +279,8 @@ pub enum ArgsShape {
     FSrcXDest,
     // rd, rs1 => X | rs2 => F
     XSrcFSrc,
+    // rd, rs1, rs2 => NZX
+    NZXSrcNZXDest,
 }
 
 /// This function maps each opcode to the corresponding ArgsShape that the opcode uses
@@ -254,10 +297,11 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
         | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh
         | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw
-        | CLwsp | CSw | CSwsp | CJ | CJr | CJalr | CBeqz | CBnez | CLi | CLui | CAddi
-        | CAddi16sp | CAddi4spn | CSlli | CSrli | CSrai | CAndi | CMv | CAdd | CAnd | COr
-        | CXor | CSub | CAddw | CSubw | CNop | CLd | CLdsp | CSd | CSdsp | CAddiw | Unknown
-        | UnknownCompressed => ArgsShape::XSrcXDest,
+        | CLwsp | CSw | CSwsp | CJ | CBeqz | CBnez | CLi | CLui | CAddi | CAddi16sp | CAddi4spn
+        | CSlli | CSrli | CSrai | CAndi | CMv | CAdd | CAnd | COr | CXor | CSub | CAddw | CSubw
+        | CNop | CLd | CLdsp | CSd | CSdsp | CAddiw | Unknown | UnknownCompressed => {
+            ArgsShape::XSrcXDest
+        }
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -271,6 +315,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Fcvtlus | FclassD | FmvXD | Fcvtwd | Fcvtwud | Fcvtld | Fcvtlud => ArgsShape::FSrcXDest,
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
+
+        CJr | CJalr => ArgsShape::NZXSrcNZXDest,
     }
 }
 
@@ -362,22 +408,60 @@ mod tests {
 
         assert_eq!(instr_xsrc_fsrc, instr_xsrc_fsrc_de);
 
+        let instr_nzxsrc_nzxdest = Instruction {
+            opcode: OpCode::CJr,
+            args: Args {
+                rd: NonZeroXRegister::x1.into(),
+                rs1: NonZeroXRegister::x2.into(),
+                rs2: NonZeroXRegister::x3.into(),
+                ..Args::DEFAULT
+            },
+        };
+
+        let instr_nzxsrc_nzxdest_ser = bincode::serialize(&instr_nzxsrc_nzxdest).unwrap();
+        let instr_nzxsrc_nzxdest_de: Instruction =
+            bincode::deserialize(&instr_nzxsrc_nzxdest_ser).unwrap();
+
+        assert_eq!(instr_nzxsrc_nzxdest, instr_nzxsrc_nzxdest_de);
+
         // ensure width of all serialised instructions are the same
         let ser_len = instr_xsrc_xdst_ser.len();
         assert_eq!(instr_fsrc_fdst_ser.len(), ser_len);
         assert_eq!(instr_xsrc_fdst_ser.len(), ser_len);
         assert_eq!(instr_fsrc_xdst_ser.len(), ser_len);
         assert_eq!(instr_xsrc_fsrc_ser.len(), ser_len);
+        assert_eq!(instr_nzxsrc_nzxdest_ser.len(), ser_len);
     }
 
     #[test]
-    fn test_incorrect_tagged_instructions_fail_conversion() {
+    fn test_incorrectly_tagged_instructions_fail_conversion_fx() {
         let tagged_instr = TaggedInstruction {
             opcode: OpCode::Add,
             args: TaggedArgs {
                 rd: FRegister::f0.into(),
                 rs1: FRegister::f0.into(),
                 rs2: FRegister::f0.into(),
+                imm: 0,
+                csr: CSRegister::fflags,
+                rs3f: FRegister::f0,
+                rm: InstrRoundingMode::Dynamic,
+                aq: false,
+                rl: false,
+            },
+        };
+
+        let instr = Instruction::try_from(tagged_instr);
+        assert!(instr.is_err());
+    }
+
+    #[test]
+    fn test_incorrectly_tagged_instructions_fail_conversion_nzxx() {
+        let tagged_instr = TaggedInstruction {
+            opcode: OpCode::Add,
+            args: TaggedArgs {
+                rd: XRegister::x0.into(),
+                rs1: XRegister::x0.into(),
+                rs2: NonZeroXRegister::x1.into(),
                 imm: 0,
                 csr: CSRegister::fflags,
                 rs3f: FRegister::f0,

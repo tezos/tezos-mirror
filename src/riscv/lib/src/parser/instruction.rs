@@ -8,7 +8,7 @@ use crate::{
     interpreter::float::RoundingMode,
     machine_state::{
         csregisters::CSRegister,
-        registers::{FRegister, XRegister},
+        registers::{FRegister, NonZeroXRegister, XRegister},
     },
 };
 use enum_tag::EnumTag;
@@ -195,7 +195,7 @@ pub struct CRTypeArgs {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CRJTypeArgs {
-    pub rs1: XRegister,
+    pub rs1: NonZeroXRegister,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]

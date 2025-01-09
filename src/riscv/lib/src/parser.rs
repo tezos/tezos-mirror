@@ -8,6 +8,7 @@
 pub mod instruction;
 
 use crate::bits::u16;
+use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::{
     csregisters::CSRegister,
     registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
@@ -1221,9 +1222,15 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             C_F3_4 => match (u16::bit(instr, 12), c_rd_rs1(instr), c_rs2(instr)) {
                 (true, x0, x0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
                 (_, x0, _) => UnknownCompressed { instr },
-                (true, rs1, x0) => CJalr(CRJTypeArgs { rs1 }),
+                (true, rs1, x0) => {
+                    let nzrs1 = NonZeroXRegister::assert_from(rs1);
+                    CJalr(CRJTypeArgs { rs1: nzrs1 })
+                }
                 (true, rs1, rs2) => CAdd(CRTypeArgs { rd_rs1: rs1, rs2 }),
-                (false, rs1, x0) => CJr(CRJTypeArgs { rs1 }),
+                (false, rs1, x0) => {
+                    let nzrs1 = NonZeroXRegister::assert_from(rs1);
+                    CJr(CRJTypeArgs { rs1: nzrs1 })
+                }
                 (false, rs1, rs2) => CMv(CRTypeArgs { rd_rs1: rs1, rs2 }),
             },
             C_F3_5 => CFsdsp(CSSDTypeArgs {

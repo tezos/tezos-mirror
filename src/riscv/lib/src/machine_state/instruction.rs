@@ -17,7 +17,7 @@ pub mod tagged_instruction;
 use super::{
     csregisters::CSRegister,
     main_memory::MainMemoryLayout,
-    registers::{FRegister, XRegister},
+    registers::{FRegister, NonZeroXRegister, XRegister},
     MachineCoreState, ProgramCounterUpdate,
 };
 use crate::{
@@ -93,6 +93,11 @@ impl Debug for Instruction {
                         debug_struct.field("rd", &self.args.rd.x);
                         debug_struct.field("rs1", &self.args.rs1.x);
                         debug_struct.field("rs2", &self.args.rs2.f);
+                    }
+                    ArgsShape::NZXSrcNZXDest => {
+                        debug_struct.field("rd", &self.args.rd.nzx);
+                        debug_struct.field("rs1", &self.args.rs1.nzx);
+                        debug_struct.field("rs2", &self.args.rs2.nzx);
                     }
                 }
             }
@@ -603,6 +608,7 @@ impl Instruction {
 pub union Register {
     pub x: XRegister,
     pub f: FRegister,
+    pub nzx: NonZeroXRegister,
 }
 
 impl From<XRegister> for Register {
@@ -614,6 +620,12 @@ impl From<XRegister> for Register {
 impl From<FRegister> for Register {
     fn from(f: FRegister) -> Self {
         Self { f }
+    }
+}
+
+impl From<NonZeroXRegister> for Register {
+    fn from(nzx: NonZeroXRegister) -> Self {
+        Self { nzx }
     }
 }
 
@@ -1310,7 +1322,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjr(self.rs1.x)))
+        Ok(Set(core.hart.run_cjr(self.rs1.nzx)))
     }
 
     // SAFETY: This function must only be called on an `Args` belonging
@@ -1319,7 +1331,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjalr(self.rs1.x)))
+        Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
     }
 
     fn run_cnop<ML: MainMemoryLayout, M: ManagerReadWrite>(
@@ -2258,11 +2270,11 @@ impl From<&CJTypeArgs> for Args {
 impl From<&CRJTypeArgs> for Args {
     fn from(value: &CRJTypeArgs) -> Self {
         Self {
-            // We are adding a default value for rd and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rd: XRegister::x0.into(),
+            // Setting a default value of NonZeroXRegister::x1 for rd
+            // and rs2 to be explicit they are NonZeroXRegister type.
+            rd: NonZeroXRegister::x1.into(),
             rs1: value.rs1.into(),
-            rs2: XRegister::x0.into(),
+            rs2: NonZeroXRegister::x1.into(),
             ..Self::DEFAULT
         }
     }
