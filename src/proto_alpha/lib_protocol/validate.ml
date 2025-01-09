@@ -1418,50 +1418,53 @@ module Anonymous = struct
     in
     check_double_attesting_evidence vi op1 op2
 
-  let double_operation_conflict_key (type kind)
-      (op1 : kind Kind.consensus Operation.t) =
-    let {slot; level; round; block_payload_hash = _}, kind =
-      match op1.protocol_data.contents with
-      | Single (Preattestation cc) -> (cc, Misbehaviour.Double_preattesting)
-      | Single (Attestation {consensus_content; dal_content = _}) ->
-          (consensus_content, Double_attesting)
-    in
-    (level, round, slot, kind)
-
-  let check_double_attesting_evidence_conflict (type kind) vs oph
-      (op1 : kind Kind.consensus Operation.t) =
+  let check_double_attesting_evidence_conflict vs oph key =
     match
       Double_operation_evidence_map.find
-        (double_operation_conflict_key op1)
+        key
         vs.anonymous_state.double_attesting_evidences_seen
     with
     | None -> ok_unit
     | Some existing ->
         Error (Operation_conflict {existing; new_operation = oph})
 
-  let check_double_preattestation_evidence_conflict vs oph
+  let conflict_key_of_double_preattestation
       (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preattestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    check_double_attesting_evidence_conflict vs oph op1
+    match op1.protocol_data.contents with
+    | Single (Preattestation {slot; level; round; _}) ->
+        (level, round, slot, Misbehaviour.Double_preattesting)
 
-  let check_double_attestation_evidence_conflict vs oph
+  let conflict_key_of_double_attestation
       (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_attestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    check_double_attesting_evidence_conflict vs oph op1
+    match op1.protocol_data.contents with
+    | Single (Attestation {consensus_content; _}) ->
+        let {slot; level; round; _} = consensus_content in
+        (level, round, slot, Misbehaviour.Double_attesting)
+
+  let check_double_preattestation_evidence_conflict vs oph
+      (operation : Kind.double_preattestation_evidence operation) =
+    let key = conflict_key_of_double_preattestation operation in
+    check_double_attesting_evidence_conflict vs oph key
+
+  let check_double_attestation_evidence_conflict vs oph
+      (operation : Kind.double_attestation_evidence operation) =
+    let key = conflict_key_of_double_attestation operation in
+    check_double_attesting_evidence_conflict vs oph key
 
   let wrap_denunciation_conflict kind = function
     | Ok () -> ok_unit
     | Error conflict -> result_error (Conflicting_denunciation {kind; conflict})
 
-  let add_double_attesting_evidence (type kind) vs oph
-      (op1 : kind Kind.consensus Operation.t) =
+  let add_double_attesting_evidence vs oph key =
     let double_attesting_evidences_seen =
       Double_operation_evidence_map.add
-        (double_operation_conflict_key op1)
+        key
         oph
         vs.anonymous_state.double_attesting_evidences_seen
     in
@@ -1473,23 +1476,18 @@ module Anonymous = struct
 
   let add_double_attestation_evidence vs oph
       (operation : Kind.double_attestation_evidence operation) =
-    let (Single (Double_attestation_evidence {op1; _})) =
-      operation.protocol_data.contents
-    in
-    add_double_attesting_evidence vs oph op1
+    let key = conflict_key_of_double_attestation operation in
+    add_double_attesting_evidence vs oph key
 
   let add_double_preattestation_evidence vs oph
       (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preattestation_evidence {op1; _})) =
-      operation.protocol_data.contents
-    in
-    add_double_attesting_evidence vs oph op1
+    let key = conflict_key_of_double_preattestation operation in
+    add_double_attesting_evidence vs oph key
 
-  let remove_double_attesting_evidence (type kind) vs
-      (op : kind Kind.consensus Operation.t) =
+  let remove_double_attesting_evidence vs key =
     let double_attesting_evidences_seen =
       Double_operation_evidence_map.remove
-        (double_operation_conflict_key op)
+        key
         vs.anonymous_state.double_attesting_evidences_seen
     in
     let anonymous_state =
@@ -1499,17 +1497,13 @@ module Anonymous = struct
 
   let remove_double_preattestation_evidence vs
       (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preattestation_evidence {op1; _})) =
-      operation.protocol_data.contents
-    in
-    remove_double_attesting_evidence vs op1
+    let key = conflict_key_of_double_preattestation operation in
+    remove_double_attesting_evidence vs key
 
   let remove_double_attestation_evidence vs
       (operation : Kind.double_attestation_evidence operation) =
-    let (Single (Double_attestation_evidence {op1; _})) =
-      operation.protocol_data.contents
-    in
-    remove_double_attesting_evidence vs op1
+    let key = conflict_key_of_double_attestation operation in
+    remove_double_attesting_evidence vs key
 
   let check_double_baking_evidence vi
       (operation : Kind.double_baking_evidence operation) =
