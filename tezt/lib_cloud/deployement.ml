@@ -104,7 +104,7 @@ module Remote = struct
         ~point
         ~configuration
         ~next_available_port
-        ~name:vm_name
+        ~name:configuration.name
         ()
       |> Lwt.return
     in

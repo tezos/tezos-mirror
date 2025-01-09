@@ -502,14 +502,15 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   match vms with
   | None ->
       let default_agent =
+        let configuration = Configuration.make () in
         Agent.make
-          ~configuration:(Configuration.make ())
+          ~configuration
           ~next_available_port:
             (let cpt = ref 30_000 in
              fun () ->
                incr cpt ;
                !cpt)
-          ~name:"default agent"
+          ~name:configuration.name
           ()
       in
       f
@@ -582,15 +583,16 @@ let agents t =
         t.agents |> List.filter (fun agent -> Agent.name agent <> proxy_name)
       with
       | [] ->
+          let configuration = Configuration.make () in
           let default_agent =
             Agent.make
-              ~configuration:(Configuration.make ())
+              ~configuration
               ~next_available_port:
                 (let cpt = ref 30_000 in
                  fun () ->
                    incr cpt ;
                    !cpt)
-              ~name:"default agent"
+              ~name:configuration.name
               ()
           in
           [default_agent]
