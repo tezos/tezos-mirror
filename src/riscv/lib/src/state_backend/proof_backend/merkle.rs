@@ -754,6 +754,10 @@ mod tests {
             assert_eq!(compressed_merkle_proof, proof);
 
             assert_eq!(merkle_tree.to_merkle_proof().unwrap(), proof);
+            assert_eq!(
+                compressed_merkle_proof.hash().unwrap(),
+                merkle_tree_root_hash
+            );
 
             Ok(())
         };

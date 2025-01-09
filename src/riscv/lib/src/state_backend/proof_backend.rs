@@ -148,7 +148,7 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
 
 /// Implementation of [`ManagerWrite`] which wraps another manager and
 /// records written locations but does not write to the wrapped region directly.
-impl<M: ManagerWrite> ManagerWrite for ProofGen<M> {
+impl<M: ManagerBase> ManagerWrite for ProofGen<M> {
     fn region_write<E, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
@@ -211,7 +211,7 @@ impl<M: ManagerWrite> ManagerWrite for ProofGen<M> {
 
 /// Implementation of [`ManagerReadWrite`] which wraps another manager and
 /// additionally records read and written locations.
-impl<M: ManagerReadWrite> ManagerReadWrite for ProofGen<M> {
+impl<M: ManagerRead> ManagerReadWrite for ProofGen<M> {
     fn region_replace<E: Copy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
@@ -425,7 +425,7 @@ mod tests {
         owned_backend::Owned,
         proof_backend::merkle::Merkleisable,
         region::{DynCells, MERKLE_LEAF_SIZE},
-        Cells, EnrichedCell,
+        Cells, EnrichedCell, FnManagerIdent,
     };
     use proptest::{array, prop_assert_eq, proptest};
     use std::collections::VecDeque;
@@ -499,7 +499,10 @@ mod tests {
             let initial_root_hash = cells.hash().unwrap();
             cells.write(i, value_after);
             prop_assert_eq!(cells.hash().unwrap(), initial_root_hash);
-            let merkle_tree = cells.to_merkle_tree().unwrap();
+            let merkle_tree = cells.struct_ref::<FnManagerIdent>()
+                .to_merkle_tree()
+                .unwrap();
+
             match merkle_tree {
                 MerkleTree::Leaf(hash, access_info, _) => {
                     prop_assert_eq!(hash, initial_root_hash);
@@ -529,8 +532,7 @@ mod tests {
                     bytes_after: [u8; ELEM_SIZE],
                     write_address in &address_range)| {
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
-            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::bind(cells);
+            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> = ProofDynRegion::bind(cells);
             let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
@@ -545,8 +547,7 @@ mod tests {
             assert_eq!(value, value_after);
 
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
-            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::bind(cells);
+            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> = ProofDynRegion::bind(cells);
             let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
@@ -567,8 +568,7 @@ mod tests {
             assert_eq!(value, value_after);
 
             let cells = Box::new([byte_before; DYN_REGION_SIZE]);
-            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::bind(cells);
+            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> = ProofDynRegion::bind(cells);
             let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
                 DynCells::bind(dyn_region);
 
@@ -607,8 +607,11 @@ mod tests {
 
             // Build the Merkle tree and check that it has the root hash of the
             // initial wrapped region.
-            let merkle_tree = dyn_cells.to_merkle_tree().unwrap();
-            let cells: DynCells<DYN_REGION_SIZE,Owned> = DynCells::bind(region);
+            let merkle_tree = dyn_cells
+                .struct_ref::<FnManagerIdent>()
+                .to_merkle_tree()
+                .unwrap();
+            let cells: DynCells<DYN_REGION_SIZE, Owned> = DynCells::bind(region);
             let initial_root_hash = cells.hash().unwrap();
             prop_assert_eq!(merkle_tree.root_hash(), initial_root_hash);
 
@@ -698,7 +701,10 @@ mod tests {
             let initial_root_hash = proof_cell.hash().unwrap();
             proof_cell.write(value_after);
             prop_assert_eq!(proof_cell.hash().unwrap(), initial_root_hash);
-            let merkle_tree = proof_cell.to_merkle_tree().unwrap();
+            let merkle_tree = proof_cell
+                .struct_ref::<FnManagerIdent>()
+                .to_merkle_tree()
+                .unwrap();
             match merkle_tree {
                 MerkleTree::Leaf(hash, access_info, _) => {
                     prop_assert_eq!(hash, initial_root_hash);

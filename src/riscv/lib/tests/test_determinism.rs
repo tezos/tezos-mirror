@@ -37,7 +37,7 @@ fn test_jstz_determinism() {
     let base_refs = base_stepper.struct_ref();
 
     // Create multiple series of bisections that we will evaluate.
-    let ladder = dissect_steps(steps);
+    let ladder = dissect_steps(steps, 0);
     run_steps_ladder(&make_stepper, &ladder, &base_refs, base_hash);
 }
 
