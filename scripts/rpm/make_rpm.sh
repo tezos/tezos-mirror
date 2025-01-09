@@ -30,8 +30,10 @@ if ! which rpmbuild > /dev/null 2>&1; then
   exit 2
 fi
 
-rpmdev-setuptree
 rpmbuild_root=$HOME/rpmbuild # Seems to be standard
+for d in BUILD BUILDROOT RPMS SOURCES SPECS SRPMS; do
+  mkdir -p "$rpmbuild_root/$d"
+done
 spec_dir="${rpmbuild_root}/SPECS"
 rpm_dir="${rpmbuild_root}/RPMS"
 src_dir="${rpmbuild_root}/SOURCES"
@@ -124,7 +126,7 @@ for specfile in "$myhome"/*spec.in; do
   #
   echo "=> Constructing RPM package ${rpm_fullname}"
   _flags="--quiet"
-  rpmbuild -bb ${_flags} "${spec_dir}/${spec_file}"
+  rpmbuild -bb -D 'debug_package %{nil}' ${_flags} "${spec_dir}/${spec_file}"
   if [ -f "${rpm_dir}/${rpm_arch}/${rpm_fullname}" ]; then
     mv "${rpm_dir}/${rpm_arch}/${rpm_fullname}" .
   fi
