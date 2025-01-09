@@ -10,7 +10,7 @@ type content =
   | Ident of string
   | String of string
   | List of Ppxlib.expression list
-  | Apply of Ppxlib.expression * Ppxlib.expression list
+  | Apply of Ppxlib.expression * (Ppxlib.arg_label * Ppxlib.expression) list
   | Other of Ppxlib.expression
 
 type t = {

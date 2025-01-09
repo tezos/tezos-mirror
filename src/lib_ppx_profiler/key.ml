@@ -10,7 +10,7 @@ type content =
   | Ident of string
   | String of string
   | List of Ppxlib.expression list
-  | Apply of Ppxlib.expression * Ppxlib.expression list
+  | Apply of Ppxlib.expression * (Ppxlib.arg_label * Ppxlib.expression) list
   | Other of Ppxlib.expression
 
 type t = {
@@ -55,12 +55,27 @@ let to_expression loc {content; _} =
   | Ident expr -> Ppxlib.Ast_builder.Default.(eapply ~loc (evar ~loc expr) [])
   | String string -> Ppxlib.Ast_builder.Default.estring ~loc string
   | Apply (expr, expr_list) ->
-      Ppxlib.Ast_builder.Default.(eapply ~loc expr expr_list)
+      Ppxlib.Ast_builder.Default.(pexp_apply ~loc expr expr_list)
   | List expr_list -> embed_list loc expr_list
   | Other expr -> expr
 
 let pp_expr_list ppf expr_list =
   (Format.pp_print_list Ppxlib.Pprintast.expression) ppf expr_list
+
+let pp_labeled_expr_list ppf expr_list =
+  Format.pp_print_list
+    (fun ppf (label, expr) ->
+      Format.fprintf
+        ppf
+        "%s%a"
+        (match label with
+        | Ppxlib.Nolabel -> ""
+        | Labelled name -> "~" ^ name
+        | Optional name -> "?" ^ name)
+        Ppxlib.Pprintast.expression
+        expr)
+    ppf
+    expr_list
 
 let pp_content ppf {content; _} =
   match content with
@@ -74,7 +89,7 @@ let pp_content ppf {content; _} =
         "Apply %a %a"
         Ppxlib.Pprintast.expression
         expr
-        pp_expr_list
+        pp_labeled_expr_list
         expr_list
   | Other expr -> Format.fprintf ppf "Other %a" Ppxlib.Pprintast.expression expr
 
