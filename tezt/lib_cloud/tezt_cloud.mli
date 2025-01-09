@@ -34,7 +34,7 @@ module Configuration : sig
 
     Default value for [name] is ["agent-x"] where [x] is a counter
     which is incremented every time this function is used with a
-    default name (there is not check so if you override the ?name
+    default name (there is no check so if you override the ?name
     field with "agent-x", two agents can have the same name). *)
   val make :
     ?os:Types.Os.t ->
@@ -93,7 +93,7 @@ module Alert : sig
   (** [make ?route ?for_ ?description ?summary ?severity ~name ~expr]
       defines a new Prometheus alert with name [name] and promQL
       [expr]. Optionally a severity, summary and description of the
-      alert can be defined. 
+      alert can be defined.
 
       If [route] is provided, the alert can be routed to a receiver
       (Slack, webhook, ...).
