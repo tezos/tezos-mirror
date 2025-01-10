@@ -15,7 +15,8 @@
   octez-libs.data-encoding
   uri
   octez-libs.event-logging
-  lwt-exit)
+  lwt-exit
+  terminal)
  (inline_tests
   (flags -verbose)
   (modes native)

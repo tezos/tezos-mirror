@@ -25,6 +25,8 @@ be documented here either.
 General
 -------
 
+- Logging output on TTYs now adapt to the terminal width. (MR :gl:`!12348`)
+
 Node
 ----
 
