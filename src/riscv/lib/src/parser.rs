@@ -11,7 +11,7 @@ use crate::bits::u16;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::{
     csregisters::CSRegister,
-    registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
+    registers::{parse_fregister, parse_xregister, x0, FRegister, XRegister},
 };
 use arbitrary_int::{u3, u5};
 use core::ops::Range;
@@ -1169,9 +1169,9 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 (_, X0) => UnknownCompressed { instr },
                 (imm, NonZero(rd_rs1)) => CAddiw(CIBNZTypeArgs { rd_rs1, imm }),
             },
-            C_F3_2 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLi(CIBTypeArgs {
+            C_F3_2 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLi(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_imm(instr),
                 }),
@@ -1180,12 +1180,12 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 if u16::bits_subset(instr, 6, 2) == 0 && !u16::bit(instr, 12) {
                     return Instr::Cacheable(UnknownCompressed { instr });
                 };
-                match c_rd_rs1(instr) {
-                    x2 => CAddi16sp(CJTypeArgs {
+                match split_x0(c_rd_rs1(instr)) {
+                    NonZero(NonZeroXRegister::x2) => CAddi16sp(CJTypeArgs {
                         imm: ci_addi16sp_imm(instr),
                     }),
-                    x0 => UnknownCompressed { instr },
-                    rd_rs1 => CLui(CIBTypeArgs {
+                    X0 => UnknownCompressed { instr },
+                    NonZero(rd_rs1) => CLui(CIBNZTypeArgs {
                         rd_rs1,
                         imm: ci_imm(instr) << 12,
                     }),
@@ -1324,9 +1324,12 @@ mod tests {
         parse_block,
     };
     use crate::{
-        machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*},
+        machine_state::{
+            csregisters::CSRegister::mcause,
+            registers::{NonZeroXRegister, XRegister::*},
+        },
         parser::{
-            instruction::{CIBTypeArgs, InstrUncacheable},
+            instruction::{CIBNZTypeArgs, CIBTypeArgs, InstrUncacheable},
             parse_compressed_instruction, parse_compressed_instruction_inner,
         },
     };
@@ -1382,8 +1385,8 @@ mod tests {
                 rs1: x0,
                 imm: 21,
             })),
-            Instr::Cacheable(CLui(CIBTypeArgs {
-                rd_rs1: x8,
+            Instr::Cacheable(CLui(CIBNZTypeArgs {
+                rd_rs1: NonZeroXRegister::x8,
                 imm: 0x1 << 12,
             })),
             Instr::Cacheable(Addiw(ITypeArgs {

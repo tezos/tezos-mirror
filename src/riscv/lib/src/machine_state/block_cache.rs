@@ -895,7 +895,7 @@ mod tests {
             },
             main_memory::{self, tests::T1K},
             mode::Mode,
-            registers::{a0, a1, a2, t0, t1},
+            registers::{a1, a2, nz, t0, t1},
             MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
             TestCacheLayouts,
         },
@@ -936,8 +936,10 @@ mod tests {
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
             args: TaggedArgs {
-                rd: a0.into(),
+                rd: nz::a0.into(),
                 imm: 1,
+                rs1: nz::ra.into(),
+                rs2: nz::ra.into(),
                 ..TaggedArgs::DEFAULT
             },
         })
@@ -961,8 +963,10 @@ mod tests {
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
             args: TaggedArgs {
-                rd: a0.into(),
+                rd: nz::a0.into(),
                 imm: 1,
+                rs1: nz::ra.into(),
+                rs2: nz::ra.into(),
                 ..TaggedArgs::DEFAULT
             },
         })
@@ -985,8 +989,10 @@ mod tests {
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
             args: TaggedArgs {
-                rd: a0.into(),
+                rd: nz::a0.into(),
                 imm: 1,
+                rs1: nz::ra.into(),
+                rs2: nz::ra.into(),
                 ..TaggedArgs::DEFAULT
             },
         })
@@ -1014,8 +1020,10 @@ mod tests {
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::CLi,
             args: TaggedArgs {
-                rd: a0.into(),
+                rd: nz::a0.into(),
                 imm: 1,
+                rs1: nz::ra.into(),
+                rs2: nz::ra.into(),
                 ..TaggedArgs::DEFAULT
             },
         })

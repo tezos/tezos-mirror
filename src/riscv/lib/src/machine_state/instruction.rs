@@ -1311,8 +1311,8 @@ impl Args {
     impl_store_type!(run_csw, InstrWidth::Compressed);
     impl_cb_type!(run_cbeqz);
     impl_cb_type!(run_cbnez);
-    impl_ci_type!(run_cli);
-    impl_ci_type!(run_clui);
+    impl_ci_type!(run_cli, non_zero);
+    impl_ci_type!(run_clui, non_zero);
     impl_ci_type!(run_caddi, non_zero);
     impl_ci_type!(run_caddi4spn);
     impl_ci_type!(run_cslli);

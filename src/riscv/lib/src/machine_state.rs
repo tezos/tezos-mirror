@@ -680,11 +680,11 @@ mod tests {
             },
             main_memory::{self, M1M, M8K},
             mode::Mode,
-            registers::{a0, a1, a2, a5, t0, t1, t2, zero},
+            registers::{a0, a1, a2, a5, nz, t0, t1, t2, zero},
             DefaultCacheLayouts, TestCacheLayouts,
         },
         parser::{
-            instruction::{CIBTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
+            instruction::{CIBNZTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
             parse_block,
         },
         state_backend::{
@@ -1109,7 +1109,10 @@ mod tests {
                     rs2: t0,
                     imm: 8
                 })),
-                Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 1 })),
+                Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
+                    rd_rs1: nz::a0,
+                    imm: 1
+                })),
                 Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
             ]
         );
@@ -1130,7 +1133,10 @@ mod tests {
                     rs2: t0,
                     imm: 8
                 })),
-                Instr::Cacheable(InstrCacheable::CLi(CIBTypeArgs { rd_rs1: a0, imm: 2 })),
+                Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
+                    rd_rs1: nz::a0,
+                    imm: 2
+                })),
                 Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
             ]
         );
@@ -1336,8 +1342,10 @@ mod tests {
             Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::CLui,
                 args: TaggedArgs {
-                    rd: a1.into(),
+                    rd: nz::a1.into(),
                     imm: (u16::bits_subset(overwrite_bytes, 15, 12) as i64) << 12,
+                    rs1: nz::ra.into(),
+                    rs2: nz::ra.into(),
                     ..TaggedArgs::DEFAULT
                 },
             })
