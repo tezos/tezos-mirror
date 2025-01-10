@@ -52,6 +52,9 @@ let pull ?image_name ?alias ?(tag = "latest") ~registry_uri () =
   let args = ["pull"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
   Process.spawn ~name ~color "docker" args
 
+let network ~command ~network_name =
+  Process.spawn ~color "docker" (["network"] @ [command] @ [network_name])
+
 let run ?(rm = false) ?name ?network ?publish_ports image args =
   let publish_ports =
     match publish_ports with

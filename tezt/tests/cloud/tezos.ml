@@ -80,8 +80,8 @@ module Dal_node = struct
 
   module Agent = struct
     let create_from_endpoint ?net_port
-        ?(path = Uses.path Constant.octez_dal_node |> Filename.basename) ?name
-        ?rpc_port ~l1_node_endpoint agent =
+        ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
+        ~l1_node_endpoint agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port =
