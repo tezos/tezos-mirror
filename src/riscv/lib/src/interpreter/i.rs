@@ -17,3 +17,36 @@ pub fn run_add(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: XRegister
     let result = icb.xvalue_wrapping_add(lhs, rhs);
     icb.xregister_write(rd, result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        backend_test, create_state,
+        machine_state::{
+            hart_state::{HartState, HartStateLayout},
+            registers::{a0, t0},
+        },
+    };
+
+    backend_test!(test_add, F, {
+        let imm_rs1_res = [
+            (0_i64, 0_u64, 0_u64),
+            (0, 0xFFF0_0420, 0xFFF0_0420),
+            (-1, 0, 0xFFFF_FFFF_FFFF_FFFF),
+            (1_000_000, -123_000_987_i64 as u64, -122_000_987_i64 as u64),
+            (1_000_000, 123_000_987, 124_000_987),
+            (-1, -321_000_000_000_i64 as u64, -321_000_000_001_i64 as u64),
+        ];
+
+        for (imm, rs1, res) in imm_rs1_res {
+            let mut state = create_state!(HartState, F);
+
+            state.xregisters.write(a0, rs1);
+            state.xregisters.write(t0, imm as u64);
+
+            run_add(&mut state.xregisters, a0, t0, a0);
+            assert_eq!(state.xregisters.read(a0), res);
+        }
+    });
+}

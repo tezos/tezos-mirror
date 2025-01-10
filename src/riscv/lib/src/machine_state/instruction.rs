@@ -22,11 +22,11 @@ use super::{
 };
 use crate::{
     default::ConstDefault,
-    interpreter::i,
+    interpreter::{c, i},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
-        AmoArgs, CIBDTypeArgs, CIBTypeArgs, CJTypeArgs, CRJTypeArgs, CRTypeArgs, CSSDTypeArgs,
-        CSSTypeArgs, CsrArgs, CsriArgs, FCmpArgs, FLoadArgs, FR1ArgWithRounding,
+        AmoArgs, CIBDTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs, CRTypeArgs,
+        CSSDTypeArgs, CSSTypeArgs, CsrArgs, CsriArgs, FCmpArgs, FLoadArgs, FR1ArgWithRounding,
         FR2ArgsWithRounding, FR3ArgsWithRounding, FRArgs, FRegToXRegArgs,
         FRegToXRegArgsWithRounding, FStoreArgs, ITypeArgs, InstrCacheable, InstrRoundingMode,
         InstrWidth, RTypeArgs, SBTypeArgs, UJTypeArgs, XRegToFRegArgs, XRegToFRegArgsWithRounding,
@@ -887,6 +887,20 @@ macro_rules! impl_cr_type {
     };
 }
 
+macro_rules! impl_cr_nz_type {
+    ($impl: path, $fn: ident) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            $impl(&mut core.hart.xregisters, self.rd.nzx, self.rs2.nzx);
+            Ok(Next(InstrWidth::Compressed))
+        }
+    };
+}
+
 macro_rules! impl_cb_type {
     ($fn: ident) => {
         // SAFETY: This function must only be called on an `Args` belonging
@@ -1278,6 +1292,8 @@ impl Args {
     impl_csr_imm_type!(run_csrrci);
 
     // RV32C compressed instructions
+    impl_cr_nz_type!(c::run_cadd, run_cadd);
+    impl_cr_nz_type!(c::run_cmv, run_cmv);
     impl_load_type!(run_clw, InstrWidth::Compressed);
     impl_cload_sp_type!(run_clwsp);
     impl_store_type!(run_csw, InstrWidth::Compressed);
@@ -1291,8 +1307,6 @@ impl Args {
     impl_ci_type!(run_csrli);
     impl_ci_type!(run_csrai);
     impl_ci_type!(run_candi);
-    impl_cr_type!(run_cmv);
-    impl_cr_type!(run_cadd);
     impl_cr_type!(run_cand);
     impl_cr_type!(run_cxor);
     impl_cr_type!(run_cor);
@@ -2244,9 +2258,22 @@ impl From<&CRTypeArgs> for Args {
     fn from(value: &CRTypeArgs) -> Self {
         Self {
             rd: value.rd_rs1.into(),
-            // We are adding a default value for rs1 and rs2 as X0
-            // to be explicit that they are of XRegister type.
+            // We are adding a default value for rs1 as X0
+            // to be explicit that it is of XRegister type.
             rs1: XRegister::x0.into(),
+            rs2: value.rs2.into(),
+            ..Self::DEFAULT
+        }
+    }
+}
+
+impl From<&CNZRTypeArgs> for Args {
+    fn from(value: &CNZRTypeArgs) -> Self {
+        Self {
+            rd: value.rd_rs1.into(),
+            // We are adding a default value for rs1 as NonZeroXRegister::x1
+            // to be explicit that it is of NonZeroXRegister type.
+            rs1: NonZeroXRegister::x1.into(),
             rs2: value.rs2.into(),
             ..Self::DEFAULT
         }

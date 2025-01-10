@@ -194,6 +194,12 @@ pub struct CRTypeArgs {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CNZRTypeArgs {
+    pub rd_rs1: NonZeroXRegister,
+    pub rs2: NonZeroXRegister,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CRJTypeArgs {
     pub rs1: NonZeroXRegister,
 }
@@ -427,8 +433,8 @@ pub enum InstrCacheable {
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),
     CAndi(CIBTypeArgs),
-    CMv(CRTypeArgs),
-    CAdd(CRTypeArgs),
+    CMv(CNZRTypeArgs),
+    CAdd(CNZRTypeArgs),
     CAnd(CRTypeArgs),
     COr(CRTypeArgs),
     CXor(CRTypeArgs),

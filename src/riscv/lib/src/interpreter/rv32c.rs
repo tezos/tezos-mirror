@@ -8,7 +8,6 @@
 //! U:C-16
 
 use crate::{
-    interpreter::i,
     machine_state::{
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
@@ -148,23 +147,6 @@ where
     /// the sign-extended 6-bit immediate, then writes the result back to `rd_rs1`.
     pub fn run_candi(&mut self, imm: i64, rd_rs1: XRegister) {
         self.run_andi(imm, rd_rs1, rd_rs1)
-    }
-
-    /// `C.MV` CR-type compressed instruction
-    ///
-    /// Copies the value in register `rs2` into register `rd_rs1`.
-    pub fn run_cmv(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        debug_assert!(rd_rs1 != x0 && rs2 != x0);
-        i::run_add(self, rs2, x0, rd_rs1)
-    }
-
-    /// `C.ADD` CR-type compressed instruction
-    ///
-    /// Adds the values in registers `rd_rs1` and `rs2` and writes the result
-    /// back to register `rd_rs1`.
-    pub fn run_cadd(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        debug_assert!(rd_rs1 != x0 && rs2 != x0);
-        i::run_add(self, rd_rs1, rs2, rd_rs1)
     }
 
     /// `C.AND` CA-type compressed instruction

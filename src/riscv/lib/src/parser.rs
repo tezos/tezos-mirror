@@ -1226,12 +1226,20 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                     let nzrs1 = NonZeroXRegister::assert_from(rs1);
                     CJalr(CRJTypeArgs { rs1: nzrs1 })
                 }
-                (true, rs1, rs2) => CAdd(CRTypeArgs { rd_rs1: rs1, rs2 }),
+                (true, rs1, rs2) => {
+                    let rd_rs1 = NonZeroXRegister::assert_from(rs1);
+                    let rs2 = NonZeroXRegister::assert_from(rs2);
+                    CAdd(CNZRTypeArgs { rd_rs1, rs2 })
+                }
                 (false, rs1, x0) => {
                     let nzrs1 = NonZeroXRegister::assert_from(rs1);
                     CJr(CRJTypeArgs { rs1: nzrs1 })
                 }
-                (false, rs1, rs2) => CMv(CRTypeArgs { rd_rs1: rs1, rs2 }),
+                (false, rs1, rs2) => {
+                    let rd_rs1 = NonZeroXRegister::assert_from(rs1);
+                    let rs2 = NonZeroXRegister::assert_from(rs2);
+                    CMv(CNZRTypeArgs { rd_rs1, rs2 })
+                }
             },
             C_F3_5 => CFsdsp(CSSDTypeArgs {
                 rs2: c_f_rs2(instr),
