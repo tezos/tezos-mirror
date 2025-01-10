@@ -202,15 +202,28 @@ let check_and_reset_delegate_participation ctxt delegate =
       let*! ctxt = Storage.Contract.Missed_attestations.remove ctxt contract in
       return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
 
-let get_and_reset_delegate_dal_participation ctxt delegate =
+let get_and_maybe_reset_delegate_dal_participation ~reset ctxt delegate =
   let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
   let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
   match result with
   | None -> return (ctxt, 0l)
   | Some num_slots ->
-      let*! ctxt = Storage.Contract.Attested_dal_slots.remove ctxt contract in
+      let*! ctxt =
+        if reset then Storage.Contract.Attested_dal_slots.remove ctxt contract
+        else Lwt.return ctxt
+      in
       return (ctxt, num_slots)
+
+let get_and_reset_delegate_dal_participation =
+  get_and_maybe_reset_delegate_dal_participation ~reset:true
+
+let get_delegate_dal_participation ctxt delegate =
+  let open Lwt_result_syntax in
+  let* _ctxt, n =
+    get_and_maybe_reset_delegate_dal_participation ~reset:false ctxt delegate
+  in
+  return n
 
 module For_RPC = struct
   type participation_info = {
@@ -301,4 +314,87 @@ module For_RPC = struct
             remaining_allowed_missed_slots;
             expected_attesting_rewards;
           }
+
+  type dal_participation_info = {
+    expected_assigned_shards : int;
+    delegate_attested_dal_slots : int;
+    total_dal_attested_slots : int;
+    expected_dal_rewards : Tez_repr.t;
+    sufficient_dal_participation : bool;
+  }
+
+  (* Inefficient, only for RPC *)
+  let dal_participation_info_enabled ctxt delegate =
+    let open Lwt_result_syntax in
+    let level = Level_storage.current ctxt in
+    let* stake_distribution =
+      Stake_storage.get_selected_distribution ctxt level.cycle
+    in
+    match
+      List.assoc_opt
+        ~equal:Signature.Public_key_hash.equal
+        delegate
+        stake_distribution
+    with
+    | None ->
+        (* delegate does not have an active stake at the current cycle *)
+        return
+          {
+            expected_assigned_shards = 0;
+            delegate_attested_dal_slots = 0;
+            total_dal_attested_slots = 0;
+            expected_dal_rewards = Tez_repr.zero;
+            sufficient_dal_participation = false;
+          }
+    | Some active_stake ->
+        let* total_active_stake =
+          Stake_storage.get_total_active_stake ctxt level.cycle
+        in
+        let expected_assigned_shards =
+          let active_stake_weight = Stake_repr.staking_weight active_stake in
+          let total_active_stake_weight =
+            Stake_repr.staking_weight total_active_stake
+          in
+          expected_dal_shards_for_given_active_stake
+            ctxt
+            ~total_active_stake_weight
+            ~active_stake_weight
+        in
+        let* dal_attested_slots_by_delegate =
+          get_delegate_dal_participation ctxt delegate
+        in
+        let* total_dal_attested_slots =
+          let+ total_opt = Storage.Dal.Total_attested_slots.find ctxt in
+          Option.value ~default:0l total_opt
+        in
+        let sufficient_dal_participation =
+          is_dal_participation_sufficient
+            ctxt
+            ~dal_attested_slots_by_delegate
+            ~total_dal_attested_slots
+        in
+        let*? dal_attesting_reward_per_shard =
+          Delegate_rewards.dal_attesting_reward_per_shard ctxt
+        in
+        let expected_dal_rewards =
+          Tez_repr.mul_exn
+            dal_attesting_reward_per_shard
+            expected_assigned_shards
+        in
+        return
+          {
+            expected_assigned_shards;
+            delegate_attested_dal_slots =
+              Int32.to_int dal_attested_slots_by_delegate;
+            total_dal_attested_slots = Int32.to_int total_dal_attested_slots;
+            expected_dal_rewards;
+            sufficient_dal_participation;
+          }
+
+  (* Inefficient, only for RPC *)
+  let dal_participation_info ctxt delegate =
+    Raw_context.Dal.only_if_incentives_enabled
+      ctxt
+      ~default:(fun _ctxt -> tzfail Dal_errors_repr.Dal_incentives_disabled)
+      (fun ctxt -> dal_participation_info_enabled ctxt delegate)
 end
