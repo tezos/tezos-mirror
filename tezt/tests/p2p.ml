@@ -1198,13 +1198,14 @@ module P2p_stat = struct
   }
 
   let parse_p2p_stat client_output =
-    let fail ~__LOC__ line =
+    let fail ~__LOC__ section line =
       Test.fail
         ~__LOC__
-        "[parse_p2p_stat] Could not parse line:\n\
+        "[parse_p2p_stat] Could not parse %s from line:\n\
          %s\n\
         \ when parsing client output:\n\
          %s"
+        section
         line
         client_output
     in
@@ -1212,40 +1213,58 @@ module P2p_stat = struct
     let _prefix, lines = span (( <> ) "GLOBAL STATS") lines in
     let _global_stats, lines = span (( <> ) "CONNECTIONS") lines in
     let connections, lines = span (( <> ) "KNOWN PEERS") lines in
+    let incoming, outgoing = span (( <> ) " OUTGOING") connections in
     let known_peers, known_points = span (( <> ) "KNOWN POINTS") lines in
-    let connections =
+    let incoming_connections =
       (* Example: *)
       (* ↘ idscnVnp4ZgHbxBem9ZkaGtmVDdPt3 127.0.0.1:16392 (TEZOS.2 (p2p: 1))  *\) *)
       List.map
         (fun line ->
           match line =~* rex "(id\\w+)" with
           | Some peer_id -> Peer_id peer_id
-          | None -> fail ~__LOC__ line)
-        (List.tl connections)
+          | None -> fail ~__LOC__ "incoming connections" line)
+        (* Removing the lines:
+           - CONNECTIONS
+           - INCOMING *)
+        (List.tl (List.tl incoming))
     in
+    let outgoing_connections =
+      (* Example: *)
+      (* ↗ idscnVnp4ZgHbxBem9ZkaGtmVDdPt3 127.0.0.1:16392 (TEZOS.2 (p2p: 1))  *\) *)
+      List.map
+        (fun line ->
+          match line =~* rex "(id\\w+)" with
+          | Some peer_id -> Peer_id peer_id
+          | None -> fail ~__LOC__ "outgoing connections" line)
+        (List.tl outgoing)
+    in
+    let connections = incoming_connections @ outgoing_connections in
     let known_peers =
       (* Example: *)
       (* ⚏  1 idtn1bQKkQvzgPH5zbD86Bi3eTgQhB ↗ 0 B (0 B/s) ↘ 0 B (0 B/s)   *\) *)
       List.map
         (fun line ->
-          match line =~** rex "(⚏|⚌).* (id\\w+)" with
+          match line =~** rex "  (⚏|⚌).* (id\\w+)" with
           | Some (connection, peer_id) ->
               {id = Peer_id peer_id; connected = connection = "⚌"}
-          | None -> fail ~__LOC__ line)
-        (List.tl known_peers)
+          | None -> fail ~__LOC__ "peers" line)
+        (* Removing the lines:
+           - KNOWNPEERS
+           - St Sc Peer Id Upload Download Tr *)
+        (List.tl (List.tl known_peers))
     in
     let known_points =
       (* Example: *)
       (* ⚏  127.0.0.1:16388 (last seen: idtn1bQKkQvzgPH5zbD86Bi3eTgQhB 2023-01-16T13:23:08.499-00:00) *)
       List.map
         (fun line ->
-          match line =~*** rex "(⚏|⚌)\\s+(\\S+:\\S+).* (id\\w+)" with
+          match line =~*** rex "  (⚏|⚌)\\s+(\\S+:\\S+).* (id\\w+)" with
           | Some (connection, point_id, peer_id) ->
               {
                 id = point_id_of_string point_id;
                 peer = {connected = connection = "⚌"; id = Peer_id peer_id};
               }
-          | None -> fail ~__LOC__ line)
+          | None -> fail ~__LOC__ "points" line)
         (List.tl known_points)
     in
     {connections; known_peers; known_points}

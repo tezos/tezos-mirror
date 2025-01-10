@@ -29,9 +29,6 @@ let group =
     title = "Commands for monitoring and controlling p2p-layer state";
   }
 
-let pp_connection_info ppf conn =
-  P2p_connection.Info.pp (fun _ _ -> ()) ppf conn
-
 let addr_parameter =
   let open Tezos_clic in
   param
@@ -48,6 +45,18 @@ let p2p_peer_id_param ~name ~desc t =
          Lwt.return (P2p_peer.Id.of_b58check str)))
     t
 
+let p2p_stat dont_colorize (cctxt : #Client_context.full) =
+  let open Lwt_result_syntax in
+  let* full_stats = P2p_services.Full_stat.full_stat cctxt in
+  let*! () =
+    cctxt#message
+      "%s"
+      (P2p_services.Full_stat.to_string
+         ~colorize:((not dont_colorize) && Unix.isatty Unix.stdout)
+         full_stats)
+  in
+  return_unit
+
 let commands () =
   let open Lwt_result_syntax in
   let open Tezos_clic in
@@ -55,85 +64,9 @@ let commands () =
     command
       ~group
       ~desc:"show global network status"
-      no_options
+      (args1 (Client_commands.dont_colorize ()))
       (prefixes ["p2p"; "stat"] stop)
-      (fun () (cctxt : #Client_context.full) ->
-        let* stat = Shell_services.P2p.stat cctxt in
-        let* conns = Shell_services.P2p.Connections.list cctxt in
-        let* peers = Shell_services.P2p.Peers.list cctxt in
-        let* points = Shell_services.P2p.Points.list cctxt in
-        let*! () = cctxt#message "GLOBAL STATS" in
-        let*! () = cctxt#message "  %a" P2p_stat.pp stat in
-        let*! () = cctxt#message "CONNECTIONS" in
-        let incoming, outgoing =
-          List.partition (fun c -> c.P2p_connection.Info.incoming) conns
-        in
-        let*! () =
-          List.iter_s
-            (fun conn -> cctxt#message "  %a" pp_connection_info conn)
-            incoming
-        in
-        let*! () =
-          List.iter_s
-            (fun conn -> cctxt#message "  %a" pp_connection_info conn)
-            outgoing
-        in
-        let*! () = cctxt#message "KNOWN PEERS" in
-        let*! () =
-          List.iter_s
-            (fun (p, pi) ->
-              cctxt#message
-                "  %a  %.0f %a %a %s"
-                P2p_peer.State.pp_digram
-                pi.P2p_peer.Info.state
-                pi.score
-                P2p_peer.Id.pp
-                p
-                P2p_stat.pp
-                pi.stat
-                (if pi.trusted then "★" else " "))
-            peers
-        in
-        let*! () = cctxt#message "KNOWN POINTS" in
-        let*! () =
-          List.iter_s
-            (fun (p, pi) ->
-              match pi.P2p_point.Info.state with
-              | Running peer_id ->
-                  cctxt#message
-                    "  %a  %a %a %s"
-                    P2p_point.State.pp_digram
-                    pi.state
-                    P2p_point.Id.pp
-                    p
-                    P2p_peer.Id.pp
-                    peer_id
-                    (if pi.trusted then "★" else " ")
-              | _ -> (
-                  match pi.last_seen with
-                  | Some (peer_id, ts) ->
-                      cctxt#message
-                        "  %a  %a (last seen: %a %a) %s"
-                        P2p_point.State.pp_digram
-                        pi.state
-                        P2p_point.Id.pp
-                        p
-                        P2p_peer.Id.pp
-                        peer_id
-                        Time.System.pp_hum
-                        ts
-                        (if pi.trusted then "★" else " ")
-                  | None ->
-                      cctxt#message
-                        "  %a  %a %s"
-                        P2p_point.State.pp_digram
-                        pi.state
-                        P2p_point.Id.pp
-                        p
-                        (if pi.trusted then "★" else " ")))
-            points
-        in
-        return_unit);
+      p2p_stat;
     command
       ~group
       ~desc:"Connect to a new point."

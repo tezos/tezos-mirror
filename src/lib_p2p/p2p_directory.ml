@@ -31,6 +31,57 @@ let info_of_peer_info = P2p_pool.Peers.info_of_peer_info
 let build_rpc_directory net =
   let open Lwt_result_syntax in
   let dir = Tezos_rpc.Directory.empty in
+
+  (* Utility functions *)
+  let get_stat () () =
+    match P2p.connect_handler net with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some connect_handler -> return (P2p_connect_handler.stat connect_handler)
+  in
+
+  let get_connections () () =
+    match P2p.pool net with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some pool ->
+        return
+        @@ P2p_pool.Connection.fold pool ~init:[] ~f:(fun _peer_id c acc ->
+               P2p_conn.info c :: acc)
+  in
+
+  let get_peers_list ?q () =
+    match P2p.pool net with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some pool ->
+        return
+        @@ P2p_pool.Peers.fold_known pool ~init:[] ~f:(fun peer_id i a ->
+               let info = info_of_peer_info pool i in
+               match q with
+               | None -> (peer_id, info) :: a
+               | Some q -> (
+                   match q#filters with
+                   | [] -> (peer_id, info) :: a
+                   | filters when P2p_peer.State.filter filters info.state ->
+                       (peer_id, info) :: a
+                   | _ -> a))
+  in
+
+  let get_points_list ?q () =
+    match P2p.pool net with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some pool ->
+        return
+        @@ P2p_pool.Points.fold_known pool ~init:[] ~f:(fun point i a ->
+               let info = info_of_point_info i in
+               match q with
+               | None -> (point, info) :: a
+               | Some q -> (
+                   match q#filters with
+                   | [] -> (point, info) :: a
+                   | filters when P2p_point.State.filter filters info.state ->
+                       (point, info) :: a
+                   | _ -> a))
+  in
+
   (* Network : Global *)
   let dir =
     Tezos_rpc.Directory.register0 dir P2p_services.S.self (fun () () ->
@@ -38,13 +89,7 @@ let build_rpc_directory net =
         | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool -> return (P2p_pool.config pool).identity.peer_id)
   in
-  let dir =
-    Tezos_rpc.Directory.register0 dir P2p_services.S.stat (fun () () ->
-        match P2p.connect_handler net with
-        | None -> tzfail P2p_errors.P2p_layer_disabled
-        | Some connect_handler ->
-            return (P2p_connect_handler.stat connect_handler))
-  in
+  let dir = Tezos_rpc.Directory.register0 dir P2p_services.S.stat get_stat in
   let dir =
     Tezos_rpc.Directory.gen_register0 dir P2p_services.S.events (fun () () ->
         let stream, stopper = P2p.watcher net in
@@ -65,6 +110,23 @@ let build_rpc_directory net =
             in
             return_unit)
   in
+  let dir =
+    Tezos_rpc.Directory.register0
+      dir
+      P2p_services.Full_stat.S.full_stat
+      (fun () () ->
+        let* stat = get_stat () () in
+        let* connections = get_connections () () in
+        let* peers = get_peers_list () in
+        let* points = get_points_list () in
+        let incoming_connections, outgoing_connections =
+          List.partition (fun c -> c.P2p_connection.Info.incoming) connections
+        in
+        Lwt.return_ok
+          P2p_services.Full_stat.
+            {stat; incoming_connections; outgoing_connections; peers; points})
+  in
+
   (* Network : Connection *)
   let dir =
     Tezos_rpc.Directory.opt_register1
@@ -94,29 +156,14 @@ let build_rpc_directory net =
     Tezos_rpc.Directory.register0
       dir
       P2p_services.Connections.S.list
-      (fun () () ->
-        match P2p.pool net with
-        | None -> tzfail P2p_errors.P2p_layer_disabled
-        | Some pool ->
-            return
-            @@ P2p_pool.Connection.fold pool ~init:[] ~f:(fun _peer_id c acc ->
-                   P2p_conn.info c :: acc))
+      get_connections
   in
   (* Network : Peer_id *)
   let dir =
     Tezos_rpc.Directory.register0 dir P2p_services.Peers.S.list (fun q () ->
-        match P2p.pool net with
-        | None -> tzfail P2p_errors.P2p_layer_disabled
-        | Some pool ->
-            return
-            @@ P2p_pool.Peers.fold_known pool ~init:[] ~f:(fun peer_id i a ->
-                   let info = info_of_peer_info pool i in
-                   match q#filters with
-                   | [] -> (peer_id, info) :: a
-                   | filters when P2p_peer.State.filter filters info.state ->
-                       (peer_id, info) :: a
-                   | _ -> a))
+        get_peers_list ~q ())
   in
+
   let dir =
     Tezos_rpc.Directory.opt_register1
       dir
@@ -211,17 +258,7 @@ let build_rpc_directory net =
   (* Network : Point *)
   let dir =
     Tezos_rpc.Directory.register0 dir P2p_services.Points.S.list (fun q () ->
-        match P2p.pool net with
-        | None -> tzfail P2p_errors.P2p_layer_disabled
-        | Some pool ->
-            return
-            @@ P2p_pool.Points.fold_known pool ~init:[] ~f:(fun point i a ->
-                   let info = info_of_point_info i in
-                   match q#filters with
-                   | [] -> (point, info) :: a
-                   | filters when P2p_point.State.filter filters info.state ->
-                       (point, info) :: a
-                   | _ -> a))
+        get_points_list ~q ())
   in
   let dir =
     Tezos_rpc.Directory.opt_register1

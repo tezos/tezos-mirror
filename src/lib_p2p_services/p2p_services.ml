@@ -354,6 +354,164 @@ module Peers = struct
   let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 end
 
+module Full_stat = struct
+  type t = {
+    stat : P2p_stat.t;
+    incoming_connections : Connection_metadata.t P2p_connection.Info.t list;
+    outgoing_connections : Connection_metadata.t P2p_connection.Info.t list;
+    peers :
+      (P2p_peer.Id.t * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t)
+      list;
+    points : (P2p_point.Id.t * P2p_point.Info.t) list;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    def
+      "client_p2p_stat"
+      ~description:"Stored statistics about the p2p network."
+    @@ conv
+         (fun {stat; incoming_connections; outgoing_connections; peers; points} ->
+           (stat, incoming_connections, outgoing_connections, peers, points))
+         (fun (stat, incoming_connections, outgoing_connections, peers, points) ->
+           {stat; incoming_connections; outgoing_connections; peers; points})
+         (obj5
+            (req "stat" P2p_stat.encoding)
+            (req
+               "incoming_connections"
+               (list
+                  (P2p_connection.Info.encoding Connection_metadata.encoding)))
+            (req
+               "outgoing_connections"
+               (list
+                  (P2p_connection.Info.encoding Connection_metadata.encoding)))
+            (req
+               "peers"
+               (list
+                  (tup2
+                     P2p_peer.Id.encoding
+                     (P2p_peer.Info.encoding
+                        Peer_metadata.encoding
+                        Connection_metadata.encoding))))
+            (req
+               "points"
+               (list (tup2 P2p_point.Id.encoding P2p_point.Info.encoding))))
+
+  let pp_list pp ppf l =
+    match l with
+    | [] -> ()
+    | l ->
+        Format.fprintf ppf "@," ;
+        Format.(pp_print_list ~pp_sep:pp_print_cut pp ppf) l
+
+  let pp_peer ppf (p, pi) =
+    Format.fprintf
+      ppf
+      "%a   %.0f  %a %a %s"
+      P2p_peer.State.pp_digram
+      pi.P2p_peer.Info.state
+      pi.score
+      P2p_peer.Id.pp
+      p
+      P2p_stat.pp
+      pi.stat
+      (if pi.trusted then "★" else " ")
+
+  let pp_peers ppf peers =
+    Format.fprintf
+      ppf
+      "@,@[<v 0>@{<bold; underline; fg_cyan>St Sc %a%a%a Tr@}%a@]"
+      (Tezos_stdlib.Pretty_printing.pp_centered 30)
+      "Peer Id"
+      (Tezos_stdlib.Pretty_printing.pp_centered 30)
+      "Upload"
+      (Tezos_stdlib.Pretty_printing.pp_centered 30)
+      "Download"
+      (pp_list pp_peer)
+      peers
+
+  let pp_point ppf (p, pi) =
+    match pi.P2p_point.Info.state with
+    | Running peer_id ->
+        Format.fprintf
+          ppf
+          "%a  %a %a %s"
+          P2p_point.State.pp_digram
+          pi.state
+          P2p_point.Id.pp
+          p
+          P2p_peer.Id.pp
+          peer_id
+          (if pi.trusted then "★" else " ")
+    | _ -> (
+        match pi.last_seen with
+        | Some (peer_id, ts) ->
+            Format.fprintf
+              ppf
+              "%a  %a (last seen: %a %a) %s"
+              P2p_point.State.pp_digram
+              pi.state
+              P2p_point.Id.pp
+              p
+              P2p_peer.Id.pp
+              peer_id
+              Time.System.pp_hum
+              ts
+              (if pi.trusted then "★" else " ")
+        | None ->
+            Format.fprintf
+              ppf
+              "%a  %a %s"
+              P2p_point.State.pp_digram
+              pi.state
+              P2p_point.Id.pp
+              p
+              (if pi.trusted then "★" else " "))
+
+  let pp_connection_info ppf conn =
+    P2p_connection.Info.pp (fun _ _ -> ()) ppf conn
+
+  let to_string ~colorize
+      {stat; incoming_connections; outgoing_connections; peers; points} =
+    let reset =
+      if colorize then
+        Tezos_stdlib.Pretty_printing.add_ansi_marking Format.str_formatter
+      else fun () -> ()
+    in
+    Format.fprintf
+      Format.str_formatter
+      "@[<v 2>GLOBAL STATS@,\
+       %a@]@,\
+       @[<v 1>CONNECTIONS@,\
+       @[<v 1>INCOMING%a@]@,\
+       @[<v 1>OUTGOING%a@]@]@,\
+       @[<v 2>KNOWN PEERS%a@]@,\
+       @[<v 2>KNOWN POINTS%a@."
+      P2p_stat.pp
+      stat
+      (pp_list pp_connection_info)
+      incoming_connections
+      (pp_list pp_connection_info)
+      outgoing_connections
+      pp_peers
+      peers
+      (pp_list pp_point)
+      points ;
+    reset () ;
+    Format.flush_str_formatter ()
+
+  module S = struct
+    let full_stat =
+      Tezos_rpc.Service.get_service
+        ~description:"Full network statistics."
+        ~query:Tezos_rpc.Query.empty
+        ~output:encoding
+        Tezos_rpc.Path.(root / "network" / "full_stat")
+  end
+
+  let full_stat ctxt = make_call S.full_stat ctxt () () ()
+end
+
 module ACL = struct
   type ip_list = {ips : Ipaddr.V6.t list; not_reliable_since : Ptime.t option}
 

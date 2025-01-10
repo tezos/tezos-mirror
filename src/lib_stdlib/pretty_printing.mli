@@ -36,3 +36,14 @@
     \]
 *)
 val add_ansi_marking : Format.formatter -> unit -> unit
+
+val pp_centered : int -> Format.formatter -> string -> unit
+
+module Handled_tags : Set.S with type elt = string
+
+(** [handles tag] returns [true] if [tag] is handled by this module.
+
+    This is useful when there's a possibility that a different handler for
+    semantic tags is defined or used with a function that already uses this
+    module to ignore these tags (see {!module:Tezos_base.Tezos_clic}) *)
+val handles : string -> bool

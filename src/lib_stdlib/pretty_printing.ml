@@ -6,6 +6,44 @@
 (*****************************************************************************)
 
 open Format
+module Handled_tags = Set.Make (String)
+
+let handled_tags =
+  let colors =
+    [
+      "default";
+      "black";
+      "blue";
+      "cyan";
+      "green";
+      "magenta";
+      "red";
+      "white";
+      "yellow";
+    ]
+  in
+  let grounds = ["fg"; "bg"] in
+  let ansi_colors =
+    List.fold_left
+      (fun acc ground ->
+        List.fold_left
+          (fun acc color -> (ground ^ "_" ^ color) :: acc)
+          acc
+          colors)
+      []
+      grounds
+  in
+  let emphasis = ["bold"; "italic"; "underline"] in
+  let negate tag = "/" ^ tag in
+  let shorten tag = String.sub tag 0 1 in
+  List.fold_left
+    (fun acc tag ->
+      tag :: shorten tag :: negate tag :: negate (shorten tag) :: acc)
+    ansi_colors
+    emphasis
+  |> Handled_tags.of_list
+
+let handles tag = Handled_tags.mem tag handled_tags
 
 module type Attribute = sig
   type t
@@ -208,3 +246,7 @@ module Semantic_tag = struct
 end
 
 include Semantic_tag
+
+let pp_centered width ppf s =
+  let start = (width / 2) + (String.length s / 2) in
+  Format.fprintf ppf "%*s%*s" start s (width - start) ""
