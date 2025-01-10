@@ -2294,7 +2294,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let* () = check_head_consistency ~left:sequencer ~right:observer () in
   unit
 
-let check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
+let check_applies_blueprint ?timeout sequencer_node observer_node levels_to_wait
     =
   let*@ current_head = Rpc.block_number sequencer_node in
   let targeted_level = Int32.to_int current_head + levels_to_wait in
@@ -2304,9 +2304,9 @@ let check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
     let*@ _ = Rpc.produce_block sequencer_node in
     unit
   and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout observer_node targeted_level
+    Evm_node.wait_for_blueprint_applied ?timeout observer_node targeted_level
   and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node targeted_level
+    Evm_node.wait_for_blueprint_applied ?timeout sequencer_node targeted_level
   in
 
   let* () =
@@ -2345,9 +2345,8 @@ let test_observer_applies_blueprint =
   unit
 
 let test_observer_applies_blueprint_dont_track_rollup_node =
-  let tbb = 3. in
   register_all
-    ~time_between_blocks:(Time_between_blocks tbb)
+    ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"; "dont_track_rollup_node"]
     ~title:"Can start an Observer node without a rollup node"
   @@ fun {
@@ -2358,7 +2357,6 @@ let test_observer_applies_blueprint_dont_track_rollup_node =
          }
              _protocols ->
   let levels_to_wait = 3 in
-  let timeout = tbb *. float_of_int levels_to_wait *. 2. in
   (* We stop the rollup node. This will allow to demonstrate it is not needed
      to start an observer node when the latter is configure accordingly. *)
   let* () = Sc_rollup_node.terminate sc_rollup_node in
@@ -2371,7 +2369,7 @@ let test_observer_applies_blueprint_dont_track_rollup_node =
   and* () = Evm_node.wait_for_rollup_node_follower_disabled observer_node in
 
   let* () =
-    check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
+    check_applies_blueprint sequencer_node observer_node levels_to_wait
   in
 
   (* We demonstrate we can start a working observer node with the
@@ -2392,15 +2390,14 @@ let test_observer_applies_blueprint_dont_track_rollup_node =
   and* () = Evm_node.wait_for_rollup_node_follower_disabled observer_node in
 
   let* () =
-    check_applies_blueprint ~timeout sequencer_node observer_node levels_to_wait
+    check_applies_blueprint sequencer_node observer_node levels_to_wait
   in
 
   unit
 
 let test_observer_applies_blueprint_from_rpc_node =
-  let tbb = 3. in
   register_all
-    ~time_between_blocks:(Time_between_blocks tbb)
+    ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"; "rpc_mode"]
     ~title:"Can start an Observer node tracking a RPC node"
   @@ fun {sequencer = sequencer_node; sc_rollup_node; _} _protocol ->
@@ -2408,15 +2405,16 @@ let test_observer_applies_blueprint_from_rpc_node =
      time instead of connecting directly to the sequencer, the observer
      connects to a RPC mode process. *)
   let levels_to_wait = 3 in
-  let timeout = tbb *. float_of_int levels_to_wait *. 2. in
 
   let* rpc_node = run_new_rpc_endpoint sequencer_node in
   let* observer_node = run_new_observer_node ~sc_rollup_node rpc_node in
 
-  let* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  let* _ = Evm_node.wait_for_blueprint_applied observer_node levels_to_wait
+  and* _ = Evm_node.wait_for_blueprint_applied sequencer_node levels_to_wait
   and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+    repeat levels_to_wait @@ fun () ->
+    let*@ _ = produce_block sequencer_node in
+    unit
   in
 
   let* () =
@@ -2427,20 +2425,29 @@ let test_observer_applies_blueprint_from_rpc_node =
       ()
   in
 
-  (* We stop and start the sequencer, to ensure the observer node correctly
+  (* We stop and start the sequencer, to ensure the rpc node correctly
      reconnects to it. *)
-  let* () = Evm_node.wait_for_retrying_connect observer_node
+  let* () = Evm_node.wait_for_retrying_connect rpc_node
   and* () =
     let* () = Evm_node.terminate sequencer_node in
     Evm_node.run sequencer_node
   in
 
-  let levels_to_wait = 2 * levels_to_wait in
+  (* We stop and start the rpc node, to ensure the observer node correctly
+     reconnects to it. *)
+  let* () = Evm_node.wait_for_retrying_connect observer_node
+  and* () =
+    let* () = Evm_node.terminate rpc_node in
+    Evm_node.run rpc_node
+  in
 
-  let* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  let* _ = Evm_node.wait_for_blueprint_applied observer_node (2 * levels_to_wait)
   and* _ =
-    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+    Evm_node.wait_for_blueprint_applied sequencer_node (2 * levels_to_wait)
+  and* _ =
+    repeat levels_to_wait @@ fun () ->
+    let*@ _ = produce_block sequencer_node in
+    unit
   in
 
   let* () =
