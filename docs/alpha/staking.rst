@@ -149,6 +149,11 @@ or more conveniently::
 
    octez-client stake <amount> for <staker>
 
+The staked amount and remaining spendable funds can then be checked respectively with::
+
+   octez-client get staked balance for <staker>
+   octez-client get balance for <staker>
+
 To *unstake* funds, a staker first submits an unstake request with the
 ``unstake`` pseudo-operation. This is implemented by transferring the
 chosen amount in tez to their ``unstake`` entry-point::
