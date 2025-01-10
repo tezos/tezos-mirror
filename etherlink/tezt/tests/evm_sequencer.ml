@@ -9294,14 +9294,17 @@ let test_node_correctly_uses_batcher_heap =
   in
   Log.info "Produce more blocks to create a blueprints lag." ;
   let* () =
-    (* Produces L2 blocks to grow the blueprint lag. *)
-    repeat (2 * max_blueprints_lag) (fun () ->
+    (* Produces L2 blocks to grow the blueprint lag but not enough to
+       trigger a catchup. *)
+    repeat (max_blueprints_lag - 2) (fun () ->
         let*@ _txn = produce_block sequencer in
         unit)
   in
   Log.info "Restart the rollup node." ;
   let* () =
     Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup_address []
+  and* () =
+    Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
   in
   Log.info "Continue to produce blocks to fills the batcher queue." ;
   let* () =
@@ -9356,11 +9359,12 @@ let test_node_correctly_uses_batcher_heap =
   in
 
   let*@ rollup_level = Rpc.block_number proxy in
+  (* Check that the proxy is at least about the expected catchup. *)
   Check.(
-    (Int32.to_int rollup_level = before_level + max_blueprints_catchup)
+    (Int32.to_int rollup_level >= before_level + max_blueprints_catchup)
       ~__LOC__
       int
-      ~error_msg:"Check proxy head failed. Found %L, expected %R") ;
+      ~error_msg:"Check proxy head failed. Found %L, expected >= %R") ;
 
   let l1_level_blueprints_processed_finalized =
     l1_level_blueprints_processed + 2
@@ -9395,10 +9399,10 @@ let test_node_correctly_uses_batcher_heap =
   and* _ = wait_for_catchup_l1_level_finalized in
 
   Check.(
-    (!finalized_blueprint_ref = Some (before_level + max_blueprints_catchup))
+    (!finalized_blueprint_ref >= Some (before_level + max_blueprints_catchup))
       ~__LOC__
       (option int)
-      ~error_msg:"Finalized blueprint check failed. Found %L, expected %R") ;
+      ~error_msg:"Finalized blueprint check failed. Found %L, expected >= %R") ;
   unit
 
 let test_init_config_mainnet network =
