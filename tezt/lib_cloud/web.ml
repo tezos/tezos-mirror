@@ -78,6 +78,19 @@ let agent_jingo_template agent =
       ("docker_command", Tstr (string_docker_command agent));
     ]
 
+let monitoring_jingo_template agents agent =
+  let open Jingoo.Jg_types in
+  let host =
+    match Agent.point agent with
+    | Some (host, _port) -> host
+    | None -> domain agents
+  in
+  Tobj
+    [
+      ("name", Tstr (Agent.name agent));
+      ("uri", Tstr (sf "http://%s:19999" host));
+    ]
+
 let service_jingo_template {name; url} =
   let open Jingoo.Jg_types in
   Tobj [("title", Tstr (String.capitalize_ascii name)); ("uri", Tstr url)]
@@ -103,11 +116,10 @@ let jingoo_template t agents =
                  Env.prometheus_port) );
         ] );
     ( "monitoring",
-      Tobj
-        [
-          ("activated", Tbool Env.monitoring);
-          ("uri", Tstr (Format.asprintf "http://%s:19999" (domain agents)));
-        ] );
+      Tlist
+        (if Env.monitoring then
+           List.map (monitoring_jingo_template agents) agents
+         else []) );
     ("agents", Tlist (List.map agent_jingo_template agents));
     ("services", Tlist (List.map service_jingo_template t.services));
   ]

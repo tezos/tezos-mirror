@@ -65,11 +65,11 @@
             <li><em>Prometheus disabled. Use <code>--prometheus</code> to activate it.</em></li>
             {%- endif %}
 
-            {%- if monitoring.activated %}
+            {%- if monitoring %}
             <li>NetData</li>
             <ul>
-                {%- for agent in agents %}
-                <li><a href="{{ monitoring.uri }}">{{ agent.name }}</a></li>
+                {%- for agent in monitoring %}
+                <li><a href="{{ agent.uri }}">{{ agent.name }}</a></li>
                 {%- endfor %}
             </ul>
             {%- else %}
