@@ -340,7 +340,7 @@ impl InputHandler for SequencerInput {
                 delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)
             }
             Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
-                handle_blueprint_chunk(host, seq_blueprint.blueprint)
+                handle_blueprint_chunk(host, seq_blueprint)
             }
             Self::SequencerBlueprint(
                 InvalidNumberOfChunks | InvalidSignature | InvalidNumber | Unparsable,

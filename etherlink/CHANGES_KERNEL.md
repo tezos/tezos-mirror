@@ -21,6 +21,7 @@
 - Avoid writing gas price twice per block by adding it to block-in-progress. (!15574)
 - Transaction validation support in simulation is dropped, the
   validation must be done outside of the kernel. (!15958)
+- Parsing a DAL slot is now resumed after invalid inputs. (!15926)
 
 ### Bug fixes
 

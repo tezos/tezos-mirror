@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::parsing::parse_unsigned_blueprint_chunk;
+use crate::parsing::{parse_unsigned_blueprint_chunk, SequencerBlueprintRes};
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
@@ -18,6 +18,7 @@ const DAL_PADDING_TAG: u8 = 0;
 
 enum ParsedInput {
     UnsignedSequencerBlueprint(UnsignedSequencerBlueprint),
+    InvalidInput,
     Padding,
 }
 
@@ -73,11 +74,18 @@ fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
     bytes: &[u8],
 ) -> (Option<ParsedInput>, usize) {
     if let Result::Ok(chunk_length) = rlp_length(bytes) {
-        let unsigned_chunk = parse_unsigned_blueprint_chunk(&bytes[..chunk_length]);
-        (
-            unsigned_chunk.map(ParsedInput::UnsignedSequencerBlueprint),
-            chunk_length + TAG_SIZE,
-        )
+        match parse_unsigned_blueprint_chunk(&bytes[..chunk_length]) {
+            SequencerBlueprintRes::SequencerBlueprint(unsigned_chunk) => (
+                Some(ParsedInput::UnsignedSequencerBlueprint(unsigned_chunk)),
+                chunk_length + TAG_SIZE,
+            ),
+            SequencerBlueprintRes::InvalidNumberOfChunks
+            | SequencerBlueprintRes::InvalidSignature
+            | SequencerBlueprintRes::InvalidNumber => {
+                (Some(ParsedInput::InvalidInput), chunk_length + TAG_SIZE)
+            }
+            SequencerBlueprintRes::Unparsable => (None, chunk_length + TAG_SIZE),
+        }
     } else {
         log!(host, Debug, "Read an invalid chunk from slot.");
         (None, TAG_SIZE)
@@ -139,6 +147,8 @@ fn parse_slot<Host: Runtime>(
             None => return buffer, // Once an unparsable input has been read,
             // stop reading and return the list of chunks read.
             Some(ParsedInput::UnsignedSequencerBlueprint(b)) => buffer.push(b),
+            // Invalid inputs are ignored.
+            Some(ParsedInput::InvalidInput) => {}
             Some(ParsedInput::Padding) => return buffer,
         }
 
@@ -413,6 +423,45 @@ pub mod tests {
         let (_chunks, parsed_chunks) = make_invalid_slot(&invalid_data, InsertAt::Start);
 
         assert_eq!(Some(vec![]), parsed_chunks)
+    }
+
+    #[test]
+    fn test_parse_slot_resume_after_invalid_chunk() {
+        let mut host = MockKernelHost::default();
+
+        let valid_blueprint_chunks_1 = chunk_blueprint(dummy_big_blueprint(1));
+
+        let invalid_blueprint_chunks = {
+            let mut chunks = chunk_blueprint(dummy_big_blueprint(1));
+            for chunk in chunks.iter_mut() {
+                chunk.nb_chunks = crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS + 1
+            }
+            chunks
+        };
+
+        let valid_blueprint_chunks_2 = chunk_blueprint(dummy_big_blueprint(1));
+
+        let mut chunks = vec![];
+        chunks.extend(valid_blueprint_chunks_1.clone());
+        chunks.extend(invalid_blueprint_chunks);
+        chunks.extend(valid_blueprint_chunks_2.clone());
+
+        let mut expected_chunks = vec![];
+        expected_chunks.extend(valid_blueprint_chunks_1);
+        expected_chunks.extend(valid_blueprint_chunks_2);
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
+        prepare_dal_slot(&mut host, &chunks, published_level as i32, 0);
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            0,
+            published_level,
+        );
+
+        assert_eq!(Some(expected_chunks), chunks_from_slot)
     }
 
     #[test]
