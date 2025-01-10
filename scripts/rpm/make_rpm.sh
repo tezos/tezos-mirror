@@ -37,6 +37,7 @@ done
 spec_dir="${rpmbuild_root}/SPECS"
 rpm_dir="${rpmbuild_root}/RPMS"
 src_dir="${rpmbuild_root}/SOURCES"
+staging_dir="_rpmbuild"
 
 # Get the local architecture
 #
@@ -66,7 +67,6 @@ for specfile in "$myhome"/*spec.in; do
   # Populate the staging directory with control scripts
   # binaries and configuration as appropriate
   #
-  staging_dir="_rpmbuild"
   build_dir="${staging_dir}/${tar_name}"
 
   rm -rf "${staging_dir}"
@@ -124,6 +124,9 @@ for specfile in "$myhome"/*spec.in; do
 
   # Build the package
   #
+  # Using %global debug_package %{nil} in an RPM spec file disables the
+  # generation of debuginfo packages. This directive tells the RPM build process
+  # not to create a debuginfo package for the RPM being built.
   echo "=> Constructing RPM package ${rpm_fullname}"
   _flags="--quiet"
   rpmbuild -bb -D 'debug_package %{nil}' ${_flags} "${spec_dir}/${spec_file}"
@@ -131,3 +134,6 @@ for specfile in "$myhome"/*spec.in; do
     mv "${rpm_dir}/${rpm_arch}/${rpm_fullname}" .
   fi
 done
+
+echo "Cleanup staging directories"
+rm -Rf "${staging_dir}"
