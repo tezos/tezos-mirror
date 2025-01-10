@@ -304,8 +304,8 @@ module Dal_helpers = struct
         ~dal_number_of_slots
         page_id
         ~dal_attested_slots_validity_lag
-    then
-      let* input =
+    then (
+      let* verify_proof_result =
         Dal_slot_repr.History.verify_proof
           ~with_migration:(protocol_activation_level, dal_attestation_lag)
           dal_parameters
@@ -313,7 +313,18 @@ module Dal_helpers = struct
           dal_snapshot
           proof
       in
-      return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input))
+      let Dal_slot_repr.History.
+            {
+              page_content_opt = input;
+              attestation_threshold_percent;
+              commitment_publisher_opt;
+            } =
+        verify_proof_result
+      in
+      (* TODO: Check the ignored values below against the payload of
+         input_requested (Next MRs). *)
+      ignore (attestation_threshold_percent, commitment_publisher_opt) ;
+      return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input)))
     else return_none
 
   let produce ~metadata ~dal_activation_level ~dal_attestation_lag

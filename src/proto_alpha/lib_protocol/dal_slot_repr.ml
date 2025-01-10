@@ -1476,50 +1476,49 @@ module History = struct
            path)
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
+    type verify_proof_result = {
+      page_content_opt : Page.content option;
+      attestation_threshold_percent : int option;
+      commitment_publisher_opt : Contract_repr.t option;
+    }
+
     let verify_proof_repr ?with_migration dal_params page_id snapshot proof =
       let open Result_syntax in
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
         page_id
       in
-      let* target_cell, inc_proof, page_proof_check =
+      (* With the recent refactoring of the skip list shape, we always have a
+         target cell and an inclusion proof in the provided proof, because the
+         skip list contains a cell for each slot index of each level. *)
+      let ( target_cell,
+            inc_proof,
+            attestation_threshold_percent,
+            commitment_publisher_opt ) =
         match proof with
         | Page_confirmed
             {
               target_cell;
               inc_proof;
-              page_data;
-              page_proof;
-              attestation_threshold_percent = _;
-              commitment_publisher = _;
-            (* TODO: Will be handled in the next MR *)
+              page_data = _;
+              page_proof = _;
+              attestation_threshold_percent;
+              commitment_publisher;
             } ->
-            let page_proof_check =
-              Some
-                (fun commitment ->
-                  (* We check that the page indeed belongs to the target slot at the
-                     given page index. *)
-                  let* () =
-                    check_page_proof
-                      dal_params
-                      page_proof
-                      page_data
-                      page_id
-                      commitment
-                  in
-                  (* If the check succeeds, we return the data/content of the
-                     page. *)
-                  return page_data)
-            in
-            return (target_cell, inc_proof, page_proof_check)
+            ( target_cell,
+              inc_proof,
+              attestation_threshold_percent,
+              Some commitment_publisher )
         | Page_unconfirmed
             {
               target_cell;
               inc_proof;
-              attestation_threshold_percent = _;
-              commitment_publisher_opt = _;
-            (* TODO: Will be handled in the next MR *)
+              attestation_threshold_percent;
+              commitment_publisher_opt;
             } ->
-            return (target_cell, inc_proof, None)
+            ( target_cell,
+              inc_proof,
+              attestation_threshold_percent,
+              commitment_publisher_opt )
       in
       let cell_content = Skip_list.content target_cell in
       (* We check that the target cell has the same level and index than the
@@ -1544,24 +1543,52 @@ module History = struct
           ~src:snapshot
           ~dest:target_cell
       in
-      match (page_proof_check, cell_content) with
-      | None, (Unpublished _ | Published {is_proto_attested = false; _}) ->
-          return_none
-      | ( Some page_proof_check,
-          Published {header = {commitment; id = _}; is_proto_attested = true; _}
-        ) ->
-          let* page_data = page_proof_check commitment in
-          return_some page_data
-      | Some _, (Unpublished _ | Published {is_proto_attested = false; _}) ->
-          error
-          @@ dal_proof_error
-               "verify_proof_repr: the unconfirmation proof contains the \
-                target slot."
-      | None, Published {is_proto_attested = true; _} ->
+      let is_commitment_attested =
+        is_commitment_attested
+          ~attestation_threshold_percent
+          ~restricted_commitments_publishers:
+            (Option.map (fun e -> [e]) commitment_publisher_opt)
+          cell_content
+      in
+      match (proof, is_commitment_attested) with
+      | Page_unconfirmed _, Either.Right _ ->
           error
           @@ dal_proof_error
                "verify_proof_repr: the confirmation proof doesn't contain the \
                 attested slot."
+      | Page_unconfirmed _, Either.Left validated_commitment_publisher_opt ->
+          return
+            {
+              page_content_opt = None;
+              attestation_threshold_percent;
+              commitment_publisher_opt = validated_commitment_publisher_opt;
+            }
+      | Page_confirmed _, Either.Left _ ->
+          error
+          @@ dal_proof_error
+               "verify_proof_repr: the unconfirmation proof contains the \
+                target slot."
+      | ( Page_confirmed
+            {
+              target_cell = _;
+              inc_proof = _;
+              page_data;
+              page_proof;
+              attestation_threshold_percent = _;
+              commitment_publisher = _;
+            },
+          Either.Right (commitment, validated_commitment_publisher) ) ->
+          (* We check that the page indeed belongs to the target slot at the
+             given page index. *)
+          let* () =
+            check_page_proof dal_params page_proof page_data page_id commitment
+          in
+          return
+            {
+              page_content_opt = Some page_data;
+              attestation_threshold_percent;
+              commitment_publisher_opt = Some validated_commitment_publisher;
+            }
 
     let verify_proof ?with_migration dal_params page_id snapshot
         serialized_proof =
