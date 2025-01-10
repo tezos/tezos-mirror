@@ -26,6 +26,8 @@ cd ..
 echo "Add package: octez-deps"
 mkdir -p opam-repository/packages/octez-deps/octez-deps.dev
 cp octez-deps.opam.locked opam-repository/packages/octez-deps/octez-deps.dev/opam
+mkdir -p opam-repository/packages/stdcompat/stdcompat.19
+cp stdcompat.opam.locked opam-repository/packages/stdcompat/stdcompat.19/opam
 
 echo "Add package: dummy-tezos"
 # This package adds some constraints to the solution found by the opam solver.

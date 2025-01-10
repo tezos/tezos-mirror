@@ -88,7 +88,7 @@ export OPAMSOLVERTIMEOUT="${OPAMSOLVERTIMEOUT:-600}"
 #   may want to install.
 # We use --fake to tell opam not to actually compile the packages.
 echo "---- Run: 'opam install'"
-opam install --yes --deps-only --fake opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam
+opam install --yes --deps-only --fake opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam --update-invariant
 
 # The utop package is a special case.
 # The pyml package, which is an actual dependency, optionally depends on utop.

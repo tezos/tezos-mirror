@@ -56,6 +56,7 @@ COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
 COPY --link scripts/install_dal_trusted_setup.sh /root/tezos/scripts/
 COPY --link Makefile /root/tezos/
 COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
+COPY --link opam/virtual/stdcompat.opam.locked /root/tezos/opam/virtual/
 COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
