@@ -90,9 +90,12 @@ where
     ///
     /// Adds the non-zero sign-extended 6-bit `imm` to the value in `rd_rs1` then
     /// writes the result to `rd_rs1`.
-    pub fn run_caddi(&mut self, imm: i64, rd_rs1: XRegister) {
-        debug_assert!(rd_rs1 != x0);
-        self.run_addi(imm, rd_rs1, rd_rs1)
+    pub fn run_caddi(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
+        // Return the lower XLEN (64 bits in our case) bits of the addition
+        // Irrespective of sign, the result is the same, casting to u64 for addition
+        let rval = self.read_nz(rd_rs1);
+        let result = rval.wrapping_add(imm as u64);
+        self.write_nz(rd_rs1, result)
     }
 
     /// `C.ADDI16SP` CI-type compressed instruction
@@ -266,7 +269,7 @@ mod tests {
         machine_state::{
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
-            registers::{a4, nz},
+            registers::nz,
             MachineCoreState, MachineCoreStateLayout,
         },
     };
@@ -343,9 +346,9 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            state.hart.xregisters.write(a4, rd_val);
-            state.hart.xregisters.run_caddi(imm, a4);
-            let res = state.hart.xregisters.read(a4);
+            state.hart.xregisters.write_nz(nz::a1, rd_val);
+            state.hart.xregisters.run_caddi(imm, nz::a1);
+            let res = state.hart.xregisters.read_nz(nz::a1);
             prop_assert_eq!(res, rd_val.wrapping_add(imm as u64));
         });
     });

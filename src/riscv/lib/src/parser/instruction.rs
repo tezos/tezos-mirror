@@ -432,7 +432,7 @@ pub enum InstrCacheable {
     CBnez(CIBTypeArgs),
     CLi(CIBTypeArgs),
     CLui(CIBTypeArgs),
-    CAddi(CIBTypeArgs),
+    CAddi(CIBNZTypeArgs),
     CAddi16sp(CJTypeArgs),
     CAddi4spn(CIBTypeArgs),
     CSlli(CIBTypeArgs),
@@ -454,7 +454,7 @@ pub enum InstrCacheable {
     CLdsp(CIBTypeArgs),
     CSd(SBTypeArgs),
     CSdsp(CSSTypeArgs),
-    CAddiw(CIBTypeArgs),
+    CAddiw(CIBNZTypeArgs),
 
     // RV64DC compressed instructions
     CFld(FLoadArgs),

@@ -871,6 +871,18 @@ macro_rules! impl_ci_type {
             Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
         }
     };
+
+    ($fn: ident, non_zero) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart.xregisters.$fn(self.imm, self.rd.nzx);
+            Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
+        }
+    };
 }
 
 macro_rules! impl_cr_type {
@@ -1301,7 +1313,7 @@ impl Args {
     impl_cb_type!(run_cbnez);
     impl_ci_type!(run_cli);
     impl_ci_type!(run_clui);
-    impl_ci_type!(run_caddi);
+    impl_ci_type!(run_caddi, non_zero);
     impl_ci_type!(run_caddi4spn);
     impl_ci_type!(run_cslli);
     impl_ci_type!(run_csrli);
@@ -1361,7 +1373,7 @@ impl Args {
     impl_css_type!(run_csdsp);
     impl_load_type!(run_cld, InstrWidth::Compressed);
     impl_cload_sp_type!(run_cldsp);
-    impl_ci_type!(run_caddiw);
+    impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
     impl_cr_type!(run_csubw);
 

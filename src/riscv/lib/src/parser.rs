@@ -1157,17 +1157,17 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             _ => UnknownCompressed { instr },
         },
         OP_C1 => match c_funct3(instr) {
-            C_F3_0 => match (ci_imm(instr), c_rd_rs1(instr)) {
+            C_F3_0 => match (ci_imm(instr), split_x0(c_rd_rs1(instr))) {
                 // "C.ADDI is only valid when rd != x0 and nzimm != 0.
                 // The code points with rd == x0 and nzimm == 0 encode the C.NOP instruction;
                 // the remaining code points with nzimm != 0 encode HINTs."
-                (0, x0) => CNop,
-                (0, _) | (_, x0) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CAddi(CIBTypeArgs { rd_rs1, imm }),
+                (0, X0) => CNop,
+                (0, _) | (_, X0) => UnknownCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CAddi(CIBNZTypeArgs { rd_rs1, imm }),
             },
-            C_F3_1 => match (ci_imm(instr), c_rd_rs1(instr)) {
-                (_, x0) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CAddiw(CIBTypeArgs { rd_rs1, imm }),
+            C_F3_1 => match (ci_imm(instr), split_x0(c_rd_rs1(instr))) {
+                (_, X0) => UnknownCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CAddiw(CIBNZTypeArgs { rd_rs1, imm }),
             },
             C_F3_2 => match c_rd_rs1(instr) {
                 x0 => UnknownCompressed { instr },

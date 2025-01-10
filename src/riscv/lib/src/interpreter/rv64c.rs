@@ -10,7 +10,7 @@
 use crate::{
     machine_state::{
         main_memory::MainMemoryLayout,
-        registers::{sp, x0, XRegister, XRegisters},
+        registers::{sp, x0, NonZeroXRegister, XRegister, XRegisters},
         MachineCoreState,
     },
     state_backend as backend,
@@ -26,9 +26,14 @@ where
     /// Adds the non-zero sign-extended 6-bit `imm` to the value in `rd_rs1`,
     /// producing a 32-bit result which is then sign-extended to 64 bits and
     /// written back to `rd_rs1`.
-    pub fn run_caddiw(&mut self, imm: i64, rd_rs1: XRegister) {
-        debug_assert!(rd_rs1 != x0);
-        self.run_addiw(imm, rd_rs1, rd_rs1)
+    pub fn run_caddiw(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
+        // We do not need to explicitly truncate for the lower bits since wrapping_add
+        // has the same semantics & result on the lower 32 bits irrespective of bit width
+        let rval = self.read_nz(rd_rs1);
+        let result = rval.wrapping_add(imm as u64);
+        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+        let result = result as i32 as u64;
+        self.write_nz(rd_rs1, result);
     }
 
     /// `C.ADDW` CA-type compressed instruction
@@ -100,4 +105,35 @@ where
         debug_assert!(imm >= 0 && imm % 8 == 0);
         self.run_sd(imm, sp, rs2)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        backend_test, create_state,
+        machine_state::{
+            hart_state::{HartState, HartStateLayout},
+            registers::nz,
+        },
+    };
+    use proptest::{arbitrary::any, prop_assert_eq, proptest};
+
+    backend_test!(test_caddiw, F, {
+        proptest!(|(
+            imm in any::<i64>(),
+            reg_val in any::<i64>())|
+        {
+            let mut state = create_state!(HartState, F);
+
+            state.xregisters.write_nz(nz::a0, reg_val as u64);
+            state.xregisters.run_caddiw(imm, nz::a0);
+            // check against wrapping addition performed on the lowest 32 bits
+            let r_val = reg_val as u32;
+            let i_val = imm as u32;
+            prop_assert_eq!(
+                state.xregisters.read_nz(nz::a0),
+                r_val.wrapping_add(i_val) as i32 as i64 as u64
+            );
+        });
+    });
 }
