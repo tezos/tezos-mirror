@@ -1315,7 +1315,7 @@ impl Args {
     impl_ci_type!(run_clui, non_zero);
     impl_ci_type!(run_caddi, non_zero);
     impl_ci_type!(run_caddi4spn);
-    impl_ci_type!(run_cslli);
+    impl_ci_type!(run_cslli, non_zero);
     impl_ci_type!(run_csrli);
     impl_ci_type!(run_csrai);
     impl_ci_type!(run_candi);

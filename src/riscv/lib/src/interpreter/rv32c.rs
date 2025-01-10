@@ -123,9 +123,9 @@ where
     ///
     /// Performs a logical left shift of the value in register `rd_rs1`
     /// then writes the result back to `rd_rs1`.
-    pub fn run_cslli(&mut self, imm: i64, rd_rs1: XRegister) {
-        debug_assert!(rd_rs1 != x0);
-        self.run_slli(imm, rd_rs1, rd_rs1)
+    pub fn run_cslli(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
+        // SLLI encoding allows to consider the whole immediate as the shift amount
+        self.write_nz(rd_rs1, self.read_nz(rd_rs1) << imm)
     }
 
     /// `C.SRLI` CB-type compressed instruction
@@ -267,7 +267,7 @@ mod tests {
         machine_state::{
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
-            registers::{nz, XRegisters, XRegistersLayout},
+            registers::{nz, nz::a0, XRegisters, XRegistersLayout},
             MachineCoreState, MachineCoreStateLayout,
         },
     };
@@ -380,5 +380,28 @@ mod tests {
             prop_assert_eq!(xregs.read_nz(nz::a2), 0);
             prop_assert_eq!(xregs.read_nz(nz::a4), 0);
         });
+    });
+
+    macro_rules! test_shift_instr {
+        ($state:ident, $shift_fn:tt, $imm:expr,
+            $rd_rs1:ident, $r1_val:expr, $expected_val:expr
+        ) => {
+            $state.xregisters.write_nz($rd_rs1, $r1_val);
+            $state.xregisters.$shift_fn($imm, $rd_rs1);
+            let new_val = $state.xregisters.read_nz($rd_rs1);
+            assert_eq!(new_val, $expected_val);
+        };
+    }
+
+    backend_test!(test_shift, F, {
+        let mut state = create_state!(HartState, F);
+
+        // imm = 0
+        test_shift_instr!(state, run_cslli, 0, a0, 0x1234_ABEF, 0x1234_ABEF);
+
+        // small imm (< 32))
+        test_shift_instr!(state, run_cslli, 20, a0, 0x1234_ABEF, 0x1_234A_BEF0_0000);
+        // big imm (>= 32))
+        test_shift_instr!(state, run_cslli, 40, a0, 0x1234_ABEF, 0x34AB_EF00_0000_0000);
     });
 }

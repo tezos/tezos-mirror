@@ -435,7 +435,7 @@ pub enum InstrCacheable {
     CAddi(CIBNZTypeArgs),
     CAddi16sp(CJTypeArgs),
     CAddi4spn(CIBTypeArgs),
-    CSlli(CIBTypeArgs),
+    CSlli(CIBNZTypeArgs),
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),
     CAndi(CIBTypeArgs),

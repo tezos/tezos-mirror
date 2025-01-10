@@ -1212,9 +1212,9 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             _ => UnknownCompressed { instr },
         },
         OP_C2 => match c_funct3(instr) {
-            C_F3_0 => match (cslli_imm(instr), c_rd_rs1(instr)) {
-                (_, x0) | (0, _) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CSlli(CIBTypeArgs { rd_rs1, imm }),
+            C_F3_0 => match (cslli_imm(instr), split_x0(c_rd_rs1(instr))) {
+                (_, X0) | (0, _) => UnknownCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CSlli(CIBNZTypeArgs { rd_rs1, imm }),
             },
             C_F3_1 => CFldsp(CIBDTypeArgs {
                 rd_rs1: c_f_rd_rs1(instr),
@@ -1394,7 +1394,10 @@ mod tests {
                 rs1: x8,
                 imm: 564,
             })),
-            Instr::Cacheable(CSlli(CIBTypeArgs { rd_rs1: x8, imm: 4 })),
+            Instr::Cacheable(CSlli(CIBNZTypeArgs {
+                rd_rs1: NonZeroXRegister::x8,
+                imm: 4,
+            })),
             Instr::Cacheable(Lui(UJTypeArgs {
                 rd: x7,
                 imm: 0x12 << 12,
