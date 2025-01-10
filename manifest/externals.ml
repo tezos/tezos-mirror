@@ -30,7 +30,7 @@ let sf = Printf.sprintf
 
 (* EXTERNAL LIBS *)
 
-let rope = external_lib "rope" V.(exactly "0.6.2")
+let rope = external_lib "rope" V.(at_least "0.6.2")
 
 let alcotest = external_lib "alcotest" V.(at_least "1.5.0")
 

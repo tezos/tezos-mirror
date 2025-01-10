@@ -1828,7 +1828,7 @@ let octez_base =
       V.(
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6112
            Should be in sync with scripts/version.sh *)
-        at_least "4.14.1" && less_than "4.15")
+        at_least "5.2.1" && less_than "5.3.0")
     ~license:"Apache-2.0"
 
 let octez_base_unix =
