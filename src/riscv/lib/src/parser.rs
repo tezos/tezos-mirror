@@ -8,10 +8,10 @@
 pub mod instruction;
 
 use crate::bits::u16;
-use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::{x0, NonZeroXRegister};
 use crate::machine_state::{
     csregisters::CSRegister,
-    registers::{parse_fregister, parse_xregister, x0, FRegister, XRegister},
+    registers::{parse_fregister, parse_xregister, FRegister, XRegister},
 };
 use arbitrary_int::{u3, u5};
 use core::ops::Range;
@@ -1220,16 +1220,16 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 rd_rs1: c_f_rd_rs1(instr),
                 imm: ci_ldsp_imm(instr),
             }),
-            C_F3_2 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLwsp(CIBTypeArgs {
+            C_F3_2 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLwsp(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_lwsp_imm(instr),
                 }),
             },
-            C_F3_3 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLdsp(CIBTypeArgs {
+            C_F3_3 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLdsp(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_ldsp_imm(instr),
                 }),

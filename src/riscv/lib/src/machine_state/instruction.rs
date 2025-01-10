@@ -764,7 +764,7 @@ macro_rules! impl_cload_sp_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rd.x)
+            core.$fn(self.imm, self.rd.nzx)
                 .map(|_| Next(InstrWidth::Compressed))
         }
     };

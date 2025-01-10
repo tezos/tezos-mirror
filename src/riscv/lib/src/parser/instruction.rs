@@ -422,7 +422,7 @@ pub enum InstrCacheable {
 
     // RV32C compressed instructions
     CLw(ITypeArgs),
-    CLwsp(CIBTypeArgs),
+    CLwsp(CIBNZTypeArgs),
     CSw(SBTypeArgs),
     CSwsp(CSSTypeArgs),
     CJ(CJTypeArgs),
@@ -451,7 +451,7 @@ pub enum InstrCacheable {
 
     // RV64C compressed instructions
     CLd(ITypeArgs),
-    CLdsp(CIBTypeArgs),
+    CLdsp(CIBNZTypeArgs),
     CSd(SBTypeArgs),
     CSdsp(CSSTypeArgs),
     CAddiw(CIBNZTypeArgs),
