@@ -344,7 +344,7 @@ let () =
     (add_dep_to_profile "octez-dev-deps")
     [
       external_lib "merlin" V.(at_least "4.18");
-      external_lib "ocaml-lsp-server" V.(exactly "1.20.1-4.14");
+      external_lib "ocaml-lsp-server" V.(at_least "1.20.1");
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7085
          remove constraint on odoc version when odoc bug is solved *)
       external_lib "odoc" V.(at_least "2.4.2");
