@@ -322,6 +322,11 @@ module Delegate : sig
   val participation :
     t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t
 
+  val dal_participation :
+    t ->
+    public_key_hash ->
+    Delegate.For_RPC.dal_participation_info tzresult Lwt.t
+
   val is_forbidden : t -> public_key_hash -> bool tzresult Lwt.t
 
   val stake_for_cycle : t -> Cycle.t -> public_key_hash -> stake tzresult Lwt.t

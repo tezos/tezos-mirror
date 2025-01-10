@@ -585,6 +585,9 @@ module Delegate = struct
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
+  let dal_participation ctxt pkh =
+    Delegate_services.dal_participation rpc_ctxt ctxt pkh
+
   let is_forbidden ctxt pkh = Delegate_services.is_forbidden rpc_ctxt ctxt pkh
 
   let stake_for_cycle ctxt cycle pkh =
