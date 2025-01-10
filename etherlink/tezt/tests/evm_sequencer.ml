@@ -8979,7 +8979,9 @@ let test_websocket_newHeads_event =
     let* websocket = Evm_node.open_websocket evm_node in
     let* id = Rpc.subscribe ~websocket ~kind:NewHeads evm_node in
     let check_block_number () =
-      let* () = produce_block_and_wait_for_sync ~sequencer evm_node in
+      (* We always wait for the observer to be synced, to know that the
+         blueprint was fully propagated. *)
+      let* () = produce_block_and_wait_for_sync ~sequencer observer in
       let* block = Websocket.recv websocket in
       let Block.{number; _} =
         JSON.(block |-> "params" |-> "result" |> Block.of_json)
