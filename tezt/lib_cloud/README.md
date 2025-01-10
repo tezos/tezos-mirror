@@ -101,6 +101,11 @@ possible to use docker images published by the Octez CI. At the
 moment, the docker image from the latest release of Octez is
 supported.
 
+There is now also a docker file that can be used for macOS distributions,
+which is provided in `tezt/lib_cloud/dockerfiles/macosx.Dockerfile`. Please
+note that this image is highly experimental, and several improvements are
+to be made to it, but it should work for the time being.
+
 ## Write your own dockerfile
 
 Depending on your local setup, we recommend copying and pasting an
