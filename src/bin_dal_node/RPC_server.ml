@@ -409,8 +409,8 @@ module Profile_handlers = struct
     let get_attestable_slots ~shard_indices store proto_parameters
         ~attested_level =
       let open Lwt_result_syntax in
-      let expected_number_of_shards = List.length shard_indices in
-      if expected_number_of_shards = 0 then return Types.Not_in_committee
+      let number_of_assigned_shards = List.length shard_indices in
+      if number_of_assigned_shards = 0 then return Types.Not_in_committee
       else
         let published_level =
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
@@ -422,7 +422,7 @@ module Profile_handlers = struct
               (of_int proto_parameters.Dal_plugin.attestation_lag))
         in
         let shards_store = Store.shards store in
-        let are_shards_stored slot_index =
+        let number_of_shards_stored slot_index =
           let slot_id : Types.slot_id =
             {slot_level = published_level; slot_index}
           in
@@ -439,11 +439,12 @@ module Profile_handlers = struct
           Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
         in
         let* number_of_stored_shards_per_slot =
-          List.map_es are_shards_stored all_slot_indexes
+          List.map_es number_of_shards_stored all_slot_indexes
         in
         let flags =
           List.map
-            (fun (_slot_index, stored) -> stored = expected_number_of_shards)
+            (fun (_slot_index, num_stored) ->
+              num_stored = number_of_assigned_shards)
             number_of_stored_shards_per_slot
         in
         Lwt.dont_wait
@@ -452,7 +453,7 @@ module Profile_handlers = struct
               store
               pkh
               published_level
-              expected_number_of_shards
+              number_of_assigned_shards
               number_of_stored_shards_per_slot)
           (fun _exn -> ()) ;
         return (Types.Attestable_slots {slots = flags; published_level})
