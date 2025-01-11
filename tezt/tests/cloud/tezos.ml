@@ -285,6 +285,18 @@ module Baker = struct
   end
 end
 
+module Accuser = struct
+  include Accuser
+
+  module Agent = struct
+    let init ?name ~protocol ?(path = Uses.path (Protocol.accuser protocol))
+        node agent =
+      let* path = Agent.copy agent ~source:path in
+      let runner = Agent.runner agent in
+      init ?name ~event_level:`Notice ?runner ~path ~protocol node
+  end
+end
+
 module Teztale = struct
   include Teztale
 
