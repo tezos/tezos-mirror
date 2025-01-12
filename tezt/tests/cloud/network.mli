@@ -43,20 +43,30 @@ val get_level : Endpoint.t -> int Lwt.t
 val expected_pow : t -> float
 
 (** Associate delegate aliases with octez version used (according to tzkt).
-    Only works for mainnet and ghosnet. Return empty table for other networks. *)
-val versions : t -> (string, string) Hashtbl.t Lwt.t
+    Only works for mainnet and ghostnet. Return empty table for other networks. 
 
-(** List of delegates as [(alias, public key hash, public key)] known by tzkt
-    for a given network.
-    [?accounts] is only used for [`Sandbox] network
-    (and the only source of data for this kind of network) *)
+    Returns [None] when [Tzkt] did not respond or respond with an unexpected
+    output.
+*)
+val versions : t -> (string, string) Hashtbl.t option Lwt.t
+
+(** List of delegates as [(alias, public key hash, public key)] known
+    by tzkt for a given network. [?accounts] is only used for
+    [`Sandbox] network (and the only source of data for this kind of
+    network). 
+
+    Returns [None] when [Tzkt] did not respond or respond with an unexpected
+    output. *)
 val delegates :
   ?accounts:Account.key list ->
   t ->
-  (string option * string * string) list Lwt.t
+  (string option * string * string) list option Lwt.t
 
 (** Table of delegates as [(pkh,alias)] known by tzkt for a given network
     [?accounts] is only used for [`Sandbox] network
-    (and the only source of data for this kind of network) *)
+    (and the only source of data for this kind of network).
+
+    Returns [None] when [Tzkt] did not respond or respond with a bad
+    output. *)
 val aliases :
-  ?accounts:Account.key list -> t -> (string, string) Hashtbl.t Lwt.t
+  ?accounts:Account.key list -> t -> (string, string) Hashtbl.t option Lwt.t

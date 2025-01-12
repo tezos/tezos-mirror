@@ -2350,6 +2350,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
+  let aliases = Option.value ~default:(Hashtbl.create 0) aliases in
+  let versions = Option.value ~default:(Hashtbl.create 0) versions in
   let otel = Cloud.open_telemetry_endpoint cloud in
   Lwt.return
     {
@@ -2398,6 +2400,8 @@ let update_bakers_infos t =
     Network.aliases ~accounts t.configuration.network
   in
   let* versions = Network.versions t.configuration.network in
+  let aliases = Option.value ~default:t.aliases aliases in
+  let versions = Option.value ~default:t.versions versions in
   t.aliases <- aliases ;
   t.versions <- versions ;
   Lwt.return_unit
