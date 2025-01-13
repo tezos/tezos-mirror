@@ -27,14 +27,9 @@ let make_ppx_profiler () =
   | Some s -> (
       match Handled_drivers.of_string s with
       | drivers -> Some drivers
-      | exception Failure exn ->
-          Format.eprintf
-            "@[<v 2>TEZOS_PPX_PROFILER was enabled with the following error:@,\
-             %s.@,\
-             - Ppx attributes containing a non-empty `driver_ids` field won't \
-             be preprocessed@,\
-             - Other ppx attributes will be preprocessed@."
-            exn ;
+      | exception Failure _exn ->
+          (* TODO: Need to find a way to inform that some attributes won't be
+             preprocessed without spamming the terminal *)
           Some Handled_drivers.empty)
 
 (** [mapper] inherits from Ast_traverse.map because we want to take a parsetree

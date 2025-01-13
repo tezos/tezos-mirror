@@ -212,7 +212,6 @@ let extract_content_from_structure loc structure =
       Key.Ident ident
   | [%expr [%e? {pexp_desc = Pexp_apply (fun_name, fun_args); _}]] ->
       (* [@ppx fun_name fun_arg1 fun_arg2 ...] *)
-      let fun_args = List.map snd fun_args in
       Key.Apply (fun_name, fun_args)
   | [%expr [%e? expr]] -> (
       (* [@ppx ["label1"; "label2"; ...]] *)
