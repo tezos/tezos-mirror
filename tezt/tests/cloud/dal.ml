@@ -1580,20 +1580,19 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       configuration.network
       agent
   in
+  let endpoint = Client.Node node in
   let () = toplog "Init producer: create client" in
-  let* client = Client.Agent.create ~node agent in
+  let* client = Client.Agent.create ~endpoint agent in
   let () = toplog "Init producer: import key" in
   let* () =
     Client.import_secret_key
       client
-      ~endpoint:(Node node)
+      ~endpoint
       account.Account.secret_key
       ~alias:account.Account.alias
   in
   let () = toplog "Init producer: reveal account" in
-  let*! () =
-    Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
-  in
+  let*! () = Client.reveal client ~endpoint ~src:account.Account.alias in
   let () = toplog "Init producer: create agent" in
   let* dal_node =
     Dal_node.Agent.create
@@ -1829,14 +1828,15 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       configuration.network
       agent
   in
-  let* client = Client.Agent.create ~node agent in
+  let endpoint = Client.Node node in
+  let* client = Client.Agent.create ~endpoint agent in
   let () = toplog "Init Etherlink: importing the sequencer secret key" in
   let* () =
     Lwt_list.iter_s
       (fun account ->
         Client.import_secret_key
           client
-          ~endpoint:(Node node)
+          ~endpoint
           account.Account.secret_key
           ~alias:account.Account.alias)
       (account :: batching_operators)
@@ -1846,9 +1846,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let* () =
     Lwt_list.iter_s
       (fun account ->
-        let*! () =
-          Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
-        in
+        let*! () = Client.reveal client ~endpoint ~src:account.Account.alias in
         unit)
       (account :: batching_operators)
   in
@@ -1992,7 +1990,8 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
       ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       agent
   in
-  let* client = Client.Agent.create ~node agent in
+  let endpoint = Client.Node node in
+  let* client = Client.Agent.create ~endpoint agent in
   let l = Node.get_last_seen_level node in
   let* _ = Node.wait_for_level node (l + 2) in
   (* A configuration is generated locally by the orchestrator. The resulting
