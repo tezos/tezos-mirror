@@ -71,6 +71,19 @@ val record_dal_participation :
   number_of_attested_slots:int ->
   Raw_context.t tzresult Lwt.t
 
+(** Returns [true] iff the protocol considers that the delegate attested
+    sufficiently many slots during a cycle, given the total number of attested
+    slots for that cycle and the number of those slots also attested by the
+    delegate.
+
+    The decision depends on the [minimal_participation_ratio] protocol
+    parameter. *)
+val is_dal_participation_sufficient :
+  Raw_context.t ->
+  dal_attested_slots_by_delegate:int32 ->
+  total_dal_attested_slots:int32 ->
+  bool
+
 (** Sets the payload and block producer as active. Pays the baking
    reward and the fees to the payload producer and the reward bonus to
    the payload producer (if the reward_bonus is not None).*)
