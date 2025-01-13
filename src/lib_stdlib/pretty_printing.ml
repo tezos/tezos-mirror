@@ -250,3 +250,7 @@ include Semantic_tag
 let pp_centered width ppf s =
   let start = (width / 2) + (String.length s / 2) in
   Format.fprintf ppf "%*s%*s" start s (width - start) ""
+
+let pp_right_aligned width ppf s =
+  let left_margin = width - String.length s in
+  Format.fprintf ppf "%*s%s" left_margin "" s

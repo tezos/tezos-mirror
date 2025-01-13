@@ -117,18 +117,19 @@ let close () =
 
 open Filename.Infix
 
-let default_daily_logs_at ~daily_logs_path ~section_prefixes =
+let default_daily_logs_at ~daily_logs_path ~section_prefixes ~advertise_levels =
   Internal_event_config.make_config_uri
     ~create_dirs:true
     ~daily_logs:7
     ~level:Info
     ~format:"pp-rfc5424"
     ~section_prefixes
+    ~advertise_levels
     (`Path (daily_logs_path // "daily.log"))
 
 let make_default_internal_events ~rules ~verbosity ~colors
     ~(log_output : Logs_simple_config.Output.t) ~daily_logs_path
-    ~daily_logs_section_prefixes =
+    ~daily_logs_section_prefixes ~advertise_levels =
   (* By default the node has two logs output:
      - on the configured [log_output] using the configured [verbosity] and
        a short pretty printing
@@ -160,6 +161,7 @@ let make_default_internal_events ~rules ~verbosity ~colors
       ~section_prefixes
       ~colors
       ~format:"pp-short"
+      ~advertise_levels
       kind
   in
   let sinks = [user_events] in
@@ -170,6 +172,7 @@ let make_default_internal_events ~rules ~verbosity ~colors
           default_daily_logs_at
             ~section_prefixes:daily_logs_section_prefixes
             ~daily_logs_path
+            ~advertise_levels
         in
         internal_logs_events :: sinks
     | None -> sinks
@@ -186,6 +189,7 @@ let make_with_defaults ?verbosity ?enable_default_daily_logs_at
     ~log_output:log_cfg.output
     ~daily_logs_path:enable_default_daily_logs_at
     ~daily_logs_section_prefixes
+    ~advertise_levels:log_cfg.advertise_levels
 
 let init ?config:(internal_events = make_with_defaults ()) () =
   let open Lwt_syntax in
@@ -193,5 +197,10 @@ let init ?config:(internal_events = make_with_defaults ()) () =
   return_unit
 
 let enable_default_daily_logs_at ~daily_logs_path =
-  let uri = default_daily_logs_at ~section_prefixes:[] ~daily_logs_path in
+  let uri =
+    default_daily_logs_at
+      ~section_prefixes:[]
+      ~daily_logs_path
+      ~advertise_levels:false
+  in
   Internal_event.All_sinks.activate uri

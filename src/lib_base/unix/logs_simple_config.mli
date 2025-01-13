@@ -41,6 +41,7 @@ type cfg = {
   default_level : Internal_event.level;
   rules : string option;
   colors : bool;
+  advertise_levels : bool;
 }
 
 val default_cfg : cfg
@@ -49,6 +50,7 @@ val create_cfg :
   ?output:Output.t ->
   ?default_level:Internal_event.level ->
   ?colors:bool ->
+  ?advertise_levels:bool ->
   ?rules:string ->
   unit ->
   cfg

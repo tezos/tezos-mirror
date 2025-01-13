@@ -52,6 +52,7 @@ type t = {
     [ `Level_at_least of Internal_event.Level.t
     | `Per_section_prefix of
       (Internal_event.Section.t * Internal_event.Level.t option) list ];
+  advertise_levels : bool;
 }
 
 let hostname =
@@ -99,7 +100,7 @@ module Color = struct
   end
 end
 
-let wrapped_encoding event_encoding =
+let wrapped_encoding ~advertise_levels event_encoding =
   let open Data_encoding in
   let ptime_encoding =
     conv
@@ -112,10 +113,17 @@ let wrapped_encoding event_encoding =
   in
   let v0 =
     conv
-      (fun {time_stamp; section; event} ->
-        (hostname, time_stamp, section, event))
-      (fun (_, time_stamp, section, event) -> {time_stamp; section; event})
-      (obj4
+      (fun (level, {time_stamp; section; event}) ->
+        ( (if advertise_levels then Some level else None),
+          hostname,
+          time_stamp,
+          section,
+          event ))
+      (fun (level, _, time_stamp, section, event) ->
+        ( Option.value ~default:Internal_event.Debug level,
+          {time_stamp; section; event} ))
+      (obj5
+         (opt "level" Internal_event.Level.encoding)
          (req "hostname" string)
          (req "time_stamp" ptime_encoding)
          (req "section" Internal_event.Section.encoding)
@@ -123,10 +131,25 @@ let wrapped_encoding event_encoding =
   in
   With_version.(encoding ~name:"fd-sink-item" (first_version v0))
 
-let make_with_pp_rfc5424 pp wrapped_event name =
+let make_with_pp_rfc5424 ~advertise_levels ~level pp wrapped_event name =
   (* See https://tools.ietf.org/html/rfc5424#section-6 *)
+  let priority_str =
+    if advertise_levels then
+      (* See https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 *)
+      Format.sprintf
+        "<00%d> "
+        (match level with
+        | Internal_event.Debug -> 7
+        | Info -> 6
+        | Notice -> 5
+        | Warning -> 4
+        | Error -> 3
+        | Fatal -> 0)
+    else ""
+  in
   Format.asprintf
-    "%a [%a.%s] %a\n"
+    "%s%a [%a.%s] %a\n"
+    priority_str
     (Ptime.pp_rfc3339 ~frac_s:3 ())
     wrapped_event.time_stamp
     Internal_event.Section.pp
@@ -137,7 +160,15 @@ let make_with_pp_rfc5424 pp wrapped_event name =
 
 type color_setting = Enabled of string option | Disabled
 
-let make_with_pp_short ?cols ~color pp wrapped_event =
+let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
+  let string_of_level = function
+    | Internal_event.Fatal -> "FATAL"
+    | Debug -> "DEBUG"
+    | Info -> "INFO"
+    | Notice -> "NOTICE"
+    | Warning -> "WARN"
+    | Error -> "ERROR"
+  in
   let pp_date fmt time =
     let time = Ptime.to_float_s time in
     let tm = Unix.localtime time in
@@ -158,18 +189,31 @@ let make_with_pp_short ?cols ~color pp wrapped_event =
       | _ -> assert false
       (* `tm` is built locally, so it should contain invalid month code *)
     in
+    let level_string =
+      if advertise_levels then
+        Format.asprintf
+          "%a"
+          Pretty_printing.(pp_right_aligned 7) (* NOTICE + 1 space *)
+          (string_of_level level)
+      else ""
+    in
     let ms = mod_float (time *. 1000.) 1000. in
     Format.fprintf
       fmt
-      "%s %02d %02d:%02d:%02d.%03.0f"
+      "%s %02d %02d:%02d:%02d.%03.0f%s"
       month_string
       tm.Unix.tm_mday
       tm.Unix.tm_hour
       tm.Unix.tm_min
       tm.Unix.tm_sec
       ms
+      level_string
   in
-  let timestamp = Format.asprintf "%a: " pp_date wrapped_event.time_stamp in
+  let timestamp =
+    if advertise_levels then
+      Format.asprintf "%a │ " pp_date wrapped_event.time_stamp
+    else Format.asprintf "%a: " pp_date wrapped_event.time_stamp
+  in
   let timestamp_size = String.length timestamp in
   let line_size = Option.map (fun cols -> max 1 (cols - timestamp_size)) cols in
   let lines =
@@ -246,26 +290,54 @@ let%expect_test _ =
       section = Internal_event.Section.make_sanitized ["my"; "section"];
     }
   in
-  print_endline (make_with_pp_short ~color:Disabled pp_string ev) ;
+  print_endline
+    (make_with_pp_short
+       ~color:Disabled
+       ~advertise_levels:false
+       ~level:Debug
+       pp_string
+       ev) ;
   [%expect {| Apr 27 08:29:09.000: toto |}] ;
   let ev_line_cut =
     {ev with event = "totototototototototototototototo before_cut after_cut"}
   in
   print_endline
     (String.escaped
-    @@ make_with_pp_short ~color:(Enabled None) pp_string ev_line_cut) ;
+    @@ make_with_pp_short
+         ~color:(Enabled None)
+         ~advertise_levels:false
+         ~level:Debug
+         pp_string
+         ev_line_cut) ;
   [%expect
     {|
        \027[1mApr 27 08:29:09.000: \027[0mtotototototototototototototototo before_cut\nApr 27 08:29:09.000: after_cut\n|}] ;
   print_endline
-    (String.escaped @@ make_with_pp_short ~color:(Enabled None) pp_string ev) ;
+    (String.escaped
+    @@ make_with_pp_short
+         ~color:(Enabled None)
+         ~advertise_levels:false
+         ~level:Debug
+         pp_string
+         ev) ;
   [%expect {| \027[1mApr 27 08:29:09.000: \027[0mtoto\n|}] ;
   print_endline
     (String.escaped
-    @@ make_with_pp_short ~color:(Enabled (Some Color.FG.red)) pp_string ev) ;
+    @@ make_with_pp_short
+         ~color:(Enabled (Some Color.FG.red))
+         ~advertise_levels:false
+         ~level:Debug
+         pp_string
+         ev) ;
   [%expect {| \027[1mApr 27 08:29:09.000: \027[0m\027[31mtoto\027[0m\n|}] ;
   let ev = {ev with time_stamp = make_timestamp ts} in
-  print_endline (make_with_pp_rfc5424 pp_string ev "my-event") ;
+  print_endline
+    (make_with_pp_rfc5424
+       ~advertise_levels:false
+       ~level:Debug
+       pp_string
+       ev
+       "my-event") ;
   [%expect {| 2023-04-27T08:29:09.777-00:00 [my.section.my-event] toto |}] ;
   ()
 
@@ -424,6 +496,12 @@ end) : Internal_event.SINK with type t = t = struct
             return (`Per_section_prefix sections)
           with Failure s -> fail_parsing uri "%s" s)
     in
+    let* advertise_levels =
+      match Uri.get_query_param uri "advertise-levels" with
+      | Some "false" | None -> return false
+      | Some "true" -> return true
+      | Some other -> fail_parsing uri "Expected bool, got %S" other
+    in
     let* format =
       match Uri.get_query_param uri "format" with
       | Some "netstring" -> return `Netstring
@@ -526,7 +604,7 @@ end) : Internal_event.SINK with type t = t = struct
       | `Stdout -> return (Static Lwt_unix.stdout)
       | `Stderr -> return (Static Lwt_unix.stderr)
     in
-    let t = {output; filter; format; colors} in
+    let t = {output; filter; format; colors; advertise_levels} in
     return t
 
   let write_mutex = Lwt_mutex.create ()
@@ -661,7 +739,7 @@ end) : Internal_event.SINK with type t = t = struct
         if is_a_tty then return (Terminal.Size.get_columns ()) else return_none
     | Syslog _ | Rotating _ -> return_none
 
-  let handle (type a) {output; format; colors; _} m
+  let handle (type a) {output; format; colors; advertise_levels; _} m
       ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
@@ -672,12 +750,18 @@ end) : Internal_event.SINK with type t = t = struct
       else
         let json () =
           Data_encoding.Json.construct
-            (wrapped_encoding M.encoding)
-            wrapped_event
+            (wrapped_encoding ~advertise_levels M.encoding)
+            (M.level, wrapped_event)
         in
         match format with
         | `Pp_RFC5424 ->
-            Lwt.return @@ make_with_pp_rfc5424 M.pp wrapped_event M.name
+            Lwt.return
+            @@ make_with_pp_rfc5424
+                 ~advertise_levels
+                 ~level:M.level
+                 M.pp
+                 wrapped_event
+                 M.name
         | `Pp_short ->
             let*! color =
               if colors then
@@ -690,7 +774,14 @@ end) : Internal_event.SINK with type t = t = struct
               else Lwt.return Disabled
             in
             let*! cols = output_columns output in
-            Lwt.return @@ make_with_pp_short ?cols ~color M.pp wrapped_event
+            Lwt.return
+            @@ make_with_pp_short
+                 ?cols
+                 ~color
+                 ~advertise_levels
+                 ~level:M.level
+                 M.pp
+                 wrapped_event
         | `One_per_line ->
             Lwt.return @@ Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
         | `Netstring ->
