@@ -20,14 +20,13 @@ use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use storage::{
-    read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
-    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_minimum_base_fee_per_gas, read_tracer_input, store_base_fee_per_gas,
-    store_chain_id, store_da_fee, store_kernel_version, store_minimum_base_fee_per_gas,
-    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_chain_id, read_da_fee, read_kernel_version, read_last_info_per_level_timestamp,
+    read_last_info_per_level_timestamp_stats, read_minimum_base_fee_per_gas,
+    read_tracer_input, store_chain_id, store_da_fee, store_kernel_version,
+    store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
+    STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
@@ -189,18 +188,21 @@ fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(
     }
 }
 
+#[cfg(test)]
 fn retrieve_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     minimum_base_fee_per_gas: U256,
-) -> Result<U256, Error> {
-    match read_base_fee_per_gas(host) {
-        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
-            Ok(base_fee_per_gas)
+) -> U256 {
+    match block_storage::read_current(host) {
+        Ok(current_block) => {
+            let current_base_fee_per_gas = current_block.base_fee_per_gas;
+            if current_base_fee_per_gas < minimum_base_fee_per_gas {
+                minimum_base_fee_per_gas
+            } else {
+                current_base_fee_per_gas
+            }
         }
-        _ => {
-            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
-            Ok(minimum_base_fee_per_gas)
-        }
+        Err(_) => minimum_base_fee_per_gas,
     }
 }
 
@@ -215,11 +217,18 @@ fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
+#[cfg(test)]
+fn retrieve_block_fees<Host: Runtime>(
+    host: &mut Host,
+) -> Result<tezos_ethereum::block::BlockFees, Error> {
     let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)?;
-    let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+    let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
     let da_fee = retrieve_da_fee(host)?;
-    let block_fees = BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee);
+    let block_fees = tezos_ethereum::block::BlockFees::new(
+        minimum_base_fee_per_gas,
+        base_fee_per_gas,
+        da_fee,
+    );
 
     Ok(block_fees)
 }
@@ -397,7 +406,6 @@ mod tests {
     use crate::{
         blueprint::Blueprint,
         inbox::{Transaction, TransactionContent},
-        storage,
         upgrade::KernelUpgrade,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
@@ -621,8 +629,6 @@ mod tests {
             block_fees.minimum_base_fee_per_gas(),
         )
         .unwrap();
-        crate::storage::store_base_fee_per_gas(&mut host, block_fees.base_fee_per_gas())
-            .unwrap();
         crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
 
         // If the upgrade is started, it should raise an error
@@ -670,7 +676,7 @@ mod tests {
     }
 
     #[test]
-    fn load_block_fees_with_minimum() {
+    fn load_min_block_fees() {
         let min_path =
             RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 
@@ -678,23 +684,17 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let min_base_fee = U256::from(17);
-        let curr_base_fee = U256::from(20);
-        storage::store_base_fee_per_gas(&mut host, curr_base_fee).unwrap();
         tezos_storage::write_u256_le(&mut host, &min_path, min_base_fee).unwrap();
 
         // Act
         let result = crate::retrieve_block_fees(&mut host);
-        let base_fee = storage::read_base_fee_per_gas(&mut host);
 
         // Assert
         let expected =
-            BlockFees::new(min_base_fee, curr_base_fee, fees::DA_FEE_PER_BYTE.into());
+            BlockFees::new(min_base_fee, min_base_fee, fees::DA_FEE_PER_BYTE.into());
 
         assert!(result.is_ok());
         assert_eq!(expected, result.unwrap());
-
-        assert!(base_fee.is_ok());
-        assert_eq!(curr_base_fee, base_fee.unwrap());
     }
 
     #[test]

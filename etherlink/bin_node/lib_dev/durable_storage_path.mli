@@ -20,8 +20,6 @@ val chain_id : path
 
 val minimum_base_fee_per_gas : path
 
-val base_fee_per_gas : path
-
 val da_fee_per_byte : path
 
 val kernel_version : path

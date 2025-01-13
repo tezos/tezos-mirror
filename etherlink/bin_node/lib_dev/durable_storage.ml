@@ -263,10 +263,19 @@ let chain_id read =
   inspect_durable_and_decode read Durable_storage_path.chain_id decode_number_le
 
 let base_fee_per_gas read =
-  inspect_durable_and_decode
-    read
-    Durable_storage_path.base_fee_per_gas
-    decode_number_le
+  let open Lwt_result_syntax in
+  let* block =
+    blocks_by_number
+      read
+      ~full_transaction_object:false
+      ~number:Durable_storage_path.Block.Current
+  in
+  match block.baseFeePerGas with
+  | Some base_fee_per_gas -> return base_fee_per_gas
+  | None ->
+      Error_monad.failwith
+        "Attempted to get the base fee per gas from a block which does not \
+         have one."
 
 let kernel_version read =
   inspect_durable_and_decode

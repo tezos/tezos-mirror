@@ -420,7 +420,11 @@ impl BlockInProgress {
         let receipts_root = self.receipts_root(host, previous_receipts_root)?;
         let transactions_root =
             self.transactions_root(host, previous_transactions_root)?;
-        let base_fee_per_gas = base_fee_per_gas(host, self.timestamp);
+        let base_fee_per_gas = base_fee_per_gas(
+            host,
+            self.timestamp,
+            block_constants.block_fees.minimum_base_fee_per_gas(),
+        );
         let new_block = L2Block::new(
             self.number,
             self.valid_txs,

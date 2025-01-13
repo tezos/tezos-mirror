@@ -106,8 +106,6 @@ pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 
-pub const EVM_BASE_FEE_PER_GAS: RefPath =
-    RefPath::assert_from(b"/evm/world_state/fees/base_fee_per_gas");
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 const EVM_DA_FEE: RefPath =
@@ -445,17 +443,6 @@ pub fn store_chain_id<Host: Runtime>(
 
 pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     read_u256_le(host, &EVM_CHAIN_ID).map_err(Error::from)
-}
-
-pub fn store_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
-    base_fee_per_gas: U256,
-) -> Result<(), Error> {
-    write_u256_le(host, &EVM_BASE_FEE_PER_GAS, base_fee_per_gas).map_err(Error::from)
-}
-
-pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_BASE_FEE_PER_GAS).map_err(Error::from)
 }
 
 pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
