@@ -537,9 +537,6 @@ module Pipeline = struct
         rules =
           ci_docker_workflow_rule
           :: scheduled_pipeline_worflow_rule
-               "CONTAINER_SCANNING_MASTER"
-               "schedule_container_scanning_master"
-          :: scheduled_pipeline_worflow_rule
                "CONTAINER_SCANNING_OCTEZ_RELEASES"
                "schedule_container_scanning_octez_releases"
           :: scheduled_pipeline_worflow_rule
@@ -550,9 +547,6 @@ module Pipeline = struct
     in
     let includes =
       ci_docker_include_rule
-      :: scheduled_pipeline_include_rule
-           ".gitlab/ci/pipelines/schedule_container_scanning_master.yml"
-           "CONTAINER_SCANNING_MASTER"
       :: scheduled_pipeline_include_rule
            ".gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml"
            "CONTAINER_SCANNING_OCTEZ_RELEASES"

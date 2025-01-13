@@ -70,6 +70,13 @@ val schedule_extended_validation_tests : If.t
     [TZ_SCHEDULE_KIND] set to [TEST_RELEASE]. *)
 val schedule_test_release : If.t
 
+(** A rule that is true for scheduled pipelines that scan
+    `tezos/tezos:master` Docker image.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_MASTER]. *)
+val schedule_container_scanning_master : If.t
+
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t
 
