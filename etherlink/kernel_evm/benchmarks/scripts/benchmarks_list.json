@@ -57,6 +57,7 @@
     "benchmarks/bench_ecadd.js",
     "benchmarks/bench_ecmul.js",
     "benchmarks/bench_ecpairing.js",
+    "benchmarks/bench_gas_guzzler.js",
     "benchmarks/bench_modexp.js",
     "benchmarks/bench_imbricated_calls.js",
     "benchmarks/bench_imbricated_revert.js",
