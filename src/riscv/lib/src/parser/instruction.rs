@@ -216,6 +216,12 @@ pub struct CIBTypeArgs {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CIBNZTypeArgs {
+    pub rd_rs1: NonZeroXRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CIBDTypeArgs {
     pub rd_rs1: FRegister,
     pub imm: i64,

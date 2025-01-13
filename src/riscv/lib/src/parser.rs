@@ -1096,9 +1096,25 @@ const C_Q1_1: u16 = 0b01;
 const C_Q1_2: u16 = 0b10;
 const C_Q1_3: u16 = 0b11;
 
+/// Wrapper for splitting x0 from other XRegisters that can
+/// be represented by [`NonZeroXRegister`].
+enum XRegisterParsed {
+    X0,
+    NonZero(NonZeroXRegister),
+}
+
+/// Convert [`XRegister`] to [`NonZeroXRegister`] when `r != x0`.
+const fn split_x0(r: XRegister) -> XRegisterParsed {
+    match r {
+        x0 => XRegisterParsed::X0,
+        r => XRegisterParsed::NonZero(NonZeroXRegister::assert_from(r)),
+    }
+}
+
 #[inline]
 const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
     use InstrCacheable::*;
+    use XRegisterParsed::*;
     let i = match c_opcode(instr) {
         OP_C0 => match c_funct3(instr) {
             C_F3_1 => CFld(FLoadArgs {
@@ -1219,27 +1235,17 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 }),
             },
 
-            C_F3_4 => match (u16::bit(instr, 12), c_rd_rs1(instr), c_rs2(instr)) {
-                (true, x0, x0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
-                (_, x0, _) => UnknownCompressed { instr },
-                (true, rs1, x0) => {
-                    let nzrs1 = NonZeroXRegister::assert_from(rs1);
-                    CJalr(CRJTypeArgs { rs1: nzrs1 })
-                }
-                (true, rs1, rs2) => {
-                    let rd_rs1 = NonZeroXRegister::assert_from(rs1);
-                    let rs2 = NonZeroXRegister::assert_from(rs2);
-                    CAdd(CNZRTypeArgs { rd_rs1, rs2 })
-                }
-                (false, rs1, x0) => {
-                    let nzrs1 = NonZeroXRegister::assert_from(rs1);
-                    CJr(CRJTypeArgs { rs1: nzrs1 })
-                }
-                (false, rs1, rs2) => {
-                    let rd_rs1 = NonZeroXRegister::assert_from(rs1);
-                    let rs2 = NonZeroXRegister::assert_from(rs2);
-                    CMv(CNZRTypeArgs { rd_rs1, rs2 })
-                }
+            C_F3_4 => match (
+                u16::bit(instr, 12),
+                split_x0(c_rd_rs1(instr)),
+                split_x0(c_rs2(instr)),
+            ) {
+                (true, X0, X0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
+                (_, X0, _) => UnknownCompressed { instr },
+                (true, NonZero(rs1), X0) => CJalr(CRJTypeArgs { rs1 }),
+                (true, NonZero(rd_rs1), NonZero(rs2)) => CAdd(CNZRTypeArgs { rd_rs1, rs2 }),
+                (false, NonZero(rs1), X0) => CJr(CRJTypeArgs { rs1 }),
+                (false, NonZero(rd_rs1), NonZero(rs2)) => CMv(CNZRTypeArgs { rd_rs1, rs2 }),
             },
             C_F3_5 => CFsdsp(CSSDTypeArgs {
                 rs2: c_f_rs2(instr),

@@ -25,9 +25,9 @@ use crate::{
     interpreter::{c, i},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
-        AmoArgs, CIBDTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs, CRTypeArgs,
-        CSSDTypeArgs, CSSTypeArgs, CsrArgs, CsriArgs, FCmpArgs, FLoadArgs, FR1ArgWithRounding,
-        FR2ArgsWithRounding, FR3ArgsWithRounding, FRArgs, FRegToXRegArgs,
+        AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
+        CRTypeArgs, CSSDTypeArgs, CSSTypeArgs, CsrArgs, CsriArgs, FCmpArgs, FLoadArgs,
+        FR1ArgWithRounding, FR2ArgsWithRounding, FR3ArgsWithRounding, FRArgs, FRegToXRegArgs,
         FRegToXRegArgsWithRounding, FStoreArgs, ITypeArgs, InstrCacheable, InstrRoundingMode,
         InstrWidth, RTypeArgs, SBTypeArgs, UJTypeArgs, XRegToFRegArgs, XRegToFRegArgsWithRounding,
     },
@@ -2249,6 +2249,20 @@ impl From<&CIBTypeArgs> for Args {
             // to be explicit that they are of XRegister type.
             rs1: XRegister::x0.into(),
             rs2: XRegister::x0.into(),
+            ..Self::DEFAULT
+        }
+    }
+}
+
+impl From<&CIBNZTypeArgs> for Args {
+    fn from(value: &CIBNZTypeArgs) -> Self {
+        Self {
+            rd: value.rd_rs1.into(),
+            imm: value.imm,
+            // Setting a default value of NonZeroXRegister::x1 for rs1
+            // and rs2 to be explicit they are NonZeroXRegister type.
+            rs1: NonZeroXRegister::x1.into(),
+            rs2: NonZeroXRegister::x1.into(),
             ..Self::DEFAULT
         }
     }
