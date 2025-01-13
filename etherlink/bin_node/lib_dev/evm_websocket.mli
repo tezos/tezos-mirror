@@ -7,12 +7,15 @@
 (*****************************************************************************)
 
 (** Callback to use for a websocket endpoint in a Cohttp server.
-    [cohttp_callback ~max_message_length handler conn req body] upgrades the
-    connection for request [req] to the websocket protocol and starts worker
-    that processes incoming frames and writes in return in the
+    [cohttp_callback ?monitor ~max_message_length handler conn req body]
+    upgrades the connection for request [req] to the websocket protocol and
+    starts worker that processes incoming frames and writes in return in the
     websocket. [max_message_length] specifies the maximum size of message
-    accepted by the server, over which the connection will be closed. *)
+    accepted by the server, over which the connection will be closed. If
+    [monitor] is provided, the websocket connection is monitored with the given
+    parameters and the connection closed if the client fails to answer.*)
 val cohttp_callback :
+  ?monitor:Configuration.monitor_websocket_heartbeat ->
   max_message_length:int ->
   Rpc_encodings.websocket_handler ->
   Cohttp_lwt_unix.Server.conn ->

@@ -43,6 +43,8 @@ type history_mode = Archive | Rolling
 
 type rpc_server = Resto | Dream
 
+type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;

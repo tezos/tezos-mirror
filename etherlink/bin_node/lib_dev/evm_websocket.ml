@@ -15,13 +15,15 @@ type parameters = {
   medias : Media_type.t list;
   max_message_length : int;
   handler : websocket_handler;
+  monitor : Configuration.monitor_websocket_heartbeat option;
 }
 
-type close_status = Normal_closure | Message_too_big
+type close_status = Normal_closure | Going_away | Message_too_big
 
 (* https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.1 *)
 let code_of_close_status = function
   | Normal_closure -> 1000
+  | Going_away -> 1001
   | Message_too_big -> 1009
 
 module Types = struct
@@ -29,6 +31,11 @@ module Types = struct
     (Ethereum_types.Subscription.id, unit -> unit) Stdlib.Hashtbl.t
 
   type close_info = {reason : string; status : close_status}
+
+  type monitor_state = {
+    params : Configuration.monitor_websocket_heartbeat;
+    mbox : int Lwt_mvar.t;
+  }
 
   type state = {
     push_frame : Websocket.Frame.t option -> unit;
@@ -40,6 +47,7 @@ module Types = struct
     message_buffer : Buffer.t;
     subscriptions : subscriptions_table;
     mutable close_info : close_info option;
+    monitor : monitor_state option;
   }
 
   type nonrec parameters = parameters
@@ -217,6 +225,17 @@ module Event = struct
       ~pp2:(fun ppf Ethereum_types.(Subscription.Id (Hex id)) ->
         Format.fprintf ppf "0x%s" id)
       ~pp3:Format.pp_print_string
+
+  let monitoring_exception =
+    declare_2
+      ~section
+      ~name:"websocket_monitoring_exception"
+      ~msg:"Monitoring for websocket {conn} raised exception {exception}"
+      ~level:Warning
+      ("conn", Data_encoding.string)
+      ("exception", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+      ~pp2:Format.pp_print_string
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -299,6 +318,7 @@ let on_frame worker fr =
     output_media_type;
     max_message_length;
     handler;
+    monitor;
     _;
   } =
     state
@@ -335,13 +355,16 @@ let on_frame worker fr =
          same content. *)
       push_frame (Websocket.Frame.create ~opcode:Pong ~content ()) ;
       return_unit
-  | {opcode = Pong; _} ->
-      (* We don't expect to receive pong frames because we don't send any ping
-         frames at the moment *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7658
-         Monitor connection with a background thread that sends ping frames at
-         regular intervals. *)
-      return_unit
+  | {opcode = Pong; content; _} -> (
+      match monitor with
+      | None ->
+          (* We don't expect to receive pong frames because we don't send any
+             ping frames *)
+          return_unit
+      | Some {mbox; _} -> (
+          match int_of_string_opt content with
+          | None -> return_unit
+          | Some i -> Lwt_mvar.put mbox i))
   | {opcode = Close; _} ->
       (* Client has sent a close frame, we shut everything down for this
          worker *)
@@ -379,6 +402,51 @@ let on_frame worker fr =
       (* Ignore other frames *)
       return_unit
 
+let monitor_websocket_aux worker
+    Types.{mbox; params = Configuration.{ping_timeout; ping_interval}} () =
+  let open Lwt_syntax in
+  let Types.{push_frame; _} = Worker.state worker in
+  let rec loop ~push ping_counter =
+    if push then
+      push_frame
+        (Some
+           (Websocket.Frame.create
+              ~opcode:Ping
+              ~content:(string_of_int ping_counter)
+              ())) ;
+    let* res =
+      Lwt.pick
+        [
+          (let+ c = Lwt_mvar.take mbox in
+           `Pong c);
+          (let+ () = Lwt_unix.sleep ping_timeout in
+           `Timeout);
+        ]
+    in
+    match res with
+    | `Pong c ->
+        if c = ping_counter then
+          let* () = Lwt_unix.sleep ping_interval in
+          loop ~push:true (ping_counter + 1)
+        else (* ignore *)
+          loop ~push:false ping_counter
+    | `Timeout ->
+        shutdown_worker
+          worker
+          ~status:Going_away
+          ~reason:"Timeout in ping/pong heartbeat"
+  in
+  loop ~push:true 0
+
+let monitor_websocket worker =
+  let state = Worker.state worker in
+  match state.monitor with
+  | None -> ()
+  | Some monitor ->
+      Lwt.dont_wait (monitor_websocket_aux worker monitor) (fun exn ->
+          Event.(emit__dont_wait__use_with_care monitoring_exception)
+            (state.conn_descr, Printexc.to_string exn))
+
 module Handlers = struct
   type self = worker
 
@@ -394,7 +462,15 @@ module Handlers = struct
   type launch_error = [`Not_acceptable | `Unsupported_media_type of string]
 
   let on_launch _w _name
-      ({push_frame; http_request; conn; medias; max_message_length; handler} :
+      ({
+         push_frame;
+         http_request;
+         conn;
+         medias;
+         max_message_length;
+         handler;
+         monitor;
+       } :
         Types.parameters) =
     let open Lwt_result_syntax in
     let headers = Cohttp.Request.headers http_request in
@@ -419,6 +495,11 @@ module Handlers = struct
         (Cohttp.Connection.to_string conn)
     in
     let*! () = Event.(emit starting) conn_descr in
+    let monitor =
+      Option.map
+        (fun params -> {Types.mbox = Lwt_mvar.create_empty (); params})
+        monitor
+    in
     let state =
       Types.
         {
@@ -431,6 +512,7 @@ module Handlers = struct
           message_buffer = Buffer.create 256;
           subscriptions = Stdlib.Hashtbl.create 3;
           close_info = None;
+          monitor;
         }
     in
     return state
@@ -474,16 +556,25 @@ module Handlers = struct
 end
 
 let start (conn : Cohttp_lwt_unix.Server.conn) (http_request : Cohttp.Request.t)
-    medias ~max_message_length handler push_frame =
+    ?monitor medias ~max_message_length handler push_frame =
   let open Lwt_result_syntax in
   let name = Cohttp.Connection.to_string (snd conn) in
-  let* (_worker : _ Worker.t) =
+  let* (worker : _ Worker.t) =
     Worker.launch
       table
       name
-      {push_frame; http_request; conn; medias; max_message_length; handler}
+      {
+        push_frame;
+        http_request;
+        conn;
+        medias;
+        max_message_length;
+        handler;
+        monitor;
+      }
       (module Handlers)
   in
+  monitor_websocket worker ;
   return_unit
 
 let new_frame conn fr =
@@ -495,7 +586,7 @@ let new_frame conn fr =
          cases. In this case we could lose frames. *)
       Worker.Queue.push_request_now w (Request.Frame fr)
 
-let cohttp_callback ~max_message_length handler
+let cohttp_callback ?monitor ~max_message_length handler
     (conn : Cohttp_lwt_unix.Server.conn) req _body =
   let open Lwt_syntax in
   let media_types = Supported_media_types.all in
@@ -512,7 +603,7 @@ let cohttp_callback ~max_message_length handler
         shutdown ~reason conn_name)
   in
   let+ res =
-    start conn req media_types ~max_message_length handler push_frame
+    start ?monitor conn req media_types ~max_message_length handler push_frame
   in
   match res with
   | Ok () -> response_action
