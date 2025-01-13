@@ -55,12 +55,13 @@ let string_vm_command agent =
 let agent_jingo_template agent =
   let open Jingoo.Jg_types in
   let Configuration.
-        {machine_type; docker_image; max_run_duration; binaries_path; os} =
+        {machine_type; docker_image; max_run_duration; binaries_path; os; name}
+      =
     Agent.configuration agent
   in
   Tobj
     [
-      ("name", Tstr (Agent.name agent));
+      ("name", Tstr name);
       ("machine_type", Tstr machine_type);
       ("docker_image", Tstr (Format.asprintf "%a" pp_docker_image docker_image));
       ( "max_run_duration",

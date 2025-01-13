@@ -1673,8 +1673,8 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   in
   Lwt.return {node; dal_node; topic}
 
-let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
-    ~otel ~memtrace =
+let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
+    ~memtrace =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -1684,7 +1684,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
          this index on a dedicated VM and give it directly as endpoint
          to the rollup node. *)
       toplog "Etherlink sequencer will run its own DAL node" ;
-      let name = Format.asprintf "etherlink-%s-dal-operator" name in
+      let name = Format.asprintf "etherlink-dal-operator" in
       let* agent = next_agent ~name in
       let* node =
         Node.init
@@ -1717,8 +1717,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
            Format.pp_print_int)
         dal_slots ;
       toplog "Etherlink sequencer will use a reverse proxy" ;
-
-      let name = Format.asprintf "etherlink-%s-dal-operator" name in
+      let name = Format.asprintf "etherlink-dal-operator" in
       let* agent = next_agent ~name in
       let* node =
         Node.init
@@ -1742,7 +1741,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~name ~dal_slots ~network
         dal_slots
         |> Lwt_list.map_p (fun slot_index ->
                let name =
-                 Format.asprintf "etherlink-%s-dal-operator-%d" name slot_index
+                 Format.asprintf "etherlink-dal-operator-%d" slot_index
                in
                let* agent = next_agent ~name in
                let* node =
@@ -1827,7 +1826,6 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
     init_etherlink_dal_node
       ~bootstrap
       ~next_agent
-      ~name
       ~dal_slots:etherlink_configuration.etherlink_dal_slots
       ~network:configuration.network
       ~otel
@@ -2016,7 +2014,7 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
 let init_etherlink cloud configuration etherlink_configuration ~bootstrap
     etherlink_rollup_operator_key ~dal_slots next_agent =
   let () = toplog "Initializing an Etherlink operator" in
-  let* operator_agent = next_agent ~name:"etherlink-operator-agent" in
+  let* operator_agent = next_agent ~name:"etherlink-operator" in
   let* operator =
     init_etherlink_operator_setup
       cloud
@@ -2107,35 +2105,34 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     else Lwt.return_none
   in
   let* attesters_agents =
-    List.init (List.length configuration.stake) (fun i ->
-        let name = Format.asprintf "attester-%d" i in
-        next_agent ~name)
+    configuration.stake
+    |> List.map (fun stake ->
+           let name = Format.asprintf "attester-%d" stake in
+           next_agent ~name)
     |> Lwt.all
   in
   let* producers_agents =
     configuration.dal_node_producers
-    |> List.mapi (fun i slot_index ->
-           let name = Format.asprintf "producer-%d" i in
+    |> List.map (fun slot_index ->
+           let name = Format.asprintf "dal-producer-%d" slot_index in
            let* name = next_agent ~name in
            return (name, slot_index))
     |> Lwt.all
   in
   let* observers_slot_index_agents =
-    List.map
-      (fun i ->
-        let name = Format.asprintf "observer-%d" i in
-        let* agent = next_agent ~name in
-        return (`Slot_index i, agent))
-      configuration.observer_slot_indices
+    configuration.observer_slot_indices
+    |> List.map (fun slot_index ->
+           let name = Format.asprintf "dal-observer-%d" slot_index in
+           let* agent = next_agent ~name in
+           return (`Slot_index slot_index, agent))
     |> Lwt.all
   in
   let* observers_bakers_agents =
-    List.map
-      (fun pkh ->
-        let name = Format.asprintf "observer-%s" pkh in
-        let* agent = next_agent ~name in
-        return (`Pkh pkh, agent))
-      configuration.observer_pkhs
+    configuration.observer_pkhs
+    |> List.map (fun pkh ->
+           let name = Format.asprintf "observer-%s" (String.sub pkh 0 8) in
+           let* agent = next_agent ~name in
+           return (`Pkh pkh, agent))
     |> Lwt.all
   in
   let* teztale =
@@ -2560,53 +2557,88 @@ let configuration, etherlink_configuration =
   in
   (t, etherlink)
 
+type agent_kind =
+  | Bootstrap
+  | Baker of int
+  | Producer of int
+  | Observer of [`Index of int | `Pkh of string]
+  | Reverse_proxy
+  | Etherlink_operator
+  | Etherlink_dal_operator
+  | Etherlink_dal_observer of {slot_index : int}
+  | Etherlink_producer of int
+
 let benchmark () =
   toplog "Parsing CLI done" ;
   let vms =
     [
-      (if configuration.bootstrap then [`Bootstrap] else []);
-      List.map (fun i -> `Baker i) configuration.stake;
-      List.map (fun _ -> `Producer) configuration.dal_node_producers;
-      List.map (fun _ -> `Observer) configuration.observer_slot_indices;
-      List.map (fun _ -> `Observer_pkh) configuration.observer_pkhs;
-      (if etherlink_configuration <> None then [`Etherlink_operator] else []);
+      (if configuration.bootstrap then [Bootstrap] else []);
+      List.map (fun i -> Baker i) configuration.stake;
+      List.map (fun i -> Producer i) configuration.dal_node_producers;
+      List.map
+        (fun index -> Observer (`Index index))
+        configuration.observer_slot_indices;
+      List.map (fun pkh -> Observer (`Pkh pkh)) configuration.observer_pkhs;
+      (if etherlink_configuration <> None then [Etherlink_operator] else []);
       (match etherlink_configuration with
       | None | Some {etherlink_dal_slots = []; _} -> []
-      | Some {etherlink_dal_slots = [_]; _} -> [`Etherlink_dal_node]
+      | Some {etherlink_dal_slots = [_]; _} -> [Etherlink_dal_operator]
       | Some {etherlink_dal_slots; _} ->
-          `Reverse_proxy
-          :: List.map (fun _ -> `Etherlink_dal_node) etherlink_dal_slots);
+          Reverse_proxy :: Etherlink_dal_operator
+          :: List.map
+               (fun slot_index -> Etherlink_dal_observer {slot_index})
+               etherlink_dal_slots);
       (match etherlink_configuration with
       | None -> []
       | Some {etherlink_producers; _} ->
-          List.init etherlink_producers (fun i -> `Etherlink_producer i));
+          List.init etherlink_producers (fun i -> Etherlink_producer i));
     ]
     |> List.concat
   in
   let docker_image =
     Option.map (fun tag -> Configuration.Octez_release {tag}) Cli.octez_release
   in
-  let default_vm_configuration = Configuration.make ?docker_image () in
+  let default_vm_configuration ~name =
+    Configuration.make ?docker_image ~name ()
+  in
+  let name_of = function
+    | Bootstrap -> "bootstrap"
+    | Baker i -> Format.asprintf "attester-%d" i
+    | Producer i -> Format.asprintf "dal-producer-%d" i
+    | Observer (`Index i) -> Format.asprintf "dal-observer-%d" i
+    | Observer (`Pkh pkh) ->
+        (* Shorting the pkh enables to get better logs. *)
+        Format.asprintf "dal-observer-%s" (String.sub pkh 0 8)
+    | Reverse_proxy -> "dal-reverse-proxy"
+    | Etherlink_operator -> "etherlink-operator"
+    | Etherlink_dal_operator -> Format.asprintf "etherlink-dal-operator"
+    | Etherlink_dal_observer {slot_index} ->
+        Format.asprintf "etherlink-dal-observer-%d" slot_index
+    | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
+  in
   let vms =
     vms
-    |> List.map (function
-           | `Bootstrap -> default_vm_configuration
-           | `Baker i -> (
+    |> List.map (fun agent_kind ->
+           let name = name_of agent_kind in
+           match agent_kind with
+           | Bootstrap -> default_vm_configuration ~name
+           | Baker i -> (
                match configuration.stake_machine_type with
-               | None -> default_vm_configuration
+               | None -> default_vm_configuration ~name
                | Some list -> (
                    try
                      let machine_type = List.nth list i in
-                     Configuration.make ?docker_image ~machine_type ()
-                   with _ -> default_vm_configuration))
-           | `Producer | `Observer | `Observer_pkh | `Etherlink_dal_node -> (
+                     Configuration.make ?docker_image ~machine_type ~name ()
+                   with _ -> default_vm_configuration ~name))
+           | Producer _ | Observer _ | Etherlink_dal_operator
+           | Etherlink_dal_observer _ -> (
                match configuration.producer_machine_type with
-               | None -> Configuration.make ?docker_image ()
+               | None -> Configuration.make ?docker_image ~name ()
                | Some machine_type ->
-                   Configuration.make ?docker_image ~machine_type ())
-           | `Etherlink_operator -> default_vm_configuration
-           | `Etherlink_producer _ -> default_vm_configuration
-           | `Reverse_proxy -> default_vm_configuration)
+                   Configuration.make ?docker_image ~machine_type ~name ())
+           | Etherlink_operator -> default_vm_configuration ~name
+           | Etherlink_producer _ -> default_vm_configuration ~name
+           | Reverse_proxy -> default_vm_configuration ~name)
   in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
@@ -2660,22 +2692,13 @@ let benchmark () =
            DAL deactivated for bakers. DAL network can't work properly. This \
            is probably a configuration issue." ;
       let agents = Cloud.agents cloud in
-      (* We give to the [init] function a sequence of agents (and cycle if
-         they were all consumed). We set their name only if the number of
-         agents is the computed one. Otherwise, the user has mentioned
-         explicitely a reduced number of agents and it is not clear how to give
-         them proper names. *)
-      let set_name agent name =
-        if List.length agents = List.length vms then
-          Cloud.set_agent_name cloud agent name
-        else Lwt.return_unit
-      in
-      let next_agent =
-        let f = List.to_seq agents |> Seq.cycle |> Seq.to_dispenser in
-        fun ~name ->
-          let agent = f () |> Option.get in
-          let* () = set_name agent name in
-          Lwt.return agent
+      let next_agent ~name =
+        let agent =
+          match List.find_opt (fun agent -> Agent.name agent = name) agents with
+          | None -> Test.fail ~__LOC__ "Agent not found: %s" name
+          | Some agent -> agent
+        in
+        Lwt.return agent
       in
       let* t = init ~configuration etherlink_configuration cloud next_agent in
       toplog "Starting main loop" ;

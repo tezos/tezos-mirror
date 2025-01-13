@@ -9,8 +9,7 @@ open Types
 
 type t = {
   (* The name initially is the same as [vm_name] and can be changed dynamically by the scenario. *)
-  mutable name : string;
-  vm_name : string;
+  name : string;
   zone : string option;
   point : (string * int) option;
   runner : Runner.t option;
@@ -44,11 +43,18 @@ let configuration_encoding =
   let open Data_encoding in
   let open Configuration in
   conv
-    (fun {machine_type; binaries_path; docker_image; max_run_duration = _; os} ->
-      (machine_type, binaries_path, docker_image, os))
-    (fun (machine_type, binaries_path, docker_image, os) ->
-      make ~os ~machine_type ~binaries_path ~docker_image ())
-    (obj4
+    (fun {
+           name;
+           machine_type;
+           binaries_path;
+           docker_image;
+           max_run_duration = _;
+           os;
+         } -> (name, machine_type, binaries_path, docker_image, os))
+    (fun (name, machine_type, binaries_path, docker_image, os) ->
+      make ~os ~machine_type ~binaries_path ~docker_image ~name ())
+    (obj5
+       (req "name" string)
        (req "machine_type" string)
        (req "binaries_path" string)
        (req "docker_image" docker_image_encoding)
@@ -57,17 +63,9 @@ let configuration_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {
-           name;
-           vm_name;
-           zone;
-           point;
-           runner = _;
-           next_available_port;
-           configuration;
-         } ->
-      (name, vm_name, zone, point, next_available_port (), configuration))
-    (fun (name, vm_name, zone, point, next_available_port, configuration) ->
+    (fun {name; zone; point; runner = _; next_available_port; configuration} ->
+      (name, zone, point, next_available_port (), configuration))
+    (fun (name, zone, point, next_available_port, configuration) ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -82,10 +80,9 @@ let encoding =
             Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
             |> Option.some
       in
-      {name; vm_name; zone; point; runner; next_available_port; configuration})
-    (obj6
+      {name; zone; point; runner; next_available_port; configuration})
+    (obj5
        (req "name" string)
-       (req "vm_name" string)
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
@@ -95,8 +92,6 @@ let encoding =
 
 let name {name; _} = name
 
-let vm_name {vm_name; _} = vm_name
-
 let point {point; _} = point
 
 let next_available_port t = t.next_available_port ()
@@ -105,12 +100,15 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
-(* Setters *)
-
-let set_name agent name = agent.name <- name
+let names_table = Hashtbl.create 3
 
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in
+  let () =
+    match Hashtbl.find_opt names_table name with
+    | None -> Hashtbl.add names_table name ()
+    | Some () -> Test.fail "Duplicate agent name: %s" name
+  in
   let runner =
     match (point, ssh_id) with
     | None, None -> None
@@ -119,17 +117,9 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
     | Some (address, ssh_port), Some ssh_id ->
         Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () |> Option.some
   in
-  {
-    point;
-    runner;
-    name;
-    vm_name = name;
-    next_available_port;
-    configuration;
-    zone;
-  }
+  {point; runner; name; next_available_port; configuration; zone}
 
-let cmd_wrapper {zone; vm_name; _} =
+let cmd_wrapper {zone; name; _} =
   match zone with
   | None -> None
   | Some zone ->
@@ -138,7 +128,7 @@ let cmd_wrapper {zone; vm_name; _} =
           Env.ssh_private_key_filename ~home:"$HOME" ()
         else Env.ssh_private_key_filename ()
       in
-      Some (Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename)
+      Some (Gcloud.cmd_wrapper ~zone ~vm_name:name ~ssh_private_key_filename)
 
 let path_of agent binary = agent.configuration.binaries_path // binary
 

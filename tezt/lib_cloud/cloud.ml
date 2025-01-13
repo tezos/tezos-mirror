@@ -325,14 +325,7 @@ let try_reattach () =
       |> Deployement.of_agents
     in
     let agents = Deployement.agents deployement in
-    let proxy_agent =
-      agents
-      |> List.find (fun agent ->
-             let proxy_agent_prefix =
-               Format.asprintf "%s-proxy" Env.tezt_cloud
-             in
-             String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
-    in
+    let proxy_agent = Proxy.get_agent agents in
     let* is_ssh_server_running =
       Lwt.pick
         [
@@ -373,12 +366,7 @@ let try_reattach () =
 
 let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   let agents = Deployement.agents deployement in
-  let proxy_agent =
-    agents
-    |> List.find (fun agent ->
-           let proxy_agent_prefix = Format.asprintf "%s-proxy" Env.tezt_cloud in
-           String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
-  in
+  let proxy_agent = Proxy.get_agent agents in
   let* () = wait_ssh_server_running proxy_agent in
   let destination =
     (Agent.configuration proxy_agent).binaries_path
@@ -514,14 +502,15 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   match vms with
   | None ->
       let default_agent =
+        let configuration = Configuration.make () in
         Agent.make
-          ~configuration:(Configuration.make ())
+          ~configuration
           ~next_available_port:
             (let cpt = ref 30_000 in
              fun () ->
                incr cpt ;
                !cpt)
-          ~name:"default agent"
+          ~name:configuration.name
           ()
       in
       f
@@ -589,21 +578,21 @@ let agents t =
   match Env.mode with
   | `Orchestrator -> (
       let proxy_agent = Proxy.get_agent t.agents in
-      let proxy_vm_name = Agent.vm_name proxy_agent in
+      let proxy_name = Agent.name proxy_agent in
       match
-        t.agents
-        |> List.filter (fun agent -> Agent.vm_name agent <> proxy_vm_name)
+        t.agents |> List.filter (fun agent -> Agent.name agent <> proxy_name)
       with
       | [] ->
+          let configuration = Configuration.make () in
           let default_agent =
             Agent.make
-              ~configuration:(Configuration.make ())
+              ~configuration
               ~next_available_port:
                 (let cpt = ref 30_000 in
                  fun () ->
                    incr cpt ;
                    !cpt)
-              ~name:"default agent"
+              ~name:configuration.name
               ()
           in
           [default_agent]
@@ -616,13 +605,6 @@ let write_website t =
   match t.website with
   | None -> Lwt.return_unit
   | Some website -> Web.write website ~agents:t.agents
-
-let set_agent_name t agent name =
-  Agent.set_name agent name ;
-  let* () = write_website t in
-  match t.prometheus with
-  | None -> Lwt.return_unit
-  | Some prometheus -> Prometheus.reload prometheus
 
 let push_metric t ?help ?typ ?labels ~name value =
   match t.website with

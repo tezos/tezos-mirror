@@ -5,13 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let find_agent agents =
-  let proxy_agent_prefix = Format.asprintf "%s-proxy" Env.tezt_cloud in
-  agents
-  |> List.find_opt (fun agent ->
-         String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
+let agent_name = Format.asprintf "%s-proxy" Env.tezt_cloud
 
-let get_agent agents = find_agent agents |> Option.get
+let make_config () = Configuration.make ~name:agent_name ()
+
+let get_agent agents =
+  match List.find_opt (fun agent -> Agent.name agent = agent_name) agents with
+  | None -> Test.fail ~__LOC__ "Cannot find agent %s" agent_name
+  | Some agent -> agent
 
 let copy_files proxy_agent ~scenario_files ~proxy_deployement =
   (* This file is necessary to get the agents configurations. *)

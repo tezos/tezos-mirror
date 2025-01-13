@@ -14,6 +14,7 @@ module Configuration : sig
     | Octez_release of {tag : string}
 
   type t = private {
+    name : string;
     machine_type : string;
     docker_image : docker_image;
     max_run_duration : int option;
@@ -30,13 +31,18 @@ module Configuration : sig
 
     Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
     is the value provided by the environement variable [$TEZT_CLOUD].
-    *)
+
+    Default value for [name] is ["agent-x"] where [x] is a counter
+    which is incremented every time this function is used with a
+    default name (there is no check so if you override the ?name
+    field with "agent-x", two agents can have the same name). *)
   val make :
     ?os:Types.Os.t ->
     ?binaries_path:string ->
     ?max_run_duration:int ->
     ?machine_type:string ->
     ?docker_image:docker_image ->
+    ?name:string ->
     unit ->
     t
 end
@@ -87,7 +93,7 @@ module Alert : sig
   (** [make ?route ?for_ ?description ?summary ?severity ~name ~expr]
       defines a new Prometheus alert with name [name] and promQL
       [expr]. Optionally a severity, summary and description of the
-      alert can be defined. 
+      alert can be defined.
 
       If [route] is provided, the alert can be routed to a receiver
       (Slack, webhook, ...).
@@ -149,10 +155,6 @@ module Cloud : sig
 
   (** [agents t] returns the list of agents deployed. *)
   val agents : t -> Agent.t list
-
-  (** [set_agent_name t agent name] sets the name of the agent [agent] to
-      [name]. *)
-  val set_agent_name : t -> Agent.t -> string -> unit Lwt.t
 
   type target = {agent : Agent.t; port : int; app_name : string}
 

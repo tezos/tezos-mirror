@@ -8,6 +8,7 @@
 include Types
 
 type t = {
+  name : string;
   machine_type : string;
   docker_image : Env.docker_image;
   max_run_duration : int option;
@@ -15,7 +16,14 @@ type t = {
   os : Os.t;
 }
 
-let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image () =
+let gen_name =
+  let cpt = ref (-1) in
+  fun () ->
+    incr cpt ;
+    Format.asprintf "agent-%03d" !cpt
+
+let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image
+    ?(name = gen_name ()) () =
   let os = Option.value ~default:Os.default os in
   let docker_image = Option.value ~default:Env.docker_image docker_image in
   let machine_type = Option.value ~default:Env.machine_type machine_type in
@@ -33,4 +41,4 @@ let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image () =
         if Env.no_max_run_duration then None else Some Env.max_run_duration
     | Some max_run_duration -> Some max_run_duration
   in
-  {os; machine_type; docker_image; max_run_duration; binaries_path}
+  {os; machine_type; docker_image; max_run_duration; binaries_path; name}

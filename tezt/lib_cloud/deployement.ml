@@ -104,7 +104,7 @@ module Remote = struct
         ~point
         ~configuration
         ~next_available_port
-        ~name:vm_name
+        ~name:configuration.name
         ()
       |> Lwt.return
     in
@@ -130,7 +130,7 @@ module Remote = struct
 
   let deploy_proxy () =
     let workspace_name = Format.asprintf "%s-proxy" Env.tezt_cloud in
-    let configuration = Configuration.make () in
+    let configuration = Proxy.make_config () in
     let tezt_cloud = Env.tezt_cloud in
     let* () = Terraform.VM.Workspace.init ~tezt_cloud [workspace_name] in
     let* agents =
@@ -265,7 +265,11 @@ module Localhost = struct
     agents : Agent.t list;
   }
 
-  let vm_name i = Format.asprintf "%s-%03d" Env.tezt_cloud (i + 1)
+  let container_name configuration =
+    Format.asprintf
+      "teztcloud-%s-%s"
+      Env.tezt_cloud
+      configuration.Configuration.name
 
   let macosx_docker_network = Env.tezt_cloud ^ "-net"
 
@@ -285,7 +289,6 @@ module Localhost = struct
     let* processes =
       List.to_seq configurations
       |> Seq.mapi (fun i configuration ->
-             let name = vm_name i in
              let start = base_port + (i * ports_per_vm) |> string_of_int in
              let stop =
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
@@ -303,7 +306,7 @@ module Localhost = struct
              let process =
                Docker.run
                  ~rm:true
-                 ~name
+                 ~name:(container_name configuration)
                  ?network
                  ~publish_ports
                  docker_image
@@ -312,7 +315,7 @@ module Localhost = struct
              Lwt.return process)
       |> List.of_seq |> Lwt.all
     in
-    let address i =
+    let address configuration =
       let* output =
         Process.run_and_read_stdout
           "docker"
@@ -320,7 +323,7 @@ module Localhost = struct
             "inspect";
             "-f";
             "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}";
-            vm_name i;
+            container_name configuration;
           ]
       in
       Lwt.return (String.trim output)
@@ -328,43 +331,40 @@ module Localhost = struct
     (* We need to wait a little the machine is up. As for the remote case, we
        could be more robust to handle that. *)
     let* () = Lwt_unix.sleep 5. in
-    let addresses = Hashtbl.create number_of_vms in
+    let addresses_table = Hashtbl.create number_of_vms in
+    let ports_table = Hashtbl.create number_of_vms in
     let* () =
-      List.init number_of_vms Fun.id
-      |> Lwt_list.iter_s (fun i ->
-             let* addr = address i in
-             Hashtbl.replace addresses i addr ;
-             Lwt.return_unit)
+      Lwt_list.iteri_s
+        (fun i configuration ->
+          let* addr = address configuration in
+          let () = Hashtbl.replace addresses_table i addr in
+          let port = base_port + (i * ports_per_vm) in
+          let () = Hashtbl.replace ports_table (addr, port) (port + 1) in
+          Lwt.return_unit)
+        configurations
     in
-    let next_port = Hashtbl.create number_of_vms in
-    Seq.ints 0 |> Seq.take number_of_vms
-    |> Seq.iter (fun i ->
-           let port = base_port + (i * ports_per_vm) in
-           let addr = Hashtbl.find addresses i in
-           Hashtbl.replace next_port (addr, port) (port + 1)) ;
     let ssh_id = Env.ssh_private_key_filename () in
     let get_point i =
       let port = base_port + (i * ports_per_vm) in
-      let addr = Hashtbl.find addresses i in
+      let addr = Hashtbl.find addresses_table i in
       (addr, port)
     in
     let next_port point =
-      let port = Hashtbl.find next_port point in
-      Hashtbl.replace next_port point (port + 1) ;
+      let port = Hashtbl.find ports_table point in
+      Hashtbl.replace ports_table point (port + 1) ;
       port
     in
     let* () = if Env.monitoring then Monitoring.run () else Lwt.return_unit in
     let agents =
       configurations
       |> List.mapi (fun i configuration ->
-             let name = Format.asprintf "localhost_docker_%d" i in
              let point = get_point i in
              Agent.make
                ~ssh_id
                ~point
                ~configuration
                ~next_available_port:(fun () -> next_port point)
-               ~name
+               ~name:configuration.Configuration.name
                ())
     in
     Lwt.return
@@ -390,8 +390,11 @@ module Localhost = struct
     Log.report "Terminate test: tearing down docker containers..." ;
     let* () =
       t.agents
-      |> List.mapi (fun i _agent ->
-             let* _ = Docker.kill (vm_name i) |> Process.wait in
+      |> List.map (fun agent ->
+             let* _ =
+               Docker.kill (container_name (Agent.configuration agent))
+               |> Process.wait
+             in
              Lwt.return_unit)
       |> Lwt.join
     in

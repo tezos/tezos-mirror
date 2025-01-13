@@ -871,7 +871,7 @@ let benchmark () =
     ::
     (match configuration.stake with
     | [n] -> List.init n (fun i -> `Baker i)
-    | stake -> List.map (fun i -> `Baker i) stake)
+    | stake -> List.mapi (fun i _ -> `Baker i) stake)
     @
     match configuration.stresstest with
     | None -> []
@@ -881,18 +881,18 @@ let benchmark () =
           | Some network -> nb_stresstester network tps
           | None -> tps / stresstest_max_tps_pre_node
         in
-        List.init n (fun _ -> `Stresstest)
+        List.init n (fun i -> `Stresstest i)
   in
   let default_docker_image =
     Option.map
       (fun tag -> Configuration.Octez_release {tag})
       Scenarios_cli.octez_release
   in
-  let default_vm_configuration =
-    Configuration.make ?docker_image:default_docker_image ()
+  let default_vm_configuration ~name =
+    Configuration.make ?docker_image:default_docker_image ~name ()
   in
-  let make_vm_conf = function
-    | None -> default_vm_configuration
+  let make_vm_conf ~name = function
+    | None -> default_vm_configuration ~name
     | Some {machine_type; docker_image; max_run_duration; binaries_path; os} ->
         let docker_image =
           match docker_image with
@@ -906,19 +906,21 @@ let benchmark () =
           ?max_run_duration
           ?binaries_path
           ?os
+          ~name
           ()
   in
   let vms =
     vms
-    |> List.map (function
+    |> List.map (fun kind ->
+           match kind with
            | `Bootstrap ->
-               make_vm_conf
+               make_vm_conf ~name:"bootstrap"
                @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
-           | `Stresstest ->
-               make_vm_conf
+           | `Stresstest j ->
+               make_vm_conf ~name:(Format.sprintf "stresstest-%d" j)
                @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
            | `Baker i ->
-               make_vm_conf
+               make_vm_conf ~name:(Format.sprintf "baker-%d" i)
                @@ Option.bind vms_conf (function
                       | {bakers = Some bakers; _} -> List.nth_opt bakers i
                       | {bakers = None; _} -> None))
@@ -947,19 +949,10 @@ let benchmark () =
   toplog "Created %d agents" (List.length agents) ;
   (* We give to the [init] function a sequence of agents. We set their name
      only if the number of agents is the computed one. Otherwise, the user
-     has mentioned explicitely a reduced number of agents and it is not
+     has mentioned explicitly a reduced number of agents and it is not
      clear how to give them proper names. *)
-  let set_name agent name =
-    if List.length agents = List.length vms then
-      Cloud.set_agent_name cloud agent name
-    else Lwt.return_unit
-  in
-  let next_agent =
-    let next = List.to_seq agents |> Seq.to_dispenser in
-    fun ~name ->
-      let agent = next () |> Option.get in
-      let* () = set_name agent name in
-      Lwt.return agent
+  let next_agent ~name =
+    List.find (fun agent -> Agent.name agent = name) agents |> Lwt.return
   in
   let* t = init ~configuration cloud next_agent in
   toplog "Starting main loop" ;
