@@ -2,7 +2,12 @@
 ARG RELEASE_TAG
 
 # Start from some release
+
 FROM tezos/tezos:$RELEASE_TAG
+
+# Use this one instead if you want to use docker images produced by the CI
+# on a custom branch. Likely the tag to use will be 'amd64_<branch_name>'
+# FROM us-central1-docker.pkg.dev/nl-gitlab-runner/registry/tezos/tezos:$RELEASE_TAG
 
 # Set back the user for executing the following commands
 USER root
