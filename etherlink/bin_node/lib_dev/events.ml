@@ -173,21 +173,21 @@ let missing_chain_id =
     ~msg:"Missing chain id: skipping consistency check with selected network"
     ()
 
-let downloading_file =
-  let pp_file_size fmt size =
-    let pp unit power =
-      Format.fprintf
-        fmt
-        "%d.%d%s"
-        (size / power)
-        (size / (power / 10) mod 10)
-        unit
-    in
-    if size / 1_000_000_000 > 0 then pp "GBytes" 1_000_000_000
-    else if size / 1_000_000 > 0 then pp "MBytes" 1_000_000
-    else if size / 1_000 > 0 then pp "KBytes" 1_000
-    else Format.fprintf fmt "%dbytes" size
+let pp_file_size fmt size =
+  let pp unit power =
+    Format.fprintf
+      fmt
+      "%d.%d%s"
+      (size / power)
+      (size / (power / 10) mod 10)
+      unit
   in
+  if size / 1_000_000_000 > 0 then pp "GBytes" 1_000_000_000
+  else if size / 1_000_000 > 0 then pp "MBytes" 1_000_000
+  else if size / 1_000 > 0 then pp "KBytes" 1_000
+  else Format.fprintf fmt "%dbytes" size
+
+let downloading_file =
   Internal_event.Simple.declare_2
     ~level:Notice
     ~section
@@ -199,6 +199,23 @@ let downloading_file =
         pp_print_option (fun fmt size -> fprintf fmt " (%a)" pp_file_size size))
     ("url", Data_encoding.string)
     ("size", Data_encoding.(option int31))
+
+let download_in_progress =
+  Internal_event.Simple.declare_3
+    ~level:Notice
+    ~section
+    ~name:"snapshot_download_in_progress"
+    ~msg:"Still downloading {url} after {elapsed_time}{remaining_bytes}."
+    ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
+    ~pp2:(fun fmt elapsed_time ->
+      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
+    ~pp3:
+      Format.(
+        pp_print_option (fun fmt remaining ->
+            fprintf fmt " (%a remaining)" pp_file_size remaining))
+    ("url", Data_encoding.string)
+    ("elapsed_time", Time.System.Span.encoding)
+    ("remaining_bytes", Data_encoding.(option int31))
 
 let importing_snapshot =
   Internal_event.Simple.declare_0
@@ -404,6 +421,9 @@ let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
 let missing_chain_id () = emit missing_chain_id ()
 
 let downloading_file ?size url = emit downloading_file (url, size)
+
+let download_in_progress ?remaining_bytes ~elapsed_time url =
+  emit download_in_progress (url, elapsed_time, remaining_bytes)
 
 let download_failed url reason = emit download_failed (url, reason)
 
