@@ -1342,8 +1342,8 @@ let test_delayed_transfer_is_included =
   in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
-  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
   let* tx_hash =
     send_raw_transaction_to_delayed_inbox
       ~sc_rollup_node
@@ -1360,8 +1360,8 @@ let test_delayed_transfer_is_included =
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
-  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
   Check.((sender_balance_prev > sender_balance_next) Wei.typ)
     ~error_msg:"Expected a smaller sender balance (before: %L < after: %R)" ;
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
@@ -1481,7 +1481,7 @@ let test_delayed_deposit_is_included =
       }
   in
   let* receiver_balance_prev =
-    Eth_cli.balance ~account:receiver.address ~endpoint
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -1502,7 +1502,7 @@ let test_delayed_deposit_is_included =
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
-    Eth_cli.balance ~account:receiver.address ~endpoint
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
     ~error_msg:"Expected a bigger balance" ;
@@ -2111,7 +2111,7 @@ let test_delayed_deposit_from_init_rollup_node =
              _protocol ->
   let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
   let* receiver_balance_prev =
-    Eth_cli.balance ~account:receiver ~endpoint:(Evm_node.endpoint sequencer)
+    Eth_cli.balance ~account:receiver ~endpoint:(Evm_node.endpoint sequencer) ()
   in
   let* () = bake_until_sync ~sc_rollup_node ~sequencer ~proxy ~client () in
   (* We don't care about this sequencer. *)
@@ -2160,6 +2160,7 @@ let test_delayed_deposit_from_init_rollup_node =
     Eth_cli.balance
       ~account:receiver
       ~endpoint:(Evm_node.endpoint new_sequencer)
+      ()
   in
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
     ~error_msg:"Expected a bigger balance" ;
@@ -2793,7 +2794,7 @@ let test_observer_forwards_transaction =
   in
 
   let* receipt =
-    Eth_cli.get_receipt ~endpoint:(Evm_node.endpoint sequencer_node) ~tx:txn
+    Eth_cli.get_receipt ~endpoint:(Evm_node.endpoint sequencer_node) ~tx:txn ()
   in
 
   match receipt with
@@ -2849,6 +2850,7 @@ let test_sequencer_is_reimbursed =
     Eth_cli.balance
       ~account:sequencer_pool_address
       ~endpoint:Evm_node.(endpoint sequencer_node)
+      ()
   in
 
   Check.((Wei.zero = balance) Wei.typ)
@@ -2869,7 +2871,7 @@ let test_sequencer_is_reimbursed =
   in
 
   let* receipt =
-    Eth_cli.get_receipt ~endpoint:(Evm_node.endpoint sequencer_node) ~tx:txn
+    Eth_cli.get_receipt ~endpoint:(Evm_node.endpoint sequencer_node) ~tx:txn ()
   in
 
   match receipt with
@@ -2878,6 +2880,7 @@ let test_sequencer_is_reimbursed =
         Eth_cli.balance
           ~account:sequencer_pool_address
           ~endpoint:Evm_node.(endpoint sequencer_node)
+          ()
       in
 
       Check.((Wei.zero < balance) Wei.typ)
@@ -3198,6 +3201,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
     Eth_cli.balance
       ~account:Eth_account.bootstrap_accounts.(1).address
       ~endpoint:(Evm_node.endpoint sequencer)
+      ()
   in
 
   let* () =
@@ -3255,6 +3259,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
     Eth_cli.balance
       ~account:Eth_account.bootstrap_accounts.(1).address
       ~endpoint:(Evm_node.endpoint sequencer)
+      ()
   in
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
     ~error_msg:"Expected a bigger balance" ;
@@ -4776,8 +4781,8 @@ let test_delayed_transfer_timeout =
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
-  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
   let* raw_transfer =
@@ -4806,8 +4811,8 @@ let test_delayed_transfer_timeout =
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
   Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
     ~error_msg:"Balance should be updated" ;
   Check.((receiver_balance_prev <> receiver_balance_next) Wei.typ)
@@ -4958,8 +4963,8 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
-  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
   let* raw_transfer =
@@ -4991,8 +4996,8 @@ let test_delayed_transfer_timeout_fails_l1_levels =
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
   Check.((sender_balance_prev = sender_balance_next) Wei.typ)
     ~error_msg:"Sender balance should be the same (prev %L = next %R)" ;
   Check.((receiver_balance_prev = receiver_balance_next) Wei.typ)
@@ -5003,8 +5008,8 @@ let test_delayed_transfer_timeout_fails_l1_levels =
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
   Check.((sender_balance_prev > sender_balance_next) Wei.typ)
     ~error_msg:"Expected a smaller sender balance (prev %L > next %R)" ;
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
@@ -5274,8 +5279,8 @@ let test_delayed_inbox_flushing =
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
-  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
   (* Thix crafted tx comes from [100-inputs-for-proxy] (the first one),
      but the signer is not the same so the tx is different on the signature *)
   let* tx1 =
@@ -5332,8 +5337,8 @@ let test_delayed_inbox_flushing =
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
-  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
   Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
     ~error_msg:"Balance should be updated" ;
   Check.((receiver_balance_prev <> receiver_balance_next) Wei.typ)
@@ -5886,7 +5891,7 @@ let test_outbox_size_limit_resilience ~slow =
       }
   in
   let* receiver_balance_prev =
-    Eth_cli.balance ~account:receiver.address ~endpoint
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -5907,7 +5912,7 @@ let test_outbox_size_limit_resilience ~slow =
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
-    Eth_cli.balance ~account:receiver.address ~endpoint
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
     ~error_msg:"Expected a bigger balance" ;
@@ -7710,7 +7715,7 @@ let test_trace_transaction_calltracer_deposit =
       }
   in
   let* receiver_balance_prev =
-    Eth_cli.balance ~account:receiver.address ~endpoint
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -7737,7 +7742,7 @@ let test_trace_transaction_calltracer_deposit =
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* receiver_balance_next =
-    Eth_cli.balance ~account:receiver.address ~endpoint
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
     ~error_msg:"Expected a bigger balance" ;
@@ -7907,6 +7912,7 @@ let test_trace_call =
     Eth_cli.encode_method
       ~abi_label:simple_storage_resolved.label
       ~method_:"get()"
+      ()
   in
 
   let*@ trace =
