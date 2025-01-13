@@ -62,18 +62,11 @@ let distribute_dal_attesting_rewards ctxt delegate
       ctxt
       delegate
   in
-  let minimal_dal_participation_ratio =
-    (Raw_context.constants ctxt).dal.minimal_participation_ratio
-  in
   let sufficient_dal_participation =
-    let open Z in
-    geq
-      (of_int32 dal_attested_slots_by_delegate)
-      (div
-         (mul
-            (of_int32 total_dal_attested_slots)
-            minimal_dal_participation_ratio.num)
-         minimal_dal_participation_ratio.den)
+    Delegate_missed_attestations_storage.is_dal_participation_sufficient
+      ctxt
+      ~dal_attested_slots_by_delegate
+      ~total_dal_attested_slots
   in
   let expected_dal_shards =
     Delegate_missed_attestations_storage
