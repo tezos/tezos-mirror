@@ -68,9 +68,18 @@ val register_metrics : string -> t -> t
 
 (** Register a new websocket service. The handler should return an initial
     JSONRPC response and optionally produce output elements in a stream for
-    subscription services. *)
+    subscription services. Requests above [max_message_length] will be rejected
+    and the connection closed (only for {!Resto} directories). If [monitor] is
+    provided, the websocket connection is monitored with the given parameters
+    (only for {!Resto} directories).
+*)
 val jsonrpc_websocket_register :
-  max_message_length:int -> t -> string -> Rpc_encodings.websocket_handler -> t
+  ?monitor:Configuration.monitor_websocket_heartbeat ->
+  max_message_length:int ->
+  t ->
+  string ->
+  Rpc_encodings.websocket_handler ->
+  t
 
 (** {2 Curried functions with respect to service parameters} *)
 

@@ -57,6 +57,7 @@ type experimental_features = {
   rpc_server : rpc_server;
   enable_websocket : bool;
   max_websocket_message_length : int;
+  monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
 }
 
 type sequencer = {
@@ -162,6 +163,7 @@ let default_experimental_features =
     rpc_server = Resto;
     enable_websocket = false;
     max_websocket_message_length = default_max_socket_message_length;
+    monitor_websocket_heartbeat = None;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -732,6 +734,25 @@ let history_mode_encoding =
   let open Data_encoding in
   string_enum [("archive", Archive); ("rolling", Rolling)]
 
+let monitor_websocket_heartbeat_encoding =
+  let open Data_encoding in
+  conv
+    (fun {ping_interval; ping_timeout} -> (ping_interval, ping_timeout))
+    (fun (ping_interval, ping_timeout) -> {ping_interval; ping_timeout})
+  @@ obj2
+       (req
+          ~description:
+            "Interval, in seconds, at which a ping will be sent to the client \
+             to monitor the websocket connection."
+          "ping_interval"
+          float)
+       (req
+          ~description:
+            "Timeout in seconds after which the connection will be considered \
+             dead and closed."
+          "ping_timeout"
+          float)
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -747,6 +768,7 @@ let experimental_features_encoding =
            rpc_server;
            enable_websocket;
            max_websocket_message_length;
+           monitor_websocket_heartbeat;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -758,7 +780,10 @@ let experimental_features_encoding =
           garbage_collector_parameters,
           history_mode,
           None ),
-        (rpc_server, enable_websocket, max_websocket_message_length) ))
+        ( rpc_server,
+          enable_websocket,
+          max_websocket_message_length,
+          monitor_websocket_heartbeat ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -769,7 +794,10 @@ let experimental_features_encoding =
              garbage_collector_parameters,
              history_mode,
              _next_wasm_runtime ),
-           (rpc_server, enable_websocket, max_websocket_message_length) ) ->
+           ( rpc_server,
+             enable_websocket,
+             max_websocket_message_length,
+             monitor_websocket_heartbeat ) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -782,6 +810,7 @@ let experimental_features_encoding =
         rpc_server;
         enable_websocket;
         max_websocket_message_length;
+        monitor_websocket_heartbeat;
       })
     (merge_objs
        (obj10
@@ -856,7 +885,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj3
+       (obj4
           (dft
              "rpc_server"
              ~description:
@@ -875,7 +904,13 @@ let experimental_features_encoding =
                "Maximum message size accepted by the websocket server (only \
                 for Resto backend)"
              int31
-             default_max_socket_message_length)))
+             default_max_socket_message_length)
+          (opt
+             "monitor_websocket_heartbeat"
+             ~description:
+               "Parameters to monitor websocket connections (if null, \
+                connections are not monitored)"
+             monitor_websocket_heartbeat_encoding)))
 
 let proxy_encoding =
   let open Data_encoding in

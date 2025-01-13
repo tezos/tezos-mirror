@@ -90,6 +90,7 @@ type experimental_features = {
   rpc_server : rpc_server;
   enable_websocket : bool;
   max_websocket_message_length : int;
+  monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
 }
 
 type sequencer = {
