@@ -253,6 +253,9 @@ DAL node
 Protocol
 ~~~~~~~~
 
+- A new RPC ``/chains/main/blocks/head/context/delegates/<pkh>/dal_participation``
+  similar to Tenderbake's ``/participation`` RPC to track bakers' DAL activity
+  (MR :gl:`!16168`)
 - A new antonymous operation "DAL entrapment evidence" was added. This operation
   is not valid when the feature flag for DAL incentives is turned off. (MR
   :gl:`!15677`)
