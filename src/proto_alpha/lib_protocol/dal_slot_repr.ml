@@ -1578,6 +1578,17 @@ module History = struct
       let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr ?with_migration dal_params page_id snapshot proof_repr
 
+    let adal_parameters_of_proof serialized_proof =
+      let open Result_syntax in
+      let+ proof_repr = deserialize_proof serialized_proof in
+      match proof_repr with
+      | Page_confirmed
+          {attestation_threshold_percent; restricted_commitments_publishers; _}
+      | Page_unconfirmed
+          {attestation_threshold_percent; restricted_commitments_publishers; _}
+        ->
+          (attestation_threshold_percent, restricted_commitments_publishers)
+
     let hash = hash ?with_migration:None
 
     type cell_content = Content_v2.t =

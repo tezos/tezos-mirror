@@ -500,6 +500,12 @@ module History : sig
     proof ->
     bytes option tzresult
 
+  (** Given a DAL proof, this function returns the values of the fields
+      [attestation_threshold_percent] [restricted_commitments_publishers] stored
+      in it. *)
+  val adal_parameters_of_proof :
+    proof -> (int option * Contract_repr.t list option) tzresult
+
   type error += Add_element_in_slots_skip_list_violates_ordering
 
   type error +=
