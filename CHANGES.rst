@@ -49,6 +49,10 @@ Client
 Baker
 -----
 
+- **Breaking change** Providing the endpoint of a running DAL node is required
+  for the baker to be launched, unless opted out with the newly introduced
+  ``--without-dal`` option. (MR :gl:`!16049`)
+
 Accuser
 -------
 

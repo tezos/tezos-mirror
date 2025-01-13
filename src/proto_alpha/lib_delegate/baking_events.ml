@@ -71,6 +71,44 @@ module Commands = struct
       ( "baker_commit",
         Data_encoding.option
           Tezos_version.Octez_node_version.commit_info_encoding )
+
+  let no_dal_node_running =
+    declare_0
+      ~section
+      ~name:"no_dal_node_running"
+      ~level:Warning
+      ~msg:
+        "No DAL node endpoint has been provided.\n\
+         It will soon be required to launch a DAL node before running the \
+         baker. For instructions on running a DAL node, please visit \
+         https://docs.tezos.com/tutorials/join-dal-baker."
+      ()
+
+  let unhealthy_dal_node =
+    declare_2
+      ~section
+      ~name:"unhealthy_dal_node"
+      ~level:Error
+      ~msg:
+        "The DAL node running on {endpoint} is not healthy. DAL attestations \
+         cannot be sent.\n\
+         Its health is {health}.\n\
+         Please check your DAL node and possibly restart it."
+      ~pp1:Uri.pp
+      ("endpoint", Tezos_rpc.Encoding.uri_encoding)
+      ~pp2:Tezos_dal_node_services.Types.Health.pp
+      ("health", Tezos_dal_node_services.Types.Health.encoding)
+
+  let unreachable_dal_node =
+    declare_1
+      ~section
+      ~name:"unreachable_dal_node"
+      ~level:Error
+      ~msg:
+        "The DAL node cannot be reached on endpoint: {endpoint}.\n\
+         Please check your DAL node and possibly restart it."
+      ~pp1:Uri.pp
+      ("endpoint", Tezos_rpc.Encoding.uri_encoding)
 end
 
 module State_transitions = struct
@@ -1035,16 +1073,6 @@ module Actions = struct
         Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
       )
 
-  let no_dal_node =
-    declare_0
-      ~section
-      ~name:"no_dal_node"
-      ~level:Notice
-      ~msg:
-        "DAL feature enabled, but no DAL node specified: cannot fetch \
-         attestations"
-      ()
-
   let signature_timeout =
     declare_1
       ~section
@@ -1074,6 +1102,8 @@ module Actions = struct
       ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
+
+  let no_dal_node_running = Commands.no_dal_node_running
 end
 
 module VDF = struct

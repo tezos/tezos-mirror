@@ -403,37 +403,35 @@ let () =
     (fun (chain, block_hash, length) ->
       Unexpected_empty_block_list {chain; block_hash; length})
 
-type error += No_dal_node_endpoint
+(* DAL node related errors *)
+
+type error += No_dal_node_endpoint | Incompatible_dal_options
 
 let () =
-  let description = "The mandatory argument --dal-node is missing." in
   register_error_kind
     `Permanent
     ~id:"Client_commands.no_dal_node_endpoint"
     ~title:"Missing_dal_node_argument"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.unit
-    (function No_dal_node_endpoint -> Some () | _ -> None)
-    (fun () -> No_dal_node_endpoint)
-
-type error +=
-  | Unhealthy_dal_node of {health : Tezos_dal_node_services.Types.Health.t}
-
-let () =
-  let open Tezos_dal_node_services.Types.Health in
-  register_error_kind
-    `Permanent
-    ~id:"Client_commands.Unhealthy_dal_node"
-    ~title:"Unhealthy_DAL_node"
-    ~description:"The DAL node is not performing well."
-    ~pp:(fun ppf health ->
+    ~description:"Explicit DAL node configuration is required."
+    ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "The DAL node is not performing well.\n\
-         Please check your DAL node. Its health is %a"
-        pp
-        health)
-    Data_encoding.(obj1 (req "health" encoding))
-    (function Unhealthy_dal_node {health} -> Some health | _ -> None)
-    (fun health -> Unhealthy_dal_node {health})
+        "Please connect a running DAL node using '--dal-node <endpoint>'. If \
+         you do not want to run a DAL node, you have to opt-out using \
+         '--without-dal'.")
+    Data_encoding.unit
+    (function No_dal_node_endpoint -> Some () | _ -> None)
+    (fun () -> No_dal_node_endpoint) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_commands.incompatible_dal_options"
+    ~title:"Incompatible_dal_options"
+    ~description:"'--dal-node' and '--without-dal' are incompatible."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "'--dal-node <endpoint>' and '--without-dal' are incompatible. Please \
+         do not pass '--without-dal' option.")
+    Data_encoding.unit
+    (function Incompatible_dal_options -> Some () | _ -> None)
+    (fun () -> Incompatible_dal_options)
