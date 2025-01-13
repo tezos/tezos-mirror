@@ -1415,8 +1415,11 @@ and 'ctx tree =
   | TNonTerminalSeq : 'ctx non_terminal_seq_level -> 'ctx tree
   | TEmpty : 'ctx tree
 
-let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
- fun root (Command {params; conv; _} as command) ->
+let insert_in_dispatch_tree :
+    type ctx. ?enable_argDefSwitch:bool -> ctx tree -> ctx command -> ctx tree =
+ fun ?(enable_argDefSwitch = false)
+     root
+     (Command {params; conv; options; _} as command) ->
   let rec insert_tree :
       type a ictx. (ctx -> ictx) -> ctx tree -> (a, ictx) params -> ctx tree =
    fun conv t c ->
@@ -1487,10 +1490,18 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
                print_commandline ppf ([], options, params))
              command)
   in
+  let () =
+    if enable_argDefSwitch then ()
+    else if has_argDefSwitch options then
+      Stdlib.failwith
+        "argDefSwitch is not enabled. Uses this option with precaution as it's \
+         not yet well tested."
+    else ()
+  in
   insert_tree conv root params
 
-let make_dispatch_tree commands =
-  List.fold_left insert_in_dispatch_tree TEmpty commands
+let make_dispatch_tree ?enable_argDefSwitch commands =
+  List.fold_left (insert_in_dispatch_tree ?enable_argDefSwitch) TEmpty commands
 
 let rec gather_commands ?(acc = []) tree =
   match tree with
@@ -1823,9 +1834,9 @@ let parse_global_options global_options ctx args =
     let* nested = parse_arg global_options dict ctx in
     return (nested, remaining)
 
-let dispatch commands ctx args =
+let dispatch ?enable_argDefSwitch commands ctx args =
   let open Lwt_result_syntax in
-  let tree = make_dispatch_tree commands in
+  let tree = make_dispatch_tree ?enable_argDefSwitch commands in
   match args with
   | []
     when match tree with
