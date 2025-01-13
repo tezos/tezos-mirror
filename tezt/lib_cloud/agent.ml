@@ -100,8 +100,15 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
+let names_table = Hashtbl.create 3
+
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in
+  let () =
+    match Hashtbl.find_opt names_table name with
+    | None -> Hashtbl.add names_table name ()
+    | Some () -> Test.fail "Duplicate agent name: %s" name
+  in
   let runner =
     match (point, ssh_id) with
     | None, None -> None

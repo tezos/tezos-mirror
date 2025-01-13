@@ -332,20 +332,17 @@ module Localhost = struct
        could be more robust to handle that. *)
     let* () = Lwt_unix.sleep 5. in
     let addresses_table = Hashtbl.create number_of_vms in
+    let ports_table = Hashtbl.create number_of_vms in
     let* () =
       Lwt_list.iteri_s
         (fun i configuration ->
           let* addr = address configuration in
           let () = Hashtbl.replace addresses_table i addr in
+          let port = base_port + (i * ports_per_vm) in
+          let () = Hashtbl.replace ports_table (addr, port) (port + 1) in
           Lwt.return_unit)
         configurations
     in
-    let next_port = Hashtbl.create number_of_vms in
-    Seq.ints 0 |> Seq.take number_of_vms
-    |> Seq.iter (fun i ->
-           let port = base_port + (i * ports_per_vm) in
-           let addr = Hashtbl.find addresses_table i in
-           Hashtbl.replace next_port (addr, port) (port + 1)) ;
     let ssh_id = Env.ssh_private_key_filename () in
     let get_point i =
       let port = base_port + (i * ports_per_vm) in
@@ -353,8 +350,8 @@ module Localhost = struct
       (addr, port)
     in
     let next_port point =
-      let port = Hashtbl.find next_port point in
-      Hashtbl.replace next_port point (port + 1) ;
+      let port = Hashtbl.find ports_table point in
+      Hashtbl.replace ports_table point (port + 1) ;
       port
     in
     let* () = if Env.monitoring then Monitoring.run () else Lwt.return_unit in
@@ -367,7 +364,7 @@ module Localhost = struct
                ~point
                ~configuration
                ~next_available_port:(fun () -> next_port point)
-               ~name:configuration.name
+               ~name:configuration.Configuration.name
                ())
     in
     Lwt.return
