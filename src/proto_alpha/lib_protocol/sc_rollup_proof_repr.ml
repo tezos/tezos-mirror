@@ -347,6 +347,36 @@ module Dal_helpers = struct
         ( Some (Reveal_proof (Dal_page_proof {proof; page_id})),
           Some (Sc_rollup_PVM_sig.Reveal (Dal_page content_opt)) )
     else return (None, None)
+
+  let _validate_dal_input_request proof ~proof_page_id ~request_page_id
+      ~request_attestation_threshold_percent
+      ~request_restricted_commitments_publishers =
+    let open Lwt_result_syntax in
+    let*? ( proof_attestation_threshold_percent,
+            proof_restricted_commitments_publishers ) =
+      Dal_slot_repr.History.adal_parameters_of_proof proof
+    in
+    let* () =
+      check
+        (Dal_slot_repr.Page.equal proof_page_id request_page_id)
+        "The DAL proof's page id does not match input request's one."
+    in
+    let* () =
+      check
+        (Option.equal
+           Compare.Int.equal
+           request_attestation_threshold_percent
+           proof_attestation_threshold_percent)
+        "The DAL proof's attestation_threshold_percent does not match input \
+         request's one."
+    in
+    check
+      (Option.equal
+         (List.equal Contract_repr.equal)
+         request_restricted_commitments_publishers
+         proof_restricted_commitments_publishers)
+      "The DAL proof's restricted_commitments_publishers does not match input \
+       request's one."
 end
 
 let valid (type state proof output)
