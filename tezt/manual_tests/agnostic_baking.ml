@@ -65,8 +65,8 @@ let wait_for_active_protocol_waiting agnostic_baker =
 (* Performs a protocol migration thanks to a UAU and the agnostic
    baker. *)
 let perform_protocol_migration ?node_name ?client_name ?parameter_file
-    ~blocks_per_cycle ~migration_level ~migrate_from ~migrate_to
-    ~baked_blocks_after_migration () =
+    ?(use_remote_signer = false) ~blocks_per_cycle ~migration_level
+    ~migrate_from ~migrate_to ~baked_blocks_after_migration () =
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, node =
@@ -76,6 +76,22 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~migration_level
       ~migrate_to
       ()
+  in
+  let* () =
+    if use_remote_signer then
+      let* () = Client.forget_all_keys client in
+      let keys =
+        Constant.activator :: (Account.Bootstrap.keys |> Array.to_list)
+      in
+      let* signer = Signer.init ~keys () in
+      (* tell the baker to ask the signer for the bootstrap keys *)
+      let uri = Signer.uri signer in
+      Lwt_list.iter_s
+        (fun account ->
+          let Account.{alias; public_key_hash; _} = account in
+          Client.import_signer_key client ~alias ~public_key_hash uri)
+        keys
+    else Lwt.return_unit
   in
   Log.info "Node %s initialized" (Node.name node) ;
   let baker = Agnostic_baker.create node client in
@@ -122,7 +138,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   let* () = Agnostic_baker.terminate baker in
   Lwt.return_unit
 
-let migrate ~migrate_from ~migrate_to =
+let migrate ~migrate_from ~migrate_to ?(use_remote_signer = false) () =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   let consensus_rights_delay =
@@ -130,18 +146,23 @@ let migrate ~migrate_from ~migrate_to =
   in
   (* Migration level is set arbitrarily *)
   let migration_level = blocks_per_cycle in
+  let remote_signer_text =
+    if use_remote_signer then " using HTTP remote signer" else ""
+  in
   Test.register
     ~__FILE__
     ~title:
       (Format.sprintf
-         "Protocol migration (from %s to %s) with agnostic baker"
+         "Protocol migration (from %s to %s) with agnostic baker%s"
          (Protocol.tag migrate_from)
-         (Protocol.tag migrate_to))
+         (Protocol.tag migrate_to)
+         remote_signer_text)
     ~tags:["protocol"; "migration"; "agnostic"; "baker"]
     ~uses:[Constant.octez_agnostic_baker]
   @@ fun () ->
   let* () =
     perform_protocol_migration
+      ~use_remote_signer
       ~blocks_per_cycle
       ~migration_level
       ~migrate_from
@@ -167,4 +188,5 @@ let start_stop =
 
 let register ~migrate_from ~migrate_to =
   start_stop ;
-  migrate ~migrate_from ~migrate_to
+  migrate ~migrate_from ~migrate_to ~use_remote_signer:false () ;
+  migrate ~migrate_from ~migrate_to ~use_remote_signer:true ()
