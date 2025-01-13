@@ -506,6 +506,9 @@ module Stages : sig
 
   val doc : Stage.t
 
+  (* Scanning vulnerabilities of Docker images. *)
+  val scan : Stage.t
+
   val prepare_release : Stage.t
 
   val publish_release_gitlab : Stage.t
