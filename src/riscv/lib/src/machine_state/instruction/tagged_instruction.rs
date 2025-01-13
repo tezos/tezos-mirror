@@ -296,10 +296,10 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd
         | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
         | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh
-        | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw
-        | CLwsp | CSw | CSwsp | CJ | CBeqz | CBnez | CLi | CLui | CAddi | CAddi16sp | CAddi4spn
-        | CSlli | CSrli | CSrai | CAndi | CAnd | COr | CXor | CSub | CAddw | CSubw | CNop | CLd
-        | CLdsp | CSd | CSdsp | CAddiw | Unknown | UnknownCompressed => ArgsShape::XSrcXDest,
+        | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw
+        | CSwsp | CJ | CBeqz | CBnez | CAddi16sp | CAddi4spn | CSrli | CSrai | CAndi | CAnd
+        | COr | CXor | CSub | CAddw | CSubw | CNop | CLd | CSd | CSdsp | Unknown
+        | UnknownCompressed => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -314,7 +314,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        CMv | CAdd | CJr | CJalr => ArgsShape::NZXSrcNZXDest,
+        CMv | CAdd | CJr | CJalr | CAddi | CAddiw | CLi | CLui | CSlli | CLdsp | CLwsp => {
+            ArgsShape::NZXSrcNZXDest
+        }
     }
 }
 

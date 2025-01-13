@@ -216,6 +216,12 @@ pub struct CIBTypeArgs {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CIBNZTypeArgs {
+    pub rd_rs1: NonZeroXRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CIBDTypeArgs {
     pub rd_rs1: FRegister,
     pub imm: i64,
@@ -416,7 +422,7 @@ pub enum InstrCacheable {
 
     // RV32C compressed instructions
     CLw(ITypeArgs),
-    CLwsp(CIBTypeArgs),
+    CLwsp(CIBNZTypeArgs),
     CSw(SBTypeArgs),
     CSwsp(CSSTypeArgs),
     CJ(CJTypeArgs),
@@ -424,12 +430,12 @@ pub enum InstrCacheable {
     CJalr(CRJTypeArgs),
     CBeqz(CIBTypeArgs),
     CBnez(CIBTypeArgs),
-    CLi(CIBTypeArgs),
-    CLui(CIBTypeArgs),
-    CAddi(CIBTypeArgs),
+    CLi(CIBNZTypeArgs),
+    CLui(CIBNZTypeArgs),
+    CAddi(CIBNZTypeArgs),
     CAddi16sp(CJTypeArgs),
     CAddi4spn(CIBTypeArgs),
-    CSlli(CIBTypeArgs),
+    CSlli(CIBNZTypeArgs),
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),
     CAndi(CIBTypeArgs),
@@ -445,10 +451,10 @@ pub enum InstrCacheable {
 
     // RV64C compressed instructions
     CLd(ITypeArgs),
-    CLdsp(CIBTypeArgs),
+    CLdsp(CIBNZTypeArgs),
     CSd(SBTypeArgs),
     CSdsp(CSSTypeArgs),
-    CAddiw(CIBTypeArgs),
+    CAddiw(CIBNZTypeArgs),
 
     // RV64DC compressed instructions
     CFld(FLoadArgs),

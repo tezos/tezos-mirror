@@ -8,7 +8,7 @@
 
 use crate::{default::ConstDefault, machine_state::backend};
 use arbitrary_int::u5;
-use std::{fmt, panic};
+use std::fmt;
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
@@ -317,6 +317,21 @@ impl fmt::Display for NonZeroXRegister {
     }
 }
 
+impl NonZeroXRegister {
+    /// Convert an `XRegister` to a `NonZeroXRegister`, provided `r != x0`.
+    ///
+    /// # Panics
+    /// Panics if `r == x0`.
+    pub const fn assert_from(r: XRegister) -> Self {
+        match r {
+            x0 => panic!("x0 is not a non-zero register"),
+            // SAFETY: Excluding x0, XRegister is a
+            // direct map to NonZeroXRegister, so safe to convert.
+            r => unsafe { std::mem::transmute(r) },
+        }
+    }
+}
+
 /// ABI register names for NonZeroXRegister types used in backend tests.
 #[cfg(test)]
 pub mod nz {
@@ -354,21 +369,6 @@ pub mod nz {
     pub const t4: NonZeroXRegister = NonZeroXRegister::x29;
     pub const t5: NonZeroXRegister = NonZeroXRegister::x30;
     pub const t6: NonZeroXRegister = NonZeroXRegister::x31;
-}
-
-impl NonZeroXRegister {
-    /// Convert an `XRegister` to a `NonZeroXRegister`, provided `r != x0`.
-    ///
-    /// # Panics
-    /// Panics if `r == x0`.
-    pub const fn assert_from(r: XRegister) -> Self {
-        match r {
-            x0 => panic!("x0 is not a non-zero register"),
-            // SAFETY: Excluding x0, XRegister is a
-            // direct map to NonZeroXRegister, so safe to convert.
-            r => unsafe { std::mem::transmute(r) },
-        }
-    }
 }
 
 /// Floating-point number register index

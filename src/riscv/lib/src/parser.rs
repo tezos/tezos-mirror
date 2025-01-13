@@ -8,10 +8,10 @@
 pub mod instruction;
 
 use crate::bits::u16;
-use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::{x0, NonZeroXRegister};
 use crate::machine_state::{
     csregisters::CSRegister,
-    registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
+    registers::{parse_fregister, parse_xregister, FRegister, XRegister},
 };
 use arbitrary_int::{u3, u5};
 use core::ops::Range;
@@ -1096,9 +1096,25 @@ const C_Q1_1: u16 = 0b01;
 const C_Q1_2: u16 = 0b10;
 const C_Q1_3: u16 = 0b11;
 
+/// Wrapper for splitting x0 from other XRegisters that can
+/// be represented by [`NonZeroXRegister`].
+enum XRegisterParsed {
+    X0,
+    NonZero(NonZeroXRegister),
+}
+
+/// Convert [`XRegister`] to [`NonZeroXRegister`] when `r != x0`.
+const fn split_x0(r: XRegister) -> XRegisterParsed {
+    match r {
+        x0 => XRegisterParsed::X0,
+        r => XRegisterParsed::NonZero(NonZeroXRegister::assert_from(r)),
+    }
+}
+
 #[inline]
 const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
     use InstrCacheable::*;
+    use XRegisterParsed::*;
     let i = match c_opcode(instr) {
         OP_C0 => match c_funct3(instr) {
             C_F3_1 => CFld(FLoadArgs {
@@ -1141,21 +1157,21 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             _ => UnknownCompressed { instr },
         },
         OP_C1 => match c_funct3(instr) {
-            C_F3_0 => match (ci_imm(instr), c_rd_rs1(instr)) {
+            C_F3_0 => match (ci_imm(instr), split_x0(c_rd_rs1(instr))) {
                 // "C.ADDI is only valid when rd != x0 and nzimm != 0.
                 // The code points with rd == x0 and nzimm == 0 encode the C.NOP instruction;
                 // the remaining code points with nzimm != 0 encode HINTs."
-                (0, x0) => CNop,
-                (0, _) | (_, x0) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CAddi(CIBTypeArgs { rd_rs1, imm }),
+                (0, X0) => CNop,
+                (0, _) | (_, X0) => UnknownCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CAddi(CIBNZTypeArgs { rd_rs1, imm }),
             },
-            C_F3_1 => match (ci_imm(instr), c_rd_rs1(instr)) {
-                (_, x0) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CAddiw(CIBTypeArgs { rd_rs1, imm }),
+            C_F3_1 => match (ci_imm(instr), split_x0(c_rd_rs1(instr))) {
+                (_, X0) => UnknownCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CAddiw(CIBNZTypeArgs { rd_rs1, imm }),
             },
-            C_F3_2 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLi(CIBTypeArgs {
+            C_F3_2 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLi(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_imm(instr),
                 }),
@@ -1164,12 +1180,12 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 if u16::bits_subset(instr, 6, 2) == 0 && !u16::bit(instr, 12) {
                     return Instr::Cacheable(UnknownCompressed { instr });
                 };
-                match c_rd_rs1(instr) {
-                    x2 => CAddi16sp(CJTypeArgs {
+                match split_x0(c_rd_rs1(instr)) {
+                    NonZero(NonZeroXRegister::x2) => CAddi16sp(CJTypeArgs {
                         imm: ci_addi16sp_imm(instr),
                     }),
-                    x0 => UnknownCompressed { instr },
-                    rd_rs1 => CLui(CIBTypeArgs {
+                    X0 => UnknownCompressed { instr },
+                    NonZero(rd_rs1) => CLui(CIBNZTypeArgs {
                         rd_rs1,
                         imm: ci_imm(instr) << 12,
                     }),
@@ -1196,50 +1212,40 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             _ => UnknownCompressed { instr },
         },
         OP_C2 => match c_funct3(instr) {
-            C_F3_0 => match (cslli_imm(instr), c_rd_rs1(instr)) {
-                (_, x0) | (0, _) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CSlli(CIBTypeArgs { rd_rs1, imm }),
+            C_F3_0 => match (cslli_imm(instr), split_x0(c_rd_rs1(instr))) {
+                (_, X0) | (0, _) => UnknownCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CSlli(CIBNZTypeArgs { rd_rs1, imm }),
             },
             C_F3_1 => CFldsp(CIBDTypeArgs {
                 rd_rs1: c_f_rd_rs1(instr),
                 imm: ci_ldsp_imm(instr),
             }),
-            C_F3_2 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLwsp(CIBTypeArgs {
+            C_F3_2 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLwsp(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_lwsp_imm(instr),
                 }),
             },
-            C_F3_3 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLdsp(CIBTypeArgs {
+            C_F3_3 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLdsp(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_ldsp_imm(instr),
                 }),
             },
 
-            C_F3_4 => match (u16::bit(instr, 12), c_rd_rs1(instr), c_rs2(instr)) {
-                (true, x0, x0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
-                (_, x0, _) => UnknownCompressed { instr },
-                (true, rs1, x0) => {
-                    let nzrs1 = NonZeroXRegister::assert_from(rs1);
-                    CJalr(CRJTypeArgs { rs1: nzrs1 })
-                }
-                (true, rs1, rs2) => {
-                    let rd_rs1 = NonZeroXRegister::assert_from(rs1);
-                    let rs2 = NonZeroXRegister::assert_from(rs2);
-                    CAdd(CNZRTypeArgs { rd_rs1, rs2 })
-                }
-                (false, rs1, x0) => {
-                    let nzrs1 = NonZeroXRegister::assert_from(rs1);
-                    CJr(CRJTypeArgs { rs1: nzrs1 })
-                }
-                (false, rs1, rs2) => {
-                    let rd_rs1 = NonZeroXRegister::assert_from(rs1);
-                    let rs2 = NonZeroXRegister::assert_from(rs2);
-                    CMv(CNZRTypeArgs { rd_rs1, rs2 })
-                }
+            C_F3_4 => match (
+                u16::bit(instr, 12),
+                split_x0(c_rd_rs1(instr)),
+                split_x0(c_rs2(instr)),
+            ) {
+                (true, X0, X0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
+                (_, X0, _) => UnknownCompressed { instr },
+                (true, NonZero(rs1), X0) => CJalr(CRJTypeArgs { rs1 }),
+                (true, NonZero(rd_rs1), NonZero(rs2)) => CAdd(CNZRTypeArgs { rd_rs1, rs2 }),
+                (false, NonZero(rs1), X0) => CJr(CRJTypeArgs { rs1 }),
+                (false, NonZero(rd_rs1), NonZero(rs2)) => CMv(CNZRTypeArgs { rd_rs1, rs2 }),
             },
             C_F3_5 => CFsdsp(CSSDTypeArgs {
                 rs2: c_f_rs2(instr),
@@ -1318,9 +1324,12 @@ mod tests {
         parse_block,
     };
     use crate::{
-        machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*},
+        machine_state::{
+            csregisters::CSRegister::mcause,
+            registers::{NonZeroXRegister, XRegister::*},
+        },
         parser::{
-            instruction::{CIBTypeArgs, InstrUncacheable},
+            instruction::{CIBNZTypeArgs, CIBTypeArgs, InstrUncacheable},
             parse_compressed_instruction, parse_compressed_instruction_inner,
         },
     };
@@ -1376,8 +1385,8 @@ mod tests {
                 rs1: x0,
                 imm: 21,
             })),
-            Instr::Cacheable(CLui(CIBTypeArgs {
-                rd_rs1: x8,
+            Instr::Cacheable(CLui(CIBNZTypeArgs {
+                rd_rs1: NonZeroXRegister::x8,
                 imm: 0x1 << 12,
             })),
             Instr::Cacheable(Addiw(ITypeArgs {
@@ -1385,7 +1394,10 @@ mod tests {
                 rs1: x8,
                 imm: 564,
             })),
-            Instr::Cacheable(CSlli(CIBTypeArgs { rd_rs1: x8, imm: 4 })),
+            Instr::Cacheable(CSlli(CIBNZTypeArgs {
+                rd_rs1: NonZeroXRegister::x8,
+                imm: 4,
+            })),
             Instr::Cacheable(Lui(UJTypeArgs {
                 rd: x7,
                 imm: 0x12 << 12,
