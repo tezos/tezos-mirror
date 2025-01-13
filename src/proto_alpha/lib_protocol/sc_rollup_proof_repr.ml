@@ -481,17 +481,26 @@ let valid (type state proof output)
     | ( Some (Reveal_proof Dal_parameters_proof),
         Needs_reveal Reveal_dal_parameters ) ->
         return_unit
-    | Some (Reveal_proof _), Needs_reveal (Request_dal_page _pid) ->
-        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410 implement
-           refutation games for adaptive DAL. *)
-        assert false
+    | ( Some (Reveal_proof (Dal_page_proof {page_id = proof_page_id; proof})),
+        Needs_reveal
+          (Request_adal_page
+            {
+              page_id;
+              attestation_threshold_percent;
+              restricted_commitments_publishers;
+            }) ) ->
+        Dal_helpers.validate_dal_input_request
+          proof
+          ~proof_page_id
+          ~request_page_id:page_id
+          ~request_attestation_threshold_percent:
+            (Some attestation_threshold_percent)
+          ~request_restricted_commitments_publishers:
+            restricted_commitments_publishers
     | None, (Initial | First_after _ | Needs_reveal _)
     | Some _, No_input_required
     | Some (Inbox_proof _), Needs_reveal _
     | _ ->
-        (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/milestones/410
-
-           Remove this fragile pattern matching. *)
         proof_error "Inbox proof and input request are dissociated."
   in
   return (input, input_requested)
