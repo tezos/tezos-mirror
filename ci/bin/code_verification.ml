@@ -763,7 +763,7 @@ let jobs pipeline_type =
       job_tezt_fetch_records;
       build_octez_source;
       job_build_grafazos;
-      job_build_layer1_profiling;
+      job_build_layer1_profiling ();
     ]
     @ Option.to_list job_select_tezts
     @ bin_packages_jobs

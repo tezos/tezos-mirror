@@ -1333,16 +1333,13 @@ let job_build_grafazos ?rules () =
       ]
     ["make"]
 
-let job_build_layer1_profiling =
+let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
   job
     ~__POS__
     ~stage:Stages.build
     ~image:Images.CI.build
     ~name:"build-layer1-profiling"
-    ~artifacts:
-      (artifacts
-         ~expire_in:(Duration (Days 1))
-         ["./octez-binaries/x86_64/octez-node"])
+    ~artifacts:(artifacts ~expire_in ["./octez-binaries/x86_64/octez-node"])
     ~before_script:
       (before_script
          ~take_ownership:true
