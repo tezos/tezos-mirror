@@ -852,7 +852,7 @@ let enc_git_strategy = function
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?(image_dependencies = [])
     ?services ?variables ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
-    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ~image ~stage
+    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ?image ~stage
     ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
@@ -872,7 +872,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     failwith "The job '%s' cannot have empty [rules]." name ;
   let arch = if Option.is_some arch then arch else arch_of_tag tag in
   (match (image, arch) with
-  | Internal {image = Image image_path; _}, None ->
+  | Some (Internal {image = Image image_path; _}), None ->
       failwith
         "[job] the job '%s' has tag '%s' whose architecture is not statically \
          known cannot use the image '%s' since it is Internal. Set a static \
@@ -895,7 +895,9 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
         name
   | _ -> ()) ;
   let image_dependencies =
-    (match image with Internal _ -> [image] | External _ -> [])
+    (match image with
+    | Some (Internal image) -> [Internal image]
+    | Some (External _) | None -> [])
     @ image_dependencies
   in
   let dependencies, image_builders =
@@ -963,7 +965,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       artifacts;
       before_script;
       cache;
-      image = Some (Image.image image);
+      image = Option.map Image.image image;
       interruptible;
       needs;
       (* Note that [dependencies] is always filled, because we want to

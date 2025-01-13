@@ -378,7 +378,7 @@ val job :
   ?parallel:Gitlab_ci.Types.parallel ->
   ?description:string ->
   __POS__:string * int * int * int ->
-  image:Image.t ->
+  ?image:Image.t ->
   stage:Stage.t ->
   name:string ->
   string list ->
