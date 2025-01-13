@@ -31,7 +31,12 @@ This sequence of operations was run:
     { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
       "missed_slots": 0, "missed_levels": 0,
       "remaining_allowed_missed_slots": 68,
-      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+      "expected_attesting_rewards": "477972" },
+  "dal_participation":
+    { "expected_assigned_shards_per_slot": 204,
+      "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
+      "expected_dal_rewards": "106080", "sufficient_dal_participation": true,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -66,23 +71,28 @@ This sequence of operations was run:
     { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
       "missed_slots": 0, "missed_levels": 0,
       "remaining_allowed_missed_slots": 68,
-      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+      "expected_attesting_rewards": "477972" },
+  "dal_participation":
+    { "expected_assigned_shards_per_slot": 204,
+      "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
+      "expected_dal_rewards": "106080", "sufficient_dal_participation": true,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
-  "pending_staking_parameters": [], "baking_power": "1466666683333",
-  "total_staked": "200000016667", "total_delegated": "3800000316666",
+  "pending_staking_parameters": [], "baking_power": "1466666681667",
+  "total_staked": "200000015001", "total_delegated": "3800000285009",
   "min_delegated_in_current_cycle":
     { "amount": "3800000000000",
       "level":
         { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
           "expected_commitment": false } },
-  "own_full_balance": "4000000333333", "own_staked": "200000016667",
-  "own_delegated": "3800000316666", "external_staked": "0",
+  "own_full_balance": "4000000300010", "own_staked": "200000015001",
+  "own_delegated": "3800000285009", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle": [ { "cycle": 0, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "4000000333333",
+  "staking_denominator": "0", "current_voting_power": "4000000300010",
   "voting_power": "4000000000000",
   "voting_info":
     { "voting_power": "4000000000000", "remaining_proposals": 20 },
@@ -95,7 +105,7 @@ This sequence of operations was run:
             "pk": "[PUBLIC_KEY]" } ] },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
-        "frozen_deposits": "200000016667" } ],
+        "frozen_deposits": "200000015001" } ],
   "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
@@ -104,24 +114,29 @@ This sequence of operations was run:
     { "expected_cycle_activity": 204, "minimal_cycle_activity": 136,
       "missed_slots": 0, "missed_levels": 0,
       "remaining_allowed_missed_slots": 68,
-      "expected_attesting_rewards": "531216" }, "grace_period": 3,
+      "expected_attesting_rewards": "477972" },
+  "dal_participation":
+    { "expected_assigned_shards_per_slot": 204,
+      "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
+      "expected_dal_rewards": "106080", "sufficient_dal_participation": true,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
-  "pending_staking_parameters": [], "baking_power": "1466667493344",
-  "total_staked": "200000164910", "total_delegated": "3800003133203",
+  "pending_staking_parameters": [], "baking_power": "1466667454794",
+  "total_staked": "200000159015", "total_delegated": "3800003021130",
   "min_delegated_in_current_cycle":
-    { "amount": "3800001985302",
+    { "amount": "3800001887337",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } },
-  "own_full_balance": "4000003298113", "own_staked": "200000164910",
-  "own_delegated": "3800003133203", "external_staked": "0",
+  "own_full_balance": "4000003180145", "own_staked": "200000159015",
+  "own_delegated": "3800003021130", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle":
     [ { "cycle": 0, "deposit": "0" }, { "cycle": 1, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "4000003298113",
+  "staking_denominator": "0", "current_voting_power": "4000003180145",
   "voting_power": "4000000000000",
   "voting_info":
     { "voting_power": "4000000000000", "remaining_proposals": 20 },
@@ -131,5 +146,5 @@ This sequence of operations was run:
           "pk": "[PUBLIC_KEY]" } },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
-        "frozen_deposits": "200000164910" } ],
+        "frozen_deposits": "200000159015" } ],
   "delegators": [ "[PUBLIC_KEY_HASH]" ] }
