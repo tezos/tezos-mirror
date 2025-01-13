@@ -13,14 +13,15 @@ module Configuration : sig
     | Gcp of {alias : string}
     | Octez_release of {tag : string}
 
-  type t = private {
-    name : string;
+  type vm = private {
     machine_type : string;
     docker_image : docker_image;
     max_run_duration : int option;
     binaries_path : string;
     os : Types.Os.t;
   }
+
+  type t = private {name : string; vm : vm}
 
   (** [make ?machine_type ()] is a smart-constructor to make a VM
       configuration.

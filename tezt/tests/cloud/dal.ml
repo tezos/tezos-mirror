@@ -2464,7 +2464,7 @@ let etherlink_loop (etherlink : etherlink) =
     in
     let runner = Node.runner producer.node |> Option.get in
     let firehose =
-      (Agent.configuration producer.agent).binaries_path // "firehose"
+      (Agent.configuration producer.agent).vm.binaries_path // "firehose"
     in
     let* () =
       Process.spawn

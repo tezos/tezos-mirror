@@ -46,16 +46,17 @@ module Remote = struct
     in
     Lwt.return_unit
 
-  let workspace_deploy ~workspace_name ~number_of_vms ~configuration =
+  let workspace_deploy ~workspace_name ~number_of_vms ~vm_configuration
+      ~configurations =
     let* () = Terraform.VM.Workspace.select workspace_name in
     let* docker_image =
-      Env.uri_of_docker_image configuration.Configuration.docker_image
+      Env.uri_of_docker_image vm_configuration.Configuration.docker_image
     in
-    let machine_type = configuration.machine_type in
-    let max_run_duration = configuration.max_run_duration in
+    let machine_type = vm_configuration.machine_type in
+    let max_run_duration = vm_configuration.max_run_duration in
     let ports_per_vm = Env.ports_per_vm in
     let base_port = Env.vm_base_port in
-    let os = configuration.os in
+    let os = vm_configuration.os in
     let auto_approve = Env.auto_approve in
     let prometheus_port = Env.prometheus_port in
     let* () =
@@ -76,13 +77,13 @@ module Remote = struct
     in
     let* zone = Env.zone () in
     let* () =
-      if configuration.os = Cos then
+      if vm_configuration.os = Cos then
         List.map (fun vm_name -> wait_docker_running ~vm_name ()) names
         |> Lwt.join
       else Lwt.return_unit
     in
     let ssh_private_key_filename = Env.ssh_private_key_filename () in
-    let make_agent vm_name =
+    let make_agent (vm_name, configuration) =
       let* ip = Gcloud.get_ip_address_from_name ~zone vm_name in
       let point = (ip, base_port) in
       let next_available_port =
@@ -108,7 +109,9 @@ module Remote = struct
         ()
       |> Lwt.return
     in
-    let* agents = names |> Lwt_list.map_p make_agent in
+    let* agents =
+      List.combine names configurations |> Lwt_list.map_p make_agent
+    in
     Lwt.return agents
 
   let order_agents agents configurations =
@@ -134,7 +137,11 @@ module Remote = struct
     let tezt_cloud = Env.tezt_cloud in
     let* () = Terraform.VM.Workspace.init ~tezt_cloud [workspace_name] in
     let* agents =
-      workspace_deploy ~workspace_name ~configuration ~number_of_vms:1
+      workspace_deploy
+        ~workspace_name
+        ~vm_configuration:configuration.Configuration.vm
+        ~configurations:[configuration]
+        ~number_of_vms:1
     in
     match agents with [agent] -> Lwt.return agent | _ -> assert false
 
@@ -176,11 +183,15 @@ module Remote = struct
     let agents_info = Hashtbl.create 11 in
     let workspaces_info =
       (* VMs are grouped per group of configuration. Each group leads to one workspace. *)
-      List.to_seq configurations |> Seq.group ( = )
+      List.to_seq configurations
+      |> Seq.group (fun Configuration.{vm; name = _} configuration ->
+             vm = configuration.vm)
       |> Seq.mapi (fun i seq ->
-             let configuration = Seq.uncons seq |> Option.get |> fst in
+             let Configuration.{vm = vm_configuration; _} =
+               Seq.uncons seq |> Option.get |> fst
+             in
              let workspace_name = Format.asprintf "%s-%d" Env.tezt_cloud i in
-             (workspace_name, (configuration, Seq.length seq)))
+             (workspace_name, (vm_configuration, configurations, Seq.length seq)))
     in
     let* () = Terraform.Docker_registry.init () in
     let* () = Terraform.VM.init () in
@@ -189,17 +200,24 @@ module Remote = struct
     let* () = Terraform.VM.Workspace.init ~tezt_cloud workspaces_names in
     let* agents =
       workspaces_info |> List.of_seq
-      |> Lwt_list.map_s (fun (workspace_name, (configuration, number_of_vms)) ->
+      |> Lwt_list.map_s
+           (fun
+             (workspace_name, (vm_configuration, configurations, number_of_vms))
+           ->
              let* () =
                Jobs.docker_build
-                 ~docker_image:configuration.Configuration.docker_image
+                 ~docker_image:vm_configuration.Configuration.docker_image
                  ~push:Env.push_docker
                  ()
              in
              let* () = Terraform.VM.Workspace.select workspace_name in
              let* () = Terraform.VM.init () in
              let* agents =
-               workspace_deploy ~workspace_name ~number_of_vms ~configuration
+               workspace_deploy
+                 ~workspace_name
+                 ~number_of_vms
+                 ~vm_configuration
+                 ~configurations
              in
              agents
              |> List.iter (fun agent ->
@@ -296,12 +314,12 @@ module Localhost = struct
              let publish_ports = (start, stop, start, stop) in
              let* () =
                Jobs.docker_build
-                 ~docker_image:configuration.Configuration.docker_image
+                 ~docker_image:configuration.Configuration.vm.docker_image
                  ~push:false
                  ()
              in
              let* docker_image =
-               Env.uri_of_docker_image configuration.docker_image
+               Env.uri_of_docker_image configuration.vm.docker_image
              in
              let process =
                Docker.run

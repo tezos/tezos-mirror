@@ -7,14 +7,15 @@
 
 include Types
 
-type t = {
-  name : string;
+type vm = {
   machine_type : string;
   docker_image : Env.docker_image;
   max_run_duration : int option;
   binaries_path : string;
   os : Os.t;
 }
+
+type t = {name : string; vm : vm}
 
 let gen_name =
   let cpt = ref (-1) in
@@ -41,4 +42,5 @@ let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image
         if Env.no_max_run_duration then None else Some Env.max_run_duration
     | Some max_run_duration -> Some max_run_duration
   in
-  {os; machine_type; docker_image; max_run_duration; binaries_path; name}
+  let vm = {machine_type; docker_image; max_run_duration; binaries_path; os} in
+  {name; vm}

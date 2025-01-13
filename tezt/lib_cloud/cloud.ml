@@ -134,7 +134,7 @@ let shutdown ?exn t =
 
 (* This function is used to ensure we can connect to the docker image on the VM. *)
 let wait_ssh_server_running agent =
-  if (Agent.configuration agent).os = Debian then Lwt.return_unit
+  if (Agent.configuration agent).vm.os = Debian then Lwt.return_unit
   else
     match Agent.runner agent with
     | None -> Lwt.return_unit
@@ -369,7 +369,7 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   let proxy_agent = Proxy.get_agent agents in
   let* () = wait_ssh_server_running proxy_agent in
   let destination =
-    (Agent.configuration proxy_agent).binaries_path
+    (Agent.configuration proxy_agent).vm.binaries_path
     // Filename.basename Path.self
   in
   let* self = Agent.copy ~destination proxy_agent ~source:Path.self in
