@@ -106,14 +106,16 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
   in
   let files = String.trim output |> String.split_on_char '\n' in
   let* () =
-    files
-    |> List.map (fun file ->
+    (* By default the SSH server accepts at most 10 connections, this can
+       fail if there are more then 10 files. We put 5 to take into
+       account potential other connections with the proxy SSH server. *)
+    files |> Lwt_stream.of_list
+    |> Lwt_stream.iter_n ~max_concurrency:5 (fun file ->
            Process.spawn
              ?runner:(Agent.runner proxy_agent)
              "ln"
              ["-s"; binaries_path // file; file; "-f"]
            |> Process.check)
-    |> Lwt.join
   in
   (* The scenario itself may need some files that exist on the host machine but
      are not present by default on the proxy machine. Since it may be difficult to
