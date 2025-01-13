@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -129,13 +129,16 @@ fi
 # Run & Collect #
 #################
 run_jstz() {
-  echo "[INFO]: Run $1 / $ITERATIONS"
+  echo -ne "\r\033[2K[INFO]: Run $1 / $ITERATIONS"
   if [ -z "$NATIVE" ]; then
     run_jstz_riscv "$1"
   else
     run_jstz_native "$1"
   fi
-  echo "[INFO]: Samply data saved to: $SAMPLY_OUT"
+
+  if [ -n "$PROFILING_WRAPPER" ]; then
+    echo -e "\n[INFO]: Samply data saved to: $SAMPLY_OUT"
+  fi
 }
 
 collect() {
