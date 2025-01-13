@@ -148,6 +148,34 @@ let test_participation ~sufficient_participation () =
   in
   Assert.equal_int64 ~loc:__LOC__ bal2_at_b expected_bal2_at_b
 
+let check_no_dal_participation
+    (dal_info : Delegate.For_RPC.dal_participation_info) =
+  let open Lwt_result_wrap_syntax in
+  let* () =
+    (* Some shards are assigned to the delegate. *)
+    Assert.not_equal_int ~loc:__LOC__ dal_info.expected_assigned_shards 0
+  in
+  let* () =
+    (* No slot is attested globally. *)
+    Assert.equal_int ~loc:__LOC__ dal_info.total_dal_attested_slots 0
+  in
+  let* () =
+    (* No attested slot is also attested by this delegate. *)
+    Assert.equal_int ~loc:__LOC__ dal_info.delegate_attested_dal_slots 0
+  in
+  let* () =
+    (* The delegate sufficiently participated in DAL (are there is no slot
+       attested globally). *)
+    Assert.equal_bool ~loc:__LOC__ dal_info.sufficient_dal_participation true
+  in
+  let* () =
+    (* No Tez are actually provisioned for DAL rewards as incentives are not
+       enabled in this test. Turn the test to [Assert.not_equal_tez] when
+       incentives are enabled by default. *)
+    Assert.equal_tez ~loc:__LOC__ dal_info.expected_dal_rewards Tez.zero
+  in
+  return_unit
+
 (* We bake and attest with 1 out of 2 accounts; we monitor the result
    returned by the '../delegates/<pkh>/participation' RPC for the
    non-participating account. *)
@@ -182,6 +210,12 @@ let test_participation_rpc () =
   let* _, _, _ =
     List.fold_left_es
       (fun (b_pred, b_crt, total_attesting_power) level_int ->
+        let* () =
+          if csts.Constants.parametric.dal.incentives_enable then
+            let* dal_info = Context.Delegate.dal_participation (B b_crt) del2 in
+            check_no_dal_participation dal_info
+          else return_unit
+        in
         let* info = Context.Delegate.participation (B b_crt) del2 in
         let* () =
           Assert.equal_int

@@ -71,6 +71,19 @@ val record_dal_participation :
   number_of_attested_slots:int ->
   Raw_context.t tzresult Lwt.t
 
+(** Returns [true] iff the protocol considers that the delegate attested
+    sufficiently many slots during a cycle, given the total number of attested
+    slots for that cycle and the number of those slots also attested by the
+    delegate.
+
+    The decision depends on the [minimal_participation_ratio] protocol
+    parameter. *)
+val is_dal_participation_sufficient :
+  Raw_context.t ->
+  dal_attested_slots_by_delegate:int32 ->
+  total_dal_attested_slots:int32 ->
+  bool
+
 (** Sets the payload and block producer as active. Pays the baking
    reward and the fees to the payload producer and the reward bonus to
    the payload producer (if the reward_bonus is not None).*)
@@ -130,4 +143,39 @@ module For_RPC : sig
     Raw_context.t ->
     Signature.Public_key_hash.t ->
     participation_info tzresult Lwt.t
+
+  (** Participation information. We denote by:
+      - "static" information that does not change during the cycle
+      - "dynamic" information that may change during the cycle *)
+  type dal_participation_info = {
+    expected_assigned_shards : int;
+        (** The total expected number of assigned shard indexes for the delegate
+            during the current cycle. (static) *)
+    delegate_attested_dal_slots : int;
+        (** The number of attested slots during the current cycle that are
+            attested by the delegate. (dynamic) *)
+    total_dal_attested_slots : int;
+        (** The total number of attested slots during the current cycle
+            (regardless whether this delegate attested them or
+            not). (dynamic) *)
+    expected_dal_rewards : Tez_repr.t;
+        (** The expected amount of DAL rewards for the delegate, assuming a
+            sufficient DAL participation (see [sufficient_dal_participation]
+            below). (static) *)
+    sufficient_dal_participation : bool;
+        (** A boolean flag telling whether the delegate sufficiently
+            participated in (attested) DAL slots attestation or not. In
+            particular, this flag is true if no DAL slot is attested globally by
+            the protocol at a given cycle (i.e. [total_dal_attested_slots] =
+            0). (dynamic) *)
+  }
+
+  (** Only use this function for RPC: this is expensive.
+
+      [dal_participation_info] forms the implementation of RPC call
+      "/context/delegates/<pkh>/dal_participation". *)
+  val dal_participation_info :
+    Raw_context.t ->
+    Signature.Public_key_hash.t ->
+    dal_participation_info tzresult Lwt.t
 end

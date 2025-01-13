@@ -2505,8 +2505,19 @@ module Delegate : sig
       expected_attesting_rewards : Tez.t;
     }
 
+    type dal_participation_info = {
+      expected_assigned_shards : int;
+      delegate_attested_dal_slots : int;
+      total_dal_attested_slots : int;
+      expected_dal_rewards : Tez.t;
+      sufficient_dal_participation : bool;
+    }
+
     val participation_info :
       context -> public_key_hash -> participation_info tzresult Lwt.t
+
+    val dal_participation_info :
+      context -> public_key_hash -> dal_participation_info tzresult Lwt.t
 
     (** Returns the full 'balance' of the implicit contract associated to a
         given key, i.e. the sum of the spendable balance (given by [balance] or

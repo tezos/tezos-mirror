@@ -143,6 +143,41 @@ let participation_info_encoding =
        (req "remaining_allowed_missed_slots" int31)
        (req "expected_attesting_rewards" Tez.encoding))
 
+let dal_participation_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun Delegate.For_RPC.
+           {
+             expected_assigned_shards;
+             delegate_attested_dal_slots;
+             total_dal_attested_slots;
+             expected_dal_rewards;
+             sufficient_dal_participation;
+           } ->
+      ( expected_assigned_shards,
+        delegate_attested_dal_slots,
+        total_dal_attested_slots,
+        expected_dal_rewards,
+        sufficient_dal_participation ))
+    (fun ( expected_assigned_shards,
+           delegate_attested_dal_slots,
+           total_dal_attested_slots,
+           expected_dal_rewards,
+           sufficient_dal_participation ) ->
+      {
+        expected_assigned_shards;
+        delegate_attested_dal_slots;
+        total_dal_attested_slots;
+        expected_dal_rewards;
+        sufficient_dal_participation;
+      })
+    (obj5
+       (req "expected_assigned_shards" int31)
+       (req "delegate_attested_dal_slots" int31)
+       (req "total_dal_attested_slots" int31)
+       (req "expected_dal_rewards" Tez.encoding)
+       (req "sufficient_dal_participation" bool))
+
 type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
 
 let deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t =
@@ -845,6 +880,31 @@ module S = struct
       ~output:participation_info_encoding
       RPC_path.(path / "participation")
 
+  let dal_participation =
+    RPC_service.get_service
+      ~description:
+        "Returns information about the delegate's participation in the \
+         attestation of slots published into the Data Availability Layer (DAL) \
+         during the current cycle. The field 'expected_assigned_shards' \
+         indicates the expected number of shards assigned to the delegate in \
+         the cycle. The field 'delegate_attested_dal_slots' represents the \
+         number of attested DAL slots which are also attested by the delegate, \
+         while 'total_dal_attested_slots' provides the total number of DAL \
+         slots attested during the cycle, regardless of the delegate's \
+         participation. The 'expected_dal_rewards' field specifies the \
+         expected amount of rewards for the delegate based on DAL \
+         participation, provided the delegate meets the required participation \
+         Whether this threshold is currently met is determined by the \
+         'sufficient_dal_participation' flag, which is true if currently the \
+         delegate has sufficiently participated in attesting DAL slots \
+         declared to be attested by the protocol. Note that this flag may \
+         evolve during the cycle. Also note, in particular, that if no DAL no \
+         DAL slots have been globally attested during the cycle (i.e., when \
+         'total_dal_attested_slots' is zero), the flag is true."
+      ~query:RPC_query.empty
+      ~output:dal_participation_info_encoding
+      RPC_path.(path / "dal_participation")
+
   let active_staking_parameters =
     RPC_service.get_service
       ~description:
@@ -1334,6 +1394,9 @@ let register () =
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.participation_info ctxt pkh) ;
+  register1 ~chunked:false S.dal_participation (fun ctxt pkh () () ->
+      let* () = check_delegate_registered ctxt pkh in
+      Delegate.For_RPC.dal_participation_info ctxt pkh) ;
   register1 ~chunked:false S.active_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.of_delegate ctxt pkh) ;
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
@@ -1424,6 +1487,9 @@ let consensus_key ctxt block pkh =
 
 let participation ctxt block pkh =
   RPC_context.make_call1 S.participation ctxt block pkh () ()
+
+let dal_participation ctxt block pkh =
+  RPC_context.make_call1 S.dal_participation ctxt block pkh () ()
 
 let active_staking_parameters ctxt block pkh =
   RPC_context.make_call1 S.active_staking_parameters ctxt block pkh () ()
