@@ -239,7 +239,9 @@ let copy agent ~consistency_check ~is_directory ~source ~destination =
     binary. The command returns an output of the form `file: <file_type> ...`;
     the file is binary if <file_type> is "ELF". *)
 let is_binary file =
-  let* output = Process.run_and_read_stdout "file" [file] in
+  (* With '-L' it dereferences symbolic links. Useful if the file is
+     actually a symbolic link to a binary file. *)
+  let* output = Process.run_and_read_stdout "file" ["-L"; file] in
   (* output is of the form "file: type_of_file ..." *)
   String.split_on_char ' ' output
   |> List.tl |> List.hd |> String.trim
