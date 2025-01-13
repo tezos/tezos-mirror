@@ -14,7 +14,11 @@ Suggests: lz4 curl sudo
  This package installs the Octez node.
 %install
 mkdir -p %{buildroot}/usr/bin/
+mkdir -p %{buildroot}/usr/share/octez-node/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-node %{buildroot}/usr/bin/
+install -m 0755 $HOME/rpmbuild/SPECS/scripts/octez-node-prestart.sh %{buildroot}/usr/share/octez-node/
+install -m 0755 $HOME/rpmbuild/SPECS/scripts/snapshot-import.sh %{buildroot}/usr/share/octez-node/
+install -m 0755 $HOME/rpmbuild/SPECS/scripts/wait-for-node-up.sh %{buildroot}/usr/share/octez-node/
 install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-node.1 %{buildroot}%{_mandir}/man1/octez-node.1
 gzip %{buildroot}%{_mandir}/man1/octez-node.1
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-node.service %{buildroot}/usr/lib/systemd/system/octez-node.service
@@ -25,16 +29,21 @@ install -D -m 644  $HOME/rpmbuild/SPECS/octez-node.default %{buildroot}/etc/defa
 %{_mandir}/man1/octez-node.1*
 /usr/lib/systemd/system/octez-node.service
 /etc/default/octez-node
+/usr/share/octez-node/*
+/etc/default/octez-node
 %postun
 
-. /etc/default/octez
+. /etc/default/octez-node
 
 rm -Rf "$DATADIR"
 
 userdel tezos
+rm /etc/default/octez-node
 
 %post
 TEZOS_HOME=/var/tezos
+
+. /etc/default/octez-node
 
 # Work directory to store temporary files associated with this package
 mkdir -p /run/octez-node
