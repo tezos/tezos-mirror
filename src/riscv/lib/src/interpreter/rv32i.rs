@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -429,22 +429,22 @@ mod tests {
         ];
 
         for (imm, rs1, rd, res) in imm_rs1_rd_res {
-            let mut state = create_state!(HartState, F);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
 
-            state.xregisters.write(a0, rs1);
-            state.xregisters.write(t0, imm as u64);
-            state.xregisters.run_addi(imm, a0, rd);
-            assert_eq!(state.xregisters.read(rd), res);
-            i::run_add(&mut state.xregisters, a0, t0, a0);
-            assert_eq!(state.xregisters.read(a0), res);
+            state.hart.xregisters.write(a0, rs1);
+            state.hart.xregisters.write(t0, imm as u64);
+            state.hart.xregisters.run_addi(imm, a0, rd);
+            assert_eq!(state.hart.xregisters.read(rd), res);
+            i::run_add(&mut state, a0, t0, a0);
+            assert_eq!(state.hart.xregisters.read(a0), res);
             // test sub with: res - imm = rs1 and res - rs1 = imm
-            state.xregisters.write(a0, res);
-            state.xregisters.write(t0, imm as u64);
-            state.xregisters.run_sub(a0, t0, a1);
-            assert_eq!(state.xregisters.read(a1), rs1);
+            state.hart.xregisters.write(a0, res);
+            state.hart.xregisters.write(t0, imm as u64);
+            state.hart.xregisters.run_sub(a0, t0, a1);
+            assert_eq!(state.hart.xregisters.read(a1), rs1);
             // now rs1 is in register a1
-            state.xregisters.run_sub(a0, a1, a1);
-            assert_eq!(state.xregisters.read(a1), imm as u64);
+            state.hart.xregisters.run_sub(a0, a1, a1);
+            assert_eq!(state.hart.xregisters.read(a1), imm as u64);
         }
     });
 

@@ -690,7 +690,7 @@ macro_rules! impl_r_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            $impl(&mut core.hart.xregisters, self.rs1.x, self.rs2.x, self.rd.x);
+            $impl(core, self.rs1.x, self.rs2.x, self.rd.x);
 
             Ok(Next(self.width))
         }
@@ -864,7 +864,7 @@ macro_rules! impl_cr_nz_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            $impl(&mut core.hart.xregisters, self.rd.nzx, self.rs2.nzx);
+            $impl(core, self.rd.nzx, self.rs2.nzx);
             Ok(Next(self.width))
         }
     };

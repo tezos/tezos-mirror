@@ -52,9 +52,9 @@ mod tests {
             state.hart.xregisters.write_nz(nz::a3, rs1);
             state.hart.xregisters.write_nz(nz::a4, imm as u64);
 
-            run_cadd(&mut state.hart.xregisters, nz::a3, nz::a4);
+            run_cadd(&mut state, nz::a3, nz::a4);
             assert_eq!(state.hart.xregisters.read_nz(nz::a3), res);
-            run_cmv(&mut state.hart.xregisters, nz::a4, nz::a3);
+            run_cmv(&mut state, nz::a4, nz::a3);
             assert_eq!(state.hart.xregisters.read_nz(nz::a4), res);
         }
     });

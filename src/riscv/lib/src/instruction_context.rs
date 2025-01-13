@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,7 +8,11 @@
 //! be used for both interpretation and compilation of instructions.
 
 use crate::{
-    machine_state::registers::{NonZeroXRegister, XRegister, XRegisters, XValue},
+    machine_state::{
+        main_memory::MainMemoryLayout,
+        registers::{NonZeroXRegister, XRegister, XValue},
+        MachineCoreState,
+    },
     state_backend::ManagerReadWrite,
 };
 
@@ -40,29 +44,30 @@ pub trait ICB {
     fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
 }
 
-impl<M: ManagerReadWrite> ICB for XRegisters<M> {
+impl<ML: MainMemoryLayout, M: ManagerReadWrite> ICB for MachineCoreState<ML, M> {
     type XValue = XValue;
 
     #[inline(always)]
     fn xregister_read(&mut self, reg: XRegister) -> Self::XValue {
-        self.read(reg)
+        self.hart.xregisters.read(reg)
     }
 
     #[inline(always)]
     fn xregister_write(&mut self, reg: XRegister, value: Self::XValue) {
-        self.write(reg, value)
+        self.hart.xregisters.write(reg, value)
     }
 
     #[inline(always)]
     fn xregister_read_nz(&mut self, reg: NonZeroXRegister) -> Self::XValue {
-        self.read_nz(reg)
+        self.hart.xregisters.read_nz(reg)
     }
 
     #[inline(always)]
     fn xregister_write_nz(&mut self, reg: NonZeroXRegister, value: Self::XValue) {
-        self.write_nz(reg, value)
+        self.hart.xregisters.write_nz(reg, value)
     }
 
+    #[inline(always)]
     fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         // Wrapped addition in two's complement behaves the same for signed and unsigned
         lhs.wrapping_add(rhs)

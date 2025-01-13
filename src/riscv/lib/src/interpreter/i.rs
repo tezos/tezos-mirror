@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -24,8 +24,9 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
-            hart_state::{HartState, HartStateLayout},
+            main_memory::tests::T1K,
             registers::{a0, t0},
+            MachineCoreState, MachineCoreStateLayout,
         },
     };
 
@@ -40,13 +41,13 @@ mod tests {
         ];
 
         for (imm, rs1, res) in imm_rs1_res {
-            let mut state = create_state!(HartState, F);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
 
-            state.xregisters.write(a0, rs1);
-            state.xregisters.write(t0, imm as u64);
+            state.hart.xregisters.write(a0, rs1);
+            state.hart.xregisters.write(t0, imm as u64);
 
-            run_add(&mut state.xregisters, a0, t0, a0);
-            assert_eq!(state.xregisters.read(a0), res);
+            run_add(&mut state, a0, t0, a0);
+            assert_eq!(state.hart.xregisters.read(a0), res);
         }
     });
 }
