@@ -348,7 +348,7 @@ module Dal_helpers = struct
           Some (Sc_rollup_PVM_sig.Reveal (Dal_page content_opt)) )
     else return (None, None)
 
-  let _validate_dal_input_request proof ~proof_page_id ~request_page_id
+  let validate_dal_input_request proof ~proof_page_id ~request_page_id
       ~request_attestation_threshold_percent
       ~request_restricted_commitments_publishers =
     let open Lwt_result_syntax in
@@ -470,11 +470,14 @@ let valid (type state proof output)
           "Invalid reveal"
     | Some (Reveal_proof Metadata_proof), Needs_reveal Reveal_metadata ->
         return_unit
-    | ( Some (Reveal_proof (Dal_page_proof {page_id; proof = _})),
-        Needs_reveal (Request_dal_page pid) ) ->
-        check
-          (Dal_slot_repr.Page.equal page_id pid)
-          "Dal proof's page ID is not the one expected in input request."
+    | ( Some (Reveal_proof (Dal_page_proof {page_id = proof_page_id; proof})),
+        Needs_reveal (Request_dal_page request_page_id) ) ->
+        Dal_helpers.validate_dal_input_request
+          proof
+          ~proof_page_id
+          ~request_page_id
+          ~request_attestation_threshold_percent:None
+          ~request_restricted_commitments_publishers:None
     | ( Some (Reveal_proof Dal_parameters_proof),
         Needs_reveal Reveal_dal_parameters ) ->
         return_unit
