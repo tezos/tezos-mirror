@@ -120,6 +120,17 @@ module type T = sig
       whose information are given . *)
   val block_shell_header : block_info -> Block_header.shell_header
 
+  (** Call this function to inject an entrapment evidence to the
+      corresponding L1 node. *)
+  val inject_entrapment_evidence :
+    Tezos_rpc.Context.generic ->
+    attested_level:Int32.t ->
+    Proto.operation ->
+    slot_index:slot_index ->
+    shard:Cryptobox.shard ->
+    proof:Cryptobox.shard_proof ->
+    unit tzresult Lwt.t
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list : sig
