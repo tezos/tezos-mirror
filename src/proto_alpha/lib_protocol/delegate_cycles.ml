@@ -223,6 +223,9 @@ let cycle_end ctxt last_cycle =
   in
   let new_cycle = Cycle_repr.add last_cycle 1 in
   let*! ctxt = Already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle in
+  let*! ctxt =
+    Dal_already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle
+  in
   (* Deactivating delegates which didn't participate to consensus for too long *)
   let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
   (* Computing future staking rights *)
