@@ -82,6 +82,7 @@ depends: [
   "integers"
   "ctypes" { >= "0.18.0" }
   "tezos-sapling-parameters" { >= "1.1.0" }
+  "ambient-context-lwt" { = "0.1.0" }
   "octez-rustzcash-deps" { with-test & = version }
   "bigstring" {with-test}
   "bam-ppx" { with-test & >= "0.3" }

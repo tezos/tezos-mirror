@@ -17,6 +17,7 @@ depends: [
   "alcotest" {= "1.8.0"}
   "alcotest-lwt" {= "1.8.0"}
   "ambient-context" {= "0.1.0"}
+  "ambient-context-lwt" {= "0.1.0"}
   "angstrom" {= "0.16.1"}
   "asetmap" {= "0.8.1"}
   "asn1-combinators" {= "0.3.2"}

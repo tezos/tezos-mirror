@@ -589,7 +589,10 @@ module Make_s
         advertise
           pv_shell
           advertisable_mempool
-        [@profiler.aggregate_f {verbosity = Debug} "advertise mempool"] ;
+        [@profiler.aggregate_f {verbosity = Debug} "advertise mempool"]
+        [@profiler.custom_f
+          {driver_ids = [Opentelemetry]}
+            (Opentelemetry_profiler.trace "advertise mempool")] ;
       if Mempool.is_empty validated_mempool then Lwt.return_unit
       else
         let our_mempool =
@@ -765,6 +768,10 @@ module Make_s
       else
         match Parser.parse oph op with
         | Error err ->
+            ()
+            [@profiler.custom
+              {driver_ids = [Opentelemetry]}
+                (Opentelemetry_profiler.add_event "parse_operation failed")] ;
             failwith
               "Invalid operation %a: %a."
               Operation_hash.pp
@@ -772,6 +779,10 @@ module Make_s
               Error_monad.pp_print_trace
               err
         | Ok parsed_op -> (
+            ()
+            [@profiler.custom
+              {driver_ids = [Opentelemetry]}
+                (Opentelemetry_profiler.add_event "parse_operation succeeded")] ;
             if force then (
               let*! () =
                 pv.shell.parameters.tools.chain_tools.inject_operation oph op
@@ -819,6 +830,10 @@ module Make_s
               in
               match op_status with
               | Some (_h, `Validated) ->
+                  ()
+                  [@profiler.custom
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_profiler.add_event "operation validated")] ;
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
                      We may want to only do the injection/replacement if a
                      flag `replace` is set to true in the injection query. *)
@@ -852,6 +867,10 @@ module Make_s
                     | `Branch_refused e
                     | `Refused e
                     | `Outdated e ) ) ->
+                  ()
+                  [@profiler.custom
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_profiler.add_event "operation rejected")] ;
                   Lwt.return
                   @@ error_with
                        "Error while validating injected operation %a:@ %a"
@@ -1501,6 +1520,11 @@ module Make
             op
           [@profiler.aggregate_s
             {verbosity = Notice; metadata = [("prometheus", "")]} "on_inject"]
+          [@profiler.custom_f
+            {driver_ids = [Opentelemetry]}
+              (Opentelemetry_profiler.trace_operation
+                 (`Operation op)
+                 "on_inject")]
       | Request.Arrived (oph, op) ->
           Requests.on_arrived
             pv

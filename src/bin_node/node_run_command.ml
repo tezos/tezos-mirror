@@ -892,6 +892,10 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
                 "Failed to parse the provided target. A '<block_hash>,<level>' \
                  value was expected.")
     in
+    ()
+    [@profiler.custom
+      {driver_ids = [Opentelemetry]}
+        (Opentelemetry_profiler.initialize "octez-node")] ;
     Lwt_lock_file.with_lock
       ~when_locked:
         (`Fail (Exn (Failure "Data directory is locked by another process")))
