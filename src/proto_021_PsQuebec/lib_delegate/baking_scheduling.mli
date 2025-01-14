@@ -109,3 +109,6 @@ val run :
   Baking_configuration.t ->
   consensus_key list ->
   unit tzresult Lwt.t
+
+val create_dal_node_rpc_ctxt :
+  Uri.t -> Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
