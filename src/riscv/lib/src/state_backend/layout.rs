@@ -57,6 +57,18 @@ where
     }
 }
 
+/// Layout for a fixed number of bytes, readable as types implementing [`Elem`].
+pub struct DynArray<const LEN: usize> {}
+
+impl<const LEN: usize> Layout for DynArray<LEN> {
+    type Allocated<M: super::ManagerBase> = super::DynCells<LEN, M>;
+
+    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+        let region = backend.allocate_dyn_region();
+        super::DynCells::bind(region)
+    }
+}
+
 /// Usage: Provide a struct with each field holding a layout.
 ///
 /// ```

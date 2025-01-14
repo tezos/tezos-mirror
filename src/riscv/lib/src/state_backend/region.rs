@@ -580,6 +580,21 @@ impl<'de, const LEN: usize, M: ManagerDeserialise> serde::Deserialize<'de> for D
     }
 }
 
+impl<const LEN: usize, M: ManagerRead, N: ManagerRead> PartialEq<DynCells<LEN, N>>
+    for DynCells<LEN, M>
+{
+    fn eq(&self, other: &DynCells<LEN, N>) -> bool {
+        for i in 0..LEN {
+            if self.read::<u8>(i) != other.read::<u8>(i) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl<const LEN: usize, M: ManagerRead> Eq for DynCells<LEN, M> {}
+
 // TODO RV-322: Choose optimal Merkleisation parameters for main memory.
 /// Size of the Merkle leaf used for Merkleising [`DynCells`].
 pub const MERKLE_LEAF_SIZE: NonZeroUsize =
