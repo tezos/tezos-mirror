@@ -1741,7 +1741,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
         dal_slots
         |> Lwt_list.map_p (fun slot_index ->
                let name =
-                 Format.asprintf "etherlink-dal-operator-%d" slot_index
+                 Format.asprintf "etherlink-dal-observer-%d" slot_index
                in
                let* agent = next_agent ~name in
                let* node =
