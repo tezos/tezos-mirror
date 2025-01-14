@@ -35,6 +35,8 @@ module Plugin = struct
 
   type dal_attestation = Bitset.t
 
+  type attestation_operation = Kind.attestation Alpha_context.operation
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)

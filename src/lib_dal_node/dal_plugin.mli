@@ -65,6 +65,8 @@ module type T = sig
 
   type dal_attestation
 
+  type attestation_operation
+
   (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
       [block] in [ctxt] for the given [chain]. Block's metadata are included or
       skipped depending on the value of [metadata]. This is a wrapper on top of
@@ -125,7 +127,7 @@ module type T = sig
   val inject_entrapment_evidence :
     Tezos_rpc.Context.generic ->
     attested_level:Int32.t ->
-    Proto.operation ->
+    attestation_operation ->
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->

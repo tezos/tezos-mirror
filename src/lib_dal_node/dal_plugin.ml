@@ -127,6 +127,8 @@ module type T = sig
 
   type dal_attestation
 
+  type attestation_operation
+
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
@@ -164,7 +166,7 @@ module type T = sig
   val inject_entrapment_evidence :
     Tezos_rpc.Context.generic ->
     attested_level:Int32.t ->
-    Proto.operation ->
+    attestation_operation ->
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
