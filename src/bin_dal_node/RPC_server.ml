@@ -420,7 +420,14 @@ module Profile_handlers = struct
         | Ok trap -> return @@ not trap
         | Error _ ->
             (* assume the worst, that it is a trap *)
-            (* TODO: emit warning *)
+            let*! () =
+              Event.(
+                emit
+                  trap_check_failure
+                  ( slot_id.Types.Slot_id.slot_level,
+                    slot_id.slot_index,
+                    shard_index ))
+            in
             return false)
       assigned_shard_indexes
 
