@@ -49,9 +49,16 @@ Client
 Baker
 -----
 
-- **Breaking change** Providing the endpoint of a running DAL node is required
-  for the baker to be launched, unless opted out with the newly introduced
-  ``--without-dal`` option. (MR :gl:`!16049`)
+- **Breaking change** For ``proto_alpha``, providing the endpoint of a running
+  DAL node is required for the baker to be launched, unless opted out with the
+  newly introduced ``--without-dal`` option. (MR :gl:`!16049`)
+
+- **Deprecation:** For Paris and Quebec protocols, launching a
+  baker daemon without specifying a DAL node endpoint is deprecated.
+  To opt out of this requirement, use the newly introduced
+  ``--without-dal`` option (MR :gl:`!16213`).
+  The CLI argument ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
+  in the next version of Octez.
 
 Accuser
 -------
