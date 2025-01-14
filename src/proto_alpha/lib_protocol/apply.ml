@@ -2482,8 +2482,19 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt ~operation_hash bh1 ~payload_producer
-  | Single (Dal_entrapment_evidence _) ->
-      (* This should be unreachable, because this operation is not yet valid. *)
+  | Single (Dal_entrapment_evidence {attestation; slot_index; _}) ->
+      let {slot; level = raw_level; _} =
+        match attestation.protocol_data.contents with
+        | Single (Attestation {consensus_content; _}) -> consensus_content
+      in
+      let level = Level.from_raw ctxt raw_level in
+      let* ctxt, consensus_pk = Stake_distribution.slot_owner ctxt level slot in
+      let delegate = consensus_pk.delegate in
+      let*! ctxt, _already_denounced =
+        Dal.Delegate.add_denunciation ctxt delegate level slot_index
+      in
+      (* We could assert that the delegate has not been already denounced, given
+         that the operation has already been validated. *)
       return
         ( ctxt,
           Single_result (Dal_entrapment_evidence_result {balance_updates = []})

@@ -3036,6 +3036,14 @@ module Dal : sig
   (* This would normally be a part of {!Delegate}, but it is not because
      {!Dal.Slot_index} is defined after {!Delegate}. *)
   module Delegate : sig
+    (** See {!Dal_already_denounced_storage.add_denunciation}. *)
+    val add_denunciation :
+      context ->
+      public_key_hash ->
+      Level.t ->
+      Slot_index.t ->
+      (context * bool) Lwt.t
+
     (** See {!Dal_already_denounced_storage.is_already_denounced}. *)
     val is_already_denounced :
       context -> public_key_hash -> Level.t -> Slot_index.t -> bool Lwt.t
