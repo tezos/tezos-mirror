@@ -121,6 +121,7 @@
 /oxford/validation.html /active/validation.html 301
 /oxford/views.html /active/views.html 301
 /oxford/voting.html /active/voting.html 301
+/paris/* https://octez.tezos.com/docs/active/:splat 301
 /api/cli-commands.html /shell/cli-commands.html 301
 /api/rpc.html /shell/rpc.html 301
 /developer/sapling.html /active/sapling.html 301
