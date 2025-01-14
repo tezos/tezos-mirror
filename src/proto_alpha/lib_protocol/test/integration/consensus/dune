@@ -42,7 +42,8 @@
   test_preattestation_functor
   test_preattestation
   test_seed
-  test_aggregate))
+  test_aggregate
+  test_dal_entrapment))
 
 (executable
  (name main)

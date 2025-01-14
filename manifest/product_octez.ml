@@ -5524,6 +5524,7 @@ end = struct
           ("test_preendorsement", N.(number <= 017));
           ("test_seed", true);
           ("test_aggregate", N.(number >= 022));
+          ("test_dal_entrapment", N.(number >= 022));
         ]
         |> conditional_list
       in
