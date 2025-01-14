@@ -6889,6 +6889,7 @@ let hash = Protocol.hash
             |> error_monad_module N.(number <= 018);
             octez_protocol_compiler_registerer |> open_;
             octez_stdlib_unix |> open_;
+            octez_shell_services |> open_;
             octez_dal_node_lib |> open_;
             client |> if_some |> open_;
             plugin |> if_some |> open_;
