@@ -134,7 +134,7 @@ let shutdown ?exn t =
 
 (* This function is used to ensure we can connect to the docker image on the VM. *)
 let wait_ssh_server_running agent =
-  if (Agent.configuration agent).os = Debian then Lwt.return_unit
+  if (Agent.configuration agent).vm.os = Debian then Lwt.return_unit
   else
     match Agent.runner agent with
     | None -> Lwt.return_unit
@@ -369,7 +369,7 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   let proxy_agent = Proxy.get_agent agents in
   let* () = wait_ssh_server_running proxy_agent in
   let destination =
-    (Agent.configuration proxy_agent).binaries_path
+    (Agent.configuration proxy_agent).vm.binaries_path
     // Filename.basename Path.self
   in
   let* self = Agent.copy ~destination proxy_agent ~source:Path.self in
@@ -525,54 +525,70 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           deployement = None;
         }
   | Some configurations -> (
-      let tezt_cloud = Env.tezt_cloud in
-      let ensure_ready =
-        let wait_and_faketime =
-          match Env.faketime with
-          | None -> wait_ssh_server_running
-          | Some faketime ->
-              fun agent ->
-                let* () = wait_ssh_server_running agent in
-                set_faketime faketime agent
-        in
-        fun deployement ->
-          Deployement.agents deployement
-          |> List.map wait_and_faketime |> Lwt.join
+      let sorted_names =
+        configurations
+        |> List.map (fun Configuration.{name; _} -> name)
+        |> List.sort_uniq compare
       in
-      match Env.mode with
-      | `Orchestrator ->
-          (* The scenario is executed locally on the proxy VM. *)
-          let contents = Base.read_file (Path.proxy_deployement ~tezt_cloud) in
-          let json = Data_encoding.Json.from_string contents |> Result.get_ok in
-          let deployement =
-            Data_encoding.Json.destruct (Data_encoding.list Agent.encoding) json
-            |> Deployement.of_agents
+      if List.length sorted_names < List.length configurations then
+        Test.fail
+          "Duplicate found in the agent names used by the scenario: %s"
+          (String.concat " " sorted_names)
+      else
+        let tezt_cloud = Env.tezt_cloud in
+        let ensure_ready =
+          let wait_and_faketime =
+            match Env.faketime with
+            | None -> wait_ssh_server_running
+            | Some faketime ->
+                fun agent ->
+                  let* () = wait_ssh_server_running agent in
+                  set_faketime faketime agent
           in
-          let* () = ensure_ready deployement in
-          orchestrator ?alerts deployement f
-      | `Localhost ->
-          (* The scenario is executed locally and the VM are on the host machine. *)
-          let* () = Jobs.docker_build ~push:false () in
-          let* deployement = Deployement.deploy ~configurations in
-          let* () = ensure_ready deployement in
-          orchestrator ?alerts deployement f
-      | `Cloud ->
-          (* The scenario is executed locally and the VMs are on the cloud. *)
-          let* () = Jobs.deploy_docker_registry () in
-          let* () = Jobs.docker_build ~push:Env.push_docker () in
-          let* deployement = Deployement.deploy ~configurations in
-          let* () = ensure_ready deployement in
-          orchestrator ?alerts deployement f
-      | `Host ->
-          (* The scenario is executed remotely. *)
-          let* proxy_running = try_reattach () in
-          if not proxy_running then
+          fun deployement ->
+            Deployement.agents deployement
+            |> List.map wait_and_faketime |> Lwt.join
+        in
+        match Env.mode with
+        | `Orchestrator ->
+            (* The scenario is executed locally on the proxy VM. *)
+            let contents =
+              Base.read_file (Path.proxy_deployement ~tezt_cloud)
+            in
+            let json =
+              Data_encoding.Json.from_string contents |> Result.get_ok
+            in
+            let deployement =
+              Data_encoding.Json.destruct
+                (Data_encoding.list Agent.encoding)
+                json
+              |> Deployement.of_agents
+            in
+            let* () = ensure_ready deployement in
+            orchestrator ?alerts deployement f
+        | `Localhost ->
+            (* The scenario is executed locally and the VM are on the host machine. *)
+            let* () = Jobs.docker_build ~push:false () in
+            let* deployement = Deployement.deploy ~configurations in
+            let* () = ensure_ready deployement in
+            orchestrator ?alerts deployement f
+        | `Cloud ->
+            (* The scenario is executed locally and the VMs are on the cloud. *)
             let* () = Jobs.deploy_docker_registry () in
             let* () = Jobs.docker_build ~push:Env.push_docker () in
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
-            init_proxy ?proxy_files ?proxy_args deployement
-          else Lwt.return_unit)
+            orchestrator ?alerts deployement f
+        | `Host ->
+            (* The scenario is executed remotely. *)
+            let* proxy_running = try_reattach () in
+            if not proxy_running then
+              let* () = Jobs.deploy_docker_registry () in
+              let* () = Jobs.docker_build ~push:Env.push_docker () in
+              let* deployement = Deployement.deploy ~configurations in
+              let* () = ensure_ready deployement in
+              init_proxy ?proxy_files ?proxy_args deployement
+            else Lwt.return_unit)
 
 let agents t =
   match Env.mode with

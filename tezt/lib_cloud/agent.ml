@@ -45,11 +45,14 @@ let configuration_encoding =
   conv
     (fun {
            name;
-           machine_type;
-           binaries_path;
-           docker_image;
-           max_run_duration = _;
-           os;
+           vm =
+             {
+               machine_type;
+               binaries_path;
+               docker_image;
+               max_run_duration = _;
+               os;
+             };
          } -> (name, machine_type, binaries_path, docker_image, os))
     (fun (name, machine_type, binaries_path, docker_image, os) ->
       make ~os ~machine_type ~binaries_path ~docker_image ~name ())
@@ -100,15 +103,8 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
-let names_table = Hashtbl.create 3
-
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
   let ssh_user = "root" in
-  let () =
-    match Hashtbl.find_opt names_table name with
-    | None -> Hashtbl.add names_table name ()
-    | Some () -> Test.fail "Duplicate agent name: %s" name
-  in
   let runner =
     match (point, ssh_id) with
     | None, None -> None
@@ -130,7 +126,7 @@ let cmd_wrapper {zone; name; _} =
       in
       Some (Gcloud.cmd_wrapper ~zone ~vm_name:name ~ssh_private_key_filename)
 
-let path_of agent binary = agent.configuration.binaries_path // binary
+let path_of agent binary = agent.configuration.vm.binaries_path // binary
 
 let host_run_command agent cmd args =
   match cmd_wrapper agent with
@@ -271,7 +267,7 @@ let copy =
         (* Octez images uses alpine, so we can't copy binaries from our local setup. *)
         let* is_binary_file = is_binary source in
         let octez_release_image =
-          match agent.configuration.docker_image with
+          match agent.configuration.vm.docker_image with
           | Octez_release _ -> true
           | Gcp _ -> false
         in

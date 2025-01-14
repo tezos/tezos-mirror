@@ -5,14 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = private {
-  name : string;
+type vm = private {
   machine_type : string;
   docker_image : Env.docker_image;
   max_run_duration : int option;
   binaries_path : string;
   os : Types.Os.t;
 }
+
+type t = private {name : string; vm : vm}
 
 val make :
   ?os:Types.Os.t ->

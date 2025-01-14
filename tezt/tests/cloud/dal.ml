@@ -2106,8 +2106,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   in
   let* attesters_agents =
     configuration.stake
-    |> List.map (fun stake ->
-           let name = Format.asprintf "attester-%d" stake in
+    |> List.mapi (fun i _stake ->
+           let name = Format.asprintf "attester-%d" i in
            next_agent ~name)
     |> Lwt.all
   in
@@ -2464,7 +2464,7 @@ let etherlink_loop (etherlink : etherlink) =
     in
     let runner = Node.runner producer.node |> Option.get in
     let firehose =
-      (Agent.configuration producer.agent).binaries_path // "firehose"
+      (Agent.configuration producer.agent).vm.binaries_path // "firehose"
     in
     let* () =
       Process.spawn
@@ -2573,7 +2573,7 @@ let benchmark () =
   let vms =
     [
       (if configuration.bootstrap then [Bootstrap] else []);
-      List.map (fun i -> Baker i) configuration.stake;
+      List.mapi (fun i _ -> Baker i) configuration.stake;
       List.map (fun i -> Producer i) configuration.dal_node_producers;
       List.map
         (fun index -> Observer (`Index index))
