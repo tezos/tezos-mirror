@@ -150,12 +150,6 @@ module GC : sig
 end
 
 module Performance : sig
-  (** Set memory and cpu statistics *)
-  val set_memory_cpu_stats : unit -> unit Lwt.t
-
-  (** Set disk usage statistics *)
-  val set_disk_usage_stats : string -> unit Lwt.t
-
   (** Set all statistics *)
-  val set_stats : string -> unit Lwt.t
+  val set_stats : data_dir:string -> unit Lwt.t
 end

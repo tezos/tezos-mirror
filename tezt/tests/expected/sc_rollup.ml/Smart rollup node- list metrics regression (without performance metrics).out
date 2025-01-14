@@ -68,27 +68,27 @@
 #TYPE octez_sc_rollup_node_number_of_conflicts gauge
 #HELP octez_sc_rollup_node_performance_connections Open connections
 #TYPE octez_sc_rollup_node_performance_connections gauge
-#HELP octez_sc_rollup_node_performance_context Context Disk Usage
+#HELP octez_sc_rollup_node_performance_context Disk usage: context
 #TYPE octez_sc_rollup_node_performance_context gauge
 #HELP octez_sc_rollup_node_performance_cpu_percentage CPU Percentage
 #TYPE octez_sc_rollup_node_performance_cpu_percentage gauge
-#HELP octez_sc_rollup_node_performance_data Data Disk Usage
+#HELP octez_sc_rollup_node_performance_data Disk Usage
 #TYPE octez_sc_rollup_node_performance_data gauge
 #HELP octez_sc_rollup_node_performance_disk_percentage Disk Usage Percentage
 #TYPE octez_sc_rollup_node_performance_disk_percentage gauge
 #HELP octez_sc_rollup_node_performance_file_descriptors Open file descriptors
 #TYPE octez_sc_rollup_node_performance_file_descriptors gauge
-#HELP octez_sc_rollup_node_performance_logs Logs Disk Usage
+#HELP octez_sc_rollup_node_performance_logs Disk usage: daily_logs
 #TYPE octez_sc_rollup_node_performance_logs gauge
 #HELP octez_sc_rollup_node_performance_mem_percentage Memory Percentage
 #TYPE octez_sc_rollup_node_performance_mem_percentage gauge
 #HELP octez_sc_rollup_node_performance_resident Resident Memory Stats
 #TYPE octez_sc_rollup_node_performance_resident gauge
-#HELP octez_sc_rollup_node_performance_storage Storage Disk Usage
+#HELP octez_sc_rollup_node_performance_storage Disk usage: storage
 #TYPE octez_sc_rollup_node_performance_storage gauge
 #HELP octez_sc_rollup_node_performance_virtual Size Memory Stats
 #TYPE octez_sc_rollup_node_performance_virtual gauge
-#HELP octez_sc_rollup_node_performance_wasm Wasm Disk Usage
+#HELP octez_sc_rollup_node_performance_wasm Disk usage: wasm_2_0_0
 #TYPE octez_sc_rollup_node_performance_wasm gauge
 #HELP octez_sc_rollup_node_protocol Rollup node current protocol
 #TYPE octez_sc_rollup_node_protocol counter

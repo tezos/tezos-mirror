@@ -577,7 +577,9 @@ let make_signers_for_injector operators =
 let performance_metrics state =
   let open Lwt_syntax in
   let rec collect () =
-    let* () = Metrics.Performance.set_stats state.node_ctxt.data_dir in
+    let* () =
+      Metrics.Performance.set_stats ~data_dir:state.node_ctxt.data_dir
+    in
     let* () = Lwt_unix.sleep 10. in
     collect ()
   in

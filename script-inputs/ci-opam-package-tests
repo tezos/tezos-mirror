@@ -15,9 +15,10 @@ octez-distributed-lwt-internal	all	7
 octez-injector	all	2
 octez-internal-libs	all	7
 octez-l2-libs	all	6
-octez-libs	all	6
+octez-libs	all	7
 octez-node	exec	1
 octez-node-config	all	4
+octez-performance-metrics	all	6
 octez-proto-libs	all	6
 octez-protocol-000-Ps9mPmXa-libs	all	2
 octez-protocol-001-PtCJ7pwo-libs	all	2

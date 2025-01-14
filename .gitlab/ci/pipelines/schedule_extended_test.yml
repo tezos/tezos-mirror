@@ -981,7 +981,7 @@ opam:all_6:
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
-      - octez-libs
+      - octez-performance-metrics
       - octez-l2-libs
       - efunc_core
       - dal_node_migrations
@@ -1553,6 +1553,7 @@ opam:all_7:
       - octez-rust-deps
       - octez-riscv-api
       - octez-protocol-compiler-compat
+      - octez-libs
       - octez-internal-libs
       - octez-distributed-lwt-internal
       - octez-distributed-internal

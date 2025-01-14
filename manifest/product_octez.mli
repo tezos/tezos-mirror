@@ -69,6 +69,8 @@ val octez_shell_services : Manifest.target
 
 val octez_signer_services : Manifest.target
 
+val performance_metrics : Manifest.target
+
 val octez_smart_rollup_lib : Manifest.target
 
 val octez_smart_rollup_node_store_lib : Manifest.target
