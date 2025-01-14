@@ -3019,7 +3019,7 @@ module Dal : sig
       attestation_threshold_percent:int option ->
       restricted_commitments_publishers:Contract.t list option ->
       cell_content ->
-      (Contract.t option, Slot.Commitment.t * Contract.t) Either.t
+      Slot.Commitment.t option
 
     type proof
   end
