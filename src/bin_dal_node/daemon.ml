@@ -621,7 +621,11 @@ module Handler = struct
             get_attestations
             Plugin.is_attested
         in
-        return_unit
+        Accuser.inject_entrapment_evidences
+          (module Plugin)
+          ctxt
+          cctxt
+          block_info
       else return_unit
     in
     let*? block_round = Plugin.get_round finalized_shell_header.fitness in
