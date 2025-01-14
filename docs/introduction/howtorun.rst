@@ -70,7 +70,7 @@ In turn, delegators can freely spend their own funds in spite of the active dele
 Technically, delegation is a link between a delegator account and a delegate account, meaning that *all* the funds of the former are delegated to the latter, until the delegation is withdrawn.
 When a delegator spends their tokens, the delegated balance of their delegate decreases; conversely, when they receive tokens the delegated balance of their delegate increases.
 
-Since the activation of the :ref:`new staking mechanism <new_staking>`,
+Since the activation of the new :doc:`staking mechanism <../active/staking>`,
 50% of your total funds count towards your delegator's baking power (before the staking mechanism, 100% of your total funds counted towards your delegator baking power). The delegated funds still count for 100% for the voting power, just like before the activation of the new staking mechanism.
 
 .. _staking_coins:
@@ -78,7 +78,7 @@ Since the activation of the :ref:`new staking mechanism <new_staking>`,
 Staking your coins
 ------------------
 
-Since the activation of the new :ref:`staking mechanism <new_staking>`,
+Since the activation of the new :doc:`staking mechanism <../active/staking>`,
 if you don't want to deal with the complexity of running your own
 delegate, you can also take part in the protocol by staking part of your
 coins to accrue to your delegate’s staking power.
@@ -128,7 +128,7 @@ is required for participating in consensus and in governance as a delegate.
 Delegates are required to freeze some of their funds into
 a security deposit (called their own stake), at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`).
 This can be done via the same commands used by external stakers in the previous section.
-Since the activation of the new :ref:`staking mechanism <new_staking>`,
+Since the activation of the new :doc:`staking mechanism <../active/staking>`,
 a delegate may choose to accept (or not) staked funds from external stakers.
 Both the delegate's own stake and the stake from external stakers can be
 :ref:`slashed<slashing>` (that is, partially lost), when the delegate misbehaves by double-signing.

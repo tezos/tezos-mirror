@@ -7,13 +7,14 @@ The content of a Tezos block is made up of a block header and a payload consisti
 This page first describes the protocol-specific part of the block header, and then explains what operations are.
 For the protocol-independent part of the block header, see :ref:`shell_header`.
 
+.. _proto_block_header:
 .. _proto_block_header_quebec:
 
 Protocol-specific block header
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :ref:`Recall<shell_proto_interact_quebec>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
-Namely, these two notions are the protocol-specific header and the :ref:`fitness <fitness_quebec>`.
+Namely, these two notions are the protocol-specific header and the :ref:`fitness <fitness_section_quebec>`.
 
 As in Emmy*, the protocol-specific header contains the fields:
 
@@ -41,6 +42,7 @@ or available only on test networks, is given in the
 :package-api:`OCaml Documentation
 <tezos-protocol-021-PsQuebec/Tezos_raw_protocol_021_PsQuebec/Operation_repr/index.html>`.
 
+.. _validation_passes:
 .. _validation_passes_quebec:
 
 Validation Passes
@@ -62,6 +64,7 @@ Each kind of operation belongs to exactly one validation pass, except for the :r
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
 
+.. _consensus_operations:
 .. _consensus_operations_quebec:
 
 Consensus Operations
@@ -82,6 +85,7 @@ phases required to agree on the next block.
   for which a preattestation quorum certificate (PQC) has been
   observed.
 
+.. _voting_operations:
 .. _voting_operations_quebec:
 
 Voting Operations
@@ -103,6 +107,7 @@ voting operations:
 Further details on each operation's implementation and semantics are
 provided in the dedicated entry for :doc:`on-chain governance<voting>`.
 
+.. _anonymous_operations:
 .. _anonymous_operations_quebec:
 
 Anonymous Operations
@@ -166,6 +171,7 @@ account. This operation is used as a deterrent to ensure that a
 delegate secures its consensus key as much as its manager (or main)
 key.
 
+.. _manager_operations:
 .. _manager_operations_quebec:
 
 Manager Operations
@@ -256,6 +262,7 @@ handled with dedicated manager operations.
   determine if it is called by a smart rollup using the ``SENDER``
   Michelson instruction.
 
+.. _manager_operations_batches:
 .. _manager_operations_batches_quebec:
 
 Manager Operation Batches
@@ -274,6 +281,7 @@ Batches satisfy the following properties:
   interleaving other operations. Either all the operations in the
   batch succeed, or none is applied.
 
+.. _failing_noop:
 .. _failing_noop_quebec:
 
 Failing_noop operation

@@ -366,6 +366,7 @@ defined as the conjunction of the following conditions:
   batch.
 
 .. _co-valid_operations:
+.. _co-valid_operations_alpha:
 
 Co-valid operations
 ^^^^^^^^^^^^^^^^^^^

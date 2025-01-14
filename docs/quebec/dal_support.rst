@@ -5,7 +5,7 @@ DAL support
 The support for the :doc:`DAL <../shell/dal>` within the economic protocol relies on two operations:
 
 #. ``DAL_publish_commitment``: a manager operation, allowing anyone to publish a DAL commitment
-#. ``attestation``: the existing :ref:`consensus operation <consensus_operations>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
+#. ``attestation``: the existing :ref:`consensus operation <consensus_operations_quebec>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
 
 DAL publish commitment
 ======================
@@ -67,6 +67,7 @@ If the kernel requests a page that does not satisfy the mentioned conditions, th
 
 Moreover, the rollup kernel has access to the protocol constants so that the same kernel code can be used on different test networks.
 
+.. _dal_constants:
 .. _dal_constants_quebec:
 
 DAL-related protocol constants

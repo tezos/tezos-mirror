@@ -122,6 +122,8 @@ Consequently, to agree on a block, that is, on both the payload and the header, 
 confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
+.. _time_between_blocks_alpha:
+
 Time between blocks
 -------------------
 
@@ -231,7 +233,7 @@ cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expe
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
-The concrete values for rewards depend on the issuance which is dynamically adjusted by :ref:`Adaptive Issuance<adaptive_issuance_alpha>`. 
+The concrete values for rewards depend on the issuance which is dynamically adjusted by :ref:`Adaptive Issuance<adaptive_issuance_alpha>`.
 For each block it issues an amount ``total_rewards`` of rewarded tez, that varies with
 the total amount of tez at stake on the chain.
 To obtain some concrete values, we will use as an example the issuance before Adaptive Issuance,
@@ -317,7 +319,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
-.. _fitness_alpha:
+.. _fitness_section_alpha:
 
 Fitness
 -------
