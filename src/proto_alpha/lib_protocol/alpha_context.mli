@@ -3842,8 +3842,8 @@ module Sc_rollup : sig
     module Protocol_implementation :
       PVM.PROTO_VERIFICATION
         with type context = unit
-         and type state = Sc_rollup_riscv.minimal_state
-         and type proof = Sc_rollup_riscv.void
+         and type state = Sc_rollup_riscv.state
+         and type proof = Sc_rollup_riscv.proof
   end
 
   module Number_of_ticks : sig

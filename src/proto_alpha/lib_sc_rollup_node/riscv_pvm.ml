@@ -6,34 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type Environment.Error_monad.error += Riscv_proof_verification_failed
-
-type Environment.Error_monad.error += Riscv_proof_production_failed
-
-let () =
-  let open Environment.Error_monad in
-  let open Data_encoding in
-  let msg = "Proof verification failed" in
-  register_error_kind
-    `Permanent
-    ~id:"smart_rollup_riscv_proof_verification_failed"
-    ~title:msg
-    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
-    ~description:msg
-    unit
-    (function Riscv_proof_verification_failed -> Some () | _ -> None)
-    (fun () -> Riscv_proof_verification_failed) ;
-  let msg = "Proof production failed" in
-  register_error_kind
-    `Permanent
-    ~id:"smart_rollup_riscv_proof_production_failed"
-    ~title:msg
-    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
-    ~description:msg
-    unit
-    (function Riscv_proof_production_failed -> Some () | _ -> None)
-    (fun () -> Riscv_proof_production_failed)
-
 open Protocol
 open Alpha_context
 module Context = Riscv_context
@@ -123,14 +95,11 @@ module PVM :
         (fun _ -> Error "proofs not implemented")
         unit)
 
-  let proof_start_state proof =
-    Sc_rollup.State_hash.of_bytes_exn (Backend.proof_start_state proof)
+  let proof_start_state proof = Backend.proof_start_state proof
 
-  let proof_stop_state proof =
-    Sc_rollup.State_hash.of_bytes_exn (Backend.proof_stop_state proof)
+  let proof_stop_state proof = Backend.proof_stop_state proof
 
-  let state_hash state =
-    Lwt.return (Sc_rollup.State_hash.of_bytes_exn (Backend.state_hash state))
+  let state_hash state = Lwt.return (Backend.state_hash state)
 
   let initial_state ~empty:_ = Lwt.return (Storage.empty ())
 
@@ -150,13 +119,13 @@ module PVM :
   let verify_proof ~is_reveal_enabled:_ input_given proof =
     let open Environment.Error_monad.Lwt_result_syntax in
     match Backend.verify_proof (Option.map to_pvm_input input_given) proof with
-    | None -> tzfail Riscv_proof_verification_failed
+    | None -> tzfail Sc_rollup_riscv.RISCV_proof_verification_failed
     | Some request -> return (of_pvm_input_request request)
 
   let produce_proof _context ~is_reveal_enabled:_ input_given state =
     let open Environment.Error_monad.Lwt_result_syntax in
     match Backend.produce_proof (Option.map to_pvm_input input_given) state with
-    | None -> tzfail Riscv_proof_production_failed
+    | None -> tzfail Sc_rollup_riscv.RISCV_proof_production_failed
     | Some proof -> return proof
 
   type output_proof = void
@@ -226,10 +195,7 @@ module Mutable_state :
     let* tick = Backend.Mutable_state.get_tick state in
     return (Sc_rollup.Tick.of_z tick)
 
-  let state_hash state =
-    Lwt.return
-      (Sc_rollup.State_hash.of_bytes_exn
-         (Backend.Mutable_state.state_hash state))
+  let state_hash state = Lwt.return (Backend.Mutable_state.state_hash state)
 
   let is_input_state =
     make_is_input_state
