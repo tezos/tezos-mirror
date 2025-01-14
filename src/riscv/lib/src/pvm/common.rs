@@ -4,12 +4,15 @@
 
 use crate::{
     default::ConstDefault,
-    machine_state::{self, main_memory},
+    machine_state::{
+        self,
+        main_memory::{self},
+    },
     pvm::sbi,
     state_backend::{
         self,
         proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
-        Atom, Cell,
+        AllocatedOf, Atom, Cell, DynArray, DynCells, FnManager, ManagerBase, ManagerClone, Ref,
     },
     traps::EnvironException,
 };
@@ -60,6 +63,7 @@ pub type PvmLayout<ML, CL> = (
     state_backend::Atom<u64>,
     machine_state::MachineStateLayout<ML, CL>,
     Atom<PvmStatus>,
+    RevealRequestLayout,
 );
 
 /// PVM status
@@ -97,6 +101,38 @@ impl fmt::Display for PvmStatus {
     }
 }
 
+/// Request Content of Reveal
+pub struct RevealRequest<M: ManagerBase> {
+    bytes: DynCells<4096, M>,
+    size: Cell<u64, M>,
+}
+
+type RevealRequestLayout = (DynArray<4096>, Atom<u64>);
+
+impl<M: ManagerClone> Clone for RevealRequest<M> {
+    fn clone(&self) -> Self {
+        Self {
+            bytes: self.bytes.clone(),
+            size: self.size.clone(),
+        }
+    }
+}
+
+impl<M: ManagerBase> RevealRequest<M> {
+    pub fn bind(space: AllocatedOf<RevealRequestLayout, M>) -> Self {
+        Self {
+            bytes: space.0,
+            size: space.1,
+        }
+    }
+
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<RevealRequestLayout, F::Output> {
+        (self.bytes.struct_ref::<F>(), self.size.struct_ref::<F>())
+    }
+}
+
 /// Value for the initial version
 const INITIAL_VERSION: u64 = 0;
 
@@ -109,6 +145,7 @@ pub struct Pvm<
     version: state_backend::Cell<u64, M>,
     pub(crate) machine_state: machine_state::MachineState<ML, CL, M>,
     status: Cell<PvmStatus, M>,
+    reveal_request: RevealRequest<M>,
 }
 
 impl<
@@ -123,6 +160,7 @@ impl<
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
             status: space.2,
+            reveal_request: RevealRequest::bind(space.3),
         }
     }
 
@@ -135,6 +173,7 @@ impl<
             self.version.struct_ref::<F>(),
             self.machine_state.struct_ref::<F>(),
             self.status.struct_ref::<F>(),
+            self.reveal_request.struct_ref::<F>(),
         )
     }
 
@@ -287,6 +326,7 @@ impl<
             version: self.version.clone(),
             machine_state: self.machine_state.clone(),
             status: self.status.clone(),
+            reveal_request: self.reveal_request.clone(),
         }
     }
 }
