@@ -1170,15 +1170,13 @@ module History = struct
       | Some deserialized_proof -> return deserialized_proof
 
     let pp_inclusion_proof =
-      Format.pp_print_list
-        ~pp_sep:(fun fmt () -> Format.fprintf fmt " ")
-        pp_history
+      Format.pp_print_list ~pp_sep:Format.pp_print_space pp_history
 
     let pp_whitelist fmt = function
       | None -> Format.fprintf fmt "<any>"
       | Some l ->
           (Format.pp_print_list
-             ~pp_sep:(fun fmt () -> Format.fprintf fmt " ")
+             ~pp_sep:Format.pp_print_space
              Contract_repr.pp_short)
             fmt
             l
