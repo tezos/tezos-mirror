@@ -193,6 +193,28 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     | Non_release_tag | Schedule_test -> job_gitlab_publish ~dependencies ()
     | _ -> job_gitlab_release ~dependencies
   in
+  let job_release_page_test =
+    job
+      ~__POS__
+      ~image:Images.CI.test
+      ~stage:Stages.publish_release
+      ~description:
+        "A manual job in the test release tag pipeline to update the Octez \
+         test release page. The release assets are pushed in the \
+         [release-page-test.nomadic-labs.com] bucket. Then its [index.html] is \
+         updated accordingly."
+      ~name:"publish:release-page"
+      ~allow_failure:Yes
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_static_x86_64_release;
+             Artifacts job_static_arm64_release;
+           ])
+      ~variables:[("S3_BUCKET", "release-page-test.nomadic-labs.com")]
+      ["./scripts/ci/release_page_publish.sh"]
+  in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
     job
       ~__POS__
@@ -252,6 +274,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
         job_opam_release ~dry_run:true ();
+        job_release_page_test;
       ]
   | _ -> []
 
