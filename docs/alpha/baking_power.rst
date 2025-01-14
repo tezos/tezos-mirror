@@ -239,7 +239,7 @@ needed for staked tez because they are inherently :ref:`frozen for at
 least four cycles<staked_funds_management_alpha>`, so short-duration
 staking is already not possible.)
 
-In the Paris protocol, the considered minimum is the minimum at any
+Since the Paris protocol, the considered minimum is the minimum at any
 point during block applications, which can be reached in the middle of
 executing a transaction.
 
@@ -295,7 +295,7 @@ delegate -- which is the baker itself, then adding ``150`` tez to the
 baker in our case. Finally, the ``70``-tez transfer just removes
 ``70`` tez from the ``total_delegated`` of the same baker again.
 
-Let's say that ``blocks_per_cycle = 128`` (as on Parisnet), so the
+Let's say that ``blocks_per_cycle = 128``, so the
 first level of the current cycle is ``129``, and let's say that
 ``total_delegated`` was ``1000`` at the beginning of the cycle.
 

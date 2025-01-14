@@ -57,19 +57,6 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Paris RPCs
------------
-
-The OpenAPI specifications for RPCs which are specific to the ParisC (``PtParisC``)
-protocol can be found at:
-
-- :src:`docs/api/paris-openapi.json` (version 21.2)
-
-The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Paris protocol can be found at:
-
-- :src:`docs/api/paris-mempool-openapi.json` (version 21.2)
-
 Quebec RPCs
 -----------
 
@@ -105,14 +92,6 @@ protocol in use. Their specification is given in the sections below.
 seen in the field ``.info.version`` within each file.)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
-
-Paris RPCs
-----------
-
-The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
-(``PtParisB``) protocol can be found at:
-
-- :src:`docs/api/paris-smart-rollup-node-openapi.json` (version 21.2)
 
 Quebec RPCs
 -----------
