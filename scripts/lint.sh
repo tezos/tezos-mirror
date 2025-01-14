@@ -171,13 +171,16 @@ check_redirects() {
 
   exit_code=0
   while read -r old new code; do
+    re='^#'
+    if [[ $old =~ $re ]]; then continue; fi
     re='^[0-9]+$'
     if ! [[ $code =~ $re && $code -ge 300 ]]; then
       say "in docs/_redirects: redirect $old -> $new has erroneous status code \"$code\""
       exit_code=1
     fi
+    re='^https?://'
     dest_local=docs/_build${new}
-    if [[ ! -f $dest_local ]]; then
+    if [[ ! $new =~ $re && ! -f $dest_local ]]; then
       say "in docs/_redirects: redirect $old -> $new, $dest_local does not exist"
       exit_code=1
     fi
