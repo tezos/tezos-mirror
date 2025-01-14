@@ -424,17 +424,17 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
   let*! value =
     match map_method_name ~restrict:rpc.restricted_rpcs method_ with
     | Unknown ->
-        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unknown") ;
+        Metrics.inc_rpc_method ~name:"unknown" ;
         Lwt.return_error (Rpc_errors.method_not_found method_)
     | Unsupported ->
-        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "unsupported") ;
+        Metrics.inc_rpc_method ~name:"unsupported" ;
         Lwt.return_error (Rpc_errors.method_not_supported method_)
     | Disabled ->
-        Prometheus.Counter.inc_one (Metrics.Rpc.method_ "disabled") ;
+        Metrics.inc_rpc_method ~name:"disabled" ;
         Lwt.return_error (Rpc_errors.method_disabled method_)
     (* Ethereum JSON-RPC API methods we support *)
     | Method (method_rpc, module_) -> (
-        Prometheus.Counter.inc_one (Metrics.Rpc.method_ method_) ;
+        Metrics.inc_rpc_method ~name:method_ ;
         match method_rpc with
         | Accounts.Method ->
             let f (_ : unit option) = rpc_ok [] in
