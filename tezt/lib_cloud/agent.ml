@@ -28,13 +28,13 @@ let docker_image_encoding =
       case
         ~title:"gcp"
         Json_only
-        string
+        Data_encoding.(obj1 (req "gcp" string))
         (function Env.Gcp {alias} -> Some alias | _ -> None)
         (fun alias -> Gcp {alias});
       case
         ~title:"octez_release"
         Json_only
-        string
+        Data_encoding.(obj1 (req "octez" string))
         (function Env.Octez_release {tag} -> Some tag | _ -> None)
         (fun tag -> Octez_release {tag});
     ]
