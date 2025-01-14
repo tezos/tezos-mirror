@@ -1,0 +1,13 @@
+[Unit]
+Description=Start bash shell attached to container STDIN/STDOUT
+
+[Service]
+Type=simple
+User=root
+Group=root
+PassEnvironment=PATH LD_LIBRARY_PATH
+ExecStart=/bin/bash -c "echo Attaching to pipes of PID `cat container-pipes-pid` && exec /bin/bash < /proc/`cat container-pipes-pid`/fd/0 > /proc/`cat container-pipes-pid`/fd/1 2>/proc/`cat container-pipes-pid`/fd/2"
+ExecStopPost=/usr/bin/systemctl exit --force $EXIT_STATUS
+
+[Install]
+WantedBy=multi-user.target rescue.target
