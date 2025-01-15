@@ -70,7 +70,7 @@ val handle_finalizable_and_clear :
   transfer_result tzresult Lwt.t
 
 (** [remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
-   ~check_delegate_of_unfinalizable_requests ~transfer_from_unstake_request ~handle_finalizable]
+   ~check_delegate_of_unfinalizable_requests ~transfer_from_unstake ~handle_finalizable]
     allows to spend from unfinalizable unstake requests.
 
     This function ensures that the transfers from unstake request are licit.
@@ -81,7 +81,7 @@ val handle_finalizable_and_clear :
     - the delegate has not been slashed in an unfinalizable cycle and has no
       pending denunciation.
 
-    Transfers are done using the provided [transfer_from_unstake_request] and
+    Transfers are done using the provided [transfer_from_unstake] and
     [handle_finalizable] functions successively.
 
     It returns the updated context, the balance updates and the part of the
@@ -94,7 +94,7 @@ val remove_from_unfinalizable_requests_and_finalize :
   delegate:Signature.public_key_hash ->
   check_delegate_of_unfinalizable_requests:
     (Signature.public_key_hash -> unit tzresult Lwt.t) ->
-  transfer_from_unstake_request:
+  transfer_from_unstake:
     (Raw_context.t ->
     Cycle_repr.t ->
     Signature.public_key_hash ->

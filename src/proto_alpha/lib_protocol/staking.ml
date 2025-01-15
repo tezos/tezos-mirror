@@ -74,7 +74,7 @@ let finalize_unstake ctxt contract =
   in
   return (ctxt, balance_updates)
 
-let transfer_from_unstake_request ctxt cycle delegate sender_contract amount =
+let transfer_from_unstake ctxt cycle delegate sender_contract amount =
   let open Lwt_result_syntax in
   let* ctxt, balance_updates =
     Token.transfer
@@ -119,7 +119,7 @@ let may_stake_from_unstake_for_delegate_and_finalize ctxt ~delegate
     ctxt
     ~delegate
     ~contract:sender_contract
-    ~transfer_from_unstake_request
+    ~transfer_from_unstake
     ~handle_finalizable:(perform_finalizable_unstake_transfers sender_contract)
     ~check_delegate_of_unfinalizable_requests
     amount

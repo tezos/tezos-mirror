@@ -300,7 +300,7 @@ let can_stake_from_unstake ctxt ~delegate =
 
 let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
     ~check_delegate_of_unfinalizable_requests
-    ~(transfer_from_unstake_request :
+    ~(transfer_from_unstake :
        Raw_context.t ->
        Cycle_repr.t ->
        Signature.public_key_hash ->
@@ -367,7 +367,7 @@ let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
                 if Tez_repr.(remaining_amount_to_transfer >= requested_amount)
                 then
                   let* ctxt, cycle_balance_updates =
-                    transfer_from_unstake_request
+                    transfer_from_unstake
                       ctxt
                       cycle
                       delegate
@@ -385,7 +385,7 @@ let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
                     t
                 else
                   let* ctxt, cycle_balance_updates =
-                    transfer_from_unstake_request
+                    transfer_from_unstake
                       ctxt
                       cycle
                       delegate
