@@ -148,7 +148,8 @@ val get_profiles :
   ; query : unit >
   service
 
-(** Return the shard indexes assigned to the given public key hash at the given level. *)
+(** Return the shard indexes assigned to the given delegate (identified by its
+    delegate key address) at the given level. *)
 val get_assigned_shard_indices :
   < meth : [`GET]
   ; input : unit
@@ -160,8 +161,8 @@ val get_assigned_shard_indices :
 
 (** Return the set of currently attestable slots. A slot is attestable at level
     [l] if it is published at level [l - attestation_lag] and *all* the shards
-    assigned at level [l] to the given public key hash are available in the DAL
-    node's store. *)
+    assigned at level [l] to the given delegate (identified by its delegate key
+    address) are available in the DAL node's store. *)
 val get_attestable_slots :
   < meth : [`GET]
   ; input : unit

@@ -296,7 +296,7 @@ module Profile_handlers = struct
     let statuses_store = Store.slot_header_statuses store in
     let* problems =
       List.filter_map_s
-        (fun (slot_index, num_stored) ->
+        (fun (Types.Slot_id.{slot_index; _}, num_stored) ->
           if num_stored = expected_number_of_shards then
             Lwt.return_some (`Ok (slot_index, num_stored))
           else
@@ -405,12 +405,38 @@ module Profile_handlers = struct
            [last_processed_level]. This should not happen though. *)
         Lwt.return_unit
 
+  let is_slot_attestable_with_traps shards_store traps_fraction pkh
+      assigned_shard_indexes slot_id =
+    let open Lwt_result_syntax in
+    List.for_all_es
+      (fun shard_index ->
+        let* {index = _; share} =
+          Store.Shards.read shards_store slot_id shard_index
+        in
+        (* Note: here [pkh] should identify the baker using its delegate key
+           (not the consensus key) *)
+        let trap_res = Trap.share_is_trap pkh share ~traps_fraction in
+        match trap_res with
+        | Ok trap -> return @@ not trap
+        | Error _ ->
+            (* assume the worst, that it is a trap *)
+            let*! () =
+              Event.(
+                emit
+                  trap_check_failure
+                  ( slot_id.Types.Slot_id.slot_level,
+                    slot_id.slot_index,
+                    shard_index ))
+            in
+            return false)
+      assigned_shard_indexes
+
   let get_attestable_slots ctxt pkh attested_level () () =
     let get_attestable_slots ~shard_indices store proto_parameters
         ~attested_level =
       let open Lwt_result_syntax in
-      let expected_number_of_shards = List.length shard_indices in
-      if expected_number_of_shards = 0 then return Types.Not_in_committee
+      let number_of_assigned_shards = List.length shard_indices in
+      if number_of_assigned_shards = 0 then return Types.Not_in_committee
       else
         let published_level =
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
@@ -422,7 +448,7 @@ module Profile_handlers = struct
               (of_int proto_parameters.Dal_plugin.attestation_lag))
         in
         let shards_store = Store.shards store in
-        let are_shards_stored slot_index =
+        let number_of_shards_stored slot_index =
           let slot_id : Types.slot_id =
             {slot_level = published_level; slot_index}
           in
@@ -433,17 +459,27 @@ module Profile_handlers = struct
               shard_indices
             |> lwt_map_error (fun e -> `Other e)
           in
-          (slot_index, number_stored_shards)
+          (slot_id, number_stored_shards)
         in
         let all_slot_indexes =
           Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
         in
         let* number_of_stored_shards_per_slot =
-          List.map_es are_shards_stored all_slot_indexes
+          List.map_es number_of_shards_stored all_slot_indexes
         in
-        let flags =
-          List.map
-            (fun (_slot_index, stored) -> stored = expected_number_of_shards)
+        let* flags =
+          List.map_es
+            (fun (slot_id, num_stored) ->
+              let all_stored = num_stored = number_of_assigned_shards in
+              if (not all_stored) || not proto_parameters.incentives_enable then
+                return @@ all_stored
+              else
+                is_slot_attestable_with_traps
+                  shards_store
+                  proto_parameters.traps_fraction
+                  pkh
+                  shard_indices
+                  slot_id)
             number_of_stored_shards_per_slot
         in
         Lwt.dont_wait
@@ -452,7 +488,7 @@ module Profile_handlers = struct
               store
               pkh
               published_level
-              expected_number_of_shards
+              number_of_assigned_shards
               number_of_stored_shards_per_slot)
           (fun _exn -> ()) ;
         return (Types.Attestable_slots {slots = flags; published_level})
