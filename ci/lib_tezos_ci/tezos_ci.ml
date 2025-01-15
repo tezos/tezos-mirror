@@ -406,50 +406,49 @@ module Pipeline = struct
     |> List.sort (fun (_n1, idx1) (_n2, idx2) -> Int.compare idx1 idx2)
     |> List.map fst
 
-  let write ?default ?variables ~filename () =
-    (* Write all registered pipelines *)
-    ( Fun.flip List.iter (all ()) @@ fun pipeline ->
-      let pipeline = add_image_builders pipeline in
-      let jobs = jobs pipeline in
-      let name = name pipeline in
-      if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
-        precheck pipeline ;
-      if jobs = [] then
-        failwith "[Pipeline.write] pipeline '%s' contains no jobs!" name ;
-      let filename = path ~name in
-      List.iter
-        (fun tezos_job ->
-          let job_name = name_of_tezos_job tezos_job in
-          let source_file, source_line, _, _ = tezos_job.source_position in
-          Cli.verbose
-            "%s:%d: generates '%s' for pipeline '%s' in %s"
-            source_file
-            source_line
-            job_name
-            name
-            filename)
-        jobs ;
-      let prepend_config =
-        (match pipeline with
-        | Pipeline _ -> []
-        | Child_pipeline _ ->
-            Gitlab_ci.Types.
-              [
-                Workflow
-                  {
-                    rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
-                    name = None;
-                    auto_cancel = None;
-                  };
-                Variables [("PIPELINE_TYPE", name)];
-              ])
-        @ [Stages (stages pipeline)]
-      in
-      let config =
-        prepend_config @ List.concat_map tezos_job_to_config_elements jobs
-      in
-      to_file ~filename config ) ;
-    (* Write top-level configuration. *)
+  let write_registered_pipeline pipeline =
+    let pipeline = add_image_builders pipeline in
+    let jobs = jobs pipeline in
+    let name = name pipeline in
+    if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
+      precheck pipeline ;
+    if jobs = [] then
+      failwith "[Pipeline.write] pipeline '%s' contains no jobs!" name ;
+    let filename = path ~name in
+    List.iter
+      (fun tezos_job ->
+        let job_name = name_of_tezos_job tezos_job in
+        let source_file, source_line, _, _ = tezos_job.source_position in
+        Cli.verbose
+          "%s:%d: generates '%s' for pipeline '%s' in %s"
+          source_file
+          source_line
+          job_name
+          name
+          filename)
+      jobs ;
+    let prepend_config =
+      (match pipeline with
+      | Pipeline _ -> []
+      | Child_pipeline _ ->
+          Gitlab_ci.Types.
+            [
+              Workflow
+                {
+                  rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
+                  name = None;
+                  auto_cancel = None;
+                };
+              Variables [("PIPELINE_TYPE", name)];
+            ])
+      @ [Stages (stages pipeline)]
+    in
+    let config =
+      prepend_config @ List.concat_map tezos_job_to_config_elements jobs
+    in
+    to_file ~filename config
+
+  let write_top_level_pipeline ?default ?variables ~filename () =
     let workflow, includes = workflow_includes () in
     (* temporary manual addition *)
     (* ci docker *)
@@ -566,7 +565,14 @@ module Pipeline = struct
           variables
       @ [Generic_job (Job job_dummy); Include includes]
     in
-    to_file ~filename config ;
+    to_file ~filename config
+
+  let write ?default ?variables ~filename () =
+    (* Write all registered pipelines *)
+    ( Fun.flip List.iter (all ()) @@ fun pipeline ->
+      write_registered_pipeline pipeline ) ;
+    (* Write top-level configuration. *)
+    write_top_level_pipeline ?default ?variables ~filename () ;
     ()
 
   let list_pipelines () =
