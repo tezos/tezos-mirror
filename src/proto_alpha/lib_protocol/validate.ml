@@ -1675,8 +1675,13 @@ module Anonymous = struct
     in
     match dal_content with
     | None ->
-        (* TODO: return error *)
-        failwith "Wrong evidence: the attester did not DAL attest"
+        tzfail
+          (Invalid_accusation_no_dal_content
+             {
+               tb_slot = consensus_content.slot;
+               level = consensus_content.level;
+               slot_index;
+             })
     | Some dal_content -> (
         let number_of_slots = Constants.dal_number_of_slots vi.ctxt in
         let*? () =

@@ -166,6 +166,11 @@ module Anonymous : sig
         level : Raw_level.t;
         first_allowed_level : Raw_level.t;
       }
+    | Invalid_accusation_no_dal_content of {
+        tb_slot : Slot.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
     | Conflicting_nonce_revelation of operation_conflict
     | Conflicting_vdf_revelation of operation_conflict
