@@ -51,19 +51,94 @@ usage() {
   exit 2
 }
 
+check_version() {
+  OCTEZ_VERSION=$(dune exec src/lib_version/exe/octez_print_version.exe)
+  echo "Version used for the package/octez: $DEBVERSION / $OCTEZ_VERSION"
+  if [ -n "${EXPECTED_VERSION:-}" ] && [ "$OCTEZ_VERSION" != "$EXPECTED_VERSION" ]; then
+    echo "Executables version does not match the expected version of the packages:"
+    echo "Executables version: $OCTEZ_VERSION"
+    echo "Expected version: $EXPECTED_VERSION"
+    exit 1
+  fi
+}
+
 # Cleanup old leftover packages
 rm -f scripts/packaging/*.deb
 
-TARGET=all
+export DEBEMAIL="contact@nomadic-labs.com"
+
+if [ -z "${CI:-}" ]; then
+  TIMESTAMP=$(date '+%Y%m%d%H%M')
+  CI_COMMIT_SHORT_SHA=$(git rev-parse --short HEAD)
+  CI_COMMIT_REF_NAME=$(git rev-parse --abbrev-ref HEAD)
+  CI_COMMIT_TAG=$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD)
+else
+  TIMESTAMP="$(date -d "$CI_PIPELINE_CREATED_AT" '+%Y%m%d%H%M')"
+fi
+
+gitlab_release_no_v=
+. scripts/ci/octez-packages-version.sh
+
+case "$RELEASETYPE" in
+ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
+  DEBVERSION=$VERSION
+  DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
+  EXPECTED_VERSION="Octez $(echo "$gitlab_release_no_v" | tr '-' '~')"
+  ;;
+Master)
+  DEBVERSION="1:$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
+  DEBCHANGELOG="Packages for master $CI_COMMIT_SHORT_SHA"
+  ;;
+SoftRelease)
+  DEBVERSION="1:$TIMESTAMP+${CI_COMMIT_TAG:-}"
+  DEBCHANGELOG="Packages for tag ${CI_COMMIT_TAG:-}"
+  ;;
+TestBranch)
+  DEBVERSION="1:$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
+  DEBCHANGELOG="Test package commit ${CI_COMMIT_REF_NAME:-}"
+  ;;
+*)
+  echo "Cannot create package for this branch"
+  exit 1
+  ;;
+esac
 
 if [ -z "${CI:-}" ]; then
   echo "Warning: You are compiling the debian packages locally."
   echo
   echo "    This script should be only used for development."
-  echo "    The version of the debian packages is set to be '0.0.1-1'"
+  echo "    The version of the debian packages is set to be $DEBVERSION"
   echo "    The version of the octez binaries depends on the git branch / tag"
+  echo "    git tag $CI_COMMIT_TAG"
+  echo "    git branch $CI_COMMIT_REF_NAME"
+  echo "    timestamp: $TIMESTAMP"
   echo
+else
+  echo "CI compilation"
+  echo "    debian version $DEBVERSION"
+  echo "    git tag ${CI_COMMIT_TAG:-}"
+  echo "    git branch $CI_COMMIT_REF_NAME"
+  echo "    timestamp: $TIMESTAMP"
+  echo "    ci timestamp: $CI_PIPELINE_CREATED_AT"
 fi
+
+cat << EOF > scripts/packaging/octez/debian/changelog
+octez (0.0.1-1) unstable; urgency=medium
+
+  * Initial release
+
+ -- Nomadic Labs <pkg@nomadic-labs.com>  Thu, 06 Jul 2017 09:19:24 +0000
+
+EOF
+cp scripts/packaging/octez/debian/changelog scripts/packaging/octez-data/debian/changelog
+
+# Set a version for the debian package we are building.
+debchange --changelog scripts/packaging/octez/debian/changelog \
+  --newversion "$DEBVERSION" "$DEBCHANGELOG"
+debchange --changelog scripts/packaging/octez-data/debian/changelog \
+  --newversion "$DEBVERSION" "$DEBCHANGELOG"
+
+TARGET=all
 
 while [ $# -gt 0 ]; do
   case ${1} in
@@ -93,6 +168,7 @@ case ${TARGET} in
 "binaries")
   echo "Building binary packages only"
   packages
+  check_version
   ;;
 "zcash")
   echo "Building data packages only"

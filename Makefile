@@ -447,16 +447,14 @@ fmt-ocaml:
 fmt-python:
 	@$(MAKE) -C docs fmt
 
-.PHONY: dpkg-A
-dpkg-A:	all
-	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
-
-.PHONY: dpkg-B
-dpkg-B:	all
-	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/B
-
 .PHONY: dpkg
-dpkg:	all dpkg-A dpkg-B
+dpkg: all
+	export TIMESTAMP=$$(date '+%Y%m%d%H%M') ; \
+	export CI_COMMIT_SHORT_SHA=$$(git rev-parse --short HEAD) ; \
+	export CI_COMMIT_REF_NAME=$$(git rev-parse --abbrev-ref HEAD) ; \
+	export CI_COMMIT_TAG=$$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD) ; \
+	./scripts/dpkg/make_dpkg.sh scripts/dpkg/B && \
+	./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
 
 .PHONY: rpm
 rpm: all
