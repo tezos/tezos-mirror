@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "bls12-381"
+  "octez-evm-node-libs" { = version }
   "octez-libs"
   "efunc_core"
 ]

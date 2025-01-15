@@ -5,22 +5,205 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let log_config () =
+module Parameter = struct
+  let endpoint =
+    Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
+
+  let secret_key =
+    Tezos_clic.parameter (fun _ value ->
+        Lwt.return (Account.Secret_key.from_hex_string value))
+
+  let int =
+    Tezos_clic.parameter (fun _ n ->
+        Option.to_result
+          ~none:[error_of_fmt "Expected an integer, got %s" n]
+          (int_of_string_opt n)
+        |> Lwt.return)
+
+  let float =
+    Tezos_clic.parameter (fun _ n ->
+        Option.to_result
+          ~none:[error_of_fmt "Expected a float, got %s" n]
+          (float_of_string_opt n)
+        |> Lwt.return)
+
+  let tez =
+    Tezos_clic.parameter (fun _ n ->
+        let open Lwt_result_syntax in
+        Lwt.catch
+          (fun () ->
+            match String.split_on_char '.' n with
+            | [n] -> return Z.(of_int (int_of_string n) * pow (of_int 10) 18)
+            | [n; m] ->
+                let int_of_string = function
+                  | "" -> 0
+                  | other -> int_of_string other
+                in
+                let n = Z.(of_int (int_of_string n) * pow (of_int 10) 18) in
+                let m =
+                  Z.(
+                    of_int (int_of_string m)
+                    * pow (of_int 10) Stdlib.(18 - String.length m))
+                in
+                return (Z.add n m)
+            | _ -> assert false)
+          (fun _ -> failwith "%s is not a valid balance" n))
+end
+
+module Arg = struct
+  let verbose =
+    Tezos_clic.switch
+      ~short:'v'
+      ~long:"verbose"
+      ~doc:"Sets logging level to debug"
+      ()
+
+  let endpoint ~default ~long ~doc =
+    Tezos_clic.default_arg
+      ~default
+      ~long
+      ~doc
+      ~placeholder:"URL"
+      Parameter.endpoint
+
+  let relay_endpoint =
+    endpoint
+      ~default:"https://relay.ghostnet.etherlink.com"
+      ~long:"relay-endpoint"
+      ~doc:"Endpoint used to inject transactions and receive early confirmation"
+
+  let rpc_endpoint =
+    endpoint
+      ~default:"https://node.ghostnet.etherlink.com"
+      ~long:"rpc-endpoint"
+      ~doc:"Endpoint used to fetch the state of the chain"
+
+  let secret_key ~long ~short ~doc =
+    Tezos_clic.arg
+      ~doc
+      ~long
+      ~short
+      ~placeholder:"SECRET_KEY"
+      Parameter.secret_key
+
+  let max_active_eoa =
+    let default = "1" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"max-active-eoa"
+      ~short:'m'
+      ~placeholder:"N"
+      ~doc:
+        "Maximum number of Externally Owned Accounts (EOA) actively sending \
+         transaction during an experiment"
+      Parameter.int
+
+  let spawn_interval =
+    let default = "0.5" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"spawn-interval"
+      ~short:'s'
+      ~placeholder:"SECONDS"
+      ~doc:"Minimum time span between the activation of two EOA"
+      Parameter.float
+
+  let tick_interval =
+    let default = "0.25" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"tick-interval"
+      ~short:'t'
+      ~placeholder:"SECONDS"
+      ~doc:
+        "The time span between two ticks of the Tx queue, responsible for \
+         injecting transactions to the relay endpoint"
+      Parameter.float
+
+  let base_fee_factor =
+    let default = "1.0" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"base-fee-factor"
+      ~short:'f'
+      ~placeholder:"FACTOR"
+      ~doc:
+        "The factor applied to the base fee per gas returned by the \
+         `eth_estimateGas` RPC. A factor higher than 1 increases the \
+         under-approximation of the balance for each account. A factor lower \
+         than 1 will mostly likely to produce invalid transactions."
+      Parameter.float
+
+  let initial_balance =
+    let default = "1.0" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"initial-balance"
+      ~short:'i'
+      ~placeholder:"BALANCE"
+      ~doc:
+        "The amount of funds to transfer to EOAs for spamming the targeted \
+         network (expressed in the primary unit of the targeted EVM-compatible \
+         chain, e.g., tez for Etherlink, Eth for Ethereum, etc.)"
+      Parameter.tez
+end
+
+let log_config ~verbose () =
   let open Tezos_base_unix.Internal_event_unix in
-  let config = make_with_defaults ~verbosity:Notice () in
+  let config =
+    make_with_defaults ~verbosity:(if verbose then Info else Notice) ()
+  in
   init ~config ()
+
+let require ~error_msg arg =
+  let open Lwt_result_syntax in
+  match arg with Some arg -> return arg | None -> failwith "%s" error_msg
 
 let run_command =
   let open Tezos_clic in
   command
-    ~desc:"Start Floodgate to spam an EVM-compatible endpoint"
-    no_options
-    (prefixes ["run"] stop)
-    (fun () () ->
+    ~desc:"Start Floodgate to spam an EVM-compatible network"
+    Arg.(
+      args9
+        verbose
+        relay_endpoint
+        rpc_endpoint
+        (secret_key
+           ~long:"controller"
+           ~short:'c'
+           ~doc:
+             "The secret key (encoded in hexadecimal, with a leading 0x) to an \
+              EOA with enough fund to pay for the experiment")
+        max_active_eoa
+        spawn_interval
+        tick_interval
+        base_fee_factor
+        initial_balance)
+    (prefixes ["run"] @@ stop)
+    (fun ( verbose,
+           relay_endpoint,
+           rpc_endpoint,
+           controller,
+           max_active_eoa,
+           spawn_interval,
+           tick_interval,
+           base_fee_factor,
+           initial_balance )
+         () ->
       let open Lwt_result_syntax in
-      let*! () = log_config () in
-      let*! () = Events.is_ready () in
-      return_unit)
+      let*! () = log_config ~verbose () in
+      let* controller =
+        require ~error_msg:"Missing argument --controller" controller
+      in
+      Floodgate.run
+        ~relay_endpoint
+        ~rpc_endpoint
+        ~controller
+        ~max_active_eoa
+        ~spawn_interval
+        ~tick_interval
+        ~base_fee_factor
+        ~initial_balance)
 
 let commands = [run_command]
 
@@ -68,13 +251,6 @@ let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
 
 let () =
   Random.self_init () ;
-  let _ =
-    Tezos_clic.(
-      setup_formatter
-        Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
-        Short)
-  in
   let _ =
     Tezos_clic.(
       setup_formatter

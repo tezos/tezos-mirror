@@ -454,9 +454,13 @@ let _floodgate_bin =
     ~deps:
       [
         bls12_381_archive;
+        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         efunc_core;
         octez_rpc_http_client_unix;
         octez_clic;
+        evm_node_lib_dev |> open_;
+        evm_node_lib_dev_encoding |> open_;
+        octez_workers;
       ]
