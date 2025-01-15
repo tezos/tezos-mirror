@@ -531,9 +531,11 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     match round_proposer state ~level:`Current (snd next_round) with
     | Some _ ->
         let delta =
-          state.global_state.constants.parametric.minimal_block_delay
-          |> Period.to_seconds
-          |> fun d -> Int64.div d 5L
+          max
+            1L
+            ( state.global_state.constants.parametric.minimal_block_delay
+              |> Period.to_seconds
+            |> fun d -> Int64.div d 5L )
         in
         (* NB: this means 6 seconds delay, if the first round duration is
            30. *)
