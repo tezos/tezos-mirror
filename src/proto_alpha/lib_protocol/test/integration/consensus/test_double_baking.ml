@@ -40,6 +40,16 @@ open Alpha_context
 (*                  Utility functions                           *)
 (****************************************************************)
 
+(* This function computes and returns the expected frozen deposits after
+   applying the given slashing percentage on the previous frozen deposits. *)
+let expected_frozen_deposits_after_slashing ~slashing_percentage
+    ~frozen_deposits_before ~initial_frozen_deposits_before ~autostaked =
+  let Q.{num; den} = Percentage.to_q slashing_percentage in
+  Tez_helpers.(
+    frozen_deposits_before
+    -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
+    +! autostaked)
+
 (** Bake two blocks at the same level using the same policy (i.e. same
     baker). *)
 let block_fork ?policy (contract_a, contract_b) b =
@@ -125,12 +135,12 @@ let test_valid_double_baking_evidence () =
     Context.Delegate.current_frozen_deposits (B blk_eoc) baker1
   in
   let autostaked = Block.autostaked baker1 end_cycle_metadata in
-  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Tez_helpers.(
-      frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
-      +! autostaked)
+    expected_frozen_deposits_after_slashing
+      ~frozen_deposits_before
+      ~initial_frozen_deposits_before
+      ~autostaked
+      ~slashing_percentage:p
   in
   Assert.equal_tez
     ~loc:__LOC__
@@ -212,12 +222,12 @@ let test_valid_double_baking_followed_by_double_attesting () =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
   let p = Percentage.add_bounded p_de p_db in
-  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Tez_helpers.(
-      frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
-      +! autostaked)
+    expected_frozen_deposits_after_slashing
+      ~frozen_deposits_before
+      ~initial_frozen_deposits_before
+      ~autostaked
+      ~slashing_percentage:p
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
      the percentages are additive, not multiplicative. *)
@@ -297,12 +307,12 @@ let test_valid_double_attesting_followed_by_double_baking () =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
   let p = Percentage.add_bounded p_de p_db in
-  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Tez_helpers.(
-      frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
-      +! autostaked)
+    expected_frozen_deposits_after_slashing
+      ~frozen_deposits_before
+      ~initial_frozen_deposits_before
+      ~autostaked
+      ~slashing_percentage:p
   in
   (* Both slashings are computed on the initial amount of frozen deposits so
      the percentages are additive, not multiplicative. *)
@@ -397,12 +407,12 @@ let test_payload_producer_gets_evidence_rewards () =
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in
-  let Q.{num; den} = Percentage.to_q p in
   let expected_frozen_deposits_after =
-    Tez_helpers.(
-      frozen_deposits_before
-      -! (initial_frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
-      +! autostaked)
+    expected_frozen_deposits_after_slashing
+      ~frozen_deposits_before
+      ~initial_frozen_deposits_before
+      ~autostaked
+      ~slashing_percentage:p
   in
   (* the frozen deposits of the double-signer [baker1] are slashed *)
   let* () =
