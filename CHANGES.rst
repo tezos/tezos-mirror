@@ -293,9 +293,3 @@ Baker
 
 Miscellaneous
 -------------
-
-- Fixed a ghostnet issue related to the lowering of
-  ``consensus_rights_delay`` from 3 in Paris to 2 in Quebec on
-  ghostnet. This issue does not affect mainnet, where
-  ``consensus_rights_delay`` was already 2 in Paris and remains
-  unchanged in Quebec. (MR :gl:`!16219`)

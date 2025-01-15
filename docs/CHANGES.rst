@@ -3,6 +3,17 @@
 Changelog
 '''''''''
 
+Version 21.2
+============
+
+Miscellaneous
+-------------
+
+- Fixed an issue on Ghostnet originated from lowering 
+  ``consensus_rights_delay`` from 3 to 2 with the recent activation of the Quebec protocol. This issue does not affect mainnet, where
+  ``consensus_rights_delay`` was already set to 2 by the activation of Paris and will remain
+  unchanged with the activation of Quebec. (MR :gl:`!16219`)
+
 Version 21.1
 ============
 
