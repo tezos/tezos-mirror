@@ -1,5 +1,5 @@
 open! Import
-module Stats = Index.Stats
+module Stats = Brassaia_index.Index.Stats
 
 let ( ++ ) = Int63.add
 

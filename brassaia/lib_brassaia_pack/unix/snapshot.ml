@@ -46,7 +46,7 @@ module Make (Args : Args) = struct
 
     module Index =
       Brassaia_index_unix.Index_unix.Make (Pack_index.Key) (Value_unit)
-        (Index.Cache.Unbounded)
+        (Brassaia_index.Index.Cache.Unbounded)
 
     type t = {
       file_manager : File_manager.t;
@@ -249,7 +249,7 @@ module Make (Args : Args) = struct
 
     module Index =
       Brassaia_index_unix.Index_unix.Make (Pack_index.Key) (Value)
-        (Index.Cache.Unbounded)
+        (Brassaia_index.Index.Cache.Unbounded)
 
     type path = string
 

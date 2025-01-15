@@ -124,11 +124,11 @@ module type S = sig
 
   val sync : t -> unit
   (** [sync t] syncs a read-only index with the files on disk. Raises
-      {!RW_not_allowed} if called by a read-write index. *)
+      [RW_not_allowed] if called by a read-write index. *)
 
   val is_merging : t -> bool
   (** [is_merging t] returns true if [t] is running a merge. Raises
-      {!RO_not_allowed} if called by a read-only index. *)
+      [RO_not_allowed] if called by a read-only index. *)
 
   val merge : t -> unit
   (** [merge t] forces a merge for [t].
@@ -141,7 +141,7 @@ module type S = sig
       returns. *)
 
   val try_merge : t -> unit
-  (** [try_merge] is like {!merge} but is a no-op if the number of entries in
+  (** [try_merge] is like [merge] but is a no-op if the number of entries in
       the write-ahead log is smaller than [log_size]. *)
 
   (** Offline [fsck]-like utility for checking the integrity of Index stores
@@ -185,7 +185,7 @@ module type Private = sig
     key ->
     value ->
     merge_result async option
-  (** [replace' t k v] is like {!replace t k v} but returns a promise of a merge
+  (** [replace' t k v] is like [replace t k v] but returns a promise of a merge
       result if the {!replace} call triggered one. *)
 
   val close' : hook:[ `Abort_signalled ] hook -> ?immediately:unit -> t -> unit

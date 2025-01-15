@@ -2192,7 +2192,16 @@ let brassaia_index_unix =
     "brassaia.index.unix"
     ~path:"brassaia/index/src/unix"
     ~deps:
-      [optint; mtime; rusage; fmt_tty; lwt; lwt_unix; index; semaphore_compat]
+      [
+        optint;
+        mtime;
+        rusage;
+        fmt_tty;
+        lwt;
+        lwt_unix;
+        brassaia_index;
+        semaphore_compat;
+      ]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
     ~foreign_stubs:
       {language = C; flags = []; include_dirs = []; names = ["pread"; "pwrite"]}
