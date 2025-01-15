@@ -19,7 +19,7 @@ Grafonnet
 
 ``Grafonnet`` is the jsonnet library used to generate grafana dashboards.
 
-``Grafonnet`` should be installed using `jsonnet-bundler <https://github.com/jsonnet-bundler/jsonnet-bundler/)>`__.
+``Grafonnet`` should be installed using `jsonnet-bundler <https://github.com/jsonnet-bundler/jsonnet-bundler/>`__.
 
 To do so, run ``go install -a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest`` and update your environment variables such as ``export GOPATH=$HOME/go`` and ``export PATH=$PATH:$GOPATH/bin``.
 
