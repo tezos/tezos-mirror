@@ -19,7 +19,7 @@ type t = {
 }
 
 let pp_docker_image fmt = function
-  | Env.Gcp {alias} -> Format.fprintf fmt "%s" alias
+  | Agent.Configuration.Gcp {alias} -> Format.fprintf fmt "%s" alias
   | Octez_release {tag} -> Format.fprintf fmt "Octez %s release" tag
 
 let domain agents =
@@ -54,7 +54,7 @@ let string_vm_command agent =
 
 let agent_jingo_template agent =
   let open Jingoo.Jg_types in
-  let Configuration.
+  let Agent.Configuration.
         {
           vm = {machine_type; docker_image; max_run_duration; binaries_path; os};
           name;

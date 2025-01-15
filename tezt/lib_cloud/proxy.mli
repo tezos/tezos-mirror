@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 (** Create a configuration for the proxy *)
-val make_config : unit -> Configuration.t
+val make_config : unit -> Agent.Configuration.t
 
 (** [get_agent agents] returns the proxy agent. It raises [Not_found] if the
     proxy agent was not found. This function should be safe to call when

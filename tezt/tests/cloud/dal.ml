@@ -2654,10 +2654,12 @@ let benchmark () =
     |> List.concat
   in
   let docker_image =
-    Option.map (fun tag -> Configuration.Octez_release {tag}) Cli.octez_release
+    Option.map
+      (fun tag -> Agent.Configuration.Octez_release {tag})
+      Cli.octez_release
   in
   let default_vm_configuration ~name =
-    Configuration.make ?docker_image ~name ()
+    Agent.Configuration.make ?docker_image ~name ()
   in
   let name_of = function
     | Bootstrap -> "bootstrap"
@@ -2686,14 +2688,15 @@ let benchmark () =
                | Some list -> (
                    try
                      let machine_type = List.nth list i in
-                     Configuration.make ?docker_image ~machine_type ~name ()
+                     Agent.Configuration.make
+                       ?docker_image
+                       ~machine_type
+                       ~name
+                       ()
                    with _ -> default_vm_configuration ~name))
            | Producer _ | Observer _ | Etherlink_dal_operator
-           | Etherlink_dal_observer _ -> (
-               match configuration.producer_machine_type with
-               | None -> Configuration.make ?docker_image ~name ()
-               | Some machine_type ->
-                   Configuration.make ?docker_image ~machine_type ~name ())
+           | Etherlink_dal_observer _ ->
+               Agent.Configuration.make ?docker_image ~name ()
            | Etherlink_operator -> default_vm_configuration ~name
            | Etherlink_producer _ -> default_vm_configuration ~name
            | Reverse_proxy -> default_vm_configuration ~name)

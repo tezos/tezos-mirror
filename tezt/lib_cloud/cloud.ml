@@ -502,7 +502,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   match vms with
   | None ->
       let default_agent =
-        let configuration = Configuration.make () in
+        let configuration = Agent.Configuration.make ~name:"default" () in
         Agent.make
           ~configuration
           ~next_available_port:
@@ -527,7 +527,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   | Some configurations -> (
       let sorted_names =
         configurations
-        |> List.map (fun Configuration.{name; _} -> name)
+        |> List.map (fun Agent.Configuration.{name; _} -> name)
         |> List.sort_uniq compare
       in
       if List.length sorted_names < List.length configurations then
@@ -599,7 +599,7 @@ let agents t =
         t.agents |> List.filter (fun agent -> Agent.name agent <> proxy_name)
       with
       | [] ->
-          let configuration = Configuration.make () in
+          let configuration = Agent.Configuration.make () in
           let default_agent =
             Agent.make
               ~configuration
@@ -614,8 +614,6 @@ let agents t =
           [default_agent]
       | agents -> agents)
   | `Host | `Cloud | `Localhost -> t.agents
-
-let get_configuration = Agent.configuration
 
 let write_website t =
   match t.website with

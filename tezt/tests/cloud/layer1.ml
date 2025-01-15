@@ -741,7 +741,7 @@ let on_new_level =
     toplog "Done processing metrics for level %d" level ;
     Lwt.return_unit
 
-type docker_image = Configuration.docker_image =
+type docker_image = Agent.Configuration.docker_image =
   | Gcp of {alias : string}
   | Octez_release of {tag : string}
 
@@ -887,11 +887,11 @@ let benchmark () =
   in
   let default_docker_image =
     Option.map
-      (fun tag -> Configuration.Octez_release {tag})
+      (fun tag -> Agent.Configuration.Octez_release {tag})
       Scenarios_cli.octez_release
   in
   let default_vm_configuration ~name =
-    Configuration.make ?docker_image:default_docker_image ~name ()
+    Agent.Configuration.make ?docker_image:default_docker_image ~name ()
   in
   let make_vm_conf ~name = function
     | None -> default_vm_configuration ~name
@@ -902,10 +902,10 @@ let benchmark () =
           | _ -> docker_image
         in
         let os = Option.map Types.Os.of_string_exn os in
-        Configuration.make
+        Agent.Configuration.make
           ?machine_type
           ?docker_image
-          ?max_run_duration
+          ~max_run_duration
           ?binaries_path
           ?os
           ~name

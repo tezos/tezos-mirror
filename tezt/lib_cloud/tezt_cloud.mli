@@ -8,46 +8,6 @@
 module Agent = Agent
 module Types = Types
 
-module Configuration : sig
-  type docker_image =
-    | Gcp of {alias : string}
-    | Octez_release of {tag : string}
-
-  type vm = private {
-    machine_type : string;
-    docker_image : docker_image;
-    max_run_duration : int option;
-    binaries_path : string;
-    os : Types.Os.t;
-  }
-
-  type t = private {name : string; vm : vm}
-
-  (** [make ?machine_type ()] is a smart-constructor to make a VM
-      configuration.
-
-    Default value for [max_run_duration] is [7200].
-
-    Default value for [machine_type] is [n1-standard-2].
-
-    Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
-    is the value provided by the environement variable [$TEZT_CLOUD].
-
-    Default value for [name] is ["agent-x"] where [x] is a counter
-    which is incremented every time this function is used with a
-    default name (there is no check so if you override the ?name
-    field with "agent-x", two agents can have the same name). *)
-  val make :
-    ?os:Types.Os.t ->
-    ?binaries_path:string ->
-    ?max_run_duration:int ->
-    ?machine_type:string ->
-    ?docker_image:docker_image ->
-    ?name:string ->
-    unit ->
-    t
-end
-
 module Alert : sig
   (* A receiver of an alert. *)
   type receiver
@@ -131,7 +91,7 @@ module Cloud : sig
   val register :
     ?proxy_files:string list ->
     ?proxy_args:string list ->
-    ?vms:Configuration.t list ->
+    ?vms:Agent.Configuration.t list ->
     __FILE__:string ->
     title:string ->
     tags:string list ->

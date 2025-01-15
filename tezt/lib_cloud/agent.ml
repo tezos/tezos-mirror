@@ -5,7 +5,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Types
+module Configuration = struct
+  include Types.Agent_configuration
+
+  let uri_of_docker_image docker_image =
+    match (docker_image, Env.mode) with
+    | Types.Agent_configuration.Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
+        let* registry_uri = Env.registry_uri () in
+        Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
+    | Gcp {alias}, `Localhost -> Lwt.return alias
+    | Octez_release _, (`Cloud | `Host | `Orchestrator) ->
+        let* registry_uri = Env.registry_uri () in
+        Lwt.return (Format.asprintf "%s/octez" registry_uri)
+    | Octez_release _, `Localhost -> Lwt.return "octez"
+
+  let gen_name =
+    let cpt = ref (-1) in
+    fun () ->
+      incr cpt ;
+      Format.asprintf "agent-%03d" !cpt
+
+  let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image
+      ?(name = gen_name ()) () =
+    let os = Option.value ~default:Cli.os os in
+    let binaries_path = Option.value ~default:Cli.binaries_path binaries_path in
+    let max_run_duration =
+      let default =
+        if Cli.no_max_run_duration then None else Some Cli.max_run_duration
+      in
+      Option.value ~default max_run_duration
+    in
+    let machine_type = Option.value ~default:Cli.machine_type machine_type in
+    let docker_image =
+      Option.value ~default:(Gcp {alias = Env.dockerfile_alias}) docker_image
+    in
+    make
+      ~os
+      ~binaries_path
+      ?max_run_duration
+      ~machine_type
+      ~docker_image
+      ~name
+      ()
+end
 
 type t = {
   (* The name initially is the same as [vm_name] and can be changed dynamically by the scenario. *)
@@ -20,48 +62,6 @@ type t = {
 let ssh_id () = Env.ssh_private_key_filename ()
 
 (* Encodings *)
-
-let docker_image_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"gcp"
-        Json_only
-        Data_encoding.(obj1 (req "gcp" string))
-        (function Env.Gcp {alias} -> Some alias | _ -> None)
-        (fun alias -> Gcp {alias});
-      case
-        ~title:"octez_release"
-        Json_only
-        Data_encoding.(obj1 (req "octez" string))
-        (function Env.Octez_release {tag} -> Some tag | _ -> None)
-        (fun tag -> Octez_release {tag});
-    ]
-
-let configuration_encoding =
-  let open Data_encoding in
-  let open Configuration in
-  conv
-    (fun {
-           name;
-           vm =
-             {
-               machine_type;
-               binaries_path;
-               docker_image;
-               max_run_duration = _;
-               os;
-             };
-         } -> (name, machine_type, binaries_path, docker_image, os))
-    (fun (name, machine_type, binaries_path, docker_image, os) ->
-      make ~os ~machine_type ~binaries_path ~docker_image ~name ())
-    (obj5
-       (req "name" string)
-       (req "machine_type" string)
-       (req "binaries_path" string)
-       (req "docker_image" docker_image_encoding)
-       (req "os" Os.encoding))
 
 let encoding =
   let open Data_encoding in
@@ -89,7 +89,7 @@ let encoding =
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
-       (req "configuration" configuration_encoding))
+       (req "configuration" Configuration.encoding))
 
 (* Getters *)
 

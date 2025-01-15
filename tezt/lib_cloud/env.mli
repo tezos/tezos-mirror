@@ -8,8 +8,6 @@
 (* This module aims to encapsulate static values from the CLI and several
    functions that are used by the library. *)
 
-type docker_image = Gcp of {alias : string} | Octez_release of {tag : string}
-
 (** Equivalent to [Cli.tezt_cloud], but if not present, checks if `TEZT_CLOUD`
     is provided. *)
 val tezt_cloud : string
@@ -96,9 +94,6 @@ val alert_handlers : string list
 (** If [Cli.dockerfile_alias] is provided, use it, otherwise default to [tezt_cloud]. *)
 val dockerfile_alias : string
 
-(** Use [tezt_cloud] image if [Cli.dockerfile_alias] is not provided, otherwise use it. *)
-val docker_image : docker_image
-
 (** Docker path associated to [dockerfile_alias]. *)
 val dockerfile : string
 
@@ -139,10 +134,6 @@ val zone : unit -> string Lwt.t
 
 (** [registry_uri ()] constructs the URI for the Docker registry. *)
 val registry_uri : unit -> string Lwt.t
-
-(** [uri_of_docker_image docker_image] generates the URI for the Docker image based on
-    [docker_image]'s type. *)
-val uri_of_docker_image : docker_image -> string Lwt.t
 
 (** [wait_process ?sleep ~is_ready ~run ()] recursively waits for [~run] process to be ready.
     When the process is successful, but no [~is_ready], it loops after [?sleep] seconds. If
