@@ -569,8 +569,7 @@ module Pipeline = struct
 
   let write ?default ?variables ~filename () =
     (* Write all registered pipelines *)
-    ( Fun.flip List.iter (all ()) @@ fun pipeline ->
-      write_registered_pipeline pipeline ) ;
+    List.iter write_registered_pipeline (all ()) ;
     (* Write top-level configuration. *)
     write_top_level_pipeline ?default ?variables ~filename () ;
     ()
