@@ -226,8 +226,8 @@ let current_block_hash evm_state =
    `execute_and_inspect` to 3. *)
 let pool = Lwt_pool.create 3 (fun () -> Lwt.return_unit)
 
-(** Instruments the pool with a few metrics: when adding a callback to the 
-    waiting queue we instrument the callback to track how long it stays in the 
+(** Instruments the pool with a few metrics: when adding a callback to the
+    waiting queue we instrument the callback to track how long it stays in the
     queue before being executed. *)
 let add_callback_to_queue pool callback =
   Metrics.set_simulation_queue_size (Lwt_pool.wait_queue_length pool) ;

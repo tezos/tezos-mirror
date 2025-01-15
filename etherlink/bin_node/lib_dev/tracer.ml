@@ -93,33 +93,33 @@ end
 
 module CallTracerRead = struct
   (** Context used during the call trace rebuilding algorithm.
-    
+
     The kernel stores the call trace sequentially: data for a call (excluding
   internal calls, but including its depth) is stored once a call is finished.
   Therefore, an internal call tree like the following:
-  
+
   A: (0)
   = B:(1)
   == C:(2)
   = D:(1)
-  
+
   is stored as 4 lines in the durable storage:
-  
+
   /.../0/<C at depth 2>
   /.../1/<B at depth 1>
   /.../2/<D at depth 1>
   /.../3/<A at depth 0>
 
   If we read that list from the end, (A0,D1,B1,C2) it corresponds to a depth
-  first search of the tree, with the children of a node read from last 
+  first search of the tree, with the children of a node read from last
   finished (in the execution order) to first finished.
 
     The algorithm used to rebuild the tree from the list of call read each line
     consecutively and acts depending on the line and its internal state:
         - call_list : a list of childrens at the same depth
         - depth : the depth of the last node read
-        - stack : the context of the call (parts of the tree already 
-        reconstructed) at the top of the stack is the parent of the last node 
+        - stack : the context of the call (parts of the tree already
+        reconstructed) at the top of the stack is the parent of the last node
         read, underneath is its parent, etc.
 
     The algorithm has three operations:
@@ -127,13 +127,13 @@ module CallTracerRead = struct
         child of the same node as the previous node read, so we add the current
         node in the `call_list`
         - push at next depth: the node being read is a children of the last node
-        read. So we push the `call_list` on the stack and increase the depth 
+        read. So we push the `call_list` on the stack and increase the depth
         counter
         - collapse : the node being read is at a lower depth, so we've seen all
-        nodes at the last depth. Therefore we add all the nodes in 
-        `call_list` to their parent: its the first node in the list at the top 
+        nodes at the last depth. Therefore we add all the nodes in
+        `call_list` to their parent: its the first node in the list at the top
         of the stack.
-        That operation might need to be repeated multiple times in a row: enough 
+        That operation might need to be repeated multiple times in a row: enough
         to find nodes which were seen at the same depth as the current node.
 
    *)
@@ -231,7 +231,7 @@ module CallTracerRead = struct
     in
     Lwt.return @@ Tracer_types.CallTracer.decode_call bytes
 
-  (** [call_trace_length evm_state hash] is used to findout how many lines 
+  (** [call_trace_length evm_state hash] is used to findout how many lines
         there are, to be able to read them in reverse order. *)
   let call_trace_length state transaction_hash =
     let open Lwt_result_syntax in
@@ -243,7 +243,7 @@ module CallTracerRead = struct
     in
     return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
 
-  (** [read_output state hash] reads and in the storage and interprets what 
+  (** [read_output state hash] reads and in the storage and interprets what
      the kernel stored. *)
   let read_output state transaction_hash =
     let open Lwt_result_syntax in
