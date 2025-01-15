@@ -146,6 +146,13 @@ module type T = sig
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
+  val get_attestation_operations :
+    block_info ->
+    (Signature.public_key_hash option
+    * attestation_operation
+    * dal_attestation option)
+    list
+
   val get_dal_content_of_attestations :
     block_info ->
     (int * Signature.Public_key_hash.t option * dal_attestation option) list
