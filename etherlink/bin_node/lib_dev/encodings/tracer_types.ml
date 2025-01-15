@@ -13,12 +13,19 @@
 *)
 let tracer_input_prefix_calltracer = '\001'
 
+type inconsistent_traces_input = {
+  block : Ethereum_types.quantity;
+  nb_txs : int;
+  nb_traces : int;
+}
+
 type error +=
   | Not_supported
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
   | Tracer_not_activated
+  | Inconsistent_traces of inconsistent_traces_input
 
 let () =
   register_error_kind
@@ -81,7 +88,32 @@ let () =
       Format.fprintf ppf "The tracer specified in the request is not activated")
     Data_encoding.empty
     (function Tracer_not_activated -> Some () | _ -> None)
-    (fun () -> Tracer_not_activated)
+    (fun () -> Tracer_not_activated) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_inconsistent_traces"
+    ~title:"Inconsistent traces"
+    ~description:"The tracer failed trace a block"
+    ~pp:(fun ppf (blocknumber, nb_of_hashes, nb_of_traces) ->
+      Format.fprintf
+        ppf
+        "The tracer failed to trace block %a: failed to find which transaction \
+         (among %d) was linked to which trace (among %d)"
+        Ethereum_types.pp_quantity
+        blocknumber
+        nb_of_hashes
+        nb_of_traces)
+    Data_encoding.(
+      obj3
+        (req "blocknumber" Ethereum_types.quantity_encoding)
+        (req "nb_of_hashes" Data_encoding.int31)
+        (req "nb_of_traces" Data_encoding.int31))
+    (function
+      | Inconsistent_traces {block; nb_txs; nb_traces} ->
+          Some (block, nb_txs, nb_traces)
+      | _ -> None)
+    (fun (block, nb_txs, nb_traces) ->
+      Inconsistent_traces {block; nb_txs; nb_traces})
 
 type tracer_config = {
   (* StructLogger flags *)

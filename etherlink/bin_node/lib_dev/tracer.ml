@@ -373,8 +373,15 @@ let trace_block (module Exe : Evm_execution.S)
     in
     (* Now assemble the hash and traces *)
     List.combine
-      ~when_different_lengths:[Tracer_types.Trace_not_found]
-        (* TODO better error *)
+      ~when_different_lengths:
+        [
+          Tracer_types.Inconsistent_traces
+            {
+              block = block_number;
+              nb_txs = List.length hashes;
+              nb_traces = List.length traces;
+            };
+        ]
       hashes
       traces
     |> Lwt.return

@@ -6,12 +6,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type inconsistent_traces_input = {
+  block : Ethereum_types.quantity;
+  nb_txs : int;
+  nb_traces : int;
+}
+
 type error +=
   | Not_supported
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
   | Tracer_not_activated
+  | Inconsistent_traces of inconsistent_traces_input
 
 type tracer_config = {
   enable_return_data : bool;
