@@ -496,7 +496,7 @@ build-octogram: all
 	@cp -f ./_build/default/src/bin_octogram/octogram_main.exe octogram
 
 .PHONY: build-floodgate
-build-floodgate: all
+build-floodgate:
 	@dune build ./etherlink/bin_floodgate
 	@cp -f ./_build/default/etherlink/bin_floodgate/main.exe floodgate
 
