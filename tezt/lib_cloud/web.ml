@@ -81,9 +81,11 @@ let agent_jingo_template agent =
 let monitoring_jingo_template agents agent =
   let open Jingoo.Jg_types in
   let host =
-    match Agent.point agent with
-    | Some (host, _port) -> host
-    | None -> domain agents
+    if Env.mode = `Localhost then "localhost"
+    else
+      match Agent.point agent with
+      | Some (host, _port) -> host
+      | None -> domain agents
   in
   Tobj
     [
