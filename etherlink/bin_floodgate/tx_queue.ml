@@ -142,9 +142,9 @@ let send_transactions_batch ~relay_endpoint transactions =
   let module Srt = Rpc_encodings.Send_raw_transaction in
   if Seq.is_empty transactions then return_unit
   else
-    let batch, callbacks =
+    let rev_batch, callbacks =
       Seq.fold_left
-        (fun (batch, callbacks) {payload; callback} ->
+        (fun (rev_batch, callbacks) {payload; callback} ->
           let req_id = Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false) in
           let txn =
             Rpc_encodings.JSONRPC.
@@ -156,10 +156,11 @@ let send_transactions_batch ~relay_endpoint transactions =
               }
           in
 
-          (txn :: batch, M.add req_id callback callbacks))
+          (txn :: rev_batch, M.add req_id callback callbacks))
         ([], M.empty)
         transactions
     in
+    let batch = List.rev rev_batch in
 
     let*! () = Floodgate_events.injecting_transactions (List.length batch) in
 
