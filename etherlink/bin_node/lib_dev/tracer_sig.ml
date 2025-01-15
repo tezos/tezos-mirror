@@ -23,10 +23,7 @@ end
 
 module Make
     (Executor : Evm_execution.S)
-    (Storage : sig
-      val transaction_receipt :
-        Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
-    end)
+    (Storage : Block_storage_sig.S)
     (Tracer : Backend) =
 struct
   let trace_transaction transaction_hash config =

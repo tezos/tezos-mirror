@@ -5,50 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type Block_storage = sig
-  (** [current_block_number ()] returns the most recent processed and
-      stored block number. *)
-  val current_block_number : unit -> Ethereum_types.quantity tzresult Lwt.t
-
-  (** [nth_block ~full_transaction_object n] returns the [n]th
-      processed and stored block.
-
-      If [full_transaction_object] is [true], returns the transaction objects,
-      the transactions hashes otherwise.
-    *)
-  val nth_block :
-    full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
-
-  (** [block_by_hash ~full_transaction_object hash] returns the block with the
-      given [hash].
-
-      If [full_transaction_object] is [true], returns the transaction objects,
-      the transactions hashes otherwise.
-    *)
-  val block_by_hash :
-    full_transaction_object:bool ->
-    Ethereum_types.block_hash ->
-    Ethereum_types.block tzresult Lwt.t
-
-  (** [block_receipts n] returns the receipts of the [n]th
-      processed and stored block.
-    *)
-  val block_receipts : Z.t -> Transaction_receipt.t list tzresult Lwt.t
-
-  (** [transaction_receipt tx_hash] returns the receipt of [tx_hash]. *)
-  val transaction_receipt :
-    Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
-
-  (** [transaction_object tx_hash] returns the informations of [tx_hash]. *)
-  val transaction_object :
-    Ethereum_types.hash ->
-    Ethereum_types.transaction_object option tzresult Lwt.t
-end
-
 module type S = sig
   module Reader : Durable_storage.READER
 
-  module Block_storage : Block_storage
+  module Block_storage : Block_storage_sig.S
 
   (** [balance address block_param] returns the [address]'s balance at block
       [block_param]. *)
@@ -176,13 +136,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
 
   let block_param_to_block_number = Backend.block_param_to_block_number
 
-  include
-    Tracer_sig.Make
-      (Executor)
-      (struct
-        let transaction_receipt = Block_storage.transaction_receipt
-      end)
-      (Backend.Tracer)
+  include Tracer_sig.Make (Executor) (Block_storage) (Backend.Tracer)
 
   let replay number =
     let open Lwt_result_syntax in
