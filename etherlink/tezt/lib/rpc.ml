@@ -213,6 +213,24 @@ module Request = struct
     in
     {method_ = "debug_traceCall"; parameters}
 
+  let trace_block ~block ?tracer ?tracer_config () =
+    let config =
+      match tracer with
+      | Some tracer -> [("tracer", `String tracer)]
+      | None -> [("tracer", `String "callTracer")]
+    in
+    let config =
+      match tracer_config with
+      | None -> config
+      | Some tracer_config -> config @ tracer_config
+    in
+    let parameters =
+      match config with
+      | [] -> `A [block_param_to_json block]
+      | config -> `A [block_param_to_json block; `O config]
+    in
+    {method_ = "debug_traceBlockByNumber"; parameters}
+
   let eth_feeHistory ~block_count ~newest_block =
     {
       method_ = "eth_feeHistory";
@@ -609,6 +627,18 @@ let trace_call ?websocket ~block ~to_ ~data ?tracer ?tracer_config evm_node =
   in
   return
   @@ decode_or_error (fun response -> Evm_node.extract_result response) response
+
+let trace_block ?websocket ~block ?tracer ?tracer_config evm_node =
+  let* response =
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.trace_block ~block ?tracer ?tracer_config ())
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_list)
+       response
 
 type fee_history = {
   oldest_block : int64;
