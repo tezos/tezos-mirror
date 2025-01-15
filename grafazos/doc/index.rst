@@ -25,9 +25,9 @@ To do so, run ``go install -a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@
 
 Once ``jsonnet-bundler`` installed you can import dependencies (here ``grafonnet``) by running the following:
 
-```sh
-jb install
-```
+.. code-block:: shell
+
+    jb install
 
 Tools
 -----
