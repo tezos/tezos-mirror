@@ -784,6 +784,19 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
               process_trace_result trace
             in
             build_with_input ~f module_ parameters
+        | Trace_block.Method ->
+            let f ((block_param, config) : Tracer_types.block_input) =
+              let* (Ethereum_types.Qty block_number) =
+                Backend_rpc.block_param_to_block_number
+                  (Block_parameter block_param)
+              in
+              let*! traces =
+                Backend_rpc.trace_block (Qty block_number) config
+              in
+              process_trace_result traces
+            in
+
+            build_with_input ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in

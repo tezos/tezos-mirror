@@ -307,6 +307,9 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
       in
       read_output config evm_state root_indexed_by_hash
 
+let trace_block _ _ ~block_number:_ ~config:_ =
+  Lwt_result_syntax.tzfail Tracer_types.Not_supported
+
 let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
   let open Lwt_result_syntax in
   let config_rlp = Tracer_types.input_rlp_encoder config in
