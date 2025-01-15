@@ -693,8 +693,8 @@ let run ?(monitor_node_operations = true) ~constants
     match result with
     | Error err -> Events.(emit loop_failed err)
     | Ok (head, operation_stream, op_stream_stopper) ->
+        () [@profiler.stop] ;
         ()
-        [@profiler.stop]
         [@profiler.record
           {verbosity = Notice}
             (Format.sprintf

@@ -1101,7 +1101,8 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
   let*? initial_event = compute_bootstrap_event initial_state in
   (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
   let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
-  () [@profiler.stop] [@profiler.reset_block_section profiler_section] ;
+  () [@profiler.stop] ;
+  () [@profiler.reset_block_section profiler_section] ;
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in
