@@ -16,6 +16,7 @@ type parameters = {
   on_new_blueprint : handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
+  ping_tx_pool : bool;
 }
 
 type error += Timeout
@@ -127,7 +128,10 @@ and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
   match candidate with
   | Ok (Some blueprint) -> (
       let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
-      let* () = Tx_pool.pop_and_inject_transactions () in
+      let* () =
+        when_ params.ping_tx_pool @@ fun () ->
+        Tx_pool.pop_and_inject_transactions ()
+      in
       match r with
       | `Continue ->
           (stream_loop [@tailcall])
@@ -146,12 +150,12 @@ and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
         params
   | Error err -> fail err
 
-let start ~time_between_blocks ~evm_node_endpoint ~next_blueprint_number
-    on_new_blueprint =
+let start ?(ping_tx_pool = true) ~time_between_blocks ~evm_node_endpoint
+    ~next_blueprint_number on_new_blueprint =
   catchup
     ~next_blueprint_number
     ~first_connection:true
-    {time_between_blocks; evm_node_endpoint; on_new_blueprint}
+    {time_between_blocks; evm_node_endpoint; on_new_blueprint; ping_tx_pool}
 
 (* {Note keep_alive}
 

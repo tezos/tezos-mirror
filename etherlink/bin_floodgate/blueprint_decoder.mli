@@ -1,15 +1,11 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
 
-open Internal_event.Simple
+type error += Not_a_blueprint
 
-let section = ["floodgate"]
-
-let is_ready =
-  declare_0 ~section ~name:"start" ~msg:"Floodgate is ready" ~level:Notice ()
-
-let is_ready () = emit is_ready ()
+val transaction_hashes :
+  Blueprint_types.with_events -> Ethereum_types.hash list tzresult

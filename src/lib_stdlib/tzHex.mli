@@ -71,6 +71,16 @@ val to_bytes : t -> bytes option
     @raise Invalid_argument instead of returning [None]. *)
 val to_bytes_exn : t -> bytes
 
+(** {1:bigstring Bigstring} *)
+
+(** [to_bigstring t] is the buffer [b] such that [of_bigstring b] is [t]. *)
+val to_bigstring : t -> Cstruct.buffer option
+
+(** [to_bigstring t] is the buffer [b] such that [of_bigstring b] is [t].
+
+    @raise Invalid_argument instead of returning [None]. *)
+val to_bigstring_exn : t -> Cstruct.buffer
+
 (** {1 Debugging} *)
 
 (** Same as [hexdump] except returns a string. *)
