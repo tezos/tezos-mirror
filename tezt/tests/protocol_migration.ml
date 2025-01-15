@@ -96,6 +96,40 @@ let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
           ~error_msg:"expected a non migration block ")) ;
   Lwt.return_unit
 
+let pp_option pp_item fmt = function
+  | None -> Format.pp_print_string fmt "None"
+  | Some item ->
+      Format.pp_print_string fmt "Some " ;
+      pp_item fmt item
+
+let check_adaptive_issuance_launch_cycle ~loc ~migrate_from client =
+  let* launch_cycle =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
+  and* level = Client.level client in
+  let expected =
+    if Protocol.(number migrate_from <= number Quebec) then
+      (* When activating P or Q from Genesis, the launch cycle is
+         initialized to [None] at level 1. Then, the level-2 block
+         sets it to 5 cycles after the activation of Q. *)
+      if level <= 1 then None else Some 5
+    else
+      (* From protocol R on, when the protocol is activated from
+         Genesis, AI is immediately active. *)
+      Some 0
+  in
+  Log.debug
+    "Checking that adaptive_issuance_launch_cycle at level %d is %a."
+    level
+    (pp_option Format.pp_print_int)
+    expected ;
+  Check.(
+    (launch_cycle = expected)
+      (option int)
+      ~__LOC__:loc
+      ~error_msg:"Expected adaptive_issuance_launch_cycle = %R but got %L") ;
+  unit
+
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let perform_protocol_migration ?node_name ?client_name ?parameter_file
@@ -117,6 +151,9 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     Client.activate_protocol ~protocol:migrate_from client ?parameter_file
   in
   Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
+  in
   (* Bake until migration *)
   let* () =
     repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
@@ -130,6 +167,9 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~migrate_from
       ~migrate_to
       ~level:migration_level
+  in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
   in
   let* () = Client.bake_for_and_wait client in
   (* Ensure that we migrated *)
@@ -146,6 +186,9 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   let* () =
     repeat baked_blocks_after_migration (fun () ->
         Client.bake_for_and_wait client)
+  in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
   in
   return (client, node)
 
@@ -458,6 +501,9 @@ let test_migration_with_bakers ?(migration_level = 4)
       client
       ~protocol:migrate_from
   in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
+  in
 
   Log.info
     "Launching 2 bakers, one for %s (pre-migration protocol), one for \
@@ -476,11 +522,17 @@ let test_migration_with_bakers ?(migration_level = 4)
   let* _baker_from_proto = baker_for_proto migrate_from in
   let* _baker_to_proto = baker_for_proto migrate_to in
   let* _ret = Node.wait_for_level node migration_level in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
+  in
 
   (* Bake enough blocks after migration *)
   let last_interesting_level = migration_level + num_blocks_post_migration in
   Log.info "Waiting to reach level %d" last_interesting_level ;
   let* _ret = Node.wait_for_level node last_interesting_level in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
+  in
 
   Log.info
     "Checking migration block has not been attested -- this is a special case" ;
@@ -573,6 +625,9 @@ let test_forked_migration_manual ?(migration_level = 4)
       ~consensus_threshold:(fun ~consensus_committee_size ->
         consensus_committee_size)
   in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client_1
+  in
 
   let* () =
     let n = migration_level - 2 in
@@ -633,6 +688,9 @@ let test_forked_migration_manual ?(migration_level = 4)
   Log.info "Waiting for migration level %d" migration_level ;
   let* _ = Node.wait_for_level node_1 migration_level in
   let* _ = Node.wait_for_level node_2 migration_level in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client_1
+  in
 
   Log.info "Checking we have migration blocks at level %d" migration_level ;
   let* () =
@@ -698,6 +756,9 @@ let test_forked_migration_manual ?(migration_level = 4)
   let until_level = migration_level + num_blocks_post_migration in
   Log.info "Waiting to reach level %d" until_level ;
   let* _ = Node.wait_for_level node_1 until_level in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client_1
+  in
 
   let* () = Baker.terminate baker_1 in
   let* () = Baker.terminate baker_2 in
@@ -839,6 +900,9 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
       ~protocol:migrate_from
       client1
   in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
 
   let pre_migration_level = migration_level - 1 in
   Log.info
@@ -887,6 +951,9 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   let* () = wait_for_post_migration_proposal baker1_to
   and* () = wait_for_post_migration_proposal baker3_to in
   Log.info "Post-migration proposal seen in both clusters." ;
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
 
   Log.info "Check that node1 and node3 have different migration blocks." ;
   let* migr_block1 = get_block_at_level migration_level client1
@@ -903,6 +970,9 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   let* (_ : int) = Node.wait_for_level node1 end_level
   and* (_ : int) = Node.wait_for_level node2 end_level
   and* (_ : int) = Node.wait_for_level node3 end_level in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
 
   let level_from = migration_level and level_to = end_level - 2 in
   Log.info
@@ -1136,7 +1206,9 @@ let test_migration_min_delegated_in_cycle =
     block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
   in
   let* () = Client.bake_for_and_wait client in
-  Log.info ~color:Log.Color.FG.green "Checking migration block consistency." ;
+  Log.info
+    ~color:Log.Color.FG.green
+    "Checking post-migration block consistency (first block of new protocol)." ;
   let* () =
     block_check
       ~expected_block_type:`Non_migration

@@ -194,7 +194,7 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
     Client.RPC.call sandbox_client
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
-  assert (JSON.is_null launch_cycle) ;
+  Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int launch_cycle ;
   (* Make delegate vote for AI activation*)
   let bake ?keys client =
     Helpers.bake ~ai_vote:On ~endpoint:sandbox_endpoint ~protocol ?keys client
@@ -213,14 +213,14 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
     Client.RPC.call sandbox_client
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
-  Log.info "AI will activate in cycle %d" (JSON.as_int launch_cycle) ;
+  Log.info "AI will activate in cycle %d" (Option.get launch_cycle) ;
 
   (* Wait for <launch_cycle> to have AI fully activated *)
   let* current_level = Helpers.get_current_level sandbox_client in
 
   Helpers.bake_n_cycles
     bake
-    (JSON.as_int launch_cycle - current_level.cycle)
+    (Option.get launch_cycle - current_level.cycle)
     sandbox_client
 
 (** This test starts from a protocol with AI feature flag enabled. It
@@ -337,11 +337,11 @@ let test_AI_activation_bypass_vote =
   @@ fun protocol ->
   let* _proto_hash, endpoint, client, _node = init protocol in
 
-  let* ai_activated =
+  let* launch_cycle =
     Client.RPC.call client
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
-  assert (JSON.as_int ai_activated = 0) ;
+  assert (Option.get launch_cycle = 0) ;
 
   let* staking_parameters =
     Client.RPC.call client

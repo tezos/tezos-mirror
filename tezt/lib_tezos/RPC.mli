@@ -1248,7 +1248,7 @@ val get_chain_block_context_issuance_issuance_per_minute :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_adaptive_issuance_launch_cycle :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> unit -> int option t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/expected_issuance]
     [chain] defaults to ["main"].

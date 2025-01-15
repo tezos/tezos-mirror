@@ -246,7 +246,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
             operation_results
         in
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
-        let* ctxt = Adaptive_issuance_storage.init ctxt in
+        let* ctxt = Adaptive_issuance_storage.init_from_genesis ctxt in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
         (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
@@ -284,10 +284,5 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
   let*? balance_updates = Receipt_repr.group_balance_updates balance_updates in
   let*! ctxt =
     Storage.Pending_migration.Balance_updates.add ctxt balance_updates
-  in
-  let ctxt = Raw_context.set_adaptive_issuance_enable ctxt in
-  let* ctxt =
-    let current_cycle = (Level_storage.current ctxt).cycle in
-    Storage.Adaptive_issuance.Activation.update ctxt (Some current_cycle)
   in
   return ctxt
