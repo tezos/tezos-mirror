@@ -242,6 +242,7 @@ linkcheck_ignore = [
     r'^https://gitlab\.com/nomadic-labs/tezos/-/merge_requests/',
     r'^http(s)?://localhost:\d+/?',
     r'^https://grafana\.nomadic-labs\.cloud/',
+    r'^https://github\.com/jsonnet-bundler/jsonnet-bundler/',
     # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',
@@ -249,6 +250,7 @@ linkcheck_ignore = [
     r'^https://opentezos\.com/',
     r'^https://crates\.io/crates/tezos-smart-rollup',
     r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/2771',
 ]
 linkcheck_allowed_redirects = dict(
     [
