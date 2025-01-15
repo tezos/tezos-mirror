@@ -82,6 +82,37 @@ let rec download_file ~keep_alive ~working_dir url =
   let tmp_snapshot_name = Filename.basename url in
   let target_path = working_dir // tmp_snapshot_name in
   let uri = Uri.of_string url in
+  let start_time = Ptime_clock.now () in
+
+  let rec periodic_emit ~remaining_size =
+    let* () = Lwt_unix.sleep 60.0 in
+    let elapsed_time = Ptime.diff (Ptime_clock.now ()) start_time in
+    let* () =
+      Events.download_in_progress
+        ?remaining_bytes:!remaining_size
+        ~elapsed_time
+        url
+    in
+    periodic_emit ~remaining_size
+  in
+
+  let download_task ~stream ~remaining_size =
+    Lwt_io.with_file ~mode:Lwt_io.output target_path @@ fun out ->
+    Lwt_stream.iter_s
+      (fun chunk ->
+        (* Per observations, this iteration over the stream is very
+           eager, and cannot be canceled easily without yielding
+           explicitely. *)
+        let* () = Lwt.pause () in
+        let chunk_len = String.length chunk in
+        remaining_size :=
+          Option.map
+            (fun remaining_size -> remaining_size - chunk_len)
+            !remaining_size ;
+        Lwt_io.write out chunk)
+      stream
+  in
+
   Lwt.catch
     (fun () ->
       let* resp, body = Cohttp_lwt_unix.Client.get uri in
@@ -93,17 +124,14 @@ let rec download_file ~keep_alive ~working_dir url =
               int_of_string
               (Cohttp.Header.get resp.headers "content-length")
           in
+          let remaining_size = ref size in
           let* () = Events.downloading_file ?size url in
           let* () =
-            Lwt_io.with_file ~mode:Lwt_io.output target_path @@ fun out ->
-            Lwt_stream.iter_s
-              (fun chunk ->
-                (* Per observations, this iteration over the stream is very
-                   eager, and cannot be canceled easily without yielding
-                   explicitely. *)
-                let* () = Lwt.pause () in
-                Lwt_io.write out chunk)
-              stream
+            Lwt.pick
+              [
+                download_task ~stream ~remaining_size;
+                periodic_emit ~remaining_size;
+              ]
           in
           Lwt_result.return target_path
       | #Cohttp.Code.status_code as status_code ->

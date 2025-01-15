@@ -120,6 +120,15 @@ val missing_chain_id : unit -> unit Lwt.t
     the file at [url], and explicitly mentions its [size] if provided. *)
 val downloading_file : ?size:int -> string -> unit Lwt.t
 
+(** [download_in_progress ?remaining_bytes ~elapsed_time url] advertises that the node is downloading
+    the file at [url], and explicitly mentions the [remaining_bytes] to download if provided, as well
+    as the time elapsed since the download started. *)
+val download_in_progress :
+  ?remaining_bytes:int ->
+  elapsed_time:Time.System.Span.t ->
+  string ->
+  unit Lwt.t
+
 type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
 
 (** [download_failed url status] advertises that the download of [url] failed
