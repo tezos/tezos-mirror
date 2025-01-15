@@ -1692,12 +1692,13 @@ module Anonymous = struct
         let*? () =
           check_shard_index_is_in_range ~number_of_shards shard_index
         in
-        assert (
-          (* TODO: check and return error *)
-          Dal.Attestation.is_attested
-            dal_content.attestation
-            slot_index) ;
         let level = consensus_content.level in
+        let*? () =
+          error_unless
+            (Dal.Attestation.is_attested dal_content.attestation slot_index)
+            (Invalid_accusation_slot_not_attested
+               {tb_slot = consensus_content.slot; level; slot_index})
+        in
         let* protocol_first_level = First_level_of_protocol.get vi.ctxt in
         let*? () =
           (* Due to the DAL node possibly not checking for traps before the R

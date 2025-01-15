@@ -910,6 +910,11 @@ module Anonymous = struct
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
       }
+    | Invalid_accusation_slot_not_attested of {
+        tb_slot : Slot.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
 
   let () =
@@ -1048,6 +1053,33 @@ module Anonymous = struct
         | _ -> None)
       (fun (tb_slot, level, slot_index) ->
         Invalid_accusation_no_dal_content {tb_slot; level; slot_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_slot_not_attested"
+      ~title:"Invalid accusation: the delegate did not attest the DAL slot"
+      ~description:
+        "Invalid accusation: the delegate did not attest the DAL slot."
+      ~pp:(fun ppf (tb_slot, level, slot_index) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for validator slot %a, level %a, and DAL slot \
+           index %a: the delegate did not attest the DAL slot."
+          Slot.pp
+          tb_slot
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index)
+      (obj3
+         (req "TB_slot" Slot.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding))
+      (function
+        | Invalid_accusation_slot_not_attested {tb_slot; level; slot_index} ->
+            Some (tb_slot, level, slot_index)
+        | _ -> None)
+      (fun (tb_slot, level, slot_index) ->
+        Invalid_accusation_slot_not_attested {tb_slot; level; slot_index}) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.conflicting_dal_entrapment"
