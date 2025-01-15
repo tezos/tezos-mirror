@@ -1,10 +1,15 @@
-Version 21.1
+Version 21.2
 ============
 
 Version 21 contains a new version (V13) of the protocol environment.
 As a result, Octez version 21 is the first version compatible with all protocols that require this environment.
 
 Note that starting from v21, Octez releases will not distribute the ``octez-evm-node``. You can refer to the `Etherlink documentation <https://docs.etherlink.com/network/evm-nodes>`__ for information on how to get its latest version.
+
+Octez v21.2 minor version is a bug fix meant for users of the ghostnet network.
+This version is required to be able to participate on ghostnet, unless
+you are starting from a snapshot that is more recent than level
+``10,062,848``. It has no impact on any other networks.
 
 Changes
 -------
@@ -124,14 +129,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v21.1
+  git checkout octez-v21.2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v21.1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v21.2`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
