@@ -2,6 +2,45 @@
 
 set -eu
 
+if [ -z "${CI:-}" ]; then
+  TIMESTAMP=$(date '+%Y%m%d%H%M')
+  CI_COMMIT_SHORT_SHA=$(git rev-parse --short HEAD)
+  CI_COMMIT_REF_NAME=$(git rev-parse --abbrev-ref HEAD)
+  CI_COMMIT_TAG=$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD)
+else
+  TIMESTAMP="$(date -d "$CI_PIPELINE_CREATED_AT" '+%Y%m%d%H%M')"
+fi
+
+gitlab_release_no_v=
+. scripts/ci/octez-packages-version.sh
+
+case "$RELEASETYPE" in
+ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
+  _VERSION=$VERSION
+  _EPOCH="%{nil}"
+  _CHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
+  ;;
+Master)
+  _VERSION=$TIMESTAMP+$CI_COMMIT_SHORT_SHA
+  _EPOCH=1
+  _CHANGELOG="Packages for master $CI_COMMIT_SHORT_SHA"
+  ;;
+SoftRelease)
+  _VERSION=$TIMESTAMP+${CI_COMMIT_TAG:-}
+  _EPOCH=1
+  _CHANGELOG="Packages for tag ${CI_COMMIT_TAG:-}"
+  ;;
+TestBranch)
+  _VERSION=$TIMESTAMP+$CI_COMMIT_SHORT_SHA
+  _EPOCH=1
+  _CHANGELOG="Test package commit ${CI_COMMIT_REF_NAME:-}"
+  ;;
+*)
+  echo "Cannot create package for this branch"
+  exit 1
+  ;;
+esac
+
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 packaging_dir="$(dirname "$(dirname "$script_dir")")"
 
@@ -44,6 +83,8 @@ packages() {
       cp "$packaging_dir/scripts/packaging/octez/rpm/SPECS/$pkg.spec" "$SPECS_DIR/"
       cd "$SPECS_DIR" || exit
       rpmbuild -ba \
+        --define "version $_VERSION" \
+        --define "epoch $_EPOCH" \
         --define '_source_filedir %{nil}' \
         --define "_binary_payload w2T16.xzdio" \
         "$pkg.spec"
@@ -63,6 +104,8 @@ zcash() {
       cp "$packaging_dir/scripts/packaging/octez/rpm/SPECS/$pkg.spec" "$SPECS_DIR/"
       cd "$SPECS_DIR" || exit
       rpmbuild -ba \
+        --define "version $_VERSION" \
+        --define "epoch $_EPOCH" \
         --define '_source_filedir %{nil}' \
         --define "_binary_payload w2T16.xzdio" \
         "$pkg.spec"
@@ -82,9 +125,19 @@ if [ -z "${CI:-}" ]; then
   echo "Warning: You are compiling the rpm packages locally."
   echo
   echo "    This script should be only used for development."
-  echo "    The version of the rpm packages is set to be '0.0.1-1'"
+  echo "    The version of the packages is set to be $_VERSION"
   echo "    The version of the octez binaries depends on the git branch / tag"
+  echo "    git tag ${CI_COMMIT_TAG:-}"
+  echo "    git branch $CI_COMMIT_REF_NAME"
+  echo "    timestamp: $TIMESTAMP"
   echo
+else
+  echo "CI compilation"
+  echo "    version $_VERSION"
+  echo "    git tag ${CI_COMMIT_TAG:-}"
+  echo "    git branch $CI_COMMIT_REF_NAME"
+  echo "    timestamp: $TIMESTAMP"
+  echo "    ci timestamp: $CI_PIPELINE_CREATED_AT"
 fi
 
 while [ $# -gt 0 ]; do

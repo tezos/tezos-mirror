@@ -1,5 +1,8 @@
 Name: octez-signer
-Version: 1.0.0
+Version: %{version}
+%if "%{epoch}" != ""
+Epoch: %{epoch}
+%endif
 Release: 1%{?dist}
 Summary: Signing client for the Tezos blockchain.
 License: MIT
@@ -20,7 +23,6 @@ install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-signer %{buildroot}/usr/bin/
 install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-signer.1 %{buildroot}%{_mandir}/man1/octez-signer.1
 gzip %{buildroot}%{_mandir}/man1/octez-signer.1
 %files
-%exclude /usr/lib/.build-id
 /usr/bin/octez-signer
 %{_mandir}/man1/octez-signer.1*
 %postun

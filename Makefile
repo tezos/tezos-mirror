@@ -458,12 +458,13 @@ dpkg-B:	all
 .PHONY: dpkg
 dpkg:	all dpkg-A dpkg-B
 
-.PHONY: rpm-A
-rpm-A: all
-	@./scripts/rpm/make_rpm.sh
-
 .PHONY: rpm
-rpm: all rpm-A
+rpm: all
+	export TIMESTAMP=$$(date '+%Y%m%d%H%M') ; \
+	export CI_COMMIT_SHORT_SHA=$$(git rev-parse --short HEAD) ; \
+	export CI_COMMIT_REF_NAME=$$(git rev-parse --abbrev-ref HEAD) ; \
+	export CI_COMMIT_TAG=$$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD) ; \
+  ./scripts/rpm/make_rpm.sh
 
 .PHONY: build-deps
 build-deps:

@@ -1,5 +1,8 @@
 Name: octez-smart-rollup-node
-Version: 1.0.0
+Version: %{version}
+%if "%{epoch}" != ""
+Epoch: %{epoch}
+%endif
 Release: 1%{?dist}
 Summary: Smart Rollup node for the Tezos blockchain.
 License: MIT
@@ -19,7 +22,6 @@ gzip %{buildroot}%{_mandir}/man1/octez-smart-rollup-node.1
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-smart-rollup-node.service %{buildroot}/usr/lib/systemd/system/octez-smart-rollup-node.service
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-smart-rollup-node.default %{buildroot}/etc/default/octez-smart-rollup-node
 %files
-%exclude /usr/lib/.build-id
 /usr/bin/octez-smart-rollup-node
 %{_mandir}/man1/octez-smart-rollup-node.1*
 /usr/lib/systemd/system/octez-smart-rollup-node.service

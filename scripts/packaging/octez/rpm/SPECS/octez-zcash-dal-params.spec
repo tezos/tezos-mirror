@@ -1,5 +1,8 @@
 Name: octez-zcash-dal-params
-Version: 1.0.0
+Version: %{version}
+%if "%{epoch}" != ""
+Epoch: %{epoch}
+%endif
 Release: 1%{?dist}
 Summary: Octez zcash dal parameters
 License: MIT
@@ -9,7 +12,6 @@ License: MIT
 mkdir -p %{buildroot}/usr/share/dal_trusted_setup
 install -m 0755 $HOME/rpmbuild/SPECS/dal-trusted-setup/* %{buildroot}/usr/share/dal_trusted_setup
 %files
-%exclude /usr/lib/.build-id
 /usr/share/dal_trusted_setup*
 %postun
 %post
