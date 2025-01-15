@@ -88,23 +88,11 @@ module type S = sig
 
   val replay : Ethereum_types.quantity -> Ethereum_types.block tzresult Lwt.t
 
-  (** [trace_transaction hash tracer] replays the block containing the
-      transaction [hash], and traces this transaction with the specified
-      [tracer]. *)
-  val trace_transaction :
-    Ethereum_types.hash ->
-    Tracer_types.config ->
-    Tracer_types.output tzresult Lwt.t
-
   (** [coinbase ()] returns the sequencer pool address if it exists,
       or the zero address. *)
   val coinbase : unit -> Ethereum_types.address tzresult Lwt.t
 
-  val trace_call :
-    Ethereum_types.call ->
-    Ethereum_types.Block_parameter.extended ->
-    Tracer_types.config ->
-    Tracer_types.output tzresult Lwt.t
+  include Tracer_sig.S
 end
 
 module type Backend = sig
