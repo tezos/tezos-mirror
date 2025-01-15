@@ -12,6 +12,9 @@ let is_already_denounced ctxt delegate (level : Level_repr.t) slot_index =
     (ctxt, level.cycle)
     ((level.level, slot_index), delegate)
 
+let is_denounced ctxt delegate cycle =
+  Storage.Dal_denounced_delegates.mem (ctxt, cycle) delegate
+
 let add_denunciation ctxt delegate (level : Level_repr.t) slot_index =
   let open Lwt_syntax in
   let* already_denounced =
@@ -20,10 +23,13 @@ let add_denunciation ctxt delegate (level : Level_repr.t) slot_index =
   let* ctxt =
     if already_denounced then Lwt.return ctxt
     else
-      Storage.Dal_already_denounced.add
-        (ctxt, level.cycle)
-        ((level.level, slot_index), delegate)
-        ()
+      let* ctxt =
+        Storage.Dal_already_denounced.add
+          (ctxt, level.cycle)
+          ((level.level, slot_index), delegate)
+          ()
+      in
+      Storage.Dal_denounced_delegates.add (ctxt, level.cycle) delegate ()
   in
   return (ctxt, already_denounced)
 
@@ -37,4 +43,6 @@ let clear_outdated_cycle ctxt ~new_cycle =
   match Cycle_repr.(sub new_cycle (Constants_repr.denunciation_period + 1)) with
   | None -> Lwt.return ctxt
   | Some outdated_cycle ->
-      Storage.Dal_already_denounced.clear (ctxt, outdated_cycle)
+      let open Lwt_syntax in
+      let* ctxt = Storage.Dal_already_denounced.clear (ctxt, outdated_cycle) in
+      Storage.Dal_denounced_delegates.clear (ctxt, outdated_cycle)
