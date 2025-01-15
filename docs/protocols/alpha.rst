@@ -87,6 +87,9 @@ Minor Changes
 
 - Added a feature flag for allowing all bakers to attest. (MR :gl:`!15584`, :gl:`!15764`)
 
+- Changed the type of the protocol constant ``max_slashing_threshold`` from
+  ``int`` to ``Ratio.t``. (MR :gl:`!15765`)
+
 Internal
 --------
 

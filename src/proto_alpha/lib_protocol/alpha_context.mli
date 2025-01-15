@@ -934,7 +934,7 @@ module Constants : sig
       limit_of_delegation_over_baking : int;
       percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
       max_slashing_per_block : Percentage.t;
-      max_slashing_threshold : int;
+      max_slashing_threshold : Ratio.t;
       testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
@@ -964,7 +964,6 @@ module Constants : sig
     type t = {
       consensus_threshold : int;
       issuance_weights : Parametric.issuance_weights;
-      max_slashing_threshold : int;
     }
 
     val generate : consensus_committee_size:int -> dal_rewards_ratio:Q.t -> t

@@ -39,6 +39,8 @@ let raw_context ~max_slashing_threshold ~max_slashing_per_block () =
   let open Constants_helpers in
   let constants =
     Default_parameters.constants_test
+    |> Set.consensus_committee_size
+         Default_parameters.constants_mainnet.consensus_committee_size
     |> Set.max_slashing_threshold max_slashing_threshold
     |> Set.max_slashing_per_block max_slashing_per_block
   in
@@ -76,7 +78,7 @@ let test_list_and_sum () =
   (* A max slashing threshold of 100 ensures that x -> f [x] is injective *)
   let f x =
     get_pct
-      ~max_slashing_threshold:100
+      ~max_slashing_threshold:{numerator = 100; denominator = 7000}
       ~max_slashing_per_block:Percentage.p100
       x
   in
@@ -96,7 +98,10 @@ let test_max_slashing_per_block () =
     let max_slashing_per_block =
       Percentage.of_q_bounded ~round:`Up Q.(max_slash // 100)
     in
-    get_pct ~max_slashing_threshold:100 ~max_slashing_per_block x
+    get_pct
+      ~max_slashing_threshold:{numerator = 100; denominator = 7000}
+      ~max_slashing_per_block
+      x
   in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 100 200) in
   let* () = assert_equal_int ~loc:__LOC__ 1 (f 1 200) in
@@ -114,14 +119,19 @@ let get_pct =
 (** Tests the max_slashing_threshold parameter *)
 let test_max_slashing_threshold () =
   let open Lwt_result_syntax in
-  let f max_slashing_threshold x = get_pct ~max_slashing_threshold x in
+  let f max_slashing_threshold x =
+    get_pct
+      ~max_slashing_threshold:
+        {numerator = max_slashing_threshold; denominator = 7000}
+      x
+  in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 100 20000) in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 1000 1001) in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 1000 1000) in
   let* () = assert_not_equal_int ~loc:__LOC__ 100 (f 1000 999) in
   return_unit
 
-(** We now test with max slashing threshold to 2334 (mainnet value) *)
+(** We now test with max slashing threshold to 1/3 (mainnet value) *)
 let get_pct =
   get_pct
     ~max_slashing_threshold:

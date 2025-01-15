@@ -385,14 +385,12 @@ module Generated = struct
   type t = {
     consensus_threshold : int;
     issuance_weights : Constants_parametric_repr.issuance_weights;
-    max_slashing_threshold : int;
   }
 
   let generate ~consensus_committee_size ~dal_rewards_ratio =
     (* The weights are expressed in [(256 * 80)]th of the total
        reward, because it is the smallest proportion used so far *)
     (* let f = consensus_committee_size / 3 in *)
-    let max_slashing_threshold = (consensus_committee_size / 3) + 1 in
     let consensus_threshold = (consensus_committee_size * 2 / 3) + 1 in
     let bonus_committee_size = consensus_committee_size - consensus_threshold in
     let base_total_issued_per_minute = Tez_repr.of_mutez_exn 80_007_812L in
@@ -432,7 +430,6 @@ module Generated = struct
       |> to_int
     in
     {
-      max_slashing_threshold;
       consensus_threshold;
       issuance_weights =
         {

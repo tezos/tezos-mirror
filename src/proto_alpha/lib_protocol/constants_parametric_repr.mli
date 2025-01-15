@@ -244,7 +244,7 @@ type t = {
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
   max_slashing_per_block : Percentage.t;
-  max_slashing_threshold : int;
+  max_slashing_threshold : Ratio_repr.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;

@@ -1509,7 +1509,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  percentage_of_frozen_deposits_slashed_per_double_attestation =
                    _;
                  max_slashing_per_block;
-                 max_slashing_threshold;
+                 max_slashing_threshold = _;
                  (* The `testnet_dictator` should absolutely be None on mainnet *)
                  testnet_dictator;
                  initial_seed;
@@ -1558,7 +1558,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
             max_slashing_per_block;
-            max_slashing_threshold;
+            max_slashing_threshold = Ratio_repr.{numerator = 1; denominator = 3};
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator;
             initial_seed;
