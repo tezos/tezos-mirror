@@ -684,7 +684,9 @@ mod tests {
             DefaultCacheLayouts, TestCacheLayouts,
         },
         parser::{
-            instruction::{CIBNZTypeArgs, ITypeArgs, Instr, InstrCacheable, SBTypeArgs},
+            instruction::{
+                CIBNZTypeArgs, ITypeArgs, Instr, InstrCacheable, InstrWidth, SBTypeArgs,
+            },
             parse_block,
         },
         state_backend::{
@@ -872,7 +874,7 @@ mod tests {
             [Instr::Cacheable(InstrCacheable::Sw(SBTypeArgs {
                 rs1: t0,
                 rs2: t1,
-                imm: 0
+                imm: 0,
             }))]
         );
 
@@ -883,7 +885,7 @@ mod tests {
             [Instr::Cacheable(InstrCacheable::Addi(ITypeArgs {
                 rd: t2,
                 rs1: zero,
-                imm: 6
+                imm: 6,
             }))]
         );
 
@@ -894,7 +896,7 @@ mod tests {
             [Instr::Cacheable(InstrCacheable::Addi(ITypeArgs {
                 rd: t2,
                 rs1: zero,
-                imm: 5
+                imm: 5,
             }))]
         );
 
@@ -1107,7 +1109,7 @@ mod tests {
                 Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
                     rs1: t1,
                     rs2: t0,
-                    imm: 8
+                    imm: 8,
                 })),
                 Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
                     rd_rs1: nz::a0,
@@ -1131,7 +1133,7 @@ mod tests {
                 Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
                     rs1: t1,
                     rs2: t0,
-                    imm: 8
+                    imm: 8,
                 })),
                 Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
                     rd_rs1: nz::a0,
@@ -1325,6 +1327,7 @@ mod tests {
                 opcode: OpCode::CJ,
                 args: TaggedArgs {
                     imm: 128 - 4,
+                    width: InstrWidth::Compressed,
                     ..TaggedArgs::DEFAULT
                 },
             })
@@ -1346,6 +1349,7 @@ mod tests {
                     imm: (u16::bits_subset(overwrite_bytes, 15, 12) as i64) << 12,
                     rs1: nz::ra.into(),
                     rs2: nz::ra.into(),
+                    width: InstrWidth::Compressed,
                     ..TaggedArgs::DEFAULT
                 },
             })
@@ -1366,6 +1370,7 @@ mod tests {
                     rs1: a0.into(),
                     rs2: a1.into(),
                     imm: 0,
+                    width: InstrWidth::Compressed,
                     ..TaggedArgs::DEFAULT
                 },
             })

@@ -940,6 +940,7 @@ mod tests {
                 imm: 1,
                 rs1: nz::ra.into(),
                 rs2: nz::ra.into(),
+                width: InstrWidth::Compressed,
                 ..TaggedArgs::DEFAULT
             },
         })
@@ -967,6 +968,7 @@ mod tests {
                 imm: 1,
                 rs1: nz::ra.into(),
                 rs2: nz::ra.into(),
+                width: InstrWidth::Compressed,
                 ..TaggedArgs::DEFAULT
             },
         })
@@ -993,6 +995,7 @@ mod tests {
                 imm: 1,
                 rs1: nz::ra.into(),
                 rs2: nz::ra.into(),
+                width: InstrWidth::Compressed,
                 ..TaggedArgs::DEFAULT
             },
         })
@@ -1024,6 +1027,7 @@ mod tests {
                 imm: 1,
                 rs1: nz::ra.into(),
                 rs2: nz::ra.into(),
+                width: InstrWidth::Compressed,
                 ..TaggedArgs::DEFAULT
             },
         })

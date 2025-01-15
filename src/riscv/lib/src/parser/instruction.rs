@@ -12,6 +12,7 @@ use crate::{
     },
 };
 use enum_tag::EnumTag;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
@@ -523,7 +524,7 @@ pub enum Instr {
 ///
 /// This is either 4 bytes, in the case of an uncompressed instruction,
 /// or 2 bytes, in the case of a compressed instruction.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Hash)]
 #[repr(u64)]
 pub enum InstrWidth {
     Compressed = 2,
