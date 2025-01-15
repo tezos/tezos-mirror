@@ -1397,7 +1397,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~bootstrap_accounts
       ~additional_bootstrap_accounts
       ~base
-      []
+      [(["dal_parametric"; "incentives_enable"], `Bool Cli.dal_incentives)]
   in
   let etherlink_rollup_operator_key =
     match etherlink_rollup_operator_key with [key] -> Some key | _ -> None
