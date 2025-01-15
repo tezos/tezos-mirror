@@ -55,7 +55,7 @@ let of_eth_string eth =
   | [eth] -> of_string (eth ^ wei_pow)
   | [eth; decimal] ->
       let decimal = decimal ^ String.make (shift - String.length decimal) '0' in
-      Z.add (of_string eth) (of_string decimal)
+      Z.add (of_string (eth ^ wei_pow)) (of_string decimal)
   | _ -> Test.fail "Invalid ETH amount: %s" eth
 
 let of_gwei_string gwei =
