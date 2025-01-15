@@ -439,6 +439,7 @@ type etherlink_operator_setup = {
   is_sequencer : bool;
   sc_rollup_address : string;
   account : Account.key;
+  batching_operators : Account.key list;
 }
 
 type etherlink_producer_setup = {
@@ -466,7 +467,7 @@ type per_level_info = {
   published_commitments : (int, commitment_info) Hashtbl.t;
   attestations : (public_key_hash, Z.t option) Hashtbl.t;
   attested_commitments : Z.t;
-  etherlink_operator_balance : Tez.t;
+  etherlink_operator_balance_sum : Tez.t;
 }
 
 type metrics = {
@@ -485,7 +486,7 @@ type metrics = {
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
   ratio_attested_commitments_per_baker : (public_key_hash, float) Hashtbl.t;
-  etherlink_operator_balance : Tez.t;
+  etherlink_operator_balance_sum : Tez.t;
 }
 
 let default_metrics =
@@ -501,7 +502,7 @@ let default_metrics =
     ratio_attested_commitments = 0.;
     ratio_published_commitments_last_level = 0.;
     ratio_attested_commitments_per_baker = Hashtbl.create 0;
-    etherlink_operator_balance = Tez.zero;
+    etherlink_operator_balance_sum = Tez.zero;
   }
 
 type t = {
@@ -544,7 +545,7 @@ let pp_metrics t
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
-      etherlink_operator_balance;
+      etherlink_operator_balance_sum;
     } =
   (match level_first_commitment_published with
   | None -> ()
@@ -581,8 +582,8 @@ let pp_metrics t
              in
              Log.info "Ratio for %s (with stake %d): %f" alias stake ratio) ;
   Log.info
-    "Balance of the Etherlink operator: %s tez"
-    (Tez.to_string etherlink_operator_balance) ;
+    "Sum of balances of the Etherlink operator: %s tez"
+    (Tez.to_string etherlink_operator_balance_sum) ;
   Hashtbl.iter
     (Log.info "Slot index %d: total published commitments = %d")
     total_published_commitments_per_slot ;
@@ -603,7 +604,7 @@ let push_metrics t
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
-      etherlink_operator_balance;
+      etherlink_operator_balance_sum;
     } =
   Hashtbl.to_seq ratio_attested_commitments_per_baker
   |> Seq.iter (fun (public_key_hash, value) ->
@@ -695,10 +696,10 @@ let push_metrics t
     (float_of_int total_attested_commitments) ;
   Cloud.push_metric
     t.cloud
-    ~help:"Balance of the etherlink operator"
+    ~help:"Sum of the balances of the etherlink operator"
     ~typ:`Gauge
     ~name:"tezt_etherlink_operator_balance_total"
-    (Tez.to_float etherlink_operator_balance)
+    (Tez.to_float etherlink_operator_balance_sum)
 
 let published_level_of_attested_level t level =
   level - t.parameters.attestation_lag
@@ -999,10 +1000,11 @@ let get_metrics t infos_per_level metrics =
     ratio_attested_commitments;
     ratio_published_commitments_last_level;
     ratio_attested_commitments_per_baker;
-    etherlink_operator_balance = infos_per_level.etherlink_operator_balance;
+    etherlink_operator_balance_sum =
+      infos_per_level.etherlink_operator_balance_sum;
   }
 
-let get_infos_per_level ~client ~endpoint ~level ~etherlink_operator =
+let get_infos_per_level ~client ~endpoint ~level ~etherlink_operators =
   let block = string_of_int level in
   let* header =
     RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
@@ -1066,10 +1068,16 @@ let get_infos_per_level ~client ~endpoint ~level ~etherlink_operator =
            (public_key_hash, dal_attestation))
     |> Hashtbl.of_seq
   in
-  let* etherlink_operator_balance =
-    match etherlink_operator with
-    | None -> return Tez.zero
-    | Some account -> Client.get_full_balance_for ~account client
+  let* etherlink_operator_balance_sum =
+    List.fold_left
+      (fun acc (operator : Account.key) ->
+        let* acc in
+        let* balance =
+          Client.get_full_balance_for ~account:operator.public_key_hash client
+        in
+        return Tez.(acc + balance))
+      (return Tez.zero)
+      etherlink_operators
   in
   Lwt.return
     {
@@ -1077,7 +1085,7 @@ let get_infos_per_level ~client ~endpoint ~level ~etherlink_operator =
       published_commitments;
       attestations;
       attested_commitments;
-      etherlink_operator_balance;
+      etherlink_operator_balance_sum;
     }
 
 let init_teztale (configuration : configuration) cloud agent =
@@ -1254,11 +1262,22 @@ let init_public_network cloud (configuration : configuration)
         bootstrap.client
     else Lwt.return_nil
   in
+  let* etherlink_batching_operator_keys =
+    if etherlink_configuration <> None then
+      Client.stresstest_gen_keys
+        ~alias_prefix:"etherlink_batching"
+        20
+        bootstrap.client
+    else Lwt.return []
+  in
   let accounts_to_fund =
     List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
     @ List.map
         (fun operator -> (operator, 11_000 * 1_000_000))
         etherlink_rollup_operator_key
+    @ List.map
+        (fun batcher -> (batcher, 10 * 1_000_000))
+        etherlink_batching_operator_keys
   in
   let etherlink_rollup_operator_key =
     match etherlink_rollup_operator_key with key :: _ -> Some key | [] -> None
@@ -1285,7 +1304,11 @@ let init_public_network cloud (configuration : configuration)
       Lwt.return_unit
   in
   Lwt.return
-    (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
+    ( bootstrap,
+      baker_accounts,
+      producer_accounts,
+      etherlink_rollup_operator_key,
+      etherlink_batching_operator_keys )
 
 let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     ?(etherlink_configuration : etherlink_configuration option) agent =
@@ -1349,6 +1372,11 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       Client.stresstest_gen_keys ~alias_prefix:"etherlink_operator" 1 client
     else Lwt.return_nil
   in
+  let* etherlink_batching_operator_keys =
+    if etherlink_configuration <> None then
+      Client.stresstest_gen_keys ~alias_prefix:"etherlink_batching" 20 client
+    else Lwt.return []
+  in
   let* parameter_file =
     let base =
       Either.right (configuration.protocol, Some Protocol.Constants_mainnet)
@@ -1362,7 +1390,8 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     let additional_bootstrap_accounts =
       List.map
         (fun key -> (key, Some 1_000_000_000_000, false))
-        (producer_accounts @ etherlink_rollup_operator_key)
+        (producer_accounts @ etherlink_rollup_operator_key
+       @ etherlink_batching_operator_keys)
     in
     Protocol.write_parameter_file
       ~bootstrap_accounts
@@ -1434,7 +1463,11 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     }
   in
   Lwt.return
-    (bootstrap, baker_accounts, producer_accounts, etherlink_rollup_operator_key)
+    ( bootstrap,
+      baker_accounts,
+      producer_accounts,
+      etherlink_rollup_operator_key,
+      etherlink_batching_operator_keys )
 
 let init_baker cloud (configuration : configuration) ~bootstrap teztale account
     i agent =
@@ -1771,7 +1804,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
       some reverse_proxy_dal_node
 
 let init_etherlink_operator_setup cloud configuration etherlink_configuration
-    name ~bootstrap ~dal_slots account agent next_agent =
+    name ~bootstrap ~dal_slots account batching_operators agent next_agent =
   let is_sequencer = etherlink_configuration.etherlink_sequencer in
   let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
@@ -1789,16 +1822,25 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let* client = Client.Agent.create ~node agent in
   let () = toplog "Init Etherlink: importing the sequencer secret key" in
   let* () =
-    Client.import_secret_key
-      client
-      ~endpoint:(Node node)
-      account.Account.secret_key
-      ~alias:account.Account.alias
+    Lwt_list.iter_s
+      (fun account ->
+        Client.import_secret_key
+          client
+          ~endpoint:(Node node)
+          account.Account.secret_key
+          ~alias:account.Account.alias)
+      (account :: batching_operators)
   in
   let l = Node.get_last_seen_level node in
   let () = toplog "Init Etherlink: revealing the sequencer account" in
-  let*! () =
-    Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
+  let* () =
+    Lwt_list.iter_s
+      (fun account ->
+        let*! () =
+          Client.reveal client ~endpoint:(Node node) ~src:account.Account.alias
+        in
+        unit)
+      (account :: batching_operators)
   in
   let () = toplog "Init Etherlink operator: waiting for level %d" (l + 2) in
   let* _ = Node.wait_for_level node (l + 2) in
@@ -1831,11 +1873,17 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~otel
       ~memtrace:configuration.memtrace
   in
+  let operators =
+    List.map
+      (fun account -> (Sc_rollup_node.Batching, account.Account.alias))
+      batching_operators
+  in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
       ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
       ~base_dir:(Client.base_dir client)
-      ~default_operator:account.Account.alias
+      ~default_operator:account.alias
+      ~operators
       ?dal_node
       agent
       Operator
@@ -1910,6 +1958,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       evm_node;
       is_sequencer;
       account;
+      batching_operators;
       sc_rollup_address;
     }
   in
@@ -2012,7 +2061,7 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
   return operator
 
 let init_etherlink cloud configuration etherlink_configuration ~bootstrap
-    etherlink_rollup_operator_key ~dal_slots next_agent =
+    etherlink_rollup_operator_key batching_operators ~dal_slots next_agent =
   let () = toplog "Initializing an Etherlink operator" in
   let* operator_agent = next_agent ~name:"etherlink-operator" in
   let* operator =
@@ -2024,6 +2073,7 @@ let init_etherlink cloud configuration etherlink_configuration ~bootstrap
       "operator"
       ~bootstrap
       etherlink_rollup_operator_key
+      batching_operators
       operator_agent
       next_agent
   in
@@ -2143,7 +2193,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let* ( bootstrap,
          baker_accounts,
          producer_accounts,
-         etherlink_rollup_operator_key ) =
+         etherlink_rollup_operator_key,
+         etherlink_batching_operator_keys ) =
     match configuration.network with
     | `Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
@@ -2226,6 +2277,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
             etherlink_configuration
             ~bootstrap
             etherlink_rollup_operator_key
+            etherlink_batching_operator_keys
             next_agent
             ~dal_slots
         in
@@ -2324,17 +2376,16 @@ let on_new_level t ?etherlink level =
   let* () =
     if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
   in
-  let etherlink_operator =
-    Option.map
-      (fun etherlink -> etherlink.operator.account.public_key_hash)
-      etherlink
-  in
   let* infos_per_level =
     get_infos_per_level
       ~client:t.bootstrap.client
       ~endpoint:t.bootstrap.node_rpc_endpoint
       ~level
-      ~etherlink_operator
+      ~etherlink_operators:
+        (match etherlink with
+        | None -> []
+        | Some setup ->
+            setup.operator.account :: setup.operator.batching_operators)
   in
   toplog "Level info processed" ;
   Hashtbl.replace t.infos level infos_per_level ;

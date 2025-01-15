@@ -148,7 +148,7 @@ module Sc_rollup_node = struct
 
   module Agent = struct
     let create ?(path = Uses.path Constant.octez_smart_rollup_node) ?name
-        ?default_operator ?dal_node ~base_dir agent mode l1_node =
+        ?default_operator ?operators ?dal_node ~base_dir agent mode l1_node =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
@@ -157,6 +157,7 @@ module Sc_rollup_node = struct
       create
         ?name
         ?default_operator
+        ?operators
         ?dal_node
         ~path
         ?runner
