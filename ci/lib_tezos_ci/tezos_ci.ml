@@ -100,6 +100,14 @@ module Stage = struct
   let index (Stage {name = _; index}) = index
 end
 
+type tezos_job = {
+  job : Gitlab_ci.Types.generic_job;
+  source_position : string * int * int * int;
+  description : string option;
+  stage : Stage.t;
+  image_builders : tezos_job list;
+}
+
 type tezos_image =
   | Internal of {
       image : Gitlab_ci.Types.image;
@@ -107,14 +115,6 @@ type tezos_image =
       builder_arm64 : tezos_job option;
     }
   | External of Gitlab_ci.Types.image
-
-and tezos_job = {
-  job : Gitlab_ci.Types.generic_job;
-  source_position : string * int * int * int;
-  description : string option;
-  stage : Stage.t;
-  image_builders : tezos_job list;
-}
 
 let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
   match generic_job with Job {name; _} | Trigger_job {name; _} -> name
