@@ -98,7 +98,7 @@ module Node = struct
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~name network
       agent =
-    toplog "Inititializing an L1 node" ;
+    toplog "Inititializing an L1 node for %s" name ;
     match network with
     | (`Mainnet | `Ghostnet | `Weeklynet _) as network -> (
         match data_dir with
