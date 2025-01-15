@@ -101,7 +101,7 @@ block baked by a baker.
 Using the blocks it receives on the gossip network the node also
 keeps up to date the current *context*, that is the full state of
 the blockchain shared by all peers.
-Approximately every 15 seconds a new block is created and, when the node
+Approximately every 8 seconds a new block is created and, when the node
 receives it, it applies each operation in the block to its current
 context and computes a new context.
 The last block received on a chain is also called the *head* of that

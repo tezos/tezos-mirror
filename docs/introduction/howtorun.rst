@@ -71,7 +71,7 @@ Technically, delegation is a link between a delegator account and a delegate acc
 When a delegator spends their tokens, the delegated balance of their delegate decreases; conversely, when they receive tokens the delegated balance of their delegate increases.
 
 Since the activation of the new :doc:`staking mechanism <../active/staking>`,
-50% of your total funds count towards your delegator's baking power (before the staking mechanism, 100% of your total funds counted towards your delegator baking power). The delegated funds still count for 100% for the voting power, just like before the activation of the new staking mechanism.
+33% of your total funds count towards your delegator's baking power (before the staking mechanism, 100% of your total funds counted towards your delegator baking power). The delegated funds still count for 100% for the voting power, just like before the activation of the new staking mechanism.
 
 .. _staking_coins:
 
@@ -120,7 +120,7 @@ attest. A delegate is also responsible for taking part in the
 
 Rights for baking and attesting are randomly assigned
 to delegates proportionally to their :doc:`baking power <../alpha/baking_power>`,
-which usually is their own staked funds plus the funds staked by external stakers, plus half of their total delegation.
+which usually is their own staked funds plus the funds staked by external stakers, plus the third of their total delegation.
 
 A :ref:`minimal active stake<def_minimal_stake>`
 is required for participating in consensus and in governance as a delegate.
@@ -135,7 +135,7 @@ Both the delegate's own stake and the stake from external stakers can be
 
 Delegates can set two parameters by configuring their :ref:`staking policy <staking_policy_configuration>`:
 
-- the maximum ratio of external stake over their own stake: a factor between 0 and 5, by default 0, which means that:
+- the maximum ratio of external stake over their own stake: a factor between 0 and 9, by default 0, which means that:
 
   + for any factor *f*, the delegate accepts *f* times its own stake from external stakers
   + by default, delegates don't allow external staking
