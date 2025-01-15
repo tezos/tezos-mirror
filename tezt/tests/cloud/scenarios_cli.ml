@@ -308,6 +308,15 @@ let with_dal =
        [--producers]."
     true
 
+let dal_incentives =
+  Clap.flag
+    ~section
+    ~set_long:"dal-incentives"
+    ~unset_long:"no-dal-incentives"
+    ~description:"Activate the DAL incentives"
+    (* Activate by default DAL incentives on Alpha. *)
+    (protocol = Protocol.Alpha)
+
 module Alerts = struct
   let section =
     Clap.section
