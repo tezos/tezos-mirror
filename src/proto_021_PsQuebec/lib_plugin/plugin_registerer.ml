@@ -9,6 +9,15 @@
 module Validation = struct
   include Registerer.Registered
   module Plugin = Plugin.Mempool
+
+  (* /!\ This overwrite must not be removed when protocol Q gets
+     frozen. See {!Ghostnet_fix}. *)
+  let finalize_application application_state shell_header =
+    let open Lwt_syntax in
+    let* application_state =
+      Ghostnet_fix.fix_ghostnet_state application_state
+    in
+    finalize_application application_state shell_header
 end
 
 module RPC = struct
