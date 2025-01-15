@@ -176,6 +176,12 @@ module Anonymous : sig
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
       }
+    | Invalid_accusation_shard_is_not_trap of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        shard_index : int;
+      }
     | Conflicting_dal_entrapment of operation_conflict
     | Conflicting_nonce_revelation of operation_conflict
     | Conflicting_vdf_revelation of operation_conflict

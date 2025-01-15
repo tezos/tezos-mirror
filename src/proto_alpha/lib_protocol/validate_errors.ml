@@ -915,6 +915,12 @@ module Anonymous = struct
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
       }
+    | Invalid_accusation_shard_is_not_trap of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        shard_index : int;
+      }
     | Conflicting_dal_entrapment of operation_conflict
 
   let () =
@@ -1080,6 +1086,36 @@ module Anonymous = struct
         | _ -> None)
       (fun (tb_slot, level, slot_index) ->
         Invalid_accusation_slot_not_attested {tb_slot; level; slot_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_shard_is_not_trap"
+      ~title:"Invalid accusation: the provided shard is not a trap"
+      ~description:"Invalid accusation: the provided shard is not a trap."
+      ~pp:(fun ppf (delegate, level, slot_index, shard_index) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
+           and shard index %d: the provided shard is not a trap."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index
+          shard_index)
+      (obj4
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding)
+         (req "shard_index" int31))
+      (function
+        | Invalid_accusation_shard_is_not_trap
+            {delegate; level; slot_index; shard_index} ->
+            Some (delegate, level, slot_index, shard_index)
+        | _ -> None)
+      (fun (delegate, level, slot_index, shard_index) ->
+        Invalid_accusation_shard_is_not_trap
+          {delegate; level; slot_index; shard_index}) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.conflicting_dal_entrapment"

@@ -1736,8 +1736,17 @@ module Anonymous = struct
             shard_with_proof.shard.share
             ~traps_fraction
         in
-        assert (* TODO: check and return error *)
-               is_trap ;
+        let*? () =
+          error_unless
+            is_trap
+            (Invalid_accusation_shard_is_not_trap
+               {
+                 delegate;
+                 level = level.level;
+                 slot_index;
+                 shard_index = shard_with_proof.shard.index;
+               })
+        in
         let* _ctxt, shard_owner =
           let*? tb_slot = Slot.of_int shard_index in
           Stake_distribution.slot_owner vi.ctxt level tb_slot
