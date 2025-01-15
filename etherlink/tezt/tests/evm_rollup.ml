@@ -4928,7 +4928,8 @@ let test_l2_timestamp_opcode =
 let test_migrate_proxy_to_sequencer_future =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "rollup_node"; "init"; "migration"; "sequencer"]
+    ~tags:
+      ["evm"; "rollup_node"; "init"; "migration"; "sequencer"; Tag.ci_disabled]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;

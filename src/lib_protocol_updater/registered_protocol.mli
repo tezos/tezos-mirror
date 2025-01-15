@@ -257,3 +257,4 @@ module Register_embedded_V13
      and type operation = Proto.operation
      and type operation_receipt = Proto.operation_receipt
      and type validation_state = Proto.validation_state
+     and type application_state = Proto.application_state
