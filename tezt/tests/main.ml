@@ -88,8 +88,10 @@ let register_protocol_migration_tests () =
     ~from_protocol:migrate_to
     ~to_protocol:Demo
     ~loser_protocols:[migrate_from] ;
+
   Sc_rollup_migration.register ~migrate_from ~migrate_to ;
-  Dal.register_migration ~migrate_from ~migrate_to
+  if migrate_to != Alpha || alpha_can_stitch_from_its_predecessor then
+    Dal.register_migration ~migrate_from ~migrate_to
 
 let register_old_protocol_migration_tests () =
   List.iter
