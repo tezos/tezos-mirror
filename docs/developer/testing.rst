@@ -531,7 +531,7 @@ The summary report gives the merge request an overall test coverage percentage
 Additionally, using ``bisect-ppx-report cobertura``, we produce and
 upload a Cobertura artifact activating the `test coverage
 visualization
-<https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html>`_
+<https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization/index.html>`_
 in GitLab:
 
 .. image:: images/testing-coverage-markers.png

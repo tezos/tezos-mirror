@@ -115,9 +115,9 @@ For instance, the metric ``octez_distributed_db_requester_table_length`` has a l
   octez_distributed_db_requester_table_length{requester_kind="protocol"} y
   ...
 
-Metrics provide information about the node in the form of a `gauge <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#gauge>`_ that can increase or decrease (like the number of connections),
-a `counter <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#counter>`_ that can only increase (like the head level),
-or a `histogram <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram>`_ used to track the size of events and how long they usually take (e.g., the time taken by an RPC call).
+Metrics provide information about the node in the form of a `gauge <https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md#gauge>`_ that can increase or decrease (like the number of connections),
+a `counter <https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md#counter>`_ that can only increase (like the head level),
+or a `histogram <https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram>`_ used to track the size of events and how long they usually take (e.g., the time taken by an RPC call).
 
 The label value is sometimes used to store information that can't be described by the metric value (which can only be a float). This is used for example by the ``octez_version`` metric that provides the version within the labels.
 
