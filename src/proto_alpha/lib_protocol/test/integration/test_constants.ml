@@ -331,7 +331,17 @@ let () =
   let*? validators_rewards =
     attesting_reward_per_slot *? Int64.of_int constants.consensus_committee_size
   in
-  let*? total_rewards = baking_rewards +? validators_rewards in
+  let*?@ dal_attesting_reward_per_shard =
+    get_reward ~reward_kind:Dal_attesting_reward_per_shard
+  in
+  let*? dal_rewards =
+    if constants.dal.incentives_enable then
+      dal_attesting_reward_per_shard
+      *? Int64.of_int constants.dal.cryptobox_parameters.number_of_shards
+    else Result_syntax.return (of_int 0)
+  in
+  let*? total_tb_rewards = baking_rewards +? validators_rewards in
+  let*? total_rewards = total_tb_rewards +? dal_rewards in
   let expected_subsidy = total_rewards /! 16L in
   let*?@ liquidity_baking_subsidy =
     Protocol.Alpha_context.Delegate.Rewards.For_RPC
