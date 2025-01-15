@@ -171,12 +171,12 @@ module CallTracerRead = struct
       collaspe_n_level end_call (n - 1) once
 
   (* The algorithm needs to process a new node `value` at depth `next_depth`.
-     There are three possibilities:
+     There are three valid possibilities:
          - next_depth = last_depth: the node being read is at the same depth.
          We `add`
          - next_depth = last_depth + 1: the node being read is a child of the
          last one. We `push`
-         = next_depth < last_depth: we have finished reading a subtree.
+         - next_depth < last_depth: we have finished reading a subtree.
          We `collaspe` a number of time (enough time to go back to next_depth)
   *)
   let process_value end_call next next_depth context =
@@ -192,7 +192,7 @@ module CallTracerRead = struct
       return @@ add_at_same_depth next new_context
     else Error (error_of_fmt "missing levels")
 
-  let build_calltrace end_call get_next =
+  let build_calltraces end_call get_next =
     let open Lwt_result_syntax in
     let rec iter counter context =
       let depth = context.depth in
@@ -209,6 +209,11 @@ module CallTracerRead = struct
     in
     let empty_context = {call_list = []; depth = 0; stack = []} in
     let* {call_list; _} = iter 0 empty_context in
+    return call_list
+
+  let build_calltrace end_call get_next =
+    let open Lwt_result_syntax in
+    let* call_list = build_calltraces end_call get_next in
     match call_list with
     | [o] -> return o
     | _ -> tzfail (error_of_fmt "Multiple top call")

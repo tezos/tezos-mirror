@@ -15,6 +15,11 @@ module CallTracerRead : sig
     ('a -> 'a list -> 'a) ->
     (int -> ('a * int) option tzresult Lwt.t) ->
     'a tzresult Lwt.t
+
+  val build_calltraces :
+    ('a -> 'a list -> 'a) ->
+    (int -> ('a * int) option tzresult Lwt.t) ->
+    'a list tzresult Lwt.t
 end
 
 (** [trace_transaction ~block_number ~transaction ~config] replays the block
