@@ -557,8 +557,8 @@ impl OpCode {
             Self::CJ => Args::run_cj,
             Self::CJr => Args::run_cjr,
             Self::CJalr => Args::run_cjalr,
-            Self::CBeqz => Args::run_cbeqz,
-            Self::CBnez => Args::run_cbnez,
+            Self::CBeqz => Args::run_beqz,
+            Self::CBnez => Args::run_bnez,
             Self::CLi => Args::run_cli,
             Self::CLui => Args::run_clui,
             Self::CAddi => Args::run_caddi,
@@ -680,7 +680,7 @@ macro_rules! impl_r_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rs1.x, self.rs2.x, self.rd.x);
-            Ok(Next(InstrWidth::Uncompressed))
+            Ok(Next(self.width))
         }
     };
     ($impl: path, $fn: ident) => {
@@ -692,7 +692,7 @@ macro_rules! impl_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             $impl(&mut core.hart.xregisters, self.rs1.x, self.rs2.x, self.rd.x);
 
-            Ok(Next(InstrWidth::Uncompressed))
+            Ok(Next(self.width))
         }
     };
 }
@@ -706,7 +706,7 @@ macro_rules! impl_i_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.x);
-            Ok(Next(InstrWidth::Uncompressed))
+            Ok(Next(self.width))
         }
     };
 }
@@ -720,18 +720,7 @@ macro_rules! impl_fload_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rd.f)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -744,18 +733,7 @@ macro_rules! impl_load_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rd.x)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -767,8 +745,7 @@ macro_rules! impl_cload_sp_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rd.nzx)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rd.nzx).map(|_| Next(self.width))
         }
     };
 }
@@ -780,8 +757,7 @@ macro_rules! impl_cfload_sp_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rd.f)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rd.f).map(|_| Next(self.width))
         }
     };
 }
@@ -795,18 +771,7 @@ macro_rules! impl_store_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rs2.x)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -819,18 +784,7 @@ macro_rules! impl_fstore_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rs2.f)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -843,7 +797,7 @@ macro_rules! impl_b_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x))
+            Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x, self.width))
         }
     };
 }
@@ -857,7 +811,7 @@ macro_rules! impl_amo_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.rs1.x, self.rs2.x, self.rd.x, self.rl, self.aq)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -871,7 +825,7 @@ macro_rules! impl_ci_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.x);
-            Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
+            Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
 
@@ -883,7 +837,7 @@ macro_rules! impl_ci_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.nzx);
-            Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
+            Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
 }
@@ -897,7 +851,7 @@ macro_rules! impl_cr_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rd.x, self.rs2.x);
-            Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
+            Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
 }
@@ -911,7 +865,7 @@ macro_rules! impl_cr_nz_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             $impl(&mut core.hart.xregisters, self.rd.nzx, self.rs2.nzx);
-            Ok(Next(InstrWidth::Compressed))
+            Ok(Next(self.width))
         }
     };
 }
@@ -924,7 +878,7 @@ macro_rules! impl_cb_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rd.x))
+            Ok(core.hart.$fn(self.imm, self.rd.x, self.width))
         }
     };
 }
@@ -937,8 +891,7 @@ macro_rules! impl_css_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs2.x)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rs2.x).map(|_| Next(self.width))
         }
     };
 }
@@ -951,8 +904,7 @@ macro_rules! impl_fcss_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs2.f)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rs2.f).map(|_| Next(self.width))
         }
     };
 }
@@ -967,7 +919,7 @@ macro_rules! impl_csr_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.csr, self.rs1.x, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -982,7 +934,7 @@ macro_rules! impl_csr_imm_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.csr, self.imm as u64, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -997,7 +949,7 @@ macro_rules! impl_f_x_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1010,7 +962,7 @@ macro_rules! impl_f_x_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rm, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -1025,7 +977,7 @@ macro_rules! impl_x_f_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1038,7 +990,7 @@ macro_rules! impl_x_f_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -1053,7 +1005,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1066,7 +1018,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1079,7 +1031,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1092,7 +1044,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, $(self.$field,)* self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -1160,7 +1112,7 @@ impl Args {
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         core.hart.xregisters.run_lui(self.imm, self.rd.x);
-        Ok(Next(InstrWidth::Uncompressed))
+        Ok(Next(self.width))
     }
 
     // SAFETY: This function must only be called on an `Args` belonging
@@ -1170,7 +1122,7 @@ impl Args {
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         core.hart.run_auipc(self.imm, self.rd.x);
-        Ok(Next(InstrWidth::Uncompressed))
+        Ok(Next(self.width))
     }
 
     // RV64I jump instructions
@@ -1309,11 +1261,11 @@ impl Args {
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_cadd, run_cadd);
     impl_cr_nz_type!(c::run_cmv, run_cmv);
-    impl_load_type!(run_clw, InstrWidth::Compressed);
+    impl_load_type!(run_clw);
     impl_cload_sp_type!(run_clwsp);
-    impl_store_type!(run_csw, InstrWidth::Compressed);
-    impl_cb_type!(run_cbeqz);
-    impl_cb_type!(run_cbnez);
+    impl_store_type!(run_csw);
+    impl_cb_type!(run_beqz);
+    impl_cb_type!(run_bnez);
     impl_ci_type!(run_cli, non_zero);
     impl_ci_type!(run_clui, non_zero);
     impl_ci_type!(run_caddi, non_zero);
@@ -1335,14 +1287,14 @@ impl Args {
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         core.hart.xregisters.run_caddi16sp(self.imm);
-        Ok(Next(InstrWidth::Compressed))
+        Ok(Next(self.width))
     }
 
     fn run_cj<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cj(self.imm)))
+        Ok(Set(core.hart.run_j(self.imm)))
     }
 
     // SAFETY: This function must only be called on an `Args` belonging
@@ -1372,18 +1324,18 @@ impl Args {
     }
 
     // RV64C compressed instructions
-    impl_store_type!(run_csd, InstrWidth::Compressed);
+    impl_store_type!(run_csd);
     impl_css_type!(run_csdsp);
-    impl_load_type!(run_cld, InstrWidth::Compressed);
+    impl_load_type!(run_cld);
     impl_cload_sp_type!(run_cldsp);
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
     impl_cr_type!(run_csubw);
 
     // RV64C compressed instructions
-    impl_fload_type!(run_cfld, InstrWidth::Compressed);
+    impl_fload_type!(run_cfld);
     impl_cfload_sp_type!(run_cfldsp);
-    impl_fstore_type!(run_cfsd, InstrWidth::Compressed);
+    impl_fstore_type!(run_cfsd);
     impl_fcss_type!(run_cfsdsp);
 
     // Unknown
@@ -2254,6 +2206,7 @@ impl From<&AmoArgs> for Args {
             rs2: value.rs2.into(),
             aq: value.aq,
             rl: value.rl,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
