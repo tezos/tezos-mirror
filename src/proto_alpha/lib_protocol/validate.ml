@@ -1675,8 +1675,13 @@ module Anonymous = struct
     in
     match dal_content with
     | None ->
-        (* TODO: return error *)
-        failwith "Wrong evidence: the attester did not DAL attest"
+        tzfail
+          (Invalid_accusation_no_dal_content
+             {
+               tb_slot = consensus_content.slot;
+               level = consensus_content.level;
+               slot_index;
+             })
     | Some dal_content -> (
         let number_of_slots = Constants.dal_number_of_slots vi.ctxt in
         let*? () =
@@ -1687,12 +1692,13 @@ module Anonymous = struct
         let*? () =
           check_shard_index_is_in_range ~number_of_shards shard_index
         in
-        assert (
-          (* TODO: check and return error *)
-          Dal.Attestation.is_attested
-            dal_content.attestation
-            slot_index) ;
         let level = consensus_content.level in
+        let*? () =
+          error_unless
+            (Dal.Attestation.is_attested dal_content.attestation slot_index)
+            (Invalid_accusation_slot_not_attested
+               {tb_slot = consensus_content.slot; level; slot_index})
+        in
         let* protocol_first_level = First_level_of_protocol.get vi.ctxt in
         let*? () =
           (* Due to the DAL node possibly not checking for traps before the R
@@ -1721,7 +1727,7 @@ module Anonymous = struct
         let*? () =
           error_unless
             (not already_denounced)
-            (Dal_already_denounced {delegate; level})
+            (Dal_already_denounced {delegate; level = level.level})
         in
         let traps_fraction = (Constants.parametric ctxt).dal.traps_fraction in
         let*? is_trap =
@@ -1730,27 +1736,44 @@ module Anonymous = struct
             shard_with_proof.shard.share
             ~traps_fraction
         in
-        assert (* TODO: check and return error *)
-               is_trap ;
+        let*? () =
+          error_unless
+            is_trap
+            (Invalid_accusation_shard_is_not_trap
+               {
+                 delegate;
+                 level = level.level;
+                 slot_index;
+                 shard_index = shard_with_proof.shard.index;
+               })
+        in
         let* _ctxt, shard_owner =
           let*? tb_slot = Slot.of_int shard_index in
           Stake_distribution.slot_owner vi.ctxt level tb_slot
         in
-        assert (
-          (* TODO: check and return error *)
-          Signature.Public_key_hash.equal
-            delegate
-            shard_owner.delegate) ;
+        let*? () =
+          error_unless
+            (Signature.Public_key_hash.equal delegate shard_owner.delegate)
+            (Invalid_accusation_wrong_shard_owner
+               {
+                 delegate;
+                 level = level.level;
+                 slot_index;
+                 shard_index = shard_with_proof.shard.index;
+                 shard_owner = shard_owner.delegate;
+               })
+        in
         let attestation_lag =
           (Constants.parametric vi.ctxt).dal.attestation_lag
         in
-        let published_level =
+        let* published_level =
           match Raw_level.(sub (succ level.level) attestation_lag) with
           | None ->
-              failwith
-                "SHOULD NOT HAPPEN ON MAINNET. It can in theory happen on test \
-                 networks (but it is very unlikely)"
-          | Some level -> level
+              (* The slot couldn't have been published in this case *)
+              tzfail
+                (Invalid_accusation_slot_not_published
+                   {delegate; level = level.level; slot_index})
+          | Some level -> return level
         in
         let* slot_headers_opt =
           Dal.Slot.find_slot_headers ctxt published_level
@@ -1759,9 +1782,11 @@ module Anonymous = struct
         | None ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
                Can also fail if `attestation_lag` changes. *)
-            failwith (* TODO: return error *)
-              "SHOULD NOT HAPPEN IF 1) the denunciation age is correct, and 2) \
-               the storage is updated correctly"
+            (* It should not happen if 1) the denunciation age is correct, and 2) \
+               the storage is updated correctly *)
+            tzfail
+              (Accusation_validity_error_cannot_get_slot_headers
+                 {delegate; level = level.level; slot_index})
         | Some headers -> (
             let slot_header_opt =
               List.find
@@ -1786,18 +1811,24 @@ module Anonymous = struct
                     attestation
                 in
                 return_unit
-            | Some _ ->
+            | Some (header, _publisher) ->
                 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
                    Can also fail if `attestation_lag` changes. *)
-                (* TODO: return error *)
-                failwith
-                  "SHOULD NOT HAPPEN: mismatch between published levels in \
-                   storage versus in evidence"
+                (* mismatch between published levels in \
+                   storage versus in evidence; it should not happen *)
+                tzfail
+                  (Accusation_validity_error_levels_mismatch
+                     {
+                       delegate;
+                       level = level.level;
+                       slot_index;
+                       accusation_published_level = published_level;
+                       store_published_level = header.id.published_level;
+                     })
             | None ->
-                (* TODO: return error *)
-                failwith
-                  "Wrong evidence: no slot was published at the mentioned \
-                   level and index"))
+                tzfail
+                  (Invalid_accusation_slot_not_published
+                     {delegate; level = level.level; slot_index})))
 
   let check_dal_entrapment_evidence vi
       (operation : Kind.dal_entrapment_evidence operation) =

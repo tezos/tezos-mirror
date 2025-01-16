@@ -899,11 +899,51 @@ module Anonymous = struct
     | Invalid_shard_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
         delegate : Signature.Public_key_hash.t;
-        level : Level.t;
+        level : Raw_level.t;
       }
     | Denunciations_not_allowed_just_after_migration of {
         level : Raw_level.t;
         first_allowed_level : Raw_level.t;
+      }
+    | Invalid_accusation_no_dal_content of {
+        tb_slot : Slot.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
+    | Invalid_accusation_slot_not_attested of {
+        tb_slot : Slot.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
+    | Invalid_accusation_shard_is_not_trap of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        shard_index : int;
+      }
+    | Invalid_accusation_wrong_shard_owner of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        shard_index : int;
+        shard_owner : Signature.Public_key_hash.t;
+      }
+    | Invalid_accusation_slot_not_published of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
+    | Accusation_validity_error_cannot_get_slot_headers of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
+    | Accusation_validity_error_levels_mismatch of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        accusation_published_level : Raw_level.t;
+        store_published_level : Raw_level.t;
       }
     | Conflicting_dal_entrapment of operation_conflict
 
@@ -979,11 +1019,11 @@ module Anonymous = struct
            entrapment."
           Signature.Public_key_hash.pp
           delegate
-          Level.pp
+          Raw_level.pp
           level)
       (obj2
          (req "delegate" Signature.Public_key_hash.encoding)
-         (req "level" Level.encoding))
+         (req "level" Raw_level.encoding))
       (function
         | Dal_already_denounced {delegate; level} -> Some (delegate, level)
         | _ -> None)
@@ -1016,6 +1056,247 @@ module Anonymous = struct
         Denunciations_not_allowed_just_after_migration
           {level; first_allowed_level}) ;
 
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_no_dal_content"
+      ~title:"Invalid accusation: no DAL content"
+      ~description:
+        "Invalid accusation: the attestation operation has no DAL content."
+      ~pp:(fun ppf (tb_slot, level, slot_index) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for validator slot %a, level %a, and DAL slot \
+           index %a: the attestation operation has no DAL content."
+          Slot.pp
+          tb_slot
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index)
+      (obj3
+         (req "TB_slot" Slot.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding))
+      (function
+        | Invalid_accusation_no_dal_content {tb_slot; level; slot_index} ->
+            Some (tb_slot, level, slot_index)
+        | _ -> None)
+      (fun (tb_slot, level, slot_index) ->
+        Invalid_accusation_no_dal_content {tb_slot; level; slot_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_slot_not_attested"
+      ~title:"Invalid accusation: the delegate did not attest the DAL slot"
+      ~description:
+        "Invalid accusation: the delegate did not attest the DAL slot."
+      ~pp:(fun ppf (tb_slot, level, slot_index) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for validator slot %a, level %a, and DAL slot \
+           index %a: the delegate did not attest the DAL slot."
+          Slot.pp
+          tb_slot
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index)
+      (obj3
+         (req "TB_slot" Slot.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding))
+      (function
+        | Invalid_accusation_slot_not_attested {tb_slot; level; slot_index} ->
+            Some (tb_slot, level, slot_index)
+        | _ -> None)
+      (fun (tb_slot, level, slot_index) ->
+        Invalid_accusation_slot_not_attested {tb_slot; level; slot_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_shard_is_not_trap"
+      ~title:"Invalid accusation: the provided shard is not a trap"
+      ~description:"Invalid accusation: the provided shard is not a trap."
+      ~pp:(fun ppf (delegate, level, slot_index, shard_index) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
+           and shard index %d: the provided shard is not a trap."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index
+          shard_index)
+      (obj4
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding)
+         (req "shard_index" int31))
+      (function
+        | Invalid_accusation_shard_is_not_trap
+            {delegate; level; slot_index; shard_index} ->
+            Some (delegate, level, slot_index, shard_index)
+        | _ -> None)
+      (fun (delegate, level, slot_index, shard_index) ->
+        Invalid_accusation_shard_is_not_trap
+          {delegate; level; slot_index; shard_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_wrong_shard_owner"
+      ~title:
+        "Invalid accusation: the provided shard is not assigned to the attester"
+      ~description:
+        "Invalid accusation: the provided shard is not assigned to the \
+         attester."
+      ~pp:(fun ppf (delegate, level, slot_index, shard_index, shard_owner) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
+           and shard index %d: the shard is assigned to %a, not the attester."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index
+          shard_index
+          Signature.Public_key_hash.pp
+          shard_owner)
+      (obj5
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding)
+         (req "shard_index" Data_encoding.int31)
+         (req "shard_owner" Signature.Public_key_hash.encoding))
+      (function
+        | Invalid_accusation_wrong_shard_owner
+            {delegate; level; slot_index; shard_index; shard_owner} ->
+            Some (delegate, level, slot_index, shard_index, shard_owner)
+        | _ -> None)
+      (fun (delegate, level, slot_index, shard_index, shard_owner) ->
+        Invalid_accusation_wrong_shard_owner
+          {delegate; level; slot_index; shard_index; shard_owner}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_slot_not_published"
+      ~title:"Invalid accusation: DAL slot not published"
+      ~description:"Invalid accusation: the DAL slot was not published."
+      ~pp:(fun ppf (delegate, level, slot_index) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for delegate %a, level %a, and DAL slot index \
+           %a: the DAL slot was not published."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index)
+      (obj3
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding))
+      (function
+        | Invalid_accusation_slot_not_published {delegate; level; slot_index} ->
+            Some (delegate, level, slot_index)
+        | _ -> None)
+      (fun (delegate, level, slot_index) ->
+        Invalid_accusation_slot_not_published {delegate; level; slot_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.accusation_validity_error_cannot_get_slot_headers"
+      ~title:"Accusation validity error: cannot get slot headers"
+      ~description:
+        "Accusation validity internal error: unable to retrieve the required \
+         DAL slot headers."
+      ~pp:(fun ppf (delegate, level, slot_index) ->
+        Format.fprintf
+          ppf
+          "Accusation validity internal error for delegate %a, level %a, and \
+           DAL slot index %a: unable to retrieve the required slot headers."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index)
+      (obj3
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding))
+      (function
+        | Accusation_validity_error_cannot_get_slot_headers
+            {delegate; level; slot_index} ->
+            Some (delegate, level, slot_index)
+        | _ -> None)
+      (fun (delegate, level, slot_index) ->
+        Accusation_validity_error_cannot_get_slot_headers
+          {delegate; level; slot_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.accusation_validity_error_levels_mismatch"
+      ~title:"Accusation validity internal error: levels mismatch"
+      ~description:
+        "Accusation validity internal error: mismatch between published levels \
+         in storage and evidence."
+      ~pp:(fun
+          ppf
+          ( delegate,
+            level,
+            slot_index,
+            accusation_published_level,
+            store_published_level )
+        ->
+        Format.fprintf
+          ppf
+          "Accusation validity error for delegate %a, level %a, and DAL slot \
+           index %a: mismatch between published levels in evidence (%a) and \
+           storage (%a)."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index
+          Raw_level.pp
+          accusation_published_level
+          Raw_level.pp
+          store_published_level)
+      (obj5
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding)
+         (req "accusation_published_level" Raw_level.encoding)
+         (req "store_published_level" Raw_level.encoding))
+      (function
+        | Accusation_validity_error_levels_mismatch
+            {
+              delegate;
+              level;
+              slot_index;
+              accusation_published_level;
+              store_published_level;
+            } ->
+            Some
+              ( delegate,
+                level,
+                slot_index,
+                accusation_published_level,
+                store_published_level )
+        | _ -> None)
+      (fun ( delegate,
+             level,
+             slot_index,
+             accusation_published_level,
+             store_published_level ) ->
+        Accusation_validity_error_levels_mismatch
+          {
+            delegate;
+            level;
+            slot_index;
+            accusation_published_level;
+            store_published_level;
+          }) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.conflicting_dal_entrapment"
