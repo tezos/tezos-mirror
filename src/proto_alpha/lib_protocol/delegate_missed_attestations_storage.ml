@@ -43,8 +43,8 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake_weight
           (Z.of_int number_of_attestations_per_cycle))
        (Z.of_int64 total_active_stake_weight))
 
-let expected_dal_shards_for_given_active_stake ctxt ~total_active_stake_weight
-    ~active_stake_weight =
+let expected_dal_shards_per_slot_for_given_active_stake ctxt
+    ~total_active_stake_weight ~active_stake_weight =
   let blocks_per_cycle =
     Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
   in
@@ -355,7 +355,7 @@ module For_RPC = struct
           let total_active_stake_weight =
             Stake_repr.staking_weight total_active_stake
           in
-          expected_dal_shards_for_given_active_stake
+          expected_dal_shards_per_slot_for_given_active_stake
             ctxt
             ~total_active_stake_weight
             ~active_stake_weight
