@@ -1751,11 +1751,18 @@ module Anonymous = struct
           let*? tb_slot = Slot.of_int shard_index in
           Stake_distribution.slot_owner vi.ctxt level tb_slot
         in
-        assert (
-          (* TODO: check and return error *)
-          Signature.Public_key_hash.equal
-            delegate
-            shard_owner.delegate) ;
+        let*? () =
+          error_unless
+            (Signature.Public_key_hash.equal delegate shard_owner.delegate)
+            (Invalid_accusation_wrong_shard_owner
+               {
+                 delegate;
+                 level = level.level;
+                 slot_index;
+                 shard_index = shard_with_proof.shard.index;
+                 shard_owner = shard_owner.delegate;
+               })
+        in
         let attestation_lag =
           (Constants.parametric vi.ctxt).dal.attestation_lag
         in

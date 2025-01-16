@@ -921,6 +921,13 @@ module Anonymous = struct
         slot_index : Dal.Slot_index.t;
         shard_index : int;
       }
+    | Invalid_accusation_wrong_shard_owner of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        shard_index : int;
+        shard_owner : Signature.Public_key_hash.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
 
   let () =
@@ -1116,6 +1123,42 @@ module Anonymous = struct
       (fun (delegate, level, slot_index, shard_index) ->
         Invalid_accusation_shard_is_not_trap
           {delegate; level; slot_index; shard_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_wrong_shard_owner"
+      ~title:
+        "Invalid accusation: the provided shard is not assigned to the attester"
+      ~description:
+        "Invalid accusation: the provided shard is not assigned to the \
+         attester."
+      ~pp:(fun ppf (delegate, level, slot_index, shard_index, shard_owner) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
+           and shard index %d: the shard is assigned to %a, not the attester."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index
+          shard_index
+          Signature.Public_key_hash.pp
+          shard_owner)
+      (obj5
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding)
+         (req "shard_index" Data_encoding.int31)
+         (req "shard_owner" Signature.Public_key_hash.encoding))
+      (function
+        | Invalid_accusation_wrong_shard_owner
+            {delegate; level; slot_index; shard_index; shard_owner} ->
+            Some (delegate, level, slot_index, shard_index, shard_owner)
+        | _ -> None)
+      (fun (delegate, level, slot_index, shard_index, shard_owner) ->
+        Invalid_accusation_wrong_shard_owner
+          {delegate; level; slot_index; shard_index; shard_owner}) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.conflicting_dal_entrapment"
