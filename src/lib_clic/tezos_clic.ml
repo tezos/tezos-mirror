@@ -1176,7 +1176,7 @@ let add_occurrence long value acc =
     (function Some v -> Some (v @ [value]) | None -> Some [value])
     acc
 
-let make_args_dict_consume ?command spec args =
+let make_args_dict_consume_for_global_options ?command spec args =
   let open Lwt_result_syntax in
   let rec make_args_dict arities acc args =
     let* () = check_help_flag ?command args in
@@ -1203,8 +1203,8 @@ let make_args_dict_consume ?command spec args =
                      or [0] unsupported. "
               (* ArgDefSwitch is the only option with an arity
                  different to [0; 1], which is not allowed in global
-                 argument. `make_args_dict_consume` is only used to
-                 produce global arg for now. *))
+                 argument. `make_args_dict_consume_for_global_options`
+                 is only used to produce global arg for now. *))
           | None -> tzfail (Unknown_option (arg, None))
         else return (acc, args)
   in
@@ -1491,11 +1491,10 @@ let insert_in_dispatch_tree :
              command)
   in
   let () =
-    if enable_argDefSwitch then ()
-    else if has_argDefSwitch options then
+    if (not enable_argDefSwitch) && has_argDefSwitch options then
       Stdlib.failwith
-        "argDefSwitch is not enabled. Uses this option with precaution as it's \
-         not yet well tested."
+        "Internal error: argDefSwitch is not enabled for this binary. Please \
+         fill an issue at https://gitlab.com/tezos/tezos/-/issues"
     else ()
   in
   insert_tree conv root params
@@ -1830,7 +1829,9 @@ let parse_global_options global_options ctx args =
        first global argument then the rest of the command would
        work. *)
   else
-    let* dict, remaining = make_args_dict_consume global_options args in
+    let* dict, remaining =
+      make_args_dict_consume_for_global_options global_options args
+    in
     let* nested = parse_arg global_options dict ctx in
     return (nested, remaining)
 
