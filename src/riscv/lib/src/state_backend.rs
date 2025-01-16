@@ -56,6 +56,7 @@
 //! [Layouts]: Layout
 //! [Locations]: Location
 
+mod commitment_layout;
 mod effects;
 mod elems;
 pub mod hash;
@@ -67,6 +68,7 @@ mod region;
 mod trans;
 pub mod verify_backend;
 
+pub use commitment_layout::*;
 pub use effects::*;
 pub use elems::*;
 pub use layout::*;

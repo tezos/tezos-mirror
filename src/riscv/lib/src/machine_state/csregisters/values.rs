@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -15,12 +15,12 @@ use crate::state_backend::proof_backend::merkle::{AccessInfo, AccessInfoAggregat
 use crate::{
     bits::Bits64,
     state_backend::{
-        hash::{Hash, HashError, RootHashable},
+        hash::{Hash, HashError},
         owned_backend::Owned,
         proof_backend::merkle::{MerkleTree, Merkleisable},
-        verify_backend, AllocatedOf, Cell, EffectCell, EffectCellLayout, FnManager,
-        FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
-        ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref,
+        verify_backend, AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout,
+        FnManager, FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead,
+        ManagerReadWrite, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref,
     },
     storage::binary,
 };
@@ -153,6 +153,12 @@ impl Layout for CSRValuesLayout {
             || XipCellLayout::allocate(*backend.borrow_mut()),
             || EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut()),
         )
+    }
+}
+
+impl CommitmentLayout for CSRValuesLayout {
+    fn state_hash(state: AllocatedOf<Self, Ref<'_, Owned>>) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(state)
     }
 }
 
@@ -1452,14 +1458,6 @@ impl<Raw, MStatus, MIP> CSRValuesF<Raw, MStatus, MIP> {
             RootCSRegister::dscratch0 => fold_raw(&mut self.dscratch0),
             RootCSRegister::dscratch1 => fold_raw(&mut self.dscratch1),
         }
-    }
-}
-
-impl<Raw: serde::Serialize, MStatus: serde::Serialize, MIP: serde::Serialize> RootHashable
-    for CSRValuesF<Raw, MStatus, MIP>
-{
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
     }
 }
 

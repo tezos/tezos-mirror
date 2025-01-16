@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -6,8 +7,10 @@ use crate::{
     default::ConstDefault,
     machine_state::main_memory::Address,
     state_backend::{
-        FromProofResult, Layout, ManagerAlloc, ManagerBase, Many, ProofLayout, ProofTree,
+        owned_backend::Owned, AllocatedOf, CommitmentLayout, FromProofResult, Layout, ManagerAlloc,
+        ManagerBase, Many, ProofLayout, ProofTree, Ref,
     },
+    storage::{Hash, HashError},
 };
 use std::{convert::Infallible, marker::PhantomData};
 
@@ -84,6 +87,14 @@ impl<const BITS: usize, const SIZE: usize, CachedLayout: Layout> Layout
 
     fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         Many::<CachedLayout, SIZE>::allocate(backend)
+    }
+}
+
+impl<const BITS: usize, const SIZE: usize, CachedLayout: CommitmentLayout> CommitmentLayout
+    for Sizes<BITS, SIZE, CachedLayout>
+{
+    fn state_hash(state: AllocatedOf<Self, Ref<'_, Owned>>) -> Result<Hash, HashError> {
+        Many::<CachedLayout, SIZE>::state_hash(state)
     }
 }
 

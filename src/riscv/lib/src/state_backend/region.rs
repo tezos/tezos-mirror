@@ -609,7 +609,7 @@ pub const MERKLE_ARITY: usize = 3;
 /// and writing them to a writer. The last chunk may be smaller than the
 /// Merkle leaf size. The implementations of `RootHashable` and `Merkleisable`
 /// for dynamic regions both use it, ensuring consistency between the two.
-fn chunks_to_writer<
+pub(crate) fn chunks_to_writer<
     const LEN: usize,
     T: std::io::Write,
     F: Fn(usize) -> [u8; MERKLE_LEAF_SIZE.get()],
@@ -639,8 +639,6 @@ fn chunks_to_writer<
     Ok(())
 }
 
-// TODO RV-305: Specialise implementation for `DynCells<LEN, ProofGen<'_, M>>`
-// when feature becomes stable.
 impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
     fn hash(&self) -> Result<Hash, HashError> {
         let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);

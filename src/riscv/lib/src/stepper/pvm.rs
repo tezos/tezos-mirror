@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -16,11 +16,11 @@ use crate::{
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
     state_backend::{
-        hash::{Hash, RootHashable},
+        hash::Hash,
         owned_backend::Owned,
         proof_backend::{merkle::Merkleisable, proof::Proof, ProofGen},
         verify_backend::Verifier,
-        AllocatedOf, FnManagerIdent, ProofLayout, ProofTree, Ref,
+        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref,
     },
     storage::binary,
 };
@@ -134,12 +134,9 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     }
 
     /// Obtain the root hash for the PVM state.
-    pub fn hash<'a>(&'a self) -> Hash
-    where
-        AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: RootHashable,
-    {
+    pub fn hash(&self) -> Hash {
         let refs = self.pvm.struct_ref::<FnManagerIdent>();
-        RootHashable::hash(&refs).unwrap()
+        PvmLayout::<ML, CL>::state_hash(refs).unwrap()
     }
 
     /// Create a new stepper in which the existing PVM is managed by
@@ -216,7 +213,6 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
 impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL>
 where
     for<'a, 'b> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, ProofGen<Ref<'b, Owned>>>>: Merkleisable,
-    for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: RootHashable,
 {
     /// Produce the Merkle proof for evaluating one step on the given PVM state.
     /// The given stepper takes one step.
