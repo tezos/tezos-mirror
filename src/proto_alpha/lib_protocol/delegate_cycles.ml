@@ -70,7 +70,7 @@ let distribute_dal_attesting_rewards ctxt delegate
   in
   let expected_dal_shards =
     Delegate_missed_attestations_storage
-    .expected_dal_shards_for_given_active_stake
+    .expected_dal_shards_per_slot_for_given_active_stake
       ctxt
       ~total_active_stake_weight
       ~active_stake_weight

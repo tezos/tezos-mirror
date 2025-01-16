@@ -43,8 +43,8 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake_weight
           (Z.of_int number_of_attestations_per_cycle))
        (Z.of_int64 total_active_stake_weight))
 
-let expected_dal_shards_for_given_active_stake ctxt ~total_active_stake_weight
-    ~active_stake_weight =
+let expected_dal_shards_per_slot_for_given_active_stake ctxt
+    ~total_active_stake_weight ~active_stake_weight =
   let blocks_per_cycle =
     Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
   in
@@ -316,7 +316,7 @@ module For_RPC = struct
           }
 
   type dal_participation_info = {
-    expected_assigned_shards : int;
+    expected_assigned_shards_per_slot : int;
     delegate_attested_dal_slots : int;
     total_dal_attested_slots : int;
     expected_dal_rewards : Tez_repr.t;
@@ -340,7 +340,7 @@ module For_RPC = struct
         (* delegate does not have an active stake at the current cycle *)
         return
           {
-            expected_assigned_shards = 0;
+            expected_assigned_shards_per_slot = 0;
             delegate_attested_dal_slots = 0;
             total_dal_attested_slots = 0;
             expected_dal_rewards = Tez_repr.zero;
@@ -350,12 +350,12 @@ module For_RPC = struct
         let* total_active_stake =
           Stake_storage.get_total_active_stake ctxt level.cycle
         in
-        let expected_assigned_shards =
+        let expected_assigned_shards_per_slot =
           let active_stake_weight = Stake_repr.staking_weight active_stake in
           let total_active_stake_weight =
             Stake_repr.staking_weight total_active_stake
           in
-          expected_dal_shards_for_given_active_stake
+          expected_dal_shards_per_slot_for_given_active_stake
             ctxt
             ~total_active_stake_weight
             ~active_stake_weight
@@ -379,11 +379,11 @@ module For_RPC = struct
         let expected_dal_rewards =
           Tez_repr.mul_exn
             dal_attesting_reward_per_shard
-            expected_assigned_shards
+            expected_assigned_shards_per_slot
         in
         return
           {
-            expected_assigned_shards;
+            expected_assigned_shards_per_slot;
             delegate_attested_dal_slots =
               Int32.to_int dal_attested_slots_by_delegate;
             total_dal_attested_slots = Int32.to_int total_dal_attested_slots;

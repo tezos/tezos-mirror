@@ -148,31 +148,31 @@ let dal_participation_info_encoding =
   conv
     (fun Delegate.For_RPC.
            {
-             expected_assigned_shards;
+             expected_assigned_shards_per_slot;
              delegate_attested_dal_slots;
              total_dal_attested_slots;
              expected_dal_rewards;
              sufficient_dal_participation;
            } ->
-      ( expected_assigned_shards,
+      ( expected_assigned_shards_per_slot,
         delegate_attested_dal_slots,
         total_dal_attested_slots,
         expected_dal_rewards,
         sufficient_dal_participation ))
-    (fun ( expected_assigned_shards,
+    (fun ( expected_assigned_shards_per_slot,
            delegate_attested_dal_slots,
            total_dal_attested_slots,
            expected_dal_rewards,
            sufficient_dal_participation ) ->
       {
-        expected_assigned_shards;
+        expected_assigned_shards_per_slot;
         delegate_attested_dal_slots;
         total_dal_attested_slots;
         expected_dal_rewards;
         sufficient_dal_participation;
       })
     (obj5
-       (req "expected_assigned_shards" int31)
+       (req "expected_assigned_shards_per_slot" int31)
        (req "delegate_attested_dal_slots" int31)
        (req "total_dal_attested_slots" int31)
        (req "expected_dal_rewards" Tez.encoding)
@@ -885,12 +885,13 @@ module S = struct
       ~description:
         "Returns information about the delegate's participation in the \
          attestation of slots published into the Data Availability Layer (DAL) \
-         during the current cycle. The field 'expected_assigned_shards' \
-         indicates the expected number of shards assigned to the delegate in \
-         the cycle. The field 'delegate_attested_dal_slots' represents the \
-         number of attested DAL slots which are also attested by the delegate, \
-         while 'total_dal_attested_slots' provides the total number of DAL \
-         slots attested during the cycle, regardless of the delegate's \
+         during the current cycle. The field \
+         'expected_assigned_shards_per_slot' indicates the expected number of \
+         shards assigned to the delegate in the cycle per DAL slot. The field \
+         'delegate_attested_dal_slots' represents the number of attested DAL \
+         slots which are also attested by the delegate, while \
+         'total_dal_attested_slots' provides the total number of DAL slots \
+         attested during the cycle, regardless of the delegate's \
          participation. The 'expected_dal_rewards' field specifies the \
          expected amount of rewards for the delegate based on DAL \
          participation, provided the delegate meets the required participation \

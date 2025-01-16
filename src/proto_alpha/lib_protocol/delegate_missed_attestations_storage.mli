@@ -40,9 +40,9 @@ val expected_slots_for_given_active_stake :
   int
 
 (** Computes the number of DAL shards that a delegate is expected to be
-    allocated during a cycle. This number is proportional to its active stake
-    wrt to total active stake. *)
-val expected_dal_shards_for_given_active_stake :
+    allocated during a cycle per DAL slot. This number is proportional to its
+    active stake wrt to total active stake. *)
+val expected_dal_shards_per_slot_for_given_active_stake :
   Raw_context.t ->
   total_active_stake_weight:int64 ->
   active_stake_weight:int64 ->
@@ -148,9 +148,9 @@ module For_RPC : sig
       - "static" information that does not change during the cycle
       - "dynamic" information that may change during the cycle *)
   type dal_participation_info = {
-    expected_assigned_shards : int;
+    expected_assigned_shards_per_slot : int;
         (** The total expected number of assigned shard indexes for the delegate
-            during the current cycle. (static) *)
+            during the current cycle per slot. (static) *)
     delegate_attested_dal_slots : int;
         (** The number of attested slots during the current cycle that are
             attested by the delegate. (dynamic) *)

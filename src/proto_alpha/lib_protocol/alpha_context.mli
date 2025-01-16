@@ -2505,7 +2505,7 @@ module Delegate : sig
     }
 
     type dal_participation_info = {
-      expected_assigned_shards : int;
+      expected_assigned_shards_per_slot : int;
       delegate_attested_dal_slots : int;
       total_dal_attested_slots : int;
       expected_dal_rewards : Tez.t;
