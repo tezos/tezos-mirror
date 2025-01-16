@@ -1055,21 +1055,19 @@ let own_staked ctxt pkh =
 
 let unstake_requests ctxt pkh =
   let open Lwt_result_syntax in
+  let open Unstake_requests.For_RPC in
   let* result =
     (* This function applies slashing to finalizable requests. *)
-    Unstake_requests.prepare_finalize_unstake ctxt pkh
+    prepare_finalize_unstake ctxt pkh
   in
   match result with
   | None -> return_none
   | Some {finalizable; unfinalizable} ->
       let* unfinalizable =
         (* Apply slashing to unfinalizable requests too. *)
-        Unstake_requests.For_RPC
-        .apply_slash_to_unstaked_unfinalizable_stored_requests
-          ctxt
-          unfinalizable
+        apply_slash_to_unstaked_unfinalizable_stored_requests ctxt unfinalizable
       in
-      return_some Unstake_requests.{finalizable; unfinalizable}
+      return_some {finalizable; unfinalizable}
 
 let own_staked_and_delegated ctxt pkh =
   let open Lwt_result_syntax in

@@ -88,7 +88,7 @@ val unstake_requests :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  Unstake_requests.prepared_finalize_unstake option shell_tzresult Lwt.t
+  Unstake_requests.For_RPC.prepared_finalize_unstake option shell_tzresult Lwt.t
 
 val full_balance :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t

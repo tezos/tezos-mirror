@@ -47,6 +47,8 @@ let () =
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
 
+type transfer_result = Raw_context.t * Receipt_repr.balance_update_item list
+
 let finalizable_encoding =
   let open Data_encoding in
   let elt_encoding =
@@ -112,7 +114,8 @@ let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
     amount
     slashing_history
 
-let prepare_finalize_unstake ctxt contract =
+let prepare_finalize_unstake_uncarbonated ctxt
+    ~check_delegate_of_unfinalizable_requests contract =
   let open Lwt_result_syntax in
   let slashable_deposits_period =
     Constants_storage.slashable_deposits_period ctxt
@@ -174,38 +177,272 @@ let prepare_finalize_unstake ctxt contract =
             Storage.Unstake_request.
               {delegate; requests = unfinalizable_requests}
           in
+          let* () =
+            if not (List.is_empty unfinalizable_requests) then
+              check_delegate_of_unfinalizable_requests delegate
+            else return_unit
+          in
           return_some {finalizable; unfinalizable})
 
-let update = Storage.Contract.Unstake_requests.update
-
-let add ctxt ~contract ~delegate cycle amount =
+let prepare_finalize_unstake ctxt ~check_delegate_of_unfinalizable_requests
+    contract =
   let open Lwt_result_syntax in
-  let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
-  let*? requests =
-    match requests_opt with
-    | None -> Ok []
-    | Some {delegate = request_delegate; requests} -> (
-        match requests with
-        | [] -> Ok []
-        | _ ->
-            if Signature.Public_key_hash.(delegate <> request_delegate) then
-              (* This would happen if the staker was allowed to stake towards
-                 a new delegate while having unfinalizable unstake requests,
-                 which is not allowed: it will fail earlier. Also, unstaking
-                 for 0 tez is a noop and does not change the state of the storage,
-                 so it does not allow to reach this error either. *)
-              Result_syntax.tzfail
-                Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
-            else Ok requests)
+  let*? ctxt =
+    Raw_context.consume_gas
+      ctxt
+      Adaptive_issuance_costs.prepare_finalize_unstake_cost
+  in
+  let* prepared =
+    prepare_finalize_unstake_uncarbonated
+      ctxt
+      ~check_delegate_of_unfinalizable_requests
+      contract
+  in
+  return (ctxt, prepared)
+
+(* Update the storage with the given requests.
+
+   If the given structure contains an empty list of requests, it means that
+   there are no more funds to unstake, and thus there is no need to keep an
+   entry for the contract.
+*)
+let set_stored_requests ctxt contract updated_requests =
+  match updated_requests.requests with
+  | [] -> Storage.Contract.Unstake_requests.remove ctxt contract
+  | _ :: _ ->
+      Storage.Contract.Unstake_requests.add ctxt contract updated_requests
+
+let handle_finalizable_and_clear ctxt contract
+    ~check_delegate_of_unfinalizable_requests ~handle_finalizable =
+  let open Lwt_result_syntax in
+  let* ctxt, prepared_opt =
+    prepare_finalize_unstake
+      ~check_delegate_of_unfinalizable_requests
+      ctxt
+      contract
+  in
+  match prepared_opt with
+  | None -> return (ctxt, [])
+  | Some {finalizable; unfinalizable} ->
+      let*? ctxt =
+        Raw_context.consume_gas
+          ctxt
+          Adaptive_issuance_costs.finalize_unstake_and_check_cost
+      in
+      let* ctxt, balance_updates_finalized =
+        handle_finalizable ctxt finalizable
+      in
+      let*! ctxt = set_stored_requests ctxt contract unfinalizable in
+      return (ctxt, balance_updates_finalized)
+
+let finalize_and_add ctxt ~contract ~delegate ~handle_finalizable cycle amount =
+  let open Lwt_result_syntax in
+  let* ctxt, prepared_opt =
+    prepare_finalize_unstake
+      ~check_delegate_of_unfinalizable_requests:(fun request_delegate ->
+        if Signature.Public_key_hash.(delegate <> request_delegate) then
+          (* This would happen if the staker was allowed to stake towards
+             a new delegate while having unfinalizable unstake requests,
+             which is not allowed: it will fail earlier. Also, unstaking
+             for 0 tez is a noop and does not change the state of the storage,
+             so it does not allow to reach this error either. *)
+          tzfail
+            Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate
+        else return_unit)
+      ctxt
+      contract
+  in
+  let finalizable, requests =
+    match prepared_opt with
+    | None -> ([], [])
+    | Some {finalizable; unfinalizable = {delegate = _; requests}} ->
+        (finalizable, requests)
   in
   let*? requests = Storage.Unstake_request.add cycle amount requests in
   let unstake_request = Storage.Unstake_request.{delegate; requests} in
-  let*! ctxt =
-    Storage.Contract.Unstake_requests.add ctxt contract unstake_request
+  let*! ctxt = set_stored_requests ctxt contract unstake_request in
+  handle_finalizable ctxt finalizable
+
+let can_stake_from_unstake ctxt ~delegate =
+  let open Lwt_result_syntax in
+  let* slashing_history_opt = Storage.Slashed_deposits.find ctxt delegate in
+  let slashing_history = Option.value slashing_history_opt ~default:[] in
+
+  let* slashing_history_opt_o =
+    Storage.Contract.Slashed_deposits__Oxford.find
+      ctxt
+      (Contract_repr.Implicit delegate)
   in
-  return ctxt
+  let slashing_history_o =
+    Option.value slashing_history_opt_o ~default:[]
+    |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+  in
+
+  let slashing_history = slashing_history @ slashing_history_o in
+
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
+  in
+  let oldest_slashable_cycle =
+    Cycle_repr.sub current_cycle (slashable_deposits_period + 1)
+    |> Option.value ~default:Cycle_repr.root
+  in
+  let*! is_denounced =
+    Pending_denunciations_storage.has_pending_denunciations ctxt delegate
+  in
+  let is_slashed =
+    List.exists
+      (fun (x, _) -> Cycle_repr.(x >= oldest_slashable_cycle))
+      slashing_history
+  in
+  return @@ not (is_denounced || is_slashed)
+
+let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
+    ~check_delegate_of_unfinalizable_requests
+    ~(transfer_from_unstake :
+       Raw_context.t ->
+       Cycle_repr.t ->
+       Signature.public_key_hash ->
+       Contract_repr.t ->
+       Tez_repr.t ->
+       (Raw_context.t * 'a list) tzresult Lwt.t)
+    ~(handle_finalizable :
+       Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) amount :
+    (transfer_result * Tez_repr.t) tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* allowed =
+    match contract with
+    | Contract_repr.Implicit contract
+      when Signature.Public_key_hash.(contract = delegate) ->
+        can_stake_from_unstake ctxt ~delegate
+    | Contract_repr.Originated _ | Contract_repr.Implicit _ -> return false
+  in
+  if not allowed then
+    (* a slash could have modified the unstaked frozen deposits:
+       unfinalizable stake requests cannot be spent *)
+    let* ctxt, balance_updates =
+      handle_finalizable_and_clear
+        ~check_delegate_of_unfinalizable_requests
+        ~handle_finalizable
+        ctxt
+        contract
+    in
+    return ((ctxt, balance_updates), amount)
+  else
+    let* ctxt, prepared_opt =
+      prepare_finalize_unstake
+        ~check_delegate_of_unfinalizable_requests
+        ctxt
+        contract
+    in
+    match prepared_opt with
+    | None -> return ((ctxt, []), amount)
+    | Some {finalizable; unfinalizable = {delegate; requests}} ->
+        let requests_sorted =
+          List.sort
+            (fun (cycle1, _) (cycle2, _) ->
+              Cycle_repr.compare cycle2 cycle1
+              (* decreasing cycle order, to release first the tokens
+                 that would be frozen for the longest time *))
+            requests
+        in
+        let rec transfer_from_all_unstake ctxt balance_updates
+            remaining_amount_to_transfer updated_requests_rev requests =
+          if Tez_repr.(remaining_amount_to_transfer = zero) then
+            return
+              ( ctxt,
+                balance_updates,
+                Tez_repr.zero,
+                List.rev_append requests updated_requests_rev )
+          else
+            match requests with
+            | [] ->
+                return
+                  ( ctxt,
+                    balance_updates,
+                    remaining_amount_to_transfer,
+                    updated_requests_rev )
+            | (cycle, requested_amount) :: t ->
+                if Tez_repr.(remaining_amount_to_transfer >= requested_amount)
+                then
+                  let* ctxt, cycle_balance_updates =
+                    transfer_from_unstake
+                      ctxt
+                      cycle
+                      delegate
+                      contract
+                      requested_amount
+                  in
+                  let*? remaining_amount =
+                    Tez_repr.(remaining_amount_to_transfer -? requested_amount)
+                  in
+                  transfer_from_all_unstake
+                    ctxt
+                    (balance_updates @ cycle_balance_updates)
+                    remaining_amount
+                    updated_requests_rev
+                    t
+                else
+                  let* ctxt, cycle_balance_updates =
+                    transfer_from_unstake
+                      ctxt
+                      cycle
+                      delegate
+                      contract
+                      remaining_amount_to_transfer
+                  in
+                  let*? new_requested_amount =
+                    Tez_repr.(requested_amount -? remaining_amount_to_transfer)
+                  in
+                  return
+                    ( ctxt,
+                      balance_updates @ cycle_balance_updates,
+                      Tez_repr.zero,
+                      List.rev_append
+                        t
+                        ((cycle, new_requested_amount) :: updated_requests_rev)
+                    )
+        in
+        let* ( ctxt,
+               balance_updates,
+               remaining_amount_to_transfer,
+               updated_requests_rev ) =
+          transfer_from_all_unstake ctxt [] amount [] requests_sorted
+        in
+        let updated_requests = List.rev updated_requests_rev in
+        let*! ctxt =
+          set_stored_requests
+            ctxt
+            contract
+            {delegate; requests = updated_requests}
+        in
+        let* ctxt, balance_updates_finalisation =
+          handle_finalizable ctxt finalizable
+        in
+        return
+          ( (ctxt, balance_updates @ balance_updates_finalisation),
+            remaining_amount_to_transfer )
 
 module For_RPC = struct
+  type nonrec prepared_finalize_unstake = prepared_finalize_unstake = {
+    finalizable : finalizable;
+    unfinalizable : stored_requests;
+  }
+
+  type nonrec stored_requests = stored_requests = {
+    delegate : Signature.Public_key_hash.t;
+    requests : (Cycle_repr.t * Tez_repr.t) list;
+  }
+
+  let prepared_finalize_unstake_encoding :
+      prepared_finalize_unstake Data_encoding.t =
+    prepared_finalize_unstake_encoding
+
+  let prepare_finalize_unstake =
+    prepare_finalize_unstake_uncarbonated
+      ~check_delegate_of_unfinalizable_requests:(fun _ -> return_unit)
+
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
     let open Lwt_result_syntax in
     let slashable_deposits_period =
