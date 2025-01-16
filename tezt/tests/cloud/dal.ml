@@ -1393,11 +1393,21 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         (producer_accounts @ etherlink_rollup_operator_key
        @ etherlink_batching_operator_keys)
     in
+    let overrides =
+      if Cli.dal_incentives then
+        [
+          (["dal_parametric"; "incentives_enable"], `Bool true);
+          (["blocks_per_cycle"], `Int 8);
+          (* This parameter should be lower than blocks_per_cycle *)
+          (["nonce_revelation_threshold"], `Int 4);
+        ]
+      else []
+    in
     Protocol.write_parameter_file
       ~bootstrap_accounts
       ~additional_bootstrap_accounts
       ~base
-      [(["dal_parametric"; "incentives_enable"], `Bool Cli.dal_incentives)]
+      overrides
   in
   let etherlink_rollup_operator_key =
     match etherlink_rollup_operator_key with [key] -> Some key | _ -> None
