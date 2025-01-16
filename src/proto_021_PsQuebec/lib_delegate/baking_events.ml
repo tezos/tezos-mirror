@@ -605,11 +605,14 @@ module Delegates = struct
       ~alternative_color:Internal_event.Cyan
       ~name:"delegates_used"
       ~level:Notice
-      ~msg:"Baker will run with the following delegates:\n  {delegates}"
-      ~pp1:
-        (Format.pp_print_list
-           (fun fmt (delegate : Baking_state.consensus_key) ->
-             Format.fprintf fmt "%a" Baking_state.pp_consensus_key delegate))
+      ~msg:"Baker will run with the following delegates:@[<v 2>@,{delegates}@]"
+      ~pp1:(fun ppf delegates ->
+        Format.fprintf
+          ppf
+          "@[<v 2>@,%a@]"
+          Format.(
+            pp_print_list ~pp_sep:pp_print_cut Baking_state.pp_consensus_key)
+          delegates)
       ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
 end
 
