@@ -34,13 +34,13 @@ let sum_weights
        vdf_revelation_tip_weight;
        dal_rewards_weight;
      } :
-      Constants_parametric_repr.issuance_weights) =
+      Constants_parametric_repr.issuance_weights) ~dal_incentives_enabled =
   let r = baking_reward_fixed_portion_weight in
   let r = baking_reward_bonus_weight + r in
   let r = attesting_reward_weight + r in
   let r = seed_nonce_revelation_tip_weight + r in
   let r = vdf_revelation_tip_weight + r in
-  let r = dal_rewards_weight + r in
+  let r = if dal_incentives_enabled then dal_rewards_weight + r else r in
   assert (Compare.Int.(r > 0)) ;
   r
 
@@ -53,8 +53,9 @@ let sum_weights
    [minimal_block_delay] is the minimum amount of time between two blocks. *)
 let tez_from_weights
     ~(issuance_weights : Constants_parametric_repr.issuance_weights)
-    ~(weight : int) ~(minimal_block_delay : Period_repr.t) =
-  let sum_weights = sum_weights issuance_weights in
+    ~(weight : int) ~(minimal_block_delay : Period_repr.t)
+    ~dal_incentives_enabled =
+  let sum_weights = sum_weights issuance_weights ~dal_incentives_enabled in
   let block_delay = minimal_block_delay |> Period_repr.to_seconds in
   (* base_tez = issuance_weights.base_total_issued_per_minute
      relative_weight = reward_weight / sum_weights
@@ -83,6 +84,7 @@ module M = struct
       ~(coeff : Q.t) =
     let open Result_syntax in
     let issuance_weights = csts.issuance_weights in
+    let dal_incentives_enabled = csts.dal.incentives_enable in
     let weight =
       match reward_kind with
       | Baking_reward_fixed_portion ->
@@ -90,7 +92,9 @@ module M = struct
       | Baking_reward_bonus_per_slot ->
           issuance_weights.baking_reward_bonus_weight
       | Attesting_reward_per_slot -> issuance_weights.attesting_reward_weight
-      | Dal_attesting_reward_per_shard -> issuance_weights.dal_rewards_weight
+      | Dal_attesting_reward_per_shard ->
+          if dal_incentives_enabled then issuance_weights.dal_rewards_weight
+          else 0
       | Seed_nonce_revelation_tip ->
           (* Seed nonce revelation rewards are given every [blocks_per_commitment](=240)th block *)
           let blocks_per_commitment = Int32.to_int csts.blocks_per_commitment in
@@ -103,7 +107,11 @@ module M = struct
     in
     let minimal_block_delay = csts.minimal_block_delay in
     let* rewards =
-      tez_from_weights ~issuance_weights ~weight ~minimal_block_delay
+      tez_from_weights
+        ~issuance_weights
+        ~weight
+        ~minimal_block_delay
+        ~dal_incentives_enabled
     in
     let base_rewards =
       match reward_kind with
