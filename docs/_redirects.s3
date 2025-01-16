@@ -3,3 +3,4 @@
 
 # this one is temporary, just for testing:
 /install.html /introduction/howtoget.html 301
+/releases/latest.html /releases/version-21.html 302
