@@ -27,6 +27,12 @@ pub fn run_cmv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegist
     icb.xregister_write(rd_rs1, rs2_val)
 }
 
+/// C.NOP CI-type compressed instruction
+///
+/// Does not change any user-visible state, except for advancing the pc and
+/// incrementing any applicable performance counters. Equivalent to `NOP`.
+pub fn run_cnop(_icb: &mut impl ICB) {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

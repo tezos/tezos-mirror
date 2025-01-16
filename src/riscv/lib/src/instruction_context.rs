@@ -9,13 +9,19 @@
 
 use crate::{
     machine_state::{
+        instruction::Args,
         main_memory::MainMemoryLayout,
         registers::{NonZeroXRegister, XValue},
-        MachineCoreState,
+        MachineCoreState, ProgramCounterUpdate,
     },
     state_backend::ManagerReadWrite,
     traps::Exception,
 };
+
+/// Type of function that may be used to lower [`Instructions`] to IR.
+///
+/// [`Instructions`]: crate::machine_state::instruction::Instruction
+pub type IcbLoweringFn<I> = unsafe fn(&Args, &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate>;
 
 /// Instruction Context Builder contains operations required to
 /// execute RISC-V instructions.

@@ -22,7 +22,7 @@ use super::{
 };
 use crate::{
     default::ConstDefault,
-    instruction_context::ICB,
+    instruction_context::{IcbLoweringFn, ICB},
     interpreter::c,
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
@@ -589,6 +589,30 @@ impl OpCode {
             Self::CFsdsp => Args::run_cfsdsp,
             Self::Unknown => Args::run_illegal,
             Self::UnknownCompressed => Args::run_illegal,
+        }
+    }
+
+    /// Dispatch an opcode to the function that can 'lower' the instruction to the JIT IR.
+    ///
+    /// This mechanism leverages the [InstructionContextBuilder] to do so.
+    ///
+    /// TODO (RV-394): this can be removed once all opcodes are supported, with [`OpCode::to_run`] being
+    /// used instead.
+    ///
+    /// # SAFETY
+    /// Calling the returned function **must** correspond to an `Args` belonging to an
+    /// instruction where the `OpCode` is the same as the `OpCode` of the current instruction.
+    ///
+    /// [InstructionContextBuilder]: ICB
+    #[inline(always)]
+    pub fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
+        use OpCode::*;
+
+        match self {
+            CMv => Some(Args::run_cmv),
+            CNop => Some(Args::run_cnop),
+            CAdd => Some(Args::run_cadd),
+            _ => None,
         }
     }
 }
@@ -1301,12 +1325,9 @@ impl Args {
         Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
     }
 
-    fn run_cnop<ML: MainMemoryLayout, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<ML, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
-        core.run_cnop();
-        Ok(Next(InstrWidth::Compressed))
+    fn run_cnop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+        c::run_cnop(icb);
+        icb.ok(Next(InstrWidth::Compressed))
     }
 
     // RV64C compressed instructions
