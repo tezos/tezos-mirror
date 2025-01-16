@@ -34,6 +34,17 @@ where
         self.write(rd, result)
     }
 
+    /// `ADD` R-type instruction
+    ///
+    /// Perform val(rs1) + val(rs2) and store the result in `rd`
+    pub fn run_add(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let lhs = self.read(rs1);
+        let rhs = self.read(rs2);
+        // Wrapped addition in two's complement behaves the same for signed and unsigned
+        let result = lhs.wrapping_add(rhs);
+        self.write(rd, result)
+    }
+
     /// `SUB` R-type instruction
     ///
     /// Perform val(rs1) - val(rs2) and store the result in `rd`
@@ -386,7 +397,6 @@ where
 mod tests {
     use crate::{
         backend_test, create_state,
-        interpreter::i,
         machine_state::{
             csregisters::{
                 xstatus::{MPPValue, MStatus, SPPValue},
@@ -407,6 +417,27 @@ mod tests {
         prelude::{any, prop},
         prop_assert_eq, prop_assume, proptest,
     };
+
+    backend_test!(test_add, F, {
+        let imm_rs1_res = [
+            (0_i64, 0_u64, 0_u64),
+            (0, 0xFFF0_0420, 0xFFF0_0420),
+            (-1, 0, 0xFFFF_FFFF_FFFF_FFFF),
+            (1_000_000, -123_000_987_i64 as u64, -122_000_987_i64 as u64),
+            (1_000_000, 123_000_987, 124_000_987),
+            (-1, -321_000_000_000_i64 as u64, -321_000_000_001_i64 as u64),
+        ];
+
+        for (imm, rs1, res) in imm_rs1_res {
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+
+            state.hart.xregisters.write(a0, rs1);
+            state.hart.xregisters.write(t0, imm as u64);
+
+            state.hart.xregisters.run_add(a0, t0, a0);
+            assert_eq!(state.hart.xregisters.read(a0), res);
+        }
+    });
 
     backend_test!(test_add_sub, F, {
         let imm_rs1_rd_res = [
@@ -435,7 +466,7 @@ mod tests {
             state.hart.xregisters.write(t0, imm as u64);
             state.hart.xregisters.run_addi(imm, a0, rd);
             assert_eq!(state.hart.xregisters.read(rd), res);
-            i::run_add(&mut state, a0, t0, a0);
+            state.hart.xregisters.run_add(a0, t0, a0);
             assert_eq!(state.hart.xregisters.read(a0), res);
             // test sub with: res - imm = rs1 and res - rs1 = imm
             state.hart.xregisters.write(a0, res);

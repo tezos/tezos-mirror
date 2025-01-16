@@ -21,6 +21,8 @@ use crate::{
 /// execute RISC-V instructions.
 pub trait ICB {
     /// A 64-bit value stored in [`XRegisters`].
+    ///
+    /// [`XRegisters`]: crate::machine_state::registers::XRegisters
     type XValue;
 
     /// Perform a read of an [`XRegister`], returning the value stored.

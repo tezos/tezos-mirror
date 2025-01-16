@@ -23,7 +23,7 @@ use super::{
 use crate::{
     default::ConstDefault,
     instruction_context::ICB,
-    interpreter::{c, i},
+    interpreter::c,
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -684,15 +684,6 @@ macro_rules! impl_r_type {
             Ok(Next(self.width))
         }
     };
-    ($impl: path, $fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
-            $impl(icb, self.rs1.x, self.rs2.x, self.rd.x);
-
-            icb.ok(Next(self.width))
-        }
-    };
 }
 
 macro_rules! impl_i_type {
@@ -1046,7 +1037,7 @@ macro_rules! impl_f_r_type {
 
 impl Args {
     // RV64I R-type instructions
-    impl_r_type!(i::run_add, run_add);
+    impl_r_type!(run_add);
     impl_r_type!(run_sub);
     impl_r_type!(run_xor);
     impl_r_type!(run_or);
