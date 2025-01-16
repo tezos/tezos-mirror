@@ -246,10 +246,7 @@ let block_by_hash read ~full_transaction_object block_hash =
   | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
   | Some block -> populate_tx_objects read ~full_transaction_object block
 
-let block_receipts read n =
-  let number = Durable_storage_path.Block.(Nth n) in
-  let open Lwt_result_syntax in
-  let* block = blocks_by_number read ~full_transaction_object:false ~number in
+let block_receipts_of_block read block =
   let get_receipt_from_hash tx_hash =
     Lwt.map
       (function Ok receipt -> receipt | _ -> None)
@@ -265,7 +262,13 @@ let block_receipts read n =
           (fun (tx_object : transaction_object) -> tx_object.hash)
           tx_objects
   in
-  let*! receipts = Lwt_list.filter_map_s get_receipt_from_hash tx_hashes in
+  Lwt_list.filter_map_s get_receipt_from_hash tx_hashes
+
+let block_receipts read n =
+  let number = Durable_storage_path.Block.(Nth n) in
+  let open Lwt_result_syntax in
+  let* block = blocks_by_number read ~full_transaction_object:false ~number in
+  let*! receipts = block_receipts_of_block read block in
   Lwt.return_ok receipts
 
 let chain_id read =
