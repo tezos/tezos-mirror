@@ -582,9 +582,9 @@ module Handler = struct
                     {slot_level = published_level; slot_index}
                   in
                   Slot_manager.publish_slot_data
+                    ctxt
                     ~level_committee:(Node_context.fetch_committee ctxt)
                     ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-                    store
                     (Node_context.get_gs_worker ctxt)
                     proto_parameters
                     commitment

@@ -126,6 +126,7 @@ val add_commitment_shards :
 
 (** This function publishes the given shards and their proofs. *)
 val publish_proved_shards :
+  Node_context.t ->
   Types.slot_id ->
   level_committee:
     (level:int32 ->
@@ -141,10 +142,10 @@ val publish_proved_shards :
     attestion on L1 if this node has those shards on disk and their proofs in
     memory. *)
 val publish_slot_data :
+  Node_context.t ->
   level_committee:
     (level:int32 ->
     Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
-  Store.t ->
   slot_size:int ->
   Gossipsub.Worker.t ->
   Dal_plugin.proto_parameters ->

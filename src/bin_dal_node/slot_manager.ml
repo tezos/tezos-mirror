@@ -273,7 +273,7 @@ let shards_to_attesters committee =
 (** This function publishes the shards of a commitment that is waiting
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
+let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
     proto_parameters commitment shards shard_proofs gs_worker =
   let open Lwt_result_syntax in
   let attestation_level =
@@ -313,6 +313,7 @@ let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
                    pkh;
                  }
              in
+             maybe_register_trap ctxt message_id message ;
              Gossipsub.Worker.(
                Publish_message {message; topic; message_id}
                |> app_input gs_worker) ;
@@ -321,9 +322,10 @@ let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
 (** This function publishes the shards of a commitment that is waiting
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
-    gs_worker proto_parameters commitment slot_id =
+let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
+    proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
+  let node_store = Node_context.get_store ctxt in
   let cache = Store.cache node_store in
   match Store.Commitment_indexed_cache.find_opt cache commitment with
   | None ->
@@ -353,6 +355,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
         |> Errors.to_tzresult
       in
       publish_proved_shards
+        ctxt
         slot_id
         ~level_committee
         proto_parameters
