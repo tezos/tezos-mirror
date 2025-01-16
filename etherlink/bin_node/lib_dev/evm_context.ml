@@ -551,7 +551,10 @@ module State = struct
             (fun hash ->
               let* receipt =
                 let* receipt_opt =
-                  Durable_storage.transaction_receipt read hash
+                  Durable_storage.transaction_receipt
+                    read
+                    ~block_hash:block.hash
+                    hash
                 in
                 match receipt_opt with
                 | Some receipt ->

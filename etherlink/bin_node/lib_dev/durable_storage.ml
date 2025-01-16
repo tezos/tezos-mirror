@@ -105,34 +105,43 @@ let current_block_number read =
 
 let un_qty (Qty z) = z
 
-let transaction_receipt read tx_hash =
+let mock_block_hash = Block_hash (Hex (String.make 64 'a'))
+
+let transaction_receipt read ?block_hash tx_hash =
   let open Lwt_result_syntax in
   (* We use a mock block hash to decode the rest of the receipt,
      so that we can get the number to query for the actual block
-     hash. *)
-  let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+     hash (only if the block hash isn't already available). *)
+  let block = Option.value block_hash ~default:mock_block_hash in
   let* opt_receipt =
     inspect_durable_and_decode_opt
       read
       (Durable_storage_path.Transaction_receipt.receipt tx_hash)
-      (Transaction_receipt.of_rlp_bytes mock_block_hash)
+      (Transaction_receipt.of_rlp_bytes block)
   in
-  match opt_receipt with
-  | Some temp_receipt ->
-      let+ blockHash =
-        inspect_durable_and_decode
-          read
-          (Durable_storage_path.Indexes.block_by_number
-             (Nth (un_qty temp_receipt.blockNumber)))
-          decode_block_hash
-      in
-      let logs =
-        List.map
-          (fun (log : transaction_log) -> {log with blockHash = Some blockHash})
-          temp_receipt.logs
-      in
-      Some {temp_receipt with blockHash; logs}
-  | None -> return_none
+  match block_hash with
+  | Some _ ->
+      (* Correct receipt *)
+      return opt_receipt
+  | None -> (
+      (* Need to replace with correct block hash *)
+      match opt_receipt with
+      | Some temp_receipt ->
+          let+ blockHash =
+            inspect_durable_and_decode
+              read
+              (Durable_storage_path.Indexes.block_by_number
+                 (Nth (un_qty temp_receipt.blockNumber)))
+              decode_block_hash
+          in
+          let logs =
+            List.map
+              (fun (log : transaction_log) ->
+                {log with blockHash = Some blockHash})
+              temp_receipt.logs
+          in
+          Some {temp_receipt with blockHash; logs}
+      | None -> return_none)
 
 let transaction_object read tx_hash =
   let open Lwt_result_syntax in
@@ -244,7 +253,7 @@ let block_receipts read n =
   let get_receipt_from_hash tx_hash =
     Lwt.map
       (function Ok receipt -> receipt | _ -> None)
-      (transaction_receipt read tx_hash)
+      (transaction_receipt read ~block_hash:block.hash tx_hash)
   in
   let tx_hashes : hash list =
     match block.transactions with
