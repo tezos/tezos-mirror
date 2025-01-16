@@ -119,6 +119,7 @@ impl<M: ManagerClone> Clone for RevealRequest<M> {
 }
 
 impl<M: ManagerBase> RevealRequest<M> {
+    /// Bind the reveal request to the given allocated region.
     pub fn bind(space: AllocatedOf<RevealRequestLayout, M>) -> Self {
         Self {
             bytes: space.0,
@@ -126,6 +127,9 @@ impl<M: ManagerBase> RevealRequest<M> {
         }
     }
 
+    /// Given a manager morphism `f : &M -> N`, return the reveal request layout's
+    /// allocated structure containing the constituents of `N` that were produced
+    /// from the constituents of `&M`.
     pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
         &'a self,
     ) -> AllocatedOf<RevealRequestLayout, F::Output> {
