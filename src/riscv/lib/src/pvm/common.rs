@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::reveals::{RevealRequest, RevealRequestLayout};
 use crate::{
     default::ConstDefault,
     machine_state::{
@@ -12,7 +13,7 @@ use crate::{
     state_backend::{
         self,
         proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
-        AllocatedOf, Atom, Cell, DynArray, DynCells, FnManager, ManagerBase, ManagerClone, Ref,
+        AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, Ref,
     },
     traps::EnvironException,
 };
@@ -100,14 +101,6 @@ impl fmt::Display for PvmStatus {
         f.write_str(status)
     }
 }
-
-/// Request Content of Reveal
-pub struct RevealRequest<M: ManagerBase> {
-    bytes: DynCells<4096, M>,
-    size: Cell<u64, M>,
-}
-
-type RevealRequestLayout = (DynArray<4096>, Atom<u64>);
 
 impl<M: ManagerClone> Clone for RevealRequest<M> {
     fn clone(&self) -> Self {
