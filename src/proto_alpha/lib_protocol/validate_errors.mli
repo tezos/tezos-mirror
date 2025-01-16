@@ -189,6 +189,11 @@ module Anonymous : sig
         shard_index : int;
         shard_owner : Signature.Public_key_hash.t;
       }
+    | Accusation_validity_error_cannot_get_slot_headers of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
     | Conflicting_nonce_revelation of operation_conflict
     | Conflicting_vdf_revelation of operation_conflict

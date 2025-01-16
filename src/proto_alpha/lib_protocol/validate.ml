@@ -1781,9 +1781,11 @@ module Anonymous = struct
         | None ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
                Can also fail if `attestation_lag` changes. *)
-            failwith (* TODO: return error *)
-              "SHOULD NOT HAPPEN IF 1) the denunciation age is correct, and 2) \
-               the storage is updated correctly"
+            (* It should not happen if 1) the denunciation age is correct, and 2) \
+               the storage is updated correctly *)
+            tzfail
+              (Accusation_validity_error_cannot_get_slot_headers
+                 {delegate; level = level.level; slot_index})
         | Some headers -> (
             let slot_header_opt =
               List.find

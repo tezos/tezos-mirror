@@ -928,6 +928,11 @@ module Anonymous = struct
         shard_index : int;
         shard_owner : Signature.Public_key_hash.t;
       }
+    | Accusation_validity_error_cannot_get_slot_headers of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
 
   let () =
@@ -1159,6 +1164,36 @@ module Anonymous = struct
       (fun (delegate, level, slot_index, shard_index, shard_owner) ->
         Invalid_accusation_wrong_shard_owner
           {delegate; level; slot_index; shard_index; shard_owner}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.accusation_validity_error_cannot_get_slot_headers"
+      ~title:"Accusation validity error: cannot get slot headers"
+      ~description:
+        "Accusation validity internal error: unable to retrieve the required \
+         DAL slot headers."
+      ~pp:(fun ppf (delegate, level, slot_index) ->
+        Format.fprintf
+          ppf
+          "Accusation validity internal error for delegate %a, level %a, and \
+           DAL slot index %a: unable to retrieve the required slot headers."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index)
+      (obj3
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding))
+      (function
+        | Accusation_validity_error_cannot_get_slot_headers
+            {delegate; level; slot_index} ->
+            Some (delegate, level, slot_index)
+        | _ -> None)
+      (fun (delegate, level, slot_index) ->
+        Accusation_validity_error_cannot_get_slot_headers
+          {delegate; level; slot_index}) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.conflicting_dal_entrapment"
