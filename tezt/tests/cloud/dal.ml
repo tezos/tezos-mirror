@@ -1397,6 +1397,10 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       if Cli.dal_incentives then
         [
           (["dal_parametric"; "incentives_enable"], `Bool true);
+          (["dal_parametric"; "rewards_ratio"; "numerator"], `String "1");
+          (["dal_parametric"; "rewards_ratio"; "denominator"], `String "10");
+          (* This one is derived from the two constants above. *)
+          (["issuance_weights"; "dal_rewards_weight"], `Int 5120);
           (["blocks_per_cycle"], `Int 8);
           (* This parameter should be lower than blocks_per_cycle *)
           (["nonce_revelation_threshold"], `Int 4);
