@@ -382,6 +382,14 @@ val import_snapshot :
   snapshot_file:string ->
   unit Runnable.process
 
+val list_metrics :
+  ?runner:Runner.t ->
+  ?path:string ->
+  ?hooks:Process_hooks.t ->
+  ?enable_performance_metrics:bool ->
+  unit ->
+  unit Lwt.t
+
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
 

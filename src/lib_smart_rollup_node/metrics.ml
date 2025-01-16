@@ -93,6 +93,25 @@ module Cohttp (Server : Cohttp_lwt.S.Server) = struct
     | _ -> Server.respond_error ~status:`Bad_request ~body:"Bad request" ()
 end
 
+let listing () =
+  let open Lwt_syntax in
+  let* data_sc = CollectorRegistry.(collect sc_rollup_node_registry) in
+  let+ data_injector = CollectorRegistry.(collect Injector.registry) in
+  let data_merged =
+    MetricFamilyMap.merge
+      (fun _ v1 v2 -> match v1 with Some v1 -> Some v1 | _ -> v2)
+      data_sc
+      data_injector
+  in
+  let body =
+    Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data_merged
+  in
+  let metrics =
+    String.split_on_char '\n' body
+    |> List.filter (String.starts_with ~prefix:"#")
+  in
+  String.concat "\n" metrics
+
 module Metrics_server = Cohttp (Cohttp_lwt_unix.Server)
 
 let metrics_serve metrics_addr =
