@@ -1810,13 +1810,20 @@ module Anonymous = struct
                     attestation
                 in
                 return_unit
-            | Some _ ->
+            | Some (header, _publisher) ->
                 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
                    Can also fail if `attestation_lag` changes. *)
-                (* TODO: return error *)
-                failwith
-                  "SHOULD NOT HAPPEN: mismatch between published levels in \
-                   storage versus in evidence"
+                (* mismatch between published levels in \
+                   storage versus in evidence; it should not happen *)
+                tzfail
+                  (Accusation_validity_error_levels_mismatch
+                     {
+                       delegate;
+                       level = level.level;
+                       slot_index;
+                       accusation_published_level = published_level;
+                       store_published_level = header.id.published_level;
+                     })
             | None ->
                 (* TODO: return error *)
                 failwith

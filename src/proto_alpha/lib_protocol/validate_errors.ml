@@ -933,6 +933,13 @@ module Anonymous = struct
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
       }
+    | Accusation_validity_error_levels_mismatch of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        accusation_published_level : Raw_level.t;
+        store_published_level : Raw_level.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
 
   let () =
@@ -1194,6 +1201,71 @@ module Anonymous = struct
       (fun (delegate, level, slot_index) ->
         Accusation_validity_error_cannot_get_slot_headers
           {delegate; level; slot_index}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.accusation_validity_error_levels_mismatch"
+      ~title:"Accusation validity internal error: levels mismatch"
+      ~description:
+        "Accusation validity internal error: mismatch between published levels \
+         in storage and evidence."
+      ~pp:(fun
+          ppf
+          ( delegate,
+            level,
+            slot_index,
+            accusation_published_level,
+            store_published_level )
+        ->
+        Format.fprintf
+          ppf
+          "Accusation validity error for delegate %a, level %a, and DAL slot \
+           index %a: mismatch between published levels in evidence (%a) and \
+           storage (%a)."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index
+          Raw_level.pp
+          accusation_published_level
+          Raw_level.pp
+          store_published_level)
+      (obj5
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding)
+         (req "accusation_published_level" Raw_level.encoding)
+         (req "store_published_level" Raw_level.encoding))
+      (function
+        | Accusation_validity_error_levels_mismatch
+            {
+              delegate;
+              level;
+              slot_index;
+              accusation_published_level;
+              store_published_level;
+            } ->
+            Some
+              ( delegate,
+                level,
+                slot_index,
+                accusation_published_level,
+                store_published_level )
+        | _ -> None)
+      (fun ( delegate,
+             level,
+             slot_index,
+             accusation_published_level,
+             store_published_level ) ->
+        Accusation_validity_error_levels_mismatch
+          {
+            delegate;
+            level;
+            slot_index;
+            accusation_published_level;
+            store_published_level;
+          }) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.conflicting_dal_entrapment"
