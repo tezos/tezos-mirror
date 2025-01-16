@@ -142,3 +142,6 @@ for control_file in "$myhome"/*control.in; do
   dpkg-deb -v --build --root-owner-group "${staging_dir}"
   mv "${staging_root}/${dpkg_fullname}" .
 done
+
+echo "Cleanup staging directories"
+rm -Rf "${staging_root}"
