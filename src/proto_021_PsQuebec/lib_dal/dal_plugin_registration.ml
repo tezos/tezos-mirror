@@ -72,6 +72,26 @@ module Plugin = struct
         blocks_per_cycle = parametric.blocks_per_cycle;
       }
 
+  type error += DAL_accusation_not_available
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal_accusation_not_available_quebec"
+      ~title:"DAL accusation not available on Quebec"
+      ~description:"DAL accusation is not available in protocol Quebec."
+      ~pp:(fun fmt () ->
+        Format.fprintf fmt "DAL accusation is not available in protocol Quebec")
+      Data_encoding.unit
+      (function DAL_accusation_not_available -> Some () | _ -> None)
+      (fun () -> DAL_accusation_not_available)
+
+  let inject_entrapment_evidence _cctxt ~attested_level:_ _attestation
+      ~slot_index:_ ~shard:_ ~proof:_ =
+    let open Lwt_result_syntax in
+    (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
+    fail [DAL_accusation_not_available]
+
   let block_info ?chain ?block ~metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info

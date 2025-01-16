@@ -74,6 +74,87 @@ module Plugin = struct
         blocks_per_cycle = parametric.blocks_per_cycle;
       }
 
+  (* We choose a previous offset (5 blocks from head) to ensure that the
+     injected operation is branched from a valid
+     predecessor. Denunciation operations can be emitted when the
+     consensus is under attack and may occur so you want to inject the
+     operation from a block which is considered "final". *)
+  let get_block_offset ~offset level =
+    let open Lwt_syntax in
+    let offset_int32 = Raw_level.of_int32_exn (Int32.of_int offset) in
+    let level_with_offset = Raw_level.diff level offset_int32 in
+    if Compare.Int32.(level_with_offset >= 0l) then return (`Head offset)
+    else return (`Head 0)
+
+  (* We can provide more context in the future. *)
+  type error += Not_an_attestation
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"not_an_attestation"
+      ~title:"Not an attestation"
+      ~description:
+        "This error is raised if the DAL node tries to accuse with an \
+         operation which is not an attestation"
+      ~pp:(fun fmt () ->
+        Format.fprintf
+          fmt
+          "This error is raised if the DAL node tries to accuse with an \
+           operation which is not an attestation")
+      Data_encoding.unit
+      (function Not_an_attestation -> Some () | _ -> None)
+      (fun () -> Not_an_attestation)
+
+  let inject_entrapment_evidence cctxt ~attested_level operation ~slot_index
+      ~shard ~proof =
+    let open Lwt_result_syntax in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
+    let chain = `Main in
+    let*? attested_level =
+      Raw_level.of_int32 attested_level |> Environment.wrap_tzresult
+    in
+    let*! block = get_block_offset ~offset:5 attested_level in
+    let* {dal = {number_of_slots; _}; _} =
+      (* Let's use Head. In practice the number of slots of `Head will
+         be greater. If the slot index is not valid, in any case it
+         will be caught by the forge or during the injection. *)
+      Protocol.Constants_services.parametric cpctxt (chain, `Head 0)
+    in
+    (* If the number of slots changes between two protocol, the call
+       could fail while it should succeed. This is a corner case to
+       solve in the future (or just apply a retry policy). *)
+    let*? slot_index =
+      Dal.Slot_index.of_int ~number_of_slots slot_index
+      |> Environment.wrap_tzresult
+    in
+    let* block_hash =
+      Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
+    in
+    let shard_with_proof = Dal.Shard_with_proof.{shard; proof} in
+    match operation.protocol_data with
+    | Operation_data protocol_data -> (
+        match protocol_data.contents with
+        | Single (Attestation _) ->
+            let attestation : Kind.attestation Alpha_context.operation =
+              {shell = operation.shell; protocol_data}
+            in
+            let* bytes =
+              Plugin.RPC.Forge.dal_entrapment_evidence
+                cpctxt
+                (chain, block)
+                ~branch:block_hash
+                ~attestation
+                ~slot_index
+                ~shard_with_proof
+            in
+            let bytes = Signature.concat bytes Signature.zero in
+            let* _op_hash =
+              Shell_services.Injection.operation cctxt ~chain bytes
+            in
+            return_unit
+        | _ -> fail [Not_an_attestation])
+
   let block_info ?chain ?block ~metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
