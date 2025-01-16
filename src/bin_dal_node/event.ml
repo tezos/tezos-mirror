@@ -759,3 +759,15 @@ let trap_check_failure =
     ("published_level", Data_encoding.int32)
     ("slot_index", Data_encoding.int31)
     ("shard_index", Data_encoding.int31)
+
+let trap_registration_fail =
+  declare_3
+    ~section
+    ~name:"trap_registration_fail"
+    ~msg:
+      "An error occurred when checking if the shard for delegate {delegate}, \
+       slot index {slot_index} and shard index {shard_index} is a trap"
+    ~level:Warning
+    ("delegate", Signature.Public_key_hash.encoding)
+    ("slot_index", Data_encoding.int31)
+    ("shard_index", Data_encoding.int31)
