@@ -108,6 +108,7 @@ impl Debug for Instruction {
                 .field("rm", &self.args.rm)
                 .field("aq", &self.args.aq)
                 .field("rl", &self.args.rl)
+                .field("width", &self.args.width)
                 .finish()
         };
         let debug_args = DebugArgs(&debug_args);
@@ -556,8 +557,8 @@ impl OpCode {
             Self::CJ => Args::run_cj,
             Self::CJr => Args::run_cjr,
             Self::CJalr => Args::run_cjalr,
-            Self::CBeqz => Args::run_cbeqz,
-            Self::CBnez => Args::run_cbnez,
+            Self::CBeqz => Args::run_beqz,
+            Self::CBnez => Args::run_bnez,
             Self::CLi => Args::run_cli,
             Self::CLui => Args::run_clui,
             Self::CAddi => Args::run_caddi,
@@ -652,6 +653,7 @@ pub struct Args {
     pub rm: InstrRoundingMode,
     pub aq: bool,
     pub rl: bool,
+    pub width: InstrWidth,
 }
 
 impl ConstDefault for Args {
@@ -665,6 +667,7 @@ impl ConstDefault for Args {
         rm: InstrRoundingMode::Dynamic,
         aq: false,
         rl: false,
+        width: InstrWidth::Uncompressed,
     };
 }
 
@@ -677,7 +680,7 @@ macro_rules! impl_r_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rs1.x, self.rs2.x, self.rd.x);
-            Ok(Next(InstrWidth::Uncompressed))
+            Ok(Next(self.width))
         }
     };
     ($impl: path, $fn: ident) => {
@@ -689,7 +692,7 @@ macro_rules! impl_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             $impl(&mut core.hart.xregisters, self.rs1.x, self.rs2.x, self.rd.x);
 
-            Ok(Next(InstrWidth::Uncompressed))
+            Ok(Next(self.width))
         }
     };
 }
@@ -703,7 +706,7 @@ macro_rules! impl_i_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.x);
-            Ok(Next(InstrWidth::Uncompressed))
+            Ok(Next(self.width))
         }
     };
 }
@@ -717,18 +720,7 @@ macro_rules! impl_fload_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rd.f)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -741,18 +733,7 @@ macro_rules! impl_load_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rd.x)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -764,8 +745,7 @@ macro_rules! impl_cload_sp_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rd.nzx)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rd.nzx).map(|_| Next(self.width))
         }
     };
 }
@@ -777,8 +757,7 @@ macro_rules! impl_cfload_sp_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rd.f)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rd.f).map(|_| Next(self.width))
         }
     };
 }
@@ -792,18 +771,7 @@ macro_rules! impl_store_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rs2.x)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -816,18 +784,7 @@ macro_rules! impl_fstore_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
-        }
-    };
-    ($fn: ident, $width: expr) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rs2.f)
-                .map(|_| Next($width))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -840,7 +797,7 @@ macro_rules! impl_b_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x))
+            Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x, self.width))
         }
     };
 }
@@ -854,7 +811,7 @@ macro_rules! impl_amo_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.rs1.x, self.rs2.x, self.rd.x, self.rl, self.aq)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -868,7 +825,7 @@ macro_rules! impl_ci_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.x);
-            Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
+            Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
 
@@ -880,7 +837,7 @@ macro_rules! impl_ci_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.nzx);
-            Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
+            Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
 }
@@ -894,7 +851,7 @@ macro_rules! impl_cr_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rd.x, self.rs2.x);
-            Ok(ProgramCounterUpdate::Next(InstrWidth::Compressed))
+            Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
 }
@@ -908,7 +865,7 @@ macro_rules! impl_cr_nz_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             $impl(&mut core.hart.xregisters, self.rd.nzx, self.rs2.nzx);
-            Ok(Next(InstrWidth::Compressed))
+            Ok(Next(self.width))
         }
     };
 }
@@ -921,7 +878,7 @@ macro_rules! impl_cb_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rd.x))
+            Ok(core.hart.$fn(self.imm, self.rd.x, self.width))
         }
     };
 }
@@ -934,8 +891,7 @@ macro_rules! impl_css_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs2.x)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rs2.x).map(|_| Next(self.width))
         }
     };
 }
@@ -948,8 +904,7 @@ macro_rules! impl_fcss_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs2.f)
-                .map(|_| Next(InstrWidth::Compressed))
+            core.$fn(self.imm, self.rs2.f).map(|_| Next(self.width))
         }
     };
 }
@@ -964,7 +919,7 @@ macro_rules! impl_csr_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.csr, self.rs1.x, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -979,7 +934,7 @@ macro_rules! impl_csr_imm_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.csr, self.imm as u64, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -994,7 +949,7 @@ macro_rules! impl_f_x_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1007,7 +962,7 @@ macro_rules! impl_f_x_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rm, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -1022,7 +977,7 @@ macro_rules! impl_x_f_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1035,7 +990,7 @@ macro_rules! impl_x_f_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -1050,7 +1005,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1063,7 +1018,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.x)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1076,7 +1031,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 
@@ -1089,7 +1044,7 @@ macro_rules! impl_f_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, $(self.$field,)* self.rd.f)
-                .map(|_| Next(InstrWidth::Uncompressed))
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -1157,7 +1112,7 @@ impl Args {
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         core.hart.xregisters.run_lui(self.imm, self.rd.x);
-        Ok(Next(InstrWidth::Uncompressed))
+        Ok(Next(self.width))
     }
 
     // SAFETY: This function must only be called on an `Args` belonging
@@ -1167,7 +1122,7 @@ impl Args {
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         core.hart.run_auipc(self.imm, self.rd.x);
-        Ok(Next(InstrWidth::Uncompressed))
+        Ok(Next(self.width))
     }
 
     // RV64I jump instructions
@@ -1306,11 +1261,11 @@ impl Args {
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_cadd, run_cadd);
     impl_cr_nz_type!(c::run_cmv, run_cmv);
-    impl_load_type!(run_clw, InstrWidth::Compressed);
+    impl_load_type!(run_clw);
     impl_cload_sp_type!(run_clwsp);
-    impl_store_type!(run_csw, InstrWidth::Compressed);
-    impl_cb_type!(run_cbeqz);
-    impl_cb_type!(run_cbnez);
+    impl_store_type!(run_csw);
+    impl_cb_type!(run_beqz);
+    impl_cb_type!(run_bnez);
     impl_ci_type!(run_cli, non_zero);
     impl_ci_type!(run_clui, non_zero);
     impl_ci_type!(run_caddi, non_zero);
@@ -1332,14 +1287,14 @@ impl Args {
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         core.hart.xregisters.run_caddi16sp(self.imm);
-        Ok(Next(InstrWidth::Compressed))
+        Ok(Next(self.width))
     }
 
     fn run_cj<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cj(self.imm)))
+        Ok(Set(core.hart.run_j(self.imm)))
     }
 
     // SAFETY: This function must only be called on an `Args` belonging
@@ -1369,18 +1324,18 @@ impl Args {
     }
 
     // RV64C compressed instructions
-    impl_store_type!(run_csd, InstrWidth::Compressed);
+    impl_store_type!(run_csd);
     impl_css_type!(run_csdsp);
-    impl_load_type!(run_cld, InstrWidth::Compressed);
+    impl_load_type!(run_cld);
     impl_cload_sp_type!(run_cldsp);
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
     impl_cr_type!(run_csubw);
 
     // RV64C compressed instructions
-    impl_fload_type!(run_cfld, InstrWidth::Compressed);
+    impl_fload_type!(run_cfld);
     impl_cfload_sp_type!(run_cfldsp);
-    impl_fstore_type!(run_cfsd, InstrWidth::Compressed);
+    impl_fstore_type!(run_cfsd);
     impl_fcss_type!(run_cfsdsp);
 
     // Unknown
@@ -1460,126 +1415,126 @@ impl From<&InstrCacheable> for Instruction {
             // RV64I I-type instructions
             InstrCacheable::Addi(args) => Instruction {
                 opcode: OpCode::Addi,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Addiw(args) => Instruction {
                 opcode: OpCode::Addiw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Xori(args) => Instruction {
                 opcode: OpCode::Xori,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Ori(args) => Instruction {
                 opcode: OpCode::Ori,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Andi(args) => Instruction {
                 opcode: OpCode::Andi,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Slli(args) => Instruction {
                 opcode: OpCode::Slli,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Srli(args) => Instruction {
                 opcode: OpCode::Srli,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Srai(args) => Instruction {
                 opcode: OpCode::Srai,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Slliw(args) => Instruction {
                 opcode: OpCode::Slliw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Srliw(args) => Instruction {
                 opcode: OpCode::Srliw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Sraiw(args) => Instruction {
                 opcode: OpCode::Sraiw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Slti(args) => Instruction {
                 opcode: OpCode::Slti,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Sltiu(args) => Instruction {
                 opcode: OpCode::Sltiu,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Lb(args) => Instruction {
                 opcode: OpCode::Lb,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Lh(args) => Instruction {
                 opcode: OpCode::Lh,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Lw(args) => Instruction {
                 opcode: OpCode::Lw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Lbu(args) => Instruction {
                 opcode: OpCode::Lbu,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Lhu(args) => Instruction {
                 opcode: OpCode::Lhu,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Lwu(args) => Instruction {
                 opcode: OpCode::Lwu,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Ld(args) => Instruction {
                 opcode: OpCode::Ld,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             // RV64I S-type instructions
             InstrCacheable::Sb(args) => Instruction {
                 opcode: OpCode::Sb,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Sh(args) => Instruction {
                 opcode: OpCode::Sh,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Sw(args) => Instruction {
                 opcode: OpCode::Sw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Sd(args) => Instruction {
                 opcode: OpCode::Sd,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
 
             // RV64I B-type instructions
             InstrCacheable::Beq(args) => Instruction {
                 opcode: OpCode::Beq,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Bne(args) => Instruction {
                 opcode: OpCode::Bne,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Blt(args) => Instruction {
                 opcode: OpCode::Blt,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Bge(args) => Instruction {
                 opcode: OpCode::Bge,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Bltu(args) => Instruction {
                 opcode: OpCode::Bltu,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Bgeu(args) => Instruction {
                 opcode: OpCode::Bgeu,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
 
             // RV64I U-type instructions
@@ -1599,7 +1554,7 @@ impl From<&InstrCacheable> for Instruction {
             },
             InstrCacheable::Jalr(args) => Instruction {
                 opcode: OpCode::Jalr,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
 
             // RV64A atomic instructions
@@ -1749,11 +1704,11 @@ impl From<&InstrCacheable> for Instruction {
             // RV64F instructions
             InstrCacheable::Flw(args) => Instruction {
                 opcode: OpCode::Flw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Fsw(args) => Instruction {
                 opcode: OpCode::Fsw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Feqs(args) => Instruction {
                 opcode: OpCode::Feqs,
@@ -1871,11 +1826,11 @@ impl From<&InstrCacheable> for Instruction {
             // RV64D instructions
             InstrCacheable::Fld(args) => Instruction {
                 opcode: OpCode::Fld,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Fsd(args) => Instruction {
                 opcode: OpCode::Fsd,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Uncompressed),
             },
             InstrCacheable::Feqd(args) => Instruction {
                 opcode: OpCode::Feqd,
@@ -2027,7 +1982,7 @@ impl From<&InstrCacheable> for Instruction {
             // RV32C compressed instructions
             InstrCacheable::CLw(args) => Instruction {
                 opcode: OpCode::CLw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Compressed),
             },
             InstrCacheable::CLwsp(args) => Instruction {
                 opcode: OpCode::CLwsp,
@@ -2035,7 +1990,7 @@ impl From<&InstrCacheable> for Instruction {
             },
             InstrCacheable::CSw(args) => Instruction {
                 opcode: OpCode::CSw,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Compressed),
             },
             InstrCacheable::CSwsp(args) => Instruction {
                 opcode: OpCode::CSwsp,
@@ -2129,7 +2084,7 @@ impl From<&InstrCacheable> for Instruction {
             // RV64C compressed instructions
             InstrCacheable::CLd(args) => Instruction {
                 opcode: OpCode::CLd,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Compressed),
             },
             InstrCacheable::CLdsp(args) => Instruction {
                 opcode: OpCode::CLdsp,
@@ -2137,7 +2092,7 @@ impl From<&InstrCacheable> for Instruction {
             },
             InstrCacheable::CSd(args) => Instruction {
                 opcode: OpCode::CSd,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Compressed),
             },
             InstrCacheable::CSdsp(args) => Instruction {
                 opcode: OpCode::CSdsp,
@@ -2159,7 +2114,7 @@ impl From<&InstrCacheable> for Instruction {
             // RV64DC compressed instructions
             InstrCacheable::CFld(args) => Instruction {
                 opcode: OpCode::CFld,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Compressed),
             },
             InstrCacheable::CFldsp(args) => Instruction {
                 opcode: OpCode::CFldsp,
@@ -2167,7 +2122,7 @@ impl From<&InstrCacheable> for Instruction {
             },
             InstrCacheable::CFsd(args) => Instruction {
                 opcode: OpCode::CFsd,
-                args: args.into(),
+                args: args.to_args(InstrWidth::Compressed),
             },
             InstrCacheable::CFsdsp(args) => Instruction {
                 opcode: OpCode::CFsdsp,
@@ -2192,35 +2147,38 @@ impl From<&RTypeArgs> for Args {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
             rs2: value.rs2.into(),
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
 }
 
-impl From<&ITypeArgs> for Args {
-    fn from(value: &ITypeArgs) -> Self {
-        Self {
-            rd: value.rd.into(),
-            rs1: value.rs1.into(),
-            // We are adding a default value for rs2 as X0 to be explicit
+impl ITypeArgs {
+    fn to_args(self, width: InstrWidth) -> Args {
+        Args {
+            rd: self.rd.into(),
+            rs1: self.rs1.into(),
+            // We are adding a default value for rs2 as x0 to be explicit
             // that it is of XRegister type.
             rs2: XRegister::x0.into(),
-            imm: value.imm,
-            ..Self::DEFAULT
+            imm: self.imm,
+            width,
+            ..Args::DEFAULT
         }
     }
 }
 
-impl From<&SBTypeArgs> for Args {
-    fn from(value: &SBTypeArgs) -> Self {
-        Self {
+impl SBTypeArgs {
+    fn to_args(self, width: InstrWidth) -> Args {
+        Args {
             // We are adding a default value for rd as X0 to be explicit
             // that it is of XRegister type.
             rd: XRegister::x0.into(),
-            rs1: value.rs1.into(),
-            rs2: value.rs2.into(),
-            imm: value.imm,
-            ..Self::DEFAULT
+            rs1: self.rs1.into(),
+            rs2: self.rs2.into(),
+            imm: self.imm,
+            width,
+            ..Args::DEFAULT
         }
     }
 }
@@ -2234,6 +2192,7 @@ impl From<&UJTypeArgs> for Args {
             rs1: XRegister::x0.into(),
             rs2: XRegister::x0.into(),
             imm: value.imm,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2247,6 +2206,7 @@ impl From<&AmoArgs> for Args {
             rs2: value.rs2.into(),
             aq: value.aq,
             rl: value.rl,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2261,6 +2221,7 @@ impl From<&CIBTypeArgs> for Args {
             // to be explicit that they are of XRegister type.
             rs1: XRegister::x0.into(),
             rs2: XRegister::x0.into(),
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2275,6 +2236,7 @@ impl From<&CIBNZTypeArgs> for Args {
             // and rs2 to be explicit they are NonZeroXRegister type.
             rs1: NonZeroXRegister::x1.into(),
             rs2: NonZeroXRegister::x1.into(),
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2288,6 +2250,7 @@ impl From<&CRTypeArgs> for Args {
             // to be explicit that it is of XRegister type.
             rs1: XRegister::x0.into(),
             rs2: value.rs2.into(),
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2301,6 +2264,7 @@ impl From<&CNZRTypeArgs> for Args {
             // to be explicit that it is of NonZeroXRegister type.
             rs1: NonZeroXRegister::x1.into(),
             rs2: value.rs2.into(),
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2315,6 +2279,7 @@ impl From<&CJTypeArgs> for Args {
             rs1: XRegister::x0.into(),
             rs2: XRegister::x0.into(),
             imm: value.imm,
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2328,6 +2293,7 @@ impl From<&CRJTypeArgs> for Args {
             rd: NonZeroXRegister::x1.into(),
             rs1: value.rs1.into(),
             rs2: NonZeroXRegister::x1.into(),
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2342,6 +2308,7 @@ impl From<&CSSTypeArgs> for Args {
             rs1: XRegister::x0.into(),
             rs2: value.rs2.into(),
             imm: value.imm,
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2356,6 +2323,7 @@ impl From<&CsrArgs> for Args {
             // that it is of XRegister type.
             rs2: XRegister::x0.into(),
             csr: value.csr,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2371,35 +2339,38 @@ impl From<&CsriArgs> for Args {
             rs2: XRegister::x0.into(),
             imm: value.imm,
             csr: value.csr,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
 }
 
-impl From<&FLoadArgs> for Args {
-    fn from(value: &FLoadArgs) -> Self {
-        Self {
-            imm: value.imm,
-            rd: value.rd.into(),
-            rs1: value.rs1.into(),
-            // as these arguments associate with the XSrcFDst ArgsShape,
-            // we are adding a default value for rs2 as X0 to be explicit.
+impl FLoadArgs {
+    fn to_args(self, width: InstrWidth) -> Args {
+        Args {
+            rd: self.rd.into(),
+            rs1: self.rs1.into(),
+            // We are adding a default value for rs2 as X0 to be explicit
+            // that it is of XRegister type.
             rs2: XRegister::x0.into(),
-            ..Self::DEFAULT
+            imm: self.imm,
+            width,
+            ..Args::DEFAULT
         }
     }
 }
 
-impl From<&FStoreArgs> for Args {
-    fn from(value: &FStoreArgs) -> Self {
-        Self {
-            imm: value.imm,
-            // as these arguments associate with the XSrcFSrc ArgsShape,
-            // we are adding a default value for rd as X0 to be explicit.
+impl FStoreArgs {
+    fn to_args(self, width: InstrWidth) -> Args {
+        Args {
+            // We are adding a default value for rd as X0 to be explicit
+            // that it is of XRegister type.
             rd: XRegister::x0.into(),
-            rs1: value.rs1.into(),
-            rs2: value.rs2.into(),
-            ..Self::DEFAULT
+            rs1: self.rs1.into(),
+            rs2: self.rs2.into(),
+            imm: self.imm,
+            width,
+            ..Args::DEFAULT
         }
     }
 }
@@ -2414,6 +2385,7 @@ impl From<&CSSDTypeArgs> for Args {
             rd: XRegister::x0.into(),
             rs1: XRegister::x0.into(),
             rs2: value.rs2.into(),
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2429,6 +2401,7 @@ impl From<&CIBDTypeArgs> for Args {
             // to be explicit.
             rs1: XRegister::x0.into(),
             rs2: XRegister::x0.into(),
+            width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
     }
@@ -2442,6 +2415,7 @@ impl From<&XRegToFRegArgs> for Args {
             // as these arguments associate with the XSrcFDst ArgsShape,
             // we are adding a default value for rs2 as X0 to be explicit.
             rs2: XRegister::x0.into(),
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2456,6 +2430,7 @@ impl From<&XRegToFRegArgsWithRounding> for Args {
             // we are adding a default value for rs2 as X0 to be explicit.
             rs2: XRegister::x0.into(),
             rm: value.rm,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2469,6 +2444,7 @@ impl From<&FRegToXRegArgs> for Args {
             // as these arguments associate with the FSrcXDst ArgsShape,
             // we are adding a default value for rs2 as F0.
             rs2: FRegister::f0.into(),
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2483,6 +2459,7 @@ impl From<&FRegToXRegArgsWithRounding> for Args {
             // we are adding a default value for rs2 as F0.
             rs2: FRegister::f0.into(),
             rm: value.rm,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2496,6 +2473,7 @@ impl From<&FR3ArgsWithRounding> for Args {
             rs2: value.rs2.into(),
             rs3f: value.rs3,
             rm: value.rm,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2507,6 +2485,7 @@ impl From<&FRArgs> for Args {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
             rs2: value.rs2.into(),
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2521,6 +2500,7 @@ impl From<&FR1ArgWithRounding> for Args {
             // we are adding a default value for rs2 as F0 to be explicit.
             rs2: FRegister::f0.into(),
             rm: value.rm,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2533,6 +2513,7 @@ impl From<&FR2ArgsWithRounding> for Args {
             rs1: value.rs1.into(),
             rs2: value.rs2.into(),
             rm: value.rm,
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }
@@ -2544,6 +2525,7 @@ impl From<&FCmpArgs> for Args {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
             rs2: value.rs2.into(),
+            width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
     }

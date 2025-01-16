@@ -6,7 +6,7 @@ use super::{
     Args, CSRegister, FRegister, InstrRoundingMode, Instruction, NonZeroXRegister, OpCode,
     XRegister,
 };
-use crate::default::ConstDefault;
+use crate::{default::ConstDefault, parser::instruction::InstrWidth};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
@@ -37,6 +37,7 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::FSrcFDest => Args {
                 rd: value.args.rd.unwrap_f()?.into(),
@@ -48,6 +49,7 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::XSrcFDest => Args {
                 rd: value.args.rd.unwrap_f()?.into(),
@@ -59,6 +61,7 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::FSrcXDest => Args {
                 rd: value.args.rd.unwrap_x()?.into(),
@@ -70,6 +73,7 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::XSrcFSrc => Args {
                 rd: value.args.rd.unwrap_x()?.into(),
@@ -81,6 +85,7 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::NZXSrcNZXDest => Args {
                 rd: value.args.rd.unwrap_nzx()?.into(),
@@ -92,6 +97,7 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
         };
         Ok(Instruction {
@@ -123,6 +129,7 @@ impl From<Instruction> for TaggedInstruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::FSrcFDest => TaggedArgs {
                 rd: unsafe { value.args.rd.f.into() },
@@ -134,6 +141,7 @@ impl From<Instruction> for TaggedInstruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::XSrcFDest => TaggedArgs {
                 rd: unsafe { value.args.rd.f.into() },
@@ -145,6 +153,7 @@ impl From<Instruction> for TaggedInstruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::FSrcXDest => TaggedArgs {
                 rd: unsafe { value.args.rd.x.into() },
@@ -156,6 +165,7 @@ impl From<Instruction> for TaggedInstruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::XSrcFSrc => TaggedArgs {
                 rd: unsafe { value.args.rd.x.into() },
@@ -167,6 +177,7 @@ impl From<Instruction> for TaggedInstruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
             ArgsShape::NZXSrcNZXDest => TaggedArgs {
                 rd: unsafe { value.args.rd.nzx.into() },
@@ -178,6 +189,7 @@ impl From<Instruction> for TaggedInstruction {
                 rm: value.args.rm,
                 aq: value.args.aq,
                 rl: value.args.rl,
+                width: value.args.width,
             },
         };
         TaggedInstruction {
@@ -250,6 +262,7 @@ pub struct TaggedArgs {
     pub rm: InstrRoundingMode,
     pub aq: bool,
     pub rl: bool,
+    pub width: InstrWidth,
 }
 
 impl ConstDefault for TaggedArgs {
@@ -263,6 +276,7 @@ impl ConstDefault for TaggedArgs {
         rm: InstrRoundingMode::Dynamic,
         aq: false,
         rl: false,
+        width: InstrWidth::Uncompressed,
     };
 }
 
@@ -447,6 +461,7 @@ mod tests {
                 rm: InstrRoundingMode::Dynamic,
                 aq: false,
                 rl: false,
+                width: InstrWidth::Uncompressed,
             },
         };
 
@@ -468,6 +483,7 @@ mod tests {
                 rm: InstrRoundingMode::Dynamic,
                 aq: false,
                 rl: false,
+                width: InstrWidth::Uncompressed,
             },
         };
 

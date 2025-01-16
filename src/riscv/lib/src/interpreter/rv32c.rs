@@ -23,12 +23,15 @@ impl<M> HartState<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `C.J` CJ-type compressed instruction
+    /// J-type instruction
     ///
     /// Performs an unconditional control transfer. The immediate is added to
     /// the pc to form the jump target address.
-    pub fn run_cj(&mut self, imm: i64) -> Address {
-        self.run_jal(imm, x0)
+    ///
+    /// Primarily implementing C.J instruction. Can be used for uncompressed formats too.
+    pub fn run_j(&mut self, imm: i64) -> Address {
+        let current_pc = self.pc.read();
+        current_pc.wrapping_add(imm as u64)
     }
 
     /// `C.JR` CR-type compressed instruction
@@ -56,22 +59,36 @@ where
         self.xregisters.read_nz(rs1) & !1
     }
 
-    /// `C.BEQZ` CB-type compressed instruction
+    /// `BEQZ` B-type instruction
     ///
     /// Performs a conditional ( val(`rs1`) == 0 ) control transfer.
     /// If condition met, the offset is sign-extended and added to the pc to form the branch
     /// target address that is then set, otherwise indicates to proceed to the next instruction.
-    pub fn run_cbeqz(&mut self, imm: i64, rs1: XRegister) -> ProgramCounterUpdate {
-        self.run_beq_impl(imm, rs1, x0, InstrWidth::Compressed)
+    ///
+    /// Primarily implementing C.BEQZ instruction. Can be used for uncompressed formats too.
+    pub fn run_beqz(
+        &mut self,
+        imm: i64,
+        rs1: XRegister,
+        width: InstrWidth,
+    ) -> ProgramCounterUpdate {
+        self.run_beq_impl(imm, rs1, x0, width)
     }
 
-    /// `C.BNEZ` CB-type compressed instruction
+    /// `BNEZ` B-type instruction
     ///
     /// Performs a conditional ( val(`rs1`) != 0 ) control transfer.
     /// If condition met, the offset is sign-extended and added to the pc to form the branch
     /// target address that is then set, otherwise indicates to proceed to the next instruction.
-    pub fn run_cbnez(&mut self, imm: i64, rs1: XRegister) -> ProgramCounterUpdate {
-        self.run_bne_impl(imm, rs1, x0, InstrWidth::Compressed)
+    ///
+    /// Primarily implementing C.BNEZ instruction. Can be used for uncompressed formats too.
+    pub fn run_bnez(
+        &mut self,
+        imm: i64,
+        rs1: XRegister,
+        width: InstrWidth,
+    ) -> ProgramCounterUpdate {
+        self.run_bne_impl(imm, rs1, x0, width)
     }
 
     /// `C.EBREAK` compressed instruction
@@ -287,7 +304,7 @@ mod tests {
             let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
 
             state.hart.pc.write(init_pc);
-            let new_pc = state.hart.run_cj(imm);
+            let new_pc = state.hart.run_j(imm);
 
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
