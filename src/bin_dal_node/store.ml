@@ -328,6 +328,67 @@ module Slot_id_cache = struct
       |> Option.filter_map (Fun.flip get_opt slot_index)
 end
 
+module Traps = struct
+  module Level_map =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = Types.level
+
+        let equal = Int32.equal
+
+        let hash = Hashtbl.hash
+      end)
+
+  module Slot_index_map = Map.Make (Int)
+  module Shard_index_map = Map.Make (Int)
+
+  type payload =
+    Signature.Public_key_hash.t * Cryptobox.share * Cryptobox.shard_proof
+
+  type t = payload Shard_index_map.t Slot_index_map.t Level_map.t
+
+  let create ~capacity = Level_map.create capacity
+
+  let add_slot_index t ~slot_index ~shard_index ~delegate ~share ~shard_proof =
+    let shard_index_map_opt = Slot_index_map.find_opt shard_index t in
+    let shard_index_map =
+      Option.value ~default:Shard_index_map.empty shard_index_map_opt
+    in
+    let new_shard_index_map =
+      Shard_index_map.add
+        shard_index
+        (delegate, share, shard_proof)
+        shard_index_map
+    in
+    Slot_index_map.add slot_index new_shard_index_map t
+
+  let add t ~slot_id ~shard_index ~delegate ~share ~shard_proof =
+    let Types.Slot_id.{slot_level; slot_index} = slot_id in
+    let slot_index_map_opt = Level_map.find_opt t slot_level in
+    let slot_index_map =
+      Option.value ~default:Slot_index_map.empty slot_index_map_opt
+    in
+    let new_slot_index_map =
+      add_slot_index
+        slot_index_map
+        ~slot_index
+        ~shard_index
+        ~delegate
+        ~share
+        ~shard_proof
+    in
+    Level_map.replace t slot_level new_slot_index_map
+
+  let find t ~slot_id =
+    let Types.Slot_id.{slot_level; slot_index} = slot_id in
+    match Level_map.find_opt t slot_level with
+    | None -> []
+    | Some m -> (
+        match Slot_index_map.find_opt slot_index m with
+        | None -> []
+        | Some m -> Shard_index_map.bindings m)
+end
+
 module Statuses = struct
   type t = (int32, int, Types.header_status) KVS.t
 
@@ -542,6 +603,7 @@ type t = {
   slot_header_statuses : Statuses.t;
   shards : Shards.t;
   slots : Slots.t;
+  traps : Traps.t;
   cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
@@ -567,6 +629,8 @@ let skip_list_cells t = t.skip_list_cells_store
 let slot_header_statuses {slot_header_statuses; _} = slot_header_statuses
 
 let slots {slots; _} = slots
+
+let traps {traps; _} = traps
 
 let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
   let open Lwt_result_syntax in
@@ -850,6 +914,7 @@ let init config =
   let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
+  let traps = Traps.create ~capacity:Constants.traps_cache_size in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
   let* skip_list_cells_store = init_sqlite_skip_list_cells_store base_dir in
@@ -858,6 +923,7 @@ let init config =
     {
       shards;
       slots;
+      traps;
       slot_header_statuses;
       cache = Commitment_indexed_cache.create Constants.cache_size;
       finalized_commitments =

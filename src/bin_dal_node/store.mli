@@ -125,6 +125,37 @@ module Commitment_indexed_cache : sig
   val find_opt : 'a t -> commitment -> 'a option
 end
 
+module Traps : sig
+  (** A cache for trap data that stores up to [Constants.traps_cache_size] levels
+      in memory. *)
+  type t
+
+  (** [add ~slot_id ~shard_index ~delegate ~share ~shard_proof] adds
+      trap data to the cache. The cache maintains a maximum of
+      [Constants.traps_cache_size] levels. Data is expected to be
+      added in ascending order within a window of
+      [proto_parameters.attestation_lag]. When the cache reaches its
+      capacity, the oldest trap data (relative to the highest stored
+      level) is removed when adding new entries. *)
+  val add :
+    t ->
+    slot_id:Types.Slot_id.t ->
+    shard_index:Types.shard_index ->
+    delegate:Signature.public_key_hash ->
+    share:Cryptobox.share ->
+    shard_proof:Cryptobox.shard_proof ->
+    unit
+
+  (** [find ~slot_id] retrieves the trap data associated with the
+      given [slot_id]. *)
+  val find :
+    t ->
+    slot_id:Types.Slot_id.t ->
+    (Types.shard_index
+    * (Signature.Public_key_hash.t * Cryptobox.share * Cryptobox.shard_proof))
+    list
+end
+
 module Last_processed_level : Single_value_store.S with type value = int32
 
 module First_seen_level : Single_value_store.S with type value = int32
@@ -170,6 +201,10 @@ val slot_header_statuses : t -> Statuses.t
 (** [slots t] returns the slots store associated with the store
     [t]. *)
 val slots : t -> Slots.t
+
+(** [traps t] returns the traps store associated with the store
+    [t]. *)
+val traps : t -> Traps.t
 
 (** [cache_entry store commitment entry] adds or replace an entry to
     the cache with key [commitment]. *)
