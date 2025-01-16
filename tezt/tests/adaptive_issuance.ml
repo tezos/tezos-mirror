@@ -511,9 +511,12 @@ let test_staking =
     if Protocol.(number protocol > number Quebec) then
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
          default value for [tolerated_inactivity_period] *)
-      (["tolerated_inactivity_period"], `Int 3) :: overrides
+      (["tolerated_inactivity_period"], `Int 3)
+      :: (["issuance_weights"; "dal_rewards_weight"], `Int 0)
+      :: overrides
     else overrides
   in
+
   let* _proto_hash, endpoint, client_1, node_1 = init ~overrides protocol in
 
   let* eosod = edge_of_staking_over_delegation client_1 in
