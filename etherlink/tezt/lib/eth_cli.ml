@@ -168,3 +168,7 @@ let encode_method ~abi_label ~method_ =
     spawn_command_and_read_string ["method:encode"; abi_label; method_]
   in
   return (String.trim data)
+
+let gen_eth_account () =
+  spawn_command_and_read_json ["address:random"] (fun json ->
+      Some (Eth_account.of_json json))

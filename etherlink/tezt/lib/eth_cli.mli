@@ -163,3 +163,6 @@ val get_receipt :
 (** [encode_method ~abi_label ~method_] returns the data corresponding to
     [method_] call considering the given [abi]. *)
 val encode_method : abi_label:string -> method_:string -> string Lwt.t
+
+(** [gen_eth_account ()] genarate a fresh eth account *)
+val gen_eth_account : unit -> Eth_account.t Lwt.t
