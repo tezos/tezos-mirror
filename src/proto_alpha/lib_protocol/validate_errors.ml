@@ -928,6 +928,11 @@ module Anonymous = struct
         shard_index : int;
         shard_owner : Signature.Public_key_hash.t;
       }
+    | Invalid_accusation_slot_not_published of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
     | Accusation_validity_error_cannot_get_slot_headers of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
@@ -1171,6 +1176,32 @@ module Anonymous = struct
       (fun (delegate, level, slot_index, shard_index, shard_owner) ->
         Invalid_accusation_wrong_shard_owner
           {delegate; level; slot_index; shard_index; shard_owner}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_slot_not_published"
+      ~title:"Invalid accusation: DAL slot not published"
+      ~description:"Invalid accusation: the DAL slot was not published."
+      ~pp:(fun ppf (delegate, level, slot_index) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for delegate %a, level %a, and DAL slot index \
+           %a: the DAL slot was not published."
+          Signature.Public_key_hash.pp
+          delegate
+          Raw_level.pp
+          level
+          Dal.Slot_index.pp
+          slot_index)
+      (obj3
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding))
+      (function
+        | Invalid_accusation_slot_not_published {delegate; level; slot_index} ->
+            Some (delegate, level, slot_index)
+        | _ -> None)
+      (fun (delegate, level, slot_index) ->
+        Invalid_accusation_slot_not_published {delegate; level; slot_index}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.accusation_validity_error_cannot_get_slot_headers"

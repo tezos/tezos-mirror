@@ -1766,13 +1766,14 @@ module Anonymous = struct
         let attestation_lag =
           (Constants.parametric vi.ctxt).dal.attestation_lag
         in
-        let published_level =
+        let* published_level =
           match Raw_level.(sub (succ level.level) attestation_lag) with
           | None ->
-              failwith
-                "SHOULD NOT HAPPEN ON MAINNET. It can in theory happen on test \
-                 networks (but it is very unlikely)"
-          | Some level -> level
+              (* The slot couldn't have been published in this case *)
+              tzfail
+                (Invalid_accusation_slot_not_published
+                   {delegate; level = level.level; slot_index})
+          | Some level -> return level
         in
         let* slot_headers_opt =
           Dal.Slot.find_slot_headers ctxt published_level
@@ -1825,10 +1826,9 @@ module Anonymous = struct
                        store_published_level = header.id.published_level;
                      })
             | None ->
-                (* TODO: return error *)
-                failwith
-                  "Wrong evidence: no slot was published at the mentioned \
-                   level and index"))
+                tzfail
+                  (Invalid_accusation_slot_not_published
+                     {delegate; level = level.level; slot_index})))
 
   let check_dal_entrapment_evidence vi
       (operation : Kind.dal_entrapment_evidence operation) =

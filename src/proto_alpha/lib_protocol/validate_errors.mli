@@ -189,6 +189,11 @@ module Anonymous : sig
         shard_index : int;
         shard_owner : Signature.Public_key_hash.t;
       }
+    | Invalid_accusation_slot_not_published of {
+        delegate : Signature.Public_key_hash.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+      }
     | Accusation_validity_error_cannot_get_slot_headers of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
