@@ -240,11 +240,20 @@ module Handler = struct
         with
         | `Valid ->
             (* 3. Only check for message validity if the message_id is valid. *)
-            Option.fold
-              message
-              ~none:`Valid
-              ~some:
-                (gossipsub_app_message_payload_validation cryptobox message_id)
+            let res =
+              Option.fold
+                message
+                ~none:`Valid
+                ~some:
+                  (gossipsub_app_message_payload_validation
+                     cryptobox
+                     message_id)
+            in
+            if res = `Valid then
+              Option.iter
+                (Slot_manager.maybe_register_trap ctxt message_id)
+                message ;
+            res
         | other ->
             (* 4. In the case the message id is not Valid. *)
             other
