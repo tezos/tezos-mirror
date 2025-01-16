@@ -148,9 +148,9 @@ module For_RPC : sig
       - "static" information that does not change during the cycle
       - "dynamic" information that may change during the cycle *)
   type dal_participation_info = {
-    expected_assigned_shards : int;
+    expected_assigned_shards_per_slot : int;
         (** The total expected number of assigned shard indexes for the delegate
-            during the current cycle. (static) *)
+            during the current cycle per slot. (static) *)
     delegate_attested_dal_slots : int;
         (** The number of attested slots during the current cycle that are
             attested by the delegate. (dynamic) *)

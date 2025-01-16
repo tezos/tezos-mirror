@@ -153,7 +153,10 @@ let check_no_dal_participation
   let open Lwt_result_wrap_syntax in
   let* () =
     (* Some shards are assigned to the delegate. *)
-    Assert.not_equal_int ~loc:__LOC__ dal_info.expected_assigned_shards 0
+    Assert.not_equal_int
+      ~loc:__LOC__
+      dal_info.expected_assigned_shards_per_slot
+      0
   in
   let* () =
     (* No slot is attested globally. *)
