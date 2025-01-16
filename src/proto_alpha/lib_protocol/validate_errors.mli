@@ -162,6 +162,10 @@ module Anonymous : sig
         delegate : Signature.Public_key_hash.t;
         level : Level.t;
       }
+    | Denunciations_not_allowed_just_after_migration of {
+        level : Raw_level.t;
+        first_allowed_level : Raw_level.t;
+      }
     | Conflicting_dal_entrapment of operation_conflict
     | Conflicting_nonce_revelation of operation_conflict
     | Conflicting_vdf_revelation of operation_conflict

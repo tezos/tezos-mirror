@@ -291,7 +291,7 @@ let next_inbox_level ?predecessor ctxt rollup =
       ~some:(fun pred -> pred.Sc_rollup.Commitment.inbox_level)
       predecessor
   in
-  Raw_level.Internal_for_tests.add pred_level commitment_freq
+  Raw_level.add pred_level commitment_freq
 
 let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
     ?inbox_level ctxt rollup =
@@ -768,9 +768,7 @@ let gen_commitments ctxt rollup ~predecessor ~num_commitments =
     if n <= 0 then return (List.rev acc)
     else
       let inbox_level =
-        Raw_level.Internal_for_tests.add
-          predecessor.Sc_rollup.Commitment.inbox_level
-          delta
+        Raw_level.add predecessor.Sc_rollup.Commitment.inbox_level delta
       in
       let* commitment =
         dummy_commitment

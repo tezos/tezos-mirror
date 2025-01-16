@@ -237,8 +237,6 @@ module Raw_level = struct
   include Raw_level_repr
 
   module Internal_for_tests = struct
-    let add = add
-
     let from_repr (level : raw_level) = level
 
     let to_repr (level : raw_level) = level
