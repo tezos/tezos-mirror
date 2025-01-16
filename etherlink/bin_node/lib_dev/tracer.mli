@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 module CallTracerRead : sig
-  (** [build_calltrace end_call get_next] rebuilds a call trace. 
-      [end_call node list] adds a list of calls to a node, and 
-      [get_next i] gets the data [(node,depth)] at line [i] in storage. 
+  (** [build_calltrace end_call get_next] rebuilds a call trace.
+      [end_call node list] adds a list of calls to a node, and
+      [get_next i] gets the data [(node,depth)] at line [i] in storage.
 
       This is left relatively generic to facilitate testing the algorithm.
   *)
