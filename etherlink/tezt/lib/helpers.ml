@@ -490,3 +490,29 @@ let send_transaction_to_sequencer (transaction : unit -> 'a Lwt.t) sequencer =
   let*@ _ = produce_block sequencer in
   (* Resolve the transaction sends to make sure they were included. *)
   transaction
+
+let deposit ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
+    ?safety_guard ?storage_limit ?counter ?simulation ?force ?expect_failure
+    ~amount ~giver ~sr_address ~bridge ~l2_address client =
+  let arg = Printf.sprintf "(Pair \"%s\" %s)" sr_address l2_address in
+  Client.spawn_transfer
+    ?env
+    ?log_output
+    ?endpoint
+    ?hooks
+    ?wait
+    ?burn_cap
+    ?fee
+    ?gas_limit
+    ?safety_guard
+    ?storage_limit
+    ?counter
+    ?simulation
+    ?force
+    ~entrypoint:"deposit"
+    ~arg
+    ~amount
+    ~giver
+    ~receiver:bridge
+    client
+  |> Process.check ?expect_failure
