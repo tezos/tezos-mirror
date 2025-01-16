@@ -579,9 +579,9 @@ let prepare_initial_context_params ?consensus_committee_size
     ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?consensus_rights_delay ?allow_tz4_delegate_enable
-    ?aggregate_attestation () =
+    ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance ?consensus_rights_delay
+    ?allow_tz4_delegate_enable ?aggregate_attestation () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -630,6 +630,10 @@ let prepare_initial_context_params ?consensus_committee_size
   in
   let dal_enable =
     Option.value ~default:constants.dal.feature_enable dal_enable
+  in
+
+  let dal_incentives_enable =
+    Option.value ~default:constants.dal.incentives_enable dal_incentives_enable
   in
   let zk_rollup_enable =
     Option.value ~default:constants.zk_rollup.enable zk_rollup_enable
@@ -684,7 +688,12 @@ let prepare_initial_context_params ?consensus_committee_size
           private_enable = sc_rollup_private_enable;
           riscv_pvm_enable = sc_rollup_riscv_pvm_enable;
         };
-      dal = {dal with feature_enable = dal_enable};
+      dal =
+        {
+          dal with
+          feature_enable = dal_enable;
+          incentives_enable = dal_incentives_enable;
+        };
       zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
       adaptive_issuance;
       hard_gas_limit_per_block;
@@ -726,8 +735,9 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
     ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?allow_tz4_delegate_enable ?aggregate_attestation
+    ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance
+    ?allow_tz4_delegate_enable ?aggregate_attestation
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
@@ -745,6 +755,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
       ?sc_rollup_private_enable
       ?sc_rollup_riscv_pvm_enable
       ?dal_enable
+      ?dal_incentives_enable
       ?zk_rollup_enable
       ?hard_gas_limit_per_block
       ?nonce_revelation_threshold

@@ -392,6 +392,7 @@ type 'accounts init :=
   ?sc_rollup_private_enable:bool ->
   ?sc_rollup_riscv_pvm_enable:bool ->
   ?dal_enable:bool ->
+  ?dal_incentives_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->

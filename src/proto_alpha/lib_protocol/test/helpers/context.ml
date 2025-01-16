@@ -707,8 +707,9 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?cost_per_byte ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?allow_tz4_delegate_enable ?aggregate_attestation () =
+    ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance
+    ?allow_tz4_delegate_enable ?aggregate_attestation () =
   let open Lwt_result_syntax in
   let n = tup_n tup in
   let*? accounts = Account.generate_accounts ?rng_state n in
@@ -739,6 +740,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
       ?sc_rollup_private_enable
       ?sc_rollup_riscv_pvm_enable
       ?dal_enable
+      ?dal_incentives_enable
       ?zk_rollup_enable
       ?hard_gas_limit_per_block
       ?nonce_revelation_threshold
