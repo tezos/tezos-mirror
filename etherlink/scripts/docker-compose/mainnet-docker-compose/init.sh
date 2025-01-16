@@ -86,7 +86,7 @@ init_rollup_node() {
 }
 
 init_evm_node() {
-  trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node, .tezos-evm-node}"' ERR
+  trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node, .octez-evm-node}"' ERR
   if [ "$TRACK_SMART_ROLLUP_NODE" = "false" ]; then
     EVM_NODE_CONFIG_ARGS+=("--dont-track-rollup-node")
   fi
