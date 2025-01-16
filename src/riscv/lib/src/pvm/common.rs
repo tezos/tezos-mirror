@@ -142,10 +142,10 @@ pub struct Pvm<
     CL: machine_state::CacheLayouts,
     M: state_backend::ManagerBase,
 > {
-    version: state_backend::Cell<u64, M>,
     pub(crate) machine_state: machine_state::MachineState<ML, CL, M>,
-    status: Cell<PvmStatus, M>,
     reveal_request: RevealRequest<M>,
+    version: state_backend::Cell<u64, M>,
+    status: Cell<PvmStatus, M>,
 }
 
 impl<
