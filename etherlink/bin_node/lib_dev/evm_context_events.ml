@@ -83,7 +83,7 @@ let gc_waiter_failed =
     ~section
     ~name:"evm_context_gc_waiter_failed"
     ~level:Warning
-    ~msg:"[Warning] Garbage collector waiter failed with an exception:"
+    ~msg:"Garbage collector waiter failed with an exception:"
     ("exn", Data_encoding.string)
 
 let unexpected_l1_block =
@@ -92,8 +92,8 @@ let unexpected_l1_block =
     ~name:"evm_context_unexpected_l1_block"
     ~level:Warning
     ~msg:
-      "[Warning] Apply EVM events got a block for level {provided_level} but \
-       is older than expected level {expected_level}."
+      "Received L1 block of level {provided_level} to process, but was \
+       expected level {expected_level}."
     ("expected_level", Data_encoding.int32)
     ("provided_level", Data_encoding.int32)
 
@@ -113,7 +113,7 @@ let reset_impossible_missing_finalized_state =
     ~section
     ~name:"evm_context_reset_impossible_missing_finalized_state"
     ~level:Warning
-    ~msg:"[Warning] Cannot found finalized state we must exit on divergence"
+    ~msg:"Cannot found finalized state we must exit on divergence"
     ()
 
 let missing_state =
@@ -121,7 +121,7 @@ let missing_state =
     ~section
     ~name:"evm_context_missing_state"
     ~level:Warning
-    ~msg:"[Warning] Cannot found state at level {level}"
+    ~msg:"Cannot find state at level {level}"
     ~pp1:Ethereum_types.pp_quantity
     ("level", Ethereum_types.quantity_encoding)
 
@@ -130,7 +130,7 @@ let reset_at_level =
     ~section
     ~name:"evm_context_reset_at_level"
     ~level:Notice
-    ~msg:"[Warning] Resetting to finalized block {level}"
+    ~msg:"Resetting to finalized block {level}"
     ~pp1:Ethereum_types.pp_quantity
     ("level", Ethereum_types.quantity_encoding)
 
@@ -138,7 +138,7 @@ let worker_request_failed =
   declare_2
     ~section
     ~name:"evm_context_request_failed"
-    ~msg:"[Warning]: Request {view} failed: {errors}"
+    ~msg:"Request {view} failed: {errors}"
     ~level:Error
     ("view", Evm_context_types.Request.encoding)
     ~pp1:Evm_context_types.Request.pp
@@ -150,7 +150,7 @@ let observer_potential_reorg =
     ~section
     ~name:"evm_context_observer_potential_reorg"
     ~level:Warning
-    ~msg:"[Warning] Potential reorganization happening at level {level}"
+    ~msg:"Potential reorganization happening at level {level}"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
@@ -159,8 +159,7 @@ let observer_reorg_old_blueprint =
     ~section
     ~name:"evm_context_observer_reorg_old_blueprint"
     ~level:Warning
-    ~msg:
-      "[Warning] EVM Endpoint provided an old known blueprint (level {level})"
+    ~msg:"EVM Endpoint provided an old known blueprint (level {level})"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
@@ -169,9 +168,7 @@ let observer_reorg_cannot_decode_blueprint =
     ~section
     ~name:"evm_context_observer_reorg_cannot_decode_blueprint"
     ~level:Warning
-    ~msg:
-      "[Warning] EVM Endpoint provided a blueprint (level {level}) we cannot \
-       decode"
+    ~msg:"EVM Endpoint provided a blueprint (level {level}) we cannot decode"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
@@ -181,8 +178,8 @@ let observer_reorg_cannot_find_divergence =
     ~name:"evm_context_observer_reorg_cannot_find_divergence"
     ~level:Warning
     ~msg:
-      "[Warning] Potential blueprint of reorg is at level {level1}, cannot \
-       find block {level2} locally"
+      "Potential blueprint of reorg is at level {level1}, cannot find block \
+       {level2} locally"
     ~pp1:Z.pp_print
     ~pp2:Z.pp_print
     ("level1", Data_encoding.n)
@@ -193,9 +190,7 @@ let observer_reorg_cannot_find_state =
     ~section
     ~name:"evm_context_observer_reorg_cannot_find_state"
     ~level:Warning
-    ~msg:
-      "[Warning] Reorganization needs state at level {level} but checkpoint is \
-       missing"
+    ~msg:"Reorganization needs state at level {level} but checkpoint is missing"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 

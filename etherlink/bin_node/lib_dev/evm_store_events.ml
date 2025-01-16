@@ -40,9 +40,7 @@ let no_l1_latest_level_to_catch_up =
   declare_0
     ~section
     ~name:"no_l1_latest_level"
-    ~msg:
-      "The store is missing the l1 latest level row in its table. We assume no \
-       evm events catch up is needed."
+    ~msg:"No l1 level processed, no evm events catch up will occur."
     ~level:Warning
     ()
 
