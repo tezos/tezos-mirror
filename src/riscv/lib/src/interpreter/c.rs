@@ -13,18 +13,18 @@ use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister
 /// Adds the values in registers `rd_rs1` and `rs2` and writes the result
 /// back to register `rd_rs1`.
 pub fn run_cadd(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
-    let lhs = icb.xregister_read_nz(rd_rs1);
-    let rhs = icb.xregister_read_nz(rs2);
+    let lhs = icb.xregister_read(rd_rs1);
+    let rhs = icb.xregister_read(rs2);
     let result = icb.xvalue_wrapping_add(lhs, rhs);
-    icb.xregister_write_nz(rd_rs1, result)
+    icb.xregister_write(rd_rs1, result)
 }
 
 /// `C.MV` CR-type compressed instruction
 ///
 /// Copies the value in register `rs2` into register `rd_rs1`.
 pub fn run_cmv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
-    let rs2_val = icb.xregister_read_nz(rs2);
-    icb.xregister_write_nz(rd_rs1, rs2_val)
+    let rs2_val = icb.xregister_read(rs2);
+    icb.xregister_write(rd_rs1, rs2_val)
 }
 
 #[cfg(test)]
