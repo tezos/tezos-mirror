@@ -899,7 +899,7 @@ module Anonymous = struct
     | Invalid_shard_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
         delegate : Signature.Public_key_hash.t;
-        level : Level.t;
+        level : Raw_level.t;
       }
     | Denunciations_not_allowed_just_after_migration of {
         level : Raw_level.t;
@@ -979,11 +979,11 @@ module Anonymous = struct
            entrapment."
           Signature.Public_key_hash.pp
           delegate
-          Level.pp
+          Raw_level.pp
           level)
       (obj2
          (req "delegate" Signature.Public_key_hash.encoding)
-         (req "level" Level.encoding))
+         (req "level" Raw_level.encoding))
       (function
         | Dal_already_denounced {delegate; level} -> Some (delegate, level)
         | _ -> None)

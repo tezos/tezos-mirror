@@ -160,7 +160,7 @@ module Anonymous : sig
     | Invalid_shard_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
         delegate : Signature.Public_key_hash.t;
-        level : Level.t;
+        level : Raw_level.t;
       }
     | Denunciations_not_allowed_just_after_migration of {
         level : Raw_level.t;

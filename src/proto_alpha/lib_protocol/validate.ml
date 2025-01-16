@@ -1721,7 +1721,7 @@ module Anonymous = struct
         let*? () =
           error_unless
             (not already_denounced)
-            (Dal_already_denounced {delegate; level})
+            (Dal_already_denounced {delegate; level = level.level})
         in
         let traps_fraction = (Constants.parametric ctxt).dal.traps_fraction in
         let*? is_trap =
