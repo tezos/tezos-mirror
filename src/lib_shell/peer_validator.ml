@@ -565,21 +565,21 @@ let on_launch _ name parameters : (_, launch_error) result Lwt.t =
   Lwt.return (Ok pv)
 
 let table =
-  let merge w (Worker.Any_request neu) old =
+  let merge w (Worker.Any_request (neu, neu_metadata)) old =
     let pv = Worker.state w in
     match neu with
     | Request.New_branch (locator, _) ->
         pv.last_advertised_head <- (locator.head_hash, locator.head_header) ;
-        Some (Worker.Any_request neu)
+        Some (Worker.Any_request (neu, neu_metadata))
     | Request.New_head (hash, header) -> (
         pv.last_advertised_head <- (hash, header) ;
         (* TODO penalize decreasing fitness *)
         match old with
-        | Some (Worker.Any_request (Request.New_branch _) as old) ->
+        | Some (Worker.Any_request (Request.New_branch _, _) as old) ->
             Some old (* ignore *)
-        | Some (Worker.Any_request (Request.New_head _)) ->
-            Some (Any_request neu)
-        | None -> Some (Any_request neu))
+        | Some (Worker.Any_request (Request.New_head _, _)) ->
+            Some (Any_request (neu, neu_metadata))
+        | None -> Some (Any_request (neu, neu_metadata)))
   in
   Worker.create_table (Dropbox {merge})
 

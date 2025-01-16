@@ -51,6 +51,12 @@ let trace_operation op ?attrs =
   in
   trace ~trace_id:(op_hash_to_trace_id op_hash) ~attrs
 
+let update_scope s f =
+  match s with
+  | Some s ->
+      Ambient_context.with_binding Opentelemetry.Scope.ambient_scope_key s f
+  | None -> f ()
+
 type (_, _) Profiler.kind += Opentelemetry_profiler : ('a, 'b) Profiler.kind
 
 type config = {service_name : string; verbosity : Profiler.verbosity}

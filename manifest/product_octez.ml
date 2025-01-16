@@ -2265,17 +2265,38 @@ let octez_p2p_services =
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc]
     ~linkall:true
 
+let octez_profiler_backend =
+  octez_lib
+    "octez-profiler-backend"
+    ~internal_name:"tezos_profiler_backend"
+    ~path:"src/lib_profiler_backend"
+    ~synopsis:"Backends for the Octez Profiler"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_stdlib |> open_;
+        octez_stdlib_unix;
+        opentelemetry;
+        ambient_context_lwt;
+        opentelemetry_client_cohttp_lwt;
+      ]
+
 let octez_workers =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib
     "tezos-workers"
     ~path:"src/lib_workers"
     ~synopsis:"Worker library"
     ~documentation:
       Dune.[[S "package"; S "octez-libs"]; [S "mld_files"; S "tezos_workers"]]
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_stdlib_unix |> open_;
+        octez_profiler_backend;
       ]
 
 let _octez_workers_tests =
@@ -3787,23 +3808,6 @@ let octez_requester_tests =
         octez_stdlib_unix;
         octez_requester |> open_;
         qcheck_tezt;
-      ]
-
-let octez_profiler_backend =
-  octez_lib
-    "octez-profiler-backend"
-    ~internal_name:"tezos_profiler_backend"
-    ~path:"src/lib_profiler_backend"
-    ~synopsis:"Backends for the Octez Profiler"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives" |> open_;
-        octez_base_unix |> open_;
-        octez_stdlib |> open_;
-        octez_stdlib_unix;
-        opentelemetry;
-        ambient_context_lwt;
-        opentelemetry_client_cohttp_lwt;
       ]
 
 let octez_shell =
