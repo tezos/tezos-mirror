@@ -1,3 +1,4 @@
+/releases/latest.html /releases/version-21.html 302
 /007/cli-commands.html https://octez.tezos.com/docs/shell/cli-commands.html 301
 /007/* https://octez.tezos.com/docs/alpha/:splat 301
 /009/glossary.html /active/glossary.html 301

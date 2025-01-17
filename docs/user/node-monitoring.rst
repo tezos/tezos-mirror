@@ -209,7 +209,7 @@ To install Netdata:
 
   bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
-Add the following at the end of ``/etc/netdata/app_groups.conf``
+Add the following at the end of ``/etc/netdata/apps_groups.conf``
 
 .. code-block:: shell
 
