@@ -28,6 +28,8 @@ open Rpc.Syntax
 open Contract_path
 open Solidity_contracts
 
+let hooks = Tezos_regression.hooks_custom ()
+
 module Protocol = struct
   include Protocol
 
@@ -6208,6 +6210,17 @@ let test_proxy_ignore_block_param =
       ~error_msg:"Nonces should be equal since the block param is ignored") ;
   unit
 
+let test_list_metrics_command_regression () =
+  Regression.register
+    ~__FILE__
+    ~tags:["evm"; "metrics"]
+    ~title:"EVM node: list metrics regression"
+    ~uses:[Constant.octez_evm_node]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ Evm_node.list_metrics ~hooks
+
 let register_evm_node ~protocols =
   test_cast_work () ;
   test_originate_evm_kernel protocols ;
@@ -6320,7 +6333,8 @@ let register_evm_node ~protocols =
   test_rpcs_can_be_disabled protocols ;
   test_simulation_out_of_funds protocols ;
   test_rpc_state_value_and_subkeys protocols ;
-  test_proxy_ignore_block_param protocols
+  test_proxy_ignore_block_param protocols ;
+  test_list_metrics_command_regression ()
 
 let protocols = Protocol.all
 

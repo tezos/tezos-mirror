@@ -2457,6 +2457,18 @@ let debug_print_store_schemas_command =
       Format.printf "%s\n" output ;
       return_unit)
 
+let list_metrics_command =
+  let open Tezos_clic in
+  command
+    ~desc:"List the metrics exported by the EVM node."
+    no_options
+    (prefixes ["list"; "metrics"] @@ stop)
+    (fun () () ->
+      let open Lwt_result_syntax in
+      let*! metrics = Evm_node_lib_dev.Metrics.listing () in
+      Format.printf "%s\n" metrics ;
+      return_unit)
+
 (* List of commands not ready to be used by our end-users *)
 let in_development_commands = []
 
@@ -2486,6 +2498,7 @@ let commands =
     patch_state_command;
     preemptive_kernel_download_command;
     debug_print_store_schemas_command;
+    list_metrics_command;
   ]
 
 let global_options = Tezos_clic.no_options
