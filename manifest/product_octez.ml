@@ -3358,6 +3358,7 @@ let octez_protocol_environment =
         octez_context_memory;
         octez_context_brassaia_memory;
         octez_scoru_wasm;
+        octez_riscv_pvm;
         octez_event_logging;
         octez_profiler |> open_;
       ]
@@ -3997,9 +3998,8 @@ let octez_shell =
       Dune.
         [[S "package"; S "octez-shell-libs"]; [S "mld_files"; S "octez_shell"]]
     ~inline_tests:ppx_expect
-    ~inline_tests_libraries:[octez_rustzcash_deps; bls12_381_archive]
-    ~inline_tests_link_flags:
-      ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
+    ~inline_tests_libraries:[octez_rust_deps; bls12_381_archive]
+    ~inline_tests_link_flags:["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
     ~preprocess
     ~preprocessor_deps
     ~deps:
@@ -4867,7 +4867,7 @@ let _octez_dal_node_lib_test =
     ~preprocess:(ppses [ppx_hash; bam_ppx])
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         octez_stdlib |> open_;
         octez_stdlib_unix |> open_;
         octez_base |> open_ ~m:"TzPervasives";
@@ -5602,6 +5602,13 @@ end = struct
     if should_use_infix then open_ ~m:"TzPervasives.Error_monad_legacy"
     else fun target -> target
 
+  type 't minimal_rust_deps = {lib : 't; link_flag : string}
+
+  let make_minimal_rust_deps number : 't minimal_rust_deps =
+    if N.(number >= 023) then
+      {lib = octez_rust_deps; link_flag = "-loctez_rust_deps"}
+    else {lib = octez_rustzcash_deps; link_flag = "-loctez_rustzcash_deps"}
+
   module Lib_protocol = struct
     type t = {main : target; lifted : target; embedded : target}
 
@@ -5636,6 +5643,7 @@ end = struct
         ]
         |> conditional_list
       in
+      let minimal_rust_deps = make_minimal_rust_deps number in
       let _integration_consensus =
         tezt
           modules
@@ -5644,7 +5652,7 @@ end = struct
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
-              octez_rustzcash_deps;
+              minimal_rust_deps.lib;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5663,7 +5671,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
-              octez_rustzcash_deps;
+              minimal_rust_deps.lib;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5719,7 +5727,7 @@ end = struct
                ])
           ~deps:
             [
-              octez_rustzcash_deps;
+              minimal_rust_deps.lib;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5762,7 +5770,7 @@ end = struct
           ~dep_globs:(conditional_list [("contracts/*", N.(number >= 013))])
           ~deps:
             [
-              octez_rustzcash_deps;
+              minimal_rust_deps.lib;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5794,7 +5802,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
-              octez_rustzcash_deps;
+              minimal_rust_deps.lib;
               alcotezt |> if_ N.(number <= 018);
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5836,7 +5844,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
-              octez_rustzcash_deps;
+              minimal_rust_deps.lib;
               (if N.(number >= 015) then Some tezt_lib else None) |> if_some;
               alcotezt |> if_ N.(number <= 018);
               octez_base |> open_ ~m:"TzPervasives"
@@ -5885,7 +5893,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
-              octez_rustzcash_deps;
+              minimal_rust_deps.lib;
               octez_base
               |> if_ N.(number <= 14)
               |> open_ ~m:"TzPervasives"
@@ -5999,7 +6007,7 @@ end = struct
               ~opam:(sf "tezos-protocol-%s-tests" name_dash)
               ~deps:
                 [
-                  octez_rustzcash_deps;
+                  minimal_rust_deps.lib;
                   octez_base |> open_ ~m:"TzPervasives";
                   tezt_tezos |> open_;
                   main |> open_;
@@ -6452,6 +6460,7 @@ let hash = Protocol.hash
     let both o1 o2 =
       match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
     in
+    let minimal_rust_deps = make_minimal_rust_deps number in
     let {Lib_protocol.main; lifted; embedded} =
       Lib_protocol.make ~name ~status
     in
@@ -6505,7 +6514,7 @@ let hash = Protocol.hash
         ~opam:(sf "tezos-protocol-%s" name_dash)
         ~deps:
           [
-            octez_rustzcash_deps;
+            octez_rust_deps;
             bls12_381_archive;
             octez_base |> open_ ~m:"TzPervasives";
             parameters |> open_;
@@ -6628,13 +6637,11 @@ let hash = Protocol.hash
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ?inline_tests:(if N.(number >= 009) then Some ppx_expect else None)
         ?inline_tests_libraries:
-          (if N.(number >= 009) then
-             Some [bls12_381_archive; octez_rustzcash_deps]
-           else None)
+          ( only_if N.(number >= 009) @@ fun () ->
+            [bls12_381_archive; octez_rust_deps] )
         ?inline_tests_link_flags:
-          (if N.(number >= 009) then
-             Some ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
-           else None)
+          ( only_if N.(number >= 009) @@ fun () ->
+            ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"] )
         ~linkall:true
         ~dune:
           (if N.(number >= 016) then
@@ -6688,7 +6695,7 @@ let hash = Protocol.hash
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~deps:
           [
-            octez_rustzcash_deps;
+            minimal_rust_deps.lib;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             octez_base_test_helpers |> open_;
@@ -6718,7 +6725,7 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
-            octez_rustzcash_deps;
+            minimal_rust_deps.lib;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             octez_micheline |> open_;
@@ -6902,7 +6909,7 @@ let hash = Protocol.hash
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~deps:
           [
-            octez_rustzcash_deps;
+            octez_rust_deps;
             bls12_381_archive;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018)
@@ -6950,7 +6957,7 @@ let hash = Protocol.hash
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~deps:
           [
-            octez_rustzcash_deps;
+            octez_rust_deps;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             octez_protocol_environment |> if_ N.(number <= 011);
@@ -7035,7 +7042,7 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
-            octez_rustzcash_deps;
+            minimal_rust_deps.lib;
             bls12_381_archive;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
@@ -7066,9 +7073,9 @@ let hash = Protocol.hash
             client |> if_some |> open_;
           ]
         ~inline_tests:ppx_expect
-        ~inline_tests_libraries:[bls12_381_archive; octez_rustzcash_deps]
+        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
         ~inline_tests_link_flags:
-          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
+          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
         ~linkall:true
     in
     let dal =
@@ -7093,9 +7100,9 @@ let hash = Protocol.hash
             main |> open_;
           ]
         ~inline_tests:ppx_expect
-        ~inline_tests_libraries:[bls12_381_archive; octez_rustzcash_deps]
+        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
         ~inline_tests_link_flags:
-          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
+          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
         ~linkall:true
         ~dune:[dune_signatures_version_rule]
     in
@@ -7108,7 +7115,7 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
-            octez_rustzcash_deps;
+            minimal_rust_deps.lib;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             dal |> if_some |> open_;
@@ -7284,7 +7291,7 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
-            octez_rustzcash_deps;
+            minimal_rust_deps.lib;
             bls12_381_archive;
             octez_micheline |> open_;
             octez_micheline_rewriting;
@@ -7360,7 +7367,7 @@ let hash = Protocol.hash
         ~opam:(sf "tezos-benchmark-%s" name_dash)
         ~deps:
           [
-            octez_rustzcash_deps;
+            minimal_rust_deps.lib;
             bls12_381_archive;
             octez_base |> error_monad_module N.(number <= 018);
             octez_micheline |> open_;
@@ -7552,7 +7559,7 @@ let _octez_micheline_rewriting_tests =
     ~opam:"tezos-micheline-rewriting"
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         octez_micheline |> open_;
         octez_micheline_rewriting;
         Protocol.(main alpha);
@@ -7584,7 +7591,7 @@ let octez_store_tests =
     ~synopsis:"Store tests"
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_crypto |> open_;
         octez_context_ops |> open_;
@@ -7671,7 +7678,7 @@ let _octez_shell_tests =
     ~synopsis:"Shell tests"
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_test_helpers |> open_;
         octez_store |> open_;
@@ -7760,7 +7767,7 @@ let _get_contracts =
     ~opam:""
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_micheline |> open_;
         octez_base |> open_ ~m:"TzPervasives";
@@ -7779,7 +7786,7 @@ let _proto_context_du =
     ~opam:"internal-devtools_proto-context-du"
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_clic;
         octez_base |> open_ ~m:"TzPervasives";
@@ -7848,7 +7855,7 @@ let _yes_wallet =
     ~synopsis:
       "A script extracting delegates' keys from a context into a wallet."
     ~opam:""
-    ~deps:[octez_rustzcash_deps; bls12_381_archive; yes_wallet_lib |> open_]
+    ~deps:[octez_rust_deps; bls12_381_archive; yes_wallet_lib |> open_]
     ~modules:["yes_wallet"]
     ~bisect_ppx:No
 
@@ -7884,7 +7891,7 @@ let _testnet_experiment_tools =
     ~opam:""
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos;
@@ -7984,7 +7991,7 @@ let _simulation_scenario =
     ~opam:""
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_stdlib_unix |> open_;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
@@ -8012,7 +8019,7 @@ let _extract_data =
     ~opam:""
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_base_unix;
@@ -8035,7 +8042,7 @@ let _safety_checker =
     ~opam:""
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_store |> open_;
@@ -8059,7 +8066,7 @@ let _get_teztale_data =
     ~opam:""
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_clic;
@@ -8154,7 +8161,7 @@ let _octez_node =
     ~preprocessor_deps
     ~deps:
       ([
-         octez_rustzcash_deps;
+         octez_rust_deps;
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix |> open_;
@@ -8219,7 +8226,7 @@ let _octez_experimental_agnostic_baker =
     ~with_macos_security_framework:true
     ~deps:
       ([
-         octez_rustzcash_deps;
+         octez_rust_deps;
          bls12_381_archive;
          data_encoding |> open_;
          octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -8264,7 +8271,7 @@ let _octez_client =
     ~release_status:Released
     ~deps:
       ([
-         octez_rustzcash_deps;
+         octez_rust_deps;
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
@@ -8317,7 +8324,7 @@ let _octez_codec =
     ~with_macos_security_framework:true
     ~deps:
       ([
-         octez_rustzcash_deps;
+         octez_rust_deps;
          bls12_381_archive;
          data_encoding |> open_;
          octez_base |> open_ ~m:"TzPervasives";
@@ -8354,7 +8361,7 @@ let _octez_snoop =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
@@ -8389,7 +8396,7 @@ let _octez_injector_server =
     ~linkall:true
     ~deps:
       ([
-         octez_rustzcash_deps;
+         octez_rust_deps;
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_injector_lib |> open_;
@@ -8494,7 +8501,7 @@ let _octez_tps_evaluation =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         caqti;
@@ -8564,7 +8571,7 @@ let _octez_dal_node =
     ~with_macos_security_framework:true
     ~deps:
       ([
-         octez_rustzcash_deps;
+         octez_rust_deps;
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
@@ -8799,7 +8806,7 @@ let _tezt_long_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
@@ -8825,7 +8832,7 @@ let _tezt_manual_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
@@ -8870,7 +8877,7 @@ let _tezt_vesting_contract_test =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
@@ -8891,7 +8898,7 @@ let _docs_doc_gen =
     ~release_status:Unreleased
     ~deps:
       ([
-         octez_rustzcash_deps;
+         octez_rust_deps;
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_rpc;
@@ -8917,7 +8924,7 @@ let _docs_doc_gen_errors =
     ~linkall:true
     ~deps:
       [
-        octez_rustzcash_deps;
+        octez_rust_deps;
         bls12_381_archive;
         octez_base |> open_;
         octez_error_monad |> open_;

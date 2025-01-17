@@ -106,6 +106,7 @@ let evm_node_rust_deps =
               [S "source_tree"; S "../kernel_calypso"];
               [S "source_tree"; S "../../src/rustzcash_deps"];
               [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
+              [S "source_tree"; S "../../src/riscv"];
               [S "source_tree"; S "../../src/kernel_sdk"];
               [S "source_tree"; S "../../sdk/rust"];
               [S "source_tree"; S "src"];
@@ -378,7 +379,7 @@ let _tezt_etherlink =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
         evm_node_lib_dev_encoding;
-        octez_rustzcash_deps;
+        octez_rust_deps;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
