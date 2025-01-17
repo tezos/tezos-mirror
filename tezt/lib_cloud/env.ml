@@ -34,6 +34,8 @@ let prometheus_port = Cli.prometheus_port
 
 let prometheus_snapshot_filename = Cli.prometheus_snapshot_filename
 
+let prometheus_snapshots = Cli.prometheus_snapshots
+
 let prometheus_scrape_interval = Cli.prometheus_scrape_interval
 
 let grafana = Cli.grafana

@@ -76,11 +76,33 @@ let register_prometheus_import ~tags =
   Cloud.register
     ?vms:None
     ~__FILE__
-    ~title:"Import a snapshot into a prometheus container"
+    ~title:"Import snapshots into prometheus containers"
     ~tags:("prometheus" :: "import" :: tags)
   @@ fun _cloud ->
-  let* prometheus = Prometheus.run_with_snapshot () in
-  Prometheus.shutdown prometheus
+  let conf =
+    match Env.prometheus_snapshots with
+    | [] ->
+        Test.fail
+          "You must specify the snapshot filename via --prometheus-snapshots"
+    | snapshots ->
+        List.mapi
+          (fun i -> function
+            | path, Some port -> (path, port)
+            | path, None -> (path, Env.prometheus_port + i))
+          snapshots
+  in
+  let* prometheus =
+    Lwt_list.map_s
+      (fun (path, port) -> Prometheus.run_with_snapshot port path)
+      conf
+  in
+  Log.info
+    "Prometheus instances are now running. Write 'stop' in order to stop and \
+     remove docker containers." ;
+  while read_line () <> "stop" do
+    ()
+  done ;
+  Lwt_list.iter_s Prometheus.shutdown prometheus
 
 let register_clean_up_vms ~tags =
   Cloud.register

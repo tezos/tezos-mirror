@@ -53,6 +53,7 @@ type group = {name : string; interval : string option; rules : rule list}
 type groups = (string, group) Hashtbl.t
 
 type t = {
+  name : string;
   configuration_file : string;
   rules_file : string;
   mutable jobs : job list;
@@ -158,7 +159,7 @@ let rule_template rule =
   in
   Tobj payload
 
-let group_template group =
+let group_template (group : group) =
   let open Jingoo.Jg_types in
   let payload =
     [
@@ -204,7 +205,7 @@ let add_job t ?(metrics_path = "/metrics") ~name targets =
   write_configuration_file t ;
   reload t
 
-let update_groups t group =
+let update_groups t (group : group) =
   match Hashtbl.find_opt t.groups group.name with
   | None -> Hashtbl.replace t.groups group.name group
   | Some _group' ->
@@ -276,9 +277,11 @@ let start ~alerts agents =
   let rules_file = dir // "rules" // "tezt.rules" in
   let snapshot_filename = Env.prometheus_snapshot_filename in
   let port = Env.prometheus_port in
+  let name = sf "prometheus-%d" port in
   let scrape_interval = Env.prometheus_scrape_interval in
   let t =
     {
+      name;
       configuration_file;
       rules_file;
       jobs;
@@ -376,42 +379,33 @@ let export_snapshot {snapshot_filename; _} =
   Log.info "You can find the prometheus snapshot at %s" destination ;
   Lwt.return_unit
 
-let shutdown {configuration_file = _; _} =
-  let* () = Docker.kill "prometheus" |> Process.check in
-  Lwt.return_unit
+let shutdown (t : t) = Docker.kill t.name |> Process.check
 
-let run_with_snapshot () =
-  (* No need for a configuration file here. *)
-  let configuration_file = "" in
-  let port = Env.prometheus_port in
-  let snapshot_filename =
-    match Env.prometheus_snapshot_filename with
-    | None ->
-        Test.fail
-          "You must specify the snapshot filename via \
-           --prometheus-snapshot-filename"
-    | Some file -> file
-  in
-  Log.info "You can find the prometheus instance at http://localhost:%d" port ;
-  Log.info "Use Ctrl+C to end the scenario and kill the prometheus instance." ;
-  let* () =
-    Process.run
+let run_with_snapshot port snapshot_filename =
+  let name = sf "prometheus-%d" port in
+  let _ =
+    Process.spawn
       "docker"
       [
         "run";
+        "--rm";
+        "--name";
+        name;
         "-uroot";
         "-v";
         Format.asprintf "%s:/prometheus" snapshot_filename;
         "-p";
-        Format.asprintf "%d:%d" port port;
+        Format.asprintf "%d:9090" port;
         "prom/prometheus";
         "--config.file=/etc/prometheus/prometheus.yml";
         "--storage.tsdb.path=/prometheus";
       ]
   in
+  Log.info "You can find the prometheus instance at http://localhost:%d" port ;
   Lwt.return
     {
-      configuration_file;
+      name;
+      configuration_file = "";
       rules_file = "";
       jobs = [];
       scrape_interval = 0;

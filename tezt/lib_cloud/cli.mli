@@ -64,6 +64,9 @@ val prometheus_port : int
 (** Specify the name of the prometheus snapshot. *)
 val prometheus_snapshot_filename : string option
 
+(** Specify the name of the prometheus snapshots to import. *)
+val prometheus_snapshots : (string * int option) list
+
 (** Specify the scraping interval of Prometheus. *)
 val prometheus_scrape_interval : int
 
