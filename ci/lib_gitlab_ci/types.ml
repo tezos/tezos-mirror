@@ -80,7 +80,7 @@ type workflow_rule = {
       workflow:rules:auto_cancel} for more info. *)
 }
 
-(** Represents an include rule. *)
+(** Represents an include rule. See {{:https://docs.gitlab.com/ee/ci/yaml/#includerules}include:rules} for more info. *)
 type include_rule = {
   changes : string list option;
   if_ : If.t option;
@@ -304,10 +304,25 @@ type workflow = {
 type template =
   | Jobs_container_scanning
       (** See {{:https://docs.gitlab.com/ee/user/application_security/container_scanning/index.html}Container Scanning} *)
+
+let path_of_template template =
+  match template with
+  | Jobs_container_scanning -> "Jobs/Container-Scanning.gitlab-ci.yml"
+
 (* We only use the Container Scanning tool at the moment but more
    scanners should be added in the future. *)
 
-type include_ = {local : string; rules : include_rule list}
+(** Represents an include configuration. Only [include:local] [include:template] are supported, as other subkeys are not used in our CI.
+
+    See
+    - {{:https://docs.gitlab.com/ee/ci/yaml/#include}include},
+    - {{:https://docs.gitlab.com/ee/ci/yaml/#includelocal}include:local}
+    - and {{:https://docs.gitlab.com/ee/ci/yaml/#includetemplate}include:template}
+    for more info. *)
+
+type include_subkey = Local of string | Template of template
+
+type include_ = {subkey : include_subkey; rules : include_rule list}
 
 type config_element =
   | Workflow of workflow  (** Corresponds to a [workflow:] key. *)

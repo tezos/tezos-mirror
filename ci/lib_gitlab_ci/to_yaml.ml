@@ -331,17 +331,22 @@ let enc_trigger_job : trigger_job -> value =
       ]
 
 let enc_includes : include_ list -> value =
- fun includes ->
-  let enc_includes ({local; rules} : include_) =
-    match rules with
-    | [] -> `String local
-    | _ :: _ ->
-        `O [("local", `String local); ("rules", enc_include_rules rules)]
+  let enc_subkey subkey : string * value =
+    match subkey with
+    | Local path -> ("local", `String path)
+    | Template template -> ("template", `String (path_of_template template))
   in
-  match includes with
-  | [] -> failwith "empty includes"
-  | [{local; rules = []}] -> `String local
-  | inc -> array enc_includes inc
+
+  fun includes ->
+    let enc_includes ({subkey; rules} : include_) =
+      match rules with
+      | [] -> `O [enc_subkey subkey]
+      | _ :: _ -> `O [enc_subkey subkey; ("rules", enc_include_rules rules)]
+    in
+    match includes with
+    | [] -> failwith "empty includes"
+    | [{subkey; rules = []}] -> `O [enc_subkey subkey]
+    | inc -> array enc_includes inc
 
 let config_element : config_element -> (string * value) option = function
   | Workflow wf -> Some ("workflow", enc_workflow wf)

@@ -375,7 +375,7 @@ module Pipeline = struct
              set in the include rule, they are set in the workflow
              rule *)
           let rule = include_rule ~if_ ~when_:Always () in
-          Gitlab_ci.Types.{local = path ~name; rules = [rule]}
+          Gitlab_ci.Types.{subkey = Local (path ~name); rules = [rule]}
     in
     let pipelines =
       all ()
@@ -470,7 +470,7 @@ module Pipeline = struct
     in
     let ci_docker_include_rule : Gitlab_ci.Types.include_ =
       {
-        local = "images_base/ci-docker/.gitlab-ci.yml";
+        subkey = Local "images_base/ci-docker/.gitlab-ci.yml";
         rules = [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
       }
     in
@@ -493,7 +493,7 @@ module Pipeline = struct
     let scheduled_pipeline_include_rule local tz_schedule_kind :
         Gitlab_ci.Types.include_ =
       {
-        local;
+        subkey = Local local;
         rules =
           [
             {
