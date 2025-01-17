@@ -4850,6 +4850,19 @@ let octez_injector_lib =
         octez_signer_backends;
       ]
 
+let performance_metrics =
+  public_lib
+    "octez-performance-metrics"
+    ~path:"src/lib_performance_metrics"
+    ~deps:
+      [
+        prometheus;
+        octez_version;
+        octez_base |> open_ ~m:"TzPervasives";
+        lwt_unix;
+      ]
+    ~synopsis:"Set of metrics to measure binary performances"
+
 let octez_smart_rollup_lib =
   octez_l2_lib
     "smart-rollup"
@@ -4930,6 +4943,7 @@ let octez_smart_rollup_node_store_lib =
         rollup_node_sqlite_migrations;
         octez_sqlite |> open_;
         octez_smart_rollup_lib |> open_;
+        performance_metrics;
       ]
 
 let octez_smart_rollup_node_lib =

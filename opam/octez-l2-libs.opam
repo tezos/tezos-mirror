@@ -28,6 +28,7 @@ depends: [
   "yaml" { >= "3.1.0" }
   "crunch" { >= "3.3.0" }
   "re" { >= "1.10.0" }
+  "octez-performance-metrics" { = version }
   "ppx_import"
   "qcheck-alcotest" { >= "0.20" }
   "octez-alcotezt" { = version }
