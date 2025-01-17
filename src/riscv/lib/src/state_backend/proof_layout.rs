@@ -8,9 +8,10 @@ use super::{
         proof::{MerkleProof, MerkleProofLeaf},
         tree::Tree,
     },
-    verify_backend, Array, Atom, Layout, Many,
+    verify_backend, Array, Atom, DynArray, Layout, Many,
 };
 use crate::{default::ConstDefault, storage::binary};
+use std::collections::BTreeMap;
 
 /// Errors that may occur when parsing a Merkle proof
 #[derive(Debug, thiserror::Error)]
@@ -140,6 +141,53 @@ where
         };
 
         Ok(super::Cells::bind(region))
+    }
+}
+
+impl<const LEN: usize> ProofLayout for DynArray<LEN> {
+    fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
+        let mut pipeline = vec![(0usize, LEN, proof)];
+        let mut pages = BTreeMap::new();
+
+        while let Some((start, length, tree)) = pipeline.pop() {
+            if length <= super::MERKLE_LEAF_SIZE.get() {
+                // Must be a leaf.
+
+                let super::ProofPart::Present(data) = tree.into_leaf()? else {
+                    // No point in doing anything if the leaf isn't present.
+                    continue;
+                };
+
+                let data: Box<[u8]> = binary::deserialise(data)?;
+
+                // TODO: Check data is the right length.
+                assert_eq!(data.len(), length);
+
+                pages.insert(start, data);
+            } else {
+                // Expecting a branching point.
+
+                let branches = tree.into_branches::<{ super::MERKLE_ARITY }>()?;
+                let branch_max_length = length.div_ceil(super::MERKLE_ARITY);
+
+                let mut branch_start = start;
+                let mut length_left = length;
+                for branch in branches {
+                    let this_branch_length = branch_max_length.min(length_left);
+
+                    if this_branch_length > 0 {
+                        pipeline.push((branch_start, this_branch_length, branch));
+                    }
+
+                    branch_start = branch_start.saturating_add(this_branch_length);
+                    length_left = length_left.saturating_sub(this_branch_length);
+                }
+            }
+        }
+
+        let region = verify_backend::DynRegion::from_pages(pages);
+        let data = super::DynCells::bind(region);
+        Ok(data)
     }
 }
 

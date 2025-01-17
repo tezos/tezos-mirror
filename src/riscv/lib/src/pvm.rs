@@ -4,6 +4,7 @@
 
 mod common;
 pub mod node_pvm;
+mod reveals;
 mod sbi;
 
 pub use common::*;
