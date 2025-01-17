@@ -737,18 +737,18 @@ let jobs pipeline_type =
     let job_build_grafazos =
       match pipeline_type with
       | Merge_train | Before_merging ->
-          Common.job_build_grafazos
+          Grafazos_ci.job_build_grafazos
             ~rules:
               [
                 job_rule
                   ~when_:Always
-                  ~changes:(Changeset.encode changeset_grafazos)
+                  ~changes:(Changeset.encode Grafazos_ci.changeset_grafazos)
                   ();
                 job_rule ~when_:Manual ();
               ]
             ()
       | Schedule_extended_test ->
-          Common.job_build_grafazos ~rules:[job_rule ~when_:Always ()] ()
+          Grafazos_ci.job_build_grafazos ~rules:[job_rule ~when_:Always ()] ()
     in
     [
       job_build_arm64_release;
