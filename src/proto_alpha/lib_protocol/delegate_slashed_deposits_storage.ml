@@ -202,18 +202,18 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
          denunciations_map
          acc ->
       let ctxt, balance_updates = acc in
-      let level =
+      let misbehaviour_level =
         Level_repr.level_from_raw
           ~cycle_eras:(Raw_context.cycle_eras ctxt)
           raw_level
       in
-      let misbehaviour_cycle = level.cycle in
+      let misbehaviour_cycle = misbehaviour_level.cycle in
       let denunciations =
         Signature.Public_key_hash.Map.bindings denunciations_map
       in
       let denounced = List.map fst denunciations in
       let* ctxt, slashing_percentage =
-        Slash_percentage.get ctxt ~kind ~level denounced
+        Slash_percentage.get ctxt ~kind ~level:misbehaviour_level denounced
       in
       let+ ctxt, balance_updates =
         List.fold_left_es
@@ -258,11 +258,13 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
             in
 
             let previous_total_slashing_percentage =
-              Storage.Slashed_deposits_history.get level.cycle slash_history
+              Storage.Slashed_deposits_history.get
+                misbehaviour_cycle
+                slash_history
             in
             let slash_history =
               Storage.Slashed_deposits_history.add
-                level.cycle
+                misbehaviour_cycle
                 slashing_percentage
                 slash_history
             in
@@ -270,7 +272,9 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
               Storage.Slashed_deposits.add ctxt delegate slash_history
             in
             let new_total_slashing_percentage =
-              Storage.Slashed_deposits_history.get level.cycle slash_history
+              Storage.Slashed_deposits_history.get
+                misbehaviour_cycle
+                slash_history
             in
             (* We do not slash above 100%: if the slashing percentage would
                make the total sum of the slashing history above 100%, we rectify
@@ -403,7 +407,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                 |> Option.value ~default:Cycle_repr.root
               in
               let slashable_cycles =
-                Cycle_repr.(oldest_slashable_cycle ---> misbehaviour_cycle)
+                Cycle_repr.(oldest_slashable_cycle ---> current_cycle)
               in
               List.fold_left_es
                 (fun (to_burn, to_reward) cycle ->

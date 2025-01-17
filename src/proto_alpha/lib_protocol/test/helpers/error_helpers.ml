@@ -111,7 +111,7 @@ let expect_outdated_denunciation_state ~loc ~state errs =
       (Block.current_cycle_of_level
          ~blocks_per_cycle:state.State.constants.blocks_per_cycle
          ~current_level:(Protocol.Raw_level_repr.to_int32 ds.misbehaviour.level))
-      (Protocol.Constants_repr.max_slashing_period - 1)
+      Protocol.Constants_repr.denunciation_period
   in
   let (kind : Protocol.Alpha_context.Misbehaviour.kind) =
     (* This conversion would not be needed if

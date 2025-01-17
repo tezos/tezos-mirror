@@ -23,20 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let current_unslashable_cycle ctxt =
-  let cycle = (Raw_context.current_level ctxt).cycle in
-  let slashable_deposits_period =
-    Constants_storage.slashable_deposits_period ctxt
-  in
-  let max_slashing_period = Constants_repr.max_slashing_period in
-  Cycle_repr.sub cycle (slashable_deposits_period + max_slashing_period)
-
 let get_all ctxt contract =
   let open Lwt_result_syntax in
   let* unstaked_frozen_deposits_opt =
     Storage.Contract.Unstaked_frozen_deposits.find ctxt contract
   in
-  let unslashable_cycle = current_unslashable_cycle ctxt in
+  let unslashable_cycle =
+    Cycle_storage.greatest_unstake_finalizable_cycle ctxt
+  in
   match unstaked_frozen_deposits_opt with
   | None -> return (Unstaked_frozen_deposits_repr.empty ~unslashable_cycle)
   | Some unstaked_frozen_deposits ->

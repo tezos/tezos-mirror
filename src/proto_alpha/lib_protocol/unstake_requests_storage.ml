@@ -91,19 +91,29 @@ let prepared_finalize_unstake_encoding :
        (req "finalizable" finalizable_encoding)
        (req "unfinalizable" stored_requests_encoding))
 
-let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
-    =
-  let first_cycle_to_apply_slash = from_cycle in
-  let last_cycle_to_apply_slash =
-    Cycle_repr.add from_cycle slashable_deposits_period
+let apply_slashes ctxt slashing_history ~unstake_request_cycle amount =
+  let slashable_deposits_period =
+    Constants_storage.slashable_deposits_period ctxt
   in
   (* [slashing_history] is sorted so slashings always happen in the same order. *)
   List.fold_left
-    (fun remain (slashing_cycle, slashing_percentage) ->
+    (fun remain (misbehaviour_cycle, slashing_percentage) ->
       if
         Cycle_repr.(
-          slashing_cycle >= first_cycle_to_apply_slash
-          && slashing_cycle <= last_cycle_to_apply_slash)
+          (* The unstake request is recent enough to be slashed for
+             the misbehaviour, because its funds were still staked at
+             the time the baking rights for the misbehaviour level
+             were computed. *)
+          misbehaviour_cycle
+          <= add unstake_request_cycle slashable_deposits_period
+          && (* The unstake request is old enough that it already
+                existed when the misbehaviour was slashed (or will be
+                slashed if it hasn't happened yet). Indeed, unstake
+                requests created after the slashing contain funds that
+                have already been slashed while they were still staked
+                so they should not be slashed again. *)
+          unstake_request_cycle
+          <= add misbehaviour_cycle Constants_repr.slashing_delay)
       then
         Tez_repr.(
           sub_opt
@@ -117,19 +127,11 @@ let apply_slashes ~slashable_deposits_period slashing_history ~from_cycle amount
 let prepare_finalize_unstake_uncarbonated ctxt
     ~check_delegate_of_unfinalizable_requests contract =
   let open Lwt_result_syntax in
-  let slashable_deposits_period =
-    Constants_storage.slashable_deposits_period ctxt
-  in
-  let max_slashing_period = Constants_repr.max_slashing_period in
-  let slashable_plus_denunciation_delay =
-    slashable_deposits_period + max_slashing_period
-  in
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
   let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
   match requests_opt with
   | None | Some {delegate = _; requests = []} -> return_none
   | Some {delegate; requests} -> (
-      match Cycle_repr.sub current_cycle slashable_plus_denunciation_delay with
+      match Cycle_storage.greatest_unstake_finalizable_cycle ctxt with
       | None (* no finalizable cycle *) ->
           return_some {finalizable = []; unfinalizable = {delegate; requests}}
       | Some greatest_finalizable_cycle ->
@@ -160,16 +162,19 @@ let prepare_finalize_unstake_uncarbonated ctxt
           let finalizable, unfinalizable_requests =
             List.partition_map
               (fun request ->
-                let request_cycle, request_amount = request in
-                if Cycle_repr.(request_cycle <= greatest_finalizable_cycle) then
+                let unstake_request_cycle, request_amount = request in
+                if
+                  Cycle_repr.(
+                    unstake_request_cycle <= greatest_finalizable_cycle)
+                then
                   let new_amount =
                     apply_slashes
-                      ~slashable_deposits_period
+                      ctxt
                       slashing_history
-                      ~from_cycle:request_cycle
+                      ~unstake_request_cycle
                       request_amount
                   in
-                  Left (delegate, request_cycle, new_amount)
+                  Left (delegate, unstake_request_cycle, new_amount)
                 else Right request)
               requests
           in
@@ -445,9 +450,6 @@ module For_RPC = struct
 
   let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
     let open Lwt_result_syntax in
-    let slashable_deposits_period =
-      Constants_storage.slashable_deposits_period ctxt
-    in
     let* slashing_history_opt = Storage.Slashed_deposits.find ctxt delegate in
     let slashing_history = Option.value slashing_history_opt ~default:[] in
 
@@ -471,14 +473,14 @@ module For_RPC = struct
     in
 
     List.map_es
-      (fun (request_cycle, request_amount) ->
+      (fun (unstake_request_cycle, request_amount) ->
         let new_amount =
           apply_slashes
-            ~slashable_deposits_period
+            ctxt
             slashing_history
-            ~from_cycle:request_cycle
+            ~unstake_request_cycle
             request_amount
         in
-        return (request_cycle, new_amount))
+        return (unstake_request_cycle, new_amount))
       requests
 end

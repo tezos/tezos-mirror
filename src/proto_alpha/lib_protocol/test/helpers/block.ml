@@ -662,9 +662,9 @@ let prepare_initial_context_params ?consensus_committee_size
     Option.value ~default:constants.aggregate_attestation aggregate_attestation
   in
   let cache_sampler_state_cycles =
-    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+    consensus_rights_delay + Constants_repr.slashing_delay + 2
   and cache_stake_distribution_cycles =
-    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+    consensus_rights_delay + Constants_repr.slashing_delay + 2
   in
   let constants =
     {

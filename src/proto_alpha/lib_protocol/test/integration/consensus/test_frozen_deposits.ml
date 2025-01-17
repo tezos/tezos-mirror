@@ -232,7 +232,7 @@ let test_limit_with_overdelegation () =
     Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.consensus_rights_delay + Constants.max_slashing_period)
+    2 * (constants.consensus_rights_delay + Constants.slashing_delay + 1)
   in
   let rec loop b n =
     if n = 0 then return b
@@ -424,7 +424,7 @@ let test_deposits_after_stake_removal () =
   (* the frozen deposits for account1 do not change until [preserved cycles +
      max_slashing_period] are baked (-1 because we already baked a cycle) *)
   let* b =
-    loop b (constants.consensus_rights_delay + Constants.max_slashing_period - 1)
+    loop b (constants.consensus_rights_delay + Constants.slashing_delay)
   in
   (* and still after preserved cycles + max_slashing_period, the frozen_deposits
      for account1 won't reflect the decrease in account1's active stake
@@ -459,7 +459,7 @@ let test_frozen_deposits_with_deactivation () =
   in
   let last_cycle_with_deposits =
     last_active_cycle + constants.consensus_rights_delay
-    + Constants.max_slashing_period
+    + Constants.slashing_delay + 1
     (* according to [Delegate_storage.freeze_deposits] *)
   in
   let cycles_to_bake =
@@ -545,7 +545,7 @@ let test_frozen_deposits_with_delegation () =
     Assert.equal_tez ~loc:__LOC__ new_frozen_deposits initial_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.consensus_rights_delay + Constants.max_slashing_period)
+    2 * (constants.consensus_rights_delay + Constants.slashing_delay + 1)
   in
   let rec loop b n =
     if n = 0 then return b
@@ -644,7 +644,7 @@ let test_frozen_deposits_with_overdelegation () =
       expected_new_frozen_deposits
   in
   let cycles_to_bake =
-    2 * (constants.consensus_rights_delay + Constants.max_slashing_period)
+    2 * (constants.consensus_rights_delay + Constants.slashing_delay + 1)
   in
   let* frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) account1

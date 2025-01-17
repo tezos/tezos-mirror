@@ -463,11 +463,8 @@ module Unstaked_frozen = struct
            ({cycle; requests = _; initial; current; slash_pct = old_slash_pct}
             as r)
          ->
-           if
-             Cycle.(
-               cycle > slashed_cycle
-               || add cycle slashable_deposits_period < slashed_cycle)
-           then (r, (Tez.zero, Tez.zero))
+           if Cycle.(add cycle slashable_deposits_period < slashed_cycle) then
+             (r, (Tez.zero, Tez.zero))
            else
              let new_current, burnt, rewarded =
                apply_slash_to_current cst pct initial current

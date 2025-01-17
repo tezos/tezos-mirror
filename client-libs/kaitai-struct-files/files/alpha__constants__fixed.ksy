@@ -43,7 +43,9 @@ seq:
   type: u1
 - id: michelson_maximum_type_size
   type: u2be
-- id: max_slashing_period
+- id: denunciation_period
+  type: u1
+- id: slashing_delay
   type: u1
 - id: smart_rollup_max_wrapped_proof_binary_size
   type: int31

@@ -40,9 +40,8 @@ let param_wait state = state.constants.delegate_parameters_activation_delay + 1
 
 (** Expected number of cycles before staking unstaked funds get unfrozen *)
 let unstake_wait state =
-  let pc = state.constants.consensus_rights_delay in
-  let msp = Protocol.Constants_repr.max_slashing_period in
-  pc + msp
+  state.constants.consensus_rights_delay
+  + Protocol.Constants_repr.slashing_delay + 1
 
 (** From a name, returns the corresponding account *)
 let find_account (account_name : string) (state : t) : account_state =

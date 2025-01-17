@@ -465,8 +465,8 @@ let update_state_denunciation (block, state)
       return (state, denounced))
     else if
       Cycle.(
-        add ds_cycle Protocol.Constants_repr.max_slashing_period
-        <= inclusion_cycle)
+        add ds_cycle Protocol.Constants_repr.denunciation_period
+        < inclusion_cycle)
     then (
       (* The denunciation is too late and gets refused. *)
       Log.info ~color:event_color "Denunciation too late" ;

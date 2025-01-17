@@ -238,7 +238,7 @@ let select_new_distribution_at_cycle_end ctxt ~new_cycle =
 
 let clear_outdated_sampling_data ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  match Cycle_repr.sub new_cycle Constants_repr.max_slashing_period with
+  match Cycle_storage.cycle_to_clear_of_sampling_data ~new_cycle with
   | None -> return ctxt
   | Some outdated_cycle ->
       let* ctxt = Delegate_sampler_state.remove_existing ctxt outdated_cycle in

@@ -518,10 +518,11 @@ let test_too_early_double_baking_evidence () =
    --, it is not possible to create a double baking operation anymore. *)
 let test_too_late_double_baking_evidence () =
   let open Lwt_result_syntax in
-  let max_slashing_period = Constants.max_slashing_period in
   let* b, contracts = Context.init2 ~consensus_threshold:0 () in
   let* blk_a, blk_b = block_fork ~policy:(By_round 0) contracts b in
-  let* blk = Block.bake_until_n_cycle_end max_slashing_period blk_a in
+  let* blk =
+    Block.bake_until_n_cycle_end (Constants.denunciation_period + 1) blk_a
+  in
   double_baking (B blk) blk_a.header blk_b.header |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function

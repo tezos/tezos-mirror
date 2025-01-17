@@ -218,18 +218,13 @@ let raw_for_cycle = Storage.Seed.For_cycle.get
 let for_cycle ctxt cycle =
   let open Lwt_result_syntax in
   let delay = Constants_storage.consensus_rights_delay ctxt in
-  let max_slashing_period = Constants_repr.max_slashing_period in
-  let current_cycle = (Level_storage.current ctxt).cycle in
+  let current_cycle = Cycle_storage.current ctxt in
   let latest =
     if Cycle_repr.(current_cycle = root) then
       Cycle_repr.add current_cycle (delay + 1)
     else Cycle_repr.add current_cycle delay
   in
-  let oldest =
-    match Cycle_repr.sub current_cycle (max_slashing_period - 1) with
-    | None -> Cycle_repr.root
-    | Some oldest -> oldest
-  in
+  let oldest = Cycle_storage.oldest_cycle_with_sampling_data ctxt in
   let*? () =
     error_unless
       Cycle_repr.(oldest <= cycle && cycle <= latest)

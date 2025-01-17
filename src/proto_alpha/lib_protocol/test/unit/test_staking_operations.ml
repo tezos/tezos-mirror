@@ -359,8 +359,7 @@ let fee_low_spendable_balance_non_zero_finalizable_unstake ~self_delegate_staker
   let* b = Block.bake ~operation:unstake b in
   let* b =
     Block.bake_until_n_cycle_end
-      (constants.consensus_rights_delay
-     + Protocol.Constants_repr.max_slashing_period)
+      (constants.consensus_rights_delay + Constants.slashing_delay + 1)
       b
   in
   let* () =

@@ -355,11 +355,11 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
         | Validate_errors.Consensus.Forbidden_delegate _ -> true
         | _ -> false)
   in
-  (* Check that all frozen deposits have been slashed at the end of the cycle. *)
+  (* Bake until the slashing and check the frozen deposits. *)
   let* b =
     Block.bake_until_n_cycle_end
       ~policy:(By_account baker)
-      Constants_repr.max_slashing_period
+      (Constants.slashing_delay + 1)
       blk_with_evidence2
   in
   let* slashing_pct1 =
@@ -604,20 +604,15 @@ let test_too_early_double_attestation_evidence () =
 let test_too_late_double_attestation_evidence () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
-  let max_slashing_period = Constants.max_slashing_period in
-  let* Constants.{parametric = {blocks_per_cycle; _}; _} =
-    Context.get_constants (B genesis)
-  in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
   let* attestation_a = Op.raw_attestation blk_a in
   let* attestation_b = Op.raw_attestation blk_b in
   let* blk =
-    Block.bake_n
-      ((max_slashing_period * Int32.to_int blocks_per_cycle) + 1)
-      blk_a
+    Block.bake_until_n_cycle_end (Constants.denunciation_period + 1) blk_a
   in
+  let* blk = Block.bake blk in
   double_attestation (B blk) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function

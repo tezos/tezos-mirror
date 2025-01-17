@@ -232,8 +232,7 @@ let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
 
 let clear_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let max_slashing_period = Constants_repr.max_slashing_period in
-  match Cycle_repr.sub new_cycle max_slashing_period with
+  match Cycle_storage.cycle_to_clear_of_sampling_data ~new_cycle with
   | None -> return ctxt
   | Some cycle_to_clear ->
       let* ctxt =
