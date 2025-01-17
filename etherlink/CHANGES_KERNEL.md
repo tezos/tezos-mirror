@@ -25,6 +25,8 @@
 - Current block's gas price is not stored on its own anymore but the
   information is still available as part of the current
   block. (!15609)
+- The kernel always reboots between the application of
+  blocks. (!16274)
 
 ### Bug fixes
 
