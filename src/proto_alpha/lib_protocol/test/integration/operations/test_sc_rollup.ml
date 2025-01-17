@@ -522,7 +522,7 @@ let verify_whitelist ~loc ~expected_whitelist rollup ctxt =
 let make_output ~outbox_level ~message_index message =
   let outbox_level = Raw_level.of_int32_exn (Int32.of_int outbox_level) in
   let message_index = Z.of_int message_index in
-  Sc_rollup.{outbox_level; message_index; message}
+  Sc_rollup.{output_info = {outbox_level; message_index}; message}
 
 let make_transaction_output ~outbox_level ~message_index transactions =
   let transactions =

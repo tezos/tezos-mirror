@@ -489,7 +489,7 @@ let make_output ~outbox_level ~message_index n =
   let message_index = Z.of_int message_index in
   let outbox_level = Raw_level_repr.of_int32_exn (Int32.of_int outbox_level) in
   let message = Atomic_transaction_batch {transactions} in
-  Sc_rollup_PVM_sig.{outbox_level; message_index; message}
+  Sc_rollup_PVM_sig.{output_info = {outbox_level; message_index}; message}
 
 let test_valid_output_messages () =
   let test inbox_level =

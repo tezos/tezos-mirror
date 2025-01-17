@@ -3629,11 +3629,9 @@ module Sc_rollup : sig
       level:Raw_level.t -> context -> t -> (context * int list) tzresult Lwt.t
   end
 
-  type output = {
-    outbox_level : Raw_level.t;
-    message_index : Z.t;
-    message : Outbox.Message.t;
-  }
+  type output_info = {outbox_level : Raw_level.t; message_index : Z.t}
+
+  type output = {output_info : output_info; message : Outbox.Message.t}
 
   val output_encoding : output Data_encoding.t
 
@@ -3726,7 +3724,7 @@ module Sc_rollup : sig
 
       val output_proof_encoding : output_proof Data_encoding.t
 
-      val output_of_output_proof : output_proof -> output
+      val output_info_of_output_proof : output_proof -> output_info
 
       val state_of_output_proof : output_proof -> hash
 

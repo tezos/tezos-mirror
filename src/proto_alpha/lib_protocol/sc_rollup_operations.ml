@@ -639,7 +639,7 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
       Sc_rollup_invalid_last_cemented_commitment
   in
   (* Validate and decode the output proofs. *)
-  let* Sc_rollup.{outbox_level; message_index; message}, ctxt =
+  let* Sc_rollup.{output_info = {outbox_level; message_index}; message}, ctxt =
     validate_and_decode_output_proof
       ctxt
       ~cemented_commitment

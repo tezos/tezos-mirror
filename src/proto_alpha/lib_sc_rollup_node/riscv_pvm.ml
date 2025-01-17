@@ -135,7 +135,7 @@ module PVM :
 
   let output_proof_encoding = void
 
-  let output_of_output_proof = function (_ : output_proof) -> .
+  let output_info_of_output_proof = function (_ : output_proof) -> .
 
   let state_of_output_proof = function (_ : output_proof) -> .
 

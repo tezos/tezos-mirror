@@ -475,12 +475,17 @@ let input_request_equal a b =
   | Needs_reveal p1, Needs_reveal p2 -> reveal_equal p1 p2
   | Needs_reveal _, _ -> false
 
-(** Type that describes output values. *)
-type output = {
+(** Type that describes output metadata. *)
+type output_info = {
   outbox_level : Raw_level_repr.t;
       (** The outbox level containing the message. The level corresponds to the
           inbox level for which the message was produced.  *)
   message_index : Z.t;  (** The message index. *)
+}
+
+(** Type that describes output values. *)
+type output = {
+  output_info : output_info;
   message : Sc_rollup_outbox_message_repr.t;  (** The message itself. *)
 }
 
@@ -488,10 +493,10 @@ type output = {
 let output_encoding =
   let open Data_encoding in
   conv
-    (fun {outbox_level; message_index; message} ->
+    (fun {output_info = {outbox_level; message_index}; message} ->
       (outbox_level, message_index, message))
     (fun (outbox_level, message_index, message) ->
-      {outbox_level; message_index; message})
+      {output_info = {outbox_level; message_index}; message})
     (obj3
        (req "outbox_level" Raw_level_repr.encoding)
        (req "message_index" n)
@@ -499,7 +504,7 @@ let output_encoding =
 
 (** [pp_output fmt o] pretty prints the given output [o] to the formatter
     [fmt]. *)
-let pp_output fmt {outbox_level; message_index; message} =
+let pp_output fmt {output_info = {outbox_level; message_index}; message} =
   Format.fprintf
     fmt
     "@[%a@;%a@;%a@;@]"
@@ -635,9 +640,9 @@ module type PROTO_VERIFICATION = sig
   (** [output_proof_encoding] encoding value for [output_proof]s. *)
   val output_proof_encoding : output_proof Data_encoding.t
 
-  (** [output_of_output_proof proof] returns the [output] that is referred to in
+  (** [output_info_of_output_proof proof] returns the [output_info] that is referred to in
       [proof]'s statement. *)
-  val output_of_output_proof : output_proof -> output
+  val output_info_of_output_proof : output_proof -> output_info
 
   (** [state_of_output_proof proof] returns the [state] hash that is referred to
       in [proof]'s statement. *)

@@ -165,7 +165,7 @@ let outbox_message_summary (output : Sc_rollup.output) =
         in
         Transaction_batch transactions
   in
-  (Z.to_int output.message_index, summary)
+  (Z.to_int output.output_info.message_index, summary)
 
 let get_outbox_messages node_ctxt state ~outbox_level =
   let open Lwt_syntax in
