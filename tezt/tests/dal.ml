@@ -8286,6 +8286,82 @@ let test_attesters_receive_dal_rewards protocol dal_parameters _cryptobox node
     ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
   unit
 
+let test_inject_accusation _protocol dal_parameters cryptobox node client
+    _bootstrap_key =
+  let slot_index = 0 in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let number_of_slots = dal_parameters.number_of_slots in
+  let lag = dal_parameters.attestation_lag in
+  let slot = Helpers.generate_slot ~slot_size in
+  let commitment, proof, shards_with_proofs =
+    Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+  in
+  Log.info "Bake two blocks" ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
+     We bake two blocks because we need the accusation to be introduced at level
+     at least 10 (2 = 10 - attestation_lag). In protocol S we will not need this
+     restriction. *)
+  let* () = bake_for ~count:2 client in
+  let* _op_hash =
+    Helpers.publish_commitment
+      ~source:Constant.bootstrap2
+      ~index:slot_index
+      ~commitment
+      ~proof
+      client
+  in
+  (* We need to bake exactly [lag] blocks so that we can inject an attestation
+     at the right level (that attests the published slot). *)
+  let* () = bake_for ~count:lag client in
+  Log.info "Inject an attestation" ;
+  let availability = Slots [slot_index] in
+  let signer = Constant.bootstrap2 in
+  let* attestation, _op_hash =
+    inject_dal_attestation ~signer ~nb_slots:number_of_slots availability client
+  in
+  let* signature = Operation.sign attestation client in
+  let attestation = (attestation, signature) in
+  let* shard_assignments =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_dal_shards
+         ~delegates:[signer.public_key_hash]
+         ()
+  in
+  let shard_index =
+    JSON.(
+      shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list
+      |> List.hd |> as_int)
+  in
+  Log.info "First shard index of the attester is %d" shard_index ;
+  let shard, proof =
+    Seq.find
+      (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+      shards_with_proofs
+    |> Option.get
+  in
+  let accusation =
+    Operation.Anonymous.dal_entrapment_evidence
+      ~attestation
+      ~slot_index
+      shard
+      proof
+  in
+  Log.info "Inject an accusation" ;
+  let* _op_hash = Operation.Anonymous.inject accusation client in
+  let* () = bake_for client in
+  let* ops =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~block:"head"
+         ~validation_pass:2
+         ()
+  in
+  Check.(List.length (JSON.as_list ops) = 1)
+    ~__LOC__
+    Check.(int)
+    ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -8322,6 +8398,12 @@ let register ~protocols =
     "one_committee_per_level"
     test_one_committee_per_level
     protocols ;
+  scenario_with_layer1_node
+    ~incentives_enable:true
+    ~traps_fraction:Q.one
+    "inject accusation"
+    test_inject_accusation
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
 
   (* Tests with layer1 and dal nodes *)
   test_dal_node_startup protocols ;
