@@ -688,6 +688,8 @@ module Encoding : sig
 
   val double_baking_evidence_case : Kind.double_baking_evidence case
 
+  val dal_entrapment_evidence_case : Kind.dal_entrapment_evidence case
+
   val activate_account_case : Kind.activate_account case
 
   val proposals_case : Kind.proposals case

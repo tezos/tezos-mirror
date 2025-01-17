@@ -1342,6 +1342,28 @@ module Encoding = struct
         inj = (function message -> Failing_noop message);
       }
 
+  let dal_entrapment_evidence_case : Kind.dal_entrapment_evidence case =
+    Case
+      {
+        tag = 24;
+        name = "dal_entrapment_evidence";
+        encoding =
+          obj3
+            (req "attestation" (dynamic_size attestation_encoding))
+            (req "slot_index" Dal_slot_index_repr.encoding)
+            (req "shard_with_proof" Dal_slot_repr.Shard_with_proof.encoding);
+        select =
+          (function
+          | Contents (Dal_entrapment_evidence _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Dal_entrapment_evidence
+                 {attestation; slot_index; shard_with_proof}) ->
+            (attestation, slot_index, shard_with_proof));
+        inj =
+          (fun (attestation, slot_index, shard_with_proof) ->
+            Dal_entrapment_evidence {attestation; slot_index; shard_with_proof});
+      }
+
   let manager_encoding =
     obj5
       (req "source" Signature.Public_key_hash.encoding)
@@ -1479,6 +1501,7 @@ module Encoding = struct
       PCase seed_nonce_revelation_case;
       PCase vdf_revelation_case;
       PCase double_baking_evidence_case;
+      PCase dal_entrapment_evidence_case;
       PCase activate_account_case;
       PCase proposals_case;
       PCase ballot_case;

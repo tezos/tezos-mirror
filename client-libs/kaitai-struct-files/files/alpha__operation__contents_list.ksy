@@ -149,6 +149,9 @@ types:
     - id: double_baking_evidence
       type: double_baking_evidence
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::double_baking_evidence)
+    - id: dal_entrapment_evidence
+      type: dal_entrapment_evidence
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::dal_entrapment_evidence)
     - id: activate_account
       type: activate_account
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::activate_account)
@@ -270,6 +273,19 @@ types:
       type: s4be
     - id: block_payload_hash
       size: 32
+  attestation_0:
+    seq:
+    - id: alpha__inlined__attestation
+      type: alpha__inlined__attestation
+  attestation_1:
+    seq:
+    - id: len_attestation
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: attestation
+      type: attestation_0
+      size: len_attestation
   attestation_with_dal:
     seq:
     - id: slot
@@ -365,6 +381,14 @@ types:
       type: dal_page_id
     - id: dal_proof
       type: bytes_dyn_uint30
+  dal_entrapment_evidence:
+    seq:
+    - id: attestation
+      type: attestation_1
+    - id: slot_index
+      type: u1
+    - id: shard_with_proof
+      type: shard_with_proof
   dal_page_id:
     seq:
     - id: published_level
@@ -1076,6 +1100,36 @@ types:
     - id: limit
       type: alpha__mutez
       if: (limit_tag == bool::true)
+  shard:
+    seq:
+    - id: shard_field0
+      type: int31
+    - id: shard_field1
+      type: shard_field1_0
+  shard_field1:
+    seq:
+    - id: shard_field1_entries
+      type: shard_field1_entries
+      repeat: eos
+  shard_field1_0:
+    seq:
+    - id: len_shard_field1
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: shard_field1
+      type: shard_field1
+      size: len_shard_field1
+  shard_field1_entries:
+    seq:
+    - id: shard_field1_elt
+      size: 32
+  shard_with_proof:
+    seq:
+    - id: shard
+      type: shard
+    - id: proof
+      size: 48
   slot_header:
     seq:
     - id: slot_index
@@ -1877,6 +1931,7 @@ enums:
     20: preattestation
     21: attestation
     23: attestation_with_dal
+    24: dal_entrapment_evidence
     107: reveal
     108: transaction
     109: origination
