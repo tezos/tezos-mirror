@@ -297,6 +297,16 @@ type workflow = {
       See {{:https://docs.gitlab.com/ee/ci/yaml/#workflowauto_cancelon_new_commit} workflow:auto_cancel} for more info. *)
 }
 
+(** GitLab templates provided for vulnerability scanners.  For more
+    information, see
+    {{:https://docs.gitlab.com/ee/user/application_security/#vulnerability-scanner-maintenance}Vulnerability
+    scanners}. *)
+type template =
+  | Jobs_container_scanning
+      (** See {{:https://docs.gitlab.com/ee/user/application_security/container_scanning/index.html}Container Scanning} *)
+(* We only use the Container Scanning tool at the moment but more
+   scanners should be added in the future. *)
+
 type include_ = {local : string; rules : include_rule list}
 
 type config_element =
