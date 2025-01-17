@@ -100,6 +100,18 @@ module Stage = struct
   let index (Stage {name = _; index}) = index
 end
 
+let templates_to_config (templates : Gitlab_ci.Types.template list) =
+  match templates with
+  | [] -> [] (* empty includes are forbidden *)
+  | _ :: _ ->
+      [
+        Gitlab_ci.Types.Include
+          (List.map
+             (fun template ->
+               {Gitlab_ci.Types.subkey = Template template; rules = []})
+             templates);
+      ]
+
 type tezos_job = {
   job : Gitlab_ci.Types.generic_job;
   source_position : string * int * int * int;
@@ -407,6 +419,19 @@ module Pipeline = struct
     |> List.sort (fun (_n1, idx1) (_n2, idx2) -> Int.compare idx1 idx2)
     |> List.map fst
 
+  let templates pipeline =
+    let jobs = jobs pipeline in
+    let templates : (Gitlab_ci.Types.template, unit) Hashtbl.t =
+      Hashtbl.create 5
+    in
+    let replace_template job =
+      match job.template with
+      | Some template -> Hashtbl.replace templates template ()
+      | None -> ()
+    in
+    List.iter replace_template jobs ;
+    Hashtbl.to_seq_keys templates |> List.of_seq
+
   let write_registered_pipeline pipeline =
     let pipeline = add_image_builders pipeline in
     let jobs = jobs pipeline in
@@ -429,19 +454,20 @@ module Pipeline = struct
           filename)
       jobs ;
     let prepend_config =
-      (match pipeline with
-      | Pipeline _ -> []
-      | Child_pipeline _ ->
-          Gitlab_ci.Types.
-            [
-              Workflow
-                {
-                  rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
-                  name = None;
-                  auto_cancel = None;
-                };
-              Variables [("PIPELINE_TYPE", name)];
-            ])
+      templates_to_config (templates pipeline)
+      @ (match pipeline with
+        | Pipeline _ -> []
+        | Child_pipeline _ ->
+            Gitlab_ci.Types.
+              [
+                Workflow
+                  {
+                    rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
+                    name = None;
+                    auto_cancel = None;
+                  };
+                Variables [("PIPELINE_TYPE", name)];
+              ])
       @ [Stages (stages pipeline)]
     in
     let config =
