@@ -13,20 +13,24 @@ module type Riscv_proto_env_sig = sig
 
   type proof
 
-  type output
-
   type output_info = {
     outbox_level : Bounded.Non_negative_int32.t;
     message_index : Z.t;
   }
 
+  type output = {info : output_info; encoded_message : string}
+
   type output_proof
 
   type hash = Smart_rollup.State_hash.t
 
-  type input
+  type input = Inbox_message of int32 * int64 * string | Reveal of string
 
-  type input_request
+  type input_request =
+    | No_input_required
+    | Initial
+    | First_after of int32 * int64
+    | Needs_reveal of string
 
   val state_hash : state -> hash
 
@@ -67,20 +71,24 @@ module Riscv_proto_env : Riscv_proto_env_sig = struct
 
   type proof = unit
 
-  type output = unit
-
   type output_info = {
     outbox_level : Bounded.Non_negative_int32.t;
     message_index : Z.t;
   }
 
+  type output = {info : output_info; encoded_message : string}
+
   type output_proof = unit
 
   type hash = Smart_rollup.State_hash.t
 
-  type input = unit
+  type input = Inbox_message of int32 * int64 * string | Reveal of string
 
-  type input_request = unit
+  type input_request =
+    | No_input_required
+    | Initial
+    | First_after of int32 * int64
+    | Needs_reveal of string
 
   (* In order to synchronise with the node implementation of the PVM at genesis,
      * we set the state hash to be the initial state hash of the node

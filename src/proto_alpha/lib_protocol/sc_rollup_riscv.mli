@@ -13,20 +13,24 @@ module type Riscv_proto_env_sig = sig
 
   type proof
 
-  type output
-
   type output_info = {
     outbox_level : Bounded.Non_negative_int32.t;
     message_index : Z.t;
   }
 
+  type output = {info : output_info; encoded_message : string}
+
   type output_proof
 
   type hash = Smart_rollup.State_hash.t
 
-  type input
+  type input = Inbox_message of int32 * int64 * string | Reveal of string
 
-  type input_request
+  type input_request =
+    | No_input_required
+    | Initial
+    | First_after of int32 * int64
+    | Needs_reveal of string
 
   val state_hash : state -> hash
 
