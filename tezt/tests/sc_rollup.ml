@@ -150,7 +150,7 @@ let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
 
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
-    ?(src = Constant.bootstrap1.alias) ?rpc_external ?uses
+    ?(src = Constant.bootstrap1.alias) ?rpc_external ?uses ?dal_rewards_weight
     {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
@@ -166,6 +166,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     setup_l1
       ?commitment_period
       ?challenge_window
+      ?dal_rewards_weight
       ?timeout
       ?whitelist_enable
       ?rpc_external
@@ -3930,6 +3931,9 @@ let test_refutation_reward_and_punishment ~kind =
     ~kind
     ~timeout:timeout_period
     ~commitment_period
+    ~dal_rewards_weight:0
+      (* Set the DAL rewards to zero, to not interfere with this test. See details
+         here: https://gitlab.com/tezos/tezos/-/issues/7696#note_2307123115. *)
     ~regression:true
     ~hooks
     {
