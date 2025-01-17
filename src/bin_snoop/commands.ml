@@ -174,7 +174,7 @@ module Benchmark_cmd = struct
         dump_csv_arg_param
 
     (* String argument --bench-number
-       Parameter: Number of random stacks to generate. *)
+       Parameter: Number of random inputs to generate. *)
     let bench_number_arg =
       let bench_number_param =
         parse_parameter
@@ -182,7 +182,7 @@ module Benchmark_cmd = struct
           "Error while parsing --bench-num argument."
       in
       Tezos_clic.arg
-        ~doc:"Number of benchmarks (i.e. random stacks)"
+        ~doc:"Number of benchmarks (i.e. random inputs)"
         ~long:"bench-num"
         ~placeholder:"strictly positive int"
         bench_number_param
