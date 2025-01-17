@@ -354,3 +354,13 @@ let set_block ~time_processed ~transactions =
   Block.(Process_time_histogram.(observe process_time_histogram pt)) ;
   Counter.inc metrics.block.time_processed pt ;
   Counter.inc metrics.block.transactions (Int.to_float transactions)
+
+let listing () =
+  let open Lwt_syntax in
+  let+ data = CollectorRegistry.(collect registry) in
+  let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
+  let metrics =
+    String.split_on_char '\n' body
+    |> List.filter (String.starts_with ~prefix:"#")
+  in
+  String.concat "\n" metrics

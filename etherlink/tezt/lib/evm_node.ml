@@ -1696,3 +1696,8 @@ let supports_threshold_encryption evm_node =
     | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_node evm_node.persistent_state.mode
+
+let list_metrics ?hooks () =
+  let cmd = ["list"; "metrics"] in
+  let process = Process.spawn ?hooks (Uses.path Constant.octez_evm_node) cmd in
+  Process.check process

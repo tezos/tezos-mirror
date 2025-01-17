@@ -462,3 +462,6 @@ Miscellaneous commands:
   
   debug print store schemas
     Print SQL statements describing the tables created in the store
+  
+  list metrics
+    List the metrics exported by the EVM node.
