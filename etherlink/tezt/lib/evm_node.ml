@@ -113,7 +113,6 @@ module Parameters = struct
     endpoint : string;
     runner : Runner.t option;
     restricted_rpcs : string option;
-    websockets : bool;
   }
 
   type session_state = {mutable ready : bool}
@@ -738,8 +737,7 @@ let mode_with_new_private_rpc (mode : mode) =
   | _ -> mode
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs
-    ?(websockets = false) endpoint =
+    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -778,7 +776,6 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         endpoint;
         restricted_rpcs;
         runner;
-        websockets;
       }
   in
   on_event evm_node (handle_is_ready_event evm_node) ;
@@ -1288,7 +1285,7 @@ let patch_config_with_experimental_feature
        (fun max -> `Float (float_of_int max))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs ?websockets rollup_node =
+    ?restricted_rpcs rollup_node =
   let evm_node =
     create
       ?name
@@ -1298,7 +1295,6 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       ?rpc_addr
       ?rpc_port
       ?restricted_rpcs
-      ?websockets
       rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
@@ -1306,15 +1302,6 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     match patch_config with
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
-  in
-  let* () =
-    match websockets with
-    | Some _ ->
-        Config_file.update evm_node
-        @@ patch_config_with_experimental_feature
-             ?enable_websocket:websockets
-             ()
-    | _ -> unit
   in
   let* () = run evm_node in
   return evm_node

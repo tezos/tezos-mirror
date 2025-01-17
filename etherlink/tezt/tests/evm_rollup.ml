@@ -429,7 +429,11 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       unit
     else unit
   in
-  let patch_config = Evm_node.patch_config_with_experimental_feature () in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ?enable_websocket:websockets
+      ()
+  in
   let* produce_block, evm_node =
     match setup_mode with
     | Setup_proxy ->
@@ -439,7 +443,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             ~patch_config
             ~mode
             ?restricted_rpcs
-            ?websockets
             (Sc_rollup_node.endpoint sc_rollup_node)
         in
         return
@@ -458,6 +461,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         let patch_config =
           Evm_node.patch_config_with_experimental_feature
             ~block_storage_sqlite3
+            ?enable_websocket:websockets
             ()
         in
         let private_rpc_port = Some (Port.fresh ()) in
@@ -487,7 +491,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             ~patch_config
             ~mode:sequencer_mode
             ?restricted_rpcs
-            ?websockets
             (Sc_rollup_node.endpoint sc_rollup_node)
         in
         let produce_block () = Rpc.produce_block sequencer in
@@ -497,7 +500,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             Evm_node.create
               ~data_dir:(Evm_node.data_dir sequencer)
               ~mode:(Rpc Evm_node.(mode sequencer))
-              ?websockets
               (Evm_node.endpoint sequencer)
           in
           let* () = Evm_node.run evm_node in
