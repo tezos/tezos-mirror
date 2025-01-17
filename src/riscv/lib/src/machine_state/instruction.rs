@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -22,6 +22,7 @@ use super::{
 };
 use crate::{
     default::ConstDefault,
+    instruction_context::ICB,
     interpreter::{c, i},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
@@ -686,13 +687,10 @@ macro_rules! impl_r_type {
     ($impl: path, $fn: ident) => {
         // SAFETY: This function must only be called on an `Args` belonging
         // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            $impl(&mut core.hart.xregisters, self.rs1.x, self.rs2.x, self.rd.x);
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+            $impl(icb, self.rs1.x, self.rs2.x, self.rd.x);
 
-            Ok(Next(self.width))
+            icb.ok(Next(self.width))
         }
     };
 }
@@ -860,12 +858,9 @@ macro_rules! impl_cr_nz_type {
     ($impl: path, $fn: ident) => {
         // SAFETY: This function must only be called on an `Args` belonging
         // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<ML, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            $impl(&mut core.hart.xregisters, self.rd.nzx, self.rs2.nzx);
-            Ok(Next(self.width))
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+            $impl(icb, self.rd.nzx, self.rs2.nzx);
+            icb.ok(Next(self.width))
         }
     };
 }
