@@ -9,7 +9,8 @@
      `hash(pkh . share) < trap_rate * 2^hash_size`,
    where the dot denotes concatenation and |v| the length of the bitstring v. *)
 let share_is_trap =
-  let two_to_hash_size = Z.(shift_left one Tezos_crypto.Blake2B.size) in
+  let hash_size_bits = 8 * Tezos_crypto.Blake2B.size in
+  let two_to_hash_size = Z.(shift_left one hash_size_bits) in
   fun pkh share ~traps_fraction ->
     let open Error_monad.Result_syntax in
     let* pkh_bytes =
