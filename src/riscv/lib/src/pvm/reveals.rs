@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
 use crate::state_backend::{Atom, Cell, DynArray, DynCells, ManagerBase};
 
 /// Request content of reveal
