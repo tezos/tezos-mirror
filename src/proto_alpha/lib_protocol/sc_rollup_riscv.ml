@@ -172,17 +172,55 @@ type proof = Riscv_proto_env.proof
 
 let make_empty_state = Riscv_proto_env.empty_state
 
-(* TODO: Implement conversion functions after RV-319 will introduce the protocol environment
-   modules & types for RISCV *)
-let from_riscv_input_request : Riscv_proto_env.input_request -> PS.input_request
-    =
- fun _input_request -> assert false
+(** If [None] is returned, converting from raw data encoded strings / PVM raw data to Protocol types failed  *)
+let from_riscv_input_request (input_request : Riscv_proto_env.input_request) :
+    PS.input_request option =
+  let open Option_syntax in
+  match input_request with
+  | Riscv_proto_env.No_input_required -> return PS.No_input_required
+  | Riscv_proto_env.Initial -> return PS.Initial
+  | Riscv_proto_env.First_after (level, index) ->
+      let* raw_level = Option.of_result @@ Raw_level_repr.of_int32 level in
+      return @@ PS.First_after (raw_level, Z.of_int64 index)
+  | Riscv_proto_env.Needs_reveal raw_string ->
+      let* reveal_data =
+        Data_encoding.Binary.of_string_opt PS.reveal_encoding raw_string
+      in
+      return @@ PS.Needs_reveal reveal_data
 
-let to_riscv_input : PS.input -> Riscv_proto_env.input =
- fun _input -> assert false
+(** If [None] is returned, converting from raw data encoded strings / protocol raw data to Riscv types failed  *)
+let to_riscv_input (input : PS.input) : Riscv_proto_env.input option =
+  let open Option_syntax in
+  match input with
+  | PS.Inbox_message {inbox_level; message_counter; payload} ->
+      return
+      @@ Riscv_proto_env.Inbox_message
+           ( Raw_level_repr.to_int32 inbox_level,
+             Z.to_int64 message_counter,
+             Sc_rollup_inbox_message_repr.unsafe_to_string payload )
+  | PS.Reveal reveal_data ->
+      let* raw_reveal_data =
+        Data_encoding.Binary.to_string_opt PS.reveal_data_encoding reveal_data
+      in
+      return @@ Riscv_proto_env.Reveal raw_reveal_data
 
-let from_riscv_output : Riscv_proto_env.output -> PS.output =
- fun _output -> assert false
+(** If [None] is returned, converting from raw data encoded strings / PVM raw data to Protocol types failed  *)
+let from_riscv_output (output : Riscv_proto_env.output) : PS.output option =
+  let open Option_syntax in
+  let* message =
+    Data_encoding.Binary.of_string_opt
+      Sc_rollup_outbox_message_repr.encoding
+      output.encoded_message
+  in
+  let outbox_level =
+    Raw_level_repr.of_int32_non_negative output.info.outbox_level
+  in
+  return
+    PS.
+      {
+        output_info = {message_index = output.info.message_index; outbox_level};
+        message;
+      }
 
 module Protocol_implementation :
   Sc_rollup_PVM_sig.PROTO_VERIFICATION
@@ -223,12 +261,15 @@ module Protocol_implementation :
     Lwt.return @@ Riscv_proto_env.install_boot_sector state boot_sector
 
   let verify_proof ~is_reveal_enabled:_ input proof =
-    let open Lwt_result_syntax in
-    match
-      Riscv_proto_env.verify_proof (Option.map to_riscv_input input) proof
-    with
+    let input_request =
+      let open Option_syntax in
+      let* input = Option.map to_riscv_input input in
+      let* input_request = Riscv_proto_env.verify_proof input proof in
+      from_riscv_input_request input_request
+    in
+    match input_request with
     | None -> tzfail RISCV_proof_verification_failed
-    | Some input_request -> return @@ from_riscv_input_request input_request
+    | Some input_request -> return input_request
 
   let output_proof_encoding =
     let open Data_encoding in
@@ -252,9 +293,14 @@ module Protocol_implementation :
 
   let verify_output_proof output_proof =
     let open Lwt_result_syntax in
-    match Riscv_proto_env.verify_output_proof output_proof with
+    let output =
+      let open Option_syntax in
+      let* output = Riscv_proto_env.verify_output_proof output_proof in
+      from_riscv_output output
+    in
+    match output with
     | None -> tzfail RISCV_output_proof_verification_failed
-    | Some output -> return @@ from_riscv_output output
+    | Some output -> return output
 
   let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
       dissection =
