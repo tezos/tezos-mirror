@@ -347,6 +347,13 @@ module Traps = struct
 
   type t = payload Shard_index_map.t Slot_index_map.t Level_map.t
 
+  type v = {
+    delegate : Signature.Public_key_hash.t;
+    slot_index : Types.slot_index;
+    shard : Cryptobox.shard;
+    shard_proof : Cryptobox.shard_proof;
+  }
+
   let create ~capacity = Level_map.create capacity
 
   let add_slot_index t ~slot_index ~shard_index ~delegate ~share ~shard_proof =
@@ -379,14 +386,26 @@ module Traps = struct
     in
     Level_map.replace t slot_level new_slot_index_map
 
-  let find t ~slot_id =
-    let Types.Slot_id.{slot_level; slot_index} = slot_id in
-    match Level_map.find_opt t slot_level with
+  let find t ~level =
+    match Level_map.find_opt t level with
     | None -> []
-    | Some m -> (
-        match Slot_index_map.find_opt slot_index m with
-        | None -> []
-        | Some m -> Shard_index_map.bindings m)
+    | Some m ->
+        Slot_index_map.fold
+          (fun slot_index m acc ->
+            let res =
+              List.map
+                (fun (shard_index, (delegate, share, shard_proof)) ->
+                  {
+                    delegate;
+                    slot_index;
+                    shard = Cryptobox.{index = shard_index; share};
+                    shard_proof;
+                  })
+                (Shard_index_map.bindings m)
+            in
+            res @ acc)
+          m
+          []
 end
 
 module Statuses = struct

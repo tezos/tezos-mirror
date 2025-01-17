@@ -130,6 +130,19 @@ module Traps : sig
       in memory. *)
   type t
 
+  (** The type containing all elements required to
+      construct a trap accusation.
+    - [delegate]: the baker who attested,
+    - [slot_index]: the index of the slot containing the trap,
+    - [shard]: the DAL shard containing the trap share,
+    - [shard_proof]: proof provided for the shard. *)
+  type v = {
+    delegate : Signature.Public_key_hash.t;
+    slot_index : Types.slot_index;
+    shard : Cryptobox.shard;
+    shard_proof : Cryptobox.shard_proof;
+  }
+
   (** [add ~slot_id ~shard_index ~delegate ~share ~shard_proof] adds
       trap data to the cache. The cache maintains a maximum of
       [Constants.traps_cache_size] levels. Data is expected to be
@@ -146,14 +159,9 @@ module Traps : sig
     shard_proof:Cryptobox.shard_proof ->
     unit
 
-  (** [find ~slot_id] retrieves the trap data associated with the
-      given [slot_id]. *)
-  val find :
-    t ->
-    slot_id:Types.Slot_id.t ->
-    (Types.shard_index
-    * (Signature.Public_key_hash.t * Cryptobox.share * Cryptobox.shard_proof))
-    list
+  (** [find t ~level] retrieves all trap data associated with the given
+      level. Returns an empty list if no traps exist for that level. *)
+  val find : t -> level:Types.level -> v list
 end
 
 module Last_processed_level : Single_value_store.S with type value = int32
