@@ -150,6 +150,9 @@ let default_garbage_collector_parameters =
    JSONRPC protocol. *)
 let default_max_socket_message_length = 4096 * 1024
 
+let default_monitor_websocket_heartbeat =
+  Some {ping_interval = 5.; ping_timeout = 30.}
+
 let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
@@ -163,7 +166,7 @@ let default_experimental_features =
     rpc_server = Resto;
     enable_websocket = false;
     max_websocket_message_length = default_max_socket_message_length;
-    monitor_websocket_heartbeat = None;
+    monitor_websocket_heartbeat = default_monitor_websocket_heartbeat;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -753,6 +756,25 @@ let monitor_websocket_heartbeat_encoding =
           "ping_timeout"
           float)
 
+let opt_monitor_websocket_heartbeat_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"disabled"
+        ~description:"Disable websocket connection monitoring"
+        (constant "disabled")
+        (function None -> Some () | _ -> None)
+        (fun () -> None);
+      case
+        (Tag 1)
+        ~title:"enabled"
+        monitor_websocket_heartbeat_encoding
+        Fun.id
+        Option.some;
+    ]
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -905,12 +927,11 @@ let experimental_features_encoding =
                 for Resto backend)"
              int31
              default_max_socket_message_length)
-          (opt
+          (dft
              "monitor_websocket_heartbeat"
-             ~description:
-               "Parameters to monitor websocket connections (if null, \
-                connections are not monitored)"
-             monitor_websocket_heartbeat_encoding)))
+             ~description:"Parameters to monitor websocket connections"
+             opt_monitor_websocket_heartbeat_encoding
+             default_monitor_websocket_heartbeat)))
 
 let proxy_encoding =
   let open Data_encoding in
