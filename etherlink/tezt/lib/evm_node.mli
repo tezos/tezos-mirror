@@ -141,8 +141,7 @@ val supports_threshold_encryption : t -> bool
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
-    is chosen if [rpc_port] is not set. The EVM node starts a websocket server
-    for JSON-RPC communication if [websocket] is [true].
+    is chosen if [rpc_port] is not set.
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node_endpoint].
@@ -158,7 +157,6 @@ val create :
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
-  ?websockets:bool ->
   string ->
   t
 
@@ -329,7 +327,6 @@ val init :
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
-  ?websockets:bool ->
   string ->
   t Lwt.t
 

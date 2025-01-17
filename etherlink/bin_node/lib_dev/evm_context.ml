@@ -317,16 +317,17 @@ module State = struct
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context
 
+  let read_from_state evm_state path =
+    let open Lwt_result_syntax in
+    let*! res = Evm_state.inspect evm_state path in
+    return res
+
   let on_new_delayed_transaction ~native_execution ~delayed_transaction
       evm_state =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
     let* storage_version =
-      let read path =
-        let*! res = Evm_state.inspect evm_state path in
-        return res
-      in
-      Durable_storage.storage_version read
+      Durable_storage.storage_version (read_from_state evm_state)
     in
     if storage_version < 15 then
       Evm_state.execute
@@ -540,53 +541,45 @@ module State = struct
     (* Store the block itself. *)
     let* () = Evm_store.Blocks.store conn block in
     (* Store all transactions from the block. *)
-    let read path =
-      let*! res = Evm_state.inspect evm_state path in
-      return res
-    in
-    let* () =
-      match block.transactions with
-      | Ethereum_types.TxHash hashes ->
-          List.iter_es
-            (fun hash ->
-              let* receipt =
-                let* receipt_opt =
-                  Durable_storage.transaction_receipt read hash
-                in
-                match receipt_opt with
-                | Some receipt ->
-                    Lwt_watcher.notify receipt_watcher receipt ;
-                    return receipt
-                | None ->
-                    failwith
-                      "Receipt missing for %a"
-                      Ethereum_types.pp_hash
-                      hash
+    match block.transactions with
+    | Ethereum_types.TxHash hashes ->
+        List.map_es
+          (fun hash ->
+            let* receipt =
+              let* receipt_opt =
+                Durable_storage.transaction_receipt
+                  (read_from_state evm_state)
+                  ~block_hash:block.hash
+                  hash
               in
-              let* object_ =
-                let* object_opt =
-                  Durable_storage.transaction_object read hash
-                in
-                match object_opt with
-                | Some object_ -> return object_
-                | None ->
-                    failwith "Object missing for %a" Ethereum_types.pp_hash hash
+              match receipt_opt with
+              | Some receipt -> return receipt
+              | None ->
+                  failwith "Receipt missing for %a" Ethereum_types.pp_hash hash
+            in
+            let* object_ =
+              let* object_opt =
+                Durable_storage.transaction_object
+                  (read_from_state evm_state)
+                  hash
               in
-              let info =
-                Transaction_info.of_receipt_and_object receipt object_
-              in
-              Evm_store.Transactions.store conn info)
-            hashes
-      | TxFull _ ->
-          (* Block must be read without the transactions objects. Even though
-             we could be resilient and store the objects, it doesn't make sense
-             at the moment in the code to deal this case. The node does not need
-             to read the full block on block processing. If for some reasons
-             the code reads the full block, simply store the transactions objects
-             and fetch the receipts here. *)
-          assert false
-    in
-    return_unit
+              match object_opt with
+              | Some object_ -> return object_
+              | None ->
+                  failwith "Object missing for %a" Ethereum_types.pp_hash hash
+            in
+            let info = Transaction_info.of_receipt_and_object receipt object_ in
+            let* () = Evm_store.Transactions.store conn info in
+            return receipt)
+          hashes
+    | TxFull _ ->
+        (* Block must be read without the transactions objects. Even though
+           we could be resilient and store the objects, it doesn't make sense
+           at the moment in the code to deal this case. The node does not need
+           to read the full block on block processing. If for some reasons
+           the code reads the full block, simply store the transactions objects
+           and fetch the receipts here. *)
+        assert false
 
   (** [apply_blueprint_store_unsafe ctxt payload delayed_transactions] applies
       the blueprint [payload] on the head of [ctxt], and commit the resulting
@@ -691,13 +684,20 @@ module State = struct
             {number = block.number; timestamp; payload}
         in
 
-        let* evm_state =
+        let* evm_state, receipts =
           if ctxt.configuration.experimental_features.block_storage_sqlite3 then
-            let* () = store_block_unsafe conn evm_state block in
+            let* receipts = store_block_unsafe conn evm_state block in
             let*! evm_state = Evm_state.clear_block_storage block evm_state in
-            return evm_state
-          else return evm_state
+            return (evm_state, receipts)
+          else
+            let*! receipts =
+              Durable_storage.block_receipts_of_block
+                (read_from_state evm_state)
+                block
+            in
+            return (evm_state, receipts)
         in
+        List.iter (Lwt_watcher.notify receipt_watcher) receipts ;
 
         let upgrade_candidate = check_pending_upgrade ctxt timestamp in
         let* applied_kernel_upgrade =
@@ -1545,11 +1545,7 @@ module State = struct
          if we agree with it.
       *)
       let* sequencer =
-        let read path =
-          let*! res = Evm_state.inspect ctxt.session.evm_state path in
-          return res
-        in
-        Durable_storage.sequencer read
+        Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
       in
       let blueprint_parent_hash =
         Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload

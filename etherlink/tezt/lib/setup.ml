@@ -143,11 +143,14 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     else patch_config
   in
   let patch_config =
-    match rpc_server with
-    | None -> patch_config
-    | Some rpc_server ->
+    match (rpc_server, websockets) with
+    | None, None -> patch_config
+    | _, _ ->
         fun c ->
-          Evm_node.patch_config_with_experimental_feature ~rpc_server ()
+          Evm_node.patch_config_with_experimental_feature
+            ?rpc_server
+            ?enable_websocket:websockets
+            ()
           @@ patch_config c
   in
   let* observer_mode =
@@ -175,11 +178,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
            })
   in
   let* observer =
-    Evm_node.init
-      ~patch_config
-      ~mode:observer_mode
-      ?websockets
-      (Evm_node.endpoint evm_node)
+    Evm_node.init ~patch_config ~mode:observer_mode (Evm_node.endpoint evm_node)
   in
   return observer
 
@@ -284,6 +283,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?next_wasm_runtime
       ?block_storage_sqlite3
       ?rpc_server
+      ?enable_websocket:websockets
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
@@ -340,7 +340,6 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?rpc_port:sequencer_rpc_port
       ~patch_config
       ~mode:sequencer_mode
-      ?websockets
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* observer =

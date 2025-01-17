@@ -6,6 +6,9 @@
 
 ### Bug fixes
 
+- Notify logs with `eth_subscribe` independently of block storage
+  backend. (!16258)
+
 ### Internals
 
 ## Version 0.13 (2025-01-09)
