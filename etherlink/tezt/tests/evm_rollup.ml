@@ -82,7 +82,7 @@ let evm_node_version evm_node =
   Curl.get get_version_url
 
 let get_transaction_status ~endpoint ~tx =
-  let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx () in
   match receipt with
   | None ->
       failwith "no transaction receipt, probably it hasn't been mined yet."
@@ -139,7 +139,7 @@ let check_tx_gas_for_fee ~da_fee_per_byte ~expected_execution_gas ~gas_price
     ~error_msg:"total fee in receipt %L did not cover expected fees of %R"
 
 let check_status_n_logs ~endpoint ~status ~logs ~tx =
-  let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx () in
   match receipt with
   | None ->
       failwith "no transaction receipt, probably it hasn't been mined yet."
@@ -742,7 +742,7 @@ let deploy_with_base_checks {contract; expected_address; expected_code}
     ~error_msg:"Unexpected code %L, it should be %R" ;
   (* The transaction was a contract creation, the transaction object
      must not contain the [to] field. *)
-  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx in
+  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx () in
   (match tx_object with
   | Some tx_object ->
       Check.((tx_object.to_ = None) (option string))
@@ -784,7 +784,7 @@ let send ~sender ~receiver ~value ?data full_evm_setup =
 
 let check_block_progression ~produce_block ~endpoint ~expected_block_level =
   let*@ _level = produce_block () in
-  let* block_number = Eth_cli.block_number ~endpoint in
+  let* block_number = Eth_cli.block_number ~endpoint () in
   return
   @@ Check.((block_number = expected_block_level) int)
        ~error_msg:"Unexpected block number, should be %%R, but got %%L"
@@ -866,6 +866,7 @@ let test_rpc_getBalance =
     Eth_cli.balance
       ~account:Eth_account.bootstrap_accounts.(0).address
       ~endpoint:evm_node_endpoint
+      ()
   in
   Check.((balance = Helpers.default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
@@ -880,7 +881,7 @@ let test_rpc_getBlockByNumber =
     ~title:"RPC method eth_getBlockByNumber"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
-  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint () in
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   unit
@@ -907,7 +908,7 @@ let test_rpc_getBlockByHash =
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup ->
   let evm_node_endpoint = Evm_node.endpoint evm_setup.evm_node in
-  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint () in
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   let* block' = get_block_by_hash evm_setup block.hash in
@@ -977,7 +978,7 @@ let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
       evm_setup
   in
   let* block_by_number =
-    Eth_cli.get_block ~block_id:"1" ~endpoint:evm_node_endpoint
+    Eth_cli.get_block ~block_id:"1" ~endpoint:evm_node_endpoint ()
   in
   Check.((block_by_number.baseFeePerGas = 100L) int64)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
@@ -1003,7 +1004,7 @@ let test_l2_block_size_non_zero =
     ~title:"Block size is greater than zero"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
-  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint () in
   Check.((block.size > 0l) int32)
     ~error_msg:"Unexpected block size, should be > 0, but got %%L" ;
   unit
@@ -1143,11 +1144,11 @@ let test_consistent_block_hashes =
   let* {endpoint; produce_block; _} = setup_evm_kernel ~admin:None protocol in
   let new_block () =
     let*@ _level = produce_block () in
-    let* number = Eth_cli.block_number ~endpoint in
-    Eth_cli.get_block ~block_id:(string_of_int number) ~endpoint
+    let* number = Eth_cli.block_number ~endpoint () in
+    Eth_cli.get_block ~block_id:(string_of_int number) ~endpoint ()
   in
 
-  let* block0 = Eth_cli.get_block ~block_id:(string_of_int 0) ~endpoint in
+  let* block0 = Eth_cli.get_block ~block_id:(string_of_int 0) ~endpoint () in
   let* block1 = new_block () in
   let* block2 = new_block () in
   let* block3 = new_block () in
@@ -1435,7 +1436,7 @@ let test_deploy_contract_for_shanghai =
     evm_setup
 
 let check_log_indices ~endpoint ~status ~tx indices =
-  let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx () in
   match receipt with
   | None ->
       failwith "no transaction receipt, probably it hasn't been mined yet."
@@ -1538,6 +1539,7 @@ let ensure_block_integrity ~block_result evm_setup =
     Eth_cli.get_block
       ~block_id:(Int32.to_string block_result.Block.number)
       ~endpoint:evm_setup.endpoint
+      ()
   in
   (* only the relevant fields *)
   assert (block.number = block_result.number) ;
@@ -1563,7 +1565,7 @@ type transfer_result = {
 }
 
 let get_tx_object ~endpoint ~tx_hash =
-  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash in
+  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash () in
   match tx_object with
   | Some tx_object -> return tx_object
   | None -> Test.fail "The transaction object of %s should be available" tx_hash
@@ -1572,9 +1574,9 @@ let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
     full_evm_setup =
   let endpoint = Evm_node.endpoint full_evm_setup.evm_node in
   let balance account = Eth_cli.balance ~account ~endpoint in
-  let* sender_balance = balance sender.Eth_account.address in
+  let* sender_balance = balance sender.Eth_account.address () in
   assert (sender_balance = transfer_result.sender_balance_after) ;
-  let* receiver_balance = balance receiver.Eth_account.address in
+  let* receiver_balance = balance receiver.Eth_account.address () in
   assert (receiver_balance = transfer_result.receiver_balance_after) ;
   let*@ sender_nonce =
     Rpc.get_transaction_count full_evm_setup.evm_node ~address:sender.address
@@ -1596,15 +1598,15 @@ let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
 let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
   let endpoint = Evm_node.endpoint full_evm_setup.evm_node in
   let balance account = Eth_cli.balance ~account ~endpoint in
-  let* sender_balance_before = balance sender.Eth_account.address in
-  let* receiver_balance_before = balance receiver.Eth_account.address in
+  let* sender_balance_before = balance sender.Eth_account.address () in
+  let* receiver_balance_before = balance receiver.Eth_account.address () in
   let*@ sender_nonce_before =
     Rpc.get_transaction_count full_evm_setup.evm_node ~address:sender.address
   in
   let* tx_hash = send ~sender ~receiver ~value ?data full_evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx:tx_hash in
-  let* sender_balance_after = balance sender.address in
-  let* receiver_balance_after = balance receiver.address in
+  let* sender_balance_after = balance sender.address () in
+  let* receiver_balance_after = balance receiver.address () in
   let*@ sender_nonce_after =
     Rpc.get_transaction_count full_evm_setup.evm_node ~address:sender.address
   in
@@ -1650,7 +1652,7 @@ let transfer ?data ~da_fee_per_byte ~expected_execution_gas ~evm_setup () =
       evm_setup
   in
   let* receipt =
-    Eth_cli.get_receipt ~endpoint:evm_setup.endpoint ~tx:tx_object.hash
+    Eth_cli.get_receipt ~endpoint:evm_setup.endpoint ~tx:tx_object.hash ()
   in
   let gas_used, gas_price =
     match receipt with
@@ -2443,7 +2445,7 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
   unit
 
 let check_balance ~receiver ~endpoint expected_balance =
-  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
+  let* balance = Eth_cli.balance ~account:receiver ~endpoint () in
   let balance = Wei.truncate_to_mutez balance in
   Check.((balance = Tez.to_mutez expected_balance) int)
     ~error_msg:(sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
@@ -3534,11 +3536,11 @@ let test_block_storage_before_and_after_migration =
   let block_id = "1" in
   let scenario_prior ~evm_setup:{endpoint; produce_block; _} =
     let*@ _ = produce_block () in
-    let* (block : Block.t) = Eth_cli.get_block ~block_id ~endpoint in
+    let* (block : Block.t) = Eth_cli.get_block ~block_id ~endpoint () in
     return block
   in
   let scenario_after ~evm_setup:{endpoint; _} ~(sanity_check : Block.t) =
-    let* (block : Block.t) = Eth_cli.get_block ~block_id ~endpoint in
+    let* (block : Block.t) = Eth_cli.get_block ~block_id ~endpoint () in
     (* Compare fields stored before migration *)
     assert (block.number = sanity_check.number) ;
     assert (block.hash = sanity_check.hash) ;
@@ -3827,7 +3829,7 @@ let test_rpc_getUncleCountByBlock =
        eth_getUncleCountByBlockNumber"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
-  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint () in
   let* uncle_count =
     get_uncle_count_by_block_arg evm_node ~by:`Hash block.hash
   in
@@ -3872,7 +3874,7 @@ let test_rpc_getUncleByBlockArgAndIndex =
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let block_id = "0" in
-  let* block = Eth_cli.get_block ~block_id ~endpoint:evm_node_endpoint in
+  let* block = Eth_cli.get_block ~block_id ~endpoint:evm_node_endpoint () in
   let* uncle =
     get_uncle_by_block_arg_and_index ~by:`Hash evm_node block.hash block_id
   in
@@ -3979,7 +3981,7 @@ let test_rpc_sendRawTransaction_not_included =
   in
   let*@ _ = produce_block () in
   (* Check if txs is not included *)
-  let* receipt = Eth_cli.get_receipt ~endpoint ~tx:tx_hash in
+  let* receipt = Eth_cli.get_receipt ~endpoint ~tx:tx_hash () in
   Check.((Option.is_none receipt = true) bool)
     ~error_msg:"Receipt should not be present" ;
 
@@ -4435,7 +4437,7 @@ let test_l2_revert_returns_unused_gas =
       ~signature:"run()"
       ()
   in
-  let* balance_before = Eth_cli.balance ~account:sender.address ~endpoint in
+  let* balance_before = Eth_cli.balance ~account:sender.address ~endpoint () in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx:tx evm_node in
   let* transaction_receipt =
     wait_for_application
@@ -4446,7 +4448,7 @@ let test_l2_revert_returns_unused_gas =
   let* () = check_tx_failed ~endpoint ~tx:transaction_hash in
   Check.((gas_used < 100000L) int64)
     ~error_msg:"Expected gas usage less than %R logs, got %L" ;
-  let* balance_after = Eth_cli.balance ~account:sender.address ~endpoint in
+  let* balance_after = Eth_cli.balance ~account:sender.address ~endpoint () in
   let gas_fee_paid = Wei.(balance_before - balance_after) in
   let gas_price = transaction_receipt.effectiveGasPrice in
   let expected_gas_fee_paid = expected_gas_fees ~gas_price ~gas_used in
@@ -5245,7 +5247,10 @@ let test_check_estimateGas_enforces_limits =
   in
   (* Let's call it without a gas limit. *)
   let* call_input =
-    Eth_cli.encode_method ~abi_label:gas_left_contract.label ~method_:"check()"
+    Eth_cli.encode_method
+      ~abi_label:gas_left_contract.label
+      ~method_:"check()"
+      ()
   in
   let call_params =
     [
@@ -5528,6 +5533,7 @@ let test_revert_is_correctly_propagated =
     Eth_cli.encode_method
       ~abi_label:error_resolved.label
       ~method_:"testRevert(0)"
+      ()
   in
   let* call = Rpc.call ~to_:error_address ~data evm_node in
   match call with

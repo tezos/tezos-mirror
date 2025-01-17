@@ -268,7 +268,7 @@ let rps_perf ~configuration_path ~testnet =
 
   let account_address = Eth_account.bootstrap_accounts.(0).address in
 
-  let* block = Eth_cli.get_block ~block_id ~endpoint in
+  let* block = Eth_cli.get_block ~block_id ~endpoint () in
   let block_num = Int32.to_string block.number in
   let block_hash = block.hash in
 
