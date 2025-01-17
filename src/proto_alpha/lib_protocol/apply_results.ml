@@ -1242,6 +1242,29 @@ module Encoding = struct
             Double_baking_evidence_result {forbidden_delegate; balance_updates});
       }
 
+  let dal_entrapment_evidence_case =
+    Case
+      {
+        op_case = Operation.Encoding.dal_entrapment_evidence_case;
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
+        select =
+          (function
+          | Contents_result (Dal_entrapment_evidence_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Dal_entrapment_evidence _ as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj =
+          (fun (Dal_entrapment_evidence_result {balance_updates}) ->
+            balance_updates);
+        inj =
+          (fun balance_updates ->
+            Dal_entrapment_evidence_result {balance_updates});
+      }
+
   let activate_account_case =
     Case
       {
@@ -1672,7 +1695,7 @@ let contents_cases =
   let open Encoding in
   attestation_case :: attestation_with_dal_case :: preattestation_case
   :: double_attestation_evidence_case :: double_preattestation_evidence_case
-  :: common_cases
+  :: dal_entrapment_evidence_case :: common_cases
 
 let make_contents_result
     (Encoding.Case
