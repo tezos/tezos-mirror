@@ -5,6 +5,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* [get_attestation_map] retrieves DAL attestation operations from a
+   block and transforms them into a map where delegates are mapped to
+   their corresponding attestation operation and DAL attestation. *)
+let get_attestation_map (type block_info attestation_operation dal_attestation)
+    (module Plugin : Dal_plugin.T
+      with type block_info = block_info
+       and type attestation_operation = attestation_operation
+       and type dal_attestation = dal_attestation) block =
+  let attestations = Plugin.get_attestation_operations block in
+  List.fold_left
+    (fun map (delegate_opt, operation, dal_attestation) ->
+      match delegate_opt with
+      | None -> map
+      | Some delegate ->
+          Signature.Public_key_hash.Map.add
+            delegate
+            (operation, dal_attestation)
+            map)
+    Signature.Public_key_hash.Map.empty
+    attestations
+
 (* [inject_entrapment_evidences] processes and injects trap evidence
    retrieving traps from a specific published level, filtering them to
    identify injectable ones, and then injecting entrapment evidence
@@ -31,23 +52,7 @@ let inject_entrapment_evidences (type block_info)
       match traps with
       | [] -> return_unit
       | traps ->
-          let attestations = Plugin.get_attestation_operations block in
-          let attestation_map =
-            List.fold_left
-              (fun map (delegate_opt, operation, dal_attestation) ->
-                match delegate_opt with
-                | None -> map
-                | Some delegate ->
-                    let new_map =
-                      Signature.Public_key_hash.Map.add
-                        delegate
-                        (operation, dal_attestation)
-                        map
-                    in
-                    new_map)
-              Signature.Public_key_hash.Map.empty
-              attestations
-          in
+          let attestation_map = get_attestation_map (module Plugin) block in
           List.iter_es
             (fun trap ->
               let Store.Traps.{delegate; slot_index; shard; shard_proof} =
