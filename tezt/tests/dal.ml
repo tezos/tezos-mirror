@@ -873,19 +873,18 @@ let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
     in
     Operation.Consensus.get_block_payload_hash ~block client
   in
-  Operation.Consensus.inject
-    ?force
-    ?error
-    ?request
-    ~signer
-    (Operation.Consensus.attestation
-       ~level
-       ~round
-       ~dal_attestation
-       ~slot
-       ~block_payload_hash
-       ())
-    client
+  let attestation =
+    Operation.Consensus.attestation
+      ~level
+      ~round
+      ~dal_attestation
+      ~slot
+      ~block_payload_hash
+      ()
+  in
+  let* op = Operation.Consensus.operation ~signer attestation client in
+  let* op_hash = Operation.inject ?force ?error ?request op client in
+  return (op, op_hash)
 
 let inject_dal_attestations ?payload_level ?level ?round ?force
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
@@ -909,7 +908,7 @@ let inject_dal_attestations_and_bake node client ~number_of_slots indexes =
     baker_for_round_zero node ~level:(level + 1)
   in
   let signers = different_delegates baker in
-  let* _op_hashes =
+  let* _op_and_op_hash_list =
     inject_dal_attestations ~signers ~nb_slots:number_of_slots indexes client
   in
   bake_for ~delegates:(`For [baker]) client
@@ -1253,14 +1252,17 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
   let lag = parameters.attestation_lag in
   assert (lag > 1) ;
   let attest ?payload_level ?(signer = Constant.bootstrap2) ~level () =
-    inject_dal_attestation
-      ?payload_level
-      ~force:true
-      ~nb_slots
-      ~level
-      ~signer
-      (Slots [0])
-      client
+    let* _op, op_hash =
+      inject_dal_attestation
+        ?payload_level
+        ~force:true
+        ~nb_slots
+        ~level
+        ~signer
+        (Slots [0])
+        client
+    in
+    return op_hash
   in
   let mempool_is ~__LOC__ expected_mempool =
     let* mempool = Mempool.get_mempool client in
@@ -1439,7 +1441,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   Log.info "number_of_shards = %d" number_of_shards ;
   let* () = bake_for client in
   let* level = Client.level client in
-  let* (`OpHash _oph) =
+  let* _op, `OpHash _oph =
     inject_dal_attestation
       ~nb_slots
       ~level
@@ -1505,7 +1507,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
       let* () =
         check_in_TB_committee ~__LOC__ node new_account.public_key_hash ~level
       in
-      let* (`OpHash _oph) =
+      let* _op, `OpHash _oph =
         inject_dal_attestation
           ~error:Operation.dal_data_availibility_attester_not_in_committee
           ~nb_slots
