@@ -490,7 +490,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_lag ?slot_size ?number_of_slots ?page_size
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?incentives_enable
-    ?dal_rewards_weight ?event_sections_levels ?node_arguments
+    ?dal_rewards_weight ?traps_fraction ?event_sections_levels ?node_arguments
     ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
     ?(prover = true) ?smart_rollup_timeout_period_in_blocks ?l1_history_mode f
     ~protocol =
@@ -509,6 +509,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_int_parameter
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
+    @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
     @ make_int_parameter
         ["issuance_weights"; "dal_rewards_weight"]
         dal_rewards_weight
@@ -630,7 +631,7 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 let scenario_with_layer1_node ?regression ?(tags = [])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
     ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?incentives_enable ?dal_rewards_weight
+    ?(dal_enable = true) ?incentives_enable ?traps_fraction ?dal_rewards_weight
     ?event_sections_levels ?node_arguments ?activation_timestamp
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
     variant scenario =
@@ -656,6 +657,7 @@ let scenario_with_layer1_node ?regression ?(tags = [])
         ?number_of_shards
         ?number_of_slots
         ?incentives_enable
+        ?traps_fraction
         ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
@@ -670,8 +672,8 @@ let scenario_with_layer1_node ?regression ?(tags = [])
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
-    ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
+    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
     ?producer_profiles ?history_mode ?prover ?l1_history_mode variant scenario =
   let description = "Testing DAL node" in
@@ -703,6 +705,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?number_of_shards
         ?attestation_lag
         ?attestation_threshold
+        ?traps_fraction
         ?incentives_enable
         ?dal_rewards_weight
         ?commitment_period
