@@ -3261,6 +3261,23 @@ let _octez_sapling_ctypes_gen =
     ~deps:[ctypes_stubs; ctypes]
     ~modules:["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"]
 
+let octez_riscv_api =
+  public_lib
+    "octez-riscv-api"
+    ~path:"src/lib_riscv/api"
+    ~synopsis:"OCaml API of the RISC-V Rust components"
+    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
+    ~dep_globs_rec:["../../riscv/*"]
+    ~modules:["octez_riscv_api"]
+    ~dune:Dune.[[S "copy_files"; S "../../riscv/lib/octez_riscv_api.*"]]
+
+let octez_riscv_pvm =
+  public_lib
+    "octez-riscv-pvm"
+    ~path:"src/lib_riscv/pvm"
+    ~synopsis:"RISC-V PVM"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_riscv_api]
+
 let tezos_protocol_environment_sigs_internals =
   octez_proto_lib
     "protocol-environment.sigs-internals"
@@ -4665,23 +4682,6 @@ let _octez_embedded_protocol_packer =
       ]
     ~linkall:true
     ~modules:["Main_embedded_packer"]
-
-let octez_riscv_api =
-  public_lib
-    "octez-riscv-api"
-    ~path:"src/lib_riscv/api"
-    ~synopsis:"OCaml API of the RISC-V Rust components"
-    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
-    ~dep_globs_rec:["../../riscv/*"]
-    ~modules:["octez_riscv_api"]
-    ~dune:Dune.[[S "copy_files"; S "../../riscv/lib/octez_riscv_api.*"]]
-
-let octez_riscv_pvm =
-  public_lib
-    "octez-riscv-pvm"
-    ~path:"src/lib_riscv/pvm"
-    ~synopsis:"RISC-V PVM"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_riscv_api]
 
 let _octez_riscv_pvm_test =
   tezt
