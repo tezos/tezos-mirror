@@ -70,6 +70,12 @@ let inject_entrapment_evidences (type b)
                 | Some (attestation, Some dal_attestation) ->
                     if Plugin.is_attested dal_attestation slot_index then
                       let shard = Cryptobox.{index = shard_index; share} in
+                      let*! () =
+                        Event.(
+                          emit
+                            trap_injection
+                            (delegate, published_level, slot_index, shard_index))
+                      in
                       Plugin.inject_entrapment_evidence
                         rpc_ctxt
                         ~attested_level

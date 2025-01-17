@@ -748,6 +748,19 @@ let warn_attester_did_not_attest_slot =
     ("attested_level", Data_encoding.int32)
     ~pp1:Signature.Public_key_hash.pp_short
 
+let trap_injection =
+  declare_4
+    ~section
+    ~name:"trap_injection"
+    ~msg:
+      "Injecting entrapment evidence for delegate {delegate}, published level \
+       {published_level}, slot index {slot_index}, shard index {shard_index}"
+    ~level:Notice
+    ("delegate", Signature.Public_key_hash.encoding)
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("shard_index", Data_encoding.int31)
+
 let trap_check_failure =
   declare_3
     ~section
