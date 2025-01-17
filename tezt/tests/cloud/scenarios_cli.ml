@@ -317,6 +317,17 @@ let dal_incentives =
     (* Activate by default DAL incentives on Alpha. *)
     (protocol = Protocol.Alpha)
 
+let proxy_localhost =
+  Clap.flag
+    ~section
+    ~set_long:"proxy-localhost"
+    ~unset_long:"no-proxy-localhost"
+    ~description:
+      "All agents run on the proxy VM if the proxy mode is activated. This can \
+       be used to solve a bug with the Tezt Cloud library. This option will be \
+       removed once the bug is fixed"
+    false
+
 module Alerts = struct
   let section =
     Clap.section
