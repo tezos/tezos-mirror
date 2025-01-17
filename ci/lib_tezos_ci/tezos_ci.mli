@@ -353,6 +353,10 @@ val enc_git_strategy : git_strategy -> string
       with an internal image as input.  A run-time error will be thrown
       if this list includes an external image.
 
+    - If both a [template] and an [image] are provided, then a
+    run-time error is raised to prevent overriding the image defined
+    in the GitLab template.
+
     - If the [image] used is {!Internal} and [tag] is set to
     {!Dynamic} then a run-time error is generated as the required
     architecture for the internal image cannot be statically
@@ -379,6 +383,7 @@ val job :
   ?description:string ->
   __POS__:string * int * int * int ->
   ?image:Image.t ->
+  ?template:Gitlab_ci.Types.template ->
   stage:Stage.t ->
   name:string ->
   string list ->

@@ -105,6 +105,7 @@ type tezos_job = {
   source_position : string * int * int * int;
   description : string option;
   stage : Stage.t;
+  template : Gitlab_ci.Types.template option;
   image_builders : tezos_job list;
 }
 
@@ -852,8 +853,8 @@ let enc_git_strategy = function
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?(image_dependencies = [])
     ?services ?variables ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
-    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ?image ~stage
-    ~name script : tezos_job =
+    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ?image
+    ?template ~stage ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
     match (arch, tag) with
@@ -900,6 +901,13 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     | Some (External _) | None -> [])
     @ image_dependencies
   in
+  (match (template, image) with
+  | Some _, Some _ ->
+      failwith
+        "[job] cannot specify both [image] and [template] in job '%s' as it \
+         would override the image defined in the template."
+        name
+  | None, _ | _, None -> ()) ;
   let dependencies, image_builders =
     (Fun.flip List.iter image_dependencies @@ function
      | External (Image image_path) ->
@@ -986,7 +994,14 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       parallel;
     }
   in
-  {job = Job job; source_position = __POS__; description; stage; image_builders}
+  {
+    job = Job job;
+    source_position = __POS__;
+    description;
+    stage;
+    image_builders;
+    template;
+  }
 
 let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
     Pipeline.
@@ -1019,6 +1034,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
     source_position = __POS__;
     stage;
     image_builders = [];
+    template = None;
   }
 
 let map_non_trigger_job ?error_on_trigger (tezos_job : tezos_job)
