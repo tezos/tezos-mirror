@@ -1300,7 +1300,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         let dal =
           let ({
                  feature_enable;
-                 incentives_enable;
+                 incentives_enable = _;
                  number_of_slots;
                  attestation_lag;
                  attestation_threshold;
@@ -1311,13 +1311,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           in
           {
             Constants_parametric_repr.feature_enable;
-            incentives_enable;
+            incentives_enable = true;
             number_of_slots;
             attestation_lag;
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio = Q.(64 // 100);
-            rewards_ratio = Q.zero;
+            rewards_ratio = Q.(1 // 10);
             traps_fraction = Q.(5 // 10000);
           }
         in
@@ -1452,26 +1452,18 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               adaptive_rewards_params;
             }
         in
+        (* update the weights, but do not update [base_total_issued_per_minute] *)
         let issuance_weights =
-          let ({
-                 base_total_issued_per_minute;
-                 baking_reward_fixed_portion_weight;
-                 baking_reward_bonus_weight;
-                 attesting_reward_weight;
-                 seed_nonce_revelation_tip_weight;
-                 vdf_revelation_tip_weight;
-               }
-                : Previous.issuance_weights) =
-            c.issuance_weights
+          let Constants_repr.Generated.
+                {consensus_threshold_size = _; issuance_weights} =
+            Constants_repr.Generated.generate
+              ~consensus_committee_size:c.consensus_committee_size
+              ~dal_rewards_ratio:dal.rewards_ratio
           in
           {
-            Constants_parametric_repr.base_total_issued_per_minute;
-            baking_reward_fixed_portion_weight;
-            baking_reward_bonus_weight;
-            attesting_reward_weight;
-            seed_nonce_revelation_tip_weight;
-            vdf_revelation_tip_weight;
-            dal_rewards_weight = 0;
+            issuance_weights with
+            base_total_issued_per_minute =
+              c.issuance_weights.base_total_issued_per_minute;
           }
         in
         let constants =
