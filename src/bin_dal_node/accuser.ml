@@ -26,6 +26,31 @@ let get_attestation_map (type block_info attestation_operation dal_attestation)
     Signature.Public_key_hash.Map.empty
     attestations
 
+(* [filter_injectable_traps] filters a list of traps to identify which
+   ones are injectable by checking if each trap's delegate has both an
+   attestation and DAL attestation in [attestation_map]. *)
+let filter_injectable_traps attestation_map traps =
+  List.filter_map_s
+    (fun trap ->
+      let Store.Traps.{delegate; slot_index; shard; shard_proof} = trap in
+      let attestation_opt =
+        Signature.Public_key_hash.Map.find delegate attestation_map
+      in
+      match attestation_opt with
+      | None -> Lwt.return_none
+      | Some (_attestation, None) ->
+          (* The delegate did not DAL attest at all. *)
+          Lwt.return_none
+      | Some (attestation, Some dal_attestation) ->
+          Lwt.return_some
+            ( delegate,
+              slot_index,
+              attestation,
+              dal_attestation,
+              shard,
+              shard_proof ))
+    traps
+
 (* [inject_entrapment_evidences] processes and injects trap evidence
    retrieving traps from a specific published level, filtering them to
    identify injectable ones, and then injecting entrapment evidence
@@ -53,36 +78,32 @@ let inject_entrapment_evidences (type block_info)
       | [] -> return_unit
       | traps ->
           let attestation_map = get_attestation_map (module Plugin) block in
+          let*! traps_to_inject =
+            filter_injectable_traps attestation_map traps
+          in
           List.iter_es
-            (fun trap ->
-              let Store.Traps.{delegate; slot_index; shard; shard_proof} =
-                trap
-              in
-              let Cryptobox.{index = shard_index; share = _} = shard in
-              let attestation_opt =
-                Signature.Public_key_hash.Map.find delegate attestation_map
-              in
-              match attestation_opt with
-              | None ->
-                  (* It could happen if the delegate didn't attest at all. *)
-                  return_unit
-              | Some (_, None) ->
-                  (* No dal attestation found. *)
-                  return_unit
-              | Some (attestation, Some dal_attestation) ->
-                  if Plugin.is_attested dal_attestation slot_index then
-                    let*! () =
-                      Event.(
-                        emit
-                          trap_injection
-                          (delegate, published_level, slot_index, shard_index))
-                    in
-                    Plugin.inject_entrapment_evidence
-                      rpc_ctxt
-                      ~attested_level
-                      attestation
-                      ~slot_index
-                      ~shard
-                      ~proof:shard_proof
-                  else return_unit)
-            traps)
+            (fun ( delegate,
+                   slot_index,
+                   attestation,
+                   dal_attestation,
+                   shard,
+                   shard_proof ) ->
+              if Plugin.is_attested dal_attestation slot_index then
+                let*! () =
+                  Event.(
+                    emit
+                      trap_injection
+                      ( delegate,
+                        published_level,
+                        shard.Cryptobox.index,
+                        slot_index ))
+                in
+                Plugin.inject_entrapment_evidence
+                  rpc_ctxt
+                  ~attested_level
+                  attestation
+                  ~slot_index
+                  ~shard
+                  ~proof:shard_proof
+              else return_unit)
+            traps_to_inject)
