@@ -626,6 +626,19 @@ let openapi_command =
       let*! () = cctxt#message "%s" openapi_json_str in
       return_unit)
 
+let list_metrics_command =
+  let open Lwt_result_syntax in
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"List the metrics exported by the smart rollup node."
+    (args1 enable_performance_metrics_arg)
+    (prefixes ["list"; "metrics"] @@ stop)
+  @@ fun _enable_performance_metrics ctxt ->
+  let*! metrics = Metrics.listing () in
+  let*! () = ctxt#message "%s" metrics in
+  return_unit
+
 let sc_rollup_commands () =
   [
     config_init_command;
@@ -641,6 +654,7 @@ let sc_rollup_commands () =
     import_snapshot;
     snapshot_info;
     openapi_command;
+    list_metrics_command;
   ]
   @ Repair.commands
 
