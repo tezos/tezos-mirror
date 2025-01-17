@@ -344,7 +344,7 @@ let enc_includes : include_ list -> value =
       | _ :: _ -> `O [enc_subkey subkey; ("rules", enc_include_rules rules)]
     in
     match includes with
-    | [] -> failwith "empty includes"
+    | [] -> failwith "enc_includes: empty includes"
     | [{subkey; rules = []}] -> `O [enc_subkey subkey]
     | inc -> array enc_includes inc
 
