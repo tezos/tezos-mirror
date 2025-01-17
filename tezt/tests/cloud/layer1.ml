@@ -172,7 +172,7 @@ module Node = struct
 
   let client ~node agent =
     let name = Tezt_cloud.Agent.name agent ^ "-client" in
-    Client.Agent.create ~name ~node agent
+    Client.Agent.create ~name ~endpoint:(Client.Node node) agent
 
   let yes_wallet agent =
     let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
@@ -502,7 +502,9 @@ let number_of_bakers ~snapshot ~network agent =
   let* () = Node.snapshot_import ~no_check:true node snapshot in
   let* () = Node.run node (Node.isolated_args []) in
   let* () = Node.wait_for_ready node in
-  let* client = Client.Agent.create ~name:"tmp-client" ~node agent in
+  let* client =
+    Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent
+  in
   let* n =
     Client.(
       rpc GET ["chains"; "main"; "blocks"; "head"; "context"; "delegates"])
