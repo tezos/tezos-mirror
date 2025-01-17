@@ -1283,6 +1283,12 @@ let patch_config_with_experimental_feature
        max_websocket_message_length
        ~name:"max_websocket_message_length"
        (fun max -> `Float (float_of_int max))
+  (* Monitor websocket connections with frequent heartbeats and small timeout
+     for the tests. *)
+  |> conditional_json_put
+       enable_websocket
+       ~name:"monitor_websocket_heartbeat"
+       (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     ?restricted_rpcs rollup_node =

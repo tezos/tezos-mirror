@@ -36,3 +36,9 @@ val recv : t -> JSON.t Lwt.t
 
 (** Send and receive response on websocket. *)
 val send_recv : t -> JSON.t -> JSON.t Lwt.t
+
+(** Send SIGSTOP to websocket client process. *)
+val pause : t -> unit
+
+(** Send SIGCONT to websocket client process. *)
+val resume : t -> unit

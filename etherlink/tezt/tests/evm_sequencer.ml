@@ -9086,6 +9086,42 @@ let test_websocket_max_message_length () =
           unit
       | e -> Lwt.reraise e)
 
+let test_websocket_heartbeat_monitoring () =
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~rpc_server:Resto (* Monitoring is not implemented for Dream *)
+      ~enable_websocket:true
+      ()
+  in
+  register_sandbox
+    ~tags:["evm"; "rpc"; "websocket"; "monitoring"]
+    ~title:"Websocket server closes connection when client unresponsive"
+    ~patch_config
+  @@ fun sequencer ->
+  let ws_connection_established =
+    Evm_node.wait_for sequencer "websocket_starting.v0" @@ fun _json -> Some ()
+  in
+
+  let* websocket = Evm_node.open_websocket sequencer in
+  let shutdown =
+    Lwt.pick
+      [
+        ( Evm_node.wait_for sequencer "websocket_shutdown.v0" @@ fun json ->
+          Some JSON.(json |-> "reason" |> as_string) );
+        (let* () = Lwt_unix.sleep 5. in
+         Test.fail ~__LOC__ "Websocket worker did not close.");
+      ]
+  in
+  Log.info "Wait for websocket client to be connected" ;
+  let* () = ws_connection_established in
+  Log.info "Pausing websocket client" ;
+  Websocket.pause websocket ;
+  let* reason = shutdown in
+  Log.info "Websocket shutdown reason: %S." reason ;
+  Check.(reason =~ rex "Timeout")
+    ~error_msg:"Expected reason to match %R, got %L" ;
+  unit
+
 let test_websocket_newPendingTransactions_event =
   register_all
     ~tags:["evm"; "rpc"; "websocket"; "new_pending_transactions"]
@@ -9682,6 +9718,7 @@ let () =
   test_websocket_newHeads_event [Protocol.Alpha] ;
   test_websocket_cleanup [Protocol.Alpha] ;
   test_websocket_max_message_length () ;
+  test_websocket_heartbeat_monitoring () ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
