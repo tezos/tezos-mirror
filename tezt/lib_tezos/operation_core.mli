@@ -354,6 +354,14 @@ module Anonymous : sig
     operation * Tezos_crypto.Signature.t ->
     t
 
+  (** [dal_entrapment_evidence] crafts a DAL entrapment evidence operation. *)
+  val dal_entrapment_evidence :
+    attestation:operation * Tezos_crypto.Signature.t ->
+    slot_index:int ->
+    Tezos_crypto_dal.Cryptobox.shard ->
+    Tezos_crypto_dal.Cryptobox.shard_proof ->
+    t
+
   (** [kind_to_string kind] return the name of the [kind]. *)
   val kind_to_string : double_consensus_evidence_kind -> string
 

@@ -51,6 +51,8 @@ let make ~branch ?signer ~kind contents =
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
 
+let json_of_int n = Ezjsonm.int n
+
 let raw ?protocol t client =
   match t.raw with
   | None -> (
@@ -393,6 +395,12 @@ module Anonymous = struct
         op1 : t * Tezos_crypto.Signature.t;
         op2 : t * Tezos_crypto.Signature.t;
       }
+    | Dal_entrapment_evidence of {
+        attestation : t * Tezos_crypto.Signature.t;
+        slot_index : int;
+        shard : Tezos_crypto_dal.Cryptobox.shard;
+        proof : Tezos_crypto_dal.Cryptobox.shard_proof;
+      }
 
   let double_consensus_evidence ~kind (({kind = op1_kind; _}, _) as op1)
       (({kind = op2_kind; _}, _) as op2) =
@@ -414,6 +422,13 @@ module Anonymous = struct
   let double_preattestation_evidence =
     double_consensus_evidence ~kind:Double_preattestation_evidence
 
+  let dal_entrapment_evidence ~attestation ~slot_index shard proof =
+    let {kind = op_kind; _}, _ = attestation in
+    match op_kind with
+    | Consensus {kind = Attestation _; _} ->
+        Dal_entrapment_evidence {attestation; slot_index; shard; proof}
+    | _ -> Test.fail "Invalid arguments to create a dal_entrapment_evidence"
+
   let kind_to_string kind =
     sf
       "double_%s_evidence"
@@ -430,6 +445,14 @@ module Anonymous = struct
         ("signature", `String (Tezos_crypto.Signature.to_b58check signature));
       ]
 
+  let json_of_shard shard =
+    Data_encoding.Json.construct Tezos_crypto_dal.Cryptobox.shard_encoding shard
+
+  let json_of_shard_proof shard_proof =
+    Data_encoding.Json.construct
+      Tezos_crypto_dal.Cryptobox.shard_proof_encoding
+      shard_proof
+
   let json = function
     | Double_consensus_evidence {kind; op1; op2} ->
         let op1 = denunced_op_json op1 in
@@ -439,6 +462,20 @@ module Anonymous = struct
             ("kind", Ezjsonm.string (kind_to_string kind));
             ("op1", op1);
             ("op2", op2);
+          ]
+    | Dal_entrapment_evidence {attestation; slot_index; shard; proof} ->
+        let attestation = denunced_op_json attestation in
+        `O
+          [
+            ("kind", Ezjsonm.string "dal_entrapment_evidence");
+            ("attestation", attestation);
+            ("slot_index", json_of_int slot_index);
+            ( "shard_with_proof",
+              `O
+                [
+                  ("shard", json_of_shard shard);
+                  ("proof", json_of_shard_proof proof);
+                ] );
           ]
 
   let operation ?branch anonymous_operation client =
@@ -550,8 +587,6 @@ module Manager = struct
   let json_of_tez n = string_of_int n |> Ezjsonm.string
 
   let json_of_int_as_string n = string_of_int n |> Ezjsonm.string
-
-  let json_of_int n = float_of_int n |> Ezjsonm.float
 
   let json_of_commitment commitment =
     Data_encoding.Json.construct
