@@ -29,12 +29,19 @@ open Alpha_context
 (** {2 Consensus key type and functions} *)
 
 module Consensus_key : sig
-  type t = {
+  type t = private {
     alias : string option;
     public_key : Signature.public_key;
     public_key_hash : Signature.public_key_hash;
     secret_key_uri : Client_keys.sk_uri;
   }
+
+  val make :
+    alias:string option ->
+    public_key:Signature.public_key ->
+    public_key_hash:Signature.public_key_hash ->
+    secret_key_uri:Client_keys.sk_uri ->
+    t
 
   val encoding : t Data_encoding.t
 

@@ -39,6 +39,9 @@ module Consensus_key = struct
     secret_key_uri : Client_keys.sk_uri;
   }
 
+  let make ~alias ~public_key ~public_key_hash ~secret_key_uri =
+    {alias; public_key; public_key_hash; secret_key_uri}
+
   let encoding =
     let open Data_encoding in
     conv

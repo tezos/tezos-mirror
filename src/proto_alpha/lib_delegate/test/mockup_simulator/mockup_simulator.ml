@@ -1289,12 +1289,11 @@ let make_baking_delegate
     ( (account : Alpha_context.Parameters.bootstrap_account),
       (secret : Tezos_mockup_commands.Mockup_wallet.bootstrap_secret) ) :
     Baking_state.Consensus_key.t =
-  {
-    alias = Some secret.name;
-    public_key = account.public_key |> WithExceptions.Option.get ~loc:__LOC__;
-    public_key_hash = account.public_key_hash;
-    secret_key_uri = secret.sk_uri;
-  }
+  Baking_state.Consensus_key.make
+    ~alias:(Some secret.name)
+    ~public_key_hash:account.public_key_hash
+    ~public_key:(account.public_key |> WithExceptions.Option.get ~loc:__LOC__)
+    ~secret_key_uri:secret.sk_uri
 
 let run ?(config = default_config) bakers_spec =
   let open Lwt_result_syntax in
