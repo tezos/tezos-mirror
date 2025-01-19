@@ -48,23 +48,22 @@ module Consensus_key : sig
   val pp : Format.formatter -> t -> unit
 end
 
-type consensus_key_and_delegate = {
-  consensus_key : Consensus_key.t;
-  delegate : Signature.Public_key_hash.t;
-}
-
-val consensus_key_and_delegate_encoding :
-  consensus_key_and_delegate Data_encoding.t
-
-val pp_consensus_key_and_delegate :
-  Format.formatter -> consensus_key_and_delegate -> unit
+type delegate_id = Signature.Public_key_hash.t
 
 (** {2 Delegates slots type and functions} *)
+
+module Delegate : sig
+  type t = {consensus_key : Consensus_key.t; delegate_id : delegate_id}
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
 
 (** A delegate slot consists of the delegate's consensus key, its public key
     hash, its first slot, and its attesting power at some level. *)
 type delegate_slot = {
-  consensus_key_and_delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   first_slot : Slot.t;
   attesting_power : int;
 }
@@ -126,7 +125,7 @@ val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
 type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;
-  delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   dal_content : dal_content option;
 }
 
@@ -160,7 +159,7 @@ val make_unsigned_consensus_vote_batch :
   consensus_vote_kind ->
   batch_content ->
   batch_branch:Block_hash.t ->
-  (consensus_key_and_delegate * Slot.t) list ->
+  (Delegate.t * Slot.t) list ->
   unsigned_consensus_vote_batch
 
 (** [dal_content_map_p f unsigned_consensus_vote_batch] map each
@@ -370,8 +369,7 @@ type block_kind =
 type block_to_bake = {
   predecessor : block_info;
   round : Round.t;
-  delegate : consensus_key_and_delegate;
-      (** Delegate that have the right to bake the block. *)
+  delegate : Delegate.t;  (** Delegate that have the right to bake the block. *)
   kind : block_kind;  (** Either a reproposal or a fresh proposal *)
   force_apply : bool;
       (** if true, while baking the block, try and apply the block and its
@@ -405,7 +403,7 @@ val manager_operations_infos_encoding : manager_operations_infos Data_encoding.t
 type prepared_block = {
   signed_block_header : block_header;
   round : Round.t;
-  delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   operations : Tezos_base.Operation.t list list;
   manager_operations_infos : manager_operations_infos option;
   baking_votes : Per_block_votes_repr.per_block_votes;
@@ -445,7 +443,7 @@ val pp_validation_mode : Format.formatter -> validation_mode -> unit
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
   round_timestamps :
-    (Timestamp.time * Round.t * consensus_key_and_delegate)
+    (Timestamp.time * Round.t * Delegate.t)
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 

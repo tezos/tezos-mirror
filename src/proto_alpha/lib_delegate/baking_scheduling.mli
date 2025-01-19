@@ -94,9 +94,7 @@ val sleep_until : Time.Protocol.t -> unit Lwt.t option
     own delegates; also returns the corresponding delegate. Or returns [None] if
     no such round exists. *)
 val first_potential_round_at_next_level :
-  state ->
-  earliest_round:Round.t ->
-  (Round.t * consensus_key_and_delegate) option
+  state -> earliest_round:Round.t -> (Round.t * Baking_state.Delegate.t) option
 
 (** [compute_next_potential_baking_time state] From the current [state], the
     function returns an optional association pair, which consists of the next

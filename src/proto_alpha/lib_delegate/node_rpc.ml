@@ -387,8 +387,8 @@ let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
     ~attestation_level delegate_slots =
   let attested_level = Int32.succ attestation_level in
   List.map
-    (fun delegate_slot ->
-      let pkh = delegate_slot.consensus_key_and_delegate.delegate in
+    (fun (delegate_slot : delegate_slot) ->
+      let pkh = delegate_slot.delegate.delegate_id in
       (pkh, get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level))
     delegate_slots
 

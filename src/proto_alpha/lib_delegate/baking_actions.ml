@@ -521,7 +521,7 @@ let may_get_dal_content state consensus_vote =
   let promise_opt =
     List.assoc_opt
       ~equal:Signature.Public_key_hash.equal
-      delegate.delegate
+      delegate.delegate_id
       state.level_state.dal_attestable_slots
   in
   match promise_opt with
@@ -541,7 +541,7 @@ let may_get_dal_content state consensus_vote =
              Lwt.return (`RPC_result tz_res));
           ]
       in
-      process_dal_rpc_result state delegate.delegate level round res
+      process_dal_rpc_result state delegate.delegate_id level round res
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -944,7 +944,7 @@ let notice_delegates_without_slots all_delegates delegate_slots level =
       (fun {Baking_state.Consensus_key.public_key_hash; _} ->
         not
         @@ List.exists
-             (fun {consensus_key_and_delegate = {consensus_key; _}; _} ->
+             (fun ({delegate = {consensus_key; _}; _} : delegate_slot) ->
                public_key_hash = consensus_key.public_key_hash)
              (Baking_state.Delegate_slots.own_delegates delegate_slots))
       all_delegates

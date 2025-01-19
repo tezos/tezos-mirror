@@ -16,7 +16,7 @@ end
 
 module Delegate_signing_queue = struct
   type t = {
-    delegate : consensus_key_and_delegate;
+    delegate : Baking_state.Delegate.t;
     task_stream : (unit -> unit Lwt.t) Lwt_stream.t;
     push : (unit -> unit Lwt.t) option -> unit;
     worker : unit Lwt.t;
@@ -102,7 +102,7 @@ let get_or_create_queue worker delegate =
   match
     Signature.Public_key_hash.Table.find_opt
       worker.delegate_signing_queues
-      delegate.consensus_key.public_key_hash
+      delegate.Baking_state.Delegate.consensus_key.public_key_hash
   with
   | None ->
       let queue = Delegate_signing_queue.create delegate in
