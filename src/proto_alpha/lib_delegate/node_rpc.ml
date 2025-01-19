@@ -403,7 +403,7 @@ let get_dal_profiles dal_node_rpc_ctxt =
 let register_dal_profiles dal_node_rpc_ctxt delegates =
   let profiles =
     Tezos_dal_node_services.Operator_profile.make
-      ~attesters:(List.map (fun k -> k.public_key_hash) delegates)
+      ~attesters:(List.map (fun k -> k.Consensus_key.public_key_hash) delegates)
       ()
   in
   Tezos_rpc.Context.make_call

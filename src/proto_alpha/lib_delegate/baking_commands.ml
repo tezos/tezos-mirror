@@ -306,7 +306,7 @@ let get_delegates (cctxt : Protocol_client_context.full)
   let open Lwt_result_syntax in
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
     {
-      Baking_state.alias = Some alias;
+      Baking_state.Consensus_key.alias = Some alias;
       public_key_hash;
       public_key;
       secret_key_uri;
@@ -329,7 +329,8 @@ let get_delegates (cctxt : Protocol_client_context.full)
       cctxt
       (List.filter_map
          (function
-           | {Baking_state.alias = Some alias; _} -> Some alias | _ -> None)
+           | {Baking_state.Consensus_key.alias = Some alias; _} -> Some alias
+           | _ -> None)
          delegates)
   in
   let delegates_no_duplicates = List.sort_uniq compare delegates in

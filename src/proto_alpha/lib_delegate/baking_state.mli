@@ -28,19 +28,21 @@ open Alpha_context
 
 (** {2 Consensus key type and functions} *)
 
-type consensus_key = {
-  alias : string option;
-  public_key : Signature.public_key;
-  public_key_hash : Signature.public_key_hash;
-  secret_key_uri : Client_keys.sk_uri;
-}
+module Consensus_key : sig
+  type t = {
+    alias : string option;
+    public_key : Signature.public_key;
+    public_key_hash : Signature.public_key_hash;
+    secret_key_uri : Client_keys.sk_uri;
+  }
 
-val consensus_key_encoding : consensus_key Data_encoding.t
+  val encoding : t Data_encoding.t
 
-val pp_consensus_key : Format.formatter -> consensus_key -> unit
+  val pp : Format.formatter -> t -> unit
+end
 
 type consensus_key_and_delegate = {
-  consensus_key : consensus_key;
+  consensus_key : Consensus_key.t;
   delegate : Signature.Public_key_hash.t;
 }
 
@@ -92,7 +94,7 @@ val compute_delegate_slots :
   ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
-  consensus_key list ->
+  Consensus_key.t list ->
   delegate_slots tzresult Lwt.t
 
 (** {2 Consensus operations types functions} *)
@@ -453,7 +455,7 @@ type global_state = {
   operation_worker : Operation_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
-  delegates : consensus_key list;
+  delegates : Consensus_key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }

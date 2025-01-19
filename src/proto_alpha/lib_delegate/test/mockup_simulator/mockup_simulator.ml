@@ -149,7 +149,7 @@ module type Hooks = sig
 
   val on_start_baker :
     baker_position:int ->
-    delegates:Baking_state.consensus_key list ->
+    delegates:Baking_state.Consensus_key.t list ->
     cctxt:Protocol_client_context.full ->
     unit Lwt.t
 
@@ -935,7 +935,7 @@ class tezt_printer : Tezos_client_base.Client_context.printer =
   end
 
 (** Start baker process. *)
-let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
+let baker_process ~(delegates : Baking_state.Consensus_key.t list) ~base_dir
     ~(genesis_block : Block_header.t * Tezos_protocol_environment.rpc_context)
     ~i ~global_chain_table ~broadcast_pipes ~(user_hooks : (module Hooks)) =
   let open Lwt_result_syntax in
@@ -966,7 +966,7 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
   let* () =
     List.iter_es
       (fun ({alias; public_key; public_key_hash; secret_key_uri} :
-             Baking_state.consensus_key) ->
+             Baking_state.Consensus_key.t) ->
         let open Tezos_client_base in
         let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
         let* public_key_uri = Client_keys.neuterize secret_key_uri in
@@ -1288,14 +1288,13 @@ let default_config =
 let make_baking_delegate
     ( (account : Alpha_context.Parameters.bootstrap_account),
       (secret : Tezos_mockup_commands.Mockup_wallet.bootstrap_secret) ) :
-    Baking_state.consensus_key =
-  Baking_state.
-    {
-      alias = Some secret.name;
-      public_key = account.public_key |> WithExceptions.Option.get ~loc:__LOC__;
-      public_key_hash = account.public_key_hash;
-      secret_key_uri = secret.sk_uri;
-    }
+    Baking_state.Consensus_key.t =
+  {
+    alias = Some secret.name;
+    public_key = account.public_key |> WithExceptions.Option.get ~loc:__LOC__;
+    public_key_hash = account.public_key_hash;
+    secret_key_uri = secret.sk_uri;
+  }
 
 let run ?(config = default_config) bakers_spec =
   let open Lwt_result_syntax in

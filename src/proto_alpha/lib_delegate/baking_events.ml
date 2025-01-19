@@ -594,9 +594,9 @@ module Delegates = struct
       ~msg:"Baker will run with the following delegates:\n  {delegates}"
       ~pp1:
         (Format.pp_print_list
-           (fun fmt (delegate : Baking_state.consensus_key) ->
-             Format.fprintf fmt "%a" Baking_state.pp_consensus_key delegate))
-      ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
+           (fun fmt (delegate : Baking_state.Consensus_key.t) ->
+             Format.fprintf fmt "%a" Baking_state.Consensus_key.pp delegate))
+      ("delegates", Data_encoding.list Baking_state.Consensus_key.encoding)
 end
 
 module Scheduling = struct
@@ -1120,8 +1120,8 @@ module Actions = struct
       ~msg:
         "The following delegates have no attesting rights at level {level}: \
          {delegates}"
-      ~pp1:(Format.pp_print_list Baking_state.pp_consensus_key)
-      ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
+      ~pp1:(Format.pp_print_list Baking_state.Consensus_key.pp)
+      ("delegates", Data_encoding.list Baking_state.Consensus_key.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 
