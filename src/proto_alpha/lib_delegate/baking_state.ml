@@ -73,15 +73,21 @@ let pp_consensus_key fmt {alias; public_key_hash; _} =
         Signature.Public_key_hash.pp
         public_key_hash
 
-type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
+type consensus_key_and_delegate = {
+  consensus_key : consensus_key;
+  delegate : Signature.Public_key_hash.t;
+}
 
 let consensus_key_and_delegate_encoding =
   let open Data_encoding in
-  merge_objs
-    consensus_key_encoding
-    (obj1 (req "delegate" Signature.Public_key_hash.encoding))
+  conv
+    (fun {consensus_key; delegate} -> (consensus_key, delegate))
+    (fun (consensus_key, delegate) -> {consensus_key; delegate})
+    (merge_objs
+       consensus_key_encoding
+       (obj1 (req "delegate" Signature.Public_key_hash.encoding)))
 
-let pp_consensus_key_and_delegate fmt (consensus_key, delegate) =
+let pp_consensus_key_and_delegate fmt {consensus_key; delegate} =
   if Signature.Public_key_hash.equal consensus_key.public_key_hash delegate then
     pp_consensus_key fmt consensus_key
   else
@@ -1037,7 +1043,7 @@ let delegate_slots attesting_rights delegates =
           | Some consensus_key ->
               let attesting_slot =
                 {
-                  consensus_key_and_delegate = (consensus_key, delegate);
+                  consensus_key_and_delegate = {consensus_key; delegate};
                   first_slot;
                   attesting_power;
                 }

@@ -39,7 +39,10 @@ val consensus_key_encoding : consensus_key Data_encoding.t
 
 val pp_consensus_key : Format.formatter -> consensus_key -> unit
 
-type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
+type consensus_key_and_delegate = {
+  consensus_key : consensus_key;
+  delegate : Signature.Public_key_hash.t;
+}
 
 val consensus_key_and_delegate_encoding :
   consensus_key_and_delegate Data_encoding.t
