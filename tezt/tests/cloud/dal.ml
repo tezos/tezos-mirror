@@ -532,6 +532,19 @@ type t = {
   otel : string option;
 }
 
+let pp_slot_metrics fmt xs =
+  let open Format in
+  fprintf
+    fmt
+    "[ %a ]"
+    (pp_print_list
+       (fun fmt (x, y) -> fprintf fmt "(%d -> %d)" x y)
+       ~pp_sep:(fun fmt () -> fprintf fmt "; "))
+    (List.of_seq xs
+    |> List.filter (fun (_, n) -> n > 0)
+    (* Sorting the list per slot index increasing order. *)
+    |> List.sort (fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2))
+
 let pp_metrics t
     {
       level_first_commitment_published;
@@ -584,12 +597,16 @@ let pp_metrics t
   Log.info
     "Sum of balances of the Etherlink operator: %s tez"
     (Tez.to_string etherlink_operator_balance_sum) ;
-  Hashtbl.iter
-    (Log.info "Slot index %d: total published commitments = %d")
-    total_published_commitments_per_slot ;
-  Hashtbl.iter
-    (Log.info "Slot index %d: total attested commitments = %d")
-    total_attested_commitments_per_slot
+  Log.info
+    "DAL slots: total published commitments per slot (<slot index> -> \
+     <published commit.>).@.%a"
+    pp_slot_metrics
+    (Hashtbl.to_seq total_published_commitments_per_slot) ;
+  Log.info
+    "DAL slots: total attested commitments per slot (<slot index> -> <attested \
+     commit.>).@.%a"
+    pp_slot_metrics
+    (Hashtbl.to_seq total_attested_commitments_per_slot)
 
 let push_metrics t
     {
