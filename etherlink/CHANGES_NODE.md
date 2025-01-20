@@ -4,6 +4,11 @@
 
 ### Features
 
+- Periodically (every minute) reports the remaining number of bytes to download
+  for snapshots. (!16198)
+- Periodically (every minute) reports progress on the snapshot archive decompression
+  and extraction. (!16288)
+
 ### Bug fixes
 
 - Notify logs with `eth_subscribe` independently of block storage

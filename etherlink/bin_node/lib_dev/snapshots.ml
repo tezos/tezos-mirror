@@ -299,7 +299,21 @@ let import ~cancellable ~force ~data_dir ~snapshot_file =
     if Snapshot_utils.is_compressed_snapshot snapshot_file then gzip_reader
     else stdlib_reader
   in
-  let* () =
+
+  let display_progress = not cancellable in
+
+  let start_time = Ptime_clock.now () in
+  let rec periodic_emit () =
+    let*! () = Lwt_unix.sleep 60.0 in
+    let elapsed_time = Ptime.diff (Ptime_clock.now ()) start_time in
+    let*! () =
+      Events.extract_snapshot_archive_in_progress
+        ~archive_name:snapshot_file
+        ~elapsed_time
+    in
+    periodic_emit ()
+  in
+  let extract_snapshot_archive =
     Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
     @@ fun dest ->
     let* _snapshot_header, () =
@@ -308,7 +322,7 @@ let import ~cancellable ~force ~data_dir ~snapshot_file =
         stdlib_writer
         (check_header ~populated ~data_dir)
         ~cancellable
-        ~display_progress:(not cancellable)
+        ~display_progress
           (* [progress] modifies the signal handlers, which are necessary for
              [Lwt_exit] to work. As a consequence, if we want to be
              cancellable, we cannot have display bar. *)
@@ -328,7 +342,8 @@ let import ~cancellable ~force ~data_dir ~snapshot_file =
       (data_dir // Evm_store.sqlite_file_name) ;
     return_unit
   in
-  return_unit
+  if display_progress then extract_snapshot_archive
+  else Lwt.pick [extract_snapshot_archive; periodic_emit ()]
 
 let info ~snapshot_file =
   let compressed = is_compressed_snapshot snapshot_file in
