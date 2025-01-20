@@ -970,10 +970,11 @@ let baker_process ~(delegates : Baking_state.Consensus_key.t list) ~base_dir
         let open Tezos_client_base in
         let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
         let* public_key_uri = Client_keys.neuterize secret_key_uri in
+        let pkh = Baking_state.Consensus_key_id.to_pkh id in
         Client_keys.register_key
           wallet
           ~force:false
-          (id, public_key_uri, secret_key_uri)
+          (pkh, public_key_uri, secret_key_uri)
           ~public_key
           name)
       delegates

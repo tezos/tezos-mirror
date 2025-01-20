@@ -28,7 +28,22 @@ open Alpha_context
 
 (** {2 Consensus key type and functions} *)
 module Consensus_key_id : sig
-  type t = Signature.Public_key_hash.t
+  type t
+
+  (** Only use at library frontiers *)
+  val to_pkh : t -> Signature.public_key_hash
+
+  val compare : t -> t -> int
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  module Table : sig
+    include Hashtbl.SeededS with type key = t
+
+    val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
 end
 
 module Consensus_key : sig

@@ -99,9 +99,9 @@ let () =
     (fun highwatermark -> Block_previously_attested highwatermark)
 
 module DelegateMap = Map.Make (struct
-  type t = Signature.Public_key_hash.t
+  type t = Baking_state.Consensus_key_id.t
 
-  let compare = Signature.Public_key_hash.compare
+  let compare = Baking_state.Consensus_key_id.compare
 end)
 
 let highwatermark_delegate_map_encoding =
@@ -112,7 +112,7 @@ let highwatermark_delegate_map_encoding =
       fun l -> List.fold_left (fun map (k, v) -> add k v map) empty l)
     (list
        (obj2
-          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "delegate" Baking_state.Consensus_key_id.encoding)
           (req "highwatermark" highwatermark_encoding)))
 
 type highwatermarks = {

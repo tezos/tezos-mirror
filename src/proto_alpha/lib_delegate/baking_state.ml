@@ -31,6 +31,16 @@ module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
 module Consensus_key_id = struct
   type t = Signature.Public_key_hash.t
+
+  let to_pkh pkh = pkh
+
+  let compare = Signature.Public_key_hash.compare
+
+  let encoding = Signature.Public_key_hash.encoding
+
+  let pp = Signature.Public_key_hash.pp
+
+  module Table = Signature.Public_key_hash.Table
 end
 
 module Consensus_key = struct
