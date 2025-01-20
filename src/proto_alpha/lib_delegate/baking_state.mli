@@ -48,12 +48,25 @@ module Consensus_key : sig
   val pp : Format.formatter -> t -> unit
 end
 
-type delegate_id = Signature.Public_key_hash.t
-
 (** {2 Delegates slots type and functions} *)
+module Delegate_id : sig
+  type t
+
+  (** Only use at library frontiers *)
+  val of_pkh : Signature.public_key_hash -> t
+
+  (** Only use at library frontiers *)
+  val to_pkh : t -> Signature.public_key_hash
+
+  val equal : t -> t -> bool
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
 
 module Delegate : sig
-  type t = {consensus_key : Consensus_key.t; delegate_id : delegate_id}
+  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
 
   val encoding : t Data_encoding.t
 
@@ -109,7 +122,7 @@ val compute_delegate_slots :
    at some level (as obtained through the [get_attestable_slots] RPC). See usage
    in {!level_state}. *)
 type dal_attestable_slots =
-  (Signature.Public_key_hash.t
+  (Delegate_id.t
   * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
   list
 

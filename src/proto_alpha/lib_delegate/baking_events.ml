@@ -841,7 +841,7 @@ module Actions = struct
       ~name:"failed_to_get_attestations"
       ~level:Error
       ~msg:"unable to get DAL attestation for {delegate} -- {trace}"
-      ("delegate", Signature.Public_key_hash.encoding)
+      ("delegate", Baking_state.Delegate_id.encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -851,7 +851,7 @@ module Actions = struct
       ~name:"failed_to_get_attestations_in_time"
       ~level:Error
       ~msg:"unable to get DAL attestation for {delegate} in time"
-      ("delegate", Signature.Public_key_hash.encoding)
+      ("delegate", Baking_state.Delegate_id.encoding)
 
   let failed_to_inject_consensus_vote =
     declare_3
@@ -916,7 +916,7 @@ module Actions = struct
         "ready to attach DAL attestation for level {attestation_level}, round \
          {round}, with bitset {bitset} for {delegate} to attest slots \
          published at level {published_level}"
-      ("delegate", Signature.Public_key_hash.encoding)
+      ("delegate", Baking_state.Delegate_id.encoding)
       ~pp2:Z.pp_print
       ("bitset", Data_encoding.n)
       ("published_level", Data_encoding.int32)
@@ -929,7 +929,7 @@ module Actions = struct
       ~name:"not_in_dal_committee"
       ~level:Notice
       ~msg:"{delegate} has no assigned DAL shards at level {attestation_level}"
-      ("delegate", Signature.Public_key_hash.encoding)
+      ("delegate", Baking_state.Delegate_id.encoding)
       ("attestation_level", Data_encoding.int32)
 
   let synchronizing_round =

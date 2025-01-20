@@ -375,7 +375,8 @@ let fetch_dal_config cctxt =
   | Error e -> return_error e
   | Ok dal_config -> return_ok dal_config
 
-let get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level =
+let get_attestable_slots dal_node_rpc_ctxt delegate_id ~attested_level =
+  let pkh = Delegate_id.to_pkh delegate_id in
   Tezos_rpc.Context.make_call
     Tezos_dal_node_services.Services.get_attestable_slots
     dal_node_rpc_ctxt
@@ -388,8 +389,9 @@ let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
   let attested_level = Int32.succ attestation_level in
   List.map
     (fun (delegate_slot : delegate_slot) ->
-      let pkh = delegate_slot.delegate.delegate_id in
-      (pkh, get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level))
+      let delegate_id = delegate_slot.delegate.delegate_id in
+      ( delegate_id,
+        get_attestable_slots dal_node_rpc_ctxt delegate_id ~attested_level ))
     delegate_slots
 
 let get_dal_profiles dal_node_rpc_ctxt =

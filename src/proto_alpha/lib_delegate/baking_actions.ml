@@ -520,7 +520,7 @@ let may_get_dal_content state consensus_vote =
   in
   let promise_opt =
     List.assoc_opt
-      ~equal:Signature.Public_key_hash.equal
+      ~equal:Delegate_id.equal
       delegate.delegate_id
       state.level_state.dal_attestable_slots
   in

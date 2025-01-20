@@ -79,10 +79,22 @@ module Consensus_key = struct
           public_key_hash
 end
 
-type delegate_id = Signature.Public_key_hash.t
+module Delegate_id = struct
+  type t = Signature.public_key_hash
+
+  let of_pkh pkh = pkh
+
+  let to_pkh pkh = pkh
+
+  let equal = Signature.Public_key_hash.equal
+
+  let encoding = Signature.Public_key_hash.encoding
+
+  let pp = Signature.Public_key_hash.pp
+end
 
 module Delegate = struct
-  type t = {consensus_key : Consensus_key.t; delegate_id : delegate_id}
+  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
 
   let encoding =
     let open Data_encoding in
@@ -91,7 +103,7 @@ module Delegate = struct
       (fun (consensus_key, delegate_id) -> {consensus_key; delegate_id})
       (merge_objs
          Consensus_key.encoding
-         (obj1 (req "delegate" Signature.Public_key_hash.encoding)))
+         (obj1 (req "delegate" Delegate_id.encoding)))
 
   let pp fmt {consensus_key; delegate_id} =
     if Signature.Public_key_hash.equal consensus_key.public_key_hash delegate_id
@@ -102,7 +114,7 @@ module Delegate = struct
         "%a@,on behalf of %a"
         Consensus_key.pp
         consensus_key
-        Signature.Public_key_hash.pp
+        Delegate_id.pp
         delegate_id
 end
 
@@ -241,7 +253,7 @@ end
 type delegate_slots = Delegate_slots.t
 
 type dal_attestable_slots =
-  (Signature.Public_key_hash.t
+  (Delegate_id.t
   * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
   list
 
