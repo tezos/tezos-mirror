@@ -312,7 +312,20 @@ let () =
       ]
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
-       Docker image"
+       Docker image" ;
+  register
+    "schedule_container_scanning_evm_node_releases"
+    schedule_container_scanning_evm_node_releases
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Common.job_container_scanning
+          ~docker_image:"tezos/tezos:octez-evm-node-v0.15"
+          ~dockerfile_path:"build.Dockerfile";
+      ]
+    ~description:
+      "Scheduled pipeline for scanning vulnerabilities in latest \
+       tezos/tezos:octez-evm-node-vX.Y Docker image"
 
 (** {2 Entry point of the generator binary} *)
 
@@ -326,8 +339,6 @@ let () =
       let exclude_fun filename =
         filename
         = ".gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml"
-        || filename
-           = ".gitlab/ci/pipelines/schedule_container_scanning_evm_node_releases.yml"
       in
       Tezos_ci.check_files
         ~remove_extra_files:Cli.config.remove_extra_files
