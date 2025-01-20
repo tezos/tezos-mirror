@@ -396,3 +396,9 @@ seq:
 - id: all_bakers_attest_activation_level
   type: s4be
   if: (all_bakers_attest_activation_level_tag == bool::true)
+- id: issuance_modification_delay
+  type: u1
+- id: consensus_key_activation_delay
+  type: u1
+- id: unstake_finalization_delay
+  type: u1
