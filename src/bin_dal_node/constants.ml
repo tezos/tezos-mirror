@@ -92,3 +92,11 @@ let crawler_re_processing_delay = 5.
 
 (* Sleep delay between refreshing the ips associated to bootstrap dns names *)
 let bootstrap_dns_refresh_delay = 300.
+
+(* This size is being used for the node store's traps cache. While
+   [proto_parameters.Dal_plugin.attestation_lag] defines the minimum
+   number of levels for which traps must be retained, we maintain a
+   larger cache capacity of 50 levels. This extended size is
+   acceptable since the cache is sparsely populated due to
+   [proto_parameters.traps_fraction]. *)
+let traps_cache_size = 50

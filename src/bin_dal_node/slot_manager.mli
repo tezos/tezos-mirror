@@ -126,6 +126,7 @@ val add_commitment_shards :
 
 (** This function publishes the given shards and their proofs. *)
 val publish_proved_shards :
+  Node_context.t ->
   Types.slot_id ->
   level_committee:
     (level:int32 ->
@@ -141,10 +142,10 @@ val publish_proved_shards :
     attestion on L1 if this node has those shards on disk and their proofs in
     memory. *)
 val publish_slot_data :
+  Node_context.t ->
   level_committee:
     (level:int32 ->
     Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
-  Store.t ->
   slot_size:int ->
   Gossipsub.Worker.t ->
   Dal_plugin.proto_parameters ->
@@ -197,3 +198,11 @@ val get_slot_shard :
   Types.slot_id ->
   Types.shard_index ->
   (Cryptobox.shard, [Errors.other | Errors.not_found]) result Lwt.t
+
+(** [maybe_register_trap ctxt message_id message] checks if the given
+    message is a trap according to [Trap.share_is_trap]. If the share
+    is identified as a trap, it is stored in the traps cache of the
+    DAL node store. Otherwise does nothing.
+*)
+val maybe_register_trap :
+  Node_context.t -> Types.Message_id.t -> Types.Message.t -> unit

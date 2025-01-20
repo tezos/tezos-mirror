@@ -127,6 +127,8 @@ module type T = sig
 
   type dal_attestation
 
+  type attestation_operation
+
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
@@ -143,6 +145,13 @@ module type T = sig
   val get_published_slot_headers :
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
+
+  val get_attestation_operations :
+    block_info ->
+    (Signature.public_key_hash option
+    * attestation_operation
+    * dal_attestation option)
+    list
 
   val get_dal_content_of_attestations :
     block_info ->
@@ -164,7 +173,7 @@ module type T = sig
   val inject_entrapment_evidence :
     Tezos_rpc.Context.generic ->
     attested_level:Int32.t ->
-    Proto.operation ->
+    attestation_operation ->
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->

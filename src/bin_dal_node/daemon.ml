@@ -240,11 +240,20 @@ module Handler = struct
         with
         | `Valid ->
             (* 3. Only check for message validity if the message_id is valid. *)
-            Option.fold
-              message
-              ~none:`Valid
-              ~some:
-                (gossipsub_app_message_payload_validation cryptobox message_id)
+            let res =
+              Option.fold
+                message
+                ~none:`Valid
+                ~some:
+                  (gossipsub_app_message_payload_validation
+                     cryptobox
+                     message_id)
+            in
+            if res = `Valid then
+              Option.iter
+                (Slot_manager.maybe_register_trap ctxt message_id)
+                message ;
+            res
         | other ->
             (* 4. In the case the message id is not Valid. *)
             other
@@ -573,9 +582,9 @@ module Handler = struct
                     {slot_level = published_level; slot_index}
                   in
                   Slot_manager.publish_slot_data
+                    ctxt
                     ~level_committee:(Node_context.fetch_committee ctxt)
                     ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-                    store
                     (Node_context.get_gs_worker ctxt)
                     proto_parameters
                     commitment
@@ -612,7 +621,11 @@ module Handler = struct
             get_attestations
             Plugin.is_attested
         in
-        return_unit
+        Accuser.inject_entrapment_evidences
+          (module Plugin)
+          ctxt
+          cctxt
+          block_info
       else return_unit
     in
     let*? block_round = Plugin.get_round finalized_shell_header.fitness in

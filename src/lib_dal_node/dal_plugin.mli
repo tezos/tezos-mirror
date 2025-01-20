@@ -65,6 +65,8 @@ module type T = sig
 
   type dal_attestation
 
+  type attestation_operation
+
   (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
       [block] in [ctxt] for the given [chain]. Block's metadata are included or
       skipped depending on the value of [metadata]. This is a wrapper on top of
@@ -85,6 +87,17 @@ module type T = sig
   val get_published_slot_headers :
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
+
+  (** For a given block, returns for each included attestation, as a
+      list, its attester if available, its [attestation] operation
+      and, if it exists, its [dal_attestation] to be passed to the
+      [is_attested] function. *)
+  val get_attestation_operations :
+    block_info ->
+    (Signature.public_key_hash option
+    * attestation_operation
+    * dal_attestation option)
+    list
 
   (** For a given block, returns for each included attestation, as a list, its
       Tenderbake slot, its attester (if available in the operation receipt), and
@@ -125,7 +138,7 @@ module type T = sig
   val inject_entrapment_evidence :
     Tezos_rpc.Context.generic ->
     attested_level:Int32.t ->
-    Proto.operation ->
+    attestation_operation ->
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->

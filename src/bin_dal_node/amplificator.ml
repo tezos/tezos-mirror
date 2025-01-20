@@ -304,6 +304,7 @@ let reply_receiver_job {process; query_store; _} node_context =
     in
     let* () =
       Slot_manager.publish_proved_shards
+        node_context
         slot_id
         ~level_committee:(Node_context.fetch_committee node_context)
         proto_parameters

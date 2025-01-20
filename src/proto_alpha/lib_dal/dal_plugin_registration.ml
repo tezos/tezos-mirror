@@ -35,6 +35,8 @@ module Plugin = struct
 
   type dal_attestation = Environment.Bitset.t
 
+  type attestation_operation = Kind.attestation Alpha_context.operation
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)
@@ -86,28 +88,8 @@ module Plugin = struct
     if Compare.Int32.(level_with_offset >= 0l) then return (`Head offset)
     else return (`Head 0)
 
-  (* We can provide more context in the future. *)
-  type error += Not_an_attestation
-
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"not_an_attestation"
-      ~title:"Not an attestation"
-      ~description:
-        "This error is raised if the DAL node tries to accuse with an \
-         operation which is not an attestation"
-      ~pp:(fun fmt () ->
-        Format.fprintf
-          fmt
-          "This error is raised if the DAL node tries to accuse with an \
-           operation which is not an attestation")
-      Data_encoding.unit
-      (function Not_an_attestation -> Some () | _ -> None)
-      (fun () -> Not_an_attestation)
-
-  let inject_entrapment_evidence cctxt ~attested_level operation ~slot_index
-      ~shard ~proof =
+  let inject_entrapment_evidence cctxt ~attested_level
+      (operation : attestation_operation) ~slot_index ~shard ~proof =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
     let chain = `Main in
@@ -132,28 +114,24 @@ module Plugin = struct
       Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
     in
     let shard_with_proof = Dal.Shard_with_proof.{shard; proof} in
-    match operation.protocol_data with
-    | Operation_data protocol_data -> (
-        match protocol_data.contents with
-        | Single (Attestation _) ->
-            let attestation : Kind.attestation Alpha_context.operation =
-              {shell = operation.shell; protocol_data}
-            in
-            let* bytes =
-              Plugin.RPC.Forge.dal_entrapment_evidence
-                cpctxt
-                (chain, block)
-                ~branch:block_hash
-                ~attestation
-                ~slot_index
-                ~shard_with_proof
-            in
-            let bytes = Signature.concat bytes Signature.zero in
-            let* _op_hash =
-              Shell_services.Injection.operation cctxt ~chain bytes
-            in
-            return_unit
-        | _ -> fail [Not_an_attestation])
+    let protocol_data = operation.protocol_data in
+    match operation.protocol_data.contents with
+    | Single (Attestation _) ->
+        let attestation : Kind.attestation Alpha_context.operation =
+          {shell = operation.shell; protocol_data}
+        in
+        let* bytes =
+          Plugin.RPC.Forge.dal_entrapment_evidence
+            cpctxt
+            (chain, block)
+            ~branch:block_hash
+            ~attestation
+            ~slot_index
+            ~shard_with_proof
+        in
+        let bytes = Signature.concat bytes Signature.zero in
+        let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
+        return_unit
 
   let block_info ?chain ?block ~metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -229,6 +207,45 @@ module Plugin = struct
                       :> Environment.Bitset.t option) )
             | _ -> None)
           consensus_ops
+
+  let get_attestation_operations block_info =
+    let open Protocol.Alpha_context in
+    let open Protocol_client_context.Alpha_block_services in
+    match block_info.operations with
+    | [consensus_ops; _anonymous; _votes; _managers] ->
+        List.filter_map
+          (fun operation ->
+            let (Operation_data operation_data) = operation.protocol_data in
+            match operation_data.contents with
+            | Single (Attestation attestation) -> (
+                let packed_operation : Kind.attestation Alpha_context.operation
+                    =
+                  {
+                    Alpha_context.shell = operation.shell;
+                    protocol_data = operation_data;
+                  }
+                in
+                let dal_attestation : dal_attestation option =
+                  Option.map
+                    (fun x -> (x.attestation :> dal_attestation))
+                    attestation.dal_content
+                in
+                match operation.receipt with
+                | Receipt (Operation_metadata operation_metadata) -> (
+                    match operation_metadata.contents with
+                    | Single_result (Attestation_result result) ->
+                        Some
+                          ( Some result.delegate,
+                            packed_operation,
+                            dal_attestation )
+                    | _ -> Some (None, packed_operation, dal_attestation))
+                | Empty | Too_large | Receipt No_operation_metadata ->
+                    Some (None, packed_operation, dal_attestation))
+            | _ -> None)
+          consensus_ops
+    | _ ->
+        (* that should be unreachable, as there are 4 operation passes *)
+        []
 
   let get_committee ctxt ~level =
     let open Lwt_result_syntax in
