@@ -19,6 +19,7 @@ each delegate's :ref:`voting power<voting_power_quebec>` instead, which
 is computed in a similar but simpler way.
 
 
+.. _RPC_path_shortcut:
 .. _RPC_path_shortcut_quebec:
 
 .. note::
@@ -33,6 +34,7 @@ is computed in a similar but simpler way.
   :ref:`changelog<delegates_RPCs_normalization>` for more information.
 
 
+.. _baking_power_overview:
 .. _baking_power_overview_quebec:
 
 Overview
@@ -92,6 +94,7 @@ An **external delegator** (resp. **external staker**) is a delegator
 (resp. staker) that is not the delegate itself.
 
 
+.. _total_staked:
 .. _total_staked_quebec:
 
 Staked tez
@@ -172,6 +175,7 @@ an account, called the **full balance**.
   full_balance = staked + delegated
 
 
+.. _total_delegated:
 .. _total_delegated_quebec:
 
 Delegated tez to a baker
@@ -224,6 +228,7 @@ For a given delegate, we define the following:
 
   total_delegated = own_delegated + external_delegated
 
+.. _min_delegated:
 .. _min_delegated_quebec:
 
 Min-delegated-in-current-cycle
@@ -239,7 +244,7 @@ needed for staked tez because they are inherently :ref:`frozen for at
 least four cycles<staked_funds_management_quebec>`, so short-duration
 staking is already not possible.)
 
-In the Paris protocol, the considered minimum is the minimum at any
+Starting with the Paris protocol, the considered minimum is the minimum at any
 point during block applications, which can be reached in the middle of
 executing a transaction.
 
@@ -295,7 +300,7 @@ delegate -- which is the baker itself, then adding ``150`` tez to the
 baker in our case. Finally, the ``70``-tez transfer just removes
 ``70`` tez from the ``total_delegated`` of the same baker again.
 
-Let's say that ``blocks_per_cycle = 128`` (as on Parisnet), so the
+Let's say that ``blocks_per_cycle = 128``, so the
 first level of the current cycle is ``129``, and let's say that
 ``total_delegated`` was ``1000`` at the beginning of the cycle.
 
@@ -390,6 +395,7 @@ here we use tez for simplicity.
     (min: ``900``, level: ``200``).
 
 
+.. _overstaking:
 .. _overstaking_quebec:
 
 Overstaking
@@ -474,6 +480,7 @@ We finally have everything we need to compute the baking power
   baking_power = total_staked_after_limits + (total_delegated_after_limits / 3)
 
 
+.. _minimal_baking_power:
 .. _minimal_baking_power_quebec:
 
 Minimal power and own staked requirements

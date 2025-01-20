@@ -73,6 +73,7 @@ custodians, exchanges, and other parties to support the functionality.
 stakers. In other words, smart contracts cannot stake funds (they can
 of course still delegate them).
 
+.. _staking_policy_configuration:
 .. _staking_policy_configuration_quebec:
 
 Staking policy configuration
@@ -117,6 +118,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
+.. _staked_funds_management:
 .. _staked_funds_management_quebec:
 
 Staked funds management

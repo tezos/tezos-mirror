@@ -87,6 +87,7 @@ times that of delegated funds.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_quebec:
 
 A delegate can be marked as either active or passive. A passive
@@ -106,6 +107,7 @@ Tezos being proof-of-stake, the delegates' rights are selected at
 random based on their :doc:`baking power<baking_power>`. Let us detail
 the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_quebec:
 
 Random seed
@@ -117,7 +119,9 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _rights:
 .. _rights_quebec:
+.. _slots:
 .. _slots_quebec:
 
 Slot selection
@@ -149,6 +153,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _ps_constants:
 .. _ps_constants_quebec:
 
 Proof-of-stake parameters

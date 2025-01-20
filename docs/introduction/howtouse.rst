@@ -30,8 +30,8 @@ After a successful compilation, you should have the following binaries:
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to.
 More precisely, the suffix consists of the first 8 characters of the protocol hash; except for protocol Alpha, for which the suffix is simply ``-alpha``.
-For instance, ``octez-baker-PtParisB`` is the baker
-for the Paris protocol, and ``octez-baker-alpha`` is the baker
+For instance, ``octez-baker-PsQuebec`` is the baker
+for the Quebec protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
@@ -101,7 +101,7 @@ block baked by a baker.
 Using the blocks it receives on the gossip network the node also
 keeps up to date the current *context*, that is the full state of
 the blockchain shared by all peers.
-Approximately every 15 seconds a new block is created and, when the node
+Approximately every 8 seconds a new block is created and, when the node
 receives it, it applies each operation in the block to its current
 context and computes a new context.
 The last block received on a chain is also called the *head* of that

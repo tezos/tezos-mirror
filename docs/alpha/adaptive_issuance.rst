@@ -117,7 +117,7 @@ Where:
 
 - ``blocks_per_cycle`` denotes the number of blocks in a Tezos cycle.
 - ``minimal_block_delay`` denotes the minimal duration of a block in seconds.
-- ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
+- ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 8 seconds in Quebec.
 - ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
 
 In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_alpha>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_alpha>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
@@ -427,7 +427,7 @@ Where:
 
 
 The `RPC endpoint
-<https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
+<https://tezos.gitlab.io/active/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
 ``/issuance/expected_issuance`` reports the precomputed values of all
 participation rewards for the provided block and the next
 ``consensus_rights_delay`` cycles.

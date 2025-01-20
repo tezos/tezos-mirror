@@ -3,6 +3,7 @@
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
 
 
+.. _adaptive_issuance:
 .. _adaptive_issuance_quebec:
 
 =================
@@ -43,6 +44,7 @@ emission rates increase, incentivizing participants to stake funds to
 re-approach the target. Conversely, incentives decrease as the ratio
 increases beyond the target.
 
+.. _adaptive_issuance_rate:
 .. _adaptive_issuance_rate_quebec:
 
 Adaptive issuance rate
@@ -55,6 +57,7 @@ and a :ref:`dynamic rate <dynamic_rate_quebec>`. This value is kept within
 a minimal and a maximal value, to ensure nominal emissions remain within
 reasonable bounds.
 
+.. _staked_ratio:
 .. _staked_ratio_quebec:
 
 Staked ratio
@@ -73,6 +76,7 @@ Where:
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
+.. _static_rate:
 .. _static_rate_quebec:
 
 Static rate
@@ -91,6 +95,7 @@ The static rate is defined as follows:
 
 The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from the issuance rate (~4.6%) from the Oxford protocol (before the activation of Adaptive Issuance).
 
+.. _dynamic_rate:
 .. _dynamic_rate_quebec:
 
 Dynamic rate
@@ -117,11 +122,12 @@ Where:
 
 - ``blocks_per_cycle`` denotes the number of blocks in a Tezos cycle.
 - ``minimal_block_delay`` denotes the minimal duration of a block in seconds.
-- ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 10 seconds in Paris.
+- ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 8 seconds in Quebec.
 - ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
 
 In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_quebec>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_quebec>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
 
+.. _minimum_and_maximum_rates:
 .. _minimum_and_maximum_rates_quebec:
 
 Minimum and maximum rates
@@ -205,6 +211,7 @@ Where:
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
+.. _adaptive_maximum:
 .. _adaptive_maximum_quebec:
 
 Adaptive Maximum
@@ -281,6 +288,7 @@ The function that defines the adaptive maximum is:
   while fully satisfying the minimum rate.
 
 
+.. _issuance_rate:
 .. _issuance_rate_quebec:
 
 Issuance rate
@@ -305,6 +313,7 @@ maximum <adaptive_maximum_quebec>`, computed for the cycle ``c + 1``.
     return max( min(total_rate, maximum_rate), minimum_rate )
 
 
+.. _adaptive_rewards:
 .. _adaptive_rewards_quebec:
 
 Adaptive rewards
@@ -318,6 +327,7 @@ each block of the cycle and distributed between the various rewards,
 in proportion to their relative :ref:`weights
 <rewards_weights_quebec>`.
 
+.. _rewards_weights:
 .. _rewards_weights_quebec:
 
 Reward weights
@@ -427,7 +437,7 @@ Where:
 
 
 The `RPC endpoint
-<https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
+<https://tezos.gitlab.io/active/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
 ``/issuance/expected_issuance`` reports the precomputed values of all
 participation rewards for the provided block and the next
 ``consensus_rights_delay`` cycles.
