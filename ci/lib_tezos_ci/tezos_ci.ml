@@ -501,54 +501,10 @@ module Pipeline = struct
         rules = [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
       }
     in
-    (* scheduled pipelines *)
-    let scheduled_pipeline_if_expr tz_schedule_kind =
-      Gitlab_ci.If.(
-        var "CI_PIPELINE_SOURCE" == str "schedule"
-        && var "TZ_SCHEDULE_KIND" == str tz_schedule_kind)
-    in
-    let scheduled_pipeline_worflow_rule tz_schedule_kind pipeline_type :
-        Gitlab_ci.Types.workflow_rule =
-      {
-        changes = None;
-        if_ = Some (scheduled_pipeline_if_expr tz_schedule_kind);
-        variables = Some [("PIPELINE_TYPE", pipeline_type)];
-        when_ = Always;
-        auto_cancel = None;
-      }
-    in
-    let scheduled_pipeline_include_rule local tz_schedule_kind :
-        Gitlab_ci.Types.include_ =
-      {
-        subkey = Local local;
-        rules =
-          [
-            {
-              changes = None;
-              if_ = Some (scheduled_pipeline_if_expr tz_schedule_kind);
-              when_ = Always;
-            };
-          ];
-      }
-    in
     let workflow =
-      {
-        workflow with
-        rules =
-          ci_docker_workflow_rule
-          :: scheduled_pipeline_worflow_rule
-               "CONTAINER_SCANNING_OCTEZ_RELEASES"
-               "schedule_container_scanning_octez_releases"
-          :: workflow.rules;
-      }
+      {workflow with rules = ci_docker_workflow_rule :: workflow.rules}
     in
-    let includes =
-      ci_docker_include_rule
-      :: scheduled_pipeline_include_rule
-           ".gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml"
-           "CONTAINER_SCANNING_OCTEZ_RELEASES"
-      :: includes
-    in
+    let includes = ci_docker_include_rule :: includes in
     (* end of temporary manual addition *)
     let config =
       let open Gitlab_ci.Types in
