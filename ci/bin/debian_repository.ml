@@ -105,7 +105,7 @@ let jobs pipeline_type =
       ~tag:Dynamic
       [
         "./scripts/ci/build-packages-dependencies.sh \
-         debian-systemd-tests.Dockerfile";
+         images/packages/debian-systemd-tests.Dockerfile";
       ]
   in
   let job_docker_systemd_test_debian_dependencies : tezos_job =
@@ -127,7 +127,7 @@ let jobs pipeline_type =
       ~tag:Dynamic
       [
         "./scripts/ci/build-packages-dependencies.sh \
-         debian-deps-build.Dockerfile";
+         images/packages/debian-deps-build.Dockerfile";
       ]
   in
   let job_docker_build_debian_dependencies : tezos_job =

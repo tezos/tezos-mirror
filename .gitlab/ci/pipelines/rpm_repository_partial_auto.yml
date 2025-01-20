@@ -39,7 +39,7 @@ oc.docker-build-rockylinux-dependencies:
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
-  - ./scripts/ci/build-packages-dependencies.sh rpm-deps-build.Dockerfile
+  - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
