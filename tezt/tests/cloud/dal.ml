@@ -442,19 +442,9 @@ type etherlink_operator_setup = {
   batching_operators : Account.key list;
 }
 
-type etherlink_producer_setup = {
-  agent : Agent.t;
-  node : Node.t;
-  client : Client.t;
-  sc_rollup_node : Sc_rollup_node.t;
-  evm_node : Tezt_etherlink.Evm_node.t;
-  account : Tezt_etherlink.Eth_account.t;
-}
-
 type etherlink = {
   configuration : etherlink_configuration;
   operator : etherlink_operator_setup;
-  producers : etherlink_producer_setup list;
   accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
 
@@ -1947,6 +1937,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
+  let () = toplog "Init Etherlink: launching the rollup node: done" in
   let private_rpc_port = Agent.next_available_port agent |> Option.some in
   let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
   let sequencer_mode =
@@ -1972,6 +1963,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   in
   let endpoint = Sc_rollup_node.endpoint sc_rollup_node in
   let mode = if is_sequencer then sequencer_mode else Evm_node.Proxy in
+  let () = toplog "Init Etherlink: launching the EVM node" in
   let* evm_node =
     Tezos.Evm_node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
@@ -1979,6 +1971,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       endpoint
       agent
   in
+  let () = toplog "Init Etherlink: launching the EVM node: done" in
   let operator =
     {
       node;
@@ -2003,7 +1996,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   in
   return operator
 
-let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
+let init_etherlink_producer_setup operator name ~bootstrap agent =
   let* node =
     Node.Agent.init
       ~rpc_external:Cli.node_external_rpc_server
@@ -2066,7 +2059,9 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
         rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
       }
   in
+  let () = toplog "Init Etherlink: init producer %s" name in
   let endpoint = Evm_node.endpoint operator.evm_node in
+  (* TODO: try using this local EVM node for Floodgate confirmations. *)
   let* evm_node =
     Evm_node.Agent.init
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
@@ -2074,21 +2069,19 @@ let init_etherlink_producer_setup cloud operator name account ~bootstrap agent =
       endpoint
       agent
   in
-  let operator = {agent; node; client; sc_rollup_node; evm_node; account} in
-  let* () =
-    add_prometheus_source
-      ~node
-      ~sc_rollup_node
-      ~evm_node
-      cloud
-      agent
-      (Format.asprintf "etherlink-%s" name)
-  in
   let* () =
     (* This is to avoid producing operations too soon. *)
     Evm_node.wait_for_blueprint_applied evm_node 1
   in
-  return operator
+  (* Launch floodgate *)
+  let* () =
+    Floodgate.Agent.run
+      ~rpc_endpoint:endpoint
+      ~max_active_eoa:50
+      ~controller:Tezt_etherlink.Eth_account.bootstrap_accounts.(0)
+      agent
+  in
+  return ()
 
 let init_etherlink cloud configuration etherlink_configuration ~bootstrap
     etherlink_rollup_operator_key batching_operators ~dal_slots next_agent =
@@ -2114,21 +2107,18 @@ let init_etherlink cloud configuration etherlink_configuration ~bootstrap
         next_agent ~name)
     |> Lwt.all
   in
-  let* producers =
+  let* () =
     producers_agents
     |> List.mapi (fun i agent ->
            assert (i < Array.length accounts) ;
            init_etherlink_producer_setup
-             cloud
              operator
              (Format.asprintf "producer-%d" i)
-             accounts.(i)
              ~bootstrap
              agent)
-    |> Lwt.all
+    |> Lwt.join
   in
-  return
-    {configuration = etherlink_configuration; operator; accounts; producers}
+  return {configuration = etherlink_configuration; operator; accounts}
 
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : baker list) (producers : producer list)
@@ -2536,39 +2526,6 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
-let etherlink_loop (etherlink : etherlink) =
-  let open Tezt_etherlink in
-  let* () = Lwt_unix.sleep 30. in
-  let account_loop i =
-    let producer : etherlink_producer_setup =
-      List.nth etherlink.producers (i mod List.length etherlink.producers)
-    in
-    let runner = Node.runner producer.node |> Option.get in
-    let firehose =
-      (Agent.configuration producer.agent).vm.binaries_path // "firehose"
-    in
-    let* () =
-      Process.spawn
-        ~runner
-        firehose
-        [
-          "configure";
-          "--endpoint";
-          Evm_node.endpoint etherlink.operator.evm_node;
-          "--controller";
-          etherlink.accounts.(i).private_key |> String.to_seq |> Seq.drop 2
-          |> String.of_seq;
-        ]
-      |> Process.check
-    in
-    Process.spawn ~runner firehose ["flood"; "--kind"; "xtz"; "--workers"; "20"]
-    |> Process.check
-  in
-  if List.length etherlink.producers > 0 then
-    Array.mapi (fun i _ -> account_loop i) etherlink.accounts
-    |> Array.to_list |> Lwt.join
-  else Lwt.return_unit
-
 let configuration, etherlink_configuration =
   let stake = Cli.stake in
   let stake_machine_type = Cli.stake_machine_type in
@@ -2785,16 +2742,6 @@ let benchmark () =
       in
       let* t = init ~configuration etherlink_configuration cloud next_agent in
       toplog "Starting main loop" ;
-      let main_loop = loop t (t.first_level + 1) in
-      let etherlink_loop =
-        match t.etherlink with
-        | None ->
-            let () = toplog "No Etherlink loop to start" in
-            Lwt.return_unit
-        | Some etherlink ->
-            let () = toplog "Starting Etherlink loop" in
-            etherlink_loop etherlink
-      in
-      Lwt.join [main_loop; etherlink_loop])
+      loop t (t.first_level + 1))
 
 let register () = benchmark ()

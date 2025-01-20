@@ -143,6 +143,30 @@ module Dal_node = struct
   end
 end
 
+module Floodgate = struct
+  include Tezt_etherlink.Floodgate
+
+  module Agent = struct
+    let run ?(path = "floodgate") ~rpc_endpoint ~controller ?relay_endpoint
+        ?max_active_eoa ?spawn_interval ?tick_interval ?base_fee_factor
+        ?initial_balance agent =
+      let* path = Agent.copy agent ~source:path in
+      let runner = Agent.runner agent in
+      run
+        ?runner
+        ~path
+        ~rpc_endpoint
+        ~controller
+        ?relay_endpoint
+        ?max_active_eoa
+        ?spawn_interval
+        ?tick_interval
+        ?base_fee_factor
+        ?initial_balance
+        ()
+  end
+end
+
 module Sc_rollup_node = struct
   include Tezt_tezos.Sc_rollup_node
 
