@@ -956,8 +956,10 @@ let notice_delegates_without_slots all_delegates delegate_slots level =
       (fun {Baking_state.public_key_hash; _} ->
         not
         @@ List.exists
-             (fun {consensus_key_and_delegate = _, pkh_with_rights; _} ->
-               public_key_hash = pkh_with_rights)
+             (fun {
+                    consensus_key_and_delegate = consensus_key, _pkh_with_rights;
+                    _;
+                  } -> public_key_hash = consensus_key.public_key_hash)
              (Baking_state.Delegate_slots.own_delegates delegate_slots))
       all_delegates
   in
