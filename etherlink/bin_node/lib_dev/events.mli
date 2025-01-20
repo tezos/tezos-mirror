@@ -136,3 +136,9 @@ type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
 val download_failed : string -> download_error -> unit Lwt.t
 
 val importing_snapshot : unit -> unit Lwt.t
+
+(** [extract_snapshot_archive_in_progress ~archive_name ~elapsed_time] advertises that the node is
+    extracting the snapshot archive named [archive_name], and explicitly mentions the time elapsed
+    since the extraction started. *)
+val extract_snapshot_archive_in_progress :
+  archive_name:string -> elapsed_time:Time.System.Span.t -> unit Lwt.t

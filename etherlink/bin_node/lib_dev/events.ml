@@ -225,6 +225,18 @@ let importing_snapshot =
     ~msg:"Importing snapshot"
     ()
 
+let extract_snapshot_archive_in_progress =
+  Internal_event.Simple.declare_2
+    ~level:Notice
+    ~section
+    ~name:"extract_snapshot_archive_in_progress"
+    ~msg:"Still extracting archive {name} after {elapsed_time}."
+    ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
+    ~pp2:(fun fmt elapsed_time ->
+      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
+    ("name", Data_encoding.string)
+    ("elapsed_time", Time.System.Span.encoding)
+
 type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
 
 let download_error_encoding =
@@ -428,3 +440,6 @@ let download_in_progress ?remaining_bytes ~elapsed_time url =
 let download_failed url reason = emit download_failed (url, reason)
 
 let importing_snapshot () = emit importing_snapshot ()
+
+let extract_snapshot_archive_in_progress ~archive_name ~elapsed_time =
+  emit extract_snapshot_archive_in_progress (archive_name, elapsed_time)
