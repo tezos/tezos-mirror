@@ -111,7 +111,7 @@
 //! // from `parser` for simplicity, you may also opt to create a new one to
 //! // potentially save a bit of memory (depends on the workload).
 //! let (operations_iter, new_storage) = contract_typechecked
-//!     .interpret(&mut ctx, &parser.arena, parameter, storage)
+//!     .interpret(&mut ctx, &parser.arena, parameter, None, storage)
 //!     .unwrap();
 //! let TypedValue::Int(new_storage_int) = &new_storage else { unreachable!() };
 //! assert_eq!(new_storage_int, &22698374052006863956975682u128.into());
@@ -371,6 +371,7 @@ mod tests {
                 ctx,
                 &arena,
                 "foo".into(),
+                None,
                 M::seq(
                     &arena,
                     [
@@ -1261,6 +1262,7 @@ mod multisig_tests {
                     // %sigs
                     seq([some(signature)]),
                 ),
+                None,
                 // make_initial_storage(),
                 pair(
                     anti_replay_counter(),
@@ -1333,6 +1335,7 @@ mod multisig_tests {
                     // %sigs
                     seq([some(signature)]),
                 ),
+                None,
                 pair(
                     anti_replay_counter(),
                     pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
@@ -1388,6 +1391,7 @@ mod multisig_tests {
                     // %sigs
                     seq([some(invalid_signature)]),
                 ),
+                None,
                 pair(
                     anti_replay_counter(),
                     pair(threshold, seq([PUBLIC_KEY.into()])),

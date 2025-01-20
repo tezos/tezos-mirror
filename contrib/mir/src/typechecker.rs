@@ -8,12 +8,13 @@
 //! Michelson typechecker definitions. Most functions defined as associated
 //! functions on [Micheline], see there for more.
 
-use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Entrypoints};
+use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Direction, Entrypoints};
 use chrono::prelude::DateTime;
+use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
@@ -168,6 +169,12 @@ impl From<TryFromBigIntError<()>> for TcError {
     }
 }
 
+impl From<ByteReprError> for TcError {
+    fn from(value: ByteReprError) -> Self {
+        Self::ByteReprError(Type::Bytes, value)
+    }
+}
+
 /// Errors happening when typechecking a value of type `chain_id`.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum ChainIdError {
@@ -265,7 +272,7 @@ impl<'a> Micheline<'a> {
     ) -> Result<Instruction<'a>, TcError> {
         let entrypoints = self_type
             .map(|ty| {
-                let (entrypoints, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
+                let (entrypoints, _, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
                 ty.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
                 Ok::<_, TcError>(entrypoints)
             })
@@ -287,7 +294,7 @@ impl<'a> Micheline<'a> {
     /// Interpreting `Micheline` as a contract parameter type, collect its
     /// entrypoints into [Entrypoints].
     pub fn get_entrypoints(&self, ctx: &mut Ctx) -> Result<Entrypoints, TcError> {
-        let (entrypoints, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
+        let (entrypoints, _, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
         Ok(entrypoints)
     }
 
@@ -333,7 +340,7 @@ impl<'a> Micheline<'a> {
                 }
             }
         }
-        let (entrypoints, parameter) = parse_parameter_ty_with_entrypoints(
+        let (entrypoints, anns, parameter) = parse_parameter_ty_with_entrypoints(
             ctx,
             parameter_ty.ok_or(TcError::MissingTopLevelElt(Prim::parameter))?,
         )?;
@@ -361,18 +368,21 @@ impl<'a> Micheline<'a> {
             code,
             parameter,
             storage,
+            annotations: anns,
         })
     }
 }
 
 pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
-    parse_ty_with_entrypoints(ctx, ty, None)
+    parse_ty_with_entrypoints(ctx, ty, None, &mut HashMap::new(), Vec::new())
 }
 
-fn parse_ty_with_entrypoints(
+fn parse_ty_with_entrypoints<'a>(
     ctx: &mut Ctx,
-    ty: &Micheline,
+    ty: &Micheline<'a>,
     mut entrypoints: Option<&mut Entrypoints>,
+    routed_annotations: &mut HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+    path: Vec<Direction>,
 ) -> Result<Type, TcError> {
     use Micheline::*;
     use Prim::*;
@@ -437,8 +447,16 @@ fn parse_ty_with_entrypoints(
         App(pair, ..) => unexpected()?,
 
         App(or, [l, r], _) => Type::new_or(
-            parse_ty_with_entrypoints(ctx, l, entrypoints.as_deref_mut())?,
-            parse_ty_with_entrypoints(ctx, r, entrypoints.as_deref_mut())?,
+            parse_ty_with_entrypoints(ctx, l, entrypoints.as_deref_mut(), routed_annotations, {
+                let mut new_path = path.clone();
+                new_path.push(Direction::Left);
+                new_path
+            })?,
+            parse_ty_with_entrypoints(ctx, r, entrypoints.as_deref_mut(), routed_annotations, {
+                let mut new_path = path.clone();
+                new_path.push(Direction::Right);
+                new_path
+            })?,
         ),
 
         App(or, ..) => unexpected()?,
@@ -516,6 +534,7 @@ fn parse_ty_with_entrypoints(
 
         App(prim @ micheline_unsupported_types!(), ..) => Err(TcError::TodoType(*prim))?,
     };
+
     if let Option::Some(eps) = entrypoints {
         // we just ensured it's an application of some type primitive
         irrefutable_match!(ty; App, _prim, _args, anns);
@@ -523,13 +542,16 @@ fn parse_ty_with_entrypoints(
             // NB: field annotations may be longer than entrypoints; however
             // it's not an error to have an overly-long field annotation, it
             // just doesn't count as an entrypoint.
+            routed_annotations.insert(field_ann.clone(), (path, parsed_ty.clone()));
             if let Ok(entrypoint) = Entrypoint::try_from(field_ann) {
                 let entry = eps.entry(entrypoint);
                 match entry {
                     Entry::Occupied(e) => {
                         return Err(TcError::DuplicateEntrypoint(e.key().clone()))
                     }
-                    Entry::Vacant(e) => e.insert(parsed_ty.clone()),
+                    Entry::Vacant(e) => {
+                        e.insert(parsed_ty.clone());
+                    }
                 };
             }
         }
@@ -537,16 +559,33 @@ fn parse_ty_with_entrypoints(
     Ok(parsed_ty)
 }
 
-fn parse_parameter_ty_with_entrypoints(
+fn parse_parameter_ty_with_entrypoints<'a>(
     ctx: &mut Ctx,
-    parameter_ty: &Micheline,
-) -> Result<(Entrypoints, Type), TcError> {
+    parameter_ty: &Micheline<'a>,
+) -> Result<
+    (
+        Entrypoints,
+        HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+        Type,
+    ),
+    TcError,
+> {
     let mut entrypoints = Entrypoints::new();
-    let parameter = parse_ty_with_entrypoints(ctx, parameter_ty, Some(&mut entrypoints))?;
+    let mut routed_annotations = HashMap::new();
+    let parameter = parse_ty_with_entrypoints(
+        ctx,
+        parameter_ty,
+        Some(&mut entrypoints),
+        &mut routed_annotations,
+        Vec::new(),
+    )?;
     entrypoints
         .entry(Entrypoint::default())
         .or_insert_with(|| parameter.clone());
-    Ok((entrypoints, parameter))
+    routed_annotations
+        .entry(FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME))
+        .or_insert_with(|| (vec![], parameter.clone()));
+    Ok((entrypoints, routed_annotations, parameter))
 }
 
 /// Typecheck a sequence of instructions. Assumes the passed stack is valid, i.e.
@@ -2685,10 +2724,12 @@ mod typecheck_tests {
     use super::{Lambda, Or};
     use crate::ast::micheline::test_helpers::*;
     use crate::ast::michelson_address as addr;
+    use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
+    use std::collections::HashMap;
     use Instruction::*;
     use Option::None;
 
@@ -6037,7 +6078,11 @@ mod typecheck_tests {
             Ok(ContractScript {
                 parameter: Type::new_contract(Type::Unit),
                 storage: Type::Unit,
-                code: Seq(vec![Drop(None), Unit, Failwith(Type::Unit)])
+                code: Seq(vec![Drop(None), Unit, Failwith(Type::Unit)]),
+                annotations: HashMap::from([(
+                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    (Vec::new(), Type::new_contract(Type::Unit))
+                )]),
             })
         );
     }
@@ -6472,7 +6517,17 @@ mod typecheck_tests {
                     ISelf("foo".try_into().unwrap()),
                     Unit,
                     Failwith(Type::Unit)
-                ])
+                ]),
+                annotations: HashMap::from([
+                    (
+                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        (vec![Direction::Right], Type::Unit)
+                    ),
+                    (
+                        FieldAnnotation::from_str_unchecked("foo"),
+                        (vec![Direction::Left], Type::Int)
+                    )
+                ]),
             })
         );
     }
@@ -6516,7 +6571,17 @@ mod typecheck_tests {
                     ISelf("default".try_into().unwrap()),
                     Unit,
                     Failwith(Type::Unit)
-                ])
+                ]),
+                annotations: HashMap::from([
+                    (
+                        FieldAnnotation::from_str_unchecked("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"),
+                        (vec![Direction::Left], Type::Int)
+                    ),
+                    (
+                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        (vec![Direction::Right], Type::Unit)
+                    ),
+                ]),
             })
         );
     }
