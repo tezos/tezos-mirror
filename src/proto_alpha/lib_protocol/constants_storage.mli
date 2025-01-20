@@ -157,41 +157,9 @@ val direct_ticket_spending_enable : Raw_context.t -> bool
 
 val allow_tz4_delegate_enable : Raw_context.t -> bool
 
-(** The following accessors are not actual parameters, but constants that
-    derive from the protocol parameter. *)
-
-(** Delay, in cycles, before the current state of the stake impacts the
-    issuance rate.*)
-val issuance_modification_delay : Raw_context.t -> int
-
-(** Delay, in cycles, before activation of AI after the voting EMA threshold is
-   reached *)
-val adaptive_issuance_activation_delay : Raw_context.t -> int
-
 (** Tolerated period of inactivity, in cycles, before a delegate is
     deactivated *)
 val tolerated_inactivity_period : Raw_context.t -> int
-
-(** Delay before the activation of a consensus key, in cycles *)
-val consensus_key_activation_delay : Raw_context.t -> int
-
-(** Number of cycles during which a misbehavior of a delegate will induce a
-    slashing of the funds that are currently in its frozen deposit. *)
-val slashable_deposits_period : Raw_context.t -> int
-
-(** Number of **full cycles** to wait for an unstake request to become
-    finalizable.
-
-    In other words, if the unstake is requested during cycle [n], then
-    it becomes finalizable after the end of cycle [n +
-    unstake_finalization_delay], at the beginning of cycle [n +
-    unstake_finalization_delay + 1].
-
-    The exact waiting time depends on when the unstake operation
-    happened inside cycle [n], but it is always at least [n +
-    unstake_finalization_delay] cycles and less than [n +
-    unstake_finalization_delay + 1] cycles. *)
-val unstake_finalization_delay : Raw_context.t -> int
 
 (* attestation aggregation feature flag *)
 val aggregate_attestation : Raw_context.t -> bool
@@ -205,3 +173,23 @@ val round_durations : Raw_context.t -> Round_repr.Durations.t
 (** Builds a representation of all constants (fixed and parametric)
     from the context. *)
 val all : Raw_context.t -> Constants_repr.t
+
+(** The following accessors are not actual parameters, but
+    pseudo-constants that are derived from the protocol parameters. *)
+
+(** See {!Constants_repr.Derived.val-issuance_modification_delay}. *)
+val issuance_modification_delay : Raw_context.t -> int
+
+(** See {!Constants_repr.Derived.val-consensus_key_activation_delay}. *)
+val consensus_key_activation_delay : Raw_context.t -> int
+
+(** See {!Constants_repr.Derived.val-unstake_finalization_delay}. *)
+val unstake_finalization_delay : Raw_context.t -> int
+
+(** Delay, in cycles, before activation of AI after the voting EMA threshold is
+   reached *)
+val adaptive_issuance_activation_delay : Raw_context.t -> int
+
+(** Number of cycles during which a misbehavior of a delegate will induce a
+    slashing of the funds that are currently in its frozen deposit. *)
+val slashable_deposits_period : Raw_context.t -> int

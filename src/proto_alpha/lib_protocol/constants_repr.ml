@@ -165,19 +165,6 @@ let fixed_encoding =
           (req "smart_rollup_message_size_limit" int31)
           (req "smart_rollup_max_number_of_messages_per_level" n)))
 
-let fixed = ()
-
-type t = {fixed : fixed; parametric : Constants_parametric_repr.t}
-
-let all_of_parametric parametric = {fixed; parametric}
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {fixed; parametric} -> (fixed, parametric))
-    (fun (fixed, parametric) -> {fixed; parametric})
-    (merge_objs fixed_encoding Constants_parametric_repr.encoding)
-
 type error += Invalid_protocol_constants of string (* `Permanent *)
 
 let () =
@@ -454,6 +441,102 @@ module Generated = struct
         };
     }
 end
+
+module Derived = struct
+  (** Number of full cycles after which the issuance rate -- computed
+      from current stake over total supply -- will be used.
+
+      That is, the issuance rate corresponding to the staking ratio at
+      the end of cycle n takes effect at the beginning of cycle n +
+      issuance_modification_delay + 1.
+
+      We use consensus_rights_delay so that the issuance rate in one
+      cycle corresponds to the "active" baking power. *)
+  let issuance_modification_delay ~(parametric : Constants_parametric_repr.t) =
+    parametric.consensus_rights_delay
+
+  (** Number of full cycles between the declaration of a new consensus
+      key by a delegate and when it has to be used to sign on behalf of
+      the delegate.
+
+      That is, a key registered at any time during cycle n has to be
+      used from cycle n + consensus_key_activation_delay + 1 on. *)
+  let consensus_key_activation_delay ~(parametric : Constants_parametric_repr.t)
+      =
+    parametric.consensus_rights_delay
+
+  (** Number of full cycles to wait for an unstake request to become
+      finalizable.
+
+      That is, if the unstake is requested in cycle n, then it
+      becomes finalizable at the beginning of cycle n +
+      unstake_finalization_delay + 1.
+
+      The exact waiting time depends on when the unstake operation
+      happened inside cycle n, but it is always at least n +
+      unstake_finalization_delay cycles and less than n +
+      unstake_finalization_delay + 1 cycles. *)
+  let unstake_finalization_delay ~(parametric : Constants_parametric_repr.t) =
+    parametric.consensus_rights_delay + slashing_delay
+
+  type t = {
+    issuance_modification_delay : int;
+    consensus_key_activation_delay : int;
+    unstake_finalization_delay : int;
+  }
+
+  let encoding : t Data_encoding.encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             issuance_modification_delay;
+             consensus_key_activation_delay;
+             unstake_finalization_delay;
+           } ->
+        ( issuance_modification_delay,
+          consensus_key_activation_delay,
+          unstake_finalization_delay ))
+      (fun ( issuance_modification_delay,
+             consensus_key_activation_delay,
+             unstake_finalization_delay ) ->
+        {
+          issuance_modification_delay;
+          consensus_key_activation_delay;
+          unstake_finalization_delay;
+        })
+      (obj3
+         (req "issuance_modification_delay" uint8)
+         (req "consensus_key_activation_delay" uint8)
+         (req "unstake_finalization_delay" uint8))
+
+  let of_parametric parametric =
+    {
+      issuance_modification_delay = issuance_modification_delay ~parametric;
+      consensus_key_activation_delay =
+        consensus_key_activation_delay ~parametric;
+      unstake_finalization_delay = unstake_finalization_delay ~parametric;
+    }
+end
+
+let fixed = ()
+
+type t = {
+  fixed : fixed;
+  parametric : Constants_parametric_repr.t;
+  derived : Derived.t;
+}
+
+let all_of_parametric parametric =
+  {fixed; parametric; derived = Derived.of_parametric parametric}
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {fixed; parametric; derived} -> ((fixed, parametric), derived))
+    (fun ((fixed, parametric), derived) -> {fixed; parametric; derived})
+    (merge_objs
+       (merge_objs fixed_encoding Constants_parametric_repr.encoding)
+       Derived.encoding)
 
 let cache_layout p =
   Constants_parametric_repr.

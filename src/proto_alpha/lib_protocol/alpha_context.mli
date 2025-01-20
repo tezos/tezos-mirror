@@ -980,6 +980,13 @@ module Constants : sig
     val generate : consensus_committee_size:int -> dal_rewards_ratio:Q.t -> t
   end
 
+  (** See {!Constants_repr.Derived}. *)
+  module Derived : sig
+    type t
+
+    val encoding : t Data_encoding.t
+  end
+
   val parametric : context -> Parametric.t
 
   val sc_rollup : context -> Parametric.sc_rollup
@@ -1102,8 +1109,12 @@ module Constants : sig
 
   val all_bakers_attest_activation_level : context -> Raw_level_repr.t option
 
-  (** All constants: fixed and parametric *)
-  type t = private {fixed : fixed; parametric : Parametric.t}
+  (** All constants: fixed and parametric and derived. *)
+  type t = private {
+    fixed : fixed;
+    parametric : Parametric.t;
+    derived : Derived.t;
+  }
 
   (** See {!Constants_storage.all}. *)
   val all : context -> t

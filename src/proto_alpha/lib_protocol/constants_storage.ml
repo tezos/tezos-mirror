@@ -37,17 +37,6 @@ let delegate_parameters_activation_delay c =
   let constants = Raw_context.constants c in
   constants.delegate_parameters_activation_delay
 
-(** Issuance modification delay:
-    number of cycles after which the issuance rate -- computed from current stake
-    over total supply -- will be used.
-
-    We use consensus_rights_delay so that the issuance rate in one cycle
-    corresponds to the "active" staking rights.
-*)
-let issuance_modification_delay c =
-  let constants = Raw_context.constants c in
-  constants.consensus_rights_delay
-
 (** Adaptive Issuance activation delay:
     After the e.m.a. of AI votes reaches the threshold, we wait for this delay
     before effectively activating AI.
@@ -61,20 +50,11 @@ let tolerated_inactivity_period c =
   let constants = Raw_context.constants c in
   constants.tolerated_inactivity_period
 
-(** Delay between consensus key declaration by the delegate and the cycle where
-    it has to be used to sign on behalf of the delegate.  *)
-let consensus_key_activation_delay c =
-  let constants = Raw_context.constants c in
-  constants.consensus_rights_delay
-
 (** Number of cycles during which a misbehavior of the delegate will induce a
     slashing of the funds that are currently in its frozen deposits. *)
 let slashable_deposits_period c =
   let constants = Raw_context.constants c in
   constants.consensus_rights_delay
-
-let unstake_finalization_delay c =
-  slashable_deposits_period c + Constants_repr.slashing_delay
 
 let blocks_per_cycle c =
   let constants = Raw_context.constants c in
@@ -303,3 +283,15 @@ let all_bakers_attest_activation_level c =
 let round_durations ctxt = Raw_context.round_durations ctxt
 
 let all ctxt = Constants_repr.all_of_parametric (parametric ctxt)
+
+(* Derived pseudo-constants *)
+
+let issuance_modification_delay c =
+  Constants_repr.Derived.issuance_modification_delay ~parametric:(parametric c)
+
+let consensus_key_activation_delay c =
+  Constants_repr.Derived.consensus_key_activation_delay
+    ~parametric:(parametric c)
+
+let unstake_finalization_delay c =
+  Constants_repr.Derived.unstake_finalization_delay ~parametric:(parametric c)
