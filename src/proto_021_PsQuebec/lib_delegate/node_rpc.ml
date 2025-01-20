@@ -317,8 +317,8 @@ let monitor_valid_proposals cctxt ~chain ?cache () =
   in
   let stream =
     let map (_chain_id, block_hash, block_header, operations) =
+      () [@profiler.reset_block_section {profiler_module = Profiler} block_hash] ;
       ()
-      [@profiler.reset_block_section {profiler_module = Profiler} block_hash]
       [@profiler.reset_block_section
         {profiler_module = RPC_profiler} block_hash] ;
       (let*! map_result =

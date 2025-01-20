@@ -1471,8 +1471,8 @@ module Make
       @@
       match request with
       | Request.Flush (hash, event, live_blocks, live_operations) -> (
+          () [@profiler.stop] ;
           ()
-          [@profiler.stop]
           [@profiler.record
             {
               verbosity = Notice;
@@ -1518,13 +1518,13 @@ module Make
             pv
             ~force
             op
-          [@profiler.aggregate_s
-            {verbosity = Notice; metadata = [("prometheus", "")]} "on_inject"]
           [@profiler.custom_f
             {driver_ids = [Opentelemetry]}
               (Opentelemetry_profiler.trace_operation
                  (`Operation op)
                  "on_inject")]
+          [@profiler.aggregate_s
+            {verbosity = Notice; metadata = [("prometheus", "")]} "on_inject"]
       | Request.Arrived (oph, op) ->
           Requests.on_arrived
             pv

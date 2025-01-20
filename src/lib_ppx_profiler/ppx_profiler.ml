@@ -42,11 +42,46 @@ let mapper =
 
         method! expression e =
           let detected_rewriters =
-            (* The list of attributes is reverted to make sure that we preprocess
-               them from left to right *)
-            Rewriter.extract_rewriters
-              handled_drivers
-              (List.rev e.pexp_attributes)
+            (* By choice and to be coherent with how OCamlformat parses two
+               attributes attached to the same value. For more details
+               (https://gitlab.com/tezos/tezos/-/issues/7691):
+
+               - Previous implementation was creating the following issue:
+
+                 Let's take a simple example:
+
+                 {[
+                   let wrap_1 f = Format.printf "wrap_1\n%!"; f ()
+                   let wrap_2 f = Format.printf "wrap_2\n%!"; f ()
+
+                   let f x =
+                     g x [@profiler.custom_f wrap_1] [@profiler.custom_f wrap_2]
+                 ]}
+
+                 With the current implementation, it will be compiled as:
+
+                 {[
+                   let f x =
+                     wrap_1 (fun () ->
+                         wrap_2 (fun () -> g x) ())
+                       ()
+                 ]}
+
+               - With the current implementation
+
+                 In the OCaml syntax [f [@attr1] [@attr2]] is equivalent to [(f [@attr1]) [@attr2]].
+
+                 It is even assessed by ocamlformat that would remove these unneeded parenthesis.
+
+                 As such, the right compilation should be:
+
+                 {[
+                   let f x =
+                     wrap_2 (fun () ->
+                         wrap_1 (fun () -> g x) ())
+                       ()
+                 ]} *)
+            Rewriter.extract_rewriters handled_drivers e.pexp_attributes
           in
           (* Remove the handled attributes that have been transformed in rewriters *)
           Expression.remove_attributes e
