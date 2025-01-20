@@ -18,6 +18,54 @@ else
   PREFIX=
 fi
 
+# Function to run apt-get with retries and exponential backoff for a specific error
+apt_get_with_retries() {
+  # Maximum retries
+  max_retries=5
+  # Initial delay in seconds
+  delay=1
+
+  # Loop for retries
+  for i in $(seq 1 "$max_retries"); do
+    echo "Attempt $i of $max_retries..."
+
+    # Run apt-get and capture the output and exit status
+    output=$(apt-get "$@" 2>&1)
+    status=$?
+
+    # Check if apt-get succeeded
+    if [ $status -eq 0 ]; then
+      return 0
+    fi
+
+    # Check for the specific error message pattern
+    echo "$output" | grep -q "File has unexpected size" && echo "$output" | grep -q "Mirror sync in progress"
+
+    #shellcheck disable=SC2181
+    if [ $? -eq 0 ]; then
+      # If the specific error occurs, retry with exponential backoff
+      echo "Error detected: Mirror sync in progress. Retrying in $delay seconds..."
+      echo "$output"
+      sleep "$delay"
+      # Exponential backoff (doubling the delay)
+      # 1 + 3 + 9 + 27 + 81 = 31, so we wait 121s maximum
+      # in total with max_retries = 5.
+      delay=$((delay * 3))
+    else
+      # If the error is not the one we are looking for, exit with failure
+      echo "apt-get failed with an unexpected error. Exiting."
+      echo "$output"
+      exit 1
+    fi
+  done
+
+  echo "apt-get failed after $max_retries attempts."
+  exit 1
+}
+
+# Replace apt-get with the new function
+alias apt-get="apt_get_with_retries"
+
 . scripts/ci/octez-packages-version.sh
 
 case "$RELEASETYPE" in
@@ -61,14 +109,14 @@ if [ "$RELEASETYPE" = "Master" ]; then
     sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
   echo "deb [arch=amd64] https://packages.nomadic-labs.com/$distribution $release main" |
     sudo tee /etc/apt/sources.list.d/octez.list
-  sudo apt-get update
+  apt-get update
   # [end add repository]
 else
   apt-get install -y sudo gpg curl
   REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
   curl "https://$bucket.storage.googleapis.com/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
   echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
-  sudo apt-get update
+  apt-get update
 fi
 
 # [ preeseed octez ]
@@ -93,18 +141,18 @@ EOF
 fi
 
 # [install tezos]
-sudo apt-get install -y octez-client
-sudo apt-get install -y octez-node
-sudo apt-get install -y octez-baker
-sudo apt-get install -y octez-dal-node
+apt-get install -y octez-client
+apt-get install -y octez-node
+apt-get install -y octez-baker
+apt-get install -y octez-dal-node
 
 # [install octez additional packages]
 if [ -n "$PREFIX" ]; then
   # [install octez NEXT packages]
-  sudo apt-get install -y octez-smart-rollup-node
+  apt-get install -y octez-smart-rollup-node
 else
   # [install octez current packages]
-  sudo apt-get install -y octez-smartrollup
+  apt-get install -y octez-smartrollup
 fi
 
 # [test executables]
@@ -114,7 +162,7 @@ octez-node --version
 "octez-accuser-$protocol" --version
 
 # [test autopurge]
-sudo apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
+apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
 
 # [check autopurge]
 set +x
