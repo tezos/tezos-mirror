@@ -39,6 +39,9 @@
   triggering a flush of the delayed inbox. (!16425)
 - An optional chain_id field has been added to the blueprints chunks
   sent by the sequencer. (!16366)
+- The option to limit the block production to at most one block per
+  Tezos level, which was added in version
+  ec7c3b349624896b269e179384d0a45cf39e1145, has been removed. (!16302)
 
 ### Bug fixes
 
