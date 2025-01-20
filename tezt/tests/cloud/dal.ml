@@ -2776,7 +2776,9 @@ let benchmark () =
       let next_agent ~name =
         let agent =
           match List.find_opt (fun agent -> Agent.name agent = name) agents with
-          | None -> Test.fail ~__LOC__ "Agent not found: %s" name
+          | None ->
+              if Cli.proxy_localhost then List.hd agents
+              else Test.fail ~__LOC__ "Agent not found: %s" name
           | Some agent -> agent
         in
         Lwt.return agent
