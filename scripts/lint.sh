@@ -17,6 +17,7 @@ Where <action> can be:
 * --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
 * --check-jsonnet-format: checks that the jsonnet files are formatted.
 * --check-jsonnet-lint: checks that the jsonnet files are compliant with linting rules..
+* --check-quebec-plugin-ghostnet-fix: checks that the quebec plugin ghostnet fix exists.
 * --help: display this and return 0.
 EOF
 }
@@ -314,6 +315,18 @@ check_jsonnet_lint() {
   fi
 }
 
+# Mempool in lib_plugin is usually removed when the associated protocol is frozen.
+# However to replay Ghostnet's history, it is necessary to keep a fix in the
+# mempool's validation.
+check_quebec_plugin_ghostnet_fix() {
+  count=$(grep -ho "fix_ghostnet_state" src/proto_021_PsQuebec/lib_plugin/ghostnet_fix.ml src/proto_021_PsQuebec/lib_plugin/plugin_registerer.ml | wc -l)
+  if [[ "$count" -ne 2 ]]; then
+    echo "Missing 'fix_ghostnet_state' in Quebec plugin."
+    exit 1
+  fi
+  exit 0
+}
+
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
   say "provide one action (see --help)"
   exit 1
@@ -355,6 +368,9 @@ case "$action" in
   ;;
 "--check-jsonnet-lint")
   action=check_jsonnet_lint
+  ;;
+"--check-quebec-plugin-ghostnet-fix")
+  action=check_quebec_plugin_ghostnet_fix
   ;;
 "help" | "-help" | "--help" | "-h")
   usage
