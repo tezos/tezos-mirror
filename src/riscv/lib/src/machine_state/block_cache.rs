@@ -524,7 +524,11 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     where
         M: ManagerReadWrite,
     {
-        debug_assert_eq!(instr.width(), InstrWidth::Compressed);
+        debug_assert_eq!(
+            instr.width(),
+            InstrWidth::Compressed,
+            "expected compressed instruction, found: {instr:?}"
+        );
 
         let next_addr = self.next_instr_addr.read();
 
@@ -542,7 +546,11 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     where
         M: ManagerReadWrite,
     {
-        debug_assert_eq!(instr.width(), InstrWidth::Uncompressed);
+        debug_assert_eq!(
+            instr.width(),
+            InstrWidth::Uncompressed,
+            "expected uncompressed instruction, found: {instr:?}"
+        );
 
         // ensure uncompressed does not cross page boundaries
         const END_OF_PAGE: Address = PAGE_SIZE - 2;
