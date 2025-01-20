@@ -784,3 +784,19 @@ let trap_registration_fail =
     ("delegate", Signature.Public_key_hash.encoding)
     ("slot_index", Data_encoding.int31)
     ("shard_index", Data_encoding.int31)
+
+let trap_delegate_attestation_not_found =
+  declare_5
+    ~section
+    ~name:"trap_delegate_attestation_not_found"
+    ~msg:
+      "Unable to associate an attestation with delegate {delegate} for \
+       attested level {attested_level}. Failed while injecting trap evidence \
+       from published level {published_level} at slot index {slot_index} and \
+       shard index {shard_index}"
+    ~level:Warning
+    ("delegate", Signature.Public_key_hash.encoding)
+    ("slot_index", Data_encoding.int31)
+    ("shard_index", Data_encoding.int31)
+    ("published_level", Data_encoding.int32)
+    ("attested_level", Data_encoding.int32)
