@@ -373,6 +373,7 @@ type etherlink_configuration = {
   etherlink_producers : int;
   (* Empty list means DAL FF is set to false. *)
   etherlink_dal_slots : int list;
+  chain_id : int option;
 }
 
 type configuration = {
@@ -1878,6 +1879,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~bootstrap_accounts
       ~output:output_config
       ~enable_dal:(Option.is_some dal_slots)
+      ?chain_id:etherlink_configuration.chain_id
       ?dal_slots
       ()
   in
@@ -2582,7 +2584,13 @@ let configuration, etherlink_configuration =
   in
   let etherlink =
     if etherlink then
-      Some {etherlink_sequencer; etherlink_producers; etherlink_dal_slots}
+      Some
+        {
+          etherlink_sequencer;
+          etherlink_producers;
+          etherlink_dal_slots;
+          chain_id = None;
+        }
     else None
   in
   let blocks_history = Cli.blocks_history in
