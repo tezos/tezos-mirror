@@ -4,6 +4,7 @@
 
 use crate::parsing::{parse_unsigned_blueprint_chunk, SequencerBlueprintRes};
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
+use primitive_types::U256;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
@@ -72,9 +73,10 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
 fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
+    head_level: &Option<U256>,
 ) -> (Option<ParsedInput>, usize) {
     if let Result::Ok(chunk_length) = rlp_length(bytes) {
-        match parse_unsigned_blueprint_chunk(&bytes[..chunk_length]) {
+        match parse_unsigned_blueprint_chunk(&bytes[..chunk_length], head_level) {
             SequencerBlueprintRes::SequencerBlueprint(unsigned_chunk) => (
                 Some(ParsedInput::UnsignedSequencerBlueprint(unsigned_chunk)),
                 chunk_length + TAG_SIZE,
@@ -95,6 +97,7 @@ fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
 fn parse_input<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
+    head_level: &Option<U256>,
 ) -> (Option<ParsedInput>, usize) {
     // The expected format is:
 
@@ -104,7 +107,7 @@ fn parse_input<Host: Runtime>(
         DAL_PADDING_TAG => (Some(ParsedInput::Padding), TAG_SIZE),
         DAL_BLUEPRINT_INPUT_TAG => {
             let bytes = &bytes[TAG_SIZE..];
-            parse_unsigned_sequencer_blueprint(host, bytes)
+            parse_unsigned_sequencer_blueprint(host, bytes, head_level)
         }
         invalid_tag => {
             log!(
@@ -122,6 +125,7 @@ fn parse_input<Host: Runtime>(
 fn parse_slot<Host: Runtime>(
     host: &mut Host,
     slot: &[u8],
+    head_level: &Option<U256>,
 ) -> Vec<UnsignedSequencerBlueprint> {
     // The format of a dal slot is
     // tagged chunk | tagged chunk | .. | padding
@@ -141,7 +145,7 @@ fn parse_slot<Host: Runtime>(
         if offset >= slot.len() {
             return buffer;
         };
-        let (next_input, length) = parse_input(host, &slot[offset..]);
+        let (next_input, length) = parse_input(host, &slot[offset..], head_level);
 
         match next_input {
             None => return buffer, // Once an unparsable input has been read,
@@ -161,6 +165,7 @@ fn parse_slot<Host: Runtime>(
 pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
     host: &mut Host,
     params: &RollupDalParameters,
+    head_level: &Option<U256>,
     slot_index: u8,
     published_level: u32,
 ) -> Option<Vec<UnsignedSequencerBlueprint>> {
@@ -177,7 +182,7 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
         // size, we need to remove this padding before parsing the
         // slot as a blueprint chunk.
 
-        let chunks = parse_slot(host, &slot);
+        let chunks = parse_slot(host, &slot, head_level);
         log!(
             host,
             Debug,
@@ -263,11 +268,11 @@ pub mod tests {
 
     pub fn chunk_blueprint(
         blueprint: BlueprintWithDelayedHashes,
+        number: U256,
     ) -> Vec<UnsignedSequencerBlueprint> {
         let bytes = blueprint.rlp_bytes();
         let chunks = bytes.chunks(MAX_CHUNK_SIZE);
         let nb_chunks = chunks.len();
-        let number = U256::zero();
         chunks
             .enumerate()
             .map(|(chunk_index, chunk)| UnsignedSequencerBlueprint {
@@ -339,7 +344,7 @@ pub mod tests {
         let mut host = MockKernelHost::default();
 
         let blueprint = dummy_big_blueprint(100);
-        let chunks = chunk_blueprint(blueprint);
+        let chunks = chunk_blueprint(blueprint, 0.into());
         assert!(
             chunks.len() >= 2,
             "Blueprint is composed of {} chunks, but at least two are required for the test to make sense",
@@ -353,6 +358,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -370,7 +376,7 @@ pub mod tests {
         let mut host = MockKernelHost::default();
 
         let blueprint = dummy_big_blueprint(100);
-        let chunks = chunk_blueprint(blueprint);
+        let chunks = chunk_blueprint(blueprint, 0.into());
 
         assert!(
             chunks.len() >= 2,
@@ -392,6 +398,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -429,17 +436,17 @@ pub mod tests {
     fn test_parse_slot_resume_after_invalid_chunk() {
         let mut host = MockKernelHost::default();
 
-        let valid_blueprint_chunks_1 = chunk_blueprint(dummy_big_blueprint(1));
+        let valid_blueprint_chunks_1 = chunk_blueprint(dummy_big_blueprint(1), 0.into());
 
         let invalid_blueprint_chunks = {
-            let mut chunks = chunk_blueprint(dummy_big_blueprint(1));
+            let mut chunks = chunk_blueprint(dummy_big_blueprint(1), 0.into());
             for chunk in chunks.iter_mut() {
                 chunk.nb_chunks = crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS + 1
             }
             chunks
         };
 
-        let valid_blueprint_chunks_2 = chunk_blueprint(dummy_big_blueprint(1));
+        let valid_blueprint_chunks_2 = chunk_blueprint(dummy_big_blueprint(1), 0.into());
 
         let mut chunks = vec![];
         chunks.extend(valid_blueprint_chunks_1.clone());
@@ -457,6 +464,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -523,7 +531,7 @@ pub mod tests {
         let mut host = MockKernelHost::default();
 
         let blueprint = dummy_big_blueprint(1);
-        let chunks = chunk_blueprint(blueprint);
+        let chunks = chunk_blueprint(blueprint, 0.into());
 
         let dal_parameters = host.reveal_dal_parameters();
         let published_level = host.host.level();
@@ -534,6 +542,7 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
@@ -547,10 +556,45 @@ pub mod tests {
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
             &dal_parameters,
+            &None,
             0,
             published_level,
         );
 
         assert_eq!(None, chunks_from_slot)
+    }
+
+    fn chunk_blueprint_range(min: usize, max: usize) -> Vec<UnsignedSequencerBlueprint> {
+        let mut chunks = vec![];
+        for n in min..max {
+            chunks.extend(chunk_blueprint(dummy_big_blueprint(1), n.into()));
+        }
+        chunks
+    }
+
+    #[test]
+    fn test_parse_slot_with_blueprints_from_the_past() {
+        let mut host = MockKernelHost::default();
+
+        let head_level = Some(2.into());
+        let chunks = chunk_blueprint_range(0, 5);
+        let expected_chunks = chunk_blueprint_range(3, 5);
+
+        assert_eq!(5, chunks.len());
+        assert_eq!(2, expected_chunks.len());
+
+        let dal_parameters = host.reveal_dal_parameters();
+        let published_level = host.host.level() - (dal_parameters.attestation_lag as u32);
+        prepare_dal_slot(&mut host, &chunks, published_level as i32, 0);
+
+        let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
+            &mut host,
+            &dal_parameters,
+            &head_level,
+            0,
+            published_level,
+        );
+
+        assert_eq!(chunks_from_slot, Some(expected_chunks));
     }
 }

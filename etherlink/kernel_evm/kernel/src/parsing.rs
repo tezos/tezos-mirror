@@ -309,16 +309,32 @@ pub struct SequencerParsingContext {
     pub head_level: Option<U256>,
 }
 
-pub fn parse_unsigned_blueprint_chunk(bytes: &[u8]) -> SequencerBlueprintRes {
+fn check_unsigned_blueprint_chunk(
+    unsigned_seq_blueprint: UnsignedSequencerBlueprint,
+    head_level: &Option<U256>,
+) -> SequencerBlueprintRes {
+    if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
+        return SequencerBlueprintRes::InvalidNumberOfChunks;
+    }
+
+    if let Some(head_level) = head_level {
+        if unsigned_seq_blueprint.number.le(head_level) {
+            return SequencerBlueprintRes::InvalidNumber;
+        }
+    }
+
+    SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint)
+}
+
+pub fn parse_unsigned_blueprint_chunk(
+    bytes: &[u8],
+    head_level: &Option<U256>,
+) -> SequencerBlueprintRes {
     // Parse an unsigned sequencer blueprint
     match UnsignedSequencerBlueprint::from_rlp_bytes(bytes).ok() {
         None => SequencerBlueprintRes::Unparsable,
         Some(unsigned_seq_blueprint) => {
-            if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
-                return SequencerBlueprintRes::InvalidNumberOfChunks;
-            }
-
-            SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint)
+            check_unsigned_blueprint_chunk(unsigned_seq_blueprint, head_level)
         }
     }
 }
@@ -331,32 +347,28 @@ pub fn parse_blueprint_chunk(
     // Parse the sequencer blueprint
     match SequencerBlueprint::from_rlp_bytes(bytes).ok() {
         None => SequencerBlueprintRes::Unparsable,
-        Some(seq_blueprint) => {
-            // Creates and encodes the unsigned blueprint:
-            let unsigned_seq_blueprint: UnsignedSequencerBlueprint =
-                (&seq_blueprint).into();
-            if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
-                return SequencerBlueprintRes::InvalidNumberOfChunks;
-            }
+        Some(SequencerBlueprint {
+            blueprint,
+            signature,
+        }) => match check_unsigned_blueprint_chunk(blueprint, head_level) {
+            SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint) => {
+                let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
 
-            if let Some(head_level) = head_level {
-                if unsigned_seq_blueprint.number.le(head_level) {
-                    return SequencerBlueprintRes::InvalidNumber;
+                let correctly_signed = sequencer
+                    .verify_signature(&signature.clone().into(), &bytes)
+                    .unwrap_or(false);
+
+                if correctly_signed {
+                    SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint)
+                } else {
+                    SequencerBlueprintRes::InvalidSignature
                 }
             }
-
-            let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
-
-            let correctly_signed = sequencer
-                .verify_signature(&seq_blueprint.signature.clone().into(), &bytes)
-                .unwrap_or(false);
-
-            if correctly_signed {
-                SequencerBlueprintRes::SequencerBlueprint(unsigned_seq_blueprint)
-            } else {
-                SequencerBlueprintRes::InvalidSignature
-            }
-        }
+            res @ (SequencerBlueprintRes::InvalidNumberOfChunks
+            | SequencerBlueprintRes::InvalidSignature
+            | SequencerBlueprintRes::InvalidNumber
+            | SequencerBlueprintRes::Unparsable) => res,
+        },
     }
 }
 
