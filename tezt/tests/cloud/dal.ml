@@ -2582,6 +2582,7 @@ let configuration, etherlink_configuration =
       ~some:Option.some
       Cli.fundraiser
   in
+  let etherlink_chain_id = Cli.etherlink_chain_id in
   let etherlink =
     if etherlink then
       Some
@@ -2589,7 +2590,7 @@ let configuration, etherlink_configuration =
           etherlink_sequencer;
           etherlink_producers;
           etherlink_dal_slots;
-          chain_id = None;
+          chain_id = etherlink_chain_id;
         }
     else None
   in

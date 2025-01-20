@@ -209,6 +209,9 @@ let etherlink_sequencer =
 let etherlink_producers =
   Clap.default_int ~section ~long:"etherlink-producers" 0
 
+let etherlink_chain_id =
+  Clap.optional_int ~section ~long:"etherlink-chain-id" ()
+
 let disconnect =
   let disconnect_typ =
     let parse string =
