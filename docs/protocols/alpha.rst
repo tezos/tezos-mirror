@@ -36,6 +36,10 @@ Gas improvements
 Breaking Changes
 ----------------
 
+- ``Update_consensus_key`` operation now has an optional ``proof`` parameter.
+  This parameter is needed to update to a tz4 (BLS) consensus key. (MR
+  :gl:`!15670`)
+
 RPC Changes
 -----------
 

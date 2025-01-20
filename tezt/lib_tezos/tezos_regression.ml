@@ -23,36 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let replacements =
+  [
+    ("sh\\w{72}\\b", "[DAL_SLOT_HEADER]");
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3752
+       Remove this regexp as soon as the WASM PVM stabilizes. *)
+    ("srs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");
+    ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
+    ("SRCo\\w{50}\\b", "[SC_ROLLUP_CONTEXT_HASH]");
+    ("Co\\w{50}\\b", "[CONTEXT_HASH]");
+    ("src1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
+    ("srib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
+    ("srib2\\w{50}\\b", "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]");
+    ("srib3\\w{50}\\b", "[SC_ROLLUP_INBOX_MESSAGE_HASH]");
+    ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
+    ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
+    ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
+    ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
+    ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
+    ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
+    (* Ports are non-deterministic when using -j. *)
+    ("/localhost:\\d{4,5}/", "/[HOST]:[PORT]/");
+    ("/127.0.0.1:\\d{4,5}/", "/[HOST]:[PORT]/");
+    ("/\\[::1\\]:\\d{4,5}/", "/[HOST]:[PORT]/");
+  ]
+
 (* Replace variables that may change between different runs by constants.
 
    Order them by length.
 *)
-let replace_variables string =
-  let replacements =
-    [
-      ("sh\\w{72}\\b", "[DAL_SLOT_HEADER]");
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3752
-         Remove this regexp as soon as the WASM PVM stabilizes. *)
-      ("srs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");
-      ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
-      ("SRCo\\w{50}\\b", "[SC_ROLLUP_CONTEXT_HASH]");
-      ("Co\\w{50}\\b", "[CONTEXT_HASH]");
-      ("src1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
-      ("srib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
-      ("srib2\\w{50}\\b", "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]");
-      ("srib3\\w{50}\\b", "[SC_ROLLUP_INBOX_MESSAGE_HASH]");
-      ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
-      ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
-      ("tz[1234]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
-      ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
-      ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
-      ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
-      (* Ports are non-deterministic when using -j. *)
-      ("/localhost:\\d{4,5}/", "/[HOST]:[PORT]/");
-      ("/127.0.0.1:\\d{4,5}/", "/[HOST]:[PORT]/");
-      ("/\\[::1\\]:\\d{4,5}/", "/[HOST]:[PORT]/");
-    ]
-  in
+let replace_variables ?(replacements = replacements) string =
   List.fold_left
     (fun string (replace, by) ->
       replace_string ~all:true (rex replace) ~by string)
@@ -63,7 +63,7 @@ let scrubbed_global_options =
   ["--base-dir"; "-d"; "--endpoint"; "-E"; "--sources"]
 
 let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
-    ?(replace_variables = replace_variables) () =
+    ?(replace_variables = replace_variables ~replacements) () =
   let on_spawn command arguments =
     (* Remove arguments that shouldn't be captured in regression output. *)
     let arguments, _ =

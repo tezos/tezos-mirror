@@ -209,7 +209,8 @@ val update_consensus_key :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?fee:Tez.t ->
-  consensus_pk:Signature.public_key ->
+  ?secret_key_uri:Client_keys.sk_uri ->
+  public_key:Signature.public_key ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   Signature.public_key ->
@@ -283,7 +284,7 @@ val register_as_delegate :
   ?fee:Tez.t ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
-  ?consensus_pk:public_key ->
+  ?consensus_keys:public_key * Client_keys.sk_uri option ->
   public_key ->
   (Kind.delegation Kind.manager Injection.result
   * (Kind.update_consensus_key Kind.manager contents

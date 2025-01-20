@@ -2330,6 +2330,54 @@ module Manager = struct
            trace to this effect. *)
         record_trace Gas.Gas_limit_too_high
 
+  let check_update_consensus_key vi remaining_gas source
+      (public_key : Signature.Public_key.t) proof =
+    let open Result_syntax in
+    if Constants.allow_tz4_delegate_enable vi.ctxt then
+      match (public_key, proof) with
+      | Bls _bls_public_key, None ->
+          result_error
+            (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
+               {source; public_key})
+      | ( Bls _bls_public_key,
+          Some
+            ((Signature.Ed25519 _ | Signature.Secp256k1 _ | Signature.P256 _) as
+             proof) ) ->
+          result_error
+            (Validate_errors.Manager.Update_consensus_key_with_incorrect_proof
+               {public_key; proof})
+      | Bls bls_public_key, Some (Signature.Bls _ | Signature.Unknown _) ->
+          (* Compute the gas cost to encode the consensus public key and
+             check the proof. *)
+          let gas_cost_for_sig_check =
+            let open Saturation_repr.Syntax in
+            let size = Bls.Public_key.size bls_public_key in
+            Operation_costs.serialization_cost size
+            + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+                Bls
+                size
+          in
+          let* (_ : Gas.Arith.fp) =
+            record_trace
+              Insufficient_gas_for_manager
+              (Gas.consume_from
+                 (Gas.Arith.fp remaining_gas)
+                 gas_cost_for_sig_check)
+          in
+          return_unit
+      | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof ->
+          result_error
+            (Validate_errors.Manager.Update_consensus_key_with_unused_proof
+               {source; public_key})
+      | (Ed25519 _ | Secp256k1 _ | P256 _), None -> return_unit
+    else
+      let* () = Delegate.Consensus_key.check_not_tz4 public_key in
+      if Option.is_some proof then
+        result_error
+          (Validate_errors.Manager.Update_consensus_key_with_unused_proof
+             {source; public_key})
+      else return_unit
+
   let check_kind_specific_content (type kind)
       (contents : kind Kind.manager contents) remaining_gas vi =
     let open Result_syntax in
@@ -2363,9 +2411,8 @@ module Manager = struct
     | Delegation (Some pkh) ->
         if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
         else Delegate.check_not_tz4 pkh
-    | Update_consensus_key pk ->
-        if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
-        else Delegate.Consensus_key.check_not_tz4 pk
+    | Update_consensus_key {public_key; proof} ->
+        check_update_consensus_key vi remaining_gas source public_key proof
     | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
         return_unit
     | Transfer_ticket {contents; ty; _} ->

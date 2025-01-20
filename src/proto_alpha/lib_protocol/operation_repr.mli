@@ -399,19 +399,23 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
-  (* [Update_consensus_key pk] updates the consensus key of
-     the signing delegate to [pk]. *)
-  | Update_consensus_key :
-      Signature.Public_key.t
+  (* [Update_consensus_key {public_key; proof}] updates the consensus key of the
+     signing delegate to [public_key]. To prevent rogue key attacks, a proof of
+     possession must be provided if and only if the new key is a BLS key. The
+     [proof] is a signature over the public key itself. *)
+  | Update_consensus_key : {
+      public_key : Signature.Public_key.t;
+      proof : Signature.signature option;
+    }
       -> Kind.update_consensus_key manager_operation
-      (** [Transfer_ticket] allows an implicit account (the "claimer") to
-          receive [amount] tickets, pulled out of [tx_rollup], to the
-          [entrypoint] of the smart contract [destination].
+      (** [Transfer_ticket] allows an implicit account (the "claimer") to receive
+     [amount] tickets, pulled out of [tx_rollup], to the [entrypoint] of the
+     smart contract [destination].
 
-          The ticket must have been addressed to the
-          claimer, who must be the source of this operation. It must have been
-          pulled out at [level] and from the message at [message_index]. The ticket
-          is composed of [ticketer; ty; contents]. *)
+     The ticket must have been addressed to the claimer, who must be the source
+     of this operation. It must have been pulled out at [level] and from the
+     message at [message_index]. The ticket is composed of [ticketer; ty;
+     contents]. *)
   | Transfer_ticket : {
       contents : Script_repr.lazy_expr;  (** Contents of the withdrawn ticket *)
       ty : Script_repr.lazy_expr;
