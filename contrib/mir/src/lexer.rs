@@ -148,6 +148,8 @@ defprim! {
     #[token("Gas_exhaustion")]
     OutOfGas,
     now,
+    source,
+    sender,
 }
 
 /// Either a Micheline primitive, TZT primitive, or a macro lexeme.
