@@ -7,7 +7,6 @@ mod atomics;
 pub mod c;
 mod common_memory;
 pub mod float;
-pub mod i;
 pub mod rv32a;
 pub mod rv32c;
 pub mod rv32i;

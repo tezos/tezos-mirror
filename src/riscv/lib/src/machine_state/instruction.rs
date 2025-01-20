@@ -22,8 +22,8 @@ use super::{
 };
 use crate::{
     default::ConstDefault,
-    instruction_context::ICB,
-    interpreter::{c, i},
+    instruction_context::{IcbLoweringFn, ICB},
+    interpreter::c,
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -591,6 +591,30 @@ impl OpCode {
             Self::UnknownCompressed => Args::run_illegal,
         }
     }
+
+    /// Dispatch an opcode to the function that can 'lower' the instruction to the JIT IR.
+    ///
+    /// This mechanism leverages the [InstructionContextBuilder] to do so.
+    ///
+    /// TODO (RV-394): this can be removed once all opcodes are supported, with [`OpCode::to_run`] being
+    /// used instead.
+    ///
+    /// # SAFETY
+    /// Calling the returned function **must** correspond to an `Args` belonging to an
+    /// instruction where the `OpCode` is the same as the `OpCode` of the current instruction.
+    ///
+    /// [InstructionContextBuilder]: ICB
+    #[inline(always)]
+    pub fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
+        use OpCode::*;
+
+        match self {
+            CMv => Some(Args::run_cmv),
+            CNop => Some(Args::run_cnop),
+            CAdd => Some(Args::run_cadd),
+            _ => None,
+        }
+    }
 }
 
 impl Instruction {
@@ -682,15 +706,6 @@ macro_rules! impl_r_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rs1.x, self.rs2.x, self.rd.x);
             Ok(Next(self.width))
-        }
-    };
-    ($impl: path, $fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
-            $impl(icb, self.rs1.x, self.rs2.x, self.rd.x);
-
-            icb.ok(Next(self.width))
         }
     };
 }
@@ -1046,7 +1061,7 @@ macro_rules! impl_f_r_type {
 
 impl Args {
     // RV64I R-type instructions
-    impl_r_type!(i::run_add, run_add);
+    impl_r_type!(run_add);
     impl_r_type!(run_sub);
     impl_r_type!(run_xor);
     impl_r_type!(run_or);
@@ -1310,12 +1325,9 @@ impl Args {
         Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
     }
 
-    fn run_cnop<ML: MainMemoryLayout, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<ML, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
-        core.run_cnop();
-        Ok(Next(InstrWidth::Compressed))
+    fn run_cnop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+        c::run_cnop(icb);
+        icb.ok(Next(InstrWidth::Compressed))
     }
 
     // RV64C compressed instructions

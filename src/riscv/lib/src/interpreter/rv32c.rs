@@ -271,12 +271,6 @@ where
         debug_assert!(imm >= 0 && imm % 4 == 0);
         self.run_sw(imm, sp, rs2)
     }
-
-    /// C.NOP CI-type compressed instruction
-    ///
-    /// Does not change any user-visible state, except for advancing the pc and
-    /// incrementing any applicable performance counters. Equivalent to `NOP`.
-    pub fn run_cnop(&self) {}
 }
 
 #[cfg(test)]
