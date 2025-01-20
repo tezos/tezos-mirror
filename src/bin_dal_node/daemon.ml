@@ -1219,9 +1219,9 @@ let run ~data_dir ~configuration_override =
     let rec loop () =
       catch_es
         (fun () ->
+          let*! () = Lwt_unix.sleep Constants.bootstrap_dns_refresh_delay in
           let* current_points = resolve bootstrap_names in
           bootstrap_points := current_points ;
-          let*! () = Lwt_unix.sleep Constants.bootstrap_dns_refresh_delay in
           loop ())
         ~catch_only:(function Lwt.Canceled -> true | _ -> false)
     in
