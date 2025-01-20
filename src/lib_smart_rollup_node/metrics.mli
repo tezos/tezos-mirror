@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** A description of the metrics exported by the node. *)
-val listing : unit -> string Lwt.t
+val listing : enable_performance_metrics:bool -> string Lwt.t
 
 (** The collector registry for the rollup node metrics. *)
 val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
@@ -149,7 +149,8 @@ module GC : sig
   val set_oldest_available_level : int32 -> unit
 end
 
-module Performance : sig
-  (** Set all statistics *)
+module type PERFORMANCE = sig
   val set_stats : data_dir:string -> unit Lwt.t
 end
+
+val performance_metrics : (module PERFORMANCE) Lazy.t

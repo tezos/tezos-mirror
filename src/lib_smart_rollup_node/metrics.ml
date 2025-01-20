@@ -93,25 +93,6 @@ module Cohttp (Server : Cohttp_lwt.S.Server) = struct
     | _ -> Server.respond_error ~status:`Bad_request ~body:"Bad request" ()
 end
 
-let listing () =
-  let open Lwt_syntax in
-  let* data_sc = CollectorRegistry.(collect sc_rollup_node_registry) in
-  let+ data_injector = CollectorRegistry.(collect Injector.registry) in
-  let data_merged =
-    MetricFamilyMap.merge
-      (fun _ v1 v2 -> match v1 with Some v1 -> Some v1 | _ -> v2)
-      data_sc
-      data_injector
-  in
-  let body =
-    Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data_merged
-  in
-  let metrics =
-    String.split_on_char '\n' body
-    |> List.filter (String.starts_with ~prefix:"#")
-  in
-  String.concat "\n" metrics
-
 module Metrics_server = Cohttp (Cohttp_lwt_unix.Server)
 
 let metrics_serve metrics_addr =
@@ -417,20 +398,47 @@ module DAL_batcher = struct
       Int.to_float
 end
 
-module Performance = struct
+module Performance_metrics_config = struct
   open Octez_performance_metrics
 
-  include Make (struct
-    let registry = sc_rollup_node_registry
+  let registry = sc_rollup_node_registry
 
-    let subsystem = "sc_rollup_node"
+  let subsystem = "sc_rollup_node"
 
-    let directories =
-      [
-        data_dir_element "storage";
-        data_dir_element "context";
-        data_dir_element ~metrics_suffix:"wasm" "wasm_2_0_0";
-        data_dir_element ~metrics_suffix:"logs" "daily_logs";
-      ]
-  end)
+  let directories =
+    [
+      data_dir_element "storage";
+      data_dir_element "context";
+      data_dir_element ~metrics_suffix:"wasm" "wasm_2_0_0";
+      data_dir_element ~metrics_suffix:"logs" "daily_logs";
+    ]
 end
+
+module type PERFORMANCE = sig
+  val set_stats : data_dir:string -> unit Lwt.t
+end
+
+let performance_metrics : (module PERFORMANCE) Lazy.t =
+  lazy
+    (let module M = Octez_performance_metrics.Make (Performance_metrics_config) in
+    (module M : PERFORMANCE))
+
+let listing ~enable_performance_metrics =
+  let open Lwt_syntax in
+  if enable_performance_metrics then ignore (Lazy.force_val performance_metrics) ;
+  let* data_sc = CollectorRegistry.(collect sc_rollup_node_registry) in
+  let+ data_injector = CollectorRegistry.(collect Injector.registry) in
+  let data_merged =
+    MetricFamilyMap.merge
+      (fun _ v1 v2 -> match v1 with Some v1 -> Some v1 | _ -> v2)
+      data_sc
+      data_injector
+  in
+  let body =
+    Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data_merged
+  in
+  let metrics =
+    String.split_on_char '\n' body
+    |> List.filter (String.starts_with ~prefix:"#")
+  in
+  String.concat "\n" metrics

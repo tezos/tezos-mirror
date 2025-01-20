@@ -634,8 +634,8 @@ let list_metrics_command =
     ~desc:"List the metrics exported by the smart rollup node."
     (args1 enable_performance_metrics_arg)
     (prefixes ["list"; "metrics"] @@ stop)
-  @@ fun _enable_performance_metrics ctxt ->
-  let*! metrics = Metrics.listing () in
+  @@ fun enable_performance_metrics ctxt ->
+  let*! metrics = Metrics.listing ~enable_performance_metrics in
   let*! () = ctxt#message "%s" metrics in
   return_unit
 
