@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -16,7 +16,7 @@
 
 use super::tree::{impl_modify_map_collect, ModifyResult, Tree};
 use crate::{
-    state_backend::hash::{Hash, RootHashable},
+    state_backend::hash::Hash,
     storage::{HashError, DIGEST_SIZE},
 };
 use itertools::Itertools;
@@ -52,7 +52,7 @@ impl Proof {
     /// Get the initial state hash of the proof.
     pub fn initial_state_hash(&self) -> Hash {
         self.partial_tree
-            .hash()
+            .root_hash()
             .expect("Computing the root hash of the Merkle proof should not fail")
     }
 
@@ -108,10 +108,9 @@ impl MerkleProof {
             MerkleProof::Leaf(MerkleProofLeaf::Read(_)) => Tag::Leaf(LeafTag::Read),
         }
     }
-}
 
-impl RootHashable for MerkleProof {
-    fn hash(&self) -> Result<Hash, HashError> {
+    /// Compute the root hash of the Merkle proof.
+    pub fn root_hash(&self) -> Result<Hash, HashError> {
         impl_modify_map_collect(
             self,
             |subtree| {
@@ -124,7 +123,7 @@ impl RootHashable for MerkleProof {
                 MerkleProofLeaf::Blind(hash) => Ok(*hash),
                 MerkleProofLeaf::Read(data) => Hash::blake2b_hash_bytes(data.as_slice()),
             },
-            |(), leaves| leaves.hash(),
+            |(), leaves| Hash::combine(&leaves),
         )
     }
 }

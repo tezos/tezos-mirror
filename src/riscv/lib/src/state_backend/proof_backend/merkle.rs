@@ -9,7 +9,7 @@ use super::{
     DynAccess,
 };
 use crate::state_backend::{
-    hash::{Hash, HashError, RootHashable},
+    hash::{Hash, HashError},
     proof_backend::tree::{impl_modify_map_collect, ModifyResult},
 };
 use std::convert::Infallible;
@@ -39,6 +39,14 @@ impl MerkleTree {
     pub fn make_merkle_leaf(data: Vec<u8>, access_info: AccessInfo) -> Result<Self, HashError> {
         let hash = Hash::blake2b_hash_bytes(&data)?;
         Ok(MerkleTree::Leaf(hash, access_info, data))
+    }
+
+    /// Make a Merkle tree consisting of a node which combines the given
+    /// child trees.
+    pub fn make_merkle_node(children: Vec<Self>) -> Result<Self, HashError> {
+        let children_hashes: Vec<Hash> = children.iter().map(|t| t.root_hash()).collect();
+        let node_hash = Hash::combine(children_hashes.as_slice())?;
+        Ok(MerkleTree::Node(node_hash, children))
     }
 
     /// Compress all fully blindable subtrees to a single leaf node, obtaining a [`CompressedMerkleTree`].
@@ -76,7 +84,7 @@ impl MerkleTree {
                             CompresedNode(hash, _) => (hash, None),
                         }
                     })
-                    .unzip::<_, _, Vec<&Hash>, Vec<_>>();
+                    .unzip::<_, _, Vec<Hash>, Vec<_>>();
 
                 // Obtain the compression type of all children
                 // if all children have been compressed successfully to the same type of leaf.
@@ -86,7 +94,7 @@ impl MerkleTree {
                     .flatten();
 
                 let compressed_tree = match compression {
-                    Some(access) => CompresedLeaf(RootHashable::hash(&hashes)?, access),
+                    Some(access) => CompresedLeaf(Hash::combine(hashes.as_slice())?, access),
                     None => CompresedNode(hash, compact_children),
                 };
 
@@ -99,12 +107,6 @@ impl MerkleTree {
     /// given tree.
     pub fn to_merkle_proof(self) -> Result<MerkleProof, HashError> {
         Ok(self.compress()?.into())
-    }
-}
-
-impl RootHashable for MerkleTree {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Ok(self.root_hash())
     }
 }
 
@@ -367,7 +369,7 @@ impl MerkleWriter {
 
         while self.leaves.len() > 1 {
             for chunk in self.leaves.chunks(self.arity) {
-                next_level.push(MerkleTree::Node(chunk.hash()?, chunk.to_vec()));
+                next_level.push(MerkleTree::make_merkle_node(chunk.to_vec())?)
             }
 
             std::mem::swap(&mut self.leaves, &mut next_level);
@@ -416,19 +418,15 @@ impl MerkleTree {
                     Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
                 }
                 Self::Node(hash, children) => {
-                    // TODO RV-250: Instead of building the whole input and
-                    // hashing it, we should use incremental hashing, which
-                    // isn't currently supported in `tezos_crypto_rs`.
-                    //
-                    // Check the hash of this node and push children to deque to be checked
-                    let mut hashes: Vec<u8> = Vec::with_capacity(
-                        crate::state_backend::hash::DIGEST_SIZE * children.len(),
-                    );
-                    children.iter().for_each(|child| {
-                        deque.push_back(child);
-                        hashes.extend_from_slice(child.root_hash().as_ref())
-                    });
-                    Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
+                    let children_hashes: Vec<Hash> = children
+                        .iter()
+                        .map(|child| {
+                            deque.push_back(child);
+                            child.root_hash()
+                        })
+                        .collect();
+
+                    Hash::combine(&children_hashes).is_ok_and(|h| h == *hash)
                 }
             };
             if !is_valid_hash {
@@ -443,13 +441,13 @@ impl MerkleTree {
 mod tests {
     use super::{AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree};
     use crate::state_backend::{
-        hash::{Hash, HashError, RootHashable, DIGEST_SIZE},
+        hash::{Hash, HashError},
         proof_backend::proof::{MerkleProof, MerkleProofLeaf},
     };
     use proptest::prelude::*;
 
     impl CompressedMerkleTree {
-        /// Get the root hash of a compreessed Merkle tree
+        /// Get the root hash of a compressed Merkle tree
         fn root_hash(&self) -> Hash {
             match self {
                 Self::Node(hash, _) => *hash,
@@ -472,17 +470,15 @@ mod tests {
                         }
                     },
                     Self::Node(hash, children) => {
-                        // TODO RV-250: Instead of building the whole input and
-                        // hashing it, we should use incremental hashing, which
-                        // isn't currently supported in `tezos_crypto_rs`.
-                        //
-                        // Check the hash of this node and push children to deque to be checked
-                        let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * children.len());
-                        children.iter().for_each(|child| {
-                            deque.push_back(child);
-                            hashes.extend_from_slice(child.root_hash().as_ref())
-                        });
-                        Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
+                        let children_hashes: Vec<Hash> = children
+                            .iter()
+                            .map(|child| {
+                                deque.push_back(child);
+                                child.root_hash()
+                            })
+                            .collect();
+
+                        Hash::combine(&children_hashes).is_ok_and(|h| h == *hash)
                     }
                 };
                 if !is_valid_hash {
@@ -493,20 +489,13 @@ mod tests {
         }
     }
 
-    impl RootHashable for Vec<u8> {
-        fn hash(&self) -> Result<Hash, HashError> {
-            Hash::blake2b_hash_bytes(self)
-        }
-    }
-
     fn m_l(data: &[u8], access: AccessInfo) -> Result<MerkleTree, HashError> {
         let hash = Hash::blake2b_hash_bytes(data)?;
         Ok(MerkleTree::Leaf(hash, access, data.to_vec()))
     }
 
     fn m_t(left: MerkleTree, right: MerkleTree) -> Result<MerkleTree, HashError> {
-        let hash = RootHashable::hash(&(left.root_hash(), right.root_hash()))?;
-        Ok(MerkleTree::Node(hash, vec![left, right]))
+        MerkleTree::make_merkle_node(vec![left, right])
     }
 
     #[test]
@@ -584,33 +573,24 @@ mod tests {
 
             // Not even though structurally the code has the same arborescent shape,
             // the proof shape is changed, some nodes becoming leaves now. (subtrees being compressed)
-            let proof_no_access = MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                [
-                    Hash::blake2b_hash_bytes(&l[4])?,
-                    [
-                        Hash::blake2b_hash_bytes(&l[5])?,
-                        Hash::blake2b_hash_bytes(&l[6])?,
-                    ]
-                    .hash()?,
-                ]
-                .hash()?,
-            ));
+            let proof_no_access = MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                Hash::blake2b_hash_bytes(&l[4])?,
+                Hash::combine(&[
+                    Hash::blake2b_hash_bytes(&l[5])?,
+                    Hash::blake2b_hash_bytes(&l[6])?,
+                ])?,
+            ])?));
 
-            let proof_write = MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                [
-                    [
-                        Hash::blake2b_hash_bytes(&l[7])?,
-                        Hash::blake2b_hash_bytes(&l[8])?,
-                    ]
-                    .hash()?,
-                    [
-                        Hash::blake2b_hash_bytes(&l[9])?,
-                        Hash::blake2b_hash_bytes(&l[10])?,
-                    ]
-                    .hash()?,
-                ]
-                .hash()?,
-            ));
+            let proof_write = MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                Hash::combine(&[
+                    Hash::blake2b_hash_bytes(&l[7])?,
+                    Hash::blake2b_hash_bytes(&l[8])?,
+                ])?,
+                Hash::combine(&[
+                    Hash::blake2b_hash_bytes(&l[9])?,
+                    Hash::blake2b_hash_bytes(&l[10])?,
+                ])?,
+            ])?));
 
             let proof_read = MerkleProof::Node(vec![
                 MerkleProof::Node(vec![
@@ -641,25 +621,19 @@ mod tests {
                     merkle_proof_leaf(&l[18], NoAccess)?,
                     MerkleProof::Node(vec![
                         merkle_proof_leaf(&l[19], NoAccess)?,
-                        MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                            [
-                                Hash::blake2b_hash_bytes(&l[20])?,
-                                Hash::blake2b_hash_bytes(&l[21])?,
-                            ]
-                            .hash()?,
-                        )),
+                        MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                            Hash::blake2b_hash_bytes(&l[20])?,
+                            Hash::blake2b_hash_bytes(&l[21])?,
+                        ])?)),
                     ]),
                 ]),
                 MerkleProof::Node(vec![
                     MerkleProof::Node(vec![
                         merkle_proof_leaf(&l[22], ReadWrite)?,
-                        MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                            [
-                                Hash::blake2b_hash_bytes(&l[23])?,
-                                Hash::blake2b_hash_bytes(&l[24])?,
-                            ]
-                            .hash()?,
-                        )),
+                        MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                            Hash::blake2b_hash_bytes(&l[23])?,
+                            Hash::blake2b_hash_bytes(&l[24])?,
+                        ])?)),
                     ]),
                     merkle_proof_leaf(&l[25], Read)?,
                 ]),
@@ -681,7 +655,7 @@ mod tests {
 
             assert_eq!(merkle_tree.to_merkle_proof().unwrap(), proof);
             assert_eq!(
-                compressed_merkle_proof.hash().unwrap(),
+                compressed_merkle_proof.root_hash().unwrap(),
                 merkle_tree_root_hash
             );
 

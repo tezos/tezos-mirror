@@ -468,8 +468,6 @@ pub mod test_helpers {
     /// Ensure [`EnrichedCell`] is serialized identically to [`Cell`].
     #[test]
     fn enriched_cell_serialise_match_cell() {
-        use crate::state_backend::hash::RootHashable;
-
         pub struct Enriching;
         pub struct Fun;
 
@@ -497,7 +495,6 @@ pub mod test_helpers {
             let cbytes = bincode::serialize(&cell).unwrap();
 
             assert_eq!(ebytes, cbytes, "Serializing EnrichedCell and Cell should match");
-            assert_eq!(ecell.hash().unwrap(), cell.hash().unwrap(), "RootHashable for EnrichedCell and Cell should match");
         });
     }
 

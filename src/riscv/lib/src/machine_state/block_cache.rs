@@ -945,7 +945,7 @@ mod tests {
             MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
             TestCacheLayouts,
         },
-        state_backend::owned_backend::Owned,
+        state_backend::{owned_backend::Owned, CommitmentLayout},
     };
 
     pub type TestLayout<ML> = Layout<ML, TEST_CACHE_BITS, TEST_CACHE_SIZE>;
@@ -1242,6 +1242,22 @@ mod tests {
             second_block.unwrap().num_instr()
         );
     });
+
+    /// Tests that a layout which contains an [`EnrichedCell`] is hashed identically as
+    /// a layout which contains a [`Cell`] of the same value.
+    #[test]
+    fn test_enriched_cell_hashing() {
+        let instr = Instruction::DEFAULT;
+
+        let ec_value = (instr, ICall::<T1K, Owned>::from(&instr));
+        let ec: EnrichedCell<ICallPlaced<T1K>, Ref<'_, Owned>> = EnrichedCell::bind(&ec_value);
+        let ec_hash = <ICallLayout<T1K> as CommitmentLayout>::state_hash(ec).unwrap();
+
+        let c_value = [instr; 1];
+        let c: Cell<Instruction, Ref<'_, Owned>> = Cell::bind(&c_value);
+        let c_hash = <Atom<Instruction> as CommitmentLayout>::state_hash(c).unwrap();
+        assert_eq!(ec_hash, c_hash);
+    }
 
     /// The initialised block cache must not return any blocks. This is especially important for
     /// blocks at address 0 which at one point were accidentally valid but empty which caused loops.

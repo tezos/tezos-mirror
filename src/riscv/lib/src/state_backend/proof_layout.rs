@@ -5,7 +5,7 @@
 
 use super::{
     chunks_to_writer, hash,
-    hash::{HashError, RootHashable},
+    hash::HashError,
     proof_backend::{
         merkle::{MerkleTree, MerkleWriter},
         proof::{MerkleProof, MerkleProofLeaf},
@@ -244,7 +244,7 @@ where
 {
     fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let children = vec![A::to_merkle_tree(state.0)?, B::to_merkle_tree(state.1)?];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -265,7 +265,7 @@ where
             B::to_merkle_tree(state.1)?,
             C::to_merkle_tree(state.2)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -288,7 +288,7 @@ where
             C::to_merkle_tree(state.2)?,
             D::to_merkle_tree(state.3)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -318,7 +318,7 @@ where
             D::to_merkle_tree(state.3)?,
             E::to_merkle_tree(state.4)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -351,7 +351,7 @@ where
             E::to_merkle_tree(state.4)?,
             F::to_merkle_tree(state.5)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -417,5 +417,5 @@ where
         .map(T::to_merkle_tree)
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(MerkleTree::Node(children.hash()?, children))
+    MerkleTree::make_merkle_node(children)
 }

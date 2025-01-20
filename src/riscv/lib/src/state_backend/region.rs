@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    hash::{self, Hash, HashError, HashWriter, RootHashable},
     proof_backend::{
         merkle::{AccessInfo, AccessInfoAggregatable},
         ProofGen,
@@ -185,12 +184,6 @@ impl<'de, E: serde::Deserialize<'de>, M: ManagerDeserialise> serde::Deserialize<
     {
         let region = Cells::deserialize(deserializer)?;
         Ok(Self { region })
-    }
-}
-
-impl<E: serde::Serialize, M: ManagerSerialise> RootHashable for Cell<E, M> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
     }
 }
 
@@ -412,15 +405,6 @@ where
     }
 }
 
-impl<V: EnrichedValue, M: ManagerSerialise> RootHashable for EnrichedCell<V, M>
-where
-    V::E: serde::Serialize,
-{
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
-    }
-}
-
 impl<V: EnrichedValue, M: ManagerSerialise> AccessInfoAggregatable
     for EnrichedCell<V, Ref<'_, ProofGen<M>>>
 where
@@ -454,12 +438,6 @@ where
     {
         let cell = M::deserialise_enriched_cell(deserializer)?;
         Ok(Self { cell })
-    }
-}
-
-impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> RootHashable for Cells<E, LEN, M> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
     }
 }
 
@@ -625,17 +603,6 @@ pub(crate) fn chunks_to_writer<
     };
 
     Ok(())
-}
-
-impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
-        let read =
-            |address| -> [u8; MERKLE_LEAF_SIZE.get()] { M::dyn_region_read(&self.region, address) };
-        chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
-        let hashes = writer.finalise()?;
-        hash::build_custom_merkle_hash(MERKLE_ARITY, hashes)
-    }
 }
 
 impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {

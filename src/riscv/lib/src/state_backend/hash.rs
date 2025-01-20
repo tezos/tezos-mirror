@@ -48,6 +48,24 @@ impl Hash {
     pub fn blake2b_hash<T: serde::Serialize>(data: T) -> Result<Self, HashError> {
         Self::blake2b_hash_bytes(&bincode::serialize(&data)?)
     }
+
+    /// Combine multiple [`Hash`] values into a single one.
+    ///
+    /// The hashes are combined by concatenating them, then hashing the result.
+    /// Pre-image resistance is not compromised because the concatenation is not
+    /// ambiguous, with hashes having a fixed size ([`DIGEST_SIZE`]).
+    pub fn combine(hashes: &[Hash]) -> Result<Hash, HashError> {
+        let mut input: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * hashes.len());
+
+        hashes
+            .iter()
+            .for_each(|h| input.extend_from_slice(h.as_ref()));
+
+        // TODO RV-250: Instead of building the whole input and hashing it,
+        // we should use incremental hashing, which isn't currently supported
+        // in `tezos_crypto_rs`.
+        Hash::blake2b_hash_bytes(&input)
+    }
 }
 
 impl std::fmt::Display for Hash {
@@ -91,72 +109,6 @@ impl AsRef<[u8]> for Hash {
         &self.digest
     }
 }
-
-// TODO RV-398: Remove `RootHashable` trait
-pub trait RootHashable {
-    /// Build the root hash corresponding to the Merkle tree described by the
-    /// layout of the data.
-    fn hash(&self) -> Result<Hash, HashError>;
-}
-
-impl<T: RootHashable> RootHashable for &T {
-    fn hash(&self) -> Result<Hash, HashError> {
-        T::hash(self)
-    }
-}
-
-impl RootHashable for Hash {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Ok(*self)
-    }
-}
-
-impl<T: RootHashable> RootHashable for [T] {
-    fn hash(&self) -> Result<Hash, HashError> {
-        let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * self.len());
-
-        self.iter().try_for_each(|e| {
-            hashes.extend_from_slice(e.hash()?.as_ref());
-            Ok::<(), HashError>(())
-        })?;
-
-        // TODO RV-250: Instead of building the whole input and hashing it,
-        // we should use incremental hashing, which isn't currently supported
-        // in `tezos_crypto_rs`.
-        Hash::blake2b_hash_bytes(&hashes)
-    }
-}
-
-impl<T: RootHashable> RootHashable for Vec<T> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        self.as_slice().hash()
-    }
-}
-
-impl<T: RootHashable, const N: usize> RootHashable for [T; N] {
-    fn hash(&self) -> Result<Hash, HashError> {
-        self.as_slice().hash()
-    }
-}
-
-macro_rules! impl_roothash_for_tuple {
-    ($($name:ident),*) => {
-        impl<$($name: RootHashable),*> RootHashable for ($($name,)*) {
-            fn hash(&self) -> Result<Hash, HashError> {
-                #[allow(non_snake_case)]
-                let ($($name,)*) = self;
-                let hashes: Result<Vec<Hash>, HashError> = [$($name.hash(),)*].into_iter().collect();
-                hashes?.hash()
-            }
-        }
-    }
-}
-
-impl_roothash_for_tuple!(A, B);
-impl_roothash_for_tuple!(A, B, C);
-impl_roothash_for_tuple!(A, B, C, D);
-impl_roothash_for_tuple!(A, B, C, D, E);
-impl_roothash_for_tuple!(A, B, C, D, E, F);
 
 /// Writer which hashes fixed-sized chunks of data and produces the digests.
 pub struct HashWriter {
@@ -240,7 +192,7 @@ pub(crate) fn build_custom_merkle_hash(
     while nodes.len() > 1 {
         // Group the nodes into chunks of size `arity` and hash each chunk.
         for chunk in nodes.chunks(arity) {
-            next_level.push(chunk.hash()?)
+            next_level.push(Hash::combine(chunk)?)
         }
 
         std::mem::swap(&mut nodes, &mut next_level);
