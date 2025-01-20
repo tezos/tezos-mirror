@@ -29,32 +29,33 @@ open Baking_errors
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
+module Consensus_key_id = struct
+  type t = Signature.Public_key_hash.t
+end
+
 module Consensus_key = struct
   (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
   type t = {
     alias : string option;
+    id : Consensus_key_id.t;
     public_key : Signature.Public_key.t;
-    public_key_hash : Signature.Public_key_hash.t;
     secret_key_uri : Client_keys.sk_uri;
   }
 
   let make ~alias ~public_key ~public_key_hash ~secret_key_uri =
-    {alias; public_key; public_key_hash; secret_key_uri}
+    {alias; public_key; id = public_key_hash; secret_key_uri}
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {alias; public_key; public_key_hash; secret_key_uri} ->
-        ( alias,
-          public_key,
-          public_key_hash,
-          Uri.to_string (secret_key_uri :> Uri.t) ))
-      (fun (alias, public_key, public_key_hash, secret_key_uri) ->
+      (fun {alias; public_key; id; secret_key_uri} ->
+        (alias, public_key, id, Uri.to_string (secret_key_uri :> Uri.t)))
+      (fun (alias, public_key, id, secret_key_uri) ->
         {
           alias;
           public_key;
-          public_key_hash;
+          id;
           secret_key_uri =
             (match Client_keys.make_sk_uri (Uri.of_string secret_key_uri) with
             | Ok sk -> sk
@@ -66,17 +67,11 @@ module Consensus_key = struct
          (req "public_key_hash" Signature.Public_key_hash.encoding)
          (req "secret_key_uri" string))
 
-  let pp fmt {alias; public_key_hash; _} =
+  let pp fmt {alias; id; _} =
     match alias with
-    | None ->
-        Format.fprintf fmt "%a" Signature.Public_key_hash.pp public_key_hash
+    | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp id
     | Some alias ->
-        Format.fprintf
-          fmt
-          "%s (%a)"
-          alias
-          Signature.Public_key_hash.pp
-          public_key_hash
+        Format.fprintf fmt "%s (%a)" alias Signature.Public_key_hash.pp id
 end
 
 module Delegate_id = struct
@@ -106,8 +101,8 @@ module Delegate = struct
          (obj1 (req "delegate" Delegate_id.encoding)))
 
   let pp fmt {consensus_key; delegate_id} =
-    if Signature.Public_key_hash.equal consensus_key.public_key_hash delegate_id
-    then Consensus_key.pp fmt consensus_key
+    if Signature.Public_key_hash.equal consensus_key.id delegate_id then
+      Consensus_key.pp fmt consensus_key
     else
       Format.fprintf
         fmt
@@ -1031,8 +1026,7 @@ module DelegateSet = struct
   include Set.Make (struct
     type t = Consensus_key.t
 
-    let compare Consensus_key.{public_key_hash = pkh; _}
-        Consensus_key.{public_key_hash = pkh'; _} =
+    let compare Consensus_key.{id = pkh; _} Consensus_key.{id = pkh'; _} =
       Signature.Public_key_hash.compare pkh pkh'
   end)
 
@@ -1040,9 +1034,8 @@ module DelegateSet = struct
     let exception Found of elt in
     try
       iter
-        (fun ({public_key_hash; _} as delegate) ->
-          if Signature.Public_key_hash.equal pkh public_key_hash then
-            raise (Found delegate)
+        (fun ({id; _} as delegate) ->
+          if Signature.Public_key_hash.equal pkh id then raise (Found delegate)
           else ())
         s ;
       None

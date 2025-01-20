@@ -965,7 +965,7 @@ let baker_process ~(delegates : Baking_state.Consensus_key.t list) ~base_dir
   let*! () = User_hooks.on_start_baker ~baker_position:i ~delegates ~cctxt in
   let* () =
     List.iter_es
-      (fun ({alias; public_key; public_key_hash; secret_key_uri} :
+      (fun ({alias; public_key; id; secret_key_uri} :
              Baking_state.Consensus_key.t) ->
         let open Tezos_client_base in
         let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
@@ -973,7 +973,7 @@ let baker_process ~(delegates : Baking_state.Consensus_key.t list) ~base_dir
         Client_keys.register_key
           wallet
           ~force:false
-          (public_key_hash, public_key_uri, secret_key_uri)
+          (id, public_key_uri, secret_key_uri)
           ~public_key
           name)
       delegates

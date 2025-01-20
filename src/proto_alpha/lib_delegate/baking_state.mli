@@ -27,12 +27,15 @@ open Protocol
 open Alpha_context
 
 (** {2 Consensus key type and functions} *)
+module Consensus_key_id : sig
+  type t = Signature.Public_key_hash.t
+end
 
 module Consensus_key : sig
   type t = private {
     alias : string option;
+    id : Consensus_key_id.t;
     public_key : Signature.public_key;
-    public_key_hash : Signature.public_key_hash;
     secret_key_uri : Client_keys.sk_uri;
   }
 

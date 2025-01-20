@@ -247,7 +247,7 @@ let sign_block_header global_state proposer unsigned_block_header =
           (may_sign_block
              cctxt
              block_location
-             ~delegate:proposer.Consensus_key.public_key_hash
+             ~delegate:proposer.Consensus_key.id
              ~level
              ~round [@profiler.record_s {verbosity = Debug} "may sign"])
         in
@@ -257,7 +257,7 @@ let sign_block_header global_state proposer unsigned_block_header =
               (record_block
                  cctxt
                  block_location
-                 ~delegate:proposer.public_key_hash
+                 ~delegate:proposer.id
                  ~level
                  ~round [@profiler.record_s {verbosity = Debug} "record block"])
             in
@@ -554,13 +554,13 @@ let is_authorized (global_state : global_state) highwatermarks consensus_vote =
     | Preattestation ->
         Baking_highwatermarks.may_sign_preattestation
           highwatermarks
-          ~delegate:delegate.consensus_key.public_key_hash
+          ~delegate:delegate.consensus_key.id
           ~level
           ~round
     | Attestation ->
         Baking_highwatermarks.may_sign_attestation
           highwatermarks
-          ~delegate:delegate.consensus_key.public_key_hash
+          ~delegate:delegate.consensus_key.id
           ~level
           ~round
   in
@@ -599,7 +599,7 @@ let authorized_consensus_votes global_state
         let delegates =
           List.map
             (fun ({delegate; _} : unsigned_consensus_vote) ->
-              delegate.consensus_key.public_key_hash)
+              delegate.consensus_key.id)
             authorized_votes
         in
         let record_all_consensus_vote =
@@ -941,11 +941,11 @@ let compute_round (proposal : proposal) round_durations =
 let notice_delegates_without_slots all_delegates delegate_slots level =
   let delegates_without_slots =
     List.filter
-      (fun {Baking_state.Consensus_key.public_key_hash; _} ->
+      (fun {Baking_state.Consensus_key.id; _} ->
         not
         @@ List.exists
              (fun ({delegate = {consensus_key; _}; _} : delegate_slot) ->
-               public_key_hash = consensus_key.public_key_hash)
+               id = consensus_key.id)
              (Baking_state.Delegate_slots.own_delegates delegate_slots))
       all_delegates
   in

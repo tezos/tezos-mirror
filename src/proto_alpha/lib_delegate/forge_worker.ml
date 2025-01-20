@@ -102,13 +102,13 @@ let get_or_create_queue worker delegate =
   match
     Signature.Public_key_hash.Table.find_opt
       worker.delegate_signing_queues
-      delegate.Baking_state.Delegate.consensus_key.public_key_hash
+      delegate.Baking_state.Delegate.consensus_key.id
   with
   | None ->
       let queue = Delegate_signing_queue.create delegate in
       Signature.Public_key_hash.Table.add
         worker.delegate_signing_queues
-        delegate.consensus_key.public_key_hash
+        delegate.consensus_key.id
         queue ;
       queue
   | Some queue -> queue
