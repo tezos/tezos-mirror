@@ -1016,6 +1016,12 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* constants =
+    match constants with
+    | Some c -> return c
+    | None ->
+        Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+  in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
   let* heads_stream, _block_stream_stopper =
@@ -1027,7 +1033,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*! operation_worker = Operation_worker.create cctxt in
+  let*! operation_worker = Operation_worker.create ~constants cctxt in
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->
@@ -1041,7 +1047,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
       config
       operation_worker
       ~current_proposal
-      ?constants
+      ~constants
       delegates
   in
   let _promise =

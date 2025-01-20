@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The operation worker is responsible for listening to the node's mempool 
+(** The operation worker is responsible for listening to the node's mempool
     and collecting incoming operations in an accessible operation pool. Upon
     request, it can monitor the (pre)quorum status for a given payload and
     report its completion through the provided quorum stream.
@@ -59,7 +59,10 @@ type event =
    [true]).  Set [monitor_node_operations] to [false] to only consider
    externally provided (non-node) operations.  *)
 val run :
-  ?monitor_node_operations:bool -> #Protocol_client_context.full -> t Lwt.t
+  ?monitor_node_operations:bool ->
+  constants:Constants.t ->
+  #Protocol_client_context.full ->
+  t Lwt.t
 
 (** {1 Utilities} *)
 
