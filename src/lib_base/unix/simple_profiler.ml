@@ -355,6 +355,15 @@ module Headless = struct
 
   let kind = Headless
 
+  let encoding_case =
+    Data_encoding.case
+      Json_only
+      ~title:"headless"
+      ~description:"Headless driver"
+      string
+      (function View Headless -> Some "headless" | _ -> None)
+      (fun _ -> View Headless)
+
   let create verbosity = ref (empty verbosity)
 
   include Base (struct
@@ -382,10 +391,12 @@ type auto_writer_state = {
   time : time;
 }
 
-type (_, _) Profiler.kind +=
-  | Auto_write_to_file : (string * verbosity, auto_writer_state) Profiler.kind
-
 type file_format = Plain_text | Json
+
+type (_, _) Profiler.kind +=
+  | Auto_write_to_file :
+      file_format
+      -> (string * verbosity, auto_writer_state) Profiler.kind
 
 let make_driver ~file_format =
   (module struct
@@ -393,9 +404,22 @@ let make_driver ~file_format =
 
     type config = string * verbosity
 
-    let file_format = file_format
+    let kind = Auto_write_to_file file_format
 
-    let kind = Auto_write_to_file
+    let encoding_case =
+      let title =
+        match file_format with Plain_text -> "plain_text" | Json -> "json"
+      in
+      Data_encoding.case
+        Json_only
+        ~title
+        ~description:(Printf.sprintf "%s driver" title)
+        (constant title)
+        (function
+          | View (Auto_write_to_file format) when format = file_format ->
+              Some ()
+          | _ -> None)
+        (fun () -> View (Auto_write_to_file file_format))
 
     let create (file_name, verbosity) =
       {

@@ -13,12 +13,22 @@ type prometheus_config = string * verbosity
 
 type (_, _) kind += Prometheus : (prometheus_config, prometheus_state) kind
 
-module Prometheus = struct
+module Prometheus : DRIVER with type config = prometheus_config = struct
   type nonrec state = prometheus_state
 
   type config = prometheus_config
 
   let kind = Prometheus
+
+  let encoding_case =
+    Data_encoding.(
+      case
+        Json_only
+        ~title:"prometheus"
+        ~description:"Prometheus driver"
+        (constant "prometheus")
+        (function View Prometheus -> Some () | _ -> None)
+        (fun () -> View Prometheus))
 
   let create (name, verbosity) : state =
     {state = Simple_profiler.empty verbosity; name}
@@ -113,10 +123,11 @@ module Prometheus = struct
   let close _ = ()
 end
 
-let prometheus =
+let prometheus : prometheus_config Profiler.driver =
   (module Prometheus : DRIVER with type config = prometheus_config)
 
+let instance_maker driver ~verbosity ~directory:_ ~name =
+  Profiler.instance driver (name, verbosity)
+
 let () =
-  Profiler_instance.register_backend
-    ["prometheus"]
-    (fun ~verbosity ~directory:_ ~name -> instance prometheus (name, verbosity))
+  Profiler_instance.register_backend ["prometheus"] instance_maker prometheus
