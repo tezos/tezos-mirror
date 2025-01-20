@@ -123,6 +123,7 @@ val setup_l1 :
   ?rpc_external:bool ->
   ?riscv_pvm_enable:bool ->
   ?minimal_block_delay:int ->
+  ?dal_incentives:bool ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
