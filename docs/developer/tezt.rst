@@ -7,7 +7,7 @@ In particular, Tezt can be used to orchestrate tests involving Tezos nodes and c
 
 To facilitate the use with Tezos, Tezt has been complemented by a specific library called Tezt-Tezos.
 
-Tezt is pronounced `/tɛzti/ <http://ipa-reader.xyz/?text=t%C9%9Bzti>`_
+Tezt is pronounced `/tɛzti/ <https://ipa-reader.com/?text=t%C9%9Bzti>`_
 (think "tezty", as in *Tez* are tas*ty*).
 
 

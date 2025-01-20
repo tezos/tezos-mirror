@@ -32,7 +32,7 @@ Once ``jsonnet-bundler`` installed you can import dependencies (here ``grafonnet
 Tools
 -----
 
-- Emacs mode: https://github.com/mgyucht/jsonnet-mode
+- Emacs mode: https://github.com/tminor/jsonnet-mode
 
 Build
 -----

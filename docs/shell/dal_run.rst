@@ -221,7 +221,7 @@ Follow these steps if the DAL node is running but not connected to the network:
 
    If the baker is not currently assigned any shards, the response may be ``{"kind":"not_in_committee"}``, which also means that the baker can get information from the DAL node.
 
-#. If the problem persists, contact Octez developers on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack or the Tezos `Discord <https://discord.gg/tezos>`_.
+#. If the problem persists, contact Octez developers on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack or the Tezos `Discord <https://discord.com/invite/tezos>`_.
 
 Troubleshooting firewall/NAT issues
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
