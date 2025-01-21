@@ -145,30 +145,6 @@ where
         self.write_nz(rd_rs1, self.read_nz(rd_rs1) << imm)
     }
 
-    /// `C.SRLI` CB-type compressed instruction
-    ///
-    /// Performs a logical right shift of the value in register `rd_rs1`
-    /// then writes the result back to `rd_rs1`.
-    pub fn run_csrli(&mut self, imm: i64, rd_rs1: XRegister) {
-        self.run_srli(imm, rd_rs1, rd_rs1)
-    }
-
-    /// `C.SRAI` CB-type compressed instruction
-    ///
-    /// Performs an arithmetic right shift of the value in register `rd_rs1`
-    /// then writes the result back to `rd_rs1`.
-    pub fn run_csrai(&mut self, imm: i64, rd_rs1: XRegister) {
-        self.run_srai(imm, rd_rs1, rd_rs1)
-    }
-
-    /// `C.ANDI` CB-format instruction
-    ///
-    /// Computes the bitwise AND of the value in register `rd_rs1` and
-    /// the sign-extended 6-bit immediate, then writes the result back to `rd_rs1`.
-    pub fn run_candi(&mut self, imm: i64, rd_rs1: XRegister) {
-        self.run_andi(imm, rd_rs1, rd_rs1)
-    }
-
     /// `C.AND` CA-type compressed instruction
     ///
     /// Computes the bitwise AND of the values in registers `rd_rs1` and `rs2`,
