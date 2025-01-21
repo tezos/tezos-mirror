@@ -63,71 +63,106 @@ let expected_pow = function `Sandbox -> 0. | _ -> 26.
 
 let versions network =
   match network with
-  | (`Mainnet | `Ghostnet) as public_network ->
-      let uri =
-        Format.sprintf
-          "https://api.%s.tzkt.io/v1/delegates?limit=5000&active=true"
-          (to_string public_network)
+  | (`Mainnet | `Ghostnet) as public_network -> (
+      let decoder json =
+        json |> JSON.as_list |> List.to_seq
+        |> Seq.map (fun json_account ->
+               JSON.
+                 ( json_account |-> "address" |> as_string,
+                   json_account |-> "software" |-> "version" |> as_string_opt ))
+        |> Seq.filter_map (function
+               | address, None -> Some (address, "unknown")
+               | address, Some version -> Some (address, version))
+        |> Hashtbl.of_seq
       in
-      let* output =
-        Process.spawn "curl" [uri] |> Process.check_and_read_stdout
+      let rpc =
+        RPC_core.(
+          make
+            ~query_string:[("limit", "5000"); ("active", "true")]
+            GET
+            ["v1"; "delegates"]
+            decoder)
       in
-      let json_accounts =
-        JSON.parse ~origin:"Network.versions" output |> JSON.as_list
+      let endpoint =
+        Endpoint.
+          {
+            host = Format.asprintf "api.%s.tzkt.io" (to_string public_network);
+            scheme = "https";
+            port = 443;
+          }
       in
-      json_accounts |> List.to_seq
-      |> Seq.map (fun json_account ->
-             JSON.
-               ( json_account |-> "address" |> as_string,
-                 json_account |-> "software" |-> "version" |> as_string_opt ))
-      |> Seq.filter_map (function
-             | address, None -> Some (address, "unknown")
-             | address, Some version -> Some (address, version))
-      |> Hashtbl.of_seq |> Lwt.return
+      let* response = RPC_core.call_raw endpoint rpc in
+      try
+        RPC_core.decode_raw ~origin:"Network.versions" rpc response.body
+        |> Lwt.return_some
+      with exn ->
+        Log.warn
+          "Unexpected error while fetching versions (code: %d): '%s'"
+          response.code
+          (Printexc.to_string exn) ;
+        Lwt.return_none)
   | `Weeklynet _ ->
       (* No easy way to get this information. *)
-      Lwt.return (Hashtbl.create 0)
+      Lwt.return_some (Hashtbl.create 0)
   | `Sandbox ->
       (* Not sure what to do here since it depends on the docker image. We can figure that out later. *)
-      Lwt.return (Hashtbl.create 0)
+      Lwt.return_some (Hashtbl.create 0)
 
 let delegates ?(accounts = []) network =
   match network with
-  | (`Mainnet | `Ghostnet) as network ->
-      let uri =
-        Format.sprintf
-          "https://api.%s.tzkt.io/v1/delegates?limit=5000&active=true"
-          (to_string network)
+  | (`Mainnet | `Ghostnet) as network -> (
+      let decoder json =
+        json |> JSON.as_list
+        |> List.map (fun json_account ->
+               JSON.
+                 ( json_account |-> "alias" |> as_string_opt,
+                   json_account |-> "address" |> as_string,
+                   json_account |-> "publicKey" |> as_string ))
       in
-      let* output =
-        Process.spawn ~log_output:false "curl" [uri]
-        |> Process.check_and_read_stdout
+      let rpc =
+        RPC_core.(
+          make
+            ~query_string:[("limit", "5000"); ("active", "true")]
+            GET
+            ["v1"; "delegates"]
+            decoder)
       in
-      let json_accounts =
-        JSON.parse ~origin:"Network.aliases" output |> JSON.as_list
+      let endpoint =
+        Endpoint.
+          {
+            host = Format.asprintf "api.%s.tzkt.io" (to_string network);
+            scheme = "https";
+            port = 443;
+          }
       in
-      json_accounts
-      |> List.map (fun json_account ->
-             JSON.
-               ( json_account |-> "alias" |> as_string_opt,
-                 json_account |-> "address" |> as_string,
-                 json_account |-> "publicKey" |> as_string ))
-      |> Lwt.return
+      let* response = RPC_core.call_raw endpoint rpc in
+      try
+        RPC_core.decode_raw ~origin:"Network.aliases" rpc response.body
+        |> Lwt.return_some
+      with exn ->
+        Log.warn
+          "Unexpected error while fetching aliases (code: %d): '%s'"
+          response.code
+          (Printexc.to_string exn) ;
+        Lwt.return_none)
   | `Weeklynet _ ->
       (* There is no aliases for weeklynet. *)
-      Lwt.return_nil
+      Lwt.return_none
   | `Sandbox ->
       accounts
       |> List.map (fun account ->
              ( Some account.Account.alias,
                account.public_key_hash,
                account.public_key ))
-      |> Lwt.return
+      |> Lwt.return_some
 
 let aliases ?accounts network =
   let* aliases = delegates ?accounts network in
-  aliases |> List.to_seq
-  |> Seq.filter_map (function
-         | None, _, _ -> None
-         | Some alias, address, _ -> Some (address, alias))
-  |> Hashtbl.of_seq |> Lwt.return
+  match aliases with
+  | None -> Lwt.return_none
+  | Some aliases ->
+      aliases |> List.to_seq
+      |> Seq.filter_map (function
+             | None, _, _ -> None
+             | Some alias, address, _ -> Some (address, alias))
+      |> Hashtbl.of_seq |> Lwt.return_some
