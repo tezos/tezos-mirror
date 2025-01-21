@@ -391,7 +391,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
        ~block:pred_block
        () [@profiler.record_s {verbosity = Info} "live blocks"])
   in
-  let* {unsigned_block_header; operations} =
+  let* {unsigned_block_header; operations; manager_operations_infos} =
     (Block_forge.forge
        cctxt
        ~chain_id
@@ -438,7 +438,15 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let baking_votes =
     {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
   in
-  return {signed_block_header; round; delegate; operations; baking_votes}
+  return
+    {
+      signed_block_header;
+      round;
+      delegate;
+      operations;
+      manager_operations_infos;
+      baking_votes;
+    }
 
 let only_if_dal_feature_enabled =
   let no_dal_node_warning_counter = ref 0 in
@@ -779,7 +787,14 @@ let inject_consensus_votes state signed_consensus_vote_batch =
 let inject_block ?(force_injection = false) ?(asynchronous = true) state
     prepared_block =
   let open Lwt_result_syntax in
-  let {signed_block_header; round; delegate; operations; baking_votes} =
+  let {
+    signed_block_header;
+    round;
+    delegate;
+    operations;
+    manager_operations_infos;
+    baking_votes;
+  } =
     prepared_block
   in
   (* Cache last per-block votes to use in case of vote file errors *)
@@ -819,7 +834,11 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
       Events.(
         emit
           block_injected
-          (bh, signed_block_header.shell.level, round, delegate))
+          ( bh,
+            signed_block_header.shell.level,
+            round,
+            delegate,
+            manager_operations_infos ))
     in
     return_unit
   in

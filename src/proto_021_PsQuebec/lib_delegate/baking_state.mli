@@ -156,11 +156,21 @@ type elected_block = {
   attestation_qc : Kind.attestation operation list;
 }
 
+(** [manager_operations_infos] contains information about the number of manager
+    operations in the forged block and the summing fees from these operations *)
+type manager_operations_infos = {
+  manager_operation_number : int;
+  total_fees : Int64.t;
+}
+
+val manager_operations_infos_encoding : manager_operations_infos Data_encoding.t
+
 type prepared_block = {
   signed_block_header : block_header;
   round : Round.t;
   delegate : consensus_key_and_delegate;
   operations : Tezos_base.Operation.t list list;
+  manager_operations_infos : manager_operations_infos option;
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
