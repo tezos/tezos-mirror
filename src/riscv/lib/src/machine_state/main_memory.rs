@@ -7,12 +7,12 @@ use crate::{
     machine_state::registers::XValue,
     state_backend::{
         self as backend,
-        hash::{Hash, HashError},
+        hash::HashError,
         proof_backend::{
             merkle::{MerkleTree, Merkleisable},
             ProofGen,
         },
-        DynArray, ManagerDeserialise, ManagerSerialise, Ref,
+        ManagerDeserialise, ManagerSerialise, Ref,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -36,23 +36,18 @@ impl From<OutOfBounds> for SbiError {
 /// The first valid memory address.
 pub const FIRST_ADDRESS: Address = 0;
 
-/// Configuration object for memory size
-#[derive(Clone)]
-pub enum Sizes<const BYTES: usize> {}
-
-/// Generates a variant of [Sizes] with all length parameters instantiated.
+/// Generates a [`backend::DynArray`] layout type given a memory size.
 macro_rules! gen_memory_layout {
     ($name:ident = $size_in_g:literal GiB) => {
-        pub type $name =
-            crate::machine_state::main_memory::Sizes<{ $size_in_g * 1024 * 1024 * 1024 }>;
+        pub type $name = crate::state_backend::DynArray<{ $size_in_g * 1024 * 1024 * 1024 }>;
     };
 
     ($name:ident = $size_in_m:literal MiB) => {
-        pub type $name = crate::machine_state::main_memory::Sizes<{ $size_in_m * 1024 * 1024 }>;
+        pub type $name = crate::state_backend::DynArray<{ $size_in_m * 1024 * 1024 }>;
     };
 
     ($name:ident = $size_in_k:literal KiB) => {
-        pub type $name = crate::machine_state::main_memory::Sizes<{ $size_in_k * 1024 }>;
+        pub type $name = crate::state_backend::DynArray<{ $size_in_k * 1024 }>;
     };
 }
 
@@ -64,15 +59,11 @@ gen_memory_layout!(M1G = 1 GiB);
 gen_memory_layout!(M4G = 4 GiB);
 
 /// Main memory layout, i.e. specifies how much memory there is
-// XXX: We can't associate these region types directly with [Sizes] because
+// XXX: We can't associate these layout types directly with [`backend::DynArray`] because
 // inherent associated types are unstable. Hence we must go through a dummy
 // trait.
 pub trait MainMemoryLayout: backend::ProofLayout + backend::CommitmentLayout + 'static {
-    type Data<M: backend::ManagerBase>;
-
     const BYTES: usize;
-
-    fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M>;
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
@@ -81,81 +72,73 @@ pub trait MainMemoryLayout: backend::ProofLayout + backend::CommitmentLayout + '
         M: backend::ManagerBase + 'a,
         F: backend::FnManager<backend::Ref<'a, M>>,
     >(
-        data: &'a Self::Data<M>,
+        data: &'a Self::Allocated<M>,
     ) -> backend::AllocatedOf<Self, F::Output>;
 
     /// Read an element in the region. `address` is in bytes.
     fn data_read<E: backend::Elem, M: backend::ManagerRead>(
-        data: &Self::Data<M>,
+        data: &Self::Allocated<M>,
         address: usize,
     ) -> E;
 
     /// Read elements from the region. `address` is in bytes.
     fn data_read_all<E: backend::Elem, M: backend::ManagerRead>(
-        data: &Self::Data<M>,
+        data: &Self::Allocated<M>,
         address: usize,
         values: &mut [E],
     );
 
     /// Update an element in the region. `address` is in bytes.
     fn data_write<E: backend::Elem, M: backend::ManagerWrite>(
-        data: &mut Self::Data<M>,
+        data: &mut Self::Allocated<M>,
         address: usize,
         value: E,
     );
 
     /// Update multiple elements in the region. `address` is in bytes.
     fn data_write_all<E: backend::Elem, M: backend::ManagerWrite>(
-        data: &mut Self::Data<M>,
+        data: &mut Self::Allocated<M>,
         address: usize,
         values: &[E],
     );
 
     /// Serialise main memory's dynamic region.
     fn serialise_data<M: ManagerSerialise, S: serde::Serializer>(
-        data: &Self::Data<M>,
+        data: &Self::Allocated<M>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>;
 
     /// Deserialise main memory's dynamic region.
     fn deserialise_data<'de, M: ManagerDeserialise, D: serde::Deserializer<'de>>(
         deserializer: D,
-    ) -> Result<Self::Data<M>, D::Error>;
+    ) -> Result<Self::Allocated<M>, D::Error>;
 
     /// Clone the dynamic region.
-    fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M>;
+    fn clone_data<M: backend::ManagerClone>(data: &Self::Allocated<M>) -> Self::Allocated<M>;
 
     fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Data<Ref<'_, ProofGen<M>>>,
+        data: &Self::Allocated<Ref<'_, ProofGen<M>>>,
     ) -> Result<MerkleTree, HashError>;
 }
 
-impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
-    type Data<M: backend::ManagerBase> = backend::DynCells<BYTES, M>;
-
+impl<const BYTES: usize> MainMemoryLayout for backend::DynArray<BYTES> {
     const BYTES: usize = BYTES;
 
-    fn refl<M: backend::ManagerBase>(space: backend::AllocatedOf<Self, M>) -> MainMemory<Self, M> {
-        space
-    }
-
     fn data_struct_ref<'a, M: backend::ManagerBase, F: backend::FnManager<backend::Ref<'a, M>>>(
-        data: &'a Self::Data<M>,
+        data: &'a Self::Allocated<M>,
     ) -> backend::AllocatedOf<Self, F::Output> {
-        MainMemory {
-            data: data.struct_ref::<F>(),
-        }
+        data.struct_ref::<F>()
     }
 
     fn data_read<E: backend::Elem, M: backend::ManagerRead>(
-        data: &Self::Data<M>,
+        data: &Self::Allocated<M>,
         address: usize,
     ) -> E {
         data.read(address)
     }
 
     fn data_read_all<E: backend::Elem, M: backend::ManagerRead>(
-        data: &Self::Data<M>,
+        data: &Self::Allocated<M>,
         address: usize,
         values: &mut [E],
     ) {
@@ -163,7 +146,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
     }
 
     fn data_write<E: backend::Elem, M: backend::ManagerWrite>(
-        data: &mut Self::Data<M>,
+        data: &mut Self::Allocated<M>,
         address: usize,
         value: E,
     ) {
@@ -171,7 +154,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
     }
 
     fn data_write_all<E: backend::Elem, M: backend::ManagerWrite>(
-        data: &mut Self::Data<M>,
+        data: &mut Self::Allocated<M>,
         address: usize,
         values: &[E],
     ) {
@@ -179,7 +162,7 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
     }
 
     fn serialise_data<M: ManagerSerialise, S: serde::Serializer>(
-        data: &Self::Data<M>,
+        data: &Self::Allocated<M>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         data.serialize(serializer)
@@ -187,56 +170,30 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
 
     fn deserialise_data<'de, M: ManagerDeserialise, D: serde::Deserializer<'de>>(
         deserializer: D,
-    ) -> Result<Self::Data<M>, D::Error> {
+    ) -> Result<Self::Allocated<M>, D::Error> {
         serde::Deserialize::deserialize(deserializer)
     }
 
-    fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M> {
+    fn clone_data<M: backend::ManagerClone>(data: &Self::Allocated<M>) -> Self::Allocated<M> {
         data.clone()
     }
 
     fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Data<Ref<'_, ProofGen<M>>>,
+        data: &Self::Allocated<Ref<'_, ProofGen<M>>>,
     ) -> Result<MerkleTree, HashError> {
         data.to_merkle_tree()
     }
 }
 
-impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
-    type Allocated<M: backend::ManagerBase> = MainMemory<Self, M>;
-
-    fn allocate<M: backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let data = backend.allocate_dyn_region();
-        let data = backend::DynCells::bind(data);
-        MainMemory { data }
-    }
-}
-
-impl<const BYTES: usize> backend::CommitmentLayout for Sizes<BYTES> {
-    fn state_hash(
-        state: backend::AllocatedOf<Self, Ref<'_, backend::owned_backend::Owned>>,
-    ) -> Result<Hash, HashError> {
-        DynArray::state_hash(state.data)
-    }
-}
-
-impl<const BYTES: usize> backend::ProofLayout for Sizes<BYTES> {
-    fn from_proof(proof: backend::ProofTree) -> backend::FromProofResult<Self> {
-        let data = DynArray::from_proof(proof)?;
-
-        Ok(MainMemory { data })
-    }
-}
-
 /// Main memory state for the given layout
 pub struct MainMemory<L: MainMemoryLayout + ?Sized, M: backend::ManagerBase> {
-    pub data: L::Data<M>,
+    pub data: backend::AllocatedOf<L, M>,
 }
 
 impl<L: MainMemoryLayout, M: backend::ManagerBase> MainMemory<L, M> {
     /// Bind the main memory state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<L, M>) -> Self {
-        L::refl(space)
+        MainMemory { data: space }
     }
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
@@ -377,12 +334,13 @@ impl<L: MainMemoryLayout, M: backend::ManagerRead, N: backend::ManagerRead>
 
 #[cfg(test)]
 pub mod tests {
-    use crate::backend_test;
+    use super::*;
+    use crate::{backend_test, create_state};
 
     gen_memory_layout!(T1K = 1 KiB);
 
     backend_test!(test_endianess, F, {
-        let mut memory = F::allocate::<T1K>();
+        let mut memory = create_state!(MainMemory, T1K, F, T1K);
 
         memory.write(0, 0x1122334455667788u64).unwrap();
 
