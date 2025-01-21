@@ -7,7 +7,6 @@
 ^shell/p2p_api.txt
 ^.*/cli-commands.txt
 ^shell/rpc.txt
-^quebec/
 ^alpha/
 ^releases/
 ^protocols/
