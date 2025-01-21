@@ -10,7 +10,10 @@ open Tezos_workers
 
 let two_seconds = Ptime.Span.of_int_s 2
 
-type parameters = {relay_endpoint : Uri.t}
+type parameters = {
+  relay_endpoint : Uri.t;
+  max_transaction_batch_length : int option;
+}
 
 type callback =
   [`Accepted of Ethereum_types.hash | `Confirmed | `Dropped | `Refused] ->
@@ -56,6 +59,7 @@ type state = {
   relay_endpoint : Uri.t;
   mutable queue : request Queue.t;
   pending : Pending_transactions.t;
+  max_transaction_batch_length : int option;
 }
 
 module Types = struct
@@ -236,13 +240,35 @@ module Handlers = struct
             return_unit
         | None -> return_unit)
     | Tick ->
-        let previous_queue = state.queue in
-        state.queue <- Queue.create () ;
+        let all_transactions = Queue.to_seq state.queue in
+        let* transactions_to_inject, remaining_transactions =
+          match state.max_transaction_batch_length with
+          | None -> return (all_transactions, Seq.empty)
+          | Some max_transaction_batch_length ->
+              let when_negative_length =
+                TzTrace.make
+                  (Exn (Failure "Negative max_transaction_batch_length"))
+              in
+              let*? transactions_to_inject =
+                Seq.take
+                  ~when_negative_length
+                  max_transaction_batch_length
+                  all_transactions
+              in
+              let*? remaining_transactions =
+                Seq.drop
+                  ~when_negative_length
+                  max_transaction_batch_length
+                  all_transactions
+              in
+              return (transactions_to_inject, remaining_transactions)
+        in
+        state.queue <- Queue.of_seq remaining_transactions ;
 
         let+ () =
           send_transactions_batch
             ~relay_endpoint:state.relay_endpoint
-            (Queue.to_seq previous_queue)
+            transactions_to_inject
         in
 
         let txns = Pending_transactions.drop state.pending in
@@ -252,13 +278,15 @@ module Handlers = struct
 
   type launch_error = tztrace
 
-  let on_launch _self () ({relay_endpoint} : parameters) =
+  let on_launch _self ()
+      ({relay_endpoint; max_transaction_batch_length} : parameters) =
     let open Lwt_result_syntax in
     return
       {
         relay_endpoint;
         queue = Queue.create ();
         pending = Pending_transactions.empty ();
+        max_transaction_batch_length;
       }
 
   let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -314,9 +342,15 @@ let confirm txn_hash =
   assert was_pushed ;
   return_unit
 
-let start ~relay_endpoint () =
+let start ~relay_endpoint ~max_transaction_batch_length () =
   let open Lwt_result_syntax in
-  let* worker = Worker.launch table () {relay_endpoint} (module Handlers) in
+  let* worker =
+    Worker.launch
+      table
+      ()
+      {relay_endpoint; max_transaction_batch_length}
+      (module Handlers)
+  in
   Lwt.wakeup worker_waker worker ;
   let*! () = Floodgate_events.tx_queue_is_ready () in
   return_unit

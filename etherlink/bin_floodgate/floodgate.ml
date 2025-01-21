@@ -254,13 +254,14 @@ let prepare_scenario ~rpc_endpoint ~scenario infos simple_gas_limit controller =
       return (`ERC20 (Efunc_core.Private.a contract), gas_limit)
 
 let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
-    ~spawn_interval ~tick_interval ~base_fee_factor ~initial_balance =
+    ~max_transaction_batch_length ~spawn_interval ~tick_interval
+    ~base_fee_factor ~initial_balance =
   let open Lwt_result_syntax in
   let* controller =
     controller_from_sk ~rpc_endpoint ~min_balance:(xtz_of_int 100) controller
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
-  let* () = Tx_queue.start ~relay_endpoint () in
+  let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
   let* time_between_blocks =
     Evm_services.get_time_between_blocks ~evm_node_endpoint:rpc_endpoint ()
   in

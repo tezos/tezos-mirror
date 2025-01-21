@@ -14,6 +14,7 @@ val run :
   controller:Eth_account.t ->
   ?relay_endpoint:string ->
   ?max_active_eoa:int ->
+  ?max_transaction_batch_length:int ->
   ?spawn_interval:float ->
   ?tick_interval:float ->
   ?base_fee_factor:float ->

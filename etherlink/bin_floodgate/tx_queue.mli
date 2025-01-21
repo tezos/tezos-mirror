@@ -32,9 +32,14 @@ type callback =
     transaction life cycle. *)
 type request = {payload : Ethereum_types.hex; callback : callback}
 
-(** [start ~relay_endpoint ()] starts the worker, meaning it is possible to
-    call {!inject}, {!confirm} and {!beacon}. *)
-val start : relay_endpoint:Uri.t -> unit -> unit tzresult Lwt.t
+(** [start ~relay_endpoint ~max_transaction_batch_length ()] starts
+    the worker, meaning it is possible to call {!inject}, {!confirm}
+    and {!beacon}. *)
+val start :
+  relay_endpoint:Uri.t ->
+  max_transaction_batch_length:int option ->
+  unit ->
+  unit tzresult Lwt.t
 
 (** [inject ?callback raw_txn] pushes the raw transaction [raw_txn] to the
     worker queue.
