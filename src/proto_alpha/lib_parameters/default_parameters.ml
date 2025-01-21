@@ -263,7 +263,7 @@ let constants_mainnet : Constants.Parametric.t =
        will not witness any activity from it then.
 
        Last updated in protocol R. *)
-    tolerated_inactivity_period = 1;
+    tolerated_inactivity_period = 2;
     (* [blocks_per_cycle] is the duration of a cycle in number of
        blocks. Multiply it by [minimal_block_delay] to get the minimal
        duration of a cycle in seconds.

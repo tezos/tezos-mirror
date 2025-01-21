@@ -172,12 +172,12 @@ let () =
     ~days:5l
 
 let () =
-  register_test ~title:"tolerated inactivity period is 1 day" @@ fun () ->
+  register_test ~title:"tolerated inactivity period is 2 days" @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   check_protocol_time_correlation
     ~constants
     ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
-    ~days:1l
+    ~days:2l
 
 (* Check that
     [sc_rollup_challenge_window_in_blocks < sc_rollup_max_lookahead_in_blocks]

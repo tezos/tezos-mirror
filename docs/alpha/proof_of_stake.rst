@@ -95,10 +95,17 @@ delegate cannot participate in the consensus algorithm.
 
 A delegate is marked as active at its registration.
 
-A delegate becomes inactive at the end of a cycle if it has failed to
-participate in the consensus algorithm at all during this whole cycle.
-This is specified by the ``TOLERATED_INACTIVITY_PERIOD`` protocol
-constant, which is currently equal to ``1`` cycle.
+At the end of a cycle, a delegate gets deactivated if the chain has
+not witnessed any consensus activity (baking, attesting) from it during the
+past ``TOLERATED_INACTIVITY_PERIOD`` cycles, including the currently
+ending cycle.
+
+Note that there is an extra grace period of ``CONSENSUS_RIGHTS_DELAY``
+cycles when a delegate has just registered or has just been
+reactivated. This is to account for the fact that it will not receive
+consensus rights yet for the first ``CONSENSUS_RIGHTS_DELAY``
+cycles, so of course the chain cannot witness any activity from it
+during that time.
 
 Delegates' rights selection
 ---------------------------
@@ -170,7 +177,7 @@ Proof-of-stake parameters
    * - ``MINIMAL_FROZEN_STAKE``
      - 600 ꜩ
    * - ``TOLERATED_INACTIVITY_PERIOD``
-     - 1 cycle
+     - 2 cycles
 
 Further External Resources
 --------------------------
