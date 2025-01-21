@@ -144,6 +144,8 @@ impl ConstDefault for Instruction {
 /// decouple these from the parsed instructions down the line.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum OpCode {
+    Unknown,
+
     // RV64I R-type instructions
     Add,
     Sub,
@@ -354,9 +356,6 @@ pub enum OpCode {
     CFsd,
     CFsdsp,
 
-    Unknown,
-    UnknownCompressed,
-
     // Internal OpCodes
     Beqz,
     Bnez,
@@ -561,7 +560,6 @@ impl OpCode {
             Self::CFsd => Args::run_cfsd,
             Self::CFsdsp => Args::run_cfsdsp,
             Self::Unknown => Args::run_illegal,
-            Self::UnknownCompressed => Args::run_illegal,
         }
     }
 
@@ -2114,8 +2112,11 @@ impl From<&InstrCacheable> for Instruction {
                 args: Args::DEFAULT,
             },
             InstrCacheable::UnknownCompressed { instr: _ } => Instruction {
-                opcode: OpCode::UnknownCompressed,
-                args: Args::DEFAULT,
+                opcode: OpCode::Unknown,
+                args: Args {
+                    width: InstrWidth::Compressed,
+                    ..Args::DEFAULT
+                },
             },
         }
     }
