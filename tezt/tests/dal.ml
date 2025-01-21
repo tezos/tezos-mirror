@@ -7076,11 +7076,6 @@ let dal_crypto_benchmark () =
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
   let page_size = Cli.get_int ~default:3967 "page_size" in
-  let generate_slot ~slot_size =
-    Bytes.init slot_size (fun _ ->
-        let x = Random.int 26 in
-        Char.chr (x + Char.code 'a'))
-  in
   let* () =
     let parameters =
       {number_of_shards; redundancy_factor; page_size; slot_size}
@@ -7131,7 +7126,7 @@ let dal_crypto_benchmark () =
         in
         let slot =
           Profiler.record_f Profiler.main Debug ("slot generation", [])
-          @@ fun () -> generate_slot ~slot_size
+          @@ fun () -> Helpers.generate_slot ~slot_size
         in
         let*? polynomial =
           Profiler.record_f Profiler.main Debug ("polynomial from slot", [])

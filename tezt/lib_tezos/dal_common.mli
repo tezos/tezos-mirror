@@ -97,6 +97,10 @@ module Helpers : sig
     Cryptobox.parameters ->
     Cryptobox.t Lwt.t
 
+  (** Generates a random string (with chars from 'a' to 'z') of size
+      [slot_size]. *)
+  val generate_slot : slot_size:int -> bytes
+
   val publish_commitment :
     ?dont_wait:bool ->
     ?counter:int ->

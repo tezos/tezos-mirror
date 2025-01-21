@@ -674,6 +674,11 @@ module Helpers = struct
              Data_encoding.Json.pp
              parameters_json
 
+  let generate_slot ~slot_size =
+    Bytes.init slot_size (fun _ ->
+        let x = Random.int 26 in
+        Char.chr (x + Char.code 'a'))
+
   let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
       ~commitment ~proof client =
     (* We scale the fees to match the actual gas cost of publishing a slot header.
