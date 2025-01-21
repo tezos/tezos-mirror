@@ -61,7 +61,7 @@ val host_run_command : t -> string -> string list -> Process.t
     The library uses it to ensure there won't be any check of the host
     when issuing for the first time an ssh connection.
  *)
-val docker_run_command : t -> string -> string list -> Process.t
+val docker_run_command : t -> ?detach:bool -> string -> string list -> Process.t
 
 (** [copy ?refresh ?is_directory ?destination agent ~source] copies the file 
     into the [agent] directory and returns the directory where the file
