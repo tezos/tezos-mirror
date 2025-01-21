@@ -2166,8 +2166,9 @@ let init_etherlink_producer_setup operator name ~bootstrap agent =
   let* () =
     Floodgate.Agent.run
       ~rpc_endpoint:endpoint
-      ~max_active_eoa:150
-      ~max_transaction_batch_length:50
+      ~max_active_eoa:210
+      ~max_transaction_batch_length:70
+      ~tick_interval:1.0
       ~controller:Tezt_etherlink.Eth_account.bootstrap_accounts.(0)
       ~base_fee_factor:1000.0
       agent
