@@ -201,11 +201,15 @@ let reload t =
   in
   Process.run "docker" ["kill"; "--signal"; "SIGHUP"; t.name]
 
-let add_job t ?(metrics_path = "/metrics") ~name targets =
+let add_job (t : t) ?(metrics_path = "/metrics") ~name targets =
   let source = {name; metrics_path; targets} in
-  t.jobs <- source :: t.jobs ;
-  write_configuration_file t ;
-  reload t
+  if List.exists (fun (job : job) -> job.name = source.name) t.jobs then (
+    Log.warn "Prometheus: trying to add duplicate job : %s. Ignoring." name ;
+    Lwt.return_unit)
+  else (
+    t.jobs <- source :: t.jobs ;
+    write_configuration_file t ;
+    reload t)
 
 let update_groups t (group : group) =
   match Hashtbl.find_opt t.groups group.name with
