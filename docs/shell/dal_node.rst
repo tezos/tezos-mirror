@@ -79,7 +79,7 @@ A DAL node in controller mode can run in these profiles:
 
       octez-dal-node run --endpoint http://127.0.0.1:8732 --operator-profiles=0,1 --data-dir $DATA_DIR
 
-- The ``attester`` profile is for bakers who want to attest to data. When an ``octez-baker`` daemon with attestation rights connects to a DAL node, it prompts the DAL node to run with the ``attester`` profile. The DAL node receives this prompt and runs in the ``attester`` profile unless it is running in bootstrap profile. To force the DAL node to run with the ``attester`` profile, pass the ``--attester-profiles`` argument with the public key hashes of the bakers to attest data for, as in this example:
+- The ``attester`` profile is for bakers who want to attest to data. DAL nodes in this profile must pass the ``--attester-profiles`` argument with the public key hashes of the bakers to attest data for (their delegate or manager keys, not their :ref:`consensus keys<consensus_key>`), as in this example:
 
    .. code-block:: shell
 
