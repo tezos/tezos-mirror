@@ -4,17 +4,38 @@
 
 ### Features
 
+### Bug fixes
+
+### Internals
+
+## Version 0.14 (2025-01-21)
+
+This version contains UX improvements for displaying progress regarding snapshot
+download/import with `--init-from-snapshot`, and fixes an issue where the `logs`
+events of the JSON-RPC method `eth_subscribe` on WebSockets (whose support by
+the EVM node remains experimental at this point) would not be notified.
+
+This release will not apply any migration to the node’s store (version 16),
+meaning it is possible to downgrade to the previous version.
+
+### Features
+
 - Periodically (every minute) reports the remaining number of bytes to download
   for snapshots. (!16198)
-- Periodically (every minute) reports progress on the snapshot archive decompression
-  and extraction. (!16288)
+- Periodically (every minute) reports progress on the snapshot archive
+  decompression and extraction. (!16288)
 
 ### Bug fixes
 
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
 - Notify logs with `eth_subscribe` independently of block storage
   backend. (!16258)
-
-### Internals
 
 ## Version 0.13 (2025-01-09)
 
