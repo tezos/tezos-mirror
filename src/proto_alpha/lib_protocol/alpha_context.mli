@@ -2524,6 +2524,7 @@ module Delegate : sig
       total_dal_attested_slots : int;
       expected_dal_rewards : Tez.t;
       sufficient_dal_participation : bool;
+      denounced : bool;
     }
 
     val participation_info :
