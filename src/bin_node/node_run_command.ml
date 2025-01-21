@@ -753,6 +753,12 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   in
   let* () = Config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
+  ()
+  [@profiler.custom
+    {driver_ids = [Opentelemetry]}
+      (Opentelemetry_profiler.initialize
+         ~unique_identifier:(P2p_peer.Id.to_b58check identity.peer_id)
+         "octez-node")] ;
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   let*! () =
     Event.(emit starting_node)
@@ -892,10 +898,6 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
                 "Failed to parse the provided target. A '<block_hash>,<level>' \
                  value was expected.")
     in
-    ()
-    [@profiler.custom
-      {driver_ids = [Opentelemetry]}
-        (Opentelemetry_profiler.initialize "octez-node")] ;
     Lwt_lock_file.with_lock
       ~when_locked:
         (`Fail (Exn (Failure "Data directory is locked by another process")))

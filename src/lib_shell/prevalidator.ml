@@ -718,12 +718,18 @@ module Make_s
       else
         match Parser.parse oph op with
         | Error _ ->
+            ()
+            [@profiler.custom
+              Opentelemetry_profiler.add_event "parse_operation failed"] ;
             let* () = Events.(emit unparsable_operation) oph in
             Prevalidator_classification.add_unparsable
               oph
               pv.shell.classification ;
             return_ok_unit
         | Ok parsed_op -> (
+            ()
+            [@profiler.custom
+              Opentelemetry_profiler.add_event "parse_operation succeeded"] ;
             let* v =
               pre_filter
                 pv
@@ -1532,6 +1538,8 @@ module Make
             op
           [@profiler.aggregate_s
             {verbosity = Notice; metadata = [("prometheus", "")]} "on_arrived"]
+          [@profiler.custom_s
+            Opentelemetry_profiler.trace_operation (`Hash oph) "on_arrived"]
       | Request.Advertise ->
           Requests.on_advertise
             pv.shell
