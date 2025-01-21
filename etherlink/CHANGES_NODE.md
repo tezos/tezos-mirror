@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internals
+
 ## Version 0.14 (2025-01-21)
 
 This version contains UX improvements for displaying progress regarding snapshot
