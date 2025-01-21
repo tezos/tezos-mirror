@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -38,6 +38,23 @@ val make :
   ?enable_multichain:string * string ->
   ?set_account_code:(string * string) list ->
   ?max_delayed_inbox_blueprint_length:string * string ->
+  output:string ->
+  unit ->
+  unit tzresult Lwt.t
+
+(** [make_l2 ~boostrap_balance ?bootstrap_accounts ... ~l2_chain_id ~output ()]
+    generates a configuration file located at [output] for the chain [l2_chain_id], 
+    where [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
+val make_l2 :
+  boostrap_balance:Z.t ->
+  ?bootstrap_accounts:string list ->
+  ?minimum_base_fee_per_gas:string * string ->
+  ?da_fee_per_byte:string * string ->
+  ?sequencer_pool_address:string * string ->
+  ?maximum_gas_per_transaction:string * string ->
+  ?set_account_code:(string * string) list ->
+  ?world_state_path:string * string ->
+  l2_chain_id:string ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

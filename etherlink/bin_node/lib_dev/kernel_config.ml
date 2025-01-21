@@ -15,6 +15,12 @@ let make_instr ?(path_prefix = ["evm"]) ?(convert = Fun.id) arg_opt =
          Installer_config.make ~key:(path_prefix ^ key) ~value:(convert value))
   |> Option.to_list
 
+let make_l2_config_instr ?(convert = Fun.id) ~l2_chain_id config =
+  make_instr
+    ~path_prefix:["evm"; "chain_configurations"; l2_chain_id]
+    ~convert
+    config
+
 let padded_32_le_int_bytes z =
   String.of_bytes @@ Ethereum_types.encode_u256_le (Qty z)
 
@@ -30,6 +36,77 @@ let le_int64_bytes i =
   let b = Bytes.make 8 '\000' in
   Bytes.set_int64_le b 0 (Int64.of_string i) ;
   String.of_bytes b
+
+(* When splitting the path given in argument,
+   their should be empty string at the start/end of
+   the list *)
+let clean_path path =
+  List.fold_left
+    (fun acc l -> if l = "" then acc else l :: acc)
+    []
+    (List.rev path)
+
+let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
+    ?da_fee_per_byte ?sequencer_pool_address ?maximum_gas_per_transaction
+    ?set_account_code ?world_state_path ~l2_chain_id ~output () =
+  let world_state_prefix =
+    match world_state_path with
+    | None -> ["evm"; "world_state"; l2_chain_id]
+    | Some (_, value) -> clean_path (String.split_on_char '/' value)
+  in
+  let bootstrap_accounts =
+    match bootstrap_accounts with
+    | None -> []
+    | Some bootstrap_accounts ->
+        let balance = padded_32_le_int_bytes boostrap_balance in
+        List.map
+          (fun address ->
+            make_instr
+              ~path_prefix:(world_state_prefix @ ["eth_accounts"; address])
+              (Some ("balance", balance)))
+          bootstrap_accounts
+        |> List.flatten
+  in
+  let set_account_code =
+    match set_account_code with
+    | None -> []
+    | Some set_account_codes ->
+        List.map
+          (fun (address, code) ->
+            make_instr
+              ~convert:encode_hexa
+              ~path_prefix:(world_state_prefix @ ["eth_accounts"; address])
+              (Some ("code", code)))
+          set_account_codes
+        |> List.flatten
+  in
+  let config_instrs =
+    (* These configuration parameter will not be stored in the world_state of an l2 chain but are parameter for an l2 chain *)
+    (* To do so we put them into another path /evm/config/<l2_chain_id> *)
+    make_l2_config_instr
+      ~l2_chain_id
+      ~convert:parse_z_to_padded_32_le_int_bytes
+      minimum_base_fee_per_gas
+    @ make_l2_config_instr
+        ~l2_chain_id
+        ~convert:parse_z_to_padded_32_le_int_bytes
+        da_fee_per_byte
+    @ make_l2_config_instr
+        ~l2_chain_id
+        ~convert:le_int64_bytes
+        maximum_gas_per_transaction
+    @ make_l2_config_instr ~l2_chain_id world_state_path
+  in
+  let world_state_instrs =
+    make_instr
+      ~convert:(fun addr ->
+        let addr = Misc.normalize_addr addr in
+        Hex.to_bytes_exn (`Hex addr) |> String.of_bytes)
+      ~path_prefix:world_state_prefix
+      sequencer_pool_address
+    @ bootstrap_accounts @ set_account_code
+  in
+  Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
 let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?chain_id ?sequencer ?delayed_bridge ?ticketer ?admin ?sequencer_governance
