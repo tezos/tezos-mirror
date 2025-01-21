@@ -44,18 +44,19 @@ ocaml::custom!(Repo);
 ocaml::custom!(Id);
 
 #[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive, strum::EnumCount)]
-#[ocaml::sig("Evaluating | WaitingForInput | WaitingForMetadata")]
+#[ocaml::sig("Evaluating | WaitingForInput | WaitingForMetadata | WaitingForReveal")]
 #[repr(u8)]
 pub enum Status {
     Evaluating,
     WaitingForInput,
     WaitingForMetadata,
+    WaitingForReveal,
 }
 
 // Check that [`PvmStatus`] and [`Status`] can be coerced into each other.
 const STATUS_ENUM_COERCIBLE: bool = {
     if <PvmStatus as strum::EnumCount>::COUNT != <Status as strum::EnumCount>::COUNT
-        || <Status as strum::EnumCount>::COUNT != 3
+        || <Status as strum::EnumCount>::COUNT != 4
     {
         panic!("Not coercible!");
     }
@@ -69,6 +70,10 @@ const STATUS_ENUM_COERCIBLE: bool = {
     }
 
     if PvmStatus::WaitingForMetadata as u8 != Status::WaitingForMetadata as u8 {
+        panic!("Not coercible!");
+    }
+
+    if PvmStatus::WaitingForReveal as u8 != Status::WaitingForReveal as u8 {
         panic!("Not coercible!");
     }
 

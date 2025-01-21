@@ -85,6 +85,7 @@ pub enum PvmStatus {
     Evaluating,
     WaitingForInput,
     WaitingForMetadata,
+    WaitingForReveal,
 }
 
 impl ConstDefault for PvmStatus {
@@ -97,6 +98,7 @@ impl fmt::Display for PvmStatus {
             PvmStatus::Evaluating => "Evaluating",
             PvmStatus::WaitingForInput => "Waiting for input message",
             PvmStatus::WaitingForMetadata => "Waiting for metadata",
+            PvmStatus::WaitingForReveal => "Waiting for reveal",
         };
         f.write_str(status)
     }
@@ -127,6 +129,21 @@ impl<M: ManagerBase> RevealRequest<M> {
         &'a self,
     ) -> AllocatedOf<RevealRequestLayout, F::Output> {
         (self.bytes.struct_ref::<F>(), self.size.struct_ref::<F>())
+    }
+
+    /// Return the content of a reveal request as a vector
+    #[cfg(test)]
+    pub fn to_vec(&self) -> Vec<u8>
+    where
+        M: state_backend::ManagerRead,
+    {
+        use std::cmp::min;
+        use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
+
+        let size = self.size.read() as usize;
+        let mut buffer = vec![0u8; min(size, REVEAL_REQUEST_MAX_SIZE)];
+        self.bytes.read_all(0, &mut buffer);
+        buffer
     }
 }
 
@@ -222,7 +239,13 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
-        sbi::handle_call(&mut self.status, &mut self.machine_state, hooks, exception)
+        sbi::handle_call(
+            &mut self.status,
+            &mut self.reveal_request,
+            &mut self.machine_state,
+            hooks,
+            exception,
+        )
     }
 
     /// Perform one evaluation step.
@@ -257,6 +280,7 @@ impl<
             .step_max_handle::<Infallible>(step_bounds, |machine_state, exc| {
                 Ok(sbi::handle_call(
                     &mut self.status,
+                    &mut self.reveal_request,
                     machine_state,
                     hooks,
                     exc,
@@ -332,6 +356,7 @@ impl<
 mod tests {
     use super::*;
     use crate::{
+        backend_test, create_state,
         machine_state::{
             main_memory::M1M,
             registers::{a0, a1, a2, a3, a6, a7},
@@ -342,7 +367,8 @@ mod tests {
     use rand::{thread_rng, Fill};
     use std::mem;
     use tezos_smart_rollup_constants::riscv::{
-        SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT,
+        REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT,
+        SBI_TEZOS_REVEAL,
     };
 
     #[test]
@@ -485,4 +511,50 @@ mod tests {
         // intended to write
         assert_eq!(written, buffer);
     }
+
+    backend_test!(test_reveal, F, {
+        type ML = M1M;
+        type L = PvmLayout<ML, TestCacheLayouts>;
+
+        // Setup PVM
+        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts);
+        pvm.reset();
+
+        let input_address = main_memory::FIRST_ADDRESS;
+        let buffer = [1u8, 2, 3, 4];
+        let output_address = input_address + buffer.len() as u64;
+        let xregisters = &mut pvm.machine_state.core.hart.xregisters;
+
+        // Configure machine for 'sbi_tezos_reveal'
+        xregisters.write(a7, SBI_FIRMWARE_TEZOS);
+
+        xregisters.write(a6, SBI_TEZOS_REVEAL);
+
+        xregisters.write(a0, input_address);
+
+        xregisters.write(a1, buffer.len() as u64);
+
+        xregisters.write(a2, output_address);
+
+        xregisters.write(a3, REVEAL_REQUEST_MAX_SIZE as u64);
+
+        pvm.machine_state
+            .core
+            .main_memory
+            .write_all(input_address, &buffer)
+            .unwrap();
+
+        assert_eq!(pvm.status(), PvmStatus::Evaluating);
+
+        // Handle the ECALL successfully
+        let outcome =
+            pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
+        assert!(!outcome);
+
+        // After the ECALL we should be waiting for reveal
+        assert_eq!(pvm.status(), PvmStatus::WaitingForReveal);
+
+        // After ECALL the reveal_request field should be set correctly
+        assert_eq!(pvm.reveal_request.to_vec(), buffer)
+    });
 }
