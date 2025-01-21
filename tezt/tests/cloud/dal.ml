@@ -1826,7 +1826,6 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
 let init_etherlink_operator_setup cloud configuration etherlink_configuration
     name ~bootstrap ~dal_slots account batching_operators agent next_agent =
   let is_sequencer = etherlink_configuration.etherlink_sequencer in
-  let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
