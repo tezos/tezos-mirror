@@ -89,22 +89,17 @@ module type T = sig
     (slot_header * operation_application_result) list tzresult Lwt.t
 
   (** For a given block, returns for each included attestation, as a
-      list, its attester if available, its [attestation] operation
-      and, if it exists, its [dal_attestation] to be passed to the
-      [is_attested] function. *)
-  val get_attestation_operations :
+      list, its Tenderbake slot, its attester if available in the
+      operation receipt, its [attestation] operation and, if it
+      exists, its [dal_attestation] to be passed to the [is_attested]
+      function. *)
+  val get_attestations :
     block_info ->
-    (Signature.public_key_hash option
+    (int
+    * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
     list
-
-  (** For a given block, returns for each included attestation, as a list, its
-      Tenderbake slot, its attester (if available in the operation receipt), and
-      its DAL attestation. *)
-  val get_dal_content_of_attestations :
-    block_info ->
-    (int * Signature.Public_key_hash.t option * dal_attestation option) list
 
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
       map that associates to the public key hash [pkh] of the member of

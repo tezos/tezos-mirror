@@ -439,7 +439,7 @@ module Handler = struct
   let get_attestable_slots attestations committee ~number_of_slots is_attested =
     let count_per_slot = Array.make number_of_slots 0 in
     List.iter
-      (fun (_tb_slot, delegate_opt, dal_attestation_opt) ->
+      (fun (_tb_slot, delegate_opt, _attestation_op, dal_attestation_opt) ->
         match (delegate_opt, dal_attestation_opt) with
         | Some delegate, Some dal_attestation -> (
             match Signature.Public_key_hash.Map.find delegate committee with
@@ -488,7 +488,7 @@ module Handler = struct
       in
       let*! () =
         List.iter_s
-          (fun (_tb_slot, delegate_opt, bitset_opt) ->
+          (fun (_, delegate_opt, _attestation_op, bitset_opt) ->
             match delegate_opt with
             | Some delegate
               when Signature.Public_key_hash.Set.mem delegate attesters -> (
@@ -611,9 +611,7 @@ module Handler = struct
         in
         let* () = may_update_topics ctxt proto_parameters ~block_level in
         let* () =
-          let get_attestations () =
-            Plugin.get_dal_content_of_attestations block_info
-          in
+          let get_attestations () = Plugin.get_attestations block_info in
           check_attesters_attested
             ctxt
             proto_parameters
