@@ -21,6 +21,7 @@ if [ "${CI_COMMIT_REF_NAME}" == "master" ]; then
     # Update S3
     # https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html
     aws s3 sync ./public s3://site-prod.octez.tezos.com/docs --delete
+    aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths "/*"
   fi
 else
   echo "Skip pushing documentation. Only pushing for real master"
