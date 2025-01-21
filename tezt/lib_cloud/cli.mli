@@ -113,6 +113,9 @@ val macosx : bool
 (** Check for file consistency. *)
 val check_file_consistency : bool
 
+(** Use docker host network in localhost. *)
+val docker_host_network : bool
+
 (** Specify if the docker container should be pushed.
     Only considered for remote mode. *)
 val push_docker : bool

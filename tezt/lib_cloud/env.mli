@@ -111,6 +111,9 @@ val macosx : bool
 (** Equivalent to [Cli.check_file_consistency]. *)
 val check_file_consistency : bool
 
+(** Equivalent to [Cli.docker_host_network]. *)
+val docker_host_network : bool
+
 (** Equivalent to [Cli.push_docker]. *)
 val push_docker : bool
 
