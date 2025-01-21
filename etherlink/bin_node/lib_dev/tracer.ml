@@ -294,7 +294,7 @@ let read_outputs config state =
       Lwt_result.bind
         (CallTracerRead.read_outputs state)
         (List.map_es (fun o -> return @@ CallTracerOutput o))
-  | StructLogger -> tzfail Tracer_types.Tracer_not_activated
+  | StructLogger -> tzfail @@ Tracer_types.Tracer_not_implemented "structLogger"
 
 let trace_transaction (module Exe : Evm_execution.S) ~block_number
     ~transaction_hash ~config =
@@ -331,6 +331,13 @@ let trace_block (module Exe : Evm_execution.S)
     (module Block_storage : Block_storage_sig.S) ~block_number ~config =
   let open Lwt_result_syntax in
   let*! () = Tracer_event.tracer_input (Tracer_types.config_to_string config) in
+  (* only implemented for callTracer *)
+  let* () =
+    match config.Tracer_types.tracer with
+    | CallTracer -> return_unit
+    | StructLogger ->
+        tzfail @@ Tracer_types.Tracer_not_implemented "structLogger"
+  in
   (* first get the transaction hashes *)
   let* block =
     Block_storage.nth_block

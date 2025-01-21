@@ -17,7 +17,9 @@ type error +=
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
-  | Tracer_not_activated
+  | Tracer_not_activated  (** Tracer only activated after a certain level *)
+  | Tracer_not_implemented of string
+        (** Not all tracer are available for all rpcs *)
   | Inconsistent_traces of inconsistent_traces_input
 
 type tracer_config = {

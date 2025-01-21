@@ -410,6 +410,8 @@ let process_trace_result trace =
       rpc_error (Rpc_errors.trace_block_not_found number)
   | Error (Tracer_types.Trace_not_found :: _) ->
       rpc_error Rpc_errors.trace_not_found
+  | Error (Tracer_types.Tracer_not_implemented s :: _) ->
+      rpc_error (Rpc_errors.tracer_not_implemented s)
   | Error e ->
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)

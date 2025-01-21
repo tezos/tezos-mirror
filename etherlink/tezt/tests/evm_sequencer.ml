@@ -9421,7 +9421,7 @@ let test_node_correctly_uses_batcher_heap =
 let test_trace_empty_block =
   register_all
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "trace"; "call_trace"; "block"; "empty"]
+    ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"]
     ~title:"debug_traceBlockByNumber succeeds on empty block"
     ~kernels:Kernel.all
   @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
@@ -9436,24 +9436,28 @@ let test_trace_empty_block =
 let test_trace_block_struct_logger =
   register_all
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "trace"; "call_trace"; "block"; "empty"]
+    ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
     ~title:"debug_traceBlockByNumber not implemented for struct logger"
     ~kernels:Kernel.all
   @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
-  let*@ trace_result =
+  let* trace_result =
     Rpc.trace_block ~tracer:"structLogger" ~block:Rpc.Latest sequencer
   in
-  Check.(
-    (trace_result = [])
-      (list json)
-      ~error_msg:"Wrong trace, expected %R but got %L") ;
-  unit
+  match trace_result with
+  | Ok _ -> Test.fail "should have failed, structLogger not implemented"
+  | Error {data; code; _} ->
+      Check.((code = -32002) int ~error_msg:"Expected %R but got %L") ;
+      Check.(
+        (data = Some "structLogger")
+          (option string)
+          ~error_msg:"Error should be the name of the tracer") ;
+      unit
 
 let test_trace_block =
   register_all
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "trace"; "call_trace"; "block"]
+    ~tags:["evm"; "sequencer"; "trace"; "block"]
     ~title:"debug_traceBlockByNumber succeeds on non empty block"
     ~kernels:Kernel.all
   @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->

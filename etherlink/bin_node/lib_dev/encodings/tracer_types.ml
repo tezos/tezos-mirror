@@ -24,7 +24,9 @@ type error +=
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
-  | Tracer_not_activated
+  | Tracer_not_activated  (** Tracer only activated after a certain level *)
+  | Tracer_not_implemented of string
+        (** Not all tracer are available for all rpcs *)
   | Inconsistent_traces of inconsistent_traces_input
 
 let () =
@@ -113,7 +115,19 @@ let () =
           Some (block, nb_txs, nb_traces)
       | _ -> None)
     (fun (block, nb_txs, nb_traces) ->
-      Inconsistent_traces {block; nb_txs; nb_traces})
+      Inconsistent_traces {block; nb_txs; nb_traces}) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_tracer_not_implemented"
+    ~title:"Tracer not implemented"
+    ~description:
+      "The tracer specified in the request is not implemented for that \n\
+      \    particular request"
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "The tracer %s is not available for that request" s)
+    Data_encoding.(obj1 (req "tracer" string))
+    (function Tracer_not_implemented s -> Some s | _ -> None)
+    (fun s -> Tracer_not_implemented s)
 
 type tracer_config = {
   (* StructLogger flags *)
