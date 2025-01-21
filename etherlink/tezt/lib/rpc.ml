@@ -139,6 +139,40 @@ module Request = struct
       parameters = `A [`String address; block_param_to_json block];
     }
 
+  let eth_getLogs ?from_block ?to_block ?address ?topics () =
+    let parse_topic = function
+      | [] -> `Null
+      | [t] -> `String t
+      | l -> `A (List.map (fun s -> `String s) l)
+    in
+    let parse_address = function
+      | `Single a -> `String a
+      | `List l -> `A (List.map (fun a -> `String a) l)
+    in
+    let parameters : JSON.u =
+      `A
+        [
+          `O
+            (Option.fold
+               ~none:[]
+               ~some:(fun f -> [("fromBlock", `String f)])
+               from_block
+            @ Option.fold
+                ~none:[]
+                ~some:(fun t -> [("toBlock", `String t)])
+                to_block
+            @ Option.fold
+                ~none:[]
+                ~some:(fun a -> [("address", parse_address a)])
+                address
+            @ Option.fold
+                ~none:[]
+                ~some:(fun t -> [("topics", `A (List.map parse_topic t))])
+                topics);
+        ]
+    in
+    {method_ = "eth_getLogs"; parameters}
+
   let eth_getChainId = {method_ = "eth_chainId"; parameters = `A []}
 
   let net_version = {method_ = "net_version"; parameters = `A []}
