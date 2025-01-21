@@ -109,6 +109,16 @@ val get_code :
   Evm_node.t ->
   (string, error) result Lwt.t
 
+(** [get_logs evm_node] calls [eth_getLogs]. *)
+val get_logs :
+  ?websocket:Websocket.t ->
+  ?from_block:string ->
+  ?to_block:string ->
+  ?address:[< `List of string list | `Single of string] ->
+  ?topics:string list list ->
+  Evm_node.t ->
+  (Transaction.tx_log list, error) result Lwt.t
+
 (** [block_number evm_node] calls [eth_blockNumber]. *)
 val block_number :
   ?websocket:Websocket.t -> Evm_node.t -> (int32, error) result Lwt.t
