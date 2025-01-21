@@ -531,6 +531,13 @@ module Dal_already_denounced :
       (Raw_level_repr.t * Dal_slot_index_repr.t) * Signature.Public_key_hash.t
      and type value = unit
 
+(** Set of delegates denounced in a cycle. It is used to not distribute rewards for such delegates. *)
+module Dal_denounced_delegates :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key = Signature.Public_key_hash.t
+     and type value = unit
+
 module Pending_staking_parameters :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t

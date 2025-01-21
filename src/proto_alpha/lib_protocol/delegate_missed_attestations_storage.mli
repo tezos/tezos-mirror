@@ -168,6 +168,9 @@ module For_RPC : sig
             particular, this flag is true if no DAL slot is attested globally by
             the protocol at a given cycle (i.e. [total_dal_attested_slots] =
             0). (dynamic) *)
+    denounced : bool;
+        (** A boolean flag telling whether the delegate was denounced for
+            not detecting traps. (dynamic) *)
   }
 
   (** Only use this function for RPC: this is expensive.

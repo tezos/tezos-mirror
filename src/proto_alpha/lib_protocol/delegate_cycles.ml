@@ -52,10 +52,13 @@ let update_activity ctxt last_cycle =
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
-let distribute_dal_attesting_rewards ctxt delegate
+let distribute_dal_attesting_rewards ctxt delegate ~last_cycle
     ~dal_attesting_reward_per_shard ~total_dal_attested_slots
     ~total_active_stake_weight ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
+  let*! denounced_in_cycle =
+    Dal_already_denounced_storage.is_denounced ctxt delegate last_cycle
+  in
   let* ctxt, dal_attested_slots_by_delegate =
     Delegate_missed_attestations_storage
     .get_and_reset_delegate_dal_participation
@@ -78,7 +81,7 @@ let distribute_dal_attesting_rewards ctxt delegate
   let dal_rewards =
     Tez_repr.mul_exn dal_attesting_reward_per_shard expected_dal_shards
   in
-  if sufficient_dal_participation then
+  if sufficient_dal_participation && not denounced_in_cycle then
     Shared_stake.pay_rewards
       ctxt
       ~active_stake
@@ -98,7 +101,7 @@ let distribute_dal_attesting_rewards ctxt delegate
       (`Lost_dal_attesting_rewards delegate)
       dal_rewards
 
-let maybe_distribute_dal_attesting_rewards ctxt delegate
+let maybe_distribute_dal_attesting_rewards ctxt delegate ~last_cycle
     ~dal_attesting_reward_per_shard ~total_dal_attested_slots
     ~total_active_stake_weight ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
@@ -114,6 +117,7 @@ let maybe_distribute_dal_attesting_rewards ctxt delegate
       distribute_dal_attesting_rewards
         ctxt
         delegate
+        ~last_cycle
         ~dal_attesting_reward_per_shard
         ~total_dal_attested_slots
         ~total_active_stake_weight
@@ -194,6 +198,7 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
         maybe_distribute_dal_attesting_rewards
           ctxt
           delegate
+          ~last_cycle
           ~dal_attesting_reward_per_shard
           ~total_dal_attested_slots
           ~total_active_stake_weight

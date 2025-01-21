@@ -196,9 +196,9 @@
   Delegate_storage
   Delegate_sampler
   Delegate_rewards
-  Delegate_missed_attestations_storage
   Already_denounced_storage
   Dal_already_denounced_storage
+  Delegate_missed_attestations_storage
   Forbidden_delegates_storage
   Slash_percentage
   Delegate_slashed_deposits_storage
@@ -494,10 +494,10 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
-  delegate_missed_attestations_storage.ml
-  delegate_missed_attestations_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
+  delegate_missed_attestations_storage.ml
+  delegate_missed_attestations_storage.mli
   forbidden_delegates_storage.ml forbidden_delegates_storage.mli
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
@@ -794,10 +794,10 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
-  delegate_missed_attestations_storage.ml
-  delegate_missed_attestations_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
+  delegate_missed_attestations_storage.ml
+  delegate_missed_attestations_storage.mli
   forbidden_delegates_storage.ml forbidden_delegates_storage.mli
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
@@ -1078,10 +1078,10 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
-  delegate_missed_attestations_storage.ml
-  delegate_missed_attestations_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
+  delegate_missed_attestations_storage.ml
+  delegate_missed_attestations_storage.mli
   forbidden_delegates_storage.ml forbidden_delegates_storage.mli
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli

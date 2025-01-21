@@ -2524,6 +2524,7 @@ module Delegate : sig
       total_dal_attested_slots : int;
       expected_dal_rewards : Tez.t;
       sufficient_dal_participation : bool;
+      denounced : bool;
     }
 
     val participation_info :
@@ -3060,6 +3061,9 @@ module Dal : sig
     (** See {!Dal_already_denounced_storage.is_already_denounced}. *)
     val is_already_denounced :
       context -> public_key_hash -> Level.t -> Slot_index.t -> bool Lwt.t
+
+    (** See {!Dal_already_denounced_storage.is_denounced}. *)
+    val is_denounced : context -> public_key_hash -> Cycle.t -> bool Lwt.t
   end
 end
 

@@ -153,30 +153,35 @@ let dal_participation_info_encoding =
              total_dal_attested_slots;
              expected_dal_rewards;
              sufficient_dal_participation;
+             denounced;
            } ->
       ( expected_assigned_shards_per_slot,
         delegate_attested_dal_slots,
         total_dal_attested_slots,
         expected_dal_rewards,
-        sufficient_dal_participation ))
+        sufficient_dal_participation,
+        denounced ))
     (fun ( expected_assigned_shards_per_slot,
            delegate_attested_dal_slots,
            total_dal_attested_slots,
            expected_dal_rewards,
-           sufficient_dal_participation ) ->
+           sufficient_dal_participation,
+           denounced ) ->
       {
         expected_assigned_shards_per_slot;
         delegate_attested_dal_slots;
         total_dal_attested_slots;
         expected_dal_rewards;
         sufficient_dal_participation;
+        denounced;
       })
-    (obj5
+    (obj6
        (req "expected_assigned_shards_per_slot" int31)
        (req "delegate_attested_dal_slots" int31)
        (req "total_dal_attested_slots" int31)
        (req "expected_dal_rewards" Tez.encoding)
-       (req "sufficient_dal_participation" bool))
+       (req "sufficient_dal_participation" bool)
+       (req "denounced" bool))
 
 type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
 
@@ -901,7 +906,9 @@ module S = struct
          declared to be attested by the protocol. Note that this flag may \
          evolve during the cycle. Also note, in particular, that if no DAL no \
          DAL slots have been globally attested during the cycle (i.e., when \
-         'total_dal_attested_slots' is zero), the flag is true."
+         'total_dal_attested_slots' is zero), the flag is true. The \
+         'denounced' field specifies whether the delegate was denounced for \
+         not detecting traps during the current cycle."
       ~query:RPC_query.empty
       ~output:dal_participation_info_encoding
       RPC_path.(path / "dal_participation")

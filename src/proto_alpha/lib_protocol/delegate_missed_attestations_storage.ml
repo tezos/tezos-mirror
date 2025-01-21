@@ -321,6 +321,7 @@ module For_RPC = struct
     total_dal_attested_slots : int;
     expected_dal_rewards : Tez_repr.t;
     sufficient_dal_participation : bool;
+    denounced : bool;
   }
 
   (* Inefficient, only for RPC *)
@@ -345,6 +346,7 @@ module For_RPC = struct
             total_dal_attested_slots = 0;
             expected_dal_rewards = Tez_repr.zero;
             sufficient_dal_participation = false;
+            denounced = false;
           }
     | Some active_stake ->
         let* total_active_stake =
@@ -373,13 +375,18 @@ module For_RPC = struct
             ~dal_attested_slots_by_delegate
             ~total_dal_attested_slots
         in
+        let*! denounced =
+          Dal_already_denounced_storage.is_denounced ctxt delegate level.cycle
+        in
         let*? dal_attesting_reward_per_shard =
           Delegate_rewards.dal_attesting_reward_per_shard ctxt
         in
         let expected_dal_rewards =
-          Tez_repr.mul_exn
-            dal_attesting_reward_per_shard
-            expected_assigned_shards_per_slot
+          if denounced then Tez_repr.zero
+          else
+            Tez_repr.mul_exn
+              dal_attesting_reward_per_shard
+              expected_assigned_shards_per_slot
         in
         return
           {
@@ -389,6 +396,7 @@ module For_RPC = struct
             total_dal_attested_slots = Int32.to_int total_dal_attested_slots;
             expected_dal_rewards;
             sufficient_dal_participation;
+            denounced;
           }
 
   (* Inefficient, only for RPC *)
