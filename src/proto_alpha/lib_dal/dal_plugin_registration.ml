@@ -175,40 +175,7 @@ module Plugin = struct
            let slot_index = Dal.Slot_index.to_int slot_index in
            return Dal_plugin.({published_level; slot_index; commitment}, status))
 
-  let get_dal_content_of_attestations (block : block_info) =
-    let open Protocol.Alpha_context in
-    match List.hd block.operations with
-    | None ->
-        (* that should be unreachable, as there are 4 operation passes *) []
-    | Some consensus_ops ->
-        List.filter_map
-          (fun Protocol_client_context.Alpha_block_services.
-                 {receipt; protocol_data; _} ->
-            let delegate_opt =
-              match receipt with
-              | Receipt (Operation_metadata {contents; _}) -> (
-                  match contents with
-                  | Single_result (Attestation_result {delegate; _}) ->
-                      Some delegate
-                  | _ -> None)
-              | Empty | Too_large | Receipt No_operation_metadata -> None
-            in
-            match protocol_data with
-            | Operation_data
-                {
-                  contents =
-                    Single (Attestation {consensus_content; dal_content; _});
-                  _;
-                } ->
-                Some
-                  ( Slot.to_int consensus_content.slot,
-                    delegate_opt,
-                    (Option.map (fun d -> d.attestation) dal_content
-                      :> Environment.Bitset.t option) )
-            | _ -> None)
-          consensus_ops
-
-  let get_attestation_operations block_info =
+  let get_attestations block_info =
     let open Protocol.Alpha_context in
     let open Protocol_client_context.Alpha_block_services in
     match block_info.operations with
@@ -225,6 +192,7 @@ module Plugin = struct
                     protocol_data = operation_data;
                   }
                 in
+                let tb_slot = Slot.to_int attestation.consensus_content.slot in
                 let dal_attestation : dal_attestation option =
                   Option.map
                     (fun x -> (x.attestation :> dal_attestation))
@@ -235,12 +203,14 @@ module Plugin = struct
                     match operation_metadata.contents with
                     | Single_result (Attestation_result result) ->
                         Some
-                          ( Some result.delegate,
+                          ( tb_slot,
+                            Some result.delegate,
                             packed_operation,
                             dal_attestation )
-                    | _ -> Some (None, packed_operation, dal_attestation))
+                    | _ ->
+                        Some (tb_slot, None, packed_operation, dal_attestation))
                 | Empty | Too_large | Receipt No_operation_metadata ->
-                    Some (None, packed_operation, dal_attestation))
+                    Some (tb_slot, None, packed_operation, dal_attestation))
             | _ -> None)
           consensus_ops
     | _ ->

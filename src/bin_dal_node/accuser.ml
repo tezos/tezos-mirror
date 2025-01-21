@@ -13,9 +13,9 @@ let get_attestation_map (type block_info attestation_operation dal_attestation)
       with type block_info = block_info
        and type attestation_operation = attestation_operation
        and type dal_attestation = dal_attestation) block =
-  let attestations = Plugin.get_attestation_operations block in
+  let attestations = Plugin.get_attestations block in
   List.fold_left
-    (fun map (delegate_opt, operation, dal_attestation) ->
+    (fun map (_tb_slot, delegate_opt, operation, dal_attestation) ->
       match delegate_opt with
       | None -> map
       | Some delegate ->
