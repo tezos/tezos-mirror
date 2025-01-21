@@ -266,6 +266,17 @@ let check_file_consistency =
        behavior. Its default value is [true] unless [--macosx] is used."
     (not macosx)
 
+let docker_host_network =
+  Clap.flag
+    ~section
+    ~set_long:"docker-host-network"
+    ~unset_long:"no-docker-host-network"
+    ~description:
+      "In Localhost host mode, whether to use the host network or not. This is \
+       not available on Mac OS/X. By default [true] unless Mac OS/X is set. If \
+       not set, a dedicated docker network is created."
+    (not macosx)
+
 let push_docker =
   Clap.flag
     ~section

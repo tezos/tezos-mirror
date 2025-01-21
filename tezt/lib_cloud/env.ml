@@ -81,6 +81,8 @@ let macosx = Cli.macosx
 
 let check_file_consistency = Cli.check_file_consistency
 
+let docker_host_network = Cli.docker_host_network
+
 let push_docker = Cli.push_docker
 
 let auto_approve = Cli.auto_approve

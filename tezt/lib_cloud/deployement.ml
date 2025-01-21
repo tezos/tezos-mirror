@@ -289,20 +289,19 @@ module Localhost = struct
       Env.tezt_cloud
       configuration.Configuration.name
 
-  let macosx_docker_network = Env.tezt_cloud ^ "-net"
-
   let deploy ~configurations () =
     let number_of_vms = List.length configurations in
     let base_port = Env.vm_base_port in
     let ports_per_vm = Env.ports_per_vm in
-    let network, start_macosx_docker_network =
-      if Env.macosx then
-        ( Some macosx_docker_network,
-          Some
-            (Docker.network
-               ~command:"create"
-               ~network_name:macosx_docker_network) )
-      else (None, None)
+    let docker_network = Env.tezt_cloud ^ "-net" in
+    let* network =
+      if Env.docker_host_network then Lwt.return "host"
+      else
+        let* () =
+          Docker.network ~command:"create" ~network_name:docker_network
+          |> Process.check
+        in
+        Lwt.return docker_network
     in
     let* processes =
       List.to_seq configurations
@@ -325,7 +324,7 @@ module Localhost = struct
                Docker.run
                  ~rm:true
                  ~name:(container_name configuration)
-                 ?network
+                 ~network
                  ~publish_ports
                  docker_image
                  ["-D"; "-p"; start; "-e"]
@@ -334,17 +333,19 @@ module Localhost = struct
       |> List.of_seq |> Lwt.all
     in
     let address configuration =
-      let* output =
-        Process.run_and_read_stdout
-          "docker"
-          [
-            "inspect";
-            "-f";
-            "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}";
-            container_name configuration;
-          ]
-      in
-      Lwt.return (String.trim output)
+      if Env.docker_host_network then Lwt.return "127.0.0.1"
+      else
+        let* output =
+          Process.run_and_read_stdout
+            "docker"
+            [
+              "inspect";
+              "-f";
+              "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}";
+              container_name configuration;
+            ]
+        in
+        Lwt.return (String.trim output)
     in
     (* We need to wait a little the machine is up. As for the remote case, we
        could be more robust to handle that. *)
@@ -385,14 +386,7 @@ module Localhost = struct
                ~name:configuration.Configuration.name
                ())
     in
-    Lwt.return
-      {
-        number_of_vms;
-        processes = Option.to_list start_macosx_docker_network @ processes;
-        base_port;
-        ports_per_vm;
-        agents;
-      }
+    Lwt.return {number_of_vms; processes; base_port; ports_per_vm; agents}
 
   let agents t = t.agents
 
