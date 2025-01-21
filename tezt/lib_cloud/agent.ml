@@ -136,9 +136,10 @@ let host_run_command agent cmd args =
 
 let docker_run_command agent ?(detach = false) cmd args =
   (* This function allows to run a command and detach it from the terminal
-     session and parent process. This allows to run a command in background
-     without the session (and processes group) being killed by ssh on
-     disconnection. It uses the [setsid -f] to detach the session. *)
+      session and parent process. This allows to run a command in background
+      without the session (and processes group) being killed by ssh on
+      disconnection. It uses the [setsid -f] to detach the session.
+     Automatically log stdout and stderr of the command in tezt temporary dir *)
   let run_detached ?runner cmd args =
     let whole_cmd = String.concat " " (cmd :: args) in
     let cmd = "sh" in

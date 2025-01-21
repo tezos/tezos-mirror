@@ -12,7 +12,7 @@ type t
 
 (** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name ()]
     creates an [agent] from the given parameters. [~next_available_port] should
-    always provide an available port or raise [Not_found] otherwise. 
+    always provide an available port or raise [Not_found] otherwise.
     [~name] is the name of the agent. [?ssh_id] and [?point] are used to potentially
     create a [runner] for the [agent]. *)
 val make :
@@ -60,10 +60,15 @@ val host_run_command : t -> string -> string list -> Process.t
 
     The library uses it to ensure there won't be any check of the host
     when issuing for the first time an ssh connection.
+
+    [detach] Allows the command to be run in background and detaching from the
+    owning terminal and parent process. In this case, a temporary file is
+    automatically created in /tmp/tezt-$n with the name of the command as
+    prefix (warning: it can causes duplicates).
  *)
 val docker_run_command : t -> ?detach:bool -> string -> string list -> Process.t
 
-(** [copy ?refresh ?is_directory ?destination agent ~source] copies the file 
+(** [copy ?refresh ?is_directory ?destination agent ~source] copies the file
     into the [agent] directory and returns the directory where the file
     can be found if [?refresh] is set to [true]. It is assumed the [~source]
     file does not exist on the agent machine. If the parent directory does
