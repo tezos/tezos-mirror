@@ -30,7 +30,7 @@ binaries and creates the Debian packages.
 #### Build dependencies
 
 For the list of build dependencies needed to build post-19.1 packages, please
-refer to the list in the Docker file `debian-deps-build.Dockerfile`. This file
+refer to the list in the Docker file `images/packages/debian-deps-build.Dockerfile`. This file
 is used to build the dependencies Docker images. In particular, if you never
 built Debian packages before you will probably have to run `sudo apt install
 debhelper` .

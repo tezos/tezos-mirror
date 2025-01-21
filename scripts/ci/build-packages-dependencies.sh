@@ -4,7 +4,7 @@
 
 set -e
 
-DOCKERFILE=${1:-debian-deps-build.Dockerfile}
+DOCKERFILE=${1:-images/packages/debian-deps-build.Dockerfile}
 
 . scripts/version.sh
 

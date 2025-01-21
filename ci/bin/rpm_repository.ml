@@ -66,7 +66,10 @@ let jobs pipeline_type =
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
-      ["./scripts/ci/build-packages-dependencies.sh rpm-deps-build.Dockerfile"]
+      [
+        "./scripts/ci/build-packages-dependencies.sh \
+         images/packages/rpm-deps-build.Dockerfile";
+      ]
   in
   let job_docker_build_rockylinux_dependencies : tezos_job =
     make_job_docker_build_dependencies
