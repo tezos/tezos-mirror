@@ -229,6 +229,10 @@ let make_parameter name = function
   | None -> []
   | Some value -> [([name], `Int value)]
 
+let make_int_parameter name = function
+  | None -> []
+  | Some value -> [(name, `Int value)]
+
 let make_bool_parameter name = function
   | None -> []
   | Some value -> [([name], `Bool value)]
@@ -244,7 +248,7 @@ let make_string_parameter name = function
 let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     ?commitment_period ?challenge_window ?timeout ?whitelist_enable
     ?rpc_external ?(riscv_pvm_enable = false) ?minimal_block_delay
-    ?dal_incentives protocol =
+    ?dal_incentives ?dal_rewards_weight protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
@@ -262,6 +266,11 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     @ make_bool_parameter_l
         ["dal_parametric"; "incentives_enable"]
         dal_incentives
+    @ (if Protocol.(number protocol > number Quebec) then
+         make_int_parameter
+           ["issuance_weights"; "dal_rewards_weight"]
+           dal_rewards_weight
+       else [])
     @
     if riscv_pvm_enable then [(["smart_rollup_riscv_pvm_enable"], `Bool true)]
     else []
