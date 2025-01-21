@@ -137,7 +137,7 @@ The peer-to-peer (P2P) protocol for the DAL is made out of two components:
 
 - A gossipsub algorithm, instantiated as detailed below.
 - A transport layer for handling connections with peers.
-  We reuse for that the P2P protocol used by the Octez node (see :ref:`dal_p2p`).
+  We reuse for that the :doc:`P2P protocol used by the Octez node <p2p>`.
 
 The gossip algorithm used for the DAL is an in-house version of the gossipsub v1.1 P2P protocol defined by the lib-p2p project. A detailed overview of this protocol is available `here <https://docs.libp2p.io/concepts/pubsub/overview/>`__ and an informal English specification can be found `here <https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md>`__. This gossip algorithm allows to partition the network into virtual subnetworks, each identified by a **topic**. The topic also determines the valid data that can be exchanged over the corresponding virtual subnetwork, as any exchanged message has exactly one associated topic. Each peer subscribes to topics of interest to him. This protocol enhances the network's scalability compared to traditional gossip algorithms.
 
