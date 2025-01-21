@@ -488,11 +488,11 @@ module Handler = struct
       in
       let*! () =
         List.iter_s
-          (fun (_, delegate_opt, _attestation_op, bitset_opt) ->
+          (fun (_, delegate_opt, _attestation_op, dal_attestation_opt) ->
             match delegate_opt with
             | Some delegate
               when Signature.Public_key_hash.Set.mem delegate attesters -> (
-                match bitset_opt with
+                match dal_attestation_opt with
                 | None ->
                     let in_committee =
                       match
