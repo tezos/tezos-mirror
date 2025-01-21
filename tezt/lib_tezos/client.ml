@@ -2807,11 +2807,12 @@ module Zk_rollup = struct
     Lwt.return_unit
 end
 
-let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
+let init ?path ?admin_path ?name ?color ?base_dir ?endpoint
+    ?(keys = Constant.all_secret_keys) ?media_type () =
   let client =
     create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type ()
   in
-  Account.write Constant.all_secret_keys ~base_dir:client.base_dir ;
+  Account.write keys ~base_dir:client.base_dir ;
   return client
 
 let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode

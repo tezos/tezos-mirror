@@ -2467,6 +2467,7 @@ val init :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?endpoint:endpoint ->
+  ?keys:Account.key list ->
   ?media_type:media_type ->
   unit ->
   t Lwt.t
