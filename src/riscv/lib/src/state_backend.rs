@@ -393,6 +393,8 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
     }
 }
 
+pub type RefOwnedAlloc<'a, L> = AllocatedOf<L, Ref<'a, owned_backend::Owned>>;
+
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::{

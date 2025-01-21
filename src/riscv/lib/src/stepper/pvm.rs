@@ -20,7 +20,7 @@ use crate::{
         owned_backend::Owned,
         proof_backend::{merkle::Merkleisable, proof::Proof, ProofGen},
         verify_backend::Verifier,
-        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref,
+        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref, RefOwnedAlloc,
     },
     storage::binary,
 };
@@ -180,7 +180,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
-    pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<ML, CL>, Ref<'_, Owned>> {
+    pub fn struct_ref(&self) -> RefOwnedAlloc<PvmLayout<ML, CL>> {
         self.pvm.struct_ref::<FnManagerIdent>()
     }
 
@@ -188,7 +188,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
     /// ephemeral state that doesn't make it into the serialised output.
     pub fn rebind_via_serde(&mut self)
     where
-        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, Owned>>: Serialize,
+        for<'a> RefOwnedAlloc<'a, PvmLayout<ML, CL>>: Serialize,
         AllocatedOf<PvmLayout<ML, CL>, Owned>: DeserializeOwned,
     {
         let space = {

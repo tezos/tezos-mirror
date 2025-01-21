@@ -8,7 +8,7 @@ use common::*;
 use octez_riscv::{
     machine_state::{main_memory::M100M, DefaultCacheLayouts},
     pvm::PvmLayout,
-    state_backend::{hash, owned_backend::Owned, AllocatedOf, Ref},
+    state_backend::{hash, RefOwnedAlloc},
     stepper::{pvm::PvmStepper, Stepper, StepperStatus},
 };
 use std::ops::Bound;
@@ -44,7 +44,7 @@ fn test_jstz_determinism() {
 fn run_steps_ladder<F>(
     make_stepper: F,
     ladder: &[usize],
-    expected_refs: &AllocatedOf<PvmLayout<M100M, DefaultCacheLayouts>, Ref<'_, Owned>>,
+    expected_refs: &RefOwnedAlloc<PvmLayout<M100M, DefaultCacheLayouts>>,
     expected_hash: hash::Hash,
 ) where
     F: Fn() -> PvmStepper<'static, M100M, DefaultCacheLayouts>,
@@ -109,8 +109,8 @@ where
 }
 
 fn assert_eq_struct_wrapper<'a, 'regions1, 'regions2>(
-    refs: AllocatedOf<PvmLayout<M100M, DefaultCacheLayouts>, Ref<'regions1, Owned>>,
-    expected: &'a AllocatedOf<PvmLayout<M100M, DefaultCacheLayouts>, Ref<'regions2, Owned>>,
+    refs: RefOwnedAlloc<'regions1, PvmLayout<M100M, DefaultCacheLayouts>>,
+    expected: &'a RefOwnedAlloc<'regions2, PvmLayout<M100M, DefaultCacheLayouts>>,
 ) {
     // SAFETY: Rust does not allow us to compare two references with different lifetimes.
     // Theoretically this should be possible and safe thanks to `PartialEq`. However, Rust's
@@ -120,7 +120,7 @@ fn assert_eq_struct_wrapper<'a, 'regions1, 'regions2>(
     // the `==` operator need to be identical in type. This also means lifetimes are forcibly
     // unified. We can work around this by transmuting the references to the same lifetime. This is
     // safe because lifetimes are not violated as dictated by the interface of this function.
-    let refs: AllocatedOf<PvmLayout<M100M, DefaultCacheLayouts>, Ref<'regions2, Owned>> =
+    let refs: RefOwnedAlloc<'regions2, PvmLayout<M100M, DefaultCacheLayouts>> =
         unsafe { std::mem::transmute(refs) };
     assert_eq_struct(&refs, expected);
 }

@@ -20,7 +20,7 @@ use crate::{
         proof_backend::merkle::{MerkleTree, Merkleisable},
         verify_backend, AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout,
         FnManager, FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead,
-        ManagerReadWrite, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref,
+        ManagerReadWrite, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref, RefOwnedAlloc,
     },
     storage::binary,
 };
@@ -157,7 +157,7 @@ impl Layout for CSRValuesLayout {
 }
 
 impl CommitmentLayout for CSRValuesLayout {
-    fn state_hash(state: AllocatedOf<Self, Ref<'_, Owned>>) -> Result<Hash, HashError> {
+    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
     }
 }
