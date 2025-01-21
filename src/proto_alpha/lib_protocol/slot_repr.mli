@@ -50,16 +50,6 @@ val max_value : t
  *)
 val of_int : int -> t tzresult
 
-(** [of_int_do_not_use_except_for_parameters i] is an unchecked construction
-   function.
-
-   It may be used in cases where one knows [0 <= i <= max_value], e.g., when
-   creating protocol parameters.
-
-   When in doubt, use [of_int] or [of_int_exn].
- *)
-val of_int_do_not_use_except_for_parameters : int -> t
-
 (** {1 Operator and pretty-printer} *)
 
 (** [succ n] either returns an [Invalid_slot] error if [n] is [max_value] or [ok
@@ -114,4 +104,15 @@ module Range : sig
       order. *)
   val rev_fold_es :
     ('a -> slot -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
+end
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** [of_int_unsafe_only_use_for_tests i] is an unchecked construction
+   function.
+
+   It may be used to test cases with a slot outside of the allowed slot range,
+   or carefully in tests where we know we are in the allowed range. *)
+  val of_int_unsafe_only_use_for_tests : int -> t
 end

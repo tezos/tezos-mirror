@@ -351,7 +351,7 @@ let test_consensus_key_with_unused_proof () =
   return_unit
 
 let test_attestation_with_consensus_key () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* genesis, contracts = Context.init_with_constants1 constants in
   let account1_pkh = Context.Contract.pkh contracts in
   let consensus_account = Account.new_account () in
@@ -363,7 +363,7 @@ let test_attestation_with_consensus_key () =
   in
   let* b_pre = update_consensus_key blk' delegate consensus_pk in
   let* b = Block.bake b_pre in
-  let slot = Slot.of_int_do_not_use_except_for_parameters 0 in
+  let*?@ slot = Slot.of_int 0 in
   let* attestation = Op.attestation ~delegate:account1_pkh ~slot b in
   let*! res = Block.bake ~operation:attestation b in
   let* () =

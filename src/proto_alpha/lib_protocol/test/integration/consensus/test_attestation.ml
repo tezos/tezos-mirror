@@ -167,7 +167,7 @@ let test_negative_slot () =
       let* (_ : packed_operation) =
         Op.attestation
           ~delegate
-          ~slot:(Slot.of_int_do_not_use_except_for_parameters (-1))
+          ~slot:(Slot.Internal_for_tests.of_int_unsafe_only_use_for_tests (-1))
           b
       in
       failwith "negative slot should not be accepted by the binary format")

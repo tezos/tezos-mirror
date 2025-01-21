@@ -58,8 +58,6 @@ let to_int x = x
    performance penalty first. *)
 let max_value = (1 lsl 16) - 1
 
-let of_int_do_not_use_except_for_parameters i = i
-
 let of_int i =
   let open Result_syntax in
   if Compare.Int.(i < 0 || i > max_value) then tzfail (Invalid_slot i)
@@ -114,4 +112,8 @@ module Range = struct
     in
     let* acc = f init hi in
     loop ~acc ~next:(hi - 1)
+end
+
+module Internal_for_tests = struct
+  let of_int_unsafe_only_use_for_tests i = i
 end
