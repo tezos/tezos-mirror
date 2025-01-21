@@ -124,30 +124,7 @@ impl Debug for Instruction {
 impl Instruction {
     /// Returns the width of the instruction: either compressed or uncompressed.
     pub const fn width(&self) -> InstrWidth {
-        use OpCode::*;
-        match self.opcode {
-            Add | Sub | Xor | Or | And | Sll | Srl | Sra | Slt | Sltu | Addw | Subw | Sllw
-            | Srlw | Sraw | Addi | Addiw | Xori | Ori | Andi | Slli | Srli | Srai | Slliw
-            | Srliw | Sraiw | Slti | Sltiu | Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw
-            | Sd | Beq | Bne | Blt | Bge | Bltu | Bgeu | Lui | Auipc | Jal | Jalr | Lrw | Scw
-            | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw
-            | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind
-            | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw
-            | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | FclassS | Feqs | Fles | Flts | Fadds
-            | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fmadds | Fmsubs | Fnmsubs
-            | Fnmadds | Flw | Fsw | Fcvtsw | Fcvtswu | Fcvtsl | Fcvtslu | Fcvtws | Fcvtwus
-            | Fcvtls | Fcvtlus | Fsgnjs | Fsgnjns | Fsgnjxs | FmvXW | FmvWX | FclassD | Feqd
-            | Fled | Fltd | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind | Fmaxd | Fmaddd
-            | Fmsubd | Fnmsubd | Fnmaddd | Fld | Fsd | Fcvtdw | Fcvtdwu | Fcvtdl | Fcvtdlu
-            | Fcvtds | Fcvtsd | Fcvtwd | Fcvtwud | Fcvtld | Fcvtlud | Fsgnjd | Fsgnjnd
-            | Fsgnjxd | FmvXD | FmvDX | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci
-            | Unknown => InstrWidth::Uncompressed,
-
-            CLw | CLwsp | CSw | CSwsp | CJ | CJr | CJalr | CBeqz | CBnez | CLi | CLui | CAddi
-            | CAddi16sp | CAddi4spn | CSlli | CSrli | CSrai | CAndi | CMv | CAdd | CAnd | COr
-            | CXor | CSub | CAddw | CSubw | CNop | CLd | CLdsp | CSd | CSdsp | CAddiw | CFld
-            | CFldsp | CFsd | CFsdsp | UnknownCompressed => InstrWidth::Compressed,
-        }
+        self.args.width
     }
 
     /// Returns a reference to the arguments of an instruction.
@@ -1327,7 +1304,7 @@ impl Args {
 
     fn run_cnop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
         c::run_cnop(icb);
-        icb.ok(Next(InstrWidth::Compressed))
+        icb.ok(Next(self.width))
     }
 
     // RV64C compressed instructions
@@ -2085,7 +2062,10 @@ impl From<&InstrCacheable> for Instruction {
             },
             InstrCacheable::CNop => Instruction {
                 opcode: OpCode::CNop,
-                args: Args::DEFAULT,
+                args: Args {
+                    width: InstrWidth::Compressed,
+                    ..Args::DEFAULT
+                },
             },
 
             // RV64C compressed instructions
