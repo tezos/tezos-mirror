@@ -299,3 +299,7 @@ let allow_tz4_delegate_enable c =
 
 let all_bakers_attest_activation_level c =
   (Raw_context.constants c).all_bakers_attest_activation_level
+
+let round_durations ctxt = Raw_context.round_durations ctxt
+
+let all ctxt = Constants_repr.all_of_parametric (parametric ctxt)

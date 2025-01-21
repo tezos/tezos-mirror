@@ -1105,6 +1105,7 @@ module Constants : sig
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
 
+  (** See {!Constants_storage.all}. *)
   val all : context -> t
 
   val encoding : t Data_encoding.t

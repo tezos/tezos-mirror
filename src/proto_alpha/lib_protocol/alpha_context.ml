@@ -269,10 +269,6 @@ module Constants = struct
       let update_sc_rollup_parameter = update_sc_rollup_parameter
     end
   end
-
-  let round_durations ctxt = Raw_context.round_durations ctxt
-
-  let all ctxt = all_of_parametric (parametric ctxt)
 end
 
 module Voting_period = struct
