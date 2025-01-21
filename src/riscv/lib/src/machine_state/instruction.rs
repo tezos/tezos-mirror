@@ -323,20 +323,14 @@ pub enum OpCode {
     CLwsp,
     CSw,
     CSwsp,
-    CJ,
     CJr,
     CJalr,
-    CBeqz,
-    CBnez,
     CLi,
     CLui,
     CAddi,
     CAddi16sp,
     CAddi4spn,
     CSlli,
-    CSrli,
-    CSrai,
-    CAndi,
     CMv,
     CAdd,
     CAnd,
@@ -362,6 +356,11 @@ pub enum OpCode {
 
     Unknown,
     UnknownCompressed,
+
+    // Internal OpCodes
+    Beqz,
+    Bnez,
+    J,
 }
 
 impl OpCode {
@@ -532,20 +531,17 @@ impl OpCode {
             Self::CLwsp => Args::run_clwsp,
             Self::CSw => Args::run_csw,
             Self::CSwsp => Args::run_cswsp,
-            Self::CJ => Args::run_cj,
+            Self::J => Args::run_j,
             Self::CJr => Args::run_cjr,
             Self::CJalr => Args::run_cjalr,
-            Self::CBeqz => Args::run_beqz,
-            Self::CBnez => Args::run_bnez,
+            Self::Beqz => Args::run_beqz,
+            Self::Bnez => Args::run_bnez,
             Self::CLi => Args::run_cli,
             Self::CLui => Args::run_clui,
             Self::CAddi => Args::run_caddi,
             Self::CAddi16sp => Args::run_caddi16spn,
             Self::CAddi4spn => Args::run_caddi4spn,
             Self::CSlli => Args::run_cslli,
-            Self::CSrli => Args::run_csrli,
-            Self::CSrai => Args::run_csrai,
-            Self::CAndi => Args::run_candi,
             Self::CMv => Args::run_cmv,
             Self::CAdd => Args::run_cadd,
             Self::CAnd => Args::run_cand,
@@ -1258,9 +1254,6 @@ impl Args {
     impl_ci_type!(run_caddi, non_zero);
     impl_ci_type!(run_caddi4spn);
     impl_ci_type!(run_cslli, non_zero);
-    impl_ci_type!(run_csrli);
-    impl_ci_type!(run_csrai);
-    impl_ci_type!(run_candi);
     impl_cr_type!(run_cand);
     impl_cr_type!(run_cxor);
     impl_cr_type!(run_cor);
@@ -1277,7 +1270,7 @@ impl Args {
         Ok(Next(self.width))
     }
 
-    fn run_cj<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    fn run_j<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
@@ -1981,7 +1974,7 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
             InstrCacheable::CJ(args) => Instruction {
-                opcode: OpCode::CJ,
+                opcode: OpCode::J,
                 args: args.into(),
             },
             InstrCacheable::CJr(args) => Instruction {
@@ -1993,11 +1986,11 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
             InstrCacheable::CBeqz(args) => Instruction {
-                opcode: OpCode::CBeqz,
+                opcode: OpCode::Beqz,
                 args: args.into(),
             },
             InstrCacheable::CBnez(args) => Instruction {
-                opcode: OpCode::CBnez,
+                opcode: OpCode::Bnez,
                 args: args.into(),
             },
             InstrCacheable::CLi(args) => Instruction {
@@ -2025,15 +2018,15 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
             InstrCacheable::CSrli(args) => Instruction {
-                opcode: OpCode::CSrli,
+                opcode: OpCode::Srli,
                 args: args.into(),
             },
             InstrCacheable::CSrai(args) => Instruction {
-                opcode: OpCode::CSrai,
+                opcode: OpCode::Srai,
                 args: args.into(),
             },
             InstrCacheable::CAndi(args) => Instruction {
-                opcode: OpCode::CAndi,
+                opcode: OpCode::Andi,
                 args: args.into(),
             },
             InstrCacheable::CMv(args) => Instruction {
@@ -2204,9 +2197,11 @@ impl From<&CIBTypeArgs> for Args {
         Self {
             rd: value.rd_rs1.into(),
             imm: value.imm,
-            // We are adding a default value for rs1 and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rs1: XRegister::x0.into(),
+            rs1: value.rd_rs1.into(),
+            // We are adding a default value for rs2 as X0
+            // to be explicit that it is of XRegister type.
+            // In the cases of CBEQZ and CBNEZ, rs2 must be
+            // 0 as rs1 is being compared to it.
             rs2: XRegister::x0.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
