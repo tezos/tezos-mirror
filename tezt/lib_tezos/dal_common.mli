@@ -101,6 +101,13 @@ module Helpers : sig
       [slot_size]. *)
   val generate_slot : slot_size:int -> bytes
 
+  val get_commitment_and_shards_with_proofs :
+    Cryptobox.t ->
+    slot:bytes ->
+    Cryptobox.commitment
+    * Cryptobox.commitment_proof
+    * (Cryptobox.shard * Cryptobox.shard_proof) Seq.t
+
   val publish_commitment :
     ?dont_wait:bool ->
     ?counter:int ->
