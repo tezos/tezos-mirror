@@ -1323,8 +1323,9 @@ mod tests {
                 },
             })
             .unwrap(),
+            // this represents a CJ instruction.
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::CJ,
+                opcode: OpCode::J,
                 args: TaggedArgs {
                     imm: 128 - 4,
                     width: InstrWidth::Compressed,

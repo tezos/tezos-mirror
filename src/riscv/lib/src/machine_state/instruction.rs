@@ -323,11 +323,8 @@ pub enum OpCode {
     CLwsp,
     CSw,
     CSwsp,
-    CJ,
     CJr,
     CJalr,
-    CBeqz,
-    CBnez,
     CLi,
     CLui,
     CAddi,
@@ -362,6 +359,11 @@ pub enum OpCode {
 
     Unknown,
     UnknownCompressed,
+
+    // Internal OpCodes
+    Beqz,
+    Bnez,
+    J,
 }
 
 impl OpCode {
@@ -532,11 +534,11 @@ impl OpCode {
             Self::CLwsp => Args::run_clwsp,
             Self::CSw => Args::run_csw,
             Self::CSwsp => Args::run_cswsp,
-            Self::CJ => Args::run_cj,
+            Self::J => Args::run_j,
             Self::CJr => Args::run_cjr,
             Self::CJalr => Args::run_cjalr,
-            Self::CBeqz => Args::run_beqz,
-            Self::CBnez => Args::run_bnez,
+            Self::Beqz => Args::run_beqz,
+            Self::Bnez => Args::run_bnez,
             Self::CLi => Args::run_cli,
             Self::CLui => Args::run_clui,
             Self::CAddi => Args::run_caddi,
@@ -1277,7 +1279,7 @@ impl Args {
         Ok(Next(self.width))
     }
 
-    fn run_cj<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    fn run_j<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
@@ -1981,7 +1983,7 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
             InstrCacheable::CJ(args) => Instruction {
-                opcode: OpCode::CJ,
+                opcode: OpCode::J,
                 args: args.into(),
             },
             InstrCacheable::CJr(args) => Instruction {
@@ -1993,11 +1995,11 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
             InstrCacheable::CBeqz(args) => Instruction {
-                opcode: OpCode::CBeqz,
+                opcode: OpCode::Beqz,
                 args: args.into(),
             },
             InstrCacheable::CBnez(args) => Instruction {
-                opcode: OpCode::CBnez,
+                opcode: OpCode::Bnez,
                 args: args.into(),
             },
             InstrCacheable::CLi(args) => Instruction {
