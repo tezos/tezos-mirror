@@ -2073,7 +2073,21 @@ let brassaia_index =
   octez_lib
     "brassaia.index"
     ~path:"brassaia/index/src/"
-    ~deps:[optint; mtime; fmt; rusage; lwt; progress; cmdliner; repr; lru]
+    ~deps:
+      [
+        optint;
+        mtime;
+        fmt;
+        fmt_cli;
+        logs;
+        logs_cli;
+        rusage;
+        lwt;
+        progress;
+        cmdliner;
+        repr;
+        lru;
+      ]
     ~preprocess:(pps ppx_repr)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
@@ -2081,7 +2095,8 @@ let brassaia_index_unix =
   octez_lib
     "brassaia.index.unix"
     ~path:"brassaia/index/src/unix"
-    ~deps:[optint; mtime; rusage; lwt; lwt_unix; index; semaphore_compat]
+    ~deps:
+      [optint; mtime; rusage; fmt_tty; lwt; lwt_unix; index; semaphore_compat]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
     ~foreign_stubs:
       {language = C; flags = []; include_dirs = []; names = ["pread"; "pwrite"]}

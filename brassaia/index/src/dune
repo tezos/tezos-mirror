@@ -9,6 +9,9 @@
   optint
   mtime
   fmt
+  fmt.cli
+  logs
+  logs.cli
   rusage
   lwt
   progress

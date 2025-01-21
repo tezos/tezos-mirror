@@ -155,6 +155,8 @@ let logs = external_lib "logs" V.True
 
 let logs_fmt = external_sublib logs "logs.fmt"
 
+let logs_cli = external_sublib fmt "logs.cli"
+
 let logs_lwt = external_sublib logs "logs.lwt"
 
 let lru = external_lib "lru" V.(at_least "0.3.0")

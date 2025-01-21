@@ -9,6 +9,7 @@
   optint
   mtime
   rusage
+  fmt.tty
   lwt
   lwt.unix
   index
