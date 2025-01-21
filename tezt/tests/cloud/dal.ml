@@ -1826,7 +1826,6 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
 let init_etherlink_operator_setup cloud configuration etherlink_configuration
     name ~bootstrap ~dal_slots account batching_operators agent next_agent =
   let is_sequencer = etherlink_configuration.etherlink_sequencer in
-  let name = Format.asprintf "etherlink-%s-node" name in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
@@ -1966,6 +1965,20 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let () = toplog "Init Etherlink: launching the EVM node" in
   let* evm_node =
     Tezos.Evm_node.Agent.init
+      ~patch_config:(fun json ->
+        JSON.update
+          "public_rpc"
+          (fun json ->
+            JSON.update
+              "cors_headers"
+              (fun _ ->
+                JSON.annotate ~origin:"patch-config:cors_headers"
+                @@ `A [`String "*"])
+              json
+            |> JSON.update "cors_origins" (fun _ ->
+                   JSON.annotate ~origin:"patch-config:cors_origins"
+                   @@ `A [`String "*"]))
+          json)
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
       endpoint
