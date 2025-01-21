@@ -2169,6 +2169,7 @@ let init_etherlink_producer_setup operator name ~bootstrap agent =
       ~max_active_eoa:150
       ~max_transaction_batch_length:50
       ~controller:Tezt_etherlink.Eth_account.bootstrap_accounts.(0)
+      ~base_fee_factor:1000.0
       agent
   in
   return ()
