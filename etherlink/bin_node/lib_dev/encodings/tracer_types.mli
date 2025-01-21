@@ -6,12 +6,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type inconsistent_traces_input = {
+  block : Ethereum_types.quantity;
+  nb_txs : int;
+  nb_traces : int;
+}
+
 type error +=
   | Not_supported
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
-  | Tracer_not_activated
+  | Tracer_not_activated  (** Tracer only activated after a certain level *)
+  | Tracer_not_implemented of string
+        (** Not all tracer are available for all rpcs *)
+  | Inconsistent_traces of inconsistent_traces_input
 
 type tracer_config = {
   enable_return_data : bool;
@@ -50,11 +59,15 @@ type input = Ethereum_types.hash * config
 type call_input =
   (Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config
 
+type block_input = Ethereum_types.Block_parameter.t * config
+
 val input_encoding : (Ethereum_types.hash * config) Data_encoding.t
 
 val call_input_encoding :
   ((Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config)
   Data_encoding.t
+
+val block_input_encoding : block_input Data_encoding.t
 
 val input_rlp_encoder : ?hash:Ethereum_types.hash -> config -> string
 
@@ -143,3 +156,7 @@ type output =
   | CallTracerOutput of CallTracer.output
 
 val output_encoding : output Data_encoding.t
+
+type block_output = (Ethereum_types.hash * output) list
+
+val block_output_encoding : block_output Data_encoding.t

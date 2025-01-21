@@ -410,6 +410,8 @@ let process_trace_result trace =
       rpc_error (Rpc_errors.trace_block_not_found number)
   | Error (Tracer_types.Trace_not_found :: _) ->
       rpc_error Rpc_errors.trace_not_found
+  | Error (Tracer_types.Tracer_not_implemented s :: _) ->
+      rpc_error (Rpc_errors.tracer_not_implemented s)
   | Error e ->
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
@@ -783,6 +785,19 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
               let*! trace = Backend_rpc.trace_call call block config in
               process_trace_result trace
             in
+            build_with_input ~f module_ parameters
+        | Trace_block.Method ->
+            let f ((block_param, config) : Tracer_types.block_input) =
+              let* (Ethereum_types.Qty block_number) =
+                Backend_rpc.block_param_to_block_number
+                  (Block_parameter block_param)
+              in
+              let*! traces =
+                Backend_rpc.trace_block (Qty block_number) config
+              in
+              process_trace_result traces
+            in
+
             build_with_input ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")

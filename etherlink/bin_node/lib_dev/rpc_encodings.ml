@@ -866,6 +866,20 @@ module Trace_call = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Trace_block = struct
+  type input = Tracer_types.block_input
+
+  type output = Tracer_types.block_output
+
+  let input_encoding = Tracer_types.block_input_encoding
+
+  let output_encoding = Tracer_types.block_output_encoding
+
+  let method_ = "debug_traceBlockByNumber"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_fee_history = struct
   open Ethereum_types
 
@@ -987,6 +1001,7 @@ let supported_methods : (module METHOD) list =
     (module Trace_call);
     (module Subscribe);
     (module Unsubscribe);
+    (module Trace_block);
   ]
 
 let unsupported_methods : string list =

@@ -4,6 +4,9 @@
 
 ### Features
 
+- Implements the RPC endpoint `debug_traceBlockByNumber`, with only the
+  `callTracer` at the moment. (!16164)
+
 ### Bug fixes
 
 ### Internals

@@ -171,12 +171,12 @@ module CallTracerRead = struct
       collaspe_n_level end_call (n - 1) once
 
   (* The algorithm needs to process a new node `value` at depth `next_depth`.
-     There are three possibilities:
+     There are three valid possibilities:
          - next_depth = last_depth: the node being read is at the same depth.
          We `add`
          - next_depth = last_depth + 1: the node being read is a child of the
          last one. We `push`
-         = next_depth < last_depth: we have finished reading a subtree.
+         - next_depth < last_depth: we have finished reading a subtree.
          We `collaspe` a number of time (enough time to go back to next_depth)
   *)
   let process_value end_call next next_depth context =
@@ -192,7 +192,7 @@ module CallTracerRead = struct
       return @@ add_at_same_depth next new_context
     else Error (error_of_fmt "missing levels")
 
-  let build_calltrace end_call get_next =
+  let build_calltraces end_call get_next =
     let open Lwt_result_syntax in
     let rec iter counter context =
       let depth = context.depth in
@@ -209,6 +209,11 @@ module CallTracerRead = struct
     in
     let empty_context = {call_list = []; depth = 0; stack = []} in
     let* {call_list; _} = iter 0 empty_context in
+    return call_list
+
+  let build_calltrace end_call get_next =
+    let open Lwt_result_syntax in
+    let* call_list = build_calltraces end_call get_next in
     match call_list with
     | [o] -> return o
     | _ -> tzfail (error_of_fmt "Multiple top call")
@@ -243,9 +248,9 @@ module CallTracerRead = struct
     in
     return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
 
-  (** [read_output state hash] reads and in the storage and interprets what
+  (** [read_outputs state] reads in the storage and interprets what
      the kernel stored. *)
-  let read_output state transaction_hash =
+  let read_outputs ?transaction_hash state =
     let open Lwt_result_syntax in
     let* length = call_trace_length state transaction_hash in
     (* there should at least be the top call *)
@@ -258,8 +263,16 @@ module CallTracerRead = struct
           let* node = read_node ~state index transaction_hash in
           return (Some node)
       in
-      let* call_trace = build_calltrace end_call_impl get_next in
-      return (Tracer_types.CallTracerOutput call_trace)
+      build_calltraces end_call_impl get_next
+
+  (** [read_output state hash] reads in the storage and interprets what
+     the kernel stored. *)
+  let read_output state transaction_hash =
+    let open Lwt_result_syntax in
+    let* outputs = read_outputs ?transaction_hash state in
+    match outputs with
+    | o :: _ -> return o
+    | _ -> tzfail Tracer_types.Trace_not_found
 end
 
 let read_output config state root_indexed_hash =
@@ -269,7 +282,19 @@ let read_output config state root_indexed_hash =
   | StructLogger ->
       let* output = StructLoggerRead.read_output state root_indexed_hash in
       return (StructLoggerOutput output)
-  | CallTracer -> CallTracerRead.read_output state root_indexed_hash
+  | CallTracer ->
+      let* output = CallTracerRead.read_output state root_indexed_hash in
+      return (CallTracerOutput output)
+
+let read_outputs config state =
+  let open Tracer_types in
+  let open Lwt_result_syntax in
+  match config.tracer with
+  | CallTracer ->
+      Lwt_result.bind
+        (CallTracerRead.read_outputs state)
+        (List.map_es (fun o -> return @@ CallTracerOutput o))
+  | StructLogger -> tzfail @@ Tracer_types.Tracer_not_implemented "structLogger"
 
 let trace_transaction (module Exe : Evm_execution.S) ~block_number
     ~transaction_hash ~config =
@@ -301,6 +326,72 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
         is_tracing_root_indexed_by_hash hash evm_state
       in
       read_output config evm_state root_indexed_by_hash
+
+let trace_block (module Exe : Evm_execution.S)
+    (module Block_storage : Block_storage_sig.S) ~block_number ~config =
+  let open Lwt_result_syntax in
+  let*! () = Tracer_event.tracer_input (Tracer_types.config_to_string config) in
+  (* only implemented for callTracer *)
+  let* () =
+    match config.Tracer_types.tracer with
+    | CallTracer -> return_unit
+    | StructLogger ->
+        tzfail @@ Tracer_types.Tracer_not_implemented "structLogger"
+  in
+  (* first get the transaction hashes *)
+  let* block =
+    Block_storage.nth_block
+      ~full_transaction_object:false
+      (Ethereum_types.Qty.to_z block_number)
+  in
+  let hashes =
+    match block.transactions with
+    | TxHash hashes -> hashes
+    | TxFull _ -> assert false
+  in
+  if List.is_empty hashes then return []
+  else
+    (* then get the traces *)
+    let input = Tracer_types.input_rlp_encoder config in
+    let set_input state =
+      let* () =
+        check_tracer_activation
+          ~state
+          ~version:Tracer_types.(tracer_version_activation config.tracer)
+      in
+      let*! state =
+        Evm_state.modify
+          ~key:Durable_storage_path.Trace.input
+          ~value:input
+          state
+      in
+      return state
+    in
+    let* apply_result =
+      Exe.replay
+        ~log_file:"trace_transaction"
+        ~alter_evm_state:set_input
+        block_number
+    in
+    let* traces =
+      match apply_result with
+      | Apply_failure -> tzfail Tracer_types.Trace_not_found
+      | Apply_success {evm_state; _} -> read_outputs config evm_state
+    in
+    (* Now assemble the hash and traces *)
+    List.combine
+      ~when_different_lengths:
+        [
+          Tracer_types.Inconsistent_traces
+            {
+              block = block_number;
+              nb_txs = List.length hashes;
+              nb_traces = List.length traces;
+            };
+        ]
+      hashes
+      traces
+    |> Lwt.return
 
 let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
   let open Lwt_result_syntax in

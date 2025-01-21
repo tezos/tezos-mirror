@@ -321,6 +321,11 @@ module Trace_call :
     with type input = Tracer_types.call_input
      and type output = Tracer_types.output
 
+module Trace_block :
+  METHOD
+    with type input = Tracer_types.block_input
+     and type output = Tracer_types.block_output
+
 module Eth_fee_history :
   METHOD
     with type input =

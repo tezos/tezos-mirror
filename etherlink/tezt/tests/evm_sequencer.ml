@@ -9418,6 +9418,123 @@ let test_node_correctly_uses_batcher_heap =
       ~error_msg:"Finalized blueprint check failed. Found %L, expected >= %R") ;
   unit
 
+let test_trace_empty_block =
+  register_all
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"]
+    ~title:"debug_traceBlockByNumber succeeds on empty block"
+    ~kernels:Kernel.all
+  @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let*@ trace_result = Rpc.trace_block ~block:Rpc.Latest sequencer in
+  Check.(
+    (trace_result = [])
+      (list json)
+      ~error_msg:"Wrong trace, expected %R but got %L") ;
+  unit
+
+let test_trace_block_struct_logger =
+  register_all
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
+    ~title:"debug_traceBlockByNumber not implemented for struct logger"
+    ~kernels:Kernel.all
+  @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* trace_result =
+    Rpc.trace_block ~tracer:"structLogger" ~block:Rpc.Latest sequencer
+  in
+  match trace_result with
+  | Ok _ -> Test.fail "should have failed, structLogger not implemented"
+  | Error {data; code; _} ->
+      Check.((code = -32002) int ~error_msg:"Expected %R but got %L") ;
+      Check.(
+        (data = Some "structLogger")
+          (option string)
+          ~error_msg:"Error should be the name of the tracer") ;
+      unit
+
+let test_trace_block =
+  register_all
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "trace"; "block"]
+    ~title:"debug_traceBlockByNumber succeeds on non empty block"
+    ~kernels:Kernel.all
+  @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender_0 = Eth_account.bootstrap_accounts.(0) in
+  let sender_1 = Eth_account.bootstrap_accounts.(1) in
+  let* call_types = Solidity_contracts.call_types () in
+  let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
+  let* address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender_0.Eth_account.private_key
+         ~endpoint
+         ~abi:call_types.label
+         ~bin:call_types.bin)
+      sequencer
+  in
+  let* raw_tx_0 =
+    Cast.craft_tx
+      ~chain_id:1337
+      ~source_private_key:sender_0.private_key
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.zero
+      ~address
+      ~signature:"testProduceOpcodes()"
+      ()
+  in
+  let* raw_tx_1 =
+    Cast.craft_tx
+      ~chain_id:1337
+      ~source_private_key:sender_1.private_key
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.one
+      ~address:sender_0.address
+      ()
+  in
+  let*@ transaction_hash_0 =
+    Rpc.send_raw_transaction ~raw_tx:raw_tx_0 sequencer
+  in
+  let*@ transaction_hash_1 =
+    Rpc.send_raw_transaction ~raw_tx:raw_tx_1 sequencer
+  in
+  let*@ size = produce_block sequencer in
+  Check.((size = 2) int)
+    ~error_msg:"Expected 2 transactions in the block, got %L" ;
+  let*@ trace_result = Rpc.trace_block ~block:Rpc.Latest sequencer in
+  Check.(
+    (List.length trace_result = 2)
+      int
+      ~error_msg:"Wrong nb of traces, expected %R but got %L") ;
+  let t0 = List.nth trace_result 0 in
+  let t1 = List.nth trace_result 1 in
+  (* first tx is a contract call with internal calls *)
+  Check.(
+    JSON.(t0 |-> "txHash" |> as_string = transaction_hash_0)
+      string
+      ~error_msg:"Wrong hash, expected %R but got %L") ;
+  Check.(
+    JSON.(t0 |-> "result" |-> "calls" |> as_list <> [])
+      (list json)
+      ~error_msg:"Should have a list of subcalls") ;
+  (* second tx is a simple transfer *)
+  Check.(
+    JSON.(t1 |-> "txHash" |> as_string = transaction_hash_1)
+      string
+      ~error_msg:"Wrong hash, expected %R but got %L") ;
+  Check.(
+    JSON.(t1 |-> "result" |-> "calls" |> as_list = [])
+      (list json)
+      ~error_msg:"Should not have a list of subcalls") ;
+  unit
+
 let test_init_config_mainnet network =
   Regression.register
     ~__FILE__
@@ -9521,6 +9638,9 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_trace_call protocols ;
+  test_trace_empty_block protocols ;
+  test_trace_block protocols ;
+  test_trace_block_struct_logger protocols ;
   test_patch_kernel protocols ;
   test_finalized_persistent protocols ;
   test_finalized_view protocols ;

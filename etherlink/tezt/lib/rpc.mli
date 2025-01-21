@@ -304,6 +304,14 @@ val trace_call :
   Evm_node.t ->
   (JSON.t, error) result Lwt.t
 
+val trace_block :
+  ?websocket:Websocket.t ->
+  block:block_param ->
+  ?tracer:string ->
+  ?tracer_config:(string * JSON.u) list ->
+  Evm_node.t ->
+  (JSON.t list, error) result Lwt.t
+
 type fee_history = {
   oldest_block : int64;
   base_fee_per_gas : int64 list;

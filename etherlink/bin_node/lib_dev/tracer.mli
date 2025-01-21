@@ -15,11 +15,16 @@ module CallTracerRead : sig
     ('a -> 'a list -> 'a) ->
     (int -> ('a * int) option tzresult Lwt.t) ->
     'a tzresult Lwt.t
+
+  val build_calltraces :
+    ('a -> 'a list -> 'a) ->
+    (int -> ('a * int) option tzresult Lwt.t) ->
+    'a list tzresult Lwt.t
 end
 
-(** [trace_transaction ~block_number ~transaction ~config] replays the block
-    [block_number] and traces [transaction_hash] in it, with the given
-    [config]. *)
+(** [trace_transaction (module Executor) ~block_number ~transaction ~config]
+    replays the block [block_number] and traces [transaction_hash] in it, with
+    the given [config]. *)
 val trace_transaction :
   (module Evm_execution.S) ->
   block_number:Ethereum_types.quantity ->
@@ -27,11 +32,21 @@ val trace_transaction :
   config:Tracer_types.config ->
   Tracer_types.output tzresult Lwt.t
 
-(** [trace_call ~call ~block ~config] simulates and traces call
-    [call] in block [block], with the given [config]. *)
+(** [trace_call (module Executor) ~call ~block ~config] simulates and traces
+    call [call] in block [block], with the given [config]. *)
 val trace_call :
   (module Evm_execution.S) ->
   call:Ethereum_types.call ->
   block:Ethereum_types.Block_parameter.extended ->
   config:Tracer_types.config ->
   Tracer_types.output tzresult Lwt.t
+
+(** [trace_block (module Executor) (module Storage) ~block_number ~config]
+    replays the block [block_number] and traces all transactions in it, with
+    the given [config]. *)
+val trace_block :
+  (module Evm_execution.S) ->
+  (module Block_storage_sig.S) ->
+  block_number:Ethereum_types.quantity ->
+  config:Tracer_types.config ->
+  Tracer_types.block_output tzresult Lwt.t

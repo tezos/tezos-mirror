@@ -512,13 +512,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
         | param -> block_param_to_block_number param
 
-      include
-        Tracer_sig.Make
-          (Executor)
-          (struct
-            let transaction_receipt = Block_storage.transaction_receipt
-          end)
-          (Tracer)
+      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
     end)
   else (module Backend)
 
