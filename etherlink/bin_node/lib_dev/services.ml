@@ -1011,6 +1011,7 @@ let generic_websocket_dispatch (rpc : Configuration.rpc)
     (config : Configuration.t) ctx dir path dispatch_websocket =
   if config.experimental_features.enable_websocket then
     Evm_directory.jsonrpc_websocket_register
+      ?monitor:config.experimental_features.monitor_websocket_heartbeat
       ~max_message_length:
         config.experimental_features.max_websocket_message_length
       dir

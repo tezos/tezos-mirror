@@ -7,6 +7,11 @@
 - Implements the RPC endpoint `debug_traceBlockByNumber`, with only the
   `callTracer` at the moment. (!16164)
 
+- Websocket connections with clients are monitored by default by sending regular
+  heartbeats. This feature can be disabled or tweaked by changing
+  `experimental_features.monitor_websocket_heartbeat` in the
+  configuration. (!16197)
+
 ### Bug fixes
 
 ### Internals

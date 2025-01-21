@@ -73,6 +73,9 @@ type rpc_server =
   | Resto  (** Resto/Cohttp (default) *)
   | Dream  (** Dream/httpun *)
 
+(** Parameters for monitoring websocket connection heartbeats. *)
+type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -87,6 +90,7 @@ type experimental_features = {
   rpc_server : rpc_server;
   enable_websocket : bool;
   max_websocket_message_length : int;
+  monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
 }
 
 type sequencer = {

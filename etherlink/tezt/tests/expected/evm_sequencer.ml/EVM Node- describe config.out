@@ -167,7 +167,19 @@
       "max_websocket_message_length"?:
         integer ∈ [-2^30, 2^30]
         /* Maximum message size accepted by the websocket server (only for
-           Resto backend) */ },
+           Resto backend) */,
+      "monitor_websocket_heartbeat"?:
+        /* Parameters to monitor websocket connections */
+        "disabled"
+        || { /* enabled */
+             "ping_interval":
+               number
+               /* Interval, in seconds, at which a ping will be sent to the
+                  client to monitor the websocket connection. */,
+             "ping_timeout":
+               number
+               /* Timeout in seconds after which the connection will be
+                  considered dead and closed. */ } },
   "proxy"?:
     { "finalized_view"?:
         boolean

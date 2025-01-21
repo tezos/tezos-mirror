@@ -91,3 +91,7 @@ let recv =
 let send_recv ws json =
   let* () = send ws json in
   recv ws
+
+let pause ws = Unix.kill (Process.pid ws.process) Sys.sigstop
+
+let resume ws = Unix.kill (Process.pid ws.process) Sys.sigcont
