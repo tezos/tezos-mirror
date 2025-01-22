@@ -642,7 +642,15 @@ module Handlers = struct
   let on_launch (_self : self) gid parameters : (t, launch_error) result Lwt.t =
     Lwt_result.return @@ on_launch gid parameters
 
-  let on_request _ _ = failwith "on_request: unimplemented"
+  let on_request :
+      type res err. self -> (res, err) req -> (res, err) result Lwt.t =
+   fun self (Message msg) ->
+    let open Lwt_result_syntax in
+    match msg with
+    | Ok msg ->
+        let*! () = handle_msg (Worker.state self) msg in
+        return_unit
+    | Error trace -> fail trace
 
   let on_no_request _ = failwith "on_no_request: unimplemented"
 
