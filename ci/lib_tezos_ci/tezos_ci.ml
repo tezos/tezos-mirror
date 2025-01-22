@@ -100,11 +100,24 @@ module Stage = struct
   let index (Stage {name = _; index}) = index
 end
 
+let templates_to_config (templates : Gitlab_ci.Types.template list) =
+  match templates with
+  | [] -> [] (* empty includes are forbidden *)
+  | _ :: _ ->
+      [
+        Gitlab_ci.Types.Include
+          (List.map
+             (fun template ->
+               {Gitlab_ci.Types.subkey = Template template; rules = []})
+             templates);
+      ]
+
 type tezos_job = {
   job : Gitlab_ci.Types.generic_job;
   source_position : string * int * int * int;
   description : string option;
   stage : Stage.t;
+  template : Gitlab_ci.Types.template option;
   image_builders : tezos_job list;
 }
 
@@ -375,7 +388,7 @@ module Pipeline = struct
              set in the include rule, they are set in the workflow
              rule *)
           let rule = include_rule ~if_ ~when_:Always () in
-          Gitlab_ci.Types.{local = path ~name; rules = [rule]}
+          Gitlab_ci.Types.{subkey = Local (path ~name); rules = [rule]}
     in
     let pipelines =
       all ()
@@ -406,6 +419,19 @@ module Pipeline = struct
     |> List.sort (fun (_n1, idx1) (_n2, idx2) -> Int.compare idx1 idx2)
     |> List.map fst
 
+  let templates pipeline =
+    let jobs = jobs pipeline in
+    let templates : (Gitlab_ci.Types.template, unit) Hashtbl.t =
+      Hashtbl.create 5
+    in
+    let replace_template job =
+      match job.template with
+      | Some template -> Hashtbl.replace templates template ()
+      | None -> ()
+    in
+    List.iter replace_template jobs ;
+    Hashtbl.to_seq_keys templates |> List.of_seq
+
   let write_registered_pipeline pipeline =
     let pipeline = add_image_builders pipeline in
     let jobs = jobs pipeline in
@@ -428,19 +454,20 @@ module Pipeline = struct
           filename)
       jobs ;
     let prepend_config =
-      (match pipeline with
-      | Pipeline _ -> []
-      | Child_pipeline _ ->
-          Gitlab_ci.Types.
-            [
-              Workflow
-                {
-                  rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
-                  name = None;
-                  auto_cancel = None;
-                };
-              Variables [("PIPELINE_TYPE", name)];
-            ])
+      templates_to_config (templates pipeline)
+      @ (match pipeline with
+        | Pipeline _ -> []
+        | Child_pipeline _ ->
+            Gitlab_ci.Types.
+              [
+                Workflow
+                  {
+                    rules = [Gitlab_ci.Util.workflow_rule ~if_:Rules.always ()];
+                    name = None;
+                    auto_cancel = None;
+                  };
+                Variables [("PIPELINE_TYPE", name)];
+              ])
       @ [Stages (stages pipeline)]
     in
     let config =
@@ -470,7 +497,7 @@ module Pipeline = struct
     in
     let ci_docker_include_rule : Gitlab_ci.Types.include_ =
       {
-        local = "images_base/ci-docker/.gitlab-ci.yml";
+        subkey = Local "images_base/ci-docker/.gitlab-ci.yml";
         rules = [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
       }
     in
@@ -493,7 +520,7 @@ module Pipeline = struct
     let scheduled_pipeline_include_rule local tz_schedule_kind :
         Gitlab_ci.Types.include_ =
       {
-        local;
+        subkey = Local local;
         rules =
           [
             {
@@ -852,8 +879,8 @@ let enc_git_strategy = function
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?(image_dependencies = [])
     ?services ?variables ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
-    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ~image ~stage
-    ~name script : tezos_job =
+    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ?image
+    ?template ~stage ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
     match (arch, tag) with
@@ -872,7 +899,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     failwith "The job '%s' cannot have empty [rules]." name ;
   let arch = if Option.is_some arch then arch else arch_of_tag tag in
   (match (image, arch) with
-  | Internal {image = Image image_path; _}, None ->
+  | Some (Internal {image = Image image_path; _}), None ->
       failwith
         "[job] the job '%s' has tag '%s' whose architecture is not statically \
          known cannot use the image '%s' since it is Internal. Set a static \
@@ -895,9 +922,18 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
         name
   | _ -> ()) ;
   let image_dependencies =
-    (match image with Internal _ -> [image] | External _ -> [])
+    (match image with
+    | Some (Internal image) -> [Internal image]
+    | Some (External _) | None -> [])
     @ image_dependencies
   in
+  (match (template, image) with
+  | Some _, Some _ ->
+      failwith
+        "[job] cannot specify both [image] and [template] in job '%s' as it \
+         would override the image defined in the template."
+        name
+  | None, _ | _, None -> ()) ;
   let dependencies, image_builders =
     (Fun.flip List.iter image_dependencies @@ function
      | External (Image image_path) ->
@@ -963,7 +999,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       artifacts;
       before_script;
       cache;
-      image = Some (Image.image image);
+      image = Option.map Image.image image;
       interruptible;
       needs;
       (* Note that [dependencies] is always filled, because we want to
@@ -984,7 +1020,14 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       parallel;
     }
   in
-  {job = Job job; source_position = __POS__; description; stage; image_builders}
+  {
+    job = Job job;
+    source_position = __POS__;
+    description;
+    stage;
+    image_builders;
+    template;
+  }
 
 let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
     Pipeline.
@@ -1017,6 +1060,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
     source_position = __POS__;
     stage;
     image_builders = [];
+    template = None;
   }
 
 let map_non_trigger_job ?error_on_trigger (tezos_job : tezos_job)
