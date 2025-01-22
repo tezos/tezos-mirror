@@ -490,7 +490,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_lag ?slot_size ?number_of_slots ?page_size
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?incentives_enable
-    ?dal_rewards_weight ?event_sections_levels ?node_arguments
+    ?dal_rewards_weight ?traps_fraction ?event_sections_levels ?node_arguments
     ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
     ?(prover = true) ?smart_rollup_timeout_period_in_blocks ?l1_history_mode f
     ~protocol =
@@ -509,6 +509,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_int_parameter
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
+    @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
     @ make_int_parameter
         ["issuance_weights"; "dal_rewards_weight"]
         dal_rewards_weight
@@ -630,7 +631,7 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 let scenario_with_layer1_node ?regression ?(tags = [])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
     ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?incentives_enable ?dal_rewards_weight
+    ?(dal_enable = true) ?incentives_enable ?traps_fraction ?dal_rewards_weight
     ?event_sections_levels ?node_arguments ?activation_timestamp
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
     variant scenario =
@@ -656,6 +657,7 @@ let scenario_with_layer1_node ?regression ?(tags = [])
         ?number_of_shards
         ?number_of_slots
         ?incentives_enable
+        ?traps_fraction
         ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
@@ -670,8 +672,8 @@ let scenario_with_layer1_node ?regression ?(tags = [])
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
-    ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
+    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
     ?producer_profiles ?history_mode ?prover ?l1_history_mode variant scenario =
   let description = "Testing DAL node" in
@@ -703,6 +705,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?number_of_shards
         ?attestation_lag
         ?attestation_threshold
+        ?traps_fraction
         ?incentives_enable
         ?dal_rewards_weight
         ?commitment_period
@@ -870,19 +873,18 @@ let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
     in
     Operation.Consensus.get_block_payload_hash ~block client
   in
-  Operation.Consensus.inject
-    ?force
-    ?error
-    ?request
-    ~signer
-    (Operation.Consensus.attestation
-       ~level
-       ~round
-       ~dal_attestation
-       ~slot
-       ~block_payload_hash
-       ())
-    client
+  let attestation =
+    Operation.Consensus.attestation
+      ~level
+      ~round
+      ~dal_attestation
+      ~slot
+      ~block_payload_hash
+      ()
+  in
+  let* op = Operation.Consensus.operation ~signer attestation client in
+  let* op_hash = Operation.inject ?force ?error ?request op client in
+  return (op, op_hash)
 
 let inject_dal_attestations ?payload_level ?level ?round ?force
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
@@ -906,7 +908,7 @@ let inject_dal_attestations_and_bake node client ~number_of_slots indexes =
     baker_for_round_zero node ~level:(level + 1)
   in
   let signers = different_delegates baker in
-  let* _op_hashes =
+  let* _op_and_op_hash_list =
     inject_dal_attestations ~signers ~nb_slots:number_of_slots indexes client
   in
   bake_for ~delegates:(`For [baker]) client
@@ -1250,14 +1252,17 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
   let lag = parameters.attestation_lag in
   assert (lag > 1) ;
   let attest ?payload_level ?(signer = Constant.bootstrap2) ~level () =
-    inject_dal_attestation
-      ?payload_level
-      ~force:true
-      ~nb_slots
-      ~level
-      ~signer
-      (Slots [0])
-      client
+    let* _op, op_hash =
+      inject_dal_attestation
+        ?payload_level
+        ~force:true
+        ~nb_slots
+        ~level
+        ~signer
+        (Slots [0])
+        client
+    in
+    return op_hash
   in
   let mempool_is ~__LOC__ expected_mempool =
     let* mempool = Mempool.get_mempool client in
@@ -1436,7 +1441,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   Log.info "number_of_shards = %d" number_of_shards ;
   let* () = bake_for client in
   let* level = Client.level client in
-  let* (`OpHash _oph) =
+  let* _op, `OpHash _oph =
     inject_dal_attestation
       ~nb_slots
       ~level
@@ -1502,7 +1507,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
       let* () =
         check_in_TB_committee ~__LOC__ node new_account.public_key_hash ~level
       in
-      let* (`OpHash _oph) =
+      let* _op, `OpHash _oph =
         inject_dal_attestation
           ~error:Operation.dal_data_availibility_attester_not_in_committee
           ~nb_slots
@@ -7076,11 +7081,6 @@ let dal_crypto_benchmark () =
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
   let page_size = Cli.get_int ~default:3967 "page_size" in
-  let generate_slot ~slot_size =
-    Bytes.init slot_size (fun _ ->
-        let x = Random.int 26 in
-        Char.chr (x + Char.code 'a'))
-  in
   let* () =
     let parameters =
       {number_of_shards; redundancy_factor; page_size; slot_size}
@@ -7131,7 +7131,7 @@ let dal_crypto_benchmark () =
         in
         let slot =
           Profiler.record_f Profiler.main Debug ("slot generation", [])
-          @@ fun () -> generate_slot ~slot_size
+          @@ fun () -> Helpers.generate_slot ~slot_size
         in
         let*? polynomial =
           Profiler.record_f Profiler.main Debug ("polynomial from slot", [])
@@ -8286,6 +8286,82 @@ let test_attesters_receive_dal_rewards protocol dal_parameters _cryptobox node
     ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
   unit
 
+let test_inject_accusation _protocol dal_parameters cryptobox node client
+    _bootstrap_key =
+  let slot_index = 0 in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let number_of_slots = dal_parameters.number_of_slots in
+  let lag = dal_parameters.attestation_lag in
+  let slot = Helpers.generate_slot ~slot_size in
+  let commitment, proof, shards_with_proofs =
+    Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+  in
+  Log.info "Bake two blocks" ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
+     We bake two blocks because we need the accusation to be introduced at level
+     at least 10 (2 = 10 - attestation_lag). In protocol S we will not need this
+     restriction. *)
+  let* () = bake_for ~count:2 client in
+  let* _op_hash =
+    Helpers.publish_commitment
+      ~source:Constant.bootstrap2
+      ~index:slot_index
+      ~commitment
+      ~proof
+      client
+  in
+  (* We need to bake exactly [lag] blocks so that we can inject an attestation
+     at the right level (that attests the published slot). *)
+  let* () = bake_for ~count:lag client in
+  Log.info "Inject an attestation" ;
+  let availability = Slots [slot_index] in
+  let signer = Constant.bootstrap2 in
+  let* attestation, _op_hash =
+    inject_dal_attestation ~signer ~nb_slots:number_of_slots availability client
+  in
+  let* signature = Operation.sign attestation client in
+  let attestation = (attestation, signature) in
+  let* shard_assignments =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_dal_shards
+         ~delegates:[signer.public_key_hash]
+         ()
+  in
+  let shard_index =
+    JSON.(
+      shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list
+      |> List.hd |> as_int)
+  in
+  Log.info "First shard index of the attester is %d" shard_index ;
+  let shard, proof =
+    Seq.find
+      (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+      shards_with_proofs
+    |> Option.get
+  in
+  let accusation =
+    Operation.Anonymous.dal_entrapment_evidence
+      ~attestation
+      ~slot_index
+      shard
+      proof
+  in
+  Log.info "Inject an accusation" ;
+  let* _op_hash = Operation.Anonymous.inject accusation client in
+  let* () = bake_for client in
+  let* ops =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~block:"head"
+         ~validation_pass:2
+         ()
+  in
+  Check.(List.length (JSON.as_list ops) = 1)
+    ~__LOC__
+    Check.(int)
+    ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -8322,6 +8398,12 @@ let register ~protocols =
     "one_committee_per_level"
     test_one_committee_per_level
     protocols ;
+  scenario_with_layer1_node
+    ~incentives_enable:true
+    ~traps_fraction:Q.one
+    "inject accusation"
+    test_inject_accusation
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
 
   (* Tests with layer1 and dal nodes *)
   test_dal_node_startup protocols ;

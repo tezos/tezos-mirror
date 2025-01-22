@@ -674,6 +674,35 @@ module Helpers = struct
              Data_encoding.Json.pp
              parameters_json
 
+  let generate_slot ~slot_size =
+    Bytes.init slot_size (fun _ ->
+        let x = Random.int 26 in
+        Char.chr (x + Char.code 'a'))
+
+  let get_commitment_and_shards_with_proofs cryptobox ~slot =
+    let open Cryptobox in
+    let ( let*? ) x f =
+      match x with
+      | Error err -> Test.fail "Unexpected error:@.%a@." pp_cryptobox_error err
+      | Ok x -> f x
+    in
+    let*? precomputation = precompute_shards_proofs cryptobox in
+    let*? polynomial = polynomial_from_slot cryptobox slot in
+    let shards = shards_from_polynomial cryptobox polynomial in
+    let shard_proofs =
+      prove_shards cryptobox ~precomputation ~polynomial |> Array.to_seq
+    in
+    let*? commitment = commit cryptobox polynomial in
+    let*? commitment_proof = prove_commitment cryptobox polynomial in
+    let shards =
+      Seq.fold_left2
+        (fun seq shard proof -> Seq.cons (shard, proof) seq)
+        Seq.empty
+        shards
+        shard_proofs
+    in
+    (commitment, commitment_proof, shards)
+
   let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
       ~commitment ~proof client =
     (* We scale the fees to match the actual gas cost of publishing a slot header.
