@@ -1382,6 +1382,15 @@ let run ~data_dir ~configuration_override =
       transport_layer
       cctxt
   in
+  let* () =
+    match Profile_manager.get_profiles profile_ctxt with
+    | Operator profile ->
+        Node_context.warn_if_attesters_not_delegates
+          ctxt
+          ~level:head_level
+          profile
+    | _ -> return_unit
+  in
   Gossipsub.Worker.Validate_message_hook.set
     (Handler.gossipsub_app_messages_validation
        ctxt

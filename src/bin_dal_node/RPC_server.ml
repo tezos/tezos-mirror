@@ -276,6 +276,10 @@ module Profile_handlers = struct
     let open Lwt_result_syntax in
     let gs_worker = Node_context.get_gs_worker ctxt in
     call_handler1 (fun () ->
+        let* () =
+          Node_context.warn_if_attesters_not_delegates ctxt operator_profiles
+          |> lwt_map_error (fun e -> `Other e)
+        in
         let proto_parameters = Node_context.get_proto_parameters ctxt in
         match
           Profile_manager.add_and_register_operator_profile
