@@ -2409,39 +2409,54 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
   in
   (ctxt, Single_result (mk_result (Some delegate) []))
 
-let punish_double_attestation_or_preattestation (type kind) ctxt ~operation_hash
-    ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
-    (context
-    * kind Kind.double_consensus_operation_evidence contents_result_list)
-    tzresult
-    Lwt.t =
+let punish_double_preattestation ctxt ~operation_hash
+    ~(op1 : Kind.preattestation Operation.t) ~payload_producer =
   let open Lwt_result_syntax in
-  let mk_result forbidden_delegate (balance_updates : Receipt.balance_updates) :
-      kind Kind.double_consensus_operation_evidence contents_result =
-    match op1.protocol_data.contents with
-    | Single (Preattestation _) ->
+  match op1.protocol_data.contents with
+  | Single (Preattestation consensus_content) ->
+      let {slot; level; round; _} = consensus_content in
+      let misbehaviour =
+        Misbehaviour.{level; round; kind = Double_preattesting}
+      in
+      let mk_result forbidden_delegate balance_updates =
         Double_preattestation_evidence_result
           {forbidden_delegate; balance_updates}
-    | Single (Attestation _) ->
+      in
+      let level = Level.from_raw ctxt level in
+      let* ctxt, {delegate; _} =
+        Stake_distribution.slot_owner ctxt level slot
+      in
+      punish_delegate
+        ctxt
+        ~operation_hash
+        delegate
+        level
+        misbehaviour
+        mk_result
+        ~payload_producer
+
+let punish_double_attestation ctxt ~operation_hash
+    ~(op1 : Kind.attestation Operation.t) ~payload_producer =
+  let open Lwt_result_syntax in
+  match op1.protocol_data.contents with
+  | Single (Attestation {consensus_content; _}) ->
+      let {slot; level; round; block_payload_hash = _} = consensus_content in
+      let misbehaviour = Misbehaviour.{level; round; kind = Double_attesting} in
+      let mk_result forbidden_delegate balance_updates =
         Double_attestation_evidence_result {forbidden_delegate; balance_updates}
-  in
-  let {slot; level = raw_level; round; block_payload_hash = _}, kind =
-    match op1.protocol_data.contents with
-    | Single (Preattestation consensus_content) ->
-        (consensus_content, Misbehaviour.Double_preattesting)
-    | Single (Attestation {consensus_content; dal_content = _}) ->
-        (consensus_content, Misbehaviour.Double_attesting)
-  in
-  let level = Level.from_raw ctxt raw_level in
-  let* ctxt, consensus_pk1 = Stake_distribution.slot_owner ctxt level slot in
-  punish_delegate
-    ctxt
-    ~operation_hash
-    consensus_pk1.delegate
-    level
-    {level = raw_level; round; kind}
-    mk_result
-    ~payload_producer
+      in
+      let level = Level.from_raw ctxt level in
+      let* ctxt, {delegate; _} =
+        Stake_distribution.slot_owner ctxt level slot
+      in
+      punish_delegate
+        ctxt
+        ~operation_hash
+        delegate
+        level
+        misbehaviour
+        mk_result
+        ~payload_producer
 
 let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
     ~payload_producer =
@@ -2504,17 +2519,9 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       in
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preattestation_evidence {op1; op2 = _}) ->
-      punish_double_attestation_or_preattestation
-        ctxt
-        ~operation_hash
-        ~op1
-        ~payload_producer
+      punish_double_preattestation ctxt ~operation_hash ~op1 ~payload_producer
   | Single (Double_attestation_evidence {op1; op2 = _}) ->
-      punish_double_attestation_or_preattestation
-        ctxt
-        ~operation_hash
-        ~op1
-        ~payload_producer
+      punish_double_attestation ctxt ~operation_hash ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt ~operation_hash bh1 ~payload_producer
   | Single (Dal_entrapment_evidence {attestation; slot_index; _}) ->
