@@ -523,50 +523,6 @@ let rec worker_loop state =
       state.unregister () ;
       Lwt.return_unit
 
-let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
-  if not !profiler_init then (
-    () [@profiler.record {verbosity = Notice} "start"] ;
-    profiler_init := true) ;
-  let canceler = Lwt_canceler.create () in
-  let state =
-    {
-      active_chains;
-      protocol_db;
-      p2p;
-      disk;
-      conn;
-      gid;
-      canceler;
-      peer_active_chains = Chain_id.Table.create 17;
-      worker = Lwt.return_unit;
-      unregister;
-    }
-  in
-  Chain_id.Table.iter
-    (fun chain_id _chain_db ->
-      Error_monad.dont_wait
-        (fun () ->
-          let meta = P2p.get_peer_metadata p2p gid in
-          Peer_metadata.incr meta (Sent_request Branch) ;
-          P2p.send p2p conn (Get_current_branch chain_id))
-        (fun trace ->
-          Format.eprintf
-            "Uncaught error: %a\n%!"
-            Error_monad.pp_print_trace
-            trace)
-        (fun exc ->
-          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))
-    active_chains ;
-  state.worker <-
-    Lwt_utils.worker
-      (Format.asprintf "db_network_reader.%a" P2p_peer.Id.pp_short gid)
-      ~on_event:Internal_event.Lwt_worker_logger.on_event
-      ~run:(fun () -> worker_loop state)
-      ~cancel:(fun () -> Error_monad.cancel_with_exceptions canceler) ;
-  register state
-
-let shutdown s = Error_monad.cancel_with_exceptions s.canceler
-
 type (_, _) req = Message : Message.t tzresult -> (unit, tztrace) req
 [@@ocaml.unboxed]
 
@@ -632,3 +588,82 @@ module Name : Worker_intf.NAME with type t = P2p_peer.Id.t = struct
 
   let equal = P2p_peer.Id.equal
 end
+
+module Worker = Worker.MakeSingle (Name) (Request) (Types)
+
+type worker = Worker.callback Worker.t
+
+let on_launch gid
+    {p2p; conn; disk; protocol_db; active_chains; register; unregister} =
+  if not !profiler_init then (
+    () [@profiler.record {verbosity = Notice} "start"] ;
+    profiler_init := true) ;
+  let canceler = Lwt_canceler.create () in
+  let state =
+    {
+      active_chains;
+      protocol_db;
+      p2p;
+      disk;
+      conn;
+      gid;
+      canceler;
+      peer_active_chains = Chain_id.Table.create 17;
+      worker = Lwt.return_unit;
+      unregister;
+    }
+  in
+  Chain_id.Table.iter
+    (fun chain_id _chain_db ->
+      Error_monad.dont_wait
+        (fun () ->
+          let meta = P2p.get_peer_metadata p2p gid in
+          Peer_metadata.incr meta (Sent_request Branch) ;
+          P2p.send p2p conn (Get_current_branch chain_id))
+        (fun trace ->
+          Format.eprintf
+            "Uncaught error: %a\n%!"
+            Error_monad.pp_print_trace
+            trace)
+        (fun exc ->
+          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))
+    active_chains ;
+  register state ;
+  state
+
+(* Temporarily disable warning *)
+[@@@ocaml.warning "-32"]
+
+module Handlers = struct
+  type self = worker
+
+  type launch_error = error trace
+
+  let on_launch (_self : self) gid parameters : (t, launch_error) result Lwt.t =
+    Lwt_result.return @@ on_launch gid parameters
+
+  let on_request _ _ = failwith "on_request: unimplemented"
+
+  let on_no_request _ = failwith "on_no_request: unimplemented"
+
+  let on_close _ = failwith "on_close: unimplemented"
+
+  let on_error _ _ _ _ = failwith "on_error: unimplemented"
+
+  let on_completion _ _ _ _ = failwith "on_completion: unimplemented"
+end
+
+let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
+  let state =
+    on_launch
+      gid
+      {p2p; conn; disk; protocol_db; active_chains; register; unregister}
+  in
+  state.worker <-
+    Lwt_utils.worker
+      (Format.asprintf "db_network_reader.%a" P2p_peer.Id.pp_short gid)
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
+      ~run:(fun () -> worker_loop state)
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions state.canceler)
+
+let shutdown s = Error_monad.cancel_with_exceptions s.canceler
