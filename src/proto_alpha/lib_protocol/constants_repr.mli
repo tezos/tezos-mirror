@@ -146,12 +146,6 @@ type fixed
 
 val fixed_encoding : fixed Data_encoding.encoding
 
-type t = private {fixed : fixed; parametric : Constants_parametric_repr.t}
-
-val all_of_parametric : Constants_parametric_repr.t -> t
-
-val encoding : t Data_encoding.encoding
-
 type error += (* `Permanent *) Invalid_protocol_constants of string
 
 (** performs some consistency checks on the protocol parameters *)
@@ -167,6 +161,40 @@ module Generated : sig
      migration code to be sure that the parameters are consistent. *)
   val generate : consensus_committee_size:int -> dal_rewards_ratio:Q.t -> t
 end
+
+(** Pseudo-constants that are neither fixed as the ones defined above,
+    nor protocol parameters from {!Constants_parametric_repr}. Instead,
+    they are derived from the protocol parameters. *)
+module Derived : sig
+  type t = {
+    issuance_modification_delay : int;
+    consensus_key_activation_delay : int;
+    unstake_finalization_delay : int;
+  }
+
+  val encoding : t Data_encoding.t
+
+  (* The descriptions of these pseudo-constants are in the .ml, to
+     keep them more easily synchronized with the implementation. *)
+
+  val issuance_modification_delay :
+    parametric:Constants_parametric_repr.t -> int
+
+  val consensus_key_activation_delay :
+    parametric:Constants_parametric_repr.t -> int
+
+  val unstake_finalization_delay : parametric:Constants_parametric_repr.t -> int
+end
+
+type t = private {
+  fixed : fixed;
+  parametric : Constants_parametric_repr.t;
+  derived : Derived.t;
+}
+
+val all_of_parametric : Constants_parametric_repr.t -> t
+
+val encoding : t Data_encoding.encoding
 
 (** For each subcache, a size limit needs to be declared once. However,
     depending how the protocol will be instantiated (sandboxed mode,
