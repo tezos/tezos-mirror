@@ -52,12 +52,12 @@ let update_activity ctxt last_cycle =
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
-let distribute_dal_attesting_rewards ctxt delegate ~last_cycle
+let distribute_dal_attesting_rewards ctxt delegate
     ~dal_attesting_reward_per_shard ~total_dal_attested_slots
     ~total_active_stake_weight ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
   let*! denounced_in_cycle =
-    Dal_already_denounced_storage.is_denounced ctxt delegate last_cycle
+    Dal_already_denounced_storage.is_denounced ctxt delegate
   in
   let* ctxt, dal_attested_slots_by_delegate =
     Delegate_missed_attestations_storage
@@ -101,7 +101,7 @@ let distribute_dal_attesting_rewards ctxt delegate ~last_cycle
       (`Lost_dal_attesting_rewards delegate)
       dal_rewards
 
-let maybe_distribute_dal_attesting_rewards ctxt delegate ~last_cycle
+let maybe_distribute_dal_attesting_rewards ctxt delegate
     ~dal_attesting_reward_per_shard ~total_dal_attested_slots
     ~total_active_stake_weight ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
@@ -117,7 +117,6 @@ let maybe_distribute_dal_attesting_rewards ctxt delegate ~last_cycle
       distribute_dal_attesting_rewards
         ctxt
         delegate
-        ~last_cycle
         ~dal_attesting_reward_per_shard
         ~total_dal_attested_slots
         ~total_active_stake_weight
@@ -198,7 +197,6 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
         maybe_distribute_dal_attesting_rewards
           ctxt
           delegate
-          ~last_cycle
           ~dal_attesting_reward_per_shard
           ~total_dal_attested_slots
           ~total_active_stake_weight

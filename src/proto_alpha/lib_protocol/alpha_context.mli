@@ -3063,7 +3063,7 @@ module Dal : sig
       context -> public_key_hash -> Level.t -> Slot_index.t -> bool Lwt.t
 
     (** See {!Dal_already_denounced_storage.is_denounced}. *)
-    val is_denounced : context -> public_key_hash -> Cycle.t -> bool Lwt.t
+    val is_denounced : context -> public_key_hash -> bool Lwt.t
   end
 end
 
