@@ -300,7 +300,7 @@ pub struct StorageKey {
 
 /// The layer cache is associating a storage slot which is an
 /// address and an index (StorageKey) to a value (H256).
-pub type LayerCache = HashMap<StorageKey, H256>;
+pub type LayerCache = HashMap<StorageKey, StorageValue>;
 
 /// The storage cache is associating at each layer (usize) its
 /// own cache (LayerCache). For each slot that is modified or
@@ -765,7 +765,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                         flat_storage.push(StorageMapItem {
                             address,
                             index,
-                            value,
+                            value: value.h256(),
                         });
                     });
                 flat_storage
@@ -1683,8 +1683,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         if let Some(cache) = self.storage_cache.get(&0) {
             for (StorageKey { address, index }, value) in cache.iter() {
-                let mut account = self.get_or_create_account(*address)?;
-                account.set_storage(self.host, index, value)?;
+                if let StorageValue::Hit(value) = value {
+                    let mut account = self.get_or_create_account(*address)?;
+                    account.set_storage(self.host, index, value)?;
+                }
             }
         }
         Ok(())
@@ -2116,7 +2118,7 @@ fn update_cache<Host: Runtime>(
     handler: &mut EvmHandler<'_, Host>,
     address: H160,
     index: H256,
-    value: H256,
+    value: StorageValue,
     layer: usize,
 ) {
     if let Some(cache) = handler.storage_cache.get_mut(&layer) {
@@ -2133,7 +2135,7 @@ fn find_storage_key<Host: Runtime>(
     address: H160,
     index: H256,
     current_layer: usize,
-) -> Option<H256> {
+) -> Option<StorageValue> {
     for layer in (0..=current_layer).rev() {
         if let Some(cache) = handler.storage_cache.get(&layer) {
             if let Some(value) = cache.get(&StorageKey { address, index }) {
@@ -2167,7 +2169,7 @@ fn cached_storage_access<Host: Runtime>(
     layer: usize,
 ) -> H256 {
     if let Some(value) = find_storage_key(handler, address, index, layer) {
-        value
+        value.h256()
     } else {
         let value = handler
             .get_account(address)
@@ -2177,7 +2179,7 @@ fn cached_storage_access<Host: Runtime>(
 
         // This condition will help avoiding unecessary write access
         // in the durable storage at the end of the transaction.
-        if let Some(StorageValue::Hit(value)) = value {
+        if let Some(value) = value {
             update_cache(handler, address, index, value, layer);
         }
 
@@ -2238,7 +2240,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     fn original_storage(&mut self, address: H160, index: H256) -> H256 {
         let key = StorageKey { address, index };
         if let Some(value) = self.original_storage_cache.get(&key) {
-            *value
+            value.h256()
         } else {
             let value = self
                 .get_original_account(address)
@@ -2247,7 +2249,8 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 .and_then(|a| a.get_storage(self.host, &index).ok())
                 .unwrap_or_default();
 
-            self.original_storage_cache.insert(key, value);
+            self.original_storage_cache
+                .insert(key, StorageValue::Hit(value));
 
             value
         }
@@ -2364,7 +2367,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         value: H256,
     ) -> Result<(), ExitError> {
         let layer = self.evm_account_storage.stack_depth();
-        update_cache(self, address, index, value, layer);
+        update_cache(self, address, index, StorageValue::Hit(value), layer);
         Ok(())
     }
 

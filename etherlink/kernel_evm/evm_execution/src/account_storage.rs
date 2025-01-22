@@ -187,6 +187,7 @@ pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
     OwnedPath::try_from(path_string).map_err(DurableStorageError::from)
 }
 
+#[derive(Clone, Copy)]
 pub enum StorageValue {
     Hit(H256),
     Default,
