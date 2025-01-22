@@ -104,13 +104,16 @@ for architecture in ${architectures}; do
     "$os-${architecture}-octez-smart-rollup-node.sha512"
 done
 
-echo "Query GitLab to get generic package URL"
+# No release page for standalone rollup node, only packages
+# Uncomment if we want a release
 
-gitlab_binaries_url=$(package_web_path "${gitlab_octez_binaries_package_name}")
+# echo "Query GitLab to get generic package URL"
 
-echo "Release"
+# gitlab_binaries_url=$(package_web_path "${gitlab_octez_binaries_package_name}")
 
-release-cli create \
-  --name="${gitlab_release_name}" \
-  --tag-name="${CI_COMMIT_TAG}" \
-  --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}"
+# echo "Release"
+
+# release-cli create \
+#   --name="${gitlab_release_name}" \
+#   --tag-name="${CI_COMMIT_TAG}" \
+#   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}"
