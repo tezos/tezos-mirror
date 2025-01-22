@@ -620,3 +620,15 @@ struct
 
   type nonrec parameters = parameters
 end
+
+module Name : Worker_intf.NAME with type t = P2p_peer.Id.t = struct
+  let base = ["db_network_reader"]
+
+  type t = P2p_peer.Id.t
+
+  let encoding = P2p_peer.Id.encoding
+
+  let pp = P2p_peer.Id.pp
+
+  let equal = P2p_peer.Id.equal
+end
