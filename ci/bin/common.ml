@@ -310,6 +310,7 @@ let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
     ~name
     ~image
     ~before_script
+    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
     ~variables
     script
 
