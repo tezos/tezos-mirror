@@ -875,3 +875,66 @@ impl BinWriter for MichelsonNat {
         bin_write_micheline_int(&self.0, output)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::michelson::{
+        micheline::annots::Annotations, MichelsonNat, TIMESTAMP_TYPE_TAG,
+    };
+
+    use super::{micheline::Node, MichelsonTicketContent, MichelsonTimestamp};
+    use num_bigint::BigInt;
+    use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Zarith};
+
+    fn zarith(x: u32) -> Zarith {
+        Zarith::from(BigInt::from(x))
+    }
+
+    #[test]
+    fn timestamp_serialisation_roundtrip() {
+        let initial_timestamp = MichelsonTimestamp(MichelsonNat(zarith(251197)));
+        let initial_node = Node::Prim {
+            prim_tag: TIMESTAMP_TYPE_TAG,
+            args: vec![Node::Int(zarith(251197))],
+            annots: Annotations(vec![]),
+        };
+
+        // Check:
+        // node -> timestamp == timestamp
+        // timestamp -> node == node
+        let timestamp_from_node =
+            MichelsonTimestamp::of_node(initial_node.clone()).unwrap();
+        let node_from_timestamp = timestamp_from_node.to_node();
+        assert_eq!(initial_timestamp, timestamp_from_node);
+        assert_eq!(initial_node, node_from_timestamp);
+
+        // Check:
+        // timestamp -> bytes == timestamp -> node -> bytes
+        let mut bin = Vec::new();
+        let mut bin2 = Vec::new();
+        timestamp_from_node.bin_write(&mut bin).unwrap();
+        node_from_timestamp.bin_write(&mut bin2).unwrap();
+        assert_eq!(bin, bin2);
+
+        // Check:
+        // bytes -> timestamp == bytes -> node -> timestamp
+        let (remaining, timestamp_from_bin) = MichelsonTimestamp::nom_read(&bin).unwrap();
+        let (remaining2, node_from_bin) = Node::nom_read(&bin2).unwrap();
+        let timestamp_from_node_2 = MichelsonTimestamp::of_node(node_from_bin).unwrap();
+        assert!(remaining.is_empty());
+        assert!(remaining2.is_empty());
+        assert_eq!(timestamp_from_node, timestamp_from_bin);
+        assert_eq!(timestamp_from_node, timestamp_from_node_2)
+    }
+
+    #[test]
+    fn octez_client_data_checks() {
+        let initial_timestamp = MichelsonTimestamp(MichelsonNat(zarith(112597)));
+        // > octez-client convert data 'timestamp 112597' from michelson to binary
+        // 0x056b0095df0d
+        let bin = hex::decode("056b0095df0d").unwrap();
+        let (remaining, timestamp) = MichelsonTimestamp::nom_read(&bin).unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(initial_timestamp, timestamp);
+    }
+}
