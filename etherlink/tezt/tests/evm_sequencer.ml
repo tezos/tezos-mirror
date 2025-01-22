@@ -3301,6 +3301,105 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
   unit
 
+(* Tests that _all_ blueprint chunks are cleared during a flush, including
+   blueprint chunk not yet processed: they will be invalidated by the flush
+   anyway.*)
+let test_clean_bps =
+  let sequencer_account = Constant.bootstrap1 in
+  register_all
+    ~sequencer:sequencer_account
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~title:"All blueprints are cleared on flush"
+    ~tags:["evm"; "flush"; "clean"]
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocols
+    ->
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* we send a blueprint in the (far) future, to ensure the kernel don't
+     execute it after the flush *)
+  let* chunks =
+    Evm_node.chunk_data
+      ~rollup_address:sc_rollup_address
+      ~sequencer_key:sequencer_account.alias
+      ~client
+      ~number:42
+      [raw_transfer]
+  in
+  let send_chunks chunks src =
+    let messages =
+      `A (List.map (fun c -> `String c) chunks)
+      |> JSON.annotate ~origin:"send_message"
+      |> JSON.encode
+    in
+    Client.Sc_rollup.send_message
+      ?wait:None
+      ~msg:("hex:" ^ messages)
+      ~src
+      client
+  in
+  let* () = send_chunks chunks sequencer_account.alias in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* check the bp is in storage *)
+  let* subkeys =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:"/evm/blueprints/42"
+         ()
+  in
+  Check.(
+    (subkeys <> [])
+      (list string)
+      ~error_msg:
+        "There should be a list of chunks, otherwise the blueprint was never \
+         stored") ;
+  (* flush *)
+  (* Add a transaction to the delayed inbox. *)
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* Bake a new L1 block to force the flush. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* check not in storage anymore*)
+  let* subkeys =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:"/evm/blueprints/42"
+         ()
+  in
+  Check.(
+    (subkeys = [])
+      (list string)
+      ~error_msg:"The blueprint should have been cleared, but we found %L") ;
+  unit
+
 let test_delayed_inbox_flushing_event =
   register_all
     ~time_between_blocks:Nothing
@@ -9920,6 +10019,7 @@ let () =
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
   test_overwrite_simulation_tick_limit protocols ;
+  test_clean_bps protocols ;
   test_produce_block_with_no_delayed_transactions protocols ;
   test_observer_reset [Protocol.Alpha] ;
   test_websocket_rpcs [Protocol.Alpha] ;
