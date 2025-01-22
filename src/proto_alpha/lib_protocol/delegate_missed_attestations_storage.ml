@@ -376,7 +376,7 @@ module For_RPC = struct
             ~total_dal_attested_slots
         in
         let*! denounced =
-          Dal_already_denounced_storage.is_denounced ctxt delegate level.cycle
+          Dal_already_denounced_storage.is_denounced ctxt delegate
         in
         let*? dal_attesting_reward_per_shard =
           Delegate_rewards.dal_attesting_reward_per_shard ctxt

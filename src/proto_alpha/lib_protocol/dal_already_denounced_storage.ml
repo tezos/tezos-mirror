@@ -12,8 +12,8 @@ let is_already_denounced ctxt delegate (level : Level_repr.t) slot_index =
     (ctxt, level.cycle)
     ((level.level, slot_index), delegate)
 
-let is_denounced ctxt delegate cycle =
-  Storage.Dal_denounced_delegates.mem (ctxt, cycle) delegate
+let is_denounced ctxt delegate =
+  Storage.Dal.Denounced_delegates.mem ctxt delegate
 
 let add_denunciation ctxt delegate (level : Level_repr.t) slot_index =
   let open Lwt_syntax in
@@ -29,11 +29,13 @@ let add_denunciation ctxt delegate (level : Level_repr.t) slot_index =
           ((level.level, slot_index), delegate)
           ()
       in
-      Storage.Dal_denounced_delegates.add (ctxt, level.cycle) delegate ()
+      Storage.Dal.Denounced_delegates.add ctxt delegate ()
   in
   return (ctxt, already_denounced)
 
 let clear_outdated_cycle ctxt ~new_cycle =
+  let open Lwt_syntax in
+  let* ctxt = Storage.Dal.Denounced_delegates.clear ctxt in
   (* Misbehaviours from cycles [new_cycle - denunciation_period] and
      higher might still be denounced during [new_cycle], so we need to
      keep known denunciations on them. Anything older than that can be
@@ -43,6 +45,4 @@ let clear_outdated_cycle ctxt ~new_cycle =
   match Cycle_repr.(sub new_cycle (Constants_repr.denunciation_period + 1)) with
   | None -> Lwt.return ctxt
   | Some outdated_cycle ->
-      let open Lwt_syntax in
-      let* ctxt = Storage.Dal_already_denounced.clear (ctxt, outdated_cycle) in
-      Storage.Dal_denounced_delegates.clear (ctxt, outdated_cycle)
+      Storage.Dal_already_denounced.clear (ctxt, outdated_cycle)

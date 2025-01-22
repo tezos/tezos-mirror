@@ -531,13 +531,6 @@ module Dal_already_denounced :
       (Raw_level_repr.t * Dal_slot_index_repr.t) * Signature.Public_key_hash.t
      and type value = unit
 
-(** Set of delegates denounced in a cycle. It is used to not distribute rewards for such delegates. *)
-module Dal_denounced_delegates :
-  Indexed_data_storage
-    with type t := Raw_context.t * Cycle_repr.t
-     and type key = Signature.Public_key_hash.t
-     and type value = unit
-
 module Pending_staking_parameters :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
@@ -1086,6 +1079,14 @@ module Dal : sig
   (** The number of protocol-attested DAL slots for the current cycle. *)
   module Total_attested_slots :
     Single_data_storage with type t := Raw_context.t and type value = Int32.t
+
+  (** Set of delegates denounced in the current cycle. It is used to not
+    distribute rewards for such delegates. *)
+  module Denounced_delegates :
+    Indexed_data_storage
+      with type t := Raw_context.t
+       and type key = Signature.Public_key_hash.t
+       and type value = unit
 end
 
 module Zk_rollup : sig

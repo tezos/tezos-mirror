@@ -1205,19 +1205,6 @@ module Cycle = struct
         let encoding = Data_encoding.unit
       end)
 
-  module Dal_denounced_delegates =
-    Make_indexed_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["dal_denounced_delegates"]
-         end))
-         (Public_key_hash_index)
-      (struct
-        type t = unit
-
-        let encoding = Data_encoding.empty
-      end)
-
   module Selected_stake_distribution =
     Indexed_context.Make_map
       (Registered)
@@ -1360,7 +1347,6 @@ end
 
 module Already_denounced = Cycle.Already_denounced
 module Dal_already_denounced = Cycle.Dal_already_denounced
-module Dal_denounced_delegates = Cycle.Dal_denounced_delegates
 module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
@@ -2274,6 +2260,19 @@ module Dal = struct
         let name = ["total_attested_slots"]
       end)
       (Encoding.Int32)
+
+  module Denounced_delegates =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["dal_denounced_delegates"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = unit
+
+        let encoding = Data_encoding.empty
+      end)
 end
 
 module Zk_rollup = struct

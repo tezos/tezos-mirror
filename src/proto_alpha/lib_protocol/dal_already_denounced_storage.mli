@@ -30,9 +30,8 @@ val is_already_denounced :
   Dal_slot_index_repr.t ->
   bool Lwt.t
 
-(** Returns whether the given delegate has been denounced in the given cycle. *)
-val is_denounced :
-  Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t -> bool Lwt.t
+(** Returns whether the given delegate has been denounced in the current cycle. *)
+val is_denounced : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
 
 (** Records a denunciation in {!Storage.Dal_already_denounced}.
 
