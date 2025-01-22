@@ -1211,7 +1211,7 @@ module Filter = struct
          (opt "fromBlock" Block_parameter.encoding)
          (opt "toBlock" Block_parameter.encoding)
          (opt "address" filter_address_encoding)
-         (opt "topics" (list @@ option topic_encoding))
+         (dft "topics" (option (list @@ option topic_encoding)) None)
          (opt "blockHash" block_hash_encoding))
 end
 
