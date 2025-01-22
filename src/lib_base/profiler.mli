@@ -274,6 +274,12 @@ val main : profiler
 
 (** {2 Global Profiler} *)
 module type GLOBAL_PROFILER = sig
+  type nonrec metadata = metadata
+
+  type nonrec id = id
+
+  type nonrec ids = ids
+
   type nonrec verbosity = verbosity = Notice | Info | Debug
 
   (** {3 Plugging} *)
