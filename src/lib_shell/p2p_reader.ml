@@ -83,7 +83,7 @@ let may_handle state chain_id f =
 
 (* performs [f chain_db] if [chain_id] is active and [chain_db] is the
    chain_db corresponding to this chain id. *)
-let may_handle_global state chain_id f =
+let may_handle_global (state : t) chain_id f =
   match Chain_id.Table.find state.active_chains chain_id with
   | None -> Lwt.return_unit
   | Some chain_db -> f chain_db
@@ -100,7 +100,7 @@ let find_pending_operation {peer_active_chains; _} h =
   |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
 
-let read_operation state h =
+let read_operation (state : t) h =
   let open Lwt_syntax in
   Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains)
   |> Seq_s.S.find_map (fun (chain_id, chain_db) ->
@@ -111,7 +111,7 @@ let read_operation state h =
          in
          Option.map (fun bh -> (chain_id, bh)) v)
 
-let read_block {disk; _} h =
+let read_block ({disk; _} : t) h =
   let open Lwt_syntax in
   let* chain_stores = Store.all_chain_stores disk in
   List.find_map_s
@@ -133,7 +133,7 @@ let read_block_header db h =
   | Some (chain_id, block) ->
       Lwt.return_some (chain_id, Store.Block.header block)
 
-let read_predecessor_header {disk; _} h offset =
+let read_predecessor_header ({disk; _} : t) h offset =
   Option.catch_os (fun () ->
       let open Lwt_syntax in
       let offset = Int32.to_int offset in
@@ -168,9 +168,9 @@ let activate state chain_id chain_db =
       P2p_peer.Table.add chain_db.active_connections state.gid state.conn ;
       Chain_id.Table.add state.peer_active_chains chain_id chain_db
 
-let my_peer_id state = P2p.peer_id state.p2p
+let my_peer_id (state : t) = P2p.peer_id state.p2p
 
-let handle_msg state msg =
+let handle_msg (state : t) msg =
   let open Lwt_syntax in
   let open Message in
   let meta = P2p.get_peer_metadata state.p2p state.gid in
@@ -601,4 +601,22 @@ struct
     | Error trace -> Error_monad.pp_print_trace ppf trace
 
   let view msg = View msg
+end
+
+type parameters = {
+  p2p : p2p;
+  conn : connection;
+  disk : Store.t;
+  protocol_db : Distributed_db_requester.Raw_protocol.t;
+  active_chains : chain_db Chain_id.Table.t;
+  register : t -> unit;
+  unregister : unit -> unit;
+}
+
+module Types :
+  Worker_intf.TYPES with type state = t and type parameters = parameters =
+struct
+  type state = t
+
+  type nonrec parameters = parameters
 end
