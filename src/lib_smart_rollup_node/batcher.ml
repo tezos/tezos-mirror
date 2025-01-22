@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Batcher_worker_types
-module Message_queue = Hash_queue.Make (L2_message.Id) (L2_message)
+module Message_heap = Bounded_min_heap.Make (L2_message.Id) (L2_message)
 
 module Batcher_events = Batcher_events.Declare (struct
   let worker_name = "batcher"
@@ -40,7 +40,7 @@ type status = Pending_batch | Batched of Injector.Inj_operation.id
 
 type state = {
   node_ctxt : Node_context.ro;
-  messages : Message_queue.t;
+  messages_heap : Message_heap.t;
   batched : Batched_messages.t;
   mutable plugin : (module Protocol_plugin_sig.S);
 }
@@ -81,105 +81,87 @@ let max_batch_size {node_ctxt; plugin; _} =
     ~default:Plugin.Batcher_constants.protocol_max_batch_size
 
 let get_batches state ~only_full =
-  let ( current_rev_batch,
-        current_batch_size,
-        current_batch_elements,
-        full_batches ) =
-    Message_queue.fold
-      (fun msg_id
-           message
-           ( current_rev_batch,
-             current_batch_size,
-             current_batch_elements,
-             full_batches ) ->
+  let max_batch_size = max_batch_size state in
+  let max_batch_elements = state.node_ctxt.config.batcher.max_batch_elements in
+  let heap = state.messages_heap in
+  let add_batch rev_batch rev_batches =
+    if List.is_empty rev_batch then rev_batches
+    else
+      let batch = List.rev rev_batch in
+      batch :: rev_batches
+  in
+  let rec pop_until_enough (rev_batch, batch_size, batch_elements) rev_batches =
+    let message = Message_heap.peek_min heap in
+    match message with
+    | None -> add_batch rev_batch rev_batches
+    | Some message ->
         let size = message_size (L2_message.content message) in
-        let new_batch_size = current_batch_size + size in
-        let new_batch_elements = current_batch_elements + 1 in
+        let new_batch_size = batch_size + size in
+        let new_batch_elements = batch_elements + 1 in
         if
-          new_batch_size <= max_batch_size state
-          && new_batch_elements
-             <= state.node_ctxt.config.batcher.max_batch_elements
+          new_batch_size <= max_batch_size
+          && new_batch_elements <= max_batch_elements
         then
+          (* pop the message as we only peeked it. *)
+          let _message = Message_heap.pop heap in
           (* We can add the message to the current batch because we are still
              within the bounds. *)
-          ( (msg_id, message) :: current_rev_batch,
-            new_batch_size,
-            new_batch_elements,
-            full_batches )
+          pop_until_enough
+            (message :: rev_batch, new_batch_size, new_batch_elements)
+            rev_batches
         else
-          (* The batch augmented with the message would be too big but it is
-             below the limit without it. We finalize the current batch and
-             create a new one for the message. NOTE: Messages in the queue are
-             always < [state.conf.max_batch_size] because {!on_register} only
-             accepts those. *)
-          let batch = List.rev current_rev_batch in
-          ([(msg_id, message)], size, 1, batch :: full_batches))
-      state.messages
-      ([], 0, 0, [])
-  in
-  let batches =
+          (* we haven't pop the message, so we can safely call
+             continue_or_stop. *)
+          continue_or_stop (add_batch rev_batch rev_batches)
+  and continue_or_stop rev_batches =
     if
-      (not only_full)
-      || current_batch_size >= state.node_ctxt.config.batcher.min_batch_size
-         && current_batch_elements
-            >= state.node_ctxt.config.batcher.min_batch_elements
-    then
-      (* We have enough to make a batch with the last non-full batch. *)
-      List.rev current_rev_batch :: full_batches
-    else full_batches
+      only_full
+      && Message_heap.length heap
+         < state.node_ctxt.config.batcher.min_batch_elements
+    then rev_batches
+    else pop_until_enough ([], 0, 0) rev_batches
   in
-  List.fold_left
-    (fun (batches, to_remove) -> function
-      | [] -> (batches, to_remove)
-      | batch ->
-          let msg_hashes, batch = List.split batch in
-          let to_remove = List.rev_append msg_hashes to_remove in
-          (batch :: batches, to_remove))
-    ([], [])
-    batches
+  continue_or_stop [] |> List.rev
 
 let produce_batches state ~only_full =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
-  let batches, to_remove = get_batches state ~only_full in
+  let batches = get_batches state ~only_full in
   let get_timestamp = Time.System.now () in
+  let nb_messages_batched =
+    List.fold_left (fun len l -> len + List.length l) 0 batches
+  in
   Metrics.wrap (fun () ->
       Metrics.Batcher.set_messages_queue_size
-      @@ Message_queue.length state.messages ;
-      Metrics.Batcher.set_messages_size @@ List.length to_remove ;
+      @@ Message_heap.length state.messages_heap ;
+      Metrics.Batcher.set_messages_size @@ nb_messages_batched ;
       Metrics.Batcher.set_batches_size @@ List.length batches ;
       Metrics.Batcher.set_get_time @@ Ptime.diff get_timestamp start_timestamp) ;
-  match batches with
-  | [] -> return_unit
-  | _ ->
-      let* () =
-        Metrics.wrap_lwt (fun () ->
-            Metrics.Batcher.set_last_batch_time start_timestamp ;
-            let* block = Node_context.last_processed_head_opt state.node_ctxt in
-            let () =
-              match block with
-              | Some block ->
-                  Metrics.Batcher.set_last_batch_level block.header.level
-              | None -> ()
-            in
-            return_unit)
-      in
-      let* () = inject_batches state batches in
-      let*! () =
-        Batcher_events.(emit batched)
-          (List.length batches, List.length to_remove)
-      in
-      let inject_timestamp = Time.System.now () in
-      Metrics.Batcher.set_inject_time
-      @@ Ptime.diff inject_timestamp get_timestamp ;
-      List.iter
-        (fun tr_hash -> Message_queue.remove state.messages tr_hash)
-        to_remove ;
-      return_unit
+  if List.is_empty batches then return_unit
+  else
+    let* () =
+      Metrics.wrap_lwt (fun () ->
+          Metrics.Batcher.set_last_batch_time start_timestamp ;
+          let* block = Node_context.last_processed_head_opt state.node_ctxt in
+          let () =
+            match block with
+            | Some block ->
+                Metrics.Batcher.set_last_batch_level block.header.level
+            | None -> ()
+          in
+          return_unit)
+    in
+    let* () = inject_batches state batches in
+    let*! () =
+      Batcher_events.(emit batched) (List.length batches, nb_messages_batched)
+    in
+    let inject_timestamp = Time.System.now () in
+    Metrics.Batcher.set_inject_time @@ Ptime.diff inject_timestamp get_timestamp ;
+    return_unit
 
-let message_already_added state msg_id =
-  match Batched_messages.find_opt state.batched msg_id with
-  | None -> false
+let message_already_batched state msg =
+  match Batched_messages.find_opt state.batched (L2_message.id msg) with
+  | None -> false (* check is done in insertion in the heap *)
   | Some {l1_id; _} ->
       (* If injector know about the operation then it's either
          pending, injected or included and we don't re-inject the
@@ -188,8 +170,7 @@ let message_already_added state msg_id =
          `retention_period`) and the user wants to re-inject it. *)
       Option.is_some @@ Injector.operation_status l1_id
 
-let on_register ~drop_duplicate state (messages : string list) =
-  let open Lwt_result_syntax in
+let make_l2_messages ?order ~unique state (messages : string list) =
   let module Plugin = (val state.plugin) in
   let max_size_msg =
     min
@@ -197,29 +178,52 @@ let on_register ~drop_duplicate state (messages : string list) =
      + 4 (* We add 4 because [message_size] adds 4. *))
       (max_batch_size state)
   in
+  List.mapi_e
+    (fun i message ->
+      if message_size message > max_size_msg then
+        error_with "Message %d is too large (max size is %d)" i max_size_msg
+      else Ok (L2_message.make ?order ~unique message))
+    messages
+
+type error += Heap_insertion_failed of string
+
+let () =
+  register_error_kind
+    ~id:"batcher.heap_insertion_failed"
+    ~title:"Heap insertion failed"
+    ~description:"Heap insertion failed"
+    ~pp:(fun ppf err -> Format.fprintf ppf "Heap insertion failed with %s." err)
+    `Permanent
+    Data_encoding.(obj1 (req "error" string))
+    (function Heap_insertion_failed error -> Some error | _ -> None)
+    (fun error -> Heap_insertion_failed error)
+
+let add_messages_into_heap ~drop_duplicate state =
+  let open Lwt_result_syntax in
+  List.map_es @@ fun message ->
+  let msg_id = L2_message.id message in
+  let* () =
+    (* check if already batched *)
+    if drop_duplicate && message_already_batched state message then
+      let*! () = Batcher_events.(emit dropped_msg) msg_id in
+      return_unit
+    else
+      let*? () =
+        Result.map_error (fun err_msg -> [Heap_insertion_failed err_msg])
+        @@ Message_heap.insert message state.messages_heap
+      in
+      return_unit
+  in
+  return msg_id
+
+let on_register ?order ~drop_duplicate state (messages : string list) =
+  let open Lwt_result_syntax in
+  let module Plugin = (val state.plugin) in
   let*? messages =
-    List.mapi_e
-      (fun i message ->
-        if message_size message > max_size_msg then
-          error_with "Message %d is too large (max size is %d)" i max_size_msg
-        else Ok (L2_message.make ~unique:(not drop_duplicate) message))
-      messages
+    make_l2_messages ?order ~unique:(not drop_duplicate) state messages
   in
   let*! () = Batcher_events.(emit queue) (List.length messages) in
-  let*! ids =
-    List.map_s
-      (fun message ->
-        let msg_id = L2_message.id message in
-        let*! () =
-          if drop_duplicate && message_already_added state msg_id then
-            Batcher_events.(emit dropped_msg) msg_id
-          else (
-            Message_queue.replace state.messages msg_id message ;
-            Lwt.return_unit)
-        in
-        Lwt.return msg_id)
-      messages
-  in
+  let* ids = add_messages_into_heap ~drop_duplicate state messages in
   let+ () = produce_batches state ~only_full:true in
   ids
 
@@ -228,7 +232,7 @@ let on_new_head state = produce_batches state ~only_full:false
 let init_batcher_state plugin node_ctxt =
   {
     node_ctxt;
-    messages = Message_queue.create 100_000 (* ~ 400MB *);
+    messages_heap = Message_heap.create 100_000 (* ~ 400MB *);
     batched = Batched_messages.create 100_000 (* ~ 400MB *);
     plugin;
   }
@@ -269,8 +273,8 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Register {messages; drop_duplicate} ->
-        protect @@ fun () -> on_register ~drop_duplicate state messages
+    | Request.Register {order; messages; drop_duplicate} ->
+        protect @@ fun () -> on_register ?order ~drop_duplicate state messages
     | Request.Produce_batches -> protect @@ fun () -> on_new_head state
 
   type launch_error = error trace
@@ -364,13 +368,13 @@ let find_message id =
   let open Result_syntax in
   let+ w = worker () in
   let state = Worker.state w in
-  Message_queue.find_opt state.messages id
+  Message_heap.find_opt id state.messages_heap
 
 let get_queue () =
   let open Result_syntax in
   let+ w = worker () in
   let state = Worker.state w in
-  Message_queue.bindings state.messages
+  Message_heap.elements state.messages_heap
 
 let handle_request_error rq =
   let open Lwt_syntax in
@@ -382,12 +386,12 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let register_messages ~drop_duplicate messages =
+let register_messages ?order ~drop_duplicate messages =
   let open Lwt_result_syntax in
   let*? w = worker () in
   Worker.Queue.push_request_and_wait
     w
-    (Request.Register {messages; drop_duplicate})
+    (Request.Register {order; messages; drop_duplicate})
   |> handle_request_error
 
 let produce_batches () =
@@ -409,7 +413,7 @@ let shutdown () =
   | Ok w -> Worker.shutdown w
 
 let message_status state msg_id =
-  match Message_queue.find_opt state.messages msg_id with
+  match Message_heap.find_opt msg_id state.messages_heap with
   | Some msg -> Some (Pending_batch, L2_message.content msg)
   | None -> (
       match Batched_messages.find_opt state.batched msg_id with

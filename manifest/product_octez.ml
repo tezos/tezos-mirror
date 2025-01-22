@@ -245,6 +245,7 @@ let _octez_stdlib_tests =
       "test_bits";
       "test_tzList";
       "test_bounded_heap";
+      "Test_bounded_min_heap";
       "test_tzString";
       "test_fallbackArray";
       "test_functionalArray";

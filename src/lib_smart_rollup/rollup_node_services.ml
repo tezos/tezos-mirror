@@ -219,8 +219,7 @@ module Encodings = struct
                (req "message_index" int31)
                (opt "message" Outbox_message.summary_encoding))))
 
-  let queued_message =
-    obj2 (req "id" L2_message.Id.encoding) (req "message" L2_message.encoding)
+  let queued_message = L2_message.encoding
 
   let batcher_queue = list queued_message
 
@@ -804,15 +803,29 @@ module Local = struct
       (path / "gc_info")
 
   let injection =
-    let query_drop_duplicate : bool Tezos_rpc.Query.t =
+    let z_rpc_arg =
+      Resto.Arg.make
+        ~name:"z"
+        ~destruct:(fun s -> Ok (Z.of_string s))
+        ~construct:Z.to_string
+        ()
+    in
+    let query =
       let open Tezos_rpc.Query in
-      query Fun.id
-      |+ field "drop_duplicate" Tezos_rpc.Arg.bool false Fun.id
+      query (fun order drop_duplicate ->
+          object
+            method order = order
+
+            method drop_duplicate = drop_duplicate
+          end)
+      |+ opt_field "order" z_rpc_arg (fun q -> q#order)
+      |+ field "drop_duplicate" Tezos_rpc.Arg.bool false (fun q ->
+             q#drop_duplicate)
       |> seal
     in
     Tezos_rpc.Service.post_service
       ~description:"Inject messages in the batcher's queue"
-      ~query:query_drop_duplicate
+      ~query
       ~input:
         Data_encoding.(
           def

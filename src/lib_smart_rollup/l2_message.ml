@@ -23,35 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  counter : Z.t option;
-      (** Each message is given a unique counter to allow for the batcher to
-          receive multiple identical messages. *)
-  content : string;  (** The actual content of the message. *)
-}
-
 let content_encoding =
   let open Data_encoding in
   def "sc_l2_message" ~description:"A hex encoded smart rollup message"
   @@ string' Hex
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {counter; content} -> (counter, content))
-    (fun (counter, content) -> {counter; content})
-  @@ obj2 (opt "counter" z) (req "content" content_encoding)
-
-let make =
-  let counter = ref Z.zero in
-  fun ~unique content ->
-    if unique then (
-      let m = {content; counter = Some !counter} in
-      counter := Z.succ !counter ;
-      m)
-    else {content; counter = None}
-
-let content m = m.content
 
 module Id =
   Tezos_crypto.Blake2B.Make
@@ -71,4 +46,63 @@ let () =
 
 type id = Id.t
 
-let id t = Id.hash_bytes [Data_encoding.Binary.to_bytes_exn encoding t]
+let id_encoding =
+  let open Data_encoding in
+  obj2 (opt "counter" z) (req "content" content_encoding)
+
+let id ?counter content =
+  Id.hash_bytes
+    [Data_encoding.Binary.to_bytes_exn id_encoding (counter, content)]
+
+type t = {order : Z.t option; counter : Z.t; id : Id.t; content : string}
+
+let make =
+  let counter = ref Z.zero in
+  fun ?order ~unique content ->
+    let counter_for_id = if unique then Some !counter else None in
+    let id = id ?counter:counter_for_id content in
+    let m = {order; counter = !counter; id; content} in
+    counter := Z.succ !counter ;
+    m
+
+let id t = t.id
+
+let content t = t.content
+
+let counter t = t.counter
+(*
+       We need to transform a the encoding to be retro compatible with the previous encoding
+
+       {
+         "id: <string>,
+         "message": {
+           "content": <hex_string>,
+           "counter: <n>
+          }
+       }
+
+    *)
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {order; counter; id; content} -> (order, id, (content, counter)))
+    (fun (order, id, (content, counter)) -> {order; counter; id; content})
+  @@ obj3
+       (opt "order" n)
+       (req "id" Id.encoding)
+       (req "message" (obj2 (req "content" content_encoding) (req "counter" n)))
+
+(* compare order messages in the following order: First are messages
+   with an `order`, meaning the messages priority was set by the
+   caller, then the messages are ordered by the timestamp of
+   registration. *)
+let compare msg1 msg2 =
+  let counter_cmp () = Z.compare msg1.counter msg2.counter in
+  match (msg1.order, msg2.order) with
+  | Some o1, Some o2 ->
+      let cmp = Z.compare o1 o2 in
+      if cmp = 0 then counter_cmp () else cmp
+  | None, None -> counter_cmp ()
+  | Some _p, _ -> -1
+  | _, Some _p -> 1
