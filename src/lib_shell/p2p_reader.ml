@@ -566,3 +566,39 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
   register state
 
 let shutdown s = Error_monad.cancel_with_exceptions s.canceler
+
+type (_, _) req = Message : Message.t tzresult -> (unit, tztrace) req
+[@@ocaml.unboxed]
+
+type view = View : ('a, 'b) req -> view
+
+module Request :
+  Worker_intf.REQUEST with type ('a, 'b) t = ('a, 'b) req and type view = view =
+struct
+  type ('a, 'b) t = ('a, 'b) req =
+    | Message : Message.t tzresult -> (unit, tztrace) t
+  [@@ocaml.unboxed]
+
+  type nonrec view = view
+
+  let make_encoding (p2p_cases : 'msg P2p_params.app_message_encoding list) =
+    let to_data_encoding_case
+        (P2p_params.Encoding {tag; title; encoding; wrap; unwrap; _}) =
+      Data_encoding.case ~title (Tag tag) encoding unwrap wrap
+    in
+    Data_encoding.union @@ List.map to_data_encoding_case p2p_cases
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun (View (Message msg)) -> msg)
+      (fun msg -> View (Message msg))
+      (Error_monad.result_encoding (make_encoding Message.encoding))
+
+  let pp ppf (View (Message msg)) =
+    match msg with
+    | Ok msg -> Message.pp_json ppf msg
+    | Error trace -> Error_monad.pp_print_trace ppf trace
+
+  let view msg = View msg
+end
