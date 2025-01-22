@@ -1318,7 +1318,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cryptobox_parameters;
             minimal_participation_ratio = Q.(64 // 100);
             rewards_ratio = Q.zero;
-            traps_fraction = Q.(1 // 10000);
+            traps_fraction = Q.(5 // 10000);
           }
         in
         let reveal_activation_level =

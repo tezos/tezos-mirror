@@ -171,7 +171,7 @@ let default_dal =
       (* This value determines the value of
          [issuance_weights.dal_rewards_ratio]. When computing the actual
          rewards, their values are ignored when [incentives_enable = false]. *)
-      traps_fraction = Q.(1 // 10000);
+      traps_fraction = Q.(5 // 10000);
     }
 
 let constants_mainnet : Constants.Parametric.t =
