@@ -48,6 +48,11 @@ oc.docker-systemd_tests-debian:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -76,6 +81,11 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -118,9 +128,10 @@ oc.build-debian:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
   retry:
-    max: 1
+    max: 2
     when:
     - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -163,9 +174,10 @@ oc.build-debian-current_a:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
   retry:
-    max: 1
+    max: 2
     when:
     - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -208,9 +220,10 @@ oc.build-debian-current_b:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
   retry:
-    max: 1
+    max: 2
     when:
     - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -264,6 +277,11 @@ apt_repo_debian_current:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 apt_repo_debian:
   image: debian:bookworm
@@ -287,6 +305,11 @@ apt_repo_debian:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.docker-build-ubuntu-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -307,6 +330,11 @@ oc.docker-build-ubuntu-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -349,9 +377,10 @@ oc.build-ubuntu:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
   retry:
-    max: 1
+    max: 2
     when:
     - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -394,9 +423,10 @@ oc.build-ubuntu-current_a:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
   retry:
-    max: 1
+    max: 2
     when:
     - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -439,9 +469,10 @@ oc.build-ubuntu-current_b:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
   retry:
-    max: 1
+    max: 2
     when:
     - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -472,6 +503,11 @@ apt_repo_ubuntu_current:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
@@ -495,6 +531,11 @@ apt_repo_ubuntu:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.lintian_debian:
   image: debian:bookworm
@@ -526,6 +567,11 @@ oc.install_bin_debian_bookworm_current:
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
   variables: {}
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.install_bin_debian_bookworm:
   image: debian:bookworm
@@ -540,6 +586,11 @@ oc.install_bin_debian_bookworm:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
   variables:
     PREFIX: next
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.upgrade_bin_debian_bookworm:
   image: debian:bookworm
@@ -572,6 +623,11 @@ oc.install_bin_debian_bookworm-systemd:
     PREFIX: next
     DISTRIBUTION: debian
     RELEASE: bookworm
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.lintian_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
@@ -603,6 +659,11 @@ oc.install_bin_ubuntu_noble_current:
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu noble
   variables: {}
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.install_bin_ubuntu_jammy_current:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
@@ -616,6 +677,11 @@ oc.install_bin_ubuntu_jammy_current:
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy
   variables: {}
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.upgrade_bin_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
