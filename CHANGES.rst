@@ -136,6 +136,15 @@ Smart Rollup node
 - Fixed a bug which would make injection of messages in the batcher with the RPC
   ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
 
+- Paginate RPC for durable storage subkeys
+  ``/global/block/<block_id>/durable/wasm_2_0_0/subkeys?key=<key>&offset=<offset>&length=<length>``,
+  with new query parameters ``offset`` and ``length``. (MR :gl:`!15625`)
+
+- New RPC to retrieve values under a key in the durable storage
+  ``/global/block/<block_id>/durable/wasm_2_0_0/values?key=<key>&offset=<offset>&length=<length>``.
+  (MR :gl:`!15627`)
+
+
 Smart Rollup WASM Debugger
 --------------------------
 
