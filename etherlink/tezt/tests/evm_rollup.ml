@@ -4226,11 +4226,11 @@ let test_rpc_getLogs =
   (* sender burns 42 *)
   let* _tx = wait_for_application ~produce_block (call_burn sender 42) in
   (* Check that there have been 3 logs in total *)
-  let*@ all_logs = Rpc.get_logs ~from_block:"0" evm_node in
+  let*@ all_logs = Rpc.get_logs ~from_block:(Number 0) evm_node in
   Check.((List.length all_logs = 3) int) ~error_msg:"Expected %R logs, got %L" ;
   (* Check that the [address] contract has produced 3 logs in total *)
   let*@ contract_logs =
-    Rpc.get_logs ~from_block:"0" ~address:(`Single address) evm_node
+    Rpc.get_logs ~from_block:(Number 0) ~address:(Single address) evm_node
   in
   Check.((List.length contract_logs = 3) int)
     ~error_msg:"Expected %R logs, got %L" ;
@@ -4238,15 +4238,18 @@ let test_rpc_getLogs =
      list *)
   let*@ contract_logs =
     Rpc.get_logs
-      ~from_block:"0"
-      ~address:(`List ["0x0000000000000000000000000000000000000000"; address])
+      ~from_block:(Number 0)
+      ~address:(Multi ["0x0000000000000000000000000000000000000000"; address])
       evm_node
   in
   Check.((List.length contract_logs = 3) int)
     ~error_msg:"Expected %R logs, got %L" ;
   (* Check that there have been 3 logs with the transfer event topic *)
   let*@ transfer_logs =
-    Rpc.get_logs ~from_block:"0" ~topics:[[transfer_event_topic]] evm_node
+    Rpc.get_logs
+      ~from_block:(Number 0)
+      ~topics:[[transfer_event_topic]]
+      evm_node
   in
   Check.((List.length transfer_logs = 3) int)
     ~error_msg:"Expected %R logs, got %L" ;
@@ -4254,7 +4257,7 @@ let test_rpc_getLogs =
      Note: this would also match on a transfer from zero to zero. *)
   let*@ sender_logs =
     Rpc.get_logs
-      ~from_block:"0"
+      ~from_block:(Number 0)
       ~topics:
         [
           [];
@@ -4268,7 +4271,7 @@ let test_rpc_getLogs =
   (* Look for a specific log, for the sender burn. *)
   let*@ sender_burn_logs =
     Rpc.get_logs
-      ~from_block:"0"
+      ~from_block:(Number 0)
       ~topics:
         [[transfer_event_topic]; [hex_256_of_address sender]; [zero_address]]
       evm_node
@@ -4282,8 +4285,8 @@ let test_rpc_getLogs =
   let*@! tx1_receipt = Rpc.get_transaction_receipt ~tx_hash:tx1 evm_node in
   let*@ tx1_block_logs =
     Rpc.get_logs
-      ~from_block:(Int32.to_string tx1_receipt.blockNumber)
-      ~to_block:(Int32.to_string tx1_receipt.blockNumber)
+      ~from_block:(Number (Int32.to_int tx1_receipt.blockNumber))
+      ~to_block:(Number (Int32.to_int tx1_receipt.blockNumber))
       evm_node
   in
   Check.((List.length tx1_block_logs = 1) int)
@@ -4292,7 +4295,7 @@ let test_rpc_getLogs =
   let*@ _ = produce_block () in
   let*@ no_logs_start = Rpc.block_number evm_node in
   let*@ new_logs =
-    Rpc.get_logs ~from_block:(Int32.to_string no_logs_start) evm_node
+    Rpc.get_logs ~from_block:(Number (Int32.to_int no_logs_start)) evm_node
   in
   Check.((List.length new_logs = 0) int) ~error_msg:"Expected %R logs, got %L" ;
   unit
