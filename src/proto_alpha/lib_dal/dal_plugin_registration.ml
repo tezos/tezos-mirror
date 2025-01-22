@@ -245,6 +245,17 @@ module Plugin = struct
     | Ok b -> b
     | Error _ -> false
 
+  let is_delegate ctxt ~pkh =
+    let open Lwt_result_syntax in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+    (* We just want to know whether <pkh> is a delegate. We call
+       'context/delegates/<pkh>/deactivated' just because it should be cheaper
+       than calling 'context/delegates/<pkh>/' (called [Delegate.info]). *)
+    let*! res =
+      Plugin.Alpha_services.Delegate.deactivated cpctxt (`Main, `Head 0) pkh
+    in
+    return @@ match res with Ok _deactivated -> true | Error _ -> false
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list = struct
