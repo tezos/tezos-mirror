@@ -98,6 +98,9 @@ Common options:
 -  ``color=true`` enables logs coloring. It only works on ttys, in conjunction with
    ``format=pp-short``.
 
+- ``advertise-levels=true`` enables the advertisement of the log-level of each
+  events outputted in the sink.
+
 Options available only for the ``file-descriptor-path://`` case:
 
 -  ``with-pid=<bool>`` when ``true`` adds the current process-id to the

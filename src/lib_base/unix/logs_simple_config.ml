@@ -109,22 +109,24 @@ type cfg = {
   default_level : Internal_event.level;
   rules : string option;
   colors : bool;
+  advertise_levels : bool;
 }
 
 let create_cfg ?(output = Output.Stderr)
-    ?(default_level = Internal_event.Notice) ?(colors = true) ?rules () =
-  {output; default_level; rules; colors}
+    ?(default_level = Internal_event.Notice) ?(colors = true)
+    ?(advertise_levels = false) ?rules () =
+  {output; default_level; rules; colors; advertise_levels}
 
 let default_cfg = create_cfg ()
 
 let cfg_encoding =
   let open Data_encoding in
   conv
-    (fun {output; default_level; rules; colors} ->
-      (output, default_level, colors, rules))
-    (fun (output, default_level, colors, rules) ->
-      {output; default_level; rules; colors})
-    (obj4
+    (fun {output; default_level; rules; colors; advertise_levels} ->
+      (output, default_level, colors, rules, advertise_levels))
+    (fun (output, default_level, colors, rules, advertise_levels) ->
+      {output; default_level; rules; colors; advertise_levels})
+    (obj5
        (dft
           "output"
           ~description:
@@ -152,4 +154,11 @@ let cfg_encoding =
              sections 'p2p' and all sections starting by 'client' will have \
              their messages logged up to the debug level, whereas the rest of \
              log sections will be logged up to the notice level."
-          string))
+          string)
+       (dft
+          "advertises_level"
+          ~description:
+            "When `true`, advertises the level of an event in addition to its \
+             contents."
+          bool
+          default_cfg.advertise_levels))

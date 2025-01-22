@@ -54,6 +54,7 @@ val make_config_uri :
   ?colors:bool ->
   ?fresh:bool ->
   ?section_prefixes:(string * Internal_event.level option) list ->
+  ?advertise_levels:bool ->
   [`Stdout | `Stderr | `Path of string | `Null | `Syslog of string] ->
   Uri.t
 

@@ -60,7 +60,7 @@ val close : unit -> unit Lwt.t
     - [enable_default_daily_logs_at] adds daily rotating sink at the given path
     with the following value:
     ["file-descriptor-path:///<daily_logs_path>/daily.log
-    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp"]
+    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp&advertise-levels=false"]
 
     This function handles [TEZOS_LOG] environment variables and rules
     provided through it. It also optionally accepts [?daily_logs_section_prefixes].
@@ -91,5 +91,5 @@ val init : ?config:Internal_event_config.t -> unit -> unit Lwt.t
 
 (** Adds a daily rotating sink at the given path with the following value:
     ["file-descriptor-path:///<daily_logs_path>/daily.log
-    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp"] *)
+    ?create-dirs=true&daily-logs=7&section-prefix=info&format=pp&advertise-levels=false"] *)
 val enable_default_daily_logs_at : daily_logs_path:string -> unit tzresult Lwt.t

@@ -39,6 +39,8 @@ val add_ansi_marking : Format.formatter -> unit -> unit
 
 val pp_centered : int -> Format.formatter -> string -> unit
 
+val pp_right_aligned : int -> Format.formatter -> string -> unit
+
 module Handled_tags : Set.S with type elt = string
 
 (** [handles tag] returns [true] if [tag] is handled by this module.

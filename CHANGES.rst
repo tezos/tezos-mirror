@@ -27,6 +27,10 @@ General
 
 - Logging output on TTYs now adapt to the terminal width. (MR :gl:`!12348`)
 
+- Logging output can now advertise the level associated to each events, by
+  enabling the ``advertise-levels`` option in the file-descriptor sink URI. (MR
+  :gl:`!16190`)
+
 Node
 ----
 
