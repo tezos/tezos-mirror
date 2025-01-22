@@ -507,6 +507,11 @@ let handle_msg (state : t) msg =
        Lwt.return_unit)
       [@profiler.span_s {verbosity = Notice} ["Predecessor_header"]]
 
+let on_error state =
+  Chain_id.Table.iter (fun _ -> deactivate state.gid) state.peer_active_chains ;
+  state.unregister () ;
+  Lwt_result.return `Shutdown
+
 let rec worker_loop state =
   let open Lwt_syntax in
   let* o =
@@ -516,12 +521,7 @@ let rec worker_loop state =
   | Ok msg ->
       let* () = handle_msg state msg in
       worker_loop state
-  | Error _ ->
-      Chain_id.Table.iter
-        (fun _ -> deactivate state.gid)
-        state.peer_active_chains ;
-      state.unregister () ;
-      Lwt.return_unit
+  | Error _ -> on_error state
 
 type (_, _) req = Message : Message.t tzresult -> (unit, tztrace) req
 [@@ocaml.unboxed]
@@ -656,7 +656,10 @@ module Handlers = struct
 
   let on_close _ = failwith "on_close: unimplemented"
 
-  let on_error _ _ _ _ = failwith "on_error: unimplemented"
+  let on_error :
+      type res err.
+      self -> _ -> (res, err) req -> err -> [> `Shutdown] tzresult Lwt.t =
+   fun self _ (Message _) _ -> on_error (Worker.state self)
 
   let on_completion _ _ _ _ = failwith "on_completion: unimplemented"
 end
