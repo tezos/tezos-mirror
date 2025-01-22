@@ -328,6 +328,12 @@ let unplugged () = Stdlib.Hashtbl.create 10
 let main = unplugged ()
 
 module type GLOBAL_PROFILER = sig
+  type nonrec metadata = metadata
+
+  type nonrec id = id
+
+  type nonrec ids = ids
+
   type nonrec verbosity = verbosity = Notice | Info | Debug
 
   val plug : instance -> unit
@@ -369,6 +375,12 @@ end
 
 let wrap profiler =
   let module Wrapped = struct
+    type nonrec metadata = metadata
+
+    type nonrec id = id
+
+    type nonrec ids = ids
+
     type nonrec verbosity = verbosity = Notice | Info | Debug
 
     let plug i = plug profiler i
