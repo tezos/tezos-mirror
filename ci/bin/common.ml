@@ -1014,6 +1014,24 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
+(* Job that scans a Docker image *)
+let job_container_scanning ~docker_image ~dockerfile_path : tezos_job =
+  job
+    ~__POS__
+    ~name:"container_scanning"
+    ~stage:Stages.scan
+    ~template:Jobs_container_scanning
+    ~variables:
+      [
+        ("CS_IMAGE", docker_image);
+        ("SECURE_LOG_LEVEL", "debug");
+        ("CS_DOCKERFILE_PATH", dockerfile_path);
+      ]
+    ~description:(Format.sprintf "Scanning image %s" docker_image)
+    ~artifacts:(artifacts ["scan.log"])
+    ~git_strategy:Fetch
+    ["gtcs scan > scan.log"; "grep \"Vulnerability DB:\" -B2 -A4 scan.log"]
+
 let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
   job
     ~__POS__

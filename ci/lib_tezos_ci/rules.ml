@@ -58,6 +58,9 @@ let schedule_extended_validation_tests =
 let schedule_test_release =
   scheduled && var "TZ_SCHEDULE_KIND" == str "TEST_RELEASE"
 
+let schedule_container_scanning_master =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_MASTER"
+
 let on_master = Predefined_vars.ci_commit_branch == str "master"
 
 let on_branch branch = Predefined_vars.ci_commit_branch == str branch

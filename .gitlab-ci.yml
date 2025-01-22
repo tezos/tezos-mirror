@@ -9,10 +9,6 @@ workflow:
     variables:
       PIPELINE_TYPE: ci_docker_release
     when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
-    variables:
-      PIPELINE_TYPE: schedule_container_scanning_master
-    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
     variables:
       PIPELINE_TYPE: schedule_container_scanning_octez_releases
@@ -95,6 +91,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_master_test_release
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
+    variables:
+      PIPELINE_TYPE: schedule_container_scanning_master
+    when: always
 
 default:
   interruptible: true
@@ -129,10 +129,6 @@ include:
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "ci-docker-latest-release"
-    when: always
-- local: .gitlab/ci/pipelines/schedule_container_scanning_master.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
     when: always
 - local: .gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml
   rules:
@@ -213,4 +209,8 @@ include:
 - local: .gitlab/ci/pipelines/schedule_master_test_release.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_container_scanning_master.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
     when: always
