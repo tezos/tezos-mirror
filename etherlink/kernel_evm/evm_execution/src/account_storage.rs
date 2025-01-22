@@ -15,7 +15,7 @@ use tezos_smart_rollup_storage::storage::Storage;
 use tezos_storage::{
     error::Error as GenStorageError, read_u256_le_default, read_u64_le_default,
 };
-use tezos_storage::{path_from_h256, read_h256_be_default, WORD_SIZE};
+use tezos_storage::{path_from_h256, read_h256_be_default, read_h256_be_opt, WORD_SIZE};
 use thiserror::Error;
 
 use crate::{code_storage, DurableStorageError};
@@ -185,6 +185,20 @@ pub const CODE_HASH_DEFAULT: H256 = H256(CODE_HASH_BYTES);
 pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
     OwnedPath::try_from(path_string).map_err(DurableStorageError::from)
+}
+
+pub enum StorageValue {
+    Hit(H256),
+    Default,
+}
+
+impl StorageValue {
+    pub fn h256(self) -> H256 {
+        match self {
+            StorageValue::Hit(v) => v,
+            StorageValue::Default => STORAGE_DEFAULT_VALUE,
+        }
+    }
 }
 
 impl EthereumAccount {
@@ -357,6 +371,20 @@ impl EthereumAccount {
         let path = self.storage_path(index)?;
         read_h256_be_default(host, &path, STORAGE_DEFAULT_VALUE)
             .map_err(AccountStorageError::from)
+    }
+
+    pub fn read_storage(
+        &self,
+        host: &impl Runtime,
+        index: &H256,
+    ) -> Result<StorageValue, AccountStorageError> {
+        let path = self.storage_path(index)?;
+        let res = read_h256_be_opt(host, &path).map_err(AccountStorageError::from)?;
+
+        match res {
+            Some(v) => Ok(StorageValue::Hit(v)),
+            None => Ok(StorageValue::Default),
+        }
     }
 
     /// Set the value associated with an index in durable storage. The result depends on the

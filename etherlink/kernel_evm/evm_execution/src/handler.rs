@@ -12,7 +12,7 @@
 use crate::access_record::AccessRecord;
 use crate::account_storage::{
     account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
-    CODE_HASH_DEFAULT,
+    StorageValue, CODE_HASH_DEFAULT,
 };
 use crate::precompiles::reentrancy_guard::ReentrancyGuard;
 use crate::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, WITHDRAWAL_ADDRESS};
@@ -2173,15 +2173,15 @@ fn cached_storage_access<Host: Runtime>(
             .get_account(address)
             .ok()
             .flatten()
-            .and_then(|a| a.get_storage(handler.host, &index).ok());
+            .and_then(|a| a.read_storage(handler.host, &index).ok());
 
         // This condition will help avoiding unecessary write access
         // in the durable storage at the end of the transaction.
-        if let Some(value) = value {
+        if let Some(StorageValue::Hit(value)) = value {
             update_cache(handler, address, index, value, layer);
         }
 
-        value.unwrap_or_default()
+        value.map(|x| x.h256()).unwrap_or_default()
     }
 }
 
