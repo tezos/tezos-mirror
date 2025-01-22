@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+set -x
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
@@ -20,7 +21,7 @@ if [ "${CI_COMMIT_REF_NAME}" == "master" ]; then
     sudo apk add aws-cli
     # Update S3
     # https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html
-    aws s3 sync ./public s3://site-prod.octez.tezos.com/docs --delete
+    aws s3 sync ./public s3://site-prod.octez.tezos.com/docs --delete --only-show-errors
     aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths "/*"
   fi
 else
