@@ -49,12 +49,12 @@ html: octez-gen docexes-gen
 	${MAKE} sphinx
 
 # Make all the doc in a single text file
-octezdoc.txt: octez-gen docexes-gen
+$(BUILDDIR)/octezdoc.txt: $(BUILDDIR)/index.html
 	rm -fr $(BUILDDIRTXT)
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	touch CHANGES-dev.rst
 	@$(SPHINXBUILD) --builder text "$(SOURCEDIR)" $(BUILDDIRTXT) $(SPHINXOPTS)
-	find $(BUILDDIRTXT)	 -name "*.txt" | xargs cat >$@
+	$(SCRIPTSDIR)/octezdoc.sh >$@
 
 # Build the manuals for a given protocol
 %/octez-client.html:
@@ -309,7 +309,7 @@ fmt: black
 
 .PHONY: clean
 clean:
-	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
+	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
 	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html quebec/octez-*.html
