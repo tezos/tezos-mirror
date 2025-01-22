@@ -53,4 +53,6 @@ val id : t -> Id.t
 
 val counter : t -> Z.t
 
+val order : t -> Z.t option
+
 val compare : t -> t -> int

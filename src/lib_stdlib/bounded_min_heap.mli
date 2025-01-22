@@ -66,8 +66,21 @@ module Make
       id] is true. *)
   val find_opt : Id.t -> t -> E.t option
 
+  (** [remove h id] removes the element with [id] from the heap, or leaves [h] unchanged if [id] is not present in [h]. *)
+  val remove : t -> Id.t -> unit
+
+  (** [remove_predicate f h] removes the elements [elt] for which [f elt = true] from
+      the heap and returns the list of ids removed. *)
+  val remove_predicate : (E.t -> bool) -> t -> Id.t list
+
+  (** [clear h] deletes all data from the heap. *)
+  val clear : t -> unit
+
   module Internal_for_tests : sig
     val check_heap_invariant :
-      pp_elt:(Format.formatter -> E.t -> unit) -> t -> unit
+      pp_id:(Format.formatter -> Id.t -> unit) ->
+      pp_elt:(Format.formatter -> E.t -> unit) ->
+      t ->
+      unit
   end
 end

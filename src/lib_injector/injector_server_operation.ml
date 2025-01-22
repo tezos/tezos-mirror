@@ -62,3 +62,7 @@ let pp ppf = function
       Format.fprintf ppf "Transaction of %Ld tez" amount
 
 let unique = function Transaction _ -> true
+
+let compare _ _ = 0
+(* Compare function used to prioritize a type of operation over the
+   other. Here it's not necessary. *)

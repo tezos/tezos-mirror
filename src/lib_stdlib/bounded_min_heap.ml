@@ -148,17 +148,28 @@ struct
           Ok ())
         else Error "no space left in heap"
 
+  let remove_index t index =
+    t.data.(index) <- None ;
+    t.size <- t.size - 1 ;
+    if t.size > 0 && index <> t.size then (
+      swap index t.size t ;
+      bubble_down index t)
+
+  let remove t id =
+    (* uses `find_opt` and not `find` because it may failed if called
+       with unknown id *)
+    match Hash_map.find_opt t.hash_map id with
+    | None -> ()
+    | Some index ->
+        remove_index t index ;
+        Hash_map.remove t.hash_map id
+
   let pop t =
     if t.size = 0 then None
     else
       let min_elem = get_data t.data 0 in
-      t.data.(0) <- None ;
-      t.size <- t.size - 1 ;
-      if t.size > 0 then (
-        swap 0 t.size t ;
-        bubble_down 0 t) ;
       let id = E.id min_elem in
-      Hash_map.remove t.hash_map id ;
+      remove t id ;
       assert (Hash_map.length t.hash_map = t.size) ;
       Some min_elem
 
@@ -179,8 +190,27 @@ struct
     let elt_i = Hash_map.find_opt t.hash_map id in
     Option.map (get_data t.data) elt_i
 
+  let clear t =
+    Hash_map.clear t.hash_map ;
+    Array.fill t.data 0 t.size None ;
+    t.size <- 0
+
+  let remove_predicate f (t : t) =
+    let rec aux heap_index acc =
+      if heap_index >= t.size then acc
+      else
+        let value = get_data t.data heap_index in
+        if f value then (
+          let id = E.id value in
+          remove t id ;
+          assert (Hash_map.length t.hash_map = t.size) ;
+          aux heap_index (id :: acc))
+        else aux (heap_index + 1) acc
+    in
+    aux 0 []
+
   module Internal_for_tests = struct
-    let check_heap_invariant ~pp_elt h =
+    let check_heap_invariant ~pp_id ~pp_elt h =
       let get_data_opt i =
         if i < Array.length h.data then h.data.(i) else None
       in
@@ -239,6 +269,21 @@ struct
                  (get_data_opt right_child_index)
                  correct_map_size)
       in
-      check_invariant_for_all_index h.size
+      Format.printf
+        "@.@.HEAP:@.heap: %a@.size: %d@.hash_map: %a@.@."
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+            (pp_print_option pp_elt))
+        (h.data |> Array.to_list)
+        h.size
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+            (fun fmt (id, index) ->
+              Format.fprintf fmt "(%a, %d)" pp_id id index))
+        (Hash_map.to_seq h.hash_map |> List.of_seq) ;
+      check_invariant_for_all_index h.size ;
+      assert (Hash_map.length h.hash_map = h.size)
   end
 end

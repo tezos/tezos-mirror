@@ -49,12 +49,13 @@ let message_size s =
   (* Encoded as length of s on 4 bytes + s *)
   4 + String.length s
 
-let inject_batch state (l2_messages : L2_message.t list) =
+let inject_batch ?order state (l2_messages : L2_message.t list) =
   let open Lwt_result_syntax in
   let messages = List.map L2_message.content l2_messages in
   let operation = L1_operation.Add_messages {messages} in
   let* l1_id =
     Injector.check_and_add_pending_operation
+      ?order
       state.node_ctxt.config.mode
       operation
   in
@@ -72,7 +73,11 @@ let inject_batch state (l2_messages : L2_message.t list) =
       Batched_messages.replace state.batched id {content; l1_id})
     l2_messages
 
-let inject_batches state = List.iter_es (inject_batch state)
+let inject_batches state =
+  List.iter_es (fun (min_order, batch) ->
+      (* We inject that batch taking the smallest order of that batch,
+         i.e. the one of the first element. *)
+      inject_batch ?order:min_order state batch)
 
 let max_batch_size {node_ctxt; plugin; _} =
   let module Plugin = (val plugin) in
@@ -84,17 +89,23 @@ let get_batches state ~only_full =
   let max_batch_size = max_batch_size state in
   let max_batch_elements = state.node_ctxt.config.batcher.max_batch_elements in
   let heap = state.messages_heap in
-  let add_batch rev_batch rev_batches =
+  let add_batch ~min_order rev_batch rev_batches =
     if List.is_empty rev_batch then rev_batches
     else
       let batch = List.rev rev_batch in
-      batch :: rev_batches
+      (min_order, batch) :: rev_batches
   in
-  let rec pop_until_enough (rev_batch, batch_size, batch_elements) rev_batches =
+  let rec pop_until_enough ~is_first
+      (min_order, rev_batch, batch_size, batch_elements) rev_batches =
     let message = Message_heap.peek_min heap in
     match message with
-    | None -> add_batch rev_batch rev_batches
+    | None -> add_batch ~min_order rev_batch rev_batches
     | Some message ->
+        let min_order =
+          (* first element of the batch has the lower order. We only
+             care about this one.*)
+          if is_first then L2_message.order message else min_order
+        in
         let size = message_size (L2_message.content message) in
         let new_batch_size = batch_size + size in
         let new_batch_elements = batch_elements + 1 in
@@ -107,19 +118,20 @@ let get_batches state ~only_full =
           (* We can add the message to the current batch because we are still
              within the bounds. *)
           pop_until_enough
-            (message :: rev_batch, new_batch_size, new_batch_elements)
+            ~is_first:false
+            (min_order, message :: rev_batch, new_batch_size, new_batch_elements)
             rev_batches
         else
           (* we haven't pop the message, so we can safely call
              continue_or_stop. *)
-          continue_or_stop (add_batch rev_batch rev_batches)
+          continue_or_stop (add_batch ~min_order rev_batch rev_batches)
   and continue_or_stop rev_batches =
     if
       only_full
       && Message_heap.length heap
          < state.node_ctxt.config.batcher.min_batch_elements
     then rev_batches
-    else pop_until_enough ([], 0, 0) rev_batches
+    else pop_until_enough ~is_first:true (None, [], 0, 0) rev_batches
   in
   continue_or_stop [] |> List.rev
 
@@ -129,7 +141,7 @@ let produce_batches state ~only_full =
   let batches = get_batches state ~only_full in
   let get_timestamp = Time.System.now () in
   let nb_messages_batched =
-    List.fold_left (fun len l -> len + List.length l) 0 batches
+    List.fold_left (fun len (_min_order, l) -> len + List.length l) 0 batches
   in
   Metrics.wrap (fun () ->
       Metrics.Batcher.set_messages_queue_size

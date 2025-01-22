@@ -24,3 +24,5 @@ val pp : Format.formatter -> t -> unit
 
 (** [false] if the injector will accept duplicate such operations. *)
 val unique : t -> bool
+
+val compare : t -> t -> int
