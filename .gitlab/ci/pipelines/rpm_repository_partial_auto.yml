@@ -47,6 +47,11 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -159,6 +164,11 @@ rpm_repo_rockylinux:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.install_bin_rockylinux_9.3:
   image: rockylinux:9.3
@@ -172,6 +182,11 @@ oc.install_bin_rockylinux_9.3:
   script:
   - ./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3
   variables: {}
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.install_bin_rockylinux_9.3.doc:
   image: rockylinux:9.3
@@ -185,3 +200,8 @@ oc.install_bin_rockylinux_9.3.doc:
   script:
   - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
   variables: {}
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure

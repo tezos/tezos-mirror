@@ -75,6 +75,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
          ~source_version:true
          ["./scripts/ci/install-gsutil.sh"; "apt install -y apt-utils debsigs"])
     ~variables
+    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
     script
 
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
@@ -102,6 +103,8 @@ let jobs pipeline_type =
       ~variables:
         (variables ~kind:"systemd-tests" [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~tag:Dynamic
       [
         "./scripts/ci/build-packages-dependencies.sh \
@@ -124,6 +127,8 @@ let jobs pipeline_type =
       ~stage:Stages.images
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~tag:Dynamic
       [
         "./scripts/ci/build-packages-dependencies.sh \
@@ -156,7 +161,8 @@ let jobs pipeline_type =
       ~dependencies
       ?timeout
       ~tag:Dynamic
-      ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
         (* This is an hack to enable Cargo networking for jobs in child pipelines.
@@ -341,6 +347,8 @@ let jobs pipeline_type =
       ~image
       ~dependencies
       ~variables
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in
