@@ -79,6 +79,17 @@ Protocol parameters
 
 - Rename ``consensus_threshold`` to ``consensus_threshold_size``. (MR :gl:`!15979`)
 
+- Replace the ``max_slashing_period = 2`` protocol constant with two
+  constants ``denunciation_period = 1`` and ``slashing_delay =
+  1``. The behavior of denunciations and slashing is unaffected by
+  this change. Indeed, ``denunciation_period`` represents how many
+  cycles after the misbehavior cycles still accept denunciations,
+  whereas ``max_slashing_period`` was the total number of cycles
+  accepting denunciation including the misbehavior cycle, so the
+  denunciation window remains the same. The slashing for a misbehavior
+  from cycle ``n`` still happens at the end of cycle ``n +
+  max_slashing_period - 1 = n + slashing_delay``. (MR :gl:`!15990`)
+
 Bug Fixes
 ---------
 
