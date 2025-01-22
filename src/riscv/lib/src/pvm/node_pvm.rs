@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
@@ -9,13 +9,12 @@ use crate::{
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{
         self,
-        hash::RootHashable,
         owned_backend::Owned,
         proof_backend::{
             proof::MerkleProof, ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion,
         },
         verify_backend::Verifier,
-        AllocatedOf, ProofLayout, ProofTree, Ref,
+        AllocatedOf, CommitmentLayout, ProofLayout, ProofTree, Ref,
     },
     storage::{self, Hash, Repo},
 };
@@ -161,6 +160,13 @@ where {
             state: Box::new(state),
         }
     }
+
+    pub fn hash(&self) -> Hash {
+        self.with_backend(|state| {
+            let refs = state.struct_ref::<state_backend::FnManagerIdent>();
+            <StateLayout as CommitmentLayout>::state_hash(refs).unwrap()
+        })
+    }
 }
 
 impl NodePvm<Verifier> {
@@ -257,18 +263,6 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
             let steps = state.pvm.eval_max(pvm_hooks, Bound::Included(max_steps));
             state.tick.write(state.tick.read() + steps as u64);
             steps as i64
-        })
-    }
-
-    pub fn hash(&self) -> Hash
-    where
-        M: state_backend::ManagerSerialise + state_backend::ManagerRead,
-    {
-        self.with_backend(|state| {
-            state
-                .struct_ref::<state_backend::FnManagerIdent>()
-                .hash()
-                .unwrap()
         })
     }
 

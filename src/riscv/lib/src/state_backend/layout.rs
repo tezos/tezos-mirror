@@ -165,6 +165,13 @@ macro_rules! struct_layout {
                 }
             }
 
+            impl $crate::state_backend::CommitmentLayout for $layout_t {
+                fn state_hash(state: $crate::state_backend::AllocatedOf<Self, $crate::state_backend::Ref<'_, $crate::state_backend::owned_backend::Owned>>) ->
+                    Result<$crate::storage::Hash, $crate::storage::HashError> {
+                        $crate::storage::Hash::blake2b_hash(state)
+                    }
+            }
+
             impl $crate::state_backend::ProofLayout for $layout_t {
                 fn from_proof(proof: $crate::state_backend::ProofTree) -> Result<Self::Allocated<$crate::state_backend::verify_backend::Verifier>, $crate::state_backend::FromProofError> {
                     if let $crate::state_backend::ProofTree::Present(proof) = proof {

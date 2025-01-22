@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -7,12 +7,12 @@ use crate::{
     machine_state::registers::XValue,
     state_backend::{
         self as backend,
-        hash::{Hash, HashError, RootHashable},
+        hash::{Hash, HashError},
         proof_backend::{
             merkle::{MerkleTree, Merkleisable},
             ProofGen,
         },
-        DynArray, ManagerDeserialise, ManagerRead, ManagerSerialise, Ref,
+        DynArray, ManagerDeserialise, ManagerSerialise, Ref,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -67,7 +67,7 @@ gen_memory_layout!(M4G = 4 GiB);
 // XXX: We can't associate these region types directly with [Sizes] because
 // inherent associated types are unstable. Hence we must go through a dummy
 // trait.
-pub trait MainMemoryLayout: backend::ProofLayout + 'static {
+pub trait MainMemoryLayout: backend::ProofLayout + backend::CommitmentLayout + 'static {
     type Data<M: backend::ManagerBase>;
 
     const BYTES: usize;
@@ -124,8 +124,6 @@ pub trait MainMemoryLayout: backend::ProofLayout + 'static {
 
     /// Clone the dynamic region.
     fn clone_data<M: backend::ManagerClone>(data: &Self::Data<M>) -> Self::Data<M>;
-
-    fn hash_data<M: ManagerRead>(data: &Self::Data<M>) -> Result<Hash, HashError>;
 
     fn to_merkle_tree<M: backend::ManagerRead>(
         data: &Self::Data<Ref<'_, ProofGen<M>>>,
@@ -197,10 +195,6 @@ impl<const BYTES: usize> MainMemoryLayout for Sizes<BYTES> {
         data.clone()
     }
 
-    fn hash_data<M: backend::ManagerRead>(data: &Self::Data<M>) -> Result<Hash, HashError> {
-        data.hash()
-    }
-
     fn to_merkle_tree<M: backend::ManagerRead>(
         data: &Self::Data<Ref<'_, ProofGen<M>>>,
     ) -> Result<MerkleTree, HashError> {
@@ -215,6 +209,14 @@ impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
         let data = backend.allocate_dyn_region();
         let data = backend::DynCells::bind(data);
         MainMemory { data }
+    }
+}
+
+impl<const BYTES: usize> backend::CommitmentLayout for Sizes<BYTES> {
+    fn state_hash(
+        state: backend::AllocatedOf<Self, Ref<'_, backend::owned_backend::Owned>>,
+    ) -> Result<Hash, HashError> {
+        DynArray::state_hash(state.data)
     }
 }
 
@@ -345,12 +347,6 @@ where
     {
         let data = L::deserialise_data(deserializer)?;
         Ok(Self { data })
-    }
-}
-
-impl<L: MainMemoryLayout, M: ManagerRead> RootHashable for MainMemory<L, M> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        L::hash_data(&self.data)
     }
 }
 

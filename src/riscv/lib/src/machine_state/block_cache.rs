@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -82,7 +83,6 @@ use super::instruction::Instruction;
 use super::main_memory::MainMemoryLayout;
 use super::MachineCoreState;
 use super::{main_memory::Address, ProgramCounterUpdate};
-use crate::cache_utils::Sizes;
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::parser::instruction::InstrWidth;
 use crate::state_backend::{
@@ -91,6 +91,10 @@ use crate::state_backend::{
 };
 use crate::traps::{EnvironException, Exception};
 use crate::{cache_utils::FenceCounter, state_backend::FnManager};
+use crate::{
+    cache_utils::Sizes,
+    storage::{Hash, HashError},
+};
 use crate::{default::ConstDefault, state_backend::verify_backend};
 use crate::{machine_state::instruction::Args, storage::binary};
 use std::marker::PhantomData;
@@ -113,6 +117,14 @@ impl<ML: MainMemoryLayout> crate::state_backend::Layout for ICallLayout<ML> {
     fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let value = backend.allocate_enriched_cell(Instruction::DEFAULT);
         EnrichedCell::bind(value)
+    }
+}
+
+impl<ML: MainMemoryLayout> crate::state_backend::CommitmentLayout for ICallLayout<ML> {
+    fn state_hash(
+        state: AllocatedOf<Self, Ref<'_, state_backend::owned_backend::Owned>>,
+    ) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(state)
     }
 }
 
@@ -190,6 +202,14 @@ impl state_backend::Layout for AddressCellLayout {
 
     fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         Cell::bind(backend.allocate_region([!0]))
+    }
+}
+
+impl state_backend::CommitmentLayout for AddressCellLayout {
+    fn state_hash(
+        state: AllocatedOf<Self, Ref<'_, state_backend::owned_backend::Owned>>,
+    ) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(state)
     }
 }
 
@@ -359,7 +379,7 @@ impl<M: ManagerBase> PartialBlock<M> {
 
 /// Trait for capturing the different possible layouts of the instruction cache (i.e.
 /// controlling the number of cache entries present).
-pub trait BlockCacheLayout: state_backend::ProofLayout {
+pub trait BlockCacheLayout: state_backend::CommitmentLayout + state_backend::ProofLayout {
     type MainMemoryLayout: MainMemoryLayout;
     type Entries<M: ManagerBase>;
     type Sizes;
