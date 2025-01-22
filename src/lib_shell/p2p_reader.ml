@@ -678,3 +678,22 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions state.canceler)
 
 let shutdown s = Error_monad.cancel_with_exceptions s.canceler
+
+let run_worker ~register ~unregister p2p disk protocol_db active_chains gid conn
+    =
+  let open Lwt_syntax in
+  let table =
+    Worker.create_table
+      (Callback
+         (fun () ->
+           let* parsed_message_result = P2p.recv p2p conn in
+           return
+             (Worker.Any_request (Message parsed_message_result, {scope = None}))))
+  in
+  Worker.launch
+    table
+    gid
+    {p2p; conn; disk; protocol_db; active_chains; register; unregister}
+    (module Handlers)
+
+let shutdown_worker w = Worker.shutdown w

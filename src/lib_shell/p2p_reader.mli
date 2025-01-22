@@ -191,3 +191,25 @@ val run :
   unit
 
 val shutdown : t -> unit Lwt.t
+
+type worker
+
+(** [run ~register ~unregister p2p state protocol_db active_chains peer_id conn]
+    runs an answering worker on a p2p connection [connection]. [peer_id] is
+    the peer id of the remote peer. [register] is called once the worker is
+    created, and [unregister] when the worker stops.
+
+    [active_chains] is the table of active chains (i.e. test chain,
+    main chain...) *)
+val run_worker :
+  register:(t -> unit) ->
+  unregister:(unit -> unit) ->
+  p2p ->
+  Store.t ->
+  Distributed_db_requester.Raw_protocol.t ->
+  chain_db Chain_id.Table.t ->
+  P2p_peer.Id.t ->
+  connection ->
+  worker
+
+val shutdown_worker : worker -> unit Lwt.t
