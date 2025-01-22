@@ -77,12 +77,6 @@ transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant
 like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
 manager and consensus keys are listed.
 
-If the :ref:`adaptive issuance <adaptive_issuance_quebec>`
-feature is activated, it grants delegators the ability to become
-'stakers' by placing security deposits. These deposits would contribute to their
-delegate's stake and could be subject to slashing penalties if their delegate
-misbehaves.  The staking power of funds placed by stakers and delegates is three
-times that of delegated funds.
 
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
