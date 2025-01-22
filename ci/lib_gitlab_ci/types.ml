@@ -199,6 +199,46 @@ type parallel = Vector of int | Matrix of matrix
     See https://docs.gitlab.com/ee/ci/yaml/index.html#inherit *)
 type inherit_ = Variable_list of string list | Variable_bool of bool
 
+(** Represents audience(s) used in id_tokens.
+
+    The aud sub-keyword is used to configure the aud claim for the JWT
+    in id_tokens.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#id_tokens}id_tokens} in
+    the GitLab YAML keyword reference for more information. *)
+type aud = Aud_string of string | Aud_list of string list
+
+(** Represents an id_tokens.
+
+    Use id_tokens to create JSON web tokens (JWT) to authenticate with third
+    party services. All JWTs created this way support OIDC authentication.
+    For example, a value of
+
+    [[
+      ("ID_TOKEN_1", Gitlab_ci.Types.Aud_string "https://vault.example.com");
+      ("ID_TOKEN_2", Gitlab_ci.Types.Aud_list [
+          "https://gcp.com";
+          "https://aws.com";
+        ])
+    ]]
+
+    can be used to generate the following GitLab YAML:
+
+    {{
+    id_tokens:
+      ID_TOKEN_1:
+        aud: https://vault.example.com
+      ID_TOKEN_2:
+        aud:
+          - https://gcp.com
+          - https://aws.com
+    }}
+
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#id_tokens}id_tokens} in
+    the GitLab YAML keyword reference for more information. *)
+type id_tokens = (string * aud) list
+
 type job = {
   name : string;
       (** Note that [name] does not translate to a field in a job, but
@@ -208,6 +248,7 @@ type job = {
   artifacts : artifacts option;
   before_script : string list option;
   cache : cache list option;
+  id_tokens : id_tokens option;
   image : image option;
   interruptible : bool option;
   needs : need list option;

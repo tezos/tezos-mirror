@@ -146,6 +146,17 @@ let enc_workflow : workflow -> value = function
 
 let enc_stages stages : value = strings stages
 
+let enc_id_tokens (id_tokens : id_tokens) : value =
+  `O
+    (List.map
+       (fun (id_token_name, aud) ->
+         ( id_token_name,
+           match aud with
+           | Aud_string aud_str -> `O [("aud", `String aud_str)]
+           | Aud_list aud_list ->
+               obj_flatten [key "aud" (array string) aud_list] ))
+       id_tokens)
+
 let enc_image (Image image) = string image
 
 let enc_retry : retry -> value =
@@ -271,6 +282,7 @@ let enc_job : job -> value =
        artifacts;
        before_script;
        cache;
+       id_tokens;
        image;
        interruptible;
        needs;
@@ -305,6 +317,7 @@ let enc_job : job -> value =
       opt "services" enc_services services;
       opt "variables" enc_variables variables;
       opt "artifacts" enc_artifacts artifacts;
+      opt "id_tokens" enc_id_tokens id_tokens;
       opt "when" enc_when_job when_;
       opt "coverage" string coverage;
       opt "retry" enc_retry retry;
