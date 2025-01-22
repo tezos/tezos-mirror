@@ -300,16 +300,18 @@ slashed amount; the rest of the slashed amount is burned.
 If a delegate's deposit is smaller than the slashed amount, the deposit is
 simply emptied.
 
-The evidence for double signing at a given level can be collected by any
-:ref:`accuser<def_accuser_alpha>` and included as an *accusation* operation in a block
-for a period of ``MAX_SLASHING_PERIOD``.
+The evidence for double signing at a given level can be collected by
+any :ref:`accuser<def_accuser_alpha>` and included as a *denunciation*
+operation in a block in the same cycle as the double signing or in the
+``DENUNCIATION_PERIOD`` next cycles.
 
 As soon as a delegate is denounced for any double signing, it is
 immediately :ref:`forbidden<new_forbidden_period_alpha>` from both baking
 and attesting for at least 2 cycles.
 
 The actual slashing and denunciation rewarding happen at the end of
-the last cycle of the slashing period of the misbehavior.
+cycle ``n + SLASHING_DELAY`` for a misbehavior that happened in cycle
+``n``.
 
 Note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
@@ -375,6 +377,8 @@ Consensus related protocol parameters
      - 7000
    * - ``CONSENSUS_THRESHOLD``
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
+   * - ``DENUNCIATION_PERIOD``
+     - 1 cycle
    * - ``MINIMAL_BLOCK_DELAY``
      - 8s
    * - ``BLOCKS_PER_CYCLE``
@@ -393,10 +397,10 @@ Consensus related protocol parameters
      - 600 ꜩ
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
-   * - ``MAX_SLASHING_PERIOD``
-     - 2 cycles
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
      - 5%
+   * - ``SLASHING_DELAY``
+     - 1 cycle
 
 The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
