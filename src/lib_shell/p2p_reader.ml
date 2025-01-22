@@ -652,16 +652,16 @@ module Handlers = struct
         return_unit
     | Error trace -> fail trace
 
-  let on_no_request _ = failwith "on_no_request: unimplemented"
+  let on_no_request _ = Lwt.return_unit
 
-  let on_close _ = failwith "on_close: unimplemented"
+  let on_close _ = Lwt.return_unit
 
   let on_error :
       type res err.
       self -> _ -> (res, err) req -> err -> [> `Shutdown] tzresult Lwt.t =
    fun self _ (Message _) _ -> on_error (Worker.state self)
 
-  let on_completion _ _ _ _ = failwith "on_completion: unimplemented"
+  let on_completion _ _ _ _ = Lwt.return_unit
 end
 
 let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
