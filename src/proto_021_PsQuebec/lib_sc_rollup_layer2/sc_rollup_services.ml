@@ -404,6 +404,15 @@ module Block = struct
       ~output:Data_encoding.(list Sc_rollup.output_encoding)
       (path / "outbox" /: level_param / "messages")
 
+  let committed_status =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Commitment status of the rollup state which will include content of \
+         this block"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Rollup_node_services.Encodings.committed_status
+      (path / "committed_status")
+
   module Helpers = struct
     type nonrec prefix = prefix
 

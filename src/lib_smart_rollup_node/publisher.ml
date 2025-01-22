@@ -444,6 +444,123 @@ let cementable_commitments (node_ctxt : _ Node_context.t) =
   in
   gather [] latest_cementable_commitment
 
+module Helpers = struct
+  let estimated_time_of_level (head : Sc_rollup_block.t)
+      (constants : Rollup_constants.protocol_constants) l =
+    let blocks_till = Int32.sub l head.header.level in
+    let secs_till =
+      Int32.to_int blocks_till * Int64.to_int constants.minimal_block_delay
+    in
+    let now_s = Time.System.now () |> Ptime.to_float_s |> int_of_float in
+    Ptime.of_float_s (now_s + secs_till |> float_of_int)
+    |> WithExceptions.Option.get ~loc:__LOC__
+
+  let finalized_level l =
+    (* In tenderbake, level l is finalized at l + 2. *)
+    Int32.add l 2l
+
+  let next_commitment (node_ctxt : _ Node_context.t) (block : Sc_rollup_block.t)
+      =
+    let open Lwt_result_syntax in
+    let constants = (Reference.get node_ctxt.current_protocol).constants in
+    let* prev_commitment =
+      Node_context.get_commitment
+        node_ctxt
+        block.header.previous_commitment_hash
+    in
+    let next_commitment_level =
+      Int32.add
+        prev_commitment.inbox_level
+        (Int32.of_int constants.sc_rollup.commitment_period_in_blocks)
+    in
+    let* next_commitment_block =
+      Node_context.find_l2_block_by_level node_ctxt next_commitment_level
+    in
+    match next_commitment_block with
+    | Some next ->
+        (* Commitment has already been produced *)
+        return (next.header.commitment_hash, next.header.level)
+    | _ ->
+        (* Commitment not yet produced. *)
+        return (None, next_commitment_level)
+
+  let committed_status (node_ctxt : _ Node_context.t)
+      (block : Sc_rollup_block.t) =
+    let open Lwt_result_syntax in
+    let lcc = Reference.get node_ctxt.lcc in
+    let constants = (Reference.get node_ctxt.current_protocol).constants in
+    let* head = Node_context.last_processed_head_opt node_ctxt in
+    let head = WithExceptions.Option.get ~loc:__LOC__ head in
+    let* next_commitment, next_commitment_level =
+      next_commitment node_ctxt block
+    in
+    let* pub_info =
+      Option.map_es
+        (fun c ->
+          let+ info = Node_context.commitment_published_at_level node_ctxt c in
+          (c, info))
+        next_commitment
+    in
+    match pub_info with
+    | Some
+        ( next_commitment_hash,
+          Some {first_published_at_level; published_at_level} ) ->
+        (* Commitment already published *)
+        if block.header.level <= lcc.level then
+          (* Cemented *)
+          return
+            (Rollup_node_services.Cemented
+               {
+                 commitment_hash = next_commitment_hash;
+                 commitment_level = next_commitment_level;
+                 first_published_level = first_published_at_level;
+                 published_level = published_at_level;
+                 blocks_since_cemented = Int32.sub lcc.level block.header.level;
+               })
+        else
+          (* Commitment published but not cemented *)
+          let estimated_cementation_level =
+            Int32.add
+              first_published_at_level
+              (Int32.of_int constants.sc_rollup.challenge_window_in_blocks)
+          in
+          let estimated_cementation_time =
+            estimated_time_of_level head constants estimated_cementation_level
+          in
+          return
+            (Rollup_node_services.Committed_
+               {
+                 commitment_hash = next_commitment_hash;
+                 commitment_level = next_commitment_level;
+                 first_published_level = first_published_at_level;
+                 published_level = published_at_level;
+                 estimated_cementation_time;
+               })
+    | _ ->
+        (* Commitment not yet published *)
+        let estimated_commitment_time =
+          estimated_time_of_level
+            head
+            constants
+            (finalized_level next_commitment_level)
+        in
+        let estimated_cementation_level =
+          Int32.add
+            next_commitment_level
+            (Int32.of_int constants.sc_rollup.challenge_window_in_blocks)
+        in
+        let estimated_cementation_time =
+          estimated_time_of_level head constants estimated_cementation_level
+        in
+        return
+          (Rollup_node_services.Uncommitted
+             {
+               commitment_level = next_commitment_level;
+               estimated_commitment_time;
+               estimated_cementation_time;
+             })
+end
+
 let cement_commitment (node_ctxt : _ Node_context.t) commitment =
   let open Lwt_result_syntax in
   let cement_operation =
