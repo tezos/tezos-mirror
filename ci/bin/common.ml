@@ -802,7 +802,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     in
     Matrix [[("DISTRIBUTION", distributions)]]
   in
-  let timeout = match target with Rpm -> Some (Minutes 75) in
+  let timeout = match target with Rpm -> Some (Minutes 90) in
   let group_string = match group with A -> "A" | B -> "B" in
   let artifacts =
     artifacts

@@ -852,7 +852,7 @@ oc.build:rpm:amd64:
   - gcp
   needs: []
   dependencies: []
-  timeout: 75 minutes
+  timeout: 90 minutes
   interruptible: false
   before_script:
   - . ./scripts/version.sh
