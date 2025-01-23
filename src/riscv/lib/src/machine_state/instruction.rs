@@ -140,6 +140,23 @@ impl ConstDefault for Instruction {
     };
 }
 
+impl Instruction {
+    fn new_mv(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Mv,
+            args: Args {
+                rd: rd.into(),
+                // We are adding a default value for rs1 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs1: NonZeroXRegister::x1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+}
+
 /// Opcodes map to the operation performed over the state - allowing us to
 /// decouple these from the parsed instructions down the line.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -333,7 +350,6 @@ pub enum OpCode {
     CAddi16sp,
     CAddi4spn,
     CSlli,
-    CMv,
     CAdd,
     CAnd,
     COr,
@@ -360,6 +376,7 @@ pub enum OpCode {
     Beqz,
     Bnez,
     J,
+    Mv,
 }
 
 impl OpCode {
@@ -541,7 +558,7 @@ impl OpCode {
             Self::CAddi16sp => Args::run_caddi16spn,
             Self::CAddi4spn => Args::run_caddi4spn,
             Self::CSlli => Args::run_cslli,
-            Self::CMv => Args::run_cmv,
+            Self::Mv => Args::run_mv,
             Self::CAdd => Args::run_cadd,
             Self::CAnd => Args::run_cand,
             Self::COr => Args::run_cor,
@@ -580,7 +597,7 @@ impl OpCode {
         use OpCode::*;
 
         match self {
-            CMv => Some(Args::run_cmv),
+            Mv => Some(Args::run_mv),
             CNop => Some(Args::run_cnop),
             CAdd => Some(Args::run_cadd),
             _ => None,
@@ -1241,7 +1258,7 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_cadd, run_cadd);
-    impl_cr_nz_type!(c::run_cmv, run_cmv);
+    impl_cr_nz_type!(c::run_mv, run_mv);
     impl_load_type!(run_clw);
     impl_cload_sp_type!(run_clwsp);
     impl_store_type!(run_csw);
@@ -2027,10 +2044,9 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Andi,
                 args: args.into(),
             },
-            InstrCacheable::CMv(args) => Instruction {
-                opcode: OpCode::CMv,
-                args: args.into(),
-            },
+            InstrCacheable::CMv(args) => {
+                Instruction::new_mv(args.rd_rs1, args.rs2, InstrWidth::Compressed)
+            }
             InstrCacheable::CAdd(args) => Instruction {
                 opcode: OpCode::CAdd,
                 args: args.into(),

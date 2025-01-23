@@ -440,6 +440,7 @@ pub enum InstrCacheable {
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),
     CAndi(CIBTypeArgs),
+    /// `C.MV` - Copies the value in register `rs2` into register `rd_rs1`.
     CMv(CNZRTypeArgs),
     CAdd(CNZRTypeArgs),
     CAnd(CRTypeArgs),
@@ -463,8 +464,12 @@ pub enum InstrCacheable {
     CFsd(FStoreArgs),
     CFsdsp(CSSDTypeArgs),
 
-    Unknown { instr: u32 },
-    UnknownCompressed { instr: u16 },
+    Unknown {
+        instr: u32,
+    },
+    UnknownCompressed {
+        instr: u16,
+    },
 }
 
 impl ConstDefault for InstrCacheable {
