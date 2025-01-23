@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol quebec RPC",
     "description": "The RPC API for protocol quebec served by the Octez node.",
-    "version": "Octez 21.2 (4945ba69)"
+    "version": "Octez 21.3 (73082775)"
   },
   "paths": {
     "/": {

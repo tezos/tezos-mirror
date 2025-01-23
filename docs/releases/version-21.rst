@@ -1,4 +1,4 @@
-Version 21.2
+Version 21.3
 ============
 
 Version 21 contains a new version (V13) of the protocol environment.
@@ -10,6 +10,8 @@ Octez v21.2 minor version is a bug fix meant for users of the ghostnet network.
 This version is required to be able to participate on ghostnet, unless
 you are starting from a snapshot that is more recent than level
 ``10,062,848``. It has no impact on any other networks.
+
+Octez v21.3 brings a new option for the DAL node, in anticipation of the next major version and improvement to the Rollup node. More information on the specific section for :ref:`the DAL node <dal_node_v21_changes>` and :ref:`the Smart Rollup Node <smart_rollup_node_v21_changes>`
 
 Changes
 -------
@@ -50,6 +52,8 @@ them will allow for faster propagation and earlier consensus
 agreement. See :ref:`here <baker_manual_quebec>`
 for further details on how bakers can fine-tune this parameter.
 
+.. _dal_node_v21_changes:
+
 DAL node
 ~~~~~~~~
 
@@ -75,6 +79,15 @@ In particular, the DAL node now does the following.
 The baker daemon now fetches attestation statuses one level in advance, thus not delaying the injection of attestation operations.
 The DAL node also emits more warnings for potential issues, such as attesters not attesting correctly or the node lagging (w.r.t. L1 node).
 
+Octez v21.3 introduces a new option in the Baker daemons, ``--without-dal``. This option disables the DAL support for the baker.
+This option **is not mandatory**, but a warning will be triggered if not used while running a baker without a DAL node.
+
+.. warning::
+
+   This option will be mandatory when running a baker without a DAL node in the next major version (Octez version 22). We recommend to use this option starting with Octez v21.3, or to run a DAL node. See :doc:`the DAL node documentation <../shell/dal_node>` for futher details.
+
+.. _smart_rollup_node_v21_changes:
+
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
 
@@ -94,6 +107,9 @@ node, driven by the deployment of Etherlink Mainnet beta in May. These include:
 - Opt-in automated execution of outbox messages automatically. This allows for
   an improved UX for decentralized applications relying on the outbox of a
   Smart Rollup, like the Etherlink native bridge.
+
+Octez v21.3 brings improvements to the Rollup node, especially to its use for the Etherlink EVM nodes.
+In particular, the batcher and injector now use heap structures for their queues which reduces the catch up time of the sequencer.
 
 Better logging UX
 ~~~~~~~~~~~~~~~~~
@@ -129,14 +145,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v21.2
+  git checkout octez-v21.3
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v21.2`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v21.3`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -152,6 +168,7 @@ Check :ref:`the documentation <new_packages>` for more details.
 Changelog
 ---------
 
+- `Version 21.3 <../CHANGES.html#version-21-2>`_
 - `Version 21.2 <../CHANGES.html#version-21-2>`_
 - `Version 21.1 <../CHANGES.html#version-21-1>`_
 - `Version 21.0 <../CHANGES.html#version-21-0>`_
