@@ -293,6 +293,7 @@ let evm_node_lib_dev =
         octez_dal_node_services;
         supported_installers;
         wasm_runtime;
+        performance_metrics;
       ]
 
 let _octez_evm_node_tests =

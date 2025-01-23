@@ -69,6 +69,7 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
       ~delegate_health_check_to:evm_node_endpoint
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
+      ~data_dir
       config
       (rpc_backend, ctxt.smart_rollup_address)
   in

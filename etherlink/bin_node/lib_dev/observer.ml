@@ -170,6 +170,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     Rpc_server.start_public_server
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
+      ~data_dir
       config
       (observer_backend, smart_rollup_address)
   in

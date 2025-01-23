@@ -114,9 +114,25 @@ let start_server rpc = function
   | Evm_directory.Resto dir -> Resto.start_server rpc dir
   | Evm_directory.Dream routes -> Dream.start_server rpc routes
 
-let start_public_server ?delegate_health_check_to ?evm_services
+let monitor_performances ~data_dir =
+  let (module Performance) = Lazy.force Metrics.performance_metrics in
+  let rec aux () =
+    let open Lwt_syntax in
+    let* () = Performance.set_stats ~data_dir in
+    let* () = Lwt_unix.sleep 10.0 in
+    aux ()
+  in
+  Lwt.dont_wait aux (Fun.const ())
+
+let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
     (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
+  let*! can_start_performance_metrics =
+    Octez_performance_metrics.supports_performance_metrics ()
+  in
+  if can_start_performance_metrics && Option.is_some data_dir then
+    monitor_performances
+      ~data_dir:WithExceptions.Option.(get ~loc:__LOC__ data_dir) ;
   let register_evm_services =
     match evm_services with
     | None -> Fun.id

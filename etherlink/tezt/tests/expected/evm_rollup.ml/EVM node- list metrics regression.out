@@ -24,6 +24,30 @@
 #TYPE octez_evm_node_inconsistent_da_fees counter
 #HELP octez_evm_node_l1_level Last processed L1 block level
 #TYPE octez_evm_node_l1_level gauge
+#HELP octez_evm_node_performance_connections Open connections
+#TYPE octez_evm_node_performance_connections gauge
+#HELP octez_evm_node_performance_cpu_percentage CPU Percentage
+#TYPE octez_evm_node_performance_cpu_percentage gauge
+#HELP octez_evm_node_performance_data Disk Usage
+#TYPE octez_evm_node_performance_data gauge
+#HELP octez_evm_node_performance_disk_percentage Disk Usage Percentage
+#TYPE octez_evm_node_performance_disk_percentage gauge
+#HELP octez_evm_node_performance_file_descriptors Open file descriptors
+#TYPE octez_evm_node_performance_file_descriptors gauge
+#HELP octez_evm_node_performance_logs Disk usage: daily_logs
+#TYPE octez_evm_node_performance_logs gauge
+#HELP octez_evm_node_performance_mem_percentage Memory Percentage
+#TYPE octez_evm_node_performance_mem_percentage gauge
+#HELP octez_evm_node_performance_resident Resident Memory Stats
+#TYPE octez_evm_node_performance_resident gauge
+#HELP octez_evm_node_performance_store_irmin Disk usage: store
+#TYPE octez_evm_node_performance_store_irmin gauge
+#HELP octez_evm_node_performance_store_sqlite Disk usage: store.sqlite
+#TYPE octez_evm_node_performance_store_sqlite gauge
+#HELP octez_evm_node_performance_virtual Size Memory Stats
+#TYPE octez_evm_node_performance_virtual gauge
+#HELP octez_evm_node_performance_wasm Disk usage: wasm_2_0_0
+#TYPE octez_evm_node_performance_wasm gauge
 #HELP octez_evm_node_queue_size Size of the execution queue of simulations
 #TYPE octez_evm_node_queue_size gauge
 #HELP octez_evm_node_signals_sent Number of DAL import signals sent on the inbox
