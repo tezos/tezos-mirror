@@ -206,7 +206,7 @@ oc.build:rpm:amd64:
   - gcp
   needs: []
   dependencies: []
-  timeout: 75 minutes
+  timeout: 90 minutes
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/bin_packages_rpm_dependencies.sh
