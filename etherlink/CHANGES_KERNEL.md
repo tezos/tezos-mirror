@@ -37,6 +37,8 @@
   delayed inbox). It has been demonstrated that the prediction is
   over-approximated after a Layer 1 downtime, which is the most likely scenario
   triggering a flush of the delayed inbox. (!16425)
+- An optional chain_id field has been added to the blueprints chunks
+  sent by the sequencer. (!16366)
 
 ### Bug fixes
 
