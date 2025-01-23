@@ -101,22 +101,10 @@ let resolve_random_observer_profile t proto_parameters =
 let register_profile t proto_parameters gs_worker =
   match t with
   | Types.Bootstrap -> t
-  | Random_observer -> (
-      let slot_index = Random.int proto_parameters.Dal_plugin.number_of_slots in
-      let t_opt =
-        add_and_register_operator_profile
-          empty
-          proto_parameters
-          gs_worker
-          (Operator_profile.make ~observers:[slot_index] ())
-      in
-      match t_opt with
-      | Some t -> t
-      | None ->
-          (* unreachable*)
-          Stdlib.failwith
-            "Profile_manager.register_profile: unexpected profile \
-             incompatibility")
+  | Random_observer ->
+      Stdlib.failwith
+        "Profile_manager.register_profile: random observer should have a slot \
+         index assigned at this point"
   | Operator operator_profile -> (
       let t_opt =
         add_and_register_operator_profile
