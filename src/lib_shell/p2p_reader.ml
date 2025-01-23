@@ -512,17 +512,6 @@ let on_error state =
   state.unregister () ;
   Lwt_result.return `Shutdown
 
-let rec worker_loop state =
-  let open Lwt_syntax in
-  let* o =
-    protect ~canceler:state.canceler (fun () -> P2p.recv state.p2p state.conn)
-  in
-  match o with
-  | Ok msg ->
-      let* () = handle_msg state msg in
-      worker_loop state
-  | Error _ -> on_error state
-
 type (_, _) req = Message : Message.t tzresult -> (unit, tztrace) req
 [@@ocaml.unboxed]
 
@@ -565,7 +554,6 @@ type parameters = {
   disk : Store.t;
   protocol_db : Distributed_db_requester.Raw_protocol.t;
   active_chains : chain_db Chain_id.Table.t;
-  register : t -> unit;
   unregister : unit -> unit;
 }
 
@@ -593,8 +581,8 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.callback Worker.t
 
-let on_launch gid
-    {p2p; conn; disk; protocol_db; active_chains; register; unregister} =
+let on_launch (_ : worker) gid
+    {p2p; conn; disk; protocol_db; active_chains; unregister} =
   if not !profiler_init then (
     () [@profiler.record {verbosity = Notice} "start"] ;
     profiler_init := true) ;
@@ -628,7 +616,6 @@ let on_launch gid
         (fun exc ->
           Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))
     active_chains ;
-  register state ;
   state
 
 (* Temporarily disable warning *)
@@ -639,8 +626,8 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch (_self : self) gid parameters : (t, launch_error) result Lwt.t =
-    Lwt_result.return @@ on_launch gid parameters
+  let on_launch (self : self) gid parameters : (t, launch_error) result Lwt.t =
+    Lwt_result.return @@ on_launch self gid parameters
 
   let on_request :
       type res err. self -> (res, err) req -> (res, err) result Lwt.t =
@@ -664,36 +651,24 @@ module Handlers = struct
   let on_completion _ _ _ _ = Lwt.return_unit
 end
 
-let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
-  let state =
-    on_launch
-      gid
-      {p2p; conn; disk; protocol_db; active_chains; register; unregister}
-  in
-  state.worker <-
-    Lwt_utils.worker
-      (Format.asprintf "db_network_reader.%a" P2p_peer.Id.pp_short gid)
-      ~on_event:Internal_event.Lwt_worker_logger.on_event
-      ~run:(fun () -> worker_loop state)
-      ~cancel:(fun () -> Error_monad.cancel_with_exceptions state.canceler)
-
-let shutdown s = Error_monad.cancel_with_exceptions s.canceler
-
 let run_worker ~register ~unregister p2p disk protocol_db active_chains gid conn
     =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let table =
     Worker.create_table
       (Callback
          (fun () ->
-           let* parsed_message_result = P2p.recv p2p conn in
-           return
+           let*! parsed_message_result = P2p.recv p2p conn in
+           Lwt.return
              (Worker.Any_request (Message parsed_message_result, {scope = None}))))
   in
-  Worker.launch
-    table
-    gid
-    {p2p; conn; disk; protocol_db; active_chains; register; unregister}
-    (module Handlers)
+  let* worker =
+    Worker.launch
+      table
+      gid
+      {p2p; conn; disk; protocol_db; active_chains; unregister}
+      (module Handlers)
+  in
+  return (register worker)
 
 let shutdown_worker w = Worker.shutdown w
