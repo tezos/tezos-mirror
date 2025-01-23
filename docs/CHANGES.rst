@@ -3,13 +3,53 @@
 Changelog
 '''''''''
 
+Version 21.3
+============
+
+Baker
+-----
+
+- **Deprecation:** For Paris and Quebec protocols, launching a
+  baker daemon without specifying a DAL node endpoint is deprecated.
+  To opt out of this requirement, use the newly introduced
+  ``--without-dal`` option (MR :gl:`!16213`).
+  Using one of the CLI arguments ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
+  The CLI argument ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
+  in the next version of Octez.
+
+Smart Rollup node
+-----------------
+
+- Updated batcher with a new order structure. The RPC
+  ``/local/batcher/injection`` now has a new query argument
+  possibility ``"order": <int>``. The batcher will batch the
+  received chunk with the following priority order: First chunks with
+  ascending order then chunks by order of arrival. (MR :gl:`!15672`)
+
+- Injector now uses a heap structure for its queue which allows
+  to prioritize operations to send on L1. (MR :gl:`!15864`)
+
+- New RPC to retrieve values under a key in the durable storage
+  ``/global/block/<block_id>/durable/wasm_2_0_0/values?key=<key>&offset=<offset>&length=<length>``.
+  (MR :gl:`!15627`)
+
+- Added RPCs ``/global/block/<block_id>/committed_status`` to retrieve commitment
+  and cementation status for a given block (or an estimated timestamp
+  otherwise). (MR :gl:`!15409`)
+
+- Fixed an issue in the background store migration which could make the rollup
+  node send old heads in its stream at the end of the migration.  (MR :gl:`!15739`)
+
+- Fixed an issue in the background store migration which could make the rollup
+  node send old heads in its stream at the end of the migration.  (MR :gl:`!15739`)
+
 Version 21.2
 ============
 
 Miscellaneous
 -------------
 
-- Fixed an issue on Ghostnet originated from lowering 
+- Fixed an issue on Ghostnet originated from lowering
   ``consensus_rights_delay`` from 3 to 2 with the recent activation of the Quebec protocol. This issue does not affect mainnet, where
   ``consensus_rights_delay`` was already set to 2 by the activation of Paris and will remain
   unchanged with the activation of Quebec. (MR :gl:`!16219`)

@@ -57,13 +57,6 @@ Baker
   DAL node is required for the baker to be launched, unless opted out with the
   newly introduced ``--without-dal`` option. (MR :gl:`!16049`)
 
-- **Deprecation:** For Paris and Quebec protocols, launching a
-  baker daemon without specifying a DAL node endpoint is deprecated.
-  To opt out of this requirement, use the newly introduced
-  ``--without-dal`` option (MR :gl:`!16213`).
-  The CLI argument ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
-  in the next version of Octez.
-
 Accuser
 -------
 
@@ -90,12 +83,6 @@ Smart Rollup node
 - In the bailout mode there was a bug where the wrong key was used
   when recovering the bond. The node uses the ``cementing`` key and not
   the ``operating`` key. (MR :gl:`!16016`).
-
-- Updated batcher with a new order structure. The RPC
-  ``/local/batcher/injection`` now has a new query argument
-  possibility ``"order": <int>``. The batcher will batch the
-  received chunk with the following priority order: First chunks with
-  ascending order then chunks by order of arrival. (MR :gl:`!15672`)
 
 - updated RPC ``DELETE /admin/injector/queues`` with new query to
   clear injector queues based on priority order. The RPC can takes two
@@ -183,7 +170,7 @@ Smart Rollup node
   and port of the running node have been changed via command-line arguments. (MR
   :gl:`!14694`)
 
-- Fix an issue which could introduce a discrepancy between the snapshot header
+- Fixed an issue which could introduce a discrepancy between the snapshot header
   and its content. (MR :gl:`!14777`)
 
 - RPC ``/global/block/<block_id>/outbox/<outbox_level>/messages`` now fails if
@@ -192,26 +179,14 @@ Smart Rollup node
 - Improved error messages for RPC
   ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
 
-- Fix file descriptor leak in resto for connections with the L1 node.
-  (MR :gl:`!15322`)
-
-- Fix potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
-
 - Paginate RPC for durable storage subkeys
   ``/global/block/<block_id>/durable/wasm_2_0_0/subkeys?key=<key>&offset=<offset>&length=<length>``,
   with new query parameters ``offset`` and ``length``. (MR :gl:`!15625`)
 
-- New RPC to retrieve values under a key in the durable storage
-  ``/global/block/<block_id>/durable/wasm_2_0_0/values?key=<key>&offset=<offset>&length=<length>``.
-  (MR :gl:`!15627`)
+- Fixed file descriptor leak in resto for connections with the L1 node.
+  (MR :gl:`!15322`)
 
-- RPCs ``/global/block/<block_id>/committed_status`` and to retrieve commitment
-  and cementation status for a given block (or an estimated timestamp
-  otherwise). (MR :gl:`!15409`)
-
-- Fix an issue in the background store migration which could make the rollup
-  node send old heads in its stream at the end of the migration.  (MR
-  :gl:`!15739`)
+- Fixed potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
 
 - New CLI switch ``--unsafe-disable-wasm-kernel-checks`` which allows to bypass
   invalid kernel checks in the WASM VM, for use by jstz. (MR :gl:`!15910`)
