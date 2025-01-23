@@ -27,3 +27,7 @@ module Make : functor (R : REGISTRY) -> sig
 
   val set_stats : data_dir:string -> unit Lwt.t
 end
+
+(** [supports_performance_metrics ()] returns [true] if [du], [ps] and [lsof]
+    are available on the platform. *)
+val supports_performance_metrics : unit -> bool Lwt.t
