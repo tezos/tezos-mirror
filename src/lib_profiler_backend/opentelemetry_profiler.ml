@@ -114,8 +114,11 @@ end
 let opentelemetry : config Profiler.driver =
   (module Driver : Profiler.DRIVER with type config = config)
 
+let instance_maker driver ~verbosity ~directory:_ ~name =
+  Profiler.instance driver {verbosity; service_name = name}
+
 let () =
   Profiler_instance.register_backend
     ["opentelemetry"]
-    (fun ~verbosity ~directory:_ ~name ->
-      Profiler.instance opentelemetry {verbosity; service_name = name})
+    instance_maker
+    opentelemetry
