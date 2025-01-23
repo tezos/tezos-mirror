@@ -34,6 +34,13 @@ Client
 Baker
 -----
 
+- **Deprecation:** For Paris and Quebec protocols, launching a
+  baker daemon without specifying a DAL node endpoint is deprecated.
+  To opt out of this requirement, use the newly introduced
+  ``--without-dal`` option (MR :gl:`!16213`).
+  The CLI argument ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
+  in the next version of Octez.
+
 Accuser
 -------
 
