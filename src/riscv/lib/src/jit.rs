@@ -9,6 +9,9 @@ mod builder;
 pub mod state_access;
 
 use self::builder::Builder;
+use self::state_access::register_jsa_symbols;
+use self::state_access::JsaCalls;
+use self::state_access::JsaImports;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::instruction::OpCode;
 use crate::machine_state::main_memory::MainMemoryLayout;
@@ -22,11 +25,12 @@ use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::Linkage;
 use cranelift_module::Module;
+use cranelift_module::ModuleError;
 use state_access::JitStateAccess;
 use thiserror::Error;
 
 /// Alias for the function signature produced by the JIT compilation.
-type JitFn<ML, JSA> = unsafe extern "C" fn(&mut MachineCoreState<ML, JSA>, u64, &mut usize) -> u64;
+type JitFn<ML, JSA> = unsafe extern "C" fn(&mut MachineCoreState<ML, JSA>, u64, &mut usize);
 
 /// A jit-compiled function that can be [called] over [`MachineCoreState`].
 ///
@@ -48,8 +52,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JCall<ML, JSA> {
         pc: u64,
         steps: &mut usize,
     ) -> Result<(), EnvironException> {
-        let new_pc = (self.fun)(core, pc, steps);
-        core.hart.pc.write(new_pc);
+        (self.fun)(core, pc, steps);
         Ok(())
     }
 }
@@ -66,6 +69,9 @@ pub enum JitError {
     /// Constructing the Cranelift builder failed.
     #[error("Unable to initialise builder {0}")]
     BuilderFailure(#[from] CodegenError),
+    /// Unable to register external [`JitStateAccess`] functionality.
+    #[error("Unable to register external JSA functions: {0}")]
+    JsaRegistration(#[from] ModuleError),
 }
 
 /// The JIT is responsible for compiling blocks of instructions to machine code,
@@ -84,10 +90,11 @@ pub struct JIT<ML: MainMemoryLayout, JSA: JitStateAccess> {
     /// functions.
     module: JITModule,
 
+    /// Imported [JitStateAccess] functions.
+    jsa_imports: JsaImports<ML, JSA>,
+
     /// Counter for naming of functions
     next_id: usize,
-
-    _pd: std::marker::PhantomData<(ML, JSA)>,
 }
 
 impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
@@ -102,15 +109,18 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         let isa_builder = cranelift_native::builder().map_err(JitError::UnsupportedPlatform)?;
         let isa = isa_builder.finish(settings::Flags::new(flag_builder))?;
 
-        let builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
-        let module = JITModule::new(builder);
+        let mut builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+        register_jsa_symbols::<ML, JSA>(&mut builder);
+
+        let mut module = JITModule::new(builder);
+        let jsa_imports = JsaImports::declare_in_module(&mut module)?;
 
         Ok(Self {
             builder_context: FunctionBuilderContext::new(),
             ctx: codegen::Context::new(),
             module,
             next_id: 0,
-            _pd: std::marker::PhantomData,
+            jsa_imports,
         })
     }
 
@@ -149,14 +159,12 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     /// # Return
     ///
     /// | `steps: usize`                | `int`                           |
-    fn start(&mut self) -> Builder<'_> {
+    fn start(&mut self) -> Builder<'_, ML, JSA> {
         let ptr = self.module.target_config().pointer_type();
 
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
         self.ctx.func.signature.params.push(AbiParam::new(I64));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
-
-        self.ctx.func.signature.returns.push(AbiParam::new(ptr));
 
         let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
 
@@ -166,16 +174,21 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         builder.switch_to_block(entry_block);
         builder.seal_block(entry_block);
 
+        let core_ptr_val = builder.block_params(entry_block)[0];
         let pc_val = builder.block_params(entry_block)[1];
         let steps_ptr_val = builder.block_params(entry_block)[2];
 
-        Builder {
+        let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports);
+
+        Builder::<'_, ML, JSA> {
             builder,
             ptr,
+            core_ptr_val,
             steps_ptr_val,
             steps: 0,
             pc_val,
             pc_offset: 0,
+            jsa_call,
         }
     }
 

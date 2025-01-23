@@ -6,29 +6,41 @@
 //!
 //! [instructions]: crate::machine_state::instruction::Instruction
 
-use crate::machine_state::main_memory::Address;
+use super::state_access::{JitStateAccess, JsaCalls};
+use crate::machine_state::main_memory::{Address, MainMemoryLayout};
 use cranelift::{
     codegen::ir::{InstBuilder, MemFlags, Type, Value},
     frontend::FunctionBuilder,
 };
 
 /// Builder context used when lowering individual instructions within a block.
-pub(super) struct Builder<'a> {
+pub(super) struct Builder<'a, ML: MainMemoryLayout, JSA: JitStateAccess> {
     /// Cranelift function builder
-    pub(super) builder: FunctionBuilder<'a>,
+    pub builder: FunctionBuilder<'a>,
+
+    /// Helpers for calling locally imported [JitStateAccess] methods.
+    pub jsa_call: JsaCalls<'a, ML, JSA>,
+
     /// The IR-type of pointers on the current native platform
-    pub(super) ptr: Type,
+    pub ptr: Type,
+
+    /// Value representing a pointer to `MachineCoreState<ML, JSA>`
+    pub core_ptr_val: Value,
+
     /// Value representing a pointer to `steps: usize`
-    pub(super) steps_ptr_val: Value,
+    pub steps_ptr_val: Value,
+
     /// The number of steps taken within the function
-    pub(super) steps: usize,
+    pub steps: usize,
+
     /// Value representing the initial value of `instr_pc`
-    pub(super) pc_val: Value,
+    pub pc_val: Value,
+
     /// The static offset so far of the `instr_pc`
-    pub(super) pc_offset: Address,
+    pub pc_offset: Address,
 }
 
-impl<'a> Builder<'a> {
+impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
     /// Consume the builder, allowing for the function under construction to be [`finalised`].
     ///
     /// [`finalised`]: JIT::finalise
@@ -44,12 +56,14 @@ impl<'a> Builder<'a> {
             .store(MemFlags::trusted(), steps, self.steps_ptr_val, 0);
 
         // flush pc
-        let pc = self
+        let pc_val = self
             .builder
             .ins()
             .iadd_imm(self.pc_val, self.pc_offset as i64);
-        self.builder.ins().return_(&[pc]);
+        self.jsa_call
+            .pc_write(&mut self.builder, self.core_ptr_val, pc_val);
 
+        self.builder.ins().return_(&[]);
         self.builder.finalize();
     }
 }
