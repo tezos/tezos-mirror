@@ -120,20 +120,12 @@ fn generate_optional_field_encoding(encoding: &Encoding, span: Span) -> TokenStr
     quote_spanned!(span=> tezos_data_encoding::encoding::Encoding::OptionalField(Box::new(#encoding)))
 }
 
-fn generate_sized_encoding(
-    size: &syn::Expr,
-    encoding: &Encoding<'_>,
-    span: Span,
-) -> TokenStream {
+fn generate_sized_encoding(size: &syn::Expr, encoding: &Encoding<'_>, span: Span) -> TokenStream {
     let encoding = generate_encoding(encoding);
     quote_spanned!(span=> tezos_data_encoding::encoding::Encoding::Sized(#size, Box::new(#encoding)))
 }
 
-fn generate_bounded_encoding(
-    size: &syn::Expr,
-    encoding: &Encoding<'_>,
-    span: Span,
-) -> TokenStream {
+fn generate_bounded_encoding(size: &syn::Expr, encoding: &Encoding<'_>, span: Span) -> TokenStream {
     let encoding = generate_encoding(encoding);
     quote_spanned!(span=> tezos_data_encoding::encoding::Encoding::Bounded(#size, Box::new(#encoding)))
 }

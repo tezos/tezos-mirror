@@ -285,7 +285,7 @@ impl<'de, const SIZE: usize> Deserialize<'de> for SizedBytes<SIZE> {
     }
 }
 
-impl<'a, const SIZE: usize> NomReader<'a> for SizedBytes<SIZE> {
+impl<const SIZE: usize> NomReader<'_> for SizedBytes<SIZE> {
     fn nom_read(input: &[u8]) -> crate::nom::NomResult<Self> {
         use crate::nom;
         let (input, slice) = nom::sized(SIZE, nom::bytes)(input)?;
@@ -379,7 +379,7 @@ impl HasEncoding for Bytes {
     }
 }
 
-impl<'a> NomReader<'a> for Bytes {
+impl NomReader<'_> for Bytes {
     fn nom_read(input: &[u8]) -> crate::nom::NomResult<Self> {
         use crate::nom::bytes;
         let (input, b) = bytes(input)?;
@@ -493,8 +493,7 @@ pub enum Value {
     /// Encoding of a boolean (data is encoded as a byte in binary and a boolean in JSON).
     Bool(bool),
     /// Encoding of a string
-    /// - encoded as a byte sequence in binary prefixed by the length
-    /// of the string
+    /// - encoded as a byte sequence in binary prefixed by the length of the string
     /// - encoded as a string in JSON.
     String(String),
     /// Encoding of arbitrary bytes (encoded via hex in JSON and directly as a sequence byte in binary).
@@ -505,8 +504,7 @@ pub enum Value {
     Option(Option<Box<Value>>),
     /// List combinator.
     /// - encoded as an array in JSON
-    /// - encoded as the concatenation of all the element in binary
-    /// in binary prefixed by its length in bytes
+    /// - encoded as the concatenation of all the element in binary in binary prefixed by its length in bytes
     List(Vec<Value>),
     /// Enum value with name and/or ordinal number
     Enum(Option<String>, Option<u32>),

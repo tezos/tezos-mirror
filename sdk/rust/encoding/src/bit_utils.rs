@@ -73,7 +73,7 @@ mod test_utils {
     const MASK: u8 = Self::WIDTH - 1;
 
     /// The maximum number of this type that can be held in a `BitVec`.
-    const MAX_ELT: usize = core::usize::MAX >> Self::BITS;
+    const MAX_ELT: usize = usize::MAX >> Self::BITS;
 
     /// Set a specific bit in an element to a given value.
     fn set(&mut self, place: u8, value: bool) -> Result<(), BitsError> {

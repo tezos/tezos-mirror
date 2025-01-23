@@ -5,8 +5,6 @@
 
 //! BLS support (min_pk).
 
-#![cfg(feature = "bls")]
-
 use crate::hash::BlsSignature;
 use crate::hash::ContractTz4Hash;
 use crate::hash::PublicKeyBls;
