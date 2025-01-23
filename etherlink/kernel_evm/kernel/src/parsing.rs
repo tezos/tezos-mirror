@@ -904,6 +904,7 @@ pub mod tests {
             number: 7.into(),
             nb_chunks: 3,
             chunk_index: 0,
+            chain_id: None,
         };
 
         // Blueprint chunk for level 7 is ok.

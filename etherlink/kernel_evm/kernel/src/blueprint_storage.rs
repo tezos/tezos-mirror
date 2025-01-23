@@ -551,6 +551,7 @@ mod tests {
             number: U256::from(0),
             nb_chunks: 1u16,
             chunk_index: 0u16,
+            chain_id: None,
         };
 
         store_last_info_per_level_timestamp(&mut host, Timestamp::from(40)).unwrap();
@@ -612,6 +613,7 @@ mod tests {
             number: U256::from(0),
             nb_chunks: 1u16,
             chunk_index: 0u16,
+            chain_id: None,
         };
 
         let mut delayed_inbox =

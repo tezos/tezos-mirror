@@ -68,6 +68,7 @@ pub struct UnsignedSequencerBlueprint {
     pub number: U256,
     pub nb_chunks: u16,
     pub chunk_index: u16,
+    pub chain_id: Option<U256>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -84,66 +85,160 @@ impl From<&SequencerBlueprint> for UnsignedSequencerBlueprint {
 
 impl Encodable for UnsignedSequencerBlueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(4);
-        stream.append(&self.chunk);
-        append_u256_le(stream, &self.number);
-        append_u16_le(stream, &self.nb_chunks);
-        append_u16_le(stream, &self.chunk_index);
+        let Self {
+            chunk,
+            number,
+            nb_chunks,
+            chunk_index,
+            chain_id,
+        } = self;
+        stream.begin_list(4 + if chain_id.is_some() { 1 } else { 0 });
+        stream.append(chunk);
+        append_u256_le(stream, number);
+        append_u16_le(stream, nb_chunks);
+        append_u16_le(stream, chunk_index);
+        if let Some(chain_id) = chain_id {
+            append_u256_le(stream, chain_id);
+        }
     }
 }
 
 impl Encodable for SequencerBlueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(5);
-        stream.append(&self.blueprint.chunk);
-        append_u256_le(stream, &self.blueprint.number);
-        append_u16_le(stream, &self.blueprint.nb_chunks);
-        append_u16_le(stream, &self.blueprint.chunk_index);
+        let UnsignedSequencerBlueprint {
+            chunk,
+            number,
+            nb_chunks,
+            chunk_index,
+            chain_id,
+        } = &self.blueprint;
+        stream.begin_list(5 + if chain_id.is_some() { 1 } else { 0 });
+        stream.append(chunk);
+        append_u256_le(stream, number);
+        append_u16_le(stream, nb_chunks);
+        append_u16_le(stream, chunk_index);
+        if let Some(chain_id) = chain_id {
+            append_u256_le(stream, chain_id);
+        }
         stream.append(&self.signature.as_ref());
     }
 }
 
 impl Decodable for UnsignedSequencerBlueprint {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        rlp_helpers::check_list(decoder, 4)?;
-        let mut it = decoder.iter();
-        let chunk = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
-        let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
-        let nb_chunks = decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
-        let chunk_index =
-            decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
-        Ok(Self {
-            chunk,
-            number,
-            nb_chunks,
-            chunk_index,
-        })
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        match decoder.item_count()? {
+            4 => {
+                // Optional chain_id field is absent
+                let mut it = decoder.iter();
+                let chunk =
+                    rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
+                let number =
+                    decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+                let nb_chunks =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
+                let chunk_index =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
+                Ok(Self {
+                    chunk,
+                    number,
+                    nb_chunks,
+                    chunk_index,
+                    chain_id: None,
+                })
+            }
+            5 => {
+                // Optional chain_id field is provided
+                let mut it = decoder.iter();
+                let chunk =
+                    rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
+                let number =
+                    decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+                let nb_chunks =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
+                let chunk_index =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
+                let chain_id =
+                    decode_field_u256_le(&rlp_helpers::next(&mut it)?, "chain_id")?;
+                Ok(Self {
+                    chunk,
+                    number,
+                    nb_chunks,
+                    chunk_index,
+                    chain_id: Some(chain_id),
+                })
+            }
+            _ => Err(DecoderError::RlpInvalidLength),
+        }
     }
 }
 
 impl Decodable for SequencerBlueprint {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        rlp_helpers::check_list(decoder, 5)?;
-        let mut it = decoder.iter();
-        let chunk = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
-        let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
-        let nb_chunks = decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
-        let chunk_index =
-            decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
-        let bytes: Vec<u8> =
-            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "signature")?;
-        let signature = UnknownSignature::try_from(bytes.as_slice())
-            .map_err(|_| DecoderError::Custom("Invalid signature encoding"))?;
-        let blueprint = UnsignedSequencerBlueprint {
-            chunk,
-            number,
-            nb_chunks,
-            chunk_index,
-        };
-        Ok(Self {
-            blueprint,
-            signature,
-        })
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        match decoder.item_count()? {
+            5 => {
+                // Optional chain_id field is absent
+                let mut it = decoder.iter();
+                let chunk =
+                    rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
+                let number =
+                    decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+                let nb_chunks =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
+                let chunk_index =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
+                let bytes: Vec<u8> =
+                    rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "signature")?;
+                let signature = UnknownSignature::try_from(bytes.as_slice())
+                    .map_err(|_| DecoderError::Custom("Invalid signature encoding"))?;
+                let blueprint = UnsignedSequencerBlueprint {
+                    chunk,
+                    number,
+                    nb_chunks,
+                    chunk_index,
+                    chain_id: None,
+                };
+                Ok(Self {
+                    blueprint,
+                    signature,
+                })
+            }
+            6 => {
+                // Optional chain_id field is provided
+                let mut it = decoder.iter();
+                let chunk =
+                    rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chunk")?;
+                let number =
+                    decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+                let nb_chunks =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "nb_chunks")?;
+                let chunk_index =
+                    decode_field_u16_le(&rlp_helpers::next(&mut it)?, "chunk_index")?;
+                let chain_id =
+                    decode_field_u256_le(&rlp_helpers::next(&mut it)?, "chain_id")?;
+                let bytes: Vec<u8> =
+                    rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "signature")?;
+                let signature = UnknownSignature::try_from(bytes.as_slice())
+                    .map_err(|_| DecoderError::Custom("Invalid signature encoding"))?;
+                let blueprint = UnsignedSequencerBlueprint {
+                    chunk,
+                    number,
+                    nb_chunks,
+                    chunk_index,
+                    chain_id: Some(chain_id),
+                };
+                Ok(Self {
+                    blueprint,
+                    signature,
+                })
+            }
+            _ => Err(DecoderError::RlpInvalidLength),
+        }
     }
 }
 
@@ -197,7 +292,7 @@ mod tests {
         }
     }
 
-    fn dummy_blueprint() -> SequencerBlueprint {
+    fn dummy_blueprint(chain_id: Option<U256>) -> SequencerBlueprint {
         let transactions = vec![dummy_transaction(0), dummy_transaction(1)];
         let timestamp = Timestamp::from(42);
         let blueprint = Blueprint {
@@ -215,14 +310,22 @@ mod tests {
                 number: U256::from(42),
                 nb_chunks: 1u16,
                 chunk_index: 0u16,
+                chain_id,
             },
             signature,
         }
     }
 
     #[test]
+    fn roundtrip_rlp_no_chain_id() {
+        let chunk = dummy_blueprint(None);
+        sequencer_blueprint_roundtrip(chunk);
+    }
+
+    #[test]
     fn roundtrip_rlp() {
-        let v = dummy_blueprint();
-        sequencer_blueprint_roundtrip(v);
+        let chain_id = U256::one();
+        let chunk = dummy_blueprint(Some(chain_id));
+        sequencer_blueprint_roundtrip(chunk);
     }
 }
