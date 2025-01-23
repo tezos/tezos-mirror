@@ -149,6 +149,10 @@ Smart Rollup node
   and cementation status for a given block (or an estimated timestamp
   otherwise). (MR :gl:`!15409`)
 
+- Fix an issue in the background store migration which could make the rollup
+  node send old heads in its stream at the end of the migration.  (MR
+  :gl:`!15739`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
