@@ -30,6 +30,7 @@
   different history mode, but it can be used with `--init-from-snapshot` to
   download a snapshot of the expected mode. (!16979)
 - Fixes experimental features being set by `init config`. (!17078)
+- Fixes `--private-rpc-port` being ignored by the `run observer` command. (!17078)
 
 ### RPCs changes
 

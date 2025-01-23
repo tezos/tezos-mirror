@@ -1640,9 +1640,10 @@ module Cli = struct
         configuration.public_rpc
     in
     let private_rpc =
-      Option.map
-        (patch_rpc ?rpc_port:private_rpc_port)
-        configuration.private_rpc
+      match configuration.private_rpc with
+      | None ->
+          Option.map (fun rpc_port -> default_rpc ~rpc_port ()) private_rpc_port
+      | Some rpc -> Some (patch_rpc ?rpc_port:private_rpc_port rpc)
     in
     let keep_alive =
       Option.value keep_alive ~default:configuration.keep_alive
