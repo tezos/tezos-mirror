@@ -90,6 +90,11 @@ Protocol parameters
   from cycle ``n`` still happens at the end of cycle ``n +
   max_slashing_period - 1 = n + slashing_delay``. (MR :gl:`!15990`)
 
+- Removed obsolete field
+  ``percentage_of_frozen_deposits_slashed_per_double_attestation``,
+  which is no longer used since the activation of Adaptive Slashing in
+  the Paris protocol. (MR :gl:`!15223`)
+
 Bug Fixes
 ---------
 
