@@ -15,9 +15,6 @@ use hex::FromHexError;
 use num_bigint::Sign;
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "fuzzing")]
-use crate::fuzzing::bigint::BigIntMutator;
-
 /// This is a wrapper for [num_bigint::BigInt] type.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BigInt(pub num_bigint::BigInt);
@@ -89,11 +86,8 @@ impl From<&Zarith> for BigInt {
 has_encoding!(Zarith, ZARITH_ENCODING, { Encoding::Z });
 
 /// Mutez number
-#[cfg_attr(feature = "fuzzing", derive(fuzzcheck::DefaultMutator))]
 #[derive(Clone, Debug)]
-pub struct Mutez(
-    #[cfg_attr(feature = "fuzzing", field_mutator(BigIntMutator))] pub num_bigint::BigInt,
-);
+pub struct Mutez(pub num_bigint::BigInt);
 
 impl<'de> Deserialize<'de> for Mutez {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -168,7 +162,6 @@ impl From<&Mutez> for BigInt {
 has_encoding!(Mutez, MUTEZ_ENCODING, { Encoding::Mutez });
 
 #[derive(Clone, PartialEq, Eq)]
-//#[cfg_attr(feature = "fuzzing", derive(fuzzcheck::DefaultMutator))]
 pub struct SizedBytes<const SIZE: usize>(pub [u8; SIZE]);
 
 impl<const SIZE: usize> std::fmt::Display for SizedBytes<SIZE> {
@@ -318,7 +311,6 @@ impl<const SIZE: usize> HasEncoding for SizedBytes<SIZE> {
 
 /// Sequence of bytes bounded by maximum size
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
-#[cfg_attr(feature = "fuzzing", derive(fuzzcheck::DefaultMutator))]
 pub struct Bytes(Vec<u8>);
 
 #[derive(Debug, thiserror::Error)]

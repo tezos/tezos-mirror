@@ -8,7 +8,6 @@ use cryptoxide::digest::Digest;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[cfg_attr(feature = "fuzzing", derive(fuzzcheck::DefaultMutator))]
 #[derive(Serialize, Deserialize, Error, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Blake2bError {
     #[error("Output digest length must be between 16 and 64 bytes.")]
