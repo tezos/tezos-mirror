@@ -15,9 +15,9 @@ DAL publish commitment
 
 ``DAL_publish_commitment`` is a manager operation that can be issued by a user wishing to publish data onto the DAL. The payload of this operation consists in the following fields:
 
-- Slot index: Identifies the specific slot for which the data is being published. It is an integer between ``0`` and ``number_of_slots - 1``.
+- Slot index: Identifies the specific slot for which the data is being published. It is an integer between ``0`` and ``NUMBER_OF_SLOTS - 1``.
 - Commitment: The `KZG commitment <https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html>`__ over the data.
-- Commitment proof: A proof that the commitment commits over data that does not exceed the size ``slot_size``.
+- Commitment proof: A proof that the commitment commits over data that does not exceed the size ``SLOT_SIZE``.
 
 Users can create and manage these commitments and proofs through the :doc:`DAL node <../shell/dal_node>` using these RPCs:
 
@@ -48,14 +48,14 @@ attempt.  The least significant bit corresponds to the smallest slot index.
 Attestation timing
 ------------------
 
-When a commitment is published at a certain level, say level ``PL``, the corresponding DAL payloads are expected to be included in the attestations contained in the block at level ``PL + attestation_lag``.
+When a commitment is published at a certain level, say level ``n``, the corresponding DAL payloads are expected to be included in the attestations contained in the block at level ``n + ATTESTATION_LAG``.
 
 Block metadata
 --------------
 
-In the block’s metadata, there is a specific field for the DAL. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``availability_threshold`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
+In the block’s metadata, there is a specific field for the DAL. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``AVAILABILITY_THRESHOLD`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
 
-Therefore, for data committed (published) at level ``L``, the slot's availability is determined by the metadata of the block at level ``L + attestation_lag``. Consequently, a smart rollup can only utilize this data from level ``L + attestation_lag + 1`` onward.
+Therefore, for data committed (published) at level ``n``, the slot's availability is determined by the metadata of the block at level ``n + ATTESTATION_LAG``. Consequently, a smart rollup can only utilize this data from level ``n + ATTESTATION_LAG + 1`` onward.
 
 .. _DAL_incentives_scheme_alpha:
 
@@ -75,17 +75,17 @@ Minimal participation
 
 Any baker that can take part in consensus is eligible for rewards.
 
-Bakers meeting the minimum participation ratio ``minimal_participation_ratio`` over a cycle, set to 64%, receive rewards for that cycle.
+Bakers meeting the minimum participation ratio ``MINIMAL_PARTICIPATION_RATIO`` over a cycle, set to 64%, receive rewards for that cycle.
 
 The participation ratio of the baker is the proportion of slots the baker attested over the total number of slots deemed available by the protocol in the cycle.
 
 DAL participation rewards
 -------------------------
 
-A fixed percentage, defined by a protocol parameter called ``dal_rewards_ratio``, set to %10, of the total :ref:`participation rewards<adaptive_rewards_alpha>` is allocated to the DAL.
+A fixed percentage, defined by a protocol parameter called ``DAL_REWARDS_RATIO``, set to %10, of the total :ref:`participation rewards<adaptive_rewards_alpha>` is allocated to the DAL.
 
-The DAL rewards per level are implicitly given by their weight, ``dal_rewards_weight``, as for the other types of :ref:`participation rewards<rewards_weights_alpha>`.
-The value of ``dal_rewards_weight`` is such that it represents ``dal_rewards_ratio`` of all reward weights.
+The DAL rewards per level are implicitly given by their weight, ``DAL_REWARDS_WEIGHT``, as for the other types of :ref:`participation rewards<rewards_weights_alpha>`.
+The value of ``DAL_REWARDS_WEIGHT`` is such that it represents ``DAL_REWARDS_RATIO`` of all reward weights.
 
 The rewards are distributed at the end of a cycle, and are computed in the same manner as for the other :ref:`participation rewards<adaptive_rewards_alpha>`.
 For instance, the stakers' share of these reward is proportional to the weight of their stake in relation to their baker's baking power.
@@ -95,7 +95,7 @@ Trap mechanism
 
 A deterministic function ``trap(pkh, shard)`` returning a boolean flag indicates whether a shard is a trap for a specific baker identified by its public key hash (``pkh``).
 
-The protocol parameter ``traps_fraction`` controls the fraction of shards marked as traps.
+The protocol parameter ``TRAPS_FRACTION`` controls the fraction of shards marked as traps.
 
 Bakers detect traps by retrieving shard content via their DAL node and applying the trap function. A trap invalidates the corresponding attestation: the baker should not attest a slot if one of the slot’s shards assigned to him is a trap.
 
@@ -103,7 +103,7 @@ The ``DAL_entrapment_evidence`` accusation operation can be used to accuse a bak
 This accusation operation includes the attestation operation containing the wrongly attested slot, the slot index, and the undetected shard.
 
 As for double-signing accusations, any baker can include a DAL accusation in its block.
-Accusations can be included during a period of ``denunciation_period`` cycles after the misbehavior event, which is that of the corresponding attestation operation.
+Accusations can be included during a period of ``DENUNCIATION_PERIOD`` cycles after the misbehavior event, which is that of the corresponding attestation operation.
 
 Penalties
 ---------
@@ -131,17 +131,16 @@ DAL-related protocol constants
 
 This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants_alpha` on how to find the values for tests networks):
 
-- ``feature_enable`` (true): Whether the DAL is available
-- ``incentives_enable`` (true): Whether baker incentives are available
-- ``number_of_slots`` (32): How many slots are available per block
-- ``attestation_lag`` (8): The timeframe for bakers to download shards between the published level of a commitment and the time they must attest the availability of those shards
-- ``attestation_threshold`` (66%): The minimum percentage of shards attested for a given slot to declare the slot available
-- ``blocks_per_epoch`` (1): Unused. Could be removed in the future
-- ``page_size`` (3967B, ~4KiB): The size of a page (see :ref:`dal_slots`)
-- ``slot_size`` (126944B, ~128KiB): The size of a slot (see :ref:`dal_slots`)
-- ``redundancy_factor`` (8): The erasure-code factor (see :ref:`dal_slots`)
-- ``number_of_shards`` (512): The number of shards per slot (see :ref:`dal_slots`)
-- ``minimal_participation_ratio`` (64%): The minimum percentage of slots attested by a baker during a cycle (among all slots deemed available) that entitles them to rewards
-- ``dal_rewards_ratio`` (10%): The ratio of the DAL rewards over the total participation rewards
-- ``rewards_weight`` (2275): The weight of the DAL rewards (relative to other participation rewards)
-- ``traps_fraction`` (0.0005): The fraction of shards that are traps
+- ``FEATURE_ENABLE`` (true): whether the DAL is available
+- ``INCENTIVES_ENABLE`` (true): whether baker incentives are available
+- ``NUMBER_OF_SLOTS`` (32): how many slots are available per block
+- ``ATTESTATION_LAG`` (8 level): the timeframe for bakers to download shards between the published level of a commitment and the time they must attest the availability of those shards
+- ``ATTESTATION_THRESHOLD`` (66%): the minimum percentage of shards attested for a given slot to declare the slot available
+- ``PAGE_SIZE`` (3967B, ~4KiB): the size of a page (see :ref:`dal_slots`)
+- ``SLOT_SIZE`` (126944B, ~128KiB): the size of a slot (see :ref:`dal_slots`)
+- ``REDUNDANCY_FACTOR`` (8): the erasure-code factor (see :ref:`dal_slots`)
+- ``NUMBER_OF_SHARDS`` (512): the number of shards per slot (see :ref:`dal_slots`)
+- ``MINIMAL_PARTICIPATION_RATIO`` (64%): the minimum percentage of slots attested by a baker during a cycle (among all slots deemed available) that entitles them to rewards
+- ``DAL_REWARDS_RATIO`` (10%): the ratio of the DAL rewards over the total participation rewards
+- ``DAL_REWARDS_WEIGHT`` (2275): the weight of the DAL rewards (relative to other participation rewards)
+- ``TRAPS_FRACTION`` (0.0005): the fraction of shards that are traps
