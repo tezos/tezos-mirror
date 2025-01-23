@@ -431,6 +431,7 @@ pub enum InstrCacheable {
     CJalr(CRJTypeArgs),
     CBeqz(CIBTypeArgs),
     CBnez(CIBTypeArgs),
+    /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
     CLi(CIBNZTypeArgs),
     CLui(CIBNZTypeArgs),
     CAddi(CIBNZTypeArgs),

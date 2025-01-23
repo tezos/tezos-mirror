@@ -327,7 +327,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        Mv | CAdd | CJr | CJalr | CAddi | CAddiw | CLi | CLui | CSlli | CLdsp | CLwsp => {
+        Mv | CAdd | CJr | CJalr | CAddi | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp => {
             ArgsShape::NZXSrcNZXDest
         }
     }

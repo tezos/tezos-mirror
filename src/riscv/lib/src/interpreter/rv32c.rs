@@ -177,10 +177,11 @@ where
         self.run_sub(rd_rs1, rs2, rd_rs1)
     }
 
-    /// `C.LI` CI-type compressed instruction
+    /// Loads the immediate `imm` into register `rd_rs1`.
     ///
-    /// Loads the sign-extended 6-bit immediate into register `rd_rs1`.
-    pub fn run_cli(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
+    /// Relevant RISC-V opcodes:
+    /// - C.LI
+    pub fn run_li(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
         self.write_nz(rd_rs1, imm as u64)
     }
 
@@ -349,7 +350,7 @@ mod tests {
 
         for (imm, rd_rs1, res) in imm_rdrs1_res {
             let mut state = create_state!(HartState, F);
-            state.xregisters.run_cli(imm, rd_rs1);
+            state.xregisters.run_li(imm, rd_rs1);
             assert_eq!(state.xregisters.read_nz(rd_rs1), res);
         }
     });

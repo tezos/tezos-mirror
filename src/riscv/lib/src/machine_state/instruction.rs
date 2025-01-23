@@ -155,6 +155,22 @@ impl Instruction {
             },
         }
     }
+
+    fn new_li(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Li,
+            args: Args {
+                rd: rd.into(),
+                // We are adding a default values for rs1 and rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs1: NonZeroXRegister::x1.into(),
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 /// Opcodes map to the operation performed over the state - allowing us to
@@ -344,7 +360,6 @@ pub enum OpCode {
     CSwsp,
     CJr,
     CJalr,
-    CLi,
     CLui,
     CAddi,
     CAddi16sp,
@@ -377,6 +392,7 @@ pub enum OpCode {
     Bnez,
     J,
     Mv,
+    Li,
 }
 
 impl OpCode {
@@ -552,7 +568,7 @@ impl OpCode {
             Self::CJalr => Args::run_cjalr,
             Self::Beqz => Args::run_beqz,
             Self::Bnez => Args::run_bnez,
-            Self::CLi => Args::run_cli,
+            Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
             Self::CAddi => Args::run_caddi,
             Self::CAddi16sp => Args::run_caddi16spn,
@@ -1264,7 +1280,7 @@ impl Args {
     impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
-    impl_ci_type!(run_cli, non_zero);
+    impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
     impl_ci_type!(run_caddi, non_zero);
     impl_ci_type!(run_caddi4spn);
@@ -2008,10 +2024,9 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Bnez,
                 args: args.into(),
             },
-            InstrCacheable::CLi(args) => Instruction {
-                opcode: OpCode::CLi,
-                args: args.into(),
-            },
+            InstrCacheable::CLi(args) => {
+                Instruction::new_li(args.rd_rs1, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CLui(args) => Instruction {
                 opcode: OpCode::CLui,
                 args: args.into(),
