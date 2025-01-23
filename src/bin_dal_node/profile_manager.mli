@@ -118,6 +118,17 @@ val get_profiles : t -> Types.profile
 val get_attested_data_default_store_period :
   t -> Dal_plugin.proto_parameters -> int
 
+(** Resolves a profile by either returning it unchanged (for bootstrap
+    and operator profiles) or generating a new observer profile for
+    random observer profile. The random slot is selected within the
+    DAL slots range defined by the protocol parameters.
+
+    This function is called when generating an observer profile from a
+    random profile before launching a DAL node, as implemented in the
+    daemon.
+*)
+val resolve_random_observer_profile : t -> Dal_plugin.proto_parameters -> t
+
 (** Returns [true] iff the node should support refutation games. *)
 val supports_refutations : t -> bool
 

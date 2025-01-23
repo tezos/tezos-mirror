@@ -90,6 +90,14 @@ let add_and_register_operator_profile t proto_parameters gs_worker
         "Profile_manager.add_and_register_operator_profile: random observer \
          should have a slot index assigned at this point"
 
+let resolve_random_observer_profile t proto_parameters =
+  match t with
+  | Types.Bootstrap | Operator _ -> t
+  | Random_observer ->
+      let slot_index = Random.int proto_parameters.Dal_plugin.number_of_slots in
+      let operator_profile = Operator_profile.make ~observers:[slot_index] () in
+      Operator operator_profile
+
 let register_profile t proto_parameters gs_worker =
   match t with
   | Types.Bootstrap -> t
