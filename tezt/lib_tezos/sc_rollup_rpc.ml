@@ -223,19 +223,31 @@ type 'output_type durable_state_operation =
   | Value : string option durable_state_operation
   | Length : int64 option durable_state_operation
   | Subkeys : string list durable_state_operation
+  | Values : (string * string) list durable_state_operation
 
 let string_of_durable_state_operation (type a) (x : a durable_state_operation) =
-  match x with Value -> "value" | Length -> "length" | Subkeys -> "subkeys"
+  match x with
+  | Value -> "value"
+  | Length -> "length"
+  | Subkeys -> "subkeys"
+  | Values -> "values"
 
 let get_global_block_durable_state_value ?(block = "head") ~pvm_kind ~operation
     ~key () =
   let op = string_of_durable_state_operation operation in
   let f : type k. k durable_state_operation -> JSON.t -> k =
    fun operation ->
+    let open JSON in
     match operation with
-    | Value -> JSON.as_string_opt
-    | Length -> JSON.as_int64_opt
-    | Subkeys -> fun json -> List.map JSON.as_string (JSON.as_list json)
+    | Value -> as_string_opt
+    | Length -> as_int64_opt
+    | Subkeys -> fun json -> List.map as_string (as_list json)
+    | Values ->
+        fun json ->
+          List.map
+            (fun json ->
+              (json |-> "key" |> as_string, json |-> "value" |> as_string))
+            (as_list json)
   in
   make
     ~query_string:[("key", String.trim key)]
@@ -243,17 +255,21 @@ let get_global_block_durable_state_value ?(block = "head") ~pvm_kind ~operation
     ["global"; "block"; block; "durable"; pvm_kind; op]
     (f operation)
 
-let post_local_batcher_injection ?drop_duplicate ~messages () =
+let post_local_batcher_injection ?order ?drop_duplicate ~messages () =
   let data =
     Data (`A (List.map (fun s -> `String Hex.(of_string s |> show)) messages))
   in
   let query_string =
-    Option.map (fun b -> [("drop_duplicate", string_of_bool b)]) drop_duplicate
+    let order = Option.map (fun v -> ("order", string_of_int v)) order in
+    let drop_duplicate =
+      Option.map (fun b -> ("drop_duplicate", string_of_bool b)) drop_duplicate
+    in
+    Option.to_list order @ Option.to_list drop_duplicate
   in
   make
     POST
     ["local"; "batcher"; "injection"]
-    ?query_string
+    ~query_string
     ~data
     JSON.(fun json -> as_list json |> List.map as_string)
 

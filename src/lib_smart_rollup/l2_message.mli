@@ -31,7 +31,7 @@ type t
     (multiple identical calls to [make] will return different values)
     because it will be given a unique id. Using [unique = false], on the
     contrary, makes the call idempotent. *)
-val make : unique:bool -> string -> t
+val make : ?order:Z.t -> unique:bool -> string -> t
 
 (** [content message] returns the string content of [message], i.e.
     [content (make s) = s]. *)
@@ -50,3 +50,9 @@ val content_encoding : string Data_encoding.t
 val encoding : t Data_encoding.t
 
 val id : t -> Id.t
+
+val counter : t -> Z.t
+
+val order : t -> Z.t option
+
+val compare : t -> t -> int

@@ -380,3 +380,11 @@ let register_dal_profiles dal_node_rpc_ctxt delegates =
     ()
     ()
     profiles
+
+let get_dal_health dal_node_rpc_ctxt =
+  Tezos_rpc.Context.make_call
+    Tezos_dal_node_services.Services.health
+    dal_node_rpc_ctxt
+    ()
+    ()
+    ()

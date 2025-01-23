@@ -374,6 +374,15 @@ module Block = struct
       ~output:Data_encoding.(list string)
       (path / "durable" / Sc_rollup.Kind.to_string pvm_kind / "subkeys")
 
+  let durable_state_values (pvm_kind : Sc_rollup.Kind.t) =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Retrieve values directly under a given key from PVM durable storage. \
+         PVM state is taken with respect to the specified block level."
+      ~query:Query.key_query
+      ~output:Data_encoding.(list (obj2 (req "key" string) (req "value" bytes)))
+      (path / "durable" / Sc_rollup.Kind.to_string pvm_kind / "values")
+
   let status =
     Tezos_rpc.Service.get_service
       ~description:"PVM status at block"
@@ -435,6 +444,15 @@ module Block = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.(list Sc_rollup.output_encoding)
       (path / "outbox" /: level_param / "messages")
+
+  let committed_status =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Commitment status of the rollup state which will include content of \
+         this block"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Rollup_node_services.Encodings.committed_status
+      (path / "committed_status")
 
   module Helpers = struct
     type nonrec prefix = prefix

@@ -156,6 +156,7 @@ type 'output_type durable_state_operation =
   | Value : string option durable_state_operation
   | Length : int64 option durable_state_operation
   | Subkeys : string list durable_state_operation
+  | Values : (string * string) list durable_state_operation
 
 (** RPC: [GET global/block/<block>/durable/<pvm_kind>/<operation>] gets the
     corresponding durable PVM state information (depending on [operation]) mapped to [key] for the [block]
@@ -172,7 +173,11 @@ val get_global_block_durable_state_value :
     queue the rollup node's batcher and returns the list of message
     hashes injected. *)
 val post_local_batcher_injection :
-  ?drop_duplicate:bool -> messages:string list -> unit -> string list RPC_core.t
+  ?order:int ->
+  ?drop_duplicate:bool ->
+  messages:string list ->
+  unit ->
+  string list RPC_core.t
 
 (** RPC: [POST local/dal/batcher/injection] injects the given
     [messages] in the rollup node's DAL queue. *)

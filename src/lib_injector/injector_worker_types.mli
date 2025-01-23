@@ -26,8 +26,10 @@
 
 open Injector_sigs
 
-module Request (Inj_operation : INJECTOR_OPERATION) : sig
-  type ('a, 'b) t = Inject : (unit, error trace) t
+module Request (Tag : TAG) (L1_operation : INJECTOR_OPERATION) : sig
+  type ('a, 'b) t =
+    | Inject : (unit, error trace) t
+    | Clear : Tag.t option -> (unit, error trace) t
 
   type view = View : _ t -> view
 

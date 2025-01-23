@@ -34,6 +34,13 @@ Client
 Baker
 -----
 
+- **Deprecation:** For Paris and Quebec protocols, launching a
+  baker daemon without specifying a DAL node endpoint is deprecated.
+  To opt out of this requirement, use the newly introduced
+  ``--without-dal`` option (MR :gl:`!16213`).
+  The CLI argument ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
+  in the next version of Octez.
+
 Accuser
 -------
 
@@ -51,6 +58,12 @@ Docker Images
 
 Smart Rollup node
 -----------------
+
+- Updated batcher with a new order structure. The RPC
+  ``/local/batcher/injection`` now has a new query argument
+  possibility ``"order": <int>``. The batcher will batch the
+  received chunk with the following priority order: First chunks with
+  ascending order then chunks by order of arrival. (MR :gl:`!15672`)
 
 - Updated RPC ``/local/batcher/injection`` with a new query argument
   possibility. When the rpc contains ``"drop_duplicate": true`` then
@@ -130,6 +143,23 @@ Smart Rollup node
 - Fixed a bug which would make injection of messages in the batcher with the RPC
   ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
 
+- Paginate RPC for durable storage subkeys
+  ``/global/block/<block_id>/durable/wasm_2_0_0/subkeys?key=<key>&offset=<offset>&length=<length>``,
+  with new query parameters ``offset`` and ``length``. (MR :gl:`!15625`)
+
+- New RPC to retrieve values under a key in the durable storage
+  ``/global/block/<block_id>/durable/wasm_2_0_0/values?key=<key>&offset=<offset>&length=<length>``.
+  (MR :gl:`!15627`)
+
+
+- RPCs ``/global/block/<block_id>/committed_status`` and to retrieve commitment
+  and cementation status for a given block (or an estimated timestamp
+  otherwise). (MR :gl:`!15409`)
+
+- Fix an issue in the background store migration which could make the rollup
+  node send old heads in its stream at the end of the migration.  (MR
+  :gl:`!15739`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
@@ -146,6 +176,14 @@ DAL node
   It should not break unless the value differs from the default value
   (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
   exported by default.
+
+- **Feature** The DAL node stores now a peers.json file in its
+  directory when it is shutdown with SIGINT. This file is read if it
+  exists when starting the DAL node to restore previous known
+  connections quickly.
+
+- **Bugfix** When shutting down the DAL node using SIGINT, it does a
+  best effort to shutdown properly its running P2P connections
 
 - **Breaking change** Removed the baker daemon's ``--dal-node-timeout-percentage``
   argument. (MR :gl:`!15554`)

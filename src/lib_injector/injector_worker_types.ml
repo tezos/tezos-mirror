@@ -26,8 +26,10 @@
 
 open Injector_sigs
 
-module Request (L1_operation : INJECTOR_OPERATION) = struct
-  type ('a, 'b) t = Inject : (unit, error trace) t
+module Request (Tag : TAG) (L1_operation : INJECTOR_OPERATION) = struct
+  type ('a, 'b) t =
+    | Inject : (unit, error trace) t
+    | Clear : Tag.t option -> (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -41,9 +43,19 @@ module Request (L1_operation : INJECTOR_OPERATION) = struct
           (Tag 2)
           ~title:"Inject"
           (obj1 (req "request" (constant "inject")))
-          (function View Inject -> Some ())
+          (function View Inject -> Some () | _ -> None)
           (fun () -> View Inject);
+        case
+          (Tag 3)
+          ~title:"Clear"
+          (obj2 (req "request" (constant "clear")) (opt "tag" Tag.encoding))
+          (function View (Clear tag) -> Some ((), tag) | _ -> None)
+          (fun ((), tag) -> View (Clear tag));
       ]
 
-  let pp ppf (View r) = match r with Inject -> Format.fprintf ppf "injection"
+  let pp ppf (View r) =
+    match r with
+    | Inject -> Format.fprintf ppf "injection"
+    | Clear tag ->
+        Format.fprintf ppf "clear %a" (Format.pp_print_option Tag.pp) tag
 end

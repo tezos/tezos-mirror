@@ -31,7 +31,7 @@ module Make
     (Tags : module type of Injector_tags.Make (Parameters.Tag))
         (Operation : PARAM_OPERATION)
         (Inj_operation : INJECTOR_OPERATION with type operation = Operation.t)
-        (Request : module type of Request (Inj_operation)) =
+        (Request : module type of Request (Parameters.Tag) (Inj_operation)) =
     struct
   include Internal_event.Simple
 
