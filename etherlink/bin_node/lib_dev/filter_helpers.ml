@@ -66,18 +66,17 @@ type error +=
 (** [height_from_param (module Rollup_node_rpc) from to_] returns the
     block height for params [from] and [to_] as a tuple.
 *)
-let height_from_param (module Rollup_node_rpc : Services_backend_sig.S) from to_
-    =
+let height_from_param (module Rollup_node_rpc : Services_backend_sig.S)
+    from_block to_block =
   let open Lwt_result_syntax in
   let open Block_parameter in
-  match (from, to_) with
-  | Number h1, Number h2 -> return (h1, h2)
-  | Number h1, _ ->
-      let+ h2 = Rollup_node_rpc.Block_storage.current_block_number () in
-      (h1, h2)
-  | _, _ ->
-      let+ h = Rollup_node_rpc.Block_storage.current_block_number () in
-      (h, h)
+  let* from_block =
+    Rollup_node_rpc.block_param_to_block_number (Block_parameter from_block)
+  in
+  let* to_block =
+    Rollup_node_rpc.block_param_to_block_number (Block_parameter to_block)
+  in
+  return (from_block, to_block)
 
 let valid_range log_filter_config (Qty from) (Qty to_) =
   Z.(

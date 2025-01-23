@@ -9638,6 +9638,59 @@ let test_filling_max_slots_cant_lead_to_out_of_memory =
   if contains failure error_out_of_gas then unit
   else Test.fail "Test should fail with error: %s" error_out_of_gas
 
+let test_rpc_getLogs_with_earliest_fail =
+  register_all
+    ~tags:["evm"; "rpc"; "get_logs"; "earliest"]
+    ~title:"RPC method getLogs with earliest block"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* erc20_resolved = Solidity_contracts.erc20 () in
+  let* () =
+    Eth_cli.add_abi ~label:erc20_resolved.label ~abi:erc20_resolved.abi ()
+  in
+  let* contract, _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:erc20_resolved.abi
+         ~bin:erc20_resolved.bin)
+      sequencer
+  in
+  let call_mint n =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:erc20_resolved.label
+      ~address:contract
+      ~method_call:(Printf.sprintf "mint(%d)" n)
+  in
+  let nb_generated_logs = 5 in
+  let* _ =
+    repeat nb_generated_logs (fun _ ->
+        let* _ =
+          wait_for_application
+            ~produce_block:(fun _ -> produce_block sequencer)
+            (call_mint 42)
+        in
+        unit)
+  in
+  let*@ get_logs_using_number = Rpc.get_logs ~from_block:(Number 0) sequencer in
+  let*@ get_logs_using_earliest =
+    Rpc.get_logs ~from_block:Earliest ~to_block:Latest sequencer
+  in
+  Check.(
+    (List.length get_logs_using_number = nb_generated_logs)
+      int
+      ~error_msg:"Expected %R logs, got %L") ;
+  Check.(
+    (List.length get_logs_using_earliest = List.length get_logs_using_number)
+      int
+      ~error_msg:"Expected %R logs using Earliest as from_block, got %L") ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -9769,4 +9822,5 @@ let () =
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
   test_init_config_mainnet "mainnet" ;
   test_init_config_mainnet "testnet" ;
-  test_filling_max_slots_cant_lead_to_out_of_memory protocols
+  test_filling_max_slots_cant_lead_to_out_of_memory protocols ;
+  test_rpc_getLogs_with_earliest_fail protocols
