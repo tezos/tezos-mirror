@@ -170,6 +170,14 @@ DAL node
   (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
   exported by default.
 
+- **Feature** The DAL node stores now a peers.json file in its
+  directory when it is shutdown with SIGINT. This file is read if it
+  exists when starting the DAL node to restore previous known
+  connections quickly.
+
+- **Bugfix** When shutting down the DAL node using SIGINT, it does a
+  best effort to shutdown properly its running P2P connections
+
 - **Breaking change** Removed the baker daemon's ``--dal-node-timeout-percentage``
   argument. (MR :gl:`!15554`)
 

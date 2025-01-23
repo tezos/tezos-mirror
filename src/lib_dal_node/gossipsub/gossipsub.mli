@@ -92,6 +92,10 @@ module Transport_layer : sig
     P2p_limits.t ->
     t tzresult Lwt.t
 
+  (** [shutdown t] shutdowns the transport layer and ensures that
+      active connections are closed. *)
+  val shutdown : t -> unit Lwt.t
+
   (** [activate ?additional_points t] activates the given transport layer [t]. It
       is a wrapper on top of {!P2p.activate}. If some [additional_points] are
       given, they are added to [t]'s known points. *)

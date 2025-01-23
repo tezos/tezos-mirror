@@ -1189,6 +1189,12 @@ let run ~data_dir ~configuration_override =
       p2p_limits
       ~network_name
   in
+
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    (* This is important to prevent stall connections. *)
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
+        Gossipsub.Transport_layer.shutdown transport_layer)
+  in
   (* Initialize store *)
   let* store = Store.init config in
   let* last_processed_level =
