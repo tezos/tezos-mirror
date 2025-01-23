@@ -8,12 +8,9 @@ use super::{
     proof::{MerkleProof, MerkleProofLeaf},
     DynAccess,
 };
-use crate::{
-    state_backend::{
-        hash::{Hash, HashError, RootHashable},
-        proof_backend::tree::{impl_modify_map_collect, ModifyResult},
-    },
-    storage::binary,
+use crate::state_backend::{
+    hash::{Hash, HashError, RootHashable},
+    proof_backend::tree::{impl_modify_map_collect, ModifyResult},
 };
 use std::convert::Infallible;
 
@@ -237,12 +234,6 @@ enum CompressedAccessInfo {
     ReadWrite(Vec<u8>),
 }
 
-// TODO: RV-414: Remove `Merkleisable` trait
-pub trait Merkleisable {
-    /// Build the Merkle tree described by the layouat of the data.
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError>;
-}
-
 pub trait AccessInfoAggregatable {
     /// Aggregate the access information of the Merkle tree described by
     /// the layout of the given data, without constructing the tree.
@@ -250,17 +241,6 @@ pub trait AccessInfoAggregatable {
     /// Used in implementations of `to_merkle_tree` in which certain leaves can
     /// combine data corresponding to multiple layout elements.
     fn aggregate_access_info(&self) -> AccessInfo;
-}
-
-impl<T: Merkleisable> Merkleisable for [T] {
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        let children = self
-            .iter()
-            .map(|e| e.to_merkle_tree())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(MerkleTree::Node(children.hash()?, children))
-    }
 }
 
 impl<T: AccessInfoAggregatable> AccessInfoAggregatable for [T] {
@@ -276,21 +256,9 @@ impl<T: AccessInfoAggregatable> AccessInfoAggregatable for [T] {
     }
 }
 
-impl<T: Merkleisable> Merkleisable for Vec<T> {
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        self.as_slice().to_merkle_tree()
-    }
-}
-
 impl<T: AccessInfoAggregatable> AccessInfoAggregatable for Vec<T> {
     fn aggregate_access_info(&self) -> AccessInfo {
         self.as_slice().aggregate_access_info()
-    }
-}
-
-impl<T: Merkleisable, const N: usize> Merkleisable for [T; N] {
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        self.as_slice().to_merkle_tree()
     }
 }
 
@@ -300,31 +268,14 @@ impl<T: AccessInfoAggregatable, const N: usize> AccessInfoAggregatable for [T; N
     }
 }
 
-impl Merkleisable for () {
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        let serialised = binary::serialise(self)?;
-        MerkleTree::make_merkle_leaf(serialised, AccessInfo::NoAccess)
-    }
-}
-
 impl AccessInfoAggregatable for () {
     fn aggregate_access_info(&self) -> AccessInfo {
         AccessInfo::NoAccess
     }
 }
 
-macro_rules! impl_merkleisable_for_tuple {
+macro_rules! impl_aggregatable_for_tuple {
     ($($name:ident),*) => {
-        impl<$($name: Merkleisable),*> Merkleisable for ($($name,)*) {
-            fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-                #[allow(non_snake_case)]
-                let ($($name,)*) = self;
-                let children: Result<Vec<MerkleTree>, HashError> = [$($name.to_merkle_tree(),)*].into_iter().collect();
-                let children = children?;
-                Ok(MerkleTree::Node(children.hash()?, children))
-            }
-        }
-
         impl<$($name: AccessInfoAggregatable),*> AccessInfoAggregatable for ($($name,)*) {
             fn aggregate_access_info(&self) -> AccessInfo {
                 #[allow(non_snake_case)]
@@ -336,11 +287,11 @@ macro_rules! impl_merkleisable_for_tuple {
     }
 }
 
-impl_merkleisable_for_tuple!(A, B);
-impl_merkleisable_for_tuple!(A, B, C);
-impl_merkleisable_for_tuple!(A, B, C, D);
-impl_merkleisable_for_tuple!(A, B, C, D, E);
-impl_merkleisable_for_tuple!(A, B, C, D, E, F);
+impl_aggregatable_for_tuple!(A, B);
+impl_aggregatable_for_tuple!(A, B, C);
+impl_aggregatable_for_tuple!(A, B, C, D);
+impl_aggregatable_for_tuple!(A, B, C, D, E);
+impl_aggregatable_for_tuple!(A, B, C, D, E, F);
 
 /// Writer which splits data in fixed-sized chunks and produces a [`MerkleTree`]
 /// with a given arity in which each leaf represents a chunk.
@@ -452,47 +403,50 @@ impl std::io::Write for MerkleWriter {
     }
 }
 
+impl MerkleTree {
+    /// Check the validity of the Merkle root by recomputing all hashes
+    #[cfg(test)]
+    pub fn check_root_hash(&self) -> bool {
+        let mut deque = std::collections::VecDeque::new();
+        deque.push_back(self);
+
+        while let Some(node) = deque.pop_front() {
+            let is_valid_hash = match node {
+                Self::Leaf(hash, _, data) => {
+                    Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
+                }
+                Self::Node(hash, children) => {
+                    // TODO RV-250: Instead of building the whole input and
+                    // hashing it, we should use incremental hashing, which
+                    // isn't currently supported in `tezos_crypto_rs`.
+                    //
+                    // Check the hash of this node and push children to deque to be checked
+                    let mut hashes: Vec<u8> = Vec::with_capacity(
+                        crate::state_backend::hash::DIGEST_SIZE * children.len(),
+                    );
+                    children.iter().for_each(|child| {
+                        deque.push_back(child);
+                        hashes.extend_from_slice(child.root_hash().as_ref())
+                    });
+                    Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
+                }
+            };
+            if !is_valid_hash {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree, Merkleisable};
+    use super::{AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree};
     use crate::state_backend::{
         hash::{Hash, HashError, RootHashable, DIGEST_SIZE},
         proof_backend::proof::{MerkleProof, MerkleProofLeaf},
     };
     use proptest::prelude::*;
-
-    impl MerkleTree {
-        /// Check the validity of the Merkle root by recomputing all hashes
-        fn check_root_hash(&self) -> bool {
-            let mut deque = std::collections::VecDeque::new();
-            deque.push_back(self);
-
-            while let Some(node) = deque.pop_front() {
-                let is_valid_hash = match node {
-                    Self::Leaf(hash, _, data) => {
-                        Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
-                    }
-                    Self::Node(hash, children) => {
-                        // TODO RV-250: Instead of building the whole input and
-                        // hashing it, we should use incremental hashing, which
-                        // isn't currently supported in `tezos_crypto_rs`.
-                        //
-                        // Check the hash of this node and push children to deque to be checked
-                        let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * children.len());
-                        children.iter().for_each(|child| {
-                            deque.push_back(child);
-                            hashes.extend_from_slice(child.root_hash().as_ref())
-                        });
-                        Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
-                    }
-                };
-                if !is_valid_hash {
-                    return false;
-                }
-            }
-            true
-        }
-    }
 
     impl CompressedMerkleTree {
         /// Get the root hash of a compreessed Merkle tree
@@ -539,17 +493,6 @@ mod tests {
         }
     }
 
-    impl Merkleisable for &Vec<u8> {
-        fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-            let hash = Hash::blake2b_hash_bytes(self)?;
-            Ok(MerkleTree::Leaf(
-                hash,
-                AccessInfo::NoAccess,
-                (*self).clone(),
-            ))
-        }
-    }
-
     impl RootHashable for Vec<u8> {
         fn hash(&self) -> Result<Hash, HashError> {
             Hash::blake2b_hash_bytes(self)
@@ -564,22 +507,6 @@ mod tests {
     fn m_t(left: MerkleTree, right: MerkleTree) -> Result<MerkleTree, HashError> {
         let hash = RootHashable::hash(&(left.root_hash(), right.root_hash()))?;
         Ok(MerkleTree::Node(hash, vec![left, right]))
-    }
-
-    #[test]
-    fn test_merkle_tree() {
-        proptest!(|
-        (leaves in prop::collection::vec(
-            prop::collection::vec(0u8..255, 0..100),
-            6)
-        )| {
-            let state = ((&leaves[0], (&leaves[1], &leaves[2])), ((&leaves[3], &leaves[4]), &leaves[5]));
-            let tree = state
-                .to_merkle_tree()
-                .expect("Error building Merkle tree");
-            assert!(tree.check_root_hash());
-            assert!(tree.root_hash() == state.hash()?);
-        });
     }
 
     #[test]

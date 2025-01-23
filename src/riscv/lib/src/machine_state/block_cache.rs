@@ -127,7 +127,7 @@ impl<ML: MainMemoryLayout> state_backend::CommitmentLayout for ICallLayout<ML> {
 }
 
 impl<ML: MainMemoryLayout> state_backend::ProofLayout for ICallLayout<ML> {
-    fn to_proof(
+    fn to_merkle_tree(
         state: state_backend::RefProofGenOwnedAlloc<Self>,
     ) -> Result<proof_backend::merkle::MerkleTree, HashError> {
         let cell = state.cell_ref();
@@ -218,10 +218,10 @@ impl state_backend::CommitmentLayout for AddressCellLayout {
 }
 
 impl state_backend::ProofLayout for AddressCellLayout {
-    fn to_proof(
+    fn to_merkle_tree(
         state: state_backend::RefProofGenOwnedAlloc<Self>,
     ) -> Result<proof_backend::merkle::MerkleTree, HashError> {
-        <Atom<Address> as state_backend::ProofLayout>::to_proof(state)
+        <Atom<Address> as state_backend::ProofLayout>::to_merkle_tree(state)
     }
 
     fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {

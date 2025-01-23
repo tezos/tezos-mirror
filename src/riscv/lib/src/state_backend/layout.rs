@@ -127,24 +127,8 @@ macro_rules! struct_layout {
             }
 
             use $crate::state_backend::proof_backend::merkle::{
-                AccessInfo, AccessInfoAggregatable, MerkleTree, Merkleisable,
+                AccessInfo, AccessInfoAggregatable, MerkleTree,
             };
-
-            impl <
-                $(
-                    [<$field_name:upper>]: AccessInfoAggregatable + serde::Serialize
-                ),+
-            > Merkleisable for [<$layout_t F>]<
-                $(
-                    [<$field_name:upper>]
-                ),+
-            > {
-                fn to_merkle_tree(&self) -> Result<MerkleTree, $crate::storage::HashError>
-                {
-                    let serialised = $crate::storage::binary::serialise(&self)?;
-                    MerkleTree::make_merkle_leaf(serialised, self.aggregate_access_info())
-                }
-            }
 
             impl <
                 $(
@@ -173,7 +157,7 @@ macro_rules! struct_layout {
             }
 
             impl $crate::state_backend::ProofLayout for $layout_t {
-                fn to_proof(state: $crate::state_backend::RefProofGenOwnedAlloc<Self>) ->
+                fn to_merkle_tree(state: $crate::state_backend::RefProofGenOwnedAlloc<Self>) ->
                     Result<$crate::state_backend::proof_backend::merkle::MerkleTree, $crate::storage::HashError> {
                         let serialised = $crate::storage::binary::serialise(&state)?;
                         MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())

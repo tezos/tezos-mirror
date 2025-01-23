@@ -114,7 +114,7 @@ impl<'a> ProofTree<'a> {
 pub trait ProofLayout: Layout {
     /// Obtain the complete Merkle tree which captures an execution trace
     /// using the proof-generating backend.
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError>;
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError>;
 
     /// Parse a Merkle proof into the allocated form of this layout.
     fn from_proof(proof: ProofTree) -> FromProofResult<Self>;
@@ -123,7 +123,7 @@ pub trait ProofLayout: Layout {
 impl<T: ConstDefault + serde::Serialize + serde::de::DeserializeOwned + 'static> ProofLayout
     for Atom<T>
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let serialised = binary::serialise(&state)?;
         MerkleTree::make_merkle_leaf(serialised, state.into_region().get_access_info())
     }
@@ -137,7 +137,7 @@ impl<T: serde::Serialize + 'static, const LEN: usize> ProofLayout for Array<T, L
 where
     [T; LEN]: ConstDefault + serde::de::DeserializeOwned,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         // RV-282: Break down into multiple leaves if the size of the `Cells`
         // is too large for a proof.
         let serialised = binary::serialise(&state)?;
@@ -168,7 +168,7 @@ where
 }
 
 impl<const LEN: usize> ProofLayout for DynArray<LEN> {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let region = state.region_ref();
         let mut writer = MerkleWriter::new(
             MERKLE_LEAF_SIZE,
@@ -242,8 +242,8 @@ where
     A: ProofLayout,
     B: ProofLayout,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
-        let children = vec![A::to_proof(state.0)?, B::to_proof(state.1)?];
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+        let children = vec![A::to_merkle_tree(state.0)?, B::to_merkle_tree(state.1)?];
         Ok(MerkleTree::Node(children.hash()?, children))
     }
 
@@ -259,11 +259,11 @@ where
     B: ProofLayout,
     C: ProofLayout,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let children = vec![
-            A::to_proof(state.0)?,
-            B::to_proof(state.1)?,
-            C::to_proof(state.2)?,
+            A::to_merkle_tree(state.0)?,
+            B::to_merkle_tree(state.1)?,
+            C::to_merkle_tree(state.2)?,
         ];
         Ok(MerkleTree::Node(children.hash()?, children))
     }
@@ -281,12 +281,12 @@ where
     C: ProofLayout,
     D: ProofLayout,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let children = vec![
-            A::to_proof(state.0)?,
-            B::to_proof(state.1)?,
-            C::to_proof(state.2)?,
-            D::to_proof(state.3)?,
+            A::to_merkle_tree(state.0)?,
+            B::to_merkle_tree(state.1)?,
+            C::to_merkle_tree(state.2)?,
+            D::to_merkle_tree(state.3)?,
         ];
         Ok(MerkleTree::Node(children.hash()?, children))
     }
@@ -310,13 +310,13 @@ where
     D: ProofLayout,
     E: ProofLayout,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let children = vec![
-            A::to_proof(state.0)?,
-            B::to_proof(state.1)?,
-            C::to_proof(state.2)?,
-            D::to_proof(state.3)?,
-            E::to_proof(state.4)?,
+            A::to_merkle_tree(state.0)?,
+            B::to_merkle_tree(state.1)?,
+            C::to_merkle_tree(state.2)?,
+            D::to_merkle_tree(state.3)?,
+            E::to_merkle_tree(state.4)?,
         ];
         Ok(MerkleTree::Node(children.hash()?, children))
     }
@@ -342,14 +342,14 @@ where
     E: ProofLayout,
     F: ProofLayout,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let children = vec![
-            A::to_proof(state.0)?,
-            B::to_proof(state.1)?,
-            C::to_proof(state.2)?,
-            D::to_proof(state.3)?,
-            E::to_proof(state.4)?,
-            F::to_proof(state.5)?,
+            A::to_merkle_tree(state.0)?,
+            B::to_merkle_tree(state.1)?,
+            C::to_merkle_tree(state.2)?,
+            D::to_merkle_tree(state.3)?,
+            E::to_merkle_tree(state.4)?,
+            F::to_merkle_tree(state.5)?,
         ];
         Ok(MerkleTree::Node(children.hash()?, children))
     }
@@ -371,7 +371,7 @@ impl<T, const LEN: usize> ProofLayout for [T; LEN]
 where
     T: ProofLayout,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         iter_to_proof::<_, T>(state)
     }
 
@@ -393,7 +393,7 @@ impl<T, const LEN: usize> ProofLayout for Many<T, LEN>
 where
     T: ProofLayout,
 {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         iter_to_proof::<_, T>(state)
     }
 
@@ -401,7 +401,7 @@ where
         proof
             .into_branches::<LEN>()?
             .into_iter()
-            .map(|branch| T::from_proof(branch))
+            .map(T::from_proof)
             .collect::<Result<Vec<_>, _>>()
     }
 }
@@ -414,7 +414,7 @@ where
 {
     let children = iter
         .into_iter()
-        .map(|e| T::to_proof(e))
+        .map(T::to_merkle_tree)
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(MerkleTree::Node(children.hash()?, children))

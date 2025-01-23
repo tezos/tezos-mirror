@@ -17,7 +17,7 @@ use crate::{
     state_backend::{
         hash::{Hash, HashError},
         owned_backend::Owned,
-        proof_backend::merkle::{MerkleTree, Merkleisable},
+        proof_backend::merkle::MerkleTree,
         verify_backend, AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout,
         FnManager, FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead,
         ManagerReadWrite, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref, RefOwnedAlloc,
@@ -164,7 +164,7 @@ impl CommitmentLayout for CSRValuesLayout {
 }
 
 impl ProofLayout for CSRValuesLayout {
-    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let serialised = binary::serialise(&state)?;
         MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())
     }
@@ -1464,18 +1464,6 @@ impl<Raw, MStatus, MIP> CSRValuesF<Raw, MStatus, MIP> {
             RootCSRegister::dscratch0 => fold_raw(&mut self.dscratch0),
             RootCSRegister::dscratch1 => fold_raw(&mut self.dscratch1),
         }
-    }
-}
-
-impl<Raw, MStatus, MIP> Merkleisable for CSRValuesF<Raw, MStatus, MIP>
-where
-    Raw: AccessInfoAggregatable + serde::Serialize,
-    MStatus: AccessInfoAggregatable + serde::Serialize,
-    MIP: AccessInfoAggregatable + serde::Serialize,
-{
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        let serialised = binary::serialise(&self)?;
-        MerkleTree::make_merkle_leaf(serialised, self.aggregate_access_info())
     }
 }
 

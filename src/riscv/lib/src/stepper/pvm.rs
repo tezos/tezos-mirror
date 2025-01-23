@@ -93,7 +93,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
         let refs = proof_stepper
             .pvm
             .struct_ref::<crate::state_backend::FnManagerIdent>();
-        let merkle_proof = PvmLayout::<ML, CL>::to_proof(refs)
+        let merkle_proof = PvmLayout::<ML, CL>::to_merkle_tree(refs)
             .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
             .to_merkle_proof()
             .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");

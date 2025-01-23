@@ -6,13 +6,12 @@
 use super::{
     hash::{self, Hash, HashError, HashWriter, RootHashable},
     proof_backend::{
-        merkle::{AccessInfo, AccessInfoAggregatable, MerkleTree, MerkleWriter, Merkleisable},
-        ProofDynRegion, ProofEnrichedCell, ProofGen,
+        merkle::{AccessInfo, AccessInfoAggregatable},
+        ProofGen,
     },
     Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
     ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
-use crate::storage::binary;
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
@@ -203,12 +202,6 @@ impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<
     }
 }
 
-impl<E: serde::Serialize, M: ManagerSerialise> Merkleisable for Cell<E, Ref<'_, ProofGen<M>>> {
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        self.region.to_merkle_tree()
-    }
-}
-
 impl<E: serde::Serialize, M: ManagerSerialise> AccessInfoAggregatable
     for Cell<E, Ref<'_, ProofGen<M>>>
 {
@@ -338,6 +331,11 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         }
     }
 
+    /// Obtain a reference to the underlying region.
+    pub fn region_ref(&self) -> &M::Region<E, LEN> {
+        &self.region
+    }
+
     /// Obtain the underlying region.
     pub fn into_region(self) -> M::Region<E, LEN> {
         self.region
@@ -423,16 +421,6 @@ where
     }
 }
 
-impl<V: EnrichedValue, M: ManagerSerialise> Merkleisable for EnrichedCell<V, Ref<'_, ProofGen<M>>>
-where
-    V::E: serde::Serialize,
-{
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        let serialised = ProofEnrichedCell::serialise_inner_enriched_cell(self.cell)?;
-        MerkleTree::make_merkle_leaf(serialised, self.cell.get_access_info())
-    }
-}
-
 impl<V: EnrichedValue, M: ManagerSerialise> AccessInfoAggregatable
     for EnrichedCell<V, Ref<'_, ProofGen<M>>>
 where
@@ -480,17 +468,6 @@ impl<A: PartialEq<B> + Copy, B: Copy, const LEN: usize, M: ManagerRead, N: Manag
 {
     fn eq(&self, other: &Cells<B, LEN, N>) -> bool {
         (0..LEN).all(|i| self.read(i) == other.read(i))
-    }
-}
-
-impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> Merkleisable
-    for Cells<E, LEN, Ref<'_, ProofGen<M>>>
-{
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        // RV-282: Break down into multiple leaves if the size of the `Cells`
-        // is too large for a proof.
-        let serialised = binary::serialise(&self)?;
-        MerkleTree::make_merkle_leaf(serialised, self.region.get_access_info())
     }
 }
 
@@ -615,9 +592,10 @@ pub const MERKLE_LEAF_SIZE: NonZeroUsize =
 /// Arity of the Merkle tree used for Merkleising [`DynCells`].
 pub const MERKLE_ARITY: usize = 3;
 
+// TODO RV-398: Move to `merkle` once `RootHashable` is removed
 /// Helper function which allows iterating over chunks of a dynamic region
 /// and writing them to a writer. The last chunk may be smaller than the
-/// Merkle leaf size. The implementations of `RootHashable` and `Merkleisable`
+/// Merkle leaf size. The implementations of `CommitmentLayout` and `ProofLayout`
 /// for dynamic regions both use it, ensuring consistency between the two.
 pub(crate) fn chunks_to_writer<
     const LEN: usize,
@@ -657,23 +635,6 @@ impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
         chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
         let hashes = writer.finalise()?;
         hash::build_custom_merkle_hash(MERKLE_ARITY, hashes)
-    }
-}
-
-impl<const LEN: usize, M: ManagerRead> Merkleisable for DynCells<LEN, Ref<'_, ProofGen<M>>> {
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        let mut writer = MerkleWriter::new(
-            MERKLE_LEAF_SIZE,
-            MERKLE_ARITY,
-            self.region.get_read(),
-            self.region.get_write(),
-            LEN.div_ceil(MERKLE_ARITY),
-        );
-        let read = |address| -> [u8; MERKLE_LEAF_SIZE.get()] {
-            ProofDynRegion::inner_dyn_region_read(self.region, address)
-        };
-        chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
-        writer.finalise()
     }
 }
 
