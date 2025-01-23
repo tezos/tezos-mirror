@@ -101,6 +101,12 @@ impl<const BITS: usize, const SIZE: usize, CachedLayout: CommitmentLayout> Commi
 impl<const BITS: usize, const SIZE: usize, CachedLayout: ProofLayout> ProofLayout
     for Sizes<BITS, SIZE, CachedLayout>
 {
+    fn to_proof(
+        state: crate::state_backend::RefProofGenOwnedAlloc<Self>,
+    ) -> Result<crate::state_backend::proof_backend::merkle::MerkleTree, HashError> {
+        Many::<CachedLayout, SIZE>::to_proof(state)
+    }
+
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         Many::<CachedLayout, SIZE>::from_proof(proof)
     }

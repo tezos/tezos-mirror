@@ -18,7 +18,7 @@ use crate::{
     state_backend::{
         hash::Hash,
         owned_backend::Owned,
-        proof_backend::{merkle::Merkleisable, proof::Proof, ProofGen},
+        proof_backend::{proof::Proof, ProofGen},
         verify_backend::Verifier,
         AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref,
     },
@@ -82,6 +82,26 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
     pub fn hash(&self) -> Hash {
         let refs = self.pvm.struct_ref::<FnManagerIdent>();
         PvmLayout::<ML, CL>::state_hash(refs).unwrap()
+    }
+
+    /// Produce the Merkle proof for evaluating one step on the given PVM state.
+    /// The given stepper takes one step.
+    pub fn produce_proof(&mut self) -> Option<Proof> {
+        // Step using the proof mode stepper in order to obtain the proof
+        let mut proof_stepper = self.start_proof_mode();
+        proof_stepper.eval_one();
+        let refs = proof_stepper
+            .pvm
+            .struct_ref::<crate::state_backend::FnManagerIdent>();
+        let merkle_proof = PvmLayout::<ML, CL>::to_proof(refs)
+            .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
+            .to_merkle_proof()
+            .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
+
+        // TODO RV-373 : Proof-generating backend should also compute final state hash
+        // Currently, the proof and the initial state hash are valid,
+        // but the final state hash is not.
+        Some(Proof::new(merkle_proof, self.hash()))
     }
 }
 
@@ -232,31 +252,6 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
     /// Perform one evaluation step.
     pub fn eval_one(&mut self) {
         self.pvm.eval_one(&mut self.hooks)
-    }
-}
-
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL>
-where
-    for<'a, 'b> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, ProofGen<Ref<'b, Owned>>>>: Merkleisable,
-{
-    /// Produce the Merkle proof for evaluating one step on the given PVM state.
-    /// The given stepper takes one step.
-    pub fn produce_proof(&mut self) -> Option<Proof> {
-        // Step using the proof mode stepper in order to obtain the proof
-        let mut proof_stepper = self.start_proof_mode();
-        proof_stepper.eval_one();
-        let merkle_proof = proof_stepper
-            .pvm
-            .struct_ref::<crate::state_backend::FnManagerIdent>()
-            .to_merkle_tree()
-            .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
-            .to_merkle_proof()
-            .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
-
-        // TODO RV-373 : Proof-generating backend should also compute final state hash
-        // Currently, the proof and the initial state hash are valid,
-        // but the final state hash is not.
-        Some(Proof::new(merkle_proof, self.hash()))
     }
 }
 

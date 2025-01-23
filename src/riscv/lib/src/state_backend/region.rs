@@ -31,6 +31,11 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
         Self { cell }
     }
 
+    /// Obtain a reference to the underlying cell.
+    pub fn cell_ref(&self) -> &M::EnrichedCell<V> {
+        &self.cell
+    }
+
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
     pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> EnrichedCell<V, F::Output> {
@@ -514,6 +519,11 @@ impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
     /// Bind this state to the given dynamic region.
     pub fn bind(region: M::DynRegion<LEN>) -> Self {
         Self { region }
+    }
+
+    /// Obtain a reference to the underlying dynamic region.
+    pub fn region_ref(&self) -> &M::DynRegion<LEN> {
+        &self.region
     }
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing

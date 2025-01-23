@@ -21,6 +21,7 @@ use crate::{
         verify_backend, AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout,
         FnManager, FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead,
         ManagerReadWrite, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref, RefOwnedAlloc,
+        RefProofGenOwnedAlloc,
     },
     storage::binary,
 };
@@ -163,6 +164,11 @@ impl CommitmentLayout for CSRValuesLayout {
 }
 
 impl ProofLayout for CSRValuesLayout {
+    fn to_proof(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+        let serialised = binary::serialise(&state)?;
+        MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())
+    }
+
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         fn make_absent() -> AllocatedOf<CSRValuesLayout, verify_backend::Verifier> {
             CSRValuesF::new(

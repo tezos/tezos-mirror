@@ -8,11 +8,11 @@
 //! records all state accesses performed during an evaluation step.
 //! After evaluation, a [`MerkleTree`] over the PVM state can be obtained,
 //! which can be partially blinded to produce a proof as a partial Merkle tree.
-//! The structure of the Merkle tree is informed by the layout of the state, by
-//! implementing [`Merkleisable`] for each of its components.
+//! The structure of the Merkle tree is informed by the layout of the state,
+//! which needs to implement [`ProofLayout`].
 //!
 //! [`MerkleTree`]: merkle::MerkleTree
-//! [`Merkleisable`]: merkle::Merkleisable
+//! [`ProofLayout`]: super::ProofLayout
 
 use super::{
     EnrichedCell, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,

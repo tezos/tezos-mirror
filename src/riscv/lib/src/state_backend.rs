@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -393,7 +393,13 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
     }
 }
 
+/// Alias for the allocated structure with references to regions of
+/// the [`owned_backend::Owned`] backend
 pub type RefOwnedAlloc<'a, L> = AllocatedOf<L, Ref<'a, owned_backend::Owned>>;
+
+/// Alias for the allocated structure with references to a proof-generating backend
+pub type RefProofGenOwnedAlloc<'a, 'b, L> =
+    AllocatedOf<L, Ref<'a, proof_backend::ProofGen<Ref<'b, owned_backend::Owned>>>>;
 
 #[cfg(test)]
 pub(crate) mod test_helpers {
