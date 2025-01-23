@@ -526,7 +526,7 @@ mod test {
     #[test]
     fn bytes() {
         let mut out = Vec::new();
-        super::bytes(&[1, 2, 3], &mut out).expect("Should not fail");
+        super::bytes([1, 2, 3], &mut out).expect("Should not fail");
         assert_eq!(&out, &[1, 2, 3]);
     }
 

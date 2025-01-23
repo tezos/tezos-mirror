@@ -59,7 +59,7 @@ fn make_fields<'a>(
     fields.into_iter().map(make_field).collect()
 }
 
-fn field_kind<'a, 'b>(meta: &'a [syn::Meta]) -> Option<FieldKind<'b>> {
+fn field_kind<'b>(meta: &[syn::Meta]) -> Option<FieldKind<'b>> {
     meta.iter().find_map(|meta| match meta {
         syn::Meta::Path(path) if path == symbol::SKIP => Some(FieldKind::Skip),
         _ => None,
@@ -373,8 +373,8 @@ struct AttrWithParam<T> {
 }
 
 /// Gets attribute named `name` with an optional parameter named `attr`.
-fn get_attribute_with_option<'a, T: syn::parse::Parse>(
-    meta: &'a mut Vec<syn::Meta>,
+fn get_attribute_with_option<T: syn::parse::Parse>(
+    meta: &mut Vec<syn::Meta>,
     name: &symbol::Symbol,
     attr: Option<&symbol::Symbol>,
     is_default: bool,
@@ -391,8 +391,8 @@ fn get_attribute_with_option<'a, T: syn::parse::Parse>(
 }
 
 /// Gets attribute named `name` with a mandatory parameter named `attr`.
-fn get_attribute_with_param<'a, T: syn::parse::Parse>(
-    meta: &'a mut Vec<syn::Meta>,
+fn get_attribute_with_param<T: syn::parse::Parse>(
+    meta: &mut Vec<syn::Meta>,
     name: &symbol::Symbol,
     attr: Option<&symbol::Symbol>,
     is_default: bool,

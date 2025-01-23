@@ -415,7 +415,7 @@ impl<'de> serde::Deserialize<'de> for Bytes {
     {
         if deserializer.is_human_readable() {
             let hex_bytes: String = serde::Deserialize::deserialize(deserializer)?;
-            let bytes = hex::decode(&hex_bytes).map_err(|err| {
+            let bytes = hex::decode(hex_bytes).map_err(|err| {
                 serde::de::Error::custom(format!("error decoding from hex string: {err}"))
             })?;
             Ok(Self(bytes))

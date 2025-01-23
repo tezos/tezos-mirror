@@ -151,7 +151,7 @@ where
             d => {
                 let middle = 1 << (d - 1);
                 digest_all(
-                    &[
+                    [
                         merkle_tree_inner(&RepeatingSlice(&list[..middle]), d - 1),
                         merkle_tree_inner(&RepeatingSlice(&list[middle..]), d - 1),
                     ],
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn blake2b_digest_all() {
-        let hash = digest_all(&["hello", " ", "world"], 32).unwrap();
+        let hash = digest_all(["hello", " ", "world"], 32).unwrap();
         assert_eq!(
             hash,
             hex::decode("256c83b297114d201b30179f3f0ef0cace9783622da5974326b436178aeef610")

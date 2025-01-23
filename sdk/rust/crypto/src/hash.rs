@@ -777,7 +777,7 @@ impl BlockPayloadHash {
             round.as_ref(),
             operation_list_hash.0.as_ref(),
         ];
-        blake2b::digest_all(&input, 32).map(BlockPayloadHash)
+        blake2b::digest_all(input, 32).map(BlockPayloadHash)
     }
 }
 
@@ -979,7 +979,7 @@ mod tests {
     fn test_decode_block_header_hash() -> Result<(), anyhow::Error> {
         let decoded = HashType::BlockHash
             .b58check_to_hash("BKyQ9EofHrgaZKENioHyP4FZNsTmiSEcVmcghgzCC9cGhE7oCET")?;
-        let decoded = hex::encode(&decoded);
+        let decoded = hex::encode(decoded);
         let expected = "2253698f0c94788689fb95ca35eb1535ec3a8b7c613a97e6683f8007d7959e4b";
         assert_eq!(expected, decoded);
 
@@ -990,7 +990,7 @@ mod tests {
     fn test_decode_operations_hash() -> Result<(), anyhow::Error> {
         let decoded = HashType::OperationListListHash
             .b58check_to_hash("LLoaGLRPRx3Zf8kB4ACtgku8F4feeBiskeb41J1ciwfcXB3KzHKXc")?;
-        let decoded = hex::encode(&decoded);
+        let decoded = hex::encode(decoded);
         let expected = "7c09f7c4d76ace86e1a7e1c7dc0a0c7edcaa8b284949320081131976a87760c3";
         assert_eq!(expected, decoded);
 
@@ -1016,7 +1016,7 @@ mod tests {
     fn test_decode_block_metadata_hash() -> Result<(), anyhow::Error> {
         let decoded = HashType::BlockMetadataHash
             .b58check_to_hash("bm2gU1qwmoPNsXzFKydPDHWX37es6C5Z4nHyuesW8YxbkZ1339cN")?;
-        let decoded = hex::encode(&decoded);
+        let decoded = hex::encode(decoded);
         let expected = "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8";
         assert_eq!(expected, decoded);
 
@@ -1031,7 +1031,7 @@ mod tests {
     fn test_decode_operation_metadata_list_list_hash() -> Result<(), anyhow::Error> {
         let decoded = HashType::OperationMetadataListListHash
             .b58check_to_hash("LLr283rR7AWhepNeHcP9msa2VeAurWtodBLrnSjwaxpNyiyfhYcKX")?;
-        let decoded = hex::encode(&decoded);
+        let decoded = hex::encode(decoded);
         let expected = "761223dee6643bb9f28acf45f2a44ae1a3e2fd68bfc1a00e3f539cc2dc637632";
         assert_eq!(expected, decoded);
 
@@ -1046,7 +1046,7 @@ mod tests {
     fn test_decode_operation_metadata_hash() -> Result<(), anyhow::Error> {
         let decoded = HashType::OperationMetadataHash
             .b58check_to_hash("r3E9xb2QxUeG56eujC66B56CV8mpwjwfdVmEpYu3FRtuEx9tyfG")?;
-        let decoded = hex::encode(&decoded);
+        let decoded = hex::encode(decoded);
         let expected = "2d905a5c4fefad1f1ab8a5436f26b15290f2fe2bea111c85ee4626156dc6b4da";
         assert_eq!(expected, decoded);
 

@@ -225,7 +225,7 @@ fn generate_enum_nom_read(encoding: &EnumEncoding) -> TokenStream {
     }
 }
 
-fn generate_tag_nom_read<'a>(tag: &Tag<'a>, enum_name: &syn::Ident) -> TokenStream {
+fn generate_tag_nom_read(tag: &Tag<'_>, enum_name: &syn::Ident) -> TokenStream {
     let tag_name = tag.name;
     match &tag.encoding {
         Encoding::Unit => {
