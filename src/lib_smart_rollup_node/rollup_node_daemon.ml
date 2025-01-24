@@ -574,15 +574,20 @@ let make_signers_for_injector operators =
          in
          (operators, strategy, operation_kinds))
 
-let performance_metrics state =
+let maybe_performance_metrics state =
   let open Lwt_syntax in
-  let (module Performance) = Lazy.force_val Metrics.performance_metrics in
-  let rec collect () =
-    let* () = Performance.set_stats ~data_dir:state.node_ctxt.data_dir in
-    let* () = Lwt_unix.sleep 10. in
-    collect ()
+  let+ activate =
+    if not state.configuration.performance_metrics then return_false
+    else Octez_performance_metrics.supports_performance_metrics ()
   in
-  Metrics.wrap @@ fun () -> Lwt.dont_wait collect ignore
+  if activate then
+    let (module Performance) = Lazy.force_val Metrics.performance_metrics in
+    let rec collect () =
+      let* () = Performance.set_stats ~data_dir:state.node_ctxt.data_dir in
+      let* () = Lwt_unix.sleep 10. in
+      collect ()
+    in
+    Metrics.wrap @@ fun () -> Lwt.dont_wait collect ignore
 
 let rec process_daemon ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
@@ -668,7 +673,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
         Metrics.GC.set_oldest_available_level first_available_level ;
         return_unit)
   in
-  if configuration.performance_metrics then performance_metrics state ;
+  let*! () = maybe_performance_metrics state in
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->
