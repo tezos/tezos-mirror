@@ -85,6 +85,7 @@ make -C src/riscv all
 /assign_reviewer @emturner
 /assign_reviewer @santnr
 /assign_reviewer @hantang.sun
+/assign_reviewer @jobjo
 
 /unassign me
 /unassign_reviewer me
