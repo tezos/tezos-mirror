@@ -26,7 +26,7 @@
 
 # SDK Working Group
 #
-# These users are members of the SDK Working Group, and should review any code changes 
+# These users are members of the SDK Working Group, and should review any code changes
 # in the following paths.
 #
 # @emturner = Emma Turner
@@ -42,7 +42,6 @@
 #
 # @abate = Pietro Abate
 # @ACoquereau = Albin Coquereau
-# @arvidnl = Arvid Jakobsson
 # @onurb = Bruno Bernardo
 # @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
@@ -76,7 +75,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @abate @ACoquereau @arvidnl @onurb @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @vch9 @vect0r @victor-dumitrescu @yrg
+* @abate @ACoquereau @onurb @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
@@ -84,6 +83,6 @@
 #
 # Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
 #
-/CODEOWNERS         @murbard @romain.nl @arvidnl
-/docs/CODEOWNERS    @murbard @romain.nl @arvidnl
-/.gitlab/CODEOWNERS @murbard @romain.nl @arvidnl
+/CODEOWNERS         @murbard @romain.nl
+/docs/CODEOWNERS    @murbard @romain.nl
+/.gitlab/CODEOWNERS @murbard @romain.nl
