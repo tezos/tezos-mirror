@@ -756,9 +756,9 @@ let encoding =
                                (req "direct_ticket_spending_enable" bool)
                                (req "aggregate_attestation" bool)
                                (req "allow_tz4_delegate_enable" bool)
-                               (opt
+                               (req
                                   "all_bakers_attest_activation_level"
-                                  Raw_level_repr.encoding))))))))))
+                                  (option Raw_level_repr.encoding)))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a
