@@ -714,11 +714,25 @@ val inject_error_check_recommended_fee :
 val already_denounced : rex
 
 (** Matches the message produced by
-    [Outdated_denunciation {kind; level; last_cycle}]
+    [Dal_already_denounced {delegate; level}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [delegate], [level]. *)
+val already_dal_denounced : rex
+
+(** Matches the message produced by
+    [Outdated_dal_denunciation {kind; level; last_cycle}]
     from [src/proto_xxx/lib_protocol/validate_errors].
 
     Captures [kind], [last_cycle], [level]. *)
 val outdated_denunciation : rex
+
+(** Matches the message produced by
+    [Outdated_dal_denunciation {level; last_cycle}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [last_cycle], [level]. *)
+val outdated_dal_denunciation : rex
 
 (** Matches the message
     [Operation %a is branched on either:]

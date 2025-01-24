@@ -920,9 +920,17 @@ let already_denounced =
   rex
     {|Delegate ([\w\d]+) at level ([\d]+) has already been denounced for a double ([\w]+).|}
 
+let already_dal_denounced =
+  rex
+    {|Delegate ([\w\d]+) at level ([\d]+) has already been denounced for a DAL entrapment.|}
+
 let outdated_denunciation =
   rex
     {|A double-([\w]+) denunciation is outdated \(last acceptable cycle: ([\d]+), given level: ([\d]+)\).|}
+
+let outdated_dal_denunciation =
+  rex
+    {|A DAL entrapment denunciation is outdated \(last acceptable cycle: ([\d]+), given level: ([\d]+)\).|}
 
 let injection_error_unknown_branch =
   rex {|Operation ([\w\d]+) is branched on either:|}
