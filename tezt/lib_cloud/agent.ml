@@ -134,10 +134,33 @@ let host_run_command agent cmd args =
   | Some cmd_wrapper ->
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
 
-let docker_run_command agent cmd args =
+let docker_run_command agent ?(detach = false) cmd args =
+  (* This function allows to run a command and detach it from the terminal
+      session and parent process. This allows to run a command in background
+      without the session (and processes group) being killed by ssh on
+      disconnection. It uses the [setsid -f] to detach the session.
+     Automatically log stdout and stderr of the command in tezt temporary dir *)
+  let run_detached ?runner cmd args =
+    let whole_cmd = String.concat " " (cmd :: args) in
+    let cmd = "sh" in
+    let args =
+      "-c"
+      :: [
+           "setsid -f " ^ whole_cmd ^ " > "
+           ^ Temp.file ?runner (cmd ^ ".log")
+           ^ " 2>&1";
+         ]
+    in
+    (cmd, args)
+  in
   match agent.runner with
-  | None -> Process.spawn cmd args
+  | None ->
+      let cmd, args = if detach then run_detached cmd args else (cmd, args) in
+      Process.spawn cmd args
   | Some runner ->
+      let cmd, args =
+        if detach then run_detached ~runner cmd args else (cmd, args)
+      in
       let cmd, args =
         Runner.wrap_with_ssh runner (Runner.Shell.cmd [] cmd args)
       in

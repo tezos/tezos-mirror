@@ -59,6 +59,26 @@ let run_vm () =
     (String.concat " " cmd) ;
   unit
 
+let run_detached () =
+  Cloud.register
+    ~vms:[Configuration.make ()]
+    ~__FILE__
+    ~tags:["run"; "detach"; Tag.cloud]
+    ~title:"Run a command and detach in a vm"
+  @@ fun t ->
+  let agents = Cloud.agents t in
+  let agent = List.nth agents 0 in
+  Log.info "Run a command and detach. You should not wait" ;
+  let* _ =
+    Agent.docker_run_command ~detach:true agent "sleep" ["10"] |> Process.wait
+  in
+  Log.info "OK" ;
+  Log.info "Run a command without detaching. You should wait 10sec" ;
+  let* _ = Agent.docker_run_command agent "sleep" ["10"] |> Process.wait in
+  Log.info "OK" ;
+  unit
+
 let register () =
   simple () ;
-  run_vm ()
+  run_vm () ;
+  run_detached ()
