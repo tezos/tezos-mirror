@@ -43,6 +43,7 @@
 # @abate = Pietro Abate
 # @ACoquereau = Albin Coquereau
 # @arvidnl = Arvid Jakobsson
+# @onurb = Bruno Bernardo
 # @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
 # @eugenz = Eugen Zalinescu
@@ -75,7 +76,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @abate @ACoquereau @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @vch9 @vect0r @victor-dumitrescu @yrg
+* @abate @ACoquereau @arvidnl @onurb @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
