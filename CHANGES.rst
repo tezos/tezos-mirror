@@ -25,6 +25,8 @@ be documented here either.
 General
 -------
 
+- Changed the compiler version to 5.2.1 and added a manual job to compile with
+  ocaml 4.14.2. (MR :gl:`!15404`)
 - Logging output on TTYs now adapt to the terminal width. (MR :gl:`!12348`)
 
 - Logging output can now advertise the level associated to each events, by
