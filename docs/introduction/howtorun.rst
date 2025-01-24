@@ -214,7 +214,7 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass --without-dal
 
 where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
 
@@ -223,6 +223,7 @@ the node data directory for performance reasons (to reduce the number of RPC cal
 Note also that since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
 Note that ``--liquidity-baking-toggle-vote`` must be placed
 **after** ``run`` on the command-line.
+Note that option ``--without-dal`` exists since version 21.3 and will be mandatory starting from 22.0.
 
 .. warning::
 
