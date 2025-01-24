@@ -328,10 +328,11 @@ The weights for participation rewards are defined as:
 - Attestation rewards: 10,240.
 - Fixed baking reward: 5,120.
 - Bonus baking reward: 5,120.
+- DAL rewards: 2,275.
 - Nonce revelation tip: 1.
 - VDF tip: 1.
 
-The total sum ``sum_rewards_weight`` of all weights is 20482.
+The total sum ``sum_rewards_weight`` of all weights is 22,757.
 
 .. code-block:: python
 
@@ -339,6 +340,7 @@ The total sum ``sum_rewards_weight`` of all weights is 20482.
     attestation_rewards +
     fixed_baking_rewards +
     bonus_baking_rewards +
+    dal_rewards +
     nonce_revelation_tip +
     vdf_tip)
 
