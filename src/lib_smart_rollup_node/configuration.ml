@@ -658,7 +658,7 @@ let encoding default_display : t Data_encoding.t =
                 default_acl))
           (obj8
              (opt "metrics-addr" ~description:"Metrics address" string)
-             (dft "performance-metrics" bool false)
+             (dft "performance-metrics" bool true)
              (dft
                 "reconnection_delay"
                 ~description:
@@ -843,7 +843,7 @@ module Cli = struct
       operators
 
   let configuration_from_args ~rpc_addr ~rpc_port ~acl_override ~metrics_addr
-      ~enable_performance_metrics ~loser_mode ~reconnection_delay
+      ~disable_performance_metrics ~loser_mode ~reconnection_delay
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
@@ -877,7 +877,7 @@ module Cli = struct
         dal_node_endpoint;
         pre_images_endpoint;
         metrics_addr;
-        performance_metrics = enable_performance_metrics;
+        performance_metrics = not disable_performance_metrics;
         fee_parameters = Operation_kind.Map.empty;
         mode;
         loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
@@ -921,7 +921,7 @@ module Cli = struct
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
-      ~acl_override ~metrics_addr ~enable_performance_metrics ~loser_mode
+      ~acl_override ~metrics_addr ~disable_performance_metrics ~loser_mode
       ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
@@ -985,7 +985,7 @@ module Cli = struct
         apply_unsafe_patches;
         metrics_addr = Option.either metrics_addr configuration.metrics_addr;
         performance_metrics =
-          enable_performance_metrics || configuration.performance_metrics;
+          (not disable_performance_metrics) && configuration.performance_metrics;
         index_buffer_size =
           Option.either index_buffer_size configuration.index_buffer_size;
         irmin_cache_size =
@@ -1021,7 +1021,7 @@ module Cli = struct
       }
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
-      ~metrics_addr ~enable_performance_metrics ~loser_mode ~reconnection_delay
+      ~metrics_addr ~disable_performance_metrics ~loser_mode ~reconnection_delay
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
@@ -1054,7 +1054,7 @@ module Cli = struct
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -1105,7 +1105,7 @@ module Cli = struct
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint

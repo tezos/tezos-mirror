@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** A description of the metrics exported by the node. *)
-val listing : enable_performance_metrics:bool -> string Lwt.t
+val listing : disable_performance_metrics:bool -> string Lwt.t
 
 (** The collector registry for the rollup node metrics. *)
 val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
