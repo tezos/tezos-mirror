@@ -714,11 +714,12 @@ let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
   Process.check process
 
 let list_metrics ?runner ?(path = Uses.path Constant.octez_smart_rollup_node)
-    ?hooks ?(enable_performance_metrics = false) () =
+    ?hooks ?(disable_performance_metrics = false) () =
   let cmd =
     ["list"; "metrics"]
     @
-    if enable_performance_metrics then ["--enable-performance-metrics"] else []
+    if disable_performance_metrics then ["--disable-performance-metrics"]
+    else []
   in
   let process = Process.spawn ?runner ?hooks path cmd in
   Process.check process

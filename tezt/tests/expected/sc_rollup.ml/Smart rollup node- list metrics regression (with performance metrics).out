@@ -1,5 +1,5 @@
 
-./octez-smart-rollup-node list metrics --enable-performance-metrics
+./octez-smart-rollup-node list metrics
 #HELP octez_injector_included_size injector included operations size
 #TYPE octez_injector_included_size gauge
 #HELP octez_injector_injected_size injector injected operations size
