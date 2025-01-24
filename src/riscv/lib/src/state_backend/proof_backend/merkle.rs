@@ -12,7 +12,21 @@ use crate::state_backend::{
     hash::{Hash, HashError},
     proof_backend::tree::{impl_modify_map_collect, ModifyResult},
 };
-use std::convert::Infallible;
+use std::{convert::Infallible, num::NonZeroUsize};
+
+// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
+/// Size of the Merkle leaf used for Merkleising [`DynArrays`].
+///
+/// [`DynArrays`]: [`crate::state_backend::layout::DynArray`]
+pub const MERKLE_LEAF_SIZE: NonZeroUsize =
+    // SAFETY: This constant is non-zero.
+    unsafe { NonZeroUsize::new_unchecked(4096) };
+
+// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
+/// Arity of the Merkle tree used for Merkleising [`DynArrays`].
+///
+/// [`DynArrays`]: [`crate::state_backend::layout::DynArray`]
+pub const MERKLE_ARITY: usize = 3;
 
 /// A variable-width Merkle tree with [`AccessInfo`] metadata for leaves.
 ///
@@ -295,6 +309,43 @@ impl_aggregatable_for_tuple!(A, B, C, D);
 impl_aggregatable_for_tuple!(A, B, C, D, E);
 impl_aggregatable_for_tuple!(A, B, C, D, E, F);
 
+/// Helper function which allows iterating over chunks of a dynamic array
+/// and writing them to a writer. The last chunk may be smaller than the
+/// Merkle leaf size. The implementations of [`CommitmentLayout`] and
+/// [`ProofLayout`] for both use it, ensuring consistency between the two.
+///
+/// [`CommitmentLayout`]: crate::state_backend::commitment_layout::CommitmentLayout
+/// [`ProofLayout`]: crate::state_backend::proof_layout::ProofLayout
+pub(crate) fn chunks_to_writer<
+    const LEN: usize,
+    T: std::io::Write,
+    F: Fn(usize) -> [u8; MERKLE_LEAF_SIZE.get()],
+>(
+    writer: &mut T,
+    read: F,
+) -> Result<(), std::io::Error> {
+    let merkle_leaf_size = MERKLE_LEAF_SIZE.get();
+    assert!(LEN >= merkle_leaf_size);
+
+    let mut address = 0;
+
+    while address + merkle_leaf_size <= LEN {
+        writer.write_all(read(address).as_slice())?;
+        address += merkle_leaf_size;
+    }
+
+    // When the last chunk is smaller than `MERKLE_LEAF_SIZE`,
+    // read the last `MERKLE_LEAF_SIZE` bytes and pass a subslice containing
+    // only the bytes not previously read to the writer.
+    if address != LEN {
+        address += merkle_leaf_size;
+        let buffer = read(LEN.saturating_sub(merkle_leaf_size));
+        writer.write_all(&buffer[address.saturating_sub(LEN)..])?;
+    };
+
+    Ok(())
+}
+
 /// Writer which splits data in fixed-sized chunks and produces a [`MerkleTree`]
 /// with a given arity in which each leaf represents a chunk.
 pub struct MerkleWriter {
@@ -439,12 +490,16 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
-    use super::{AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree};
+    use super::{
+        chunks_to_writer, AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree,
+        MERKLE_LEAF_SIZE,
+    };
     use crate::state_backend::{
         hash::{Hash, HashError},
         proof_backend::proof::{MerkleProof, MerkleProofLeaf},
     };
     use proptest::prelude::*;
+    use std::io::Cursor;
 
     impl CompressedMerkleTree {
         /// Get the root hash of a compressed Merkle tree
@@ -732,4 +787,41 @@ mod tests {
 
         check(t_root, root);
     }
+
+    const LENS: [usize; 4] = [0, 1, 535, 4095];
+    const _: () = {
+        if MERKLE_LEAF_SIZE.get() != 4096 {
+            panic!(
+                "Test values in `LENS` assume a specific MERKLE_LEAF_SIZE, change them accordingly"
+            );
+        }
+    };
+
+    // Test `chunks_to_writer` with a variety of lengths
+    macro_rules! generate_test_chunks_to_writer {
+        ( $name:ident, $i:expr ) => {
+            proptest! {
+                #[test]
+                fn $name(
+                    data in proptest::collection::vec(any::<u8>(), 4 * MERKLE_LEAF_SIZE.get() + LENS[$i])
+                ) {
+                    const LEN: usize = 4 * MERKLE_LEAF_SIZE.get() + LENS[$i];
+
+                    let read = |pos: usize| {
+                        assert!(pos + MERKLE_LEAF_SIZE.get() <= LEN);
+                        data[pos..pos + MERKLE_LEAF_SIZE.get()].try_into().unwrap()
+                    };
+
+                    let mut writer = Cursor::new(Vec::new());
+                    chunks_to_writer::<LEN, _, _>(&mut writer, read).unwrap();
+                    assert_eq!(writer.into_inner(), data);
+                }
+            }
+        }
+    }
+
+    generate_test_chunks_to_writer!(test_chunks_to_writer_0, 0);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_1, 1);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_2, 2);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_3, 3);
 }
