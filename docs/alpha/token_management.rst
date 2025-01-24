@@ -65,6 +65,7 @@ The value of the additional field ``category`` designates one of the following f
 * ``"attesting rewards"`` is the source of tokens minted to reward delegates for attesting blocks
 * ``"baking rewards"`` is the source of tokens minted to reward delegates for creating blocks
 * ``"baking bonuses"`` is the source of tokens minted to reward delegates for validating blocks and including extra attestations
+* ``"DAL attesting rewards"`` is the source of tokens minted to reward delegates for attesting DAL slots
 * ``"subsidy"`` is the source of tokens minted to subsidize the liquidity baking CPMM contract
 * ``"invoice"`` is the source of tokens minted to compensate some users who have contributed to the betterment of the chain
 * ``"commitment"`` is the source of tokens minted to match commitments made by some users to supply funds for the chain
@@ -142,6 +143,9 @@ The field ``category`` of a sink account may have one of the following values:
   - the field ``delegate`` contains the public key hash of the delegate
   - the field ``participation`` has the value ``"true"`` if participation was not sufficient and has the value ``"false"`` otherwise
   - the field ``revelation`` has the value ``"true"`` if the delegate has not revealed his nonce and has the value ``"false"`` otherwise.
+* ``"lost DAL attesting rewards"`` is the destination of DAL rewards that were not distributed to a delegate.
+  This category comes with the additional field ``delegate`` containing the public key hash of the delegate.
+
 * ``"Sc_rollup_refutation_punishments"`` is the destination of tokens burned as punishment for submitting bad commitments that have been refuted
 * ``"burned"`` is only for internal use and testing.
   It will not appear on mainnet, but may appear on test networks or in sandboxed mode.
@@ -239,6 +243,9 @@ For example, for an amount of ``100`` mutez in rewards not distributed due to in
      "revelation": "false",
      "change": "100", ...} ]
 
-Double signing evidence rewards and nonce revelation rewards are analogous to attesting rewards, except that the source accounts used are ``"double signing evidence rewards"`` and ``"nonce revelation rewards"``.
-Depending on the staking parameters set by the delegate, some portion of the attesting rewards
+DAL attesting rewards are analogous to attesting rewards, except that the source account used is ``DAL attesting rewards``.
+
+Depending on the staking parameters set by the delegate, some portion of the (DAL) attesting rewards
 will go to the freezer container, as for baking rewards and bonuses.
+
+Double signing evidence rewards and nonce revelation rewards are analogous to attesting rewards, except that the source accounts used are ``"double signing evidence rewards"`` and ``"nonce revelation rewards"``.
