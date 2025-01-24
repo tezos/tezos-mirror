@@ -1978,7 +1978,10 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
             |> JSON.update "cors_origins" (fun _ ->
                    JSON.annotate ~origin:"patch-config:cors_origins"
                    @@ `A [`String "*"]))
-          json)
+          json
+        |> JSON.update "experimental_features" (fun _ ->
+               JSON.annotate ~origin:"patch-config:experimental_features"
+               @@ `O [("enable_websocket", `Bool true)]))
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
       endpoint
