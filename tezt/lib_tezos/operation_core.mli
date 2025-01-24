@@ -284,6 +284,7 @@ module Consensus : sig
   val operation :
     ?branch:string ->
     ?chain_id:string ->
+    ?with_dal:bool ->
     signer:Account.key ->
     t ->
     Client.t ->
