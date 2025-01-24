@@ -8,9 +8,7 @@
 //! Definitions & tezos-encodings for *michelson* data.
 use micheline::annots::Annotations;
 use nom::branch::alt;
-use nom::bytes::complete::tag;
 use nom::combinator::map;
-use nom::sequence::preceded;
 use prim::*;
 use std::fmt::Debug;
 use tezos_data_encoding::enc::{self, BinResult, BinWriter};
@@ -29,7 +27,7 @@ use micheline::{
     bin_write_prim_1_arg_no_annots, bin_write_prim_2_args_no_annots,
     bin_write_prim_no_args_no_annots, nom_read_micheline_bytes, nom_read_micheline_int,
     nom_read_micheline_string, MichelinePrim1ArgNoAnnots, MichelinePrim2ArgsNoAnnots,
-    MichelinePrimNoArgsNoAnnots, MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG,
+    MichelinePrimNoArgsNoAnnots,
 };
 use v1_primitives as prim;
 
@@ -185,7 +183,7 @@ impl AsRef<Zarith> for MichelsonNat {
 
 /// Michelson Timestamp encoding.
 #[derive(Debug, PartialEq, Eq)]
-pub struct MichelsonTimestamp(pub MichelsonNat);
+pub struct MichelsonTimestamp(pub Zarith);
 
 // ----------
 // CONVERSION
@@ -382,31 +380,15 @@ impl MichelsonTicketContent for MichelsonUnit {
 impl MichelsonTicketContent for MichelsonTimestamp {
     typed_prim!(MichelsonTimestamp, TIMESTAMP_TYPE_TAG);
 
-    fn of_node(node: Node) -> Option<Self> {
-        if let Node::Prim {
-            prim_tag,
-            args,
-            annots,
-        } = node
-        {
-            if prim_tag == TIMESTAMP_TYPE_TAG && args.len() == 1 && annots.is_empty() {
-                let value = match args.first()? {
-                    Node::Int(value) => value,
-                    _ => return None,
-                };
-                let michelson_nat = MichelsonNat::new(value.clone())?;
-                return Some(MichelsonTimestamp(michelson_nat));
-            }
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Int(value) => Some(MichelsonTimestamp(value)),
+            _ => None,
         }
-        None
     }
 
     fn to_node(&self) -> Node {
-        Node::Prim {
-            prim_tag: TIMESTAMP_TYPE_TAG,
-            args: vec![self.0.to_node()],
-            annots: Annotations(vec![]),
-        }
+        Node::Int(self.0.clone())
     }
 }
 
@@ -715,10 +697,7 @@ impl NomReader<'_> for MichelsonInt {
 
 impl NomReader<'_> for MichelsonTimestamp {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
-        preceded(
-            tag([MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, TIMESTAMP_TYPE_TAG]),
-            map(MichelsonNat::nom_read, MichelsonTimestamp),
-        )(input)
+        map(nom_read_micheline_int, MichelsonTimestamp)(input)
     }
 }
 
@@ -866,75 +845,12 @@ impl BinWriter for MichelsonInt {
 
 impl BinWriter for MichelsonTimestamp {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
-        bin_write_prim_1_arg_no_annots(prim::TIMESTAMP_TYPE_TAG, &self.0, output)
+        bin_write_micheline_int(&self.0, output)
     }
 }
 
 impl BinWriter for MichelsonNat {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
         bin_write_micheline_int(&self.0, output)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::michelson::{
-        micheline::annots::Annotations, MichelsonNat, TIMESTAMP_TYPE_TAG,
-    };
-
-    use super::{micheline::Node, MichelsonTicketContent, MichelsonTimestamp};
-    use num_bigint::BigInt;
-    use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Zarith};
-
-    fn zarith(x: u32) -> Zarith {
-        Zarith::from(BigInt::from(x))
-    }
-
-    #[test]
-    fn timestamp_serialisation_roundtrip() {
-        let initial_timestamp = MichelsonTimestamp(MichelsonNat(zarith(251197)));
-        let initial_node = Node::Prim {
-            prim_tag: TIMESTAMP_TYPE_TAG,
-            args: vec![Node::Int(zarith(251197))],
-            annots: Annotations(vec![]),
-        };
-
-        // Check:
-        // node -> timestamp == timestamp
-        // timestamp -> node == node
-        let timestamp_from_node =
-            MichelsonTimestamp::of_node(initial_node.clone()).unwrap();
-        let node_from_timestamp = timestamp_from_node.to_node();
-        assert_eq!(initial_timestamp, timestamp_from_node);
-        assert_eq!(initial_node, node_from_timestamp);
-
-        // Check:
-        // timestamp -> bytes == timestamp -> node -> bytes
-        let mut bin = Vec::new();
-        let mut bin2 = Vec::new();
-        timestamp_from_node.bin_write(&mut bin).unwrap();
-        node_from_timestamp.bin_write(&mut bin2).unwrap();
-        assert_eq!(bin, bin2);
-
-        // Check:
-        // bytes -> timestamp == bytes -> node -> timestamp
-        let (remaining, timestamp_from_bin) = MichelsonTimestamp::nom_read(&bin).unwrap();
-        let (remaining2, node_from_bin) = Node::nom_read(&bin2).unwrap();
-        let timestamp_from_node_2 = MichelsonTimestamp::of_node(node_from_bin).unwrap();
-        assert!(remaining.is_empty());
-        assert!(remaining2.is_empty());
-        assert_eq!(timestamp_from_node, timestamp_from_bin);
-        assert_eq!(timestamp_from_node, timestamp_from_node_2)
-    }
-
-    #[test]
-    fn octez_client_data_checks() {
-        let initial_timestamp = MichelsonTimestamp(MichelsonNat(zarith(112597)));
-        // > octez-client convert data 'timestamp 112597' from michelson to binary
-        // 0x056b0095df0d
-        let bin = hex::decode("056b0095df0d").unwrap();
-        let (remaining, timestamp) = MichelsonTimestamp::nom_read(&bin).unwrap();
-        assert!(remaining.is_empty());
-        assert_eq!(initial_timestamp, timestamp);
     }
 }
