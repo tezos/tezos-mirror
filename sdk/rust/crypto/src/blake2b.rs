@@ -8,7 +8,6 @@ use cryptoxide::digest::Digest;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[cfg_attr(feature = "fuzzing", derive(fuzzcheck::DefaultMutator))]
 #[derive(Serialize, Deserialize, Error, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Blake2bError {
     #[error("Output digest length must be between 16 and 64 bytes.")]
@@ -101,7 +100,7 @@ where
     // The wrapper around slice which repeats last item forever
     struct RepeatingSlice<'a, Leaf>(pub &'a [Leaf]);
 
-    impl<'a, Leaf> Index<usize> for RepeatingSlice<'a, Leaf> {
+    impl<Leaf> Index<usize> for RepeatingSlice<'_, Leaf> {
         type Output = Leaf;
 
         fn index(&self, index: usize) -> &Self::Output {
@@ -115,7 +114,7 @@ where
         }
     }
 
-    impl<'a, Leaf> Index<RangeFrom<usize>> for RepeatingSlice<'a, Leaf> {
+    impl<Leaf> Index<RangeFrom<usize>> for RepeatingSlice<'_, Leaf> {
         type Output = [Leaf];
 
         fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
@@ -129,7 +128,7 @@ where
         }
     }
 
-    impl<'a, Leaf> Index<RangeTo<usize>> for RepeatingSlice<'a, Leaf> {
+    impl<Leaf> Index<RangeTo<usize>> for RepeatingSlice<'_, Leaf> {
         type Output = [Leaf];
 
         fn index(&self, index: RangeTo<usize>) -> &Self::Output {
@@ -152,7 +151,7 @@ where
             d => {
                 let middle = 1 << (d - 1);
                 digest_all(
-                    &[
+                    [
                         merkle_tree_inner(&RepeatingSlice(&list[..middle]), d - 1),
                         merkle_tree_inner(&RepeatingSlice(&list[middle..]), d - 1),
                     ],
@@ -214,7 +213,7 @@ mod tests {
 
     #[test]
     fn blake2b_digest_all() {
-        let hash = digest_all(&["hello", " ", "world"], 32).unwrap();
+        let hash = digest_all(["hello", " ", "world"], 32).unwrap();
         assert_eq!(
             hash,
             hex::decode("256c83b297114d201b30179f3f0ef0cace9783622da5974326b436178aeef610")

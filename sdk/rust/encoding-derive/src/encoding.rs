@@ -31,7 +31,7 @@ pub struct FieldEncoding<'a> {
 }
 
 impl<'a> FieldEncoding<'a> {
-    pub fn encoding(&'a self) -> Option<&Encoding<'a>> {
+    pub fn encoding(&'a self) -> Option<&'a Encoding<'a>> {
         match &self.kind {
             FieldKind::Encoded(encoded_field) => Some(&encoded_field.encoding),
             _ => None,

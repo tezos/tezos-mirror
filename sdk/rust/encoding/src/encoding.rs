@@ -150,13 +150,11 @@ pub enum Encoding {
     /// Encoding of a boolean (data is encoded as a byte in binary and a boolean in JSON).
     Bool,
     /// Encoding of a string
-    /// - encoded as a byte sequence in binary prefixed by the length
-    /// of the string
+    /// - encoded as a byte sequence in binary prefixed by the length of the string
     /// - encoded as a string in JSON.
     String,
     /// Encoding of a string
-    /// - encoded as a byte sequence in binary prefixed by the length
-    /// of the string
+    /// - encoded as a byte sequence in binary prefixed by the length of the string
     /// - encoded as a string in JSON.
     BoundedString(usize),
     /// Encoding of arbitrary sized bytes (encoded via hex in JSON and directly as a sequence byte in binary).

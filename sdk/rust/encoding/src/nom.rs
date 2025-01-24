@@ -219,13 +219,13 @@ pub trait NomReader<'a>: Sized {
     fn nom_read(input: &'a [u8]) -> NomResult<'a, Self>;
 }
 
-impl<'a> NomReader<'a> for Zarith {
+impl NomReader<'_> for Zarith {
     fn nom_read(bytes: &[u8]) -> NomResult<Self> {
         map(z_bignum, |big_int| big_int.into())(bytes)
     }
 }
 
-impl<'a> NomReader<'a> for Mutez {
+impl NomReader<'_> for Mutez {
     fn nom_read(bytes: &[u8]) -> NomResult<Self> {
         map(n_bignum, |big_uint| {
             BigInt::from_biguint(Sign::Plus, big_uint).into()

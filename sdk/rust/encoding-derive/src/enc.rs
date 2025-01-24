@@ -106,9 +106,9 @@ fn generate_string_encoding(size: &Option<syn::Expr>, span: Span) -> TokenStream
     )
 }
 
-fn generate_list_encoding<'a>(
+fn generate_list_encoding(
     size: &Option<syn::Expr>,
-    encoding: &Encoding<'a>,
+    encoding: &Encoding<'_>,
     span: Span,
 ) -> TokenStream {
     let encoding = generate_encoding(encoding);
@@ -120,20 +120,12 @@ fn generate_optional_field_encoding(encoding: &Encoding, span: Span) -> TokenStr
     quote_spanned!(span=> tezos_data_encoding::encoding::Encoding::OptionalField(Box::new(#encoding)))
 }
 
-fn generate_sized_encoding<'a>(
-    size: &syn::Expr,
-    encoding: &Encoding<'a>,
-    span: Span,
-) -> TokenStream {
+fn generate_sized_encoding(size: &syn::Expr, encoding: &Encoding<'_>, span: Span) -> TokenStream {
     let encoding = generate_encoding(encoding);
     quote_spanned!(span=> tezos_data_encoding::encoding::Encoding::Sized(#size, Box::new(#encoding)))
 }
 
-fn generate_bounded_encoding<'a>(
-    size: &syn::Expr,
-    encoding: &Encoding<'a>,
-    span: Span,
-) -> TokenStream {
+fn generate_bounded_encoding(size: &syn::Expr, encoding: &Encoding<'_>, span: Span) -> TokenStream {
     let encoding = generate_encoding(encoding);
     quote_spanned!(span=> tezos_data_encoding::encoding::Encoding::Bounded(#size, Box::new(#encoding)))
 }
@@ -143,9 +135,9 @@ fn generate_short_dynamic_encoding(encoding: &Encoding, span: Span) -> TokenStre
     quote_spanned!(span=> tezos_data_encoding::encoding::Encoding::ShortDynamic(Box::new(#encoding)))
 }
 
-fn generate_dynamic_encoding<'a>(
+fn generate_dynamic_encoding(
     size: &Option<syn::Expr>,
-    encoding: &Encoding<'a>,
+    encoding: &Encoding<'_>,
     span: Span,
 ) -> TokenStream {
     let encoding = generate_encoding(encoding);

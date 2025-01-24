@@ -122,8 +122,8 @@ fn generate_enum_bin_write(encoding: &EnumEncoding) -> TokenStream {
     }
 }
 
-fn generate_tag_bin_write<'a>(
-    tag: &Tag<'a>,
+fn generate_tag_bin_write(
+    tag: &Tag<'_>,
     enum_name: &syn::Ident,
     tag_encoding: &TokenStream,
 ) -> TokenStream {

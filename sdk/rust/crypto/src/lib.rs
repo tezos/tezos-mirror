@@ -4,7 +4,6 @@
 //
 // SPDX-License-Identifier: MIT
 #![forbid(unsafe_code)]
-#![cfg_attr(feature = "fuzzing", feature(no_coverage))]
 
 use thiserror::Error;
 

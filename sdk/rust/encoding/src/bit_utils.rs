@@ -1,11 +1,9 @@
 // Copyright (c) SimpleStaking, Viable Systems and Tezedge Contributors
+// SPDX-CopyrightText: 2025 Trilitech <contact@trili.tech>
 // SPDX-License-Identifier: MIT
 
-use std::fmt::{Binary, Debug, Display, LowerHex, UpperHex};
-use std::mem::size_of;
-use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl, ShlAssign, Shr, ShrAssign};
-
 use bit_vec::BitVec;
+use std::fmt::Debug;
 use thiserror::Error;
 
 /// An error triggered when working with [Bits].
@@ -16,14 +14,26 @@ pub enum BitsError {
     IndexOutOfRange,
 }
 
-/// A trait for types that can be used as direct storage of bits.
-///
-/// This trait must only be implemented on unsigned integer primitives.
-///
-/// The dependency on `Sealed`, a crate-private trait, ensures that this trait
-/// can only ever be implemented locally, and no downstream crates are able to
-/// implement it on new types.
-pub trait Bits:
+#[cfg(test)]
+pub use test_utils::*;
+
+#[cfg(test)]
+mod test_utils {
+    use super::BitsError;
+    use bit_vec::BitVec;
+    use std::fmt::{Binary, Debug, Display, LowerHex, UpperHex};
+    use std::mem::size_of;
+    use std::ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl, ShlAssign, Shr, ShrAssign};
+
+    /// A trait for types that can be used as direct storage of bits.
+    ///
+    /// This trait must only be implemented on unsigned integer primitives.
+    ///
+    /// The dependency on `Sealed`, a crate-private trait, ensures that this trait
+    /// can only ever be implemented locally, and no downstream crates are able to
+    /// implement it on new types.
+    #[cfg(test)]
+    pub trait Bits:
     Binary
     + BitAnd<Self, Output=Self>
     + BitAndAssign<Self>
@@ -63,7 +73,7 @@ pub trait Bits:
     const MASK: u8 = Self::WIDTH - 1;
 
     /// The maximum number of this type that can be held in a `BitVec`.
-    const MAX_ELT: usize = core::usize::MAX >> Self::BITS;
+    const MAX_ELT: usize = usize::MAX >> Self::BITS;
 
     /// Set a specific bit in an element to a given value.
     fn set(&mut self, place: u8, value: bool) -> Result<(), BitsError> {
@@ -87,6 +97,7 @@ pub trait Bits:
     }
 
     /// Get a specific bit in an element and resets it.
+    #[cfg(test)]
     fn take(&mut self, place: u8) -> Result<bool, BitsError> {
         if place > Self::MASK {
             return Err(BitsError::IndexOutOfRange);
@@ -105,22 +116,73 @@ pub trait Bits:
     const TY: &'static str;
 }
 
-impl Bits for u8 {
-    const BITS: u8 = 3;
+    impl Bits for u8 {
+        const BITS: u8 = 3;
 
-    const TY: &'static str = "u8";
-}
+        const TY: &'static str = "u8";
+    }
 
-impl Bits for u16 {
-    const BITS: u8 = 4;
+    impl Bits for u16 {
+        const BITS: u8 = 4;
 
-    const TY: &'static str = "u16";
-}
+        const TY: &'static str = "u16";
+    }
 
-impl Bits for u32 {
-    const BITS: u8 = 5;
+    impl Bits for u32 {
+        const BITS: u8 = 5;
 
-    const TY: &'static str = "u32";
+        const TY: &'static str = "u32";
+    }
+
+    pub trait BitTrim {
+        fn trim_left(&self) -> Self;
+    }
+
+    impl BitTrim for BitVec {
+        fn trim_left(&self) -> BitVec {
+            let mut trimmed: BitVec = BitVec::new();
+
+            let mut notrim = false;
+            for bit in self.iter() {
+                if bit {
+                    trimmed.push(bit);
+                    notrim = true;
+                } else if notrim {
+                    trimmed.push(bit);
+                }
+            }
+            trimmed
+        }
+    }
+
+    #[cfg(test)]
+    pub trait ToBytes {
+        fn to_byte_vec(&self) -> Vec<u8>;
+    }
+
+    #[cfg(test)]
+    impl ToBytes for BitVec {
+        fn to_byte_vec(&self) -> Vec<u8> {
+            let mut bytes = vec![];
+            let mut byte = 0;
+            let mut offset = 0;
+            for (idx_bit, bit) in self.iter().rev().enumerate() {
+                let idx_byte = (idx_bit % 8) as u8;
+                byte.set(idx_byte, bit)
+                    .unwrap_or_else(|_| unreachable!("Byte should have 8-bit width"));
+                if idx_byte == 7 {
+                    bytes.push(byte);
+                    byte = 0;
+                }
+                offset = idx_byte;
+            }
+            if offset != 7 {
+                bytes.push(byte);
+            }
+            bytes.reverse();
+            bytes
+        }
+    }
 }
 
 pub trait BitReverse {
@@ -135,54 +197,6 @@ impl BitReverse for BitVec {
             reversed.push(bit)
         }
         reversed
-    }
-}
-
-pub trait BitTrim {
-    fn trim_left(&self) -> Self;
-}
-
-impl BitTrim for BitVec {
-    fn trim_left(&self) -> BitVec {
-        let mut trimmed: BitVec = BitVec::new();
-
-        let mut notrim = false;
-        for bit in self.iter() {
-            if bit {
-                trimmed.push(bit);
-                notrim = true;
-            } else if notrim {
-                trimmed.push(bit);
-            }
-        }
-        trimmed
-    }
-}
-
-pub trait ToBytes {
-    fn to_byte_vec(&self) -> Vec<u8>;
-}
-
-impl ToBytes for BitVec {
-    fn to_byte_vec(&self) -> Vec<u8> {
-        let mut bytes = vec![];
-        let mut byte = 0;
-        let mut offset = 0;
-        for (idx_bit, bit) in self.iter().rev().enumerate() {
-            let idx_byte = (idx_bit % 8) as u8;
-            byte.set(idx_byte, bit)
-                .unwrap_or_else(|_| unreachable!("Byte should have 8-bit width"));
-            if idx_byte == 7 {
-                bytes.push(byte);
-                byte = 0;
-            }
-            offset = idx_byte;
-        }
-        if offset != 7 {
-            bytes.push(byte);
-        }
-        bytes.reverse();
-        bytes
     }
 }
 

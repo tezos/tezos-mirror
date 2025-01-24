@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Error produced by a [BinaryReader].
-#[cfg_attr(feature = "fuzzing", derive(fuzzcheck::DefaultMutator))]
 #[derive(Serialize, Deserialize, Debug, Clone, Error)]
 pub enum BinaryReaderError {
     Error(String),
