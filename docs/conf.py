@@ -45,7 +45,12 @@ extensions = [
     'michelsonlexer',
     'sphinxcontrib.jquery',
     'sphinx_copybutton',
+    'sphinx_sitemap',
 ]
+
+# Sitemap
+sitemap_url_scheme = '{link}'
+html_baseurl = 'https://tezos.gitlab.io/'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
