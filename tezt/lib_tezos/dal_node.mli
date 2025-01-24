@@ -154,6 +154,16 @@ val init_config :
   t ->
   unit Lwt.t
 
+val update_config :
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?producer_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  t ->
+  unit Lwt.t
+
 module Config_file : sig
   (** DAL node configuration files. *)
 
