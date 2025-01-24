@@ -1462,6 +1462,22 @@ let get_chain_block_context_delegate_participation ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_delegate_dal_participation ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "dal_participation";
+    ]
+    Fun.id
+
 let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
     ?(block = "head") pkh =
   make
