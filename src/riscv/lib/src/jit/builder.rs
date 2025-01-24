@@ -7,7 +7,13 @@
 //! [instructions]: crate::machine_state::instruction::Instruction
 
 use super::state_access::{JitStateAccess, JsaCalls};
-use crate::machine_state::main_memory::{Address, MainMemoryLayout};
+use crate::{
+    instruction_context::ICB,
+    machine_state::{
+        main_memory::{Address, MainMemoryLayout},
+        registers::NonZeroXRegister as XRegister,
+    },
+};
 use cranelift::{
     codegen::ir::{InstBuilder, MemFlags, Type, Value},
     frontend::FunctionBuilder,
@@ -65,5 +71,40 @@ impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
 
         self.builder.ins().return_(&[]);
         self.builder.finalize();
+    }
+}
+
+impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> ICB for Builder<'a, ML, JSA> {
+    type XValue = ();
+    type IResult<Value> = Value;
+
+    fn xregister_read(&mut self, _reg: XRegister) -> Self::XValue {
+        todo!("RV-404: implement xregister read/write support")
+    }
+
+    fn xregister_write(&mut self, _reg: XRegister, _value: Self::XValue) {
+        todo!("RV-404: implement xregister read/write support")
+    }
+
+    fn xvalue_wrapping_add(&mut self, _lhs: Self::XValue, _rhs: Self::XValue) -> Self::XValue {
+        todo!("RV-368: jit support for cadd instruction")
+    }
+
+    fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
+        val
+    }
+
+    fn map<Value, Next, F>(_res: Self::IResult<Value>, _f: F) -> Self::IResult<Next>
+    where
+        F: FnOnce(Value) -> Next,
+    {
+        todo!("RV-415: support fallible pathways in JIT")
+    }
+
+    fn and_then<Value, Next, F>(_res: Self::IResult<Value>, _f: F) -> Self::IResult<Next>
+    where
+        F: FnOnce(Value) -> Self::IResult<Next>,
+    {
+        todo!("RV-415: support fallible pathways in JIT")
     }
 }

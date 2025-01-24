@@ -16,6 +16,7 @@ use crate::machine_state::instruction::Instruction;
 use crate::machine_state::instruction::OpCode;
 use crate::machine_state::main_memory::MainMemoryLayout;
 use crate::machine_state::MachineCoreState;
+use crate::machine_state::ProgramCounterUpdate;
 use crate::traps::EnvironException;
 use cranelift::codegen::ir::types::I64;
 use cranelift::codegen::settings::SetError;
@@ -134,8 +135,19 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         for i in instr.iter() {
             match i.opcode {
                 OpCode::Nop => {
+                    let lower = OpCode::Nop.to_lowering()?;
+                    let pc_update = unsafe {
+                        // # SAFETY: lower is called with args from the same instruction that it
+                        // was derived
+                        (lower)(i.args(), &mut builder)
+                    };
+
+                    let ProgramCounterUpdate::Next(width) = pc_update else {
+                        unreachable!("Nop bumps pc by instruction width");
+                    };
+
+                    builder.pc_offset += width as u64;
                     builder.steps += 1;
-                    builder.pc_offset += i.width() as u64;
                 }
                 _ => return None,
             }
