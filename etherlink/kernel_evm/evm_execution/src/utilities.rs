@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2024-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 draganrakita
 //
 // SPDX-License-Identifier: MIT
@@ -6,7 +6,7 @@
 use core::cmp::min;
 
 use alloc::vec::Vec;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 
@@ -69,4 +69,11 @@ pub fn bigint_to_u256(value: &BigInt) -> Result<U256, primitive_types::Error> {
         return Err(primitive_types::Error::Overflow);
     }
     Ok(U256::from_little_endian(&bytes))
+}
+
+/// Converts a U256 to a BigInt
+pub fn u256_to_bigint(value: U256) -> BigInt {
+    let mut bytes = vec![0u8; 32];
+    value.to_big_endian(&mut bytes);
+    BigInt::from_bytes_be(Sign::Plus, &bytes)
 }

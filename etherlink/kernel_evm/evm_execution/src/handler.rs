@@ -43,19 +43,59 @@ use sha3::{Digest, Keccak256};
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use tezos_data_encoding::enc::{BinResult, BinWriter};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::michelson::ticket::FA2_1Ticket;
-use tezos_smart_rollup_encoding::michelson::{MichelsonContract, MichelsonPair};
+use tezos_smart_rollup_encoding::michelson::{
+    MichelsonBytes, MichelsonContract, MichelsonNat, MichelsonPair, MichelsonTimestamp,
+};
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_storage::StorageError;
 
 /// Withdrawal interface of the ticketer contract
 pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 
-/// Outbox message that implements RouterInterface, ready to be encoded and posted
-pub type Withdrawal = OutboxMessage<RouterInterface>;
+/// Interface of the default entrypoint of the fast withdrawal contract.
+///
+/// The parameters corresponds to (from left to right w.r.t. `MichelsonPair`):
+/// * withdrawal_id
+/// * ticket
+/// * timestamp
+/// * withdrawer's address
+/// * generic payload
+pub type FastWithdrawalInterface = MichelsonPair<
+    MichelsonNat,
+    MichelsonPair<
+        FA2_1Ticket,
+        MichelsonPair<
+            MichelsonTimestamp,
+            MichelsonPair<MichelsonContract, MichelsonBytes>,
+        >,
+    >,
+>;
+
+/// Outbox messages that implements the different withdrawal interfaces,
+/// ready to be encoded and posted.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Withdrawal {
+    Standard(OutboxMessage<RouterInterface>),
+    Fast(OutboxMessage<FastWithdrawalInterface>),
+}
+
+impl BinWriter for Withdrawal {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        match self {
+            Withdrawal::Standard(outbox_message_full) => {
+                outbox_message_full.bin_write(output)
+            }
+            Withdrawal::Fast(outbox_message_full) => {
+                outbox_message_full.bin_write(output)
+            }
+        }
+    }
+}
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ExecutionResult {

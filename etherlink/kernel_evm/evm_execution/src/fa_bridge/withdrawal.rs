@@ -187,7 +187,9 @@ impl FaWithdrawal {
             // L1 proxy accepts ticket and the final receiver address
             parameters: MichelsonPair(MichelsonContract(self.receiver), self.ticket),
         };
-        OutboxMessage::AtomicTransactionBatch(vec![message].into())
+        crate::handler::Withdrawal::Standard(OutboxMessage::AtomicTransactionBatch(
+            vec![message].into(),
+        ))
     }
 
     /// Formats FA withdrawal structure for logging purposes.
