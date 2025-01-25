@@ -1082,23 +1082,56 @@ module State = struct
       (preload_kernel_from_level ctxt)
       (earliest_level @ activation_levels)
 
-  let enable_replay_block_storage ~keep_alive evm_node_endpoint =
-    let open Lwt_syntax in
-    let get_block n =
-      let* (answer : (Ethereum_types.block, tztrace) result) =
-        Batch.call
-          (module Rpc_encodings.Get_block_by_number)
-          ~keep_alive
-          ~evm_node_endpoint
-          (Ethereum_types.Block_parameter.(Number n), false)
+  let enable_replay_block_storage ~keep_alive ?evm_node_endpoint store =
+    let get_block_from_store n =
+      Evm_store.(
+        use store @@ fun conn ->
+        Blocks.find_with_level ~full_transaction_object:false conn n)
+    in
+    let get_block_from_endpoint evm_node_endpoint n =
+      Batch.call
+        (module Rpc_encodings.Get_block_by_number)
+        ~keep_alive
+        ~evm_node_endpoint
+        (Ethereum_types.Block_parameter.(Number n), false)
+    in
+    let get_block (n : Ethereum_types.quantity) =
+      let (Qty nz) = n in
+      let open Lwt_result_syntax in
+      let* from_store =
+        trace
+          (error_of_fmt
+             "Failed when trying to fetch block %a from the store"
+             Z.pp_print
+             nz)
+        @@ get_block_from_store n
       in
-      match answer with
-      | Error err ->
-          let* () = Evm_context_events.get_block_failed n err in
-          Stdlib.failwith "Failed to retrieve the block"
+      match (from_store, evm_node_endpoint) with
+      | Some block, _ -> return block
+      | None, Some evm_node_endpoint ->
+          trace
+            (error_of_fmt
+               "Failed when trying to fetch block %a from the upstream endpoint"
+               Z.pp_print
+               nz)
+          @@ get_block_from_endpoint evm_node_endpoint n
+      | None, None ->
+          failwith
+            "Block %a was missing from the context and upstream endpoint"
+            Z.pp_print
+            nz
+    in
+    let get_block_exn n =
+      let open Lwt_syntax in
+      let* maybe_block = get_block n in
+      match maybe_block with
       | Ok block -> return block
+      | Error trace ->
+          Stdlib.failwith
+            Format.(asprintf "%a" Error_monad.pp_print_trace trace)
     in
     let store_get_hash tree key =
+      let open Lwt_syntax in
       let enable_fallback =
         match
           Lwt_preemptive.run_in_main @@ fun () -> Evm_state.storage_version tree
@@ -1118,7 +1151,7 @@ module State = struct
         Lwt_preemptive.run_in_main @@ fun () ->
         let* pred = Evm_state.current_block_height tree in
         let n = Ethereum_types.Qty.next pred in
-        let+ block = get_block n in
+        let+ block = get_block_exn n in
         let s = Ethereum_types.hash_to_bytes block.receiptRoot in
         Ok (Bytes.unsafe_of_string s)
       else if
@@ -1127,7 +1160,7 @@ module State = struct
         Lwt_preemptive.run_in_main @@ fun () ->
         let* pred = Evm_state.current_block_height tree in
         let n = Ethereum_types.Qty.next pred in
-        let+ block = get_block n in
+        let+ block = get_block_exn n in
         let s = Ethereum_types.hash_to_bytes block.transactionRoot in
         Ok (Bytes.unsafe_of_string s)
       else Wasm_runtime_callbacks.store_get_hash tree key
@@ -1359,19 +1392,20 @@ module State = struct
       when_
         configuration.experimental_features.replay_block_storage_sqlite3
         (fun () ->
-          match configuration.observer with
-          | (None | Some _) when is_sequencer ctxt ->
-              failwith "Replay block storage is not available for sequencer"
-          | Some observer ->
-              let*! () =
-                enable_replay_block_storage
-                  ~keep_alive:configuration.keep_alive
-                  observer.evm_node_endpoint
-              in
-              return_unit
-          | None ->
-              (* If it's not a sequencer it must be an observer. *)
-              assert false)
+          let* ro_store = Evm_store.init ~data_dir ~perm:`Read_only () in
+          let* evm_node_endpoint =
+            if is_sequencer ctxt then return_none
+            else
+              match configuration.observer with
+              | Some observer -> return_some observer.evm_node_endpoint
+              | None -> return_none
+          in
+
+          Lwt_result.ok
+            (enable_replay_block_storage
+               ?evm_node_endpoint
+               ~keep_alive:configuration.keep_alive
+               ro_store))
     in
 
     let*! () =

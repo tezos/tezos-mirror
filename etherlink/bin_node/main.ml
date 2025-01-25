@@ -1546,6 +1546,9 @@ let patch_kernel_command =
           ~finalized_view:false
           ()
       in
+      (* We remove the [observer] configuration. This [patch] should not need
+         to interact with an upstream EVM node. *)
+      let configuration = {configuration with observer = None} in
       if force then
         let* _status =
           Evm_context.start ~configuration ~data_dir ~store_perm:`Read_write ()
@@ -2383,6 +2386,9 @@ let patch_state_command =
           ()
       in
       if force then
+        (* We remove the [observer] configuration. This [patch] should not need
+           to interact with an upstream EVM node. *)
+        let configuration = {configuration with observer = None} in
         let* _status =
           Evm_context.start ~configuration ~data_dir ~store_perm:`Read_write ()
         in
