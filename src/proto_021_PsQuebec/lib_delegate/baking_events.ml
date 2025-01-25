@@ -779,6 +779,16 @@ module Scheduling = struct
         "first baker of next level found among delegates. pre-emptively \
          forging block."
       ()
+
+  let dal_node_no_attester_profile =
+    declare_0
+      ~section
+      ~name:"dal_node_no_attester_profile"
+      ~level:Warning
+      ~msg:
+        "The DAL node has no registered attester profile. It is recommended to \
+         start the DAL node with '--attester-profiles <manager_key>'."
+      ()
 end
 
 module Lib = struct
