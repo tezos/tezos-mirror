@@ -38,8 +38,14 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   in
   let* ctxt = Evm_ro_context.load ~data_dir config in
   let* () = Evm_ro_context.preload_known_kernels ctxt in
-  let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
 
+  let* () =
+    when_ config.experimental_features.replay_block_storage_sqlite3 @@ fun () ->
+    Lwt_result.ok
+      (Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store)
+  in
+
+  let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
   let* () =
     Tx_pool.start
       {
