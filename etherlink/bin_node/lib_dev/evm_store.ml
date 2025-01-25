@@ -235,7 +235,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 16
+    let version = 17
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -492,6 +492,15 @@ DO UPDATE SET value = excluded.value
 
     let clear_before =
       (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number < ?|}
+  end
+
+  module Block_storage_mode = struct
+    let legacy =
+      (unit ->! Caqti_type.Std.bool)
+      @@ {|SELECT legacy FROM block_storage_mode|}
+
+    let force_legacy =
+      (unit ->. unit) @@ {|UPDATE block_storage_mode SET legacy = 1|}
   end
 
   module Blocks = struct
@@ -1127,6 +1136,16 @@ module Blocks = struct
   let clear_before store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blocks.clear_before level
+end
+
+module Block_storage_mode = struct
+  let legacy store =
+    with_connection store @@ fun conn ->
+    Db.find conn Q.Block_storage_mode.legacy ()
+
+  let force_legacy store =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Block_storage_mode.force_legacy ()
 end
 
 module Pending_confirmations = struct

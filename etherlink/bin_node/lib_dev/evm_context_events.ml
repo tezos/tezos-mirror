@@ -194,16 +194,6 @@ let observer_reorg_cannot_find_state =
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
-let replace_store_get_hash =
-  declare_0
-    ~section
-    ~name:"evm_context_replace_store_get_hash"
-    ~level:Warning
-    ~msg:
-      "Host function `store_get_hash` is replaced to enable replay with block \
-       storage enabled."
-    ()
-
 let get_block_failed =
   declare_2
     ~section
@@ -293,8 +283,6 @@ let observer_reorg_cannot_find_divergence Ethereum_types.(Qty level) =
 
 let observer_reorg_cannot_find_state Ethereum_types.(Qty level) =
   emit observer_reorg_cannot_find_state level
-
-let replace_store_get_hash () = emit replace_store_get_hash ()
 
 let get_block_failed n err = emit get_block_failed (n, err)
 

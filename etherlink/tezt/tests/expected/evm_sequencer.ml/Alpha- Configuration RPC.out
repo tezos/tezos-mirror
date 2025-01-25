@@ -14,8 +14,6 @@
     "drop_duplicate_on_injection": true,
     "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
-    "block_storage_sqlite3": true,
-    "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
     "garbage_collector_parameters": {
       "split_frequency_in_seconds": 86400,
@@ -78,8 +76,6 @@
     "drop_duplicate_on_injection": true,
     "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
-    "block_storage_sqlite3": true,
-    "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
     "garbage_collector_parameters": {
       "split_frequency_in_seconds": 86400,
@@ -135,8 +131,6 @@
     "drop_duplicate_on_injection": true,
     "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
-    "block_storage_sqlite3": true,
-    "replay_block_storage_sqlite3": false,
     "overwrite_simulation_tick_limit": false,
     "garbage_collector_parameters": {
       "split_frequency_in_seconds": 86400,

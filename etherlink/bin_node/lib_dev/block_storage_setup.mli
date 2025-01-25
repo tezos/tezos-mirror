@@ -9,5 +9,4 @@
     data external to the kernel (its local store, or an upstream EVM node
     endpoint) to validate blueprints of blocks which are not compatible with the
     new block storage relying on the SQLite store. *)
-val enable :
-  keep_alive:bool -> ?evm_node_endpoint:Uri.t -> Evm_store.t -> unit Lwt.t
+val enable : keep_alive:bool -> ?evm_node_endpoint:Uri.t -> Evm_store.t -> unit

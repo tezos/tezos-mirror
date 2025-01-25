@@ -39,11 +39,11 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
   let* ctxt = Evm_ro_context.load ~data_dir config in
   let* () = Evm_ro_context.preload_known_kernels ctxt in
 
-  let* () =
-    when_ config.experimental_features.replay_block_storage_sqlite3 @@ fun () ->
-    Lwt_result.ok
-      (Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store)
+  let* legacy_block_storage =
+    Evm_store.(use ctxt.store Block_storage_mode.legacy)
   in
+  if not legacy_block_storage then
+    Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store ;
 
   let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
   let* () =

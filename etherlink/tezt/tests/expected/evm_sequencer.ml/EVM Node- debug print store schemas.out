@@ -66,4 +66,9 @@ CREATE TABLE irmin_chunks (
 CREATE TABLE metadata (
   key TEXT PRIMARY KEY NOT NULL,
   value TEXT NOT null
+);
+
+CREATE TABLE block_storage_mode (
+  legacy INTEGER NOT NULL,
+  CONSTRAINT valid_legacy CHECK (legacy IN (0, 1))
 )

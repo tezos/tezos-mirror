@@ -293,7 +293,6 @@ type setup_mode =
       time_between_blocks : Evm_node.time_between_blocks option;
       sequencer : Account.key;
       max_blueprints_ahead : int option;
-      block_storage_sqlite3 : bool;
     }
   | Setup_proxy
 
@@ -451,16 +450,10 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               return (Ok l)),
             evm_node )
     | Setup_sequencer
-        {
-          return_sequencer;
-          time_between_blocks;
-          sequencer;
-          max_blueprints_ahead;
-          block_storage_sqlite3;
-        } ->
+        {return_sequencer; time_between_blocks; sequencer; max_blueprints_ahead}
+      ->
         let patch_config =
           Evm_node.patch_config_with_experimental_feature
-            ~block_storage_sqlite3
             ?enable_websocket:websockets
             ()
         in
@@ -619,8 +612,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?(block_storage_sqlite3 = false) ?websockets f
-    protocols =
+    ?max_blueprints_ahead ?websockets f protocols =
   let register ~enable_dal : unit =
     register_test
       ~title
@@ -649,7 +641,6 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
              time_between_blocks;
              sequencer = Constant.bootstrap1;
              max_blueprints_ahead;
-             block_storage_sqlite3;
            })
   in
   register ~enable_dal:false ;
@@ -659,8 +650,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?block_storage_sqlite3 ?websockets f protocols : unit
-    =
+    ?max_blueprints_ahead ?websockets f protocols : unit =
   register_proxy
     ~title
     ~tags
@@ -698,7 +688,6 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?maximum_allowed_ticks
     ?restricted_rpcs
     ?max_blueprints_ahead
-    ?block_storage_sqlite3
     ?websockets
     f
     protocols
@@ -5366,7 +5355,6 @@ let call_get_hash ~address ~block_number endpoint =
 
 let test_blockhash_opcode =
   register_both
-    ~block_storage_sqlite3:true
     ~time_between_blocks:Nothing
     ~max_blueprints_ahead:300
     ~tags:["evm"; "blockhash"; "opcode"]
@@ -5585,7 +5573,6 @@ let test_tx_pool_timeout =
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
         max_blueprints_ahead = None;
-        block_storage_sqlite3 = false;
       }
   in
   let ttl = 15 in
@@ -5677,7 +5664,6 @@ let test_tx_pool_address_boundaries =
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
         max_blueprints_ahead = None;
-        block_storage_sqlite3 = false;
       }
   in
   let* {evm_node = sequencer_node; produce_block; _} =
@@ -5790,7 +5776,6 @@ let test_tx_pool_transaction_size_exceeded =
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
         max_blueprints_ahead = None;
-        block_storage_sqlite3 = false;
       }
   in
   let* {evm_node = sequencer_node; _} =
@@ -6014,8 +5999,8 @@ let test_rpc_feeHistory_future =
   in
   let*@? error = Rpc.fee_history "0x02" "0xFFFFFFFF" evm_setup.evm_node in
   Check.(
-    (error.message =~ rex "Unknown block 4294967295")
-      ~error_msg:"The transaction should fail with message %R, got &L") ;
+    (error.message =~ rex "Block 4294967295 not found")
+      ~error_msg:"The transaction should fail with message %R, got %L") ;
   unit
 
 let test_rpc_feeHistory_long =

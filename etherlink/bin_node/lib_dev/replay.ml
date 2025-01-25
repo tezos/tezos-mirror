@@ -48,11 +48,11 @@ let alter_evm_state ~kernel_path ~kernel_verbosity evm_state =
 let main ?profile ?kernel_path ?kernel_verbosity ~data_dir config number =
   let open Lwt_result_syntax in
   let* ro_ctxt = Evm_ro_context.load ~data_dir config in
-  let* () =
-    when_ config.experimental_features.replay_block_storage_sqlite3 @@ fun () ->
-    Lwt_result.ok
-      (Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store)
+  let* legacy_block_storage =
+    Evm_store.(use ro_ctxt.store Block_storage_mode.legacy)
   in
+  if not legacy_block_storage then
+    Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
   let alter_evm_state = alter_evm_state ~kernel_path ~kernel_verbosity in
   let* apply_result =
     Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state number

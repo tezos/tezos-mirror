@@ -1220,8 +1220,7 @@ type rpc_server = Resto | Dream
 
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
-    ?(blueprints_publisher_order_enabled = false)
-    ?(block_storage_sqlite3 = true) ?(next_wasm_runtime = true)
+    ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?garbage_collector_parameters ?history_mode ?rpc_server
     ?(enable_websocket = false) ?max_websocket_message_length () =
   let conditional_json_put ~name cond value_json json =
@@ -1253,10 +1252,6 @@ let patch_config_with_experimental_feature
   |> conditional_json_put
        blueprints_publisher_order_enabled
        ~name:"blueprints_publisher_order_enabled"
-       (`Bool true)
-  |> conditional_json_put
-       block_storage_sqlite3
-       ~name:"block_storage_sqlite3"
        (`Bool true)
   |> conditional_json_put
        next_wasm_runtime
