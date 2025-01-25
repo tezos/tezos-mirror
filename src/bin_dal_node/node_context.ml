@@ -202,6 +202,8 @@ let version {config; _} =
   let network_name = config.Configuration_file.network_name in
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7706
+   This level argument would not be needed if we had the head level in the context. *)
 let warn_if_attesters_not_delegates ctxt ?level operator_profiles =
   let open Lwt_result_syntax in
   let pkh_set = Operator_profile.attesters operator_profiles in
