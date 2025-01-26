@@ -6,6 +6,10 @@ edition = "2021"
 [dependencies]
 arbitrary-int.workspace = true
 bincode.workspace = true
+cranelift.workspace = true
+cranelift-jit.workspace = true
+cranelift-module.workspace = true
+cranelift-native.workspace = true
 derive_more.workspace = true
 ed25519-dalek.workspace = true
 enum-tag.workspace = true

@@ -1,0 +1,363 @@
+// SPDX-FileCopyrightText: 2025 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
+//! A JIT library for compilation of sequences (or blocks) of RISC-V
+//! instructions to native code.
+
+pub mod state_access;
+
+use crate::machine_state::instruction::Instruction;
+use crate::machine_state::instruction::OpCode;
+use crate::machine_state::main_memory::Address;
+use crate::machine_state::main_memory::MainMemoryLayout;
+use crate::machine_state::MachineCoreState;
+use crate::traps::EnvironException;
+use cranelift::codegen::ir::types::I64;
+use cranelift::codegen::settings::SetError;
+use cranelift::codegen::CodegenError;
+use cranelift::frontend::FunctionBuilderContext;
+use cranelift::prelude::*;
+use cranelift_jit::{JITBuilder, JITModule};
+use cranelift_module::Linkage;
+use cranelift_module::Module;
+use state_access::JitStateAccess;
+use thiserror::Error;
+
+/// Alias for the function signature produced by the JIT compilation.
+type JitFn<ML, JSA> = unsafe extern "C" fn(&mut MachineCoreState<ML, JSA>, u64, &mut usize) -> u64;
+
+/// A jit-compiled function that can be [called] over [`MachineCoreState`].
+///
+/// [called]: Self::call
+pub struct JCall<ML: MainMemoryLayout, JSA: JitStateAccess> {
+    fun: JitFn<ML, JSA>,
+}
+
+impl<ML: MainMemoryLayout, JSA: JitStateAccess> JCall<ML, JSA> {
+    /// Run the jit-compiled function over the state.
+    ///
+    /// # Safety
+    ///
+    /// When calling, the [JIT] that compiled this function *must*
+    /// still be alive.
+    pub unsafe fn call(
+        &self,
+        core: &mut MachineCoreState<ML, JSA>,
+        pc: u64,
+        steps: &mut usize,
+    ) -> Result<(), EnvironException> {
+        let new_pc = (self.fun)(core, pc, steps);
+        core.hart.pc.write(new_pc);
+        Ok(())
+    }
+}
+
+/// Errors that may arise from the initialisation of the JIT.
+#[derive(Debug, Error)]
+pub enum JitError {
+    /// Failures setting flags.
+    #[error("Failed to set flag {0}")]
+    Setting(#[from] SetError),
+    /// Native compilation unsupported on the current arch/os.
+    #[error("Native platform unsupported: {0}")]
+    UnsupportedPlatform(&'static str),
+    /// Constructing the Cranelift builder failed.
+    #[error("Unable to initialise builder {0}")]
+    BuilderFailure(#[from] CodegenError),
+}
+
+/// The JIT is responsible for compiling blocks of instructions to machine code,
+/// returning a function that can be run over the [`MachineCoreState`].
+pub struct JIT<ML: MainMemoryLayout, JSA: JitStateAccess> {
+    /// The function builder context, which is reused across multiple
+    /// [`FunctionBuilder`] instances.
+    builder_context: FunctionBuilderContext,
+
+    /// The main Cranelift context, which holds the state for codegen. Cranelift
+    /// separates this from `Module` to allow for parallel compilation, with a
+    /// context per thread, though this isn't in the simple demo here.
+    ctx: codegen::Context,
+
+    /// The module, with the jit backend, which manages the JIT'd
+    /// functions.
+    module: JITModule,
+
+    /// Counter for naming of functions
+    next_id: usize,
+
+    _pd: std::marker::PhantomData<(ML, JSA)>,
+}
+
+impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
+    /// Create a new instance of the JIT, which will be able to
+    /// produce functions that can be run over the current
+    /// memory layout & manager.
+    pub fn new() -> Result<Self, JitError> {
+        let mut flag_builder = settings::builder();
+        flag_builder.set("use_colocated_libcalls", "false")?;
+        flag_builder.set("is_pic", "false")?;
+
+        let isa_builder = cranelift_native::builder().map_err(JitError::UnsupportedPlatform)?;
+        let isa = isa_builder.finish(settings::Flags::new(flag_builder))?;
+
+        let builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+        let module = JITModule::new(builder);
+
+        Ok(Self {
+            builder_context: FunctionBuilderContext::new(),
+            ctx: codegen::Context::new(),
+            module,
+            next_id: 0,
+            _pd: std::marker::PhantomData,
+        })
+    }
+
+    /// Compile a sequence of instructions to a callable native function.
+    ///
+    /// Not all instructions are currently supported. For blocks containing
+    /// unsupported instructions, `None` will be returned.
+    pub fn compile(&mut self, instr: &[Instruction]) -> Option<JCall<ML, JSA>> {
+        let mut builder = self.start();
+
+        for i in instr.iter() {
+            match i.opcode {
+                OpCode::CNop => {
+                    builder.steps += 1;
+                    builder.pc_offset += i.width() as u64;
+                }
+                _ => return None,
+            }
+        }
+
+        builder.end();
+
+        let fun = self.finalise();
+
+        Some(JCall { fun })
+    }
+
+    /// Setup the builder, ensuring the entry block of the function is correct.
+    ///
+    /// # Input Args
+    ///
+    /// | `core: &mut MachineCoreState` | `int (ptr) -> MachineCoreState` |
+    /// | `pc: Address`                 | `I64`                           |
+    /// | `steps: &mut usize`           | `int (ptr) -> int`              |
+    ///
+    /// # Return
+    ///
+    /// | `steps: usize`                | `int`                           |
+    fn start(&mut self) -> Builder<'_> {
+        let ptr = self.module.target_config().pointer_type();
+
+        self.ctx.func.signature.params.push(AbiParam::new(ptr));
+        self.ctx.func.signature.params.push(AbiParam::new(I64));
+        self.ctx.func.signature.params.push(AbiParam::new(ptr));
+
+        self.ctx.func.signature.returns.push(AbiParam::new(ptr));
+
+        let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
+
+        // Create the entry block, to start emitting code in.
+        let entry_block = builder.create_block();
+        builder.append_block_params_for_function_params(entry_block);
+        builder.switch_to_block(entry_block);
+        builder.seal_block(entry_block);
+
+        let pc_val = builder.block_params(entry_block)[1];
+        let steps_ptr_val = builder.block_params(entry_block)[2];
+
+        Builder {
+            builder,
+            ptr,
+            steps_ptr_val,
+            steps: 0,
+            pc_val,
+            pc_offset: 0,
+        }
+    }
+
+    /// Produce a unique name, that can be used when a function is finalised.
+    fn name(&mut self) -> impl AsRef<str> {
+        let name = self.next_id.to_string();
+        self.next_id += 1;
+        name
+    }
+
+    /// Finalise the function currently under construction.
+    fn finalise(&mut self) -> JitFn<ML, JSA> {
+        let name = self.name();
+        let id = self
+            .module
+            .declare_function(name.as_ref(), Linkage::Export, &self.ctx.func.signature)
+            .map_err(|e| e.to_string())
+            .unwrap();
+
+        // define the function to jit
+        self.module.define_function(id, &mut self.ctx).unwrap();
+
+        // finalise the function
+        self.module.finalize_definitions().unwrap();
+
+        let code = self.module.get_finalized_function(id);
+
+        // Allow for a new function to be compiled
+        self.module.clear_context(&mut self.ctx);
+
+        // SAFETY: the signature of a JitFn matches exactly the abi we specified in the
+        //         entry block. Compilation has succeeded & therefore this produced code
+        //         is safe to call.
+        unsafe { std::mem::transmute(code) }
+    }
+}
+
+/// Builder context used when lowering individual instructions within a block.
+struct Builder<'a> {
+    builder: FunctionBuilder<'a>,
+    ptr: Type,
+    steps_ptr_val: Value,
+    steps: usize,
+    pc_val: Value,
+    pc_offset: Address,
+}
+
+impl<'a> Builder<'a> {
+    /// Consume the builder, allowing for the function under construction to be [`finalised`].
+    ///
+    /// [`finalised`]: JIT::finalise
+    fn end(mut self) {
+        // flush steps
+        let steps = self
+            .builder
+            .ins()
+            .load(self.ptr, MemFlags::trusted(), self.steps_ptr_val, 0);
+        let steps = self.builder.ins().iadd_imm(steps, self.steps as i64);
+        self.builder
+            .ins()
+            .store(MemFlags::trusted(), steps, self.steps_ptr_val, 0);
+
+        // flush pc
+        let pc = self
+            .builder
+            .ins()
+            .iadd_imm(self.pc_val, self.pc_offset as i64);
+        self.builder.ins().return_(&[pc]);
+
+        self.builder.finalize();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::default::ConstDefault;
+    use crate::machine_state::block_cache::{Block, ICallLayout, ICallPlaced, CACHE_INSTR};
+    use crate::machine_state::main_memory::tests::T1K;
+    use crate::machine_state::{MachineCoreState, MachineCoreStateLayout};
+    use crate::parser::instruction::InstrCacheable;
+    use crate::state_backend::test_helpers::assert_eq_struct;
+    use crate::state_backend::{
+        AllocatedOf, EnrichedCell, FnManagerIdent, ManagerBase, ManagerReadWrite,
+    };
+    use crate::{backend_test, create_state};
+
+    type BlockLayout<ML> = [ICallLayout<ML>; CACHE_INSTR];
+
+    // Simplified variant of the `Cached` structure in the block cache.
+    struct BlockState<ML: MainMemoryLayout, M: ManagerBase> {
+        instr: [EnrichedCell<ICallPlaced<ML>, M>; CACHE_INSTR],
+        buff: [Instruction; CACHE_INSTR],
+        len: usize,
+    }
+
+    impl<ML: MainMemoryLayout, M: ManagerBase> BlockState<ML, M> {
+        fn bind(space: AllocatedOf<BlockLayout<ML>, M>) -> Self {
+            Self {
+                instr: space,
+                buff: [Instruction::DEFAULT; CACHE_INSTR],
+                len: 0,
+            }
+        }
+
+        fn interpreted_block(&mut self) -> Block<'_, ML, M> {
+            Block::from(&mut self.instr[..self.len])
+        }
+
+        fn as_slice(&self) -> &[Instruction] {
+            &self.buff[..self.len]
+        }
+
+        fn construct(&mut self, instr: &[InstrCacheable])
+        where
+            M: ManagerReadWrite,
+        {
+            self.len = 0;
+            for i in instr.iter() {
+                let i = i.into();
+                self.instr[self.len].write(i);
+                self.buff[self.len] = i;
+                self.len += 1;
+            }
+        }
+    }
+
+    backend_test!(test_cnop, F, {
+        // Arrange
+        let scenarios: &[&[InstrCacheable]] = &[
+            &[InstrCacheable::CNop],
+            &[InstrCacheable::CNop, InstrCacheable::CNop],
+            &[
+                InstrCacheable::CNop,
+                InstrCacheable::CNop,
+                InstrCacheable::CNop,
+            ],
+        ];
+
+        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+
+        for scenario in scenarios {
+            let mut interpreted =
+                create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+
+            block.construct(scenario);
+
+            let mut interpreted_steps = 0;
+            let mut jitted_steps = 0;
+
+            let initial_pc = 0;
+            interpreted.hart.pc.write(initial_pc);
+            jitted.hart.pc.write(initial_pc);
+
+            // Act
+            let fun = jit
+                .compile(block.as_slice())
+                .expect("Compilation of CNop should succeed");
+            let mut block = block.interpreted_block();
+
+            let interpreted_res =
+                block.run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+            let jitted_res = unsafe {
+                // # Safety - the jit is not dropped until after we
+                //            exit the for loop
+                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+            };
+
+            // Assert
+            assert_eq!(jitted_res, interpreted_res);
+            assert_eq!(
+            interpreted_steps, jitted_steps,
+            "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+            );
+
+            assert_eq!(interpreted_steps, scenario.len());
+
+            assert_eq_struct(
+                &interpreted.struct_ref::<FnManagerIdent>(),
+                &jitted.struct_ref::<FnManagerIdent>(),
+            );
+        }
+    });
+}

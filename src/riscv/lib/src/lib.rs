@@ -9,6 +9,7 @@ pub mod default;
 pub mod devicetree;
 pub mod instruction_context;
 mod interpreter;
+pub mod jit;
 pub mod kernel_loader;
 pub mod machine_state;
 pub mod parser;
