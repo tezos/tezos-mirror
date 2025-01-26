@@ -53,6 +53,10 @@ Client
 Baker
 -----
 
+- The baker emits a warning when it is started with ``--dal-node``, but the DAL
+  node has no registered attester, that is, it was not started with
+  ``--attester-profiles <manager_key>``. (MR :gl:`!16333`)
+
 - **Breaking change** For ``proto_alpha``, providing the endpoint of a running
   DAL node is required for the baker to be launched, unless opted out with the
   newly introduced ``--without-dal`` option. (MR :gl:`!16049`)

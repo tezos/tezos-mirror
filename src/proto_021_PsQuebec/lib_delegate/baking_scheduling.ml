@@ -999,6 +999,28 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
   | Error _ as err -> Lwt.return err
 
 let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7648
+     In case the daemon was started with a consensus key, then we'd register
+     this consensus key, which is wrong, we should register the corresponding
+     delegate key. *)
+  let register dal_ctxt =
+    let open Lwt_result_syntax in
+    let* profiles = Node_rpc.get_dal_profiles dal_ctxt in
+    let warn =
+      Events.emit Baking_events.Scheduling.dal_node_no_attester_profile
+    in
+    let*! () =
+      match profiles with
+      | Tezos_dal_node_services.Types.Bootstrap | Random_observer -> warn ()
+      | Operator operator_profile ->
+          let attesters =
+            Tezos_dal_node_services.Operator_profile.attesters operator_profile
+          in
+          if Signature.Public_key_hash.Set.is_empty attesters then warn ()
+          else Lwt.return_unit
+    in
+    Node_rpc.register_dal_profiles dal_ctxt delegates
+  in
   Option.iter_es
     (fun dal_ctxt ->
       retry
@@ -1008,7 +1030,7 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
         ~factor:2.
         ~tries:max_int
         ~msg:"Failed to register profiles, DAL node is not reachable. "
-        (fun () -> Node_rpc.register_dal_profiles dal_ctxt delegates)
+        (fun () -> register dal_ctxt)
         ())
     dal_node_rpc_ctxt
 
