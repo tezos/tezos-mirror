@@ -60,8 +60,11 @@ let compile_contract ~source ~label ~contract ~evm_version =
   let input_json =
     generate_json_string ~label ~contract ~path:source ~evm_version
   in
-  let command = "npx" in
-  let args = ["--yes"; "solc"; "--standard-json"] in
+  let command, args =
+    if Option.is_some (Sys.getenv_opt "TEZT_NO_NPX") then
+      ("/usr/local/lib/node_modules/solc/solc.js", ["--standard-json"])
+    else ("npx", ["--yes"; "solc"; "--standard-json"])
+  in
 
   (* Spawn the process with the JSON input as stdin *)
   let* process, stdin_channel =

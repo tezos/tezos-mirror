@@ -85,6 +85,7 @@ tezt:
       /cloud && /flaky
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "3"
+    TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
     paths:
@@ -138,6 +139,7 @@ tezt-memory-3k:
       /cloud
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "1"
+    TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
     paths:
@@ -191,6 +193,7 @@ tezt-memory-4k:
       /cloud
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "1"
+    TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
     paths:
@@ -244,6 +247,7 @@ tezt-time-sensitive:
       /cloud
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "1"
+    TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
     paths:
@@ -296,6 +300,7 @@ tezt-slow:
       /cloud && not (file = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "3"
+    TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
     paths:
@@ -350,6 +355,7 @@ tezt-flaky:
       /cloud && flaky
     TEZT_RETRY: "3"
     TEZT_PARALLEL: "1"
+    TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
     paths:
