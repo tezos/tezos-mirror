@@ -286,6 +286,33 @@ module Request = struct
 
   let eth_unsubscribe ~id =
     {method_ = "eth_unsubscribe"; parameters = `A [`String id]}
+
+  let eth_getLogs ?from_block ?to_block ?address ?topics () =
+    let parse_topic = function
+      | [] -> `Null
+      | [t] -> `String t
+      | l -> `A (List.map (fun s -> `String s) l)
+    in
+    let parameters : JSON.u =
+      `A
+        [
+          `O
+            (address_to_param address
+            :: (Option.fold
+                  ~none:[]
+                  ~some:(fun f -> [("fromBlock", block_param_to_json f)])
+                  from_block
+               @ Option.fold
+                   ~none:[]
+                   ~some:(fun t -> [("toBlock", block_param_to_json t)])
+                   to_block
+               @ Option.fold
+                   ~none:[]
+                   ~some:(fun t -> [("topics", `A (List.map parse_topic t))])
+                   topics));
+        ]
+    in
+    {method_ = "eth_getLogs"; parameters}
 end
 
 let net_version ?websocket evm_node =
@@ -322,6 +349,21 @@ let get_code ?websocket ~address evm_node =
   in
   return
     (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
+
+let get_logs ?websocket ?from_block ?to_block ?address ?topics evm_node =
+  let* json =
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.eth_getLogs ?from_block ?to_block ?address ?topics ())
+  in
+  return
+    (decode_or_error
+       (fun json ->
+         JSON.(
+           json |-> "result" |> as_list
+           |> List.map (fun json -> Transaction.logs_of_json json)))
+       json)
 
 let block_number ?websocket evm_node =
   let* json = Evm_node.jsonrpc ?websocket evm_node Request.eth_blockNumber in
