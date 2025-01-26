@@ -14,6 +14,11 @@
 
 ### Bug fixes
 
+#### RPCs
+
+- `eth_getLogs` now accepts `null` as a valid value for the `topics` parameter.
+  (!todo)
+
 ### Internals
 
 ## Version 0.14 (2025-01-21)
