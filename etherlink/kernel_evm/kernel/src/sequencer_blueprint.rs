@@ -249,7 +249,7 @@ mod tests {
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent::Ethereum;
     use primitive_types::{H160, U256};
-    use rlp::Encodable;
+    use rlp::{Decodable, Encodable};
     use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_ethereum::rlp_helpers::FromRlpBytes;
     use tezos_ethereum::{
@@ -257,10 +257,9 @@ mod tests {
     };
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-    fn sequencer_blueprint_roundtrip(v: SequencerBlueprint) {
+    fn rlp_roundtrip<S: Encodable + Decodable + PartialEq + std::fmt::Debug>(v: S) {
         let bytes = v.rlp_bytes();
-        let v2: SequencerBlueprint = FromRlpBytes::from_rlp_bytes(&bytes)
-            .expect("Sequencer blueprint should be decodable");
+        let v2: S = FromRlpBytes::from_rlp_bytes(&bytes).expect("Should be decodable");
         assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
     }
 
@@ -292,7 +291,7 @@ mod tests {
         }
     }
 
-    fn dummy_blueprint(chain_id: Option<U256>) -> SequencerBlueprint {
+    fn dummy_blueprint_unsigned(chain_id: Option<U256>) -> UnsignedSequencerBlueprint {
         let transactions = vec![dummy_transaction(0), dummy_transaction(1)];
         let timestamp = Timestamp::from(42);
         let blueprint = Blueprint {
@@ -300,18 +299,22 @@ mod tests {
             transactions,
         };
         let chunk = rlp::Encodable::rlp_bytes(&blueprint);
+        UnsignedSequencerBlueprint {
+            chunk: chunk.into(),
+            number: U256::from(42),
+            nb_chunks: 1u16,
+            chunk_index: 0u16,
+            chain_id,
+        }
+    }
+
+    fn dummy_blueprint(chain_id: Option<U256>) -> SequencerBlueprint {
         let signature = UnknownSignature::from_base58_check(
             "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
         ).expect("signature decoding should work");
 
         SequencerBlueprint {
-            blueprint: UnsignedSequencerBlueprint {
-                chunk: chunk.into(),
-                number: U256::from(42),
-                nb_chunks: 1u16,
-                chunk_index: 0u16,
-                chain_id,
-            },
+            blueprint: dummy_blueprint_unsigned(chain_id),
             signature,
         }
     }
@@ -319,13 +322,26 @@ mod tests {
     #[test]
     fn roundtrip_rlp_no_chain_id() {
         let chunk = dummy_blueprint(None);
-        sequencer_blueprint_roundtrip(chunk);
+        rlp_roundtrip(chunk);
     }
 
     #[test]
     fn roundtrip_rlp() {
         let chain_id = U256::one();
         let chunk = dummy_blueprint(Some(chain_id));
-        sequencer_blueprint_roundtrip(chunk);
+        rlp_roundtrip(chunk);
+    }
+
+    #[test]
+    fn roundtrip_rlp_no_chain_id_unsigned() {
+        let chunk = dummy_blueprint_unsigned(None);
+        rlp_roundtrip(chunk);
+    }
+
+    #[test]
+    fn roundtrip_rlp_unsigned() {
+        let chain_id = U256::one();
+        let chunk = dummy_blueprint_unsigned(Some(chain_id));
+        rlp_roundtrip(chunk);
     }
 }
