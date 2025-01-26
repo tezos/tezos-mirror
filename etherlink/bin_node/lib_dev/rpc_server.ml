@@ -37,12 +37,8 @@ module Resto = struct
             req
             (Cohttp_lwt.Body.of_string body_str)
     in
-    let update_metrics uri meth =
-      Prometheus.Summary.(
-        time (labels Metrics.Rpc.metrics [uri; meth]) Sys.time)
-    in
     Tezos_rpc_http_server.RPC_middleware.rpc_metrics_transform_callback
-      ~update_metrics
+      ~update_metrics:Metrics.Rpc.update_metrics
       dir
       callback_log
 

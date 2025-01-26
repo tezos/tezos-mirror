@@ -181,6 +181,9 @@ module Rpc = struct
       ~namespace
       ~subsystem
       "calls_method"
+
+  let update_metrics uri meth =
+    Prometheus.Summary.(time (labels metrics [uri; meth]) Sys.time)
 end
 
 module Tx_pool = struct
@@ -276,7 +279,7 @@ type t = {
   l1_level : Gauge.t;
 }
 
-module BlueprintChunkSent = struct
+module Blueprint_chunk_sent = struct
   let on_inbox =
     Counter.v
       ~registry
@@ -294,13 +297,15 @@ module BlueprintChunkSent = struct
       "blueprint_chunks_sent_on_dal"
 end
 
-let signals_sent =
-  Counter.v
-    ~registry
-    ~help:"Number of DAL import signals sent on the inbox"
-    ~namespace
-    ~subsystem
-    "signals_sent"
+module Dal = struct
+  let signals_sent =
+    Counter.v
+      ~registry
+      ~help:"Number of DAL import signals sent on the inbox"
+      ~namespace
+      ~subsystem
+      "signals_sent"
+end
 
 let metrics =
   let name = "Etherlink" in
@@ -354,6 +359,24 @@ let set_block ~time_processed ~transactions =
   Block.(Process_time_histogram.(observe process_time_histogram pt)) ;
   Counter.inc metrics.block.time_processed pt ;
   Counter.inc metrics.block.transactions (Int.to_float transactions)
+
+let record_signals_sent signals =
+  Prometheus.Counter.inc Dal.signals_sent (Int.to_float @@ List.length signals)
+
+let inc_confirm_gas_needed () =
+  Prometheus.Counter.inc_one metrics.simulation.confirm_gas_needed
+
+let record_blueprint_chunks_sent_on_dal chunks =
+  Prometheus.Counter.inc
+    Blueprint_chunk_sent.on_dal
+    (Float.of_int (List.length chunks))
+
+let record_blueprint_chunks_sent_on_inbox chunks =
+  Prometheus.Counter.inc
+    Blueprint_chunk_sent.on_inbox
+    (Float.of_int (List.length chunks))
+
+let inc_rpc_method ~name = Prometheus.Counter.inc_one (Rpc.method_ name)
 
 let listing () =
   let open Lwt_syntax in

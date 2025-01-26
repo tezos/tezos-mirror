@@ -112,11 +112,7 @@ module Worker = struct
     let open Lwt_result_syntax in
     let payload = Blueprints_publisher_types.Request.inbox_payload payload in
     let*! () = Blueprint_events.blueprint_injected_on_inbox level in
-    let () =
-      Prometheus.Counter.inc
-        Metrics.BlueprintChunkSent.on_inbox
-        (Float.of_int (List.length payload))
-    in
+    Metrics.record_blueprint_chunks_sent_on_inbox payload ;
     Rollup_services.publish
       ~drop_duplicate:state.drop_duplicate
       ?order:(if state.order_enabled then Some level else None)
@@ -129,9 +125,7 @@ module Worker = struct
     let payloads = Sequencer_blueprint.create_dal_payloads chunks in
     let nb_chunks = List.length chunks in
     let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
-    Prometheus.Counter.inc
-      Metrics.BlueprintChunkSent.on_dal
-      (Float.of_int nb_chunks) ;
+    Metrics.record_blueprint_chunks_sent_on_dal chunks ;
     Rollup_services.publish_on_dal
       ~rollup_node_endpoint:state.rollup_node_endpoint
       ~messages:payloads
