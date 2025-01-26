@@ -501,6 +501,8 @@ pub fn produce<Host: Runtime>(
                     )?;
                     if at_most_one_block {
                         return Ok(ComputationResult::Finished);
+                    } else {
+                        return Ok(ComputationResult::RebootNeeded);
                     }
                 }
                 Ok(BlockComputationResult::RebootNeeded) => {
@@ -523,11 +525,8 @@ pub fn produce<Host: Runtime>(
     // because the sequencer pool address is located outside of `/evm/world_state`.
     upgrade::possible_sequencer_upgrade(safe_host.host)?;
 
-    // Execute stored blueprints
-    //
-    // The loop will eventually stop until there is no more blueprint, or no
-    // more ticks.
-    loop {
+    // Execute at most one of the stored blueprints
+    {
         let block_in_progress = match next_bip_from_blueprints(
             safe_host.host,
             current_block_number,
@@ -586,7 +585,9 @@ pub fn produce<Host: Runtime>(
                     included_delayed_transactions,
                 )?;
                 if at_most_one_block {
-                    return Ok(ComputationResult::Finished);
+                    Ok(ComputationResult::Finished)
+                } else {
+                    Ok(ComputationResult::RebootNeeded)
                 }
             }
             Ok(BlockComputationResult::RebootNeeded) => {
@@ -598,7 +599,7 @@ pub fn produce<Host: Runtime>(
                     "Estimated ticks: {}",
                     tick_counter.c
                 );
-                return Ok(ComputationResult::RebootNeeded);
+                Ok(ComputationResult::RebootNeeded)
             }
             Err(err) => {
                 revert_block(&mut safe_host, false, processed_blueprint, err)?;
@@ -612,7 +613,7 @@ pub fn produce<Host: Runtime>(
                     "Estimated ticks: {}",
                     tick_counter.c
                 );
-                return Ok(ComputationResult::RebootNeeded);
+                Ok(ComputationResult::RebootNeeded)
             }
         }
     }
@@ -1083,6 +1084,16 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
+        // Produce block for blueprint containing transaction_0
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            &mut Configuration::default(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        // Produce block for blueprint containing transaction_1
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
@@ -1707,6 +1718,12 @@ mod tests {
         let computation_result =
             produce(&mut host, DUMMY_CHAIN_ID, &mut configuration, None, None)
                 .expect("Should have produced");
+        // test reboot is set
+        matches!(computation_result, ComputationResult::RebootNeeded);
+
+        let computation_result =
+            produce(&mut host, DUMMY_CHAIN_ID, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test no new block
         assert_eq!(
@@ -1716,7 +1733,7 @@ mod tests {
             "There should have been one block registered"
         );
 
-        // test reboot is set
+        // test reboot is set again
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
