@@ -63,26 +63,27 @@ val record_attesting_participation :
   Raw_context.t tzresult Lwt.t
 
 (** Update the participation of a delegate as a DAL attester in the current
-    cycle with its participation (ie the number of DAL slots it attested) at the
-    current level. *)
+    cycle with its participation (ie the number of DAL slots it attested and the
+    number of DAL slots it could have attested) at the current level, based on
+    the number of slots it attested, and the number of protocol-attested
+    slot. Note that this function must be called only when attester has assigned
+    shards, so we know the delegate could have attested DAL slots. *)
 val record_dal_participation :
   Raw_context.t ->
   delegate:Signature.Public_key_hash.t ->
-  number_of_attested_slots:int ->
+  number_of_slots_attested_by_delegate:int ->
+  number_of_protocol_attested_slots:int ->
   Raw_context.t tzresult Lwt.t
 
 (** Returns [true] iff the protocol considers that the delegate attested
     sufficiently many slots during a cycle, given the total number of attested
-    slots for that cycle and the number of those slots also attested by the
-    delegate.
+    slots for that cycle that the delegate could have attested and the number of
+    those slots actually attested by the delegate.
 
     The decision depends on the [minimal_participation_ratio] protocol
     parameter. *)
 val is_dal_participation_sufficient :
-  Raw_context.t ->
-  dal_attested_slots_by_delegate:int32 ->
-  total_dal_attested_slots:int32 ->
-  bool
+  Raw_context.t -> Storage.dal_delegate_participation -> bool
 
 (** Sets the payload and block producer as active. Pays the baking
    reward and the fees to the payload producer and the reward bonus to
@@ -103,12 +104,12 @@ val check_and_reset_delegate_participation :
   Signature.Public_key_hash.t ->
   (Raw_context.t * bool) tzresult Lwt.t
 
-(** Retrieve the number of DAL slots a delegate DAL-attested during the last
-    cycle, and then reset the participation for preparing the next cycle. *)
+(** Retrieve the DAL participation of a delegate during the last cycle, and then
+    reset the participation for preparing the next cycle. *)
 val get_and_reset_delegate_dal_participation :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  (Raw_context.t * int32) tzresult Lwt.t
+  (Raw_context.t * Storage.dal_delegate_participation) tzresult Lwt.t
 
 module For_RPC : sig
   (** Participation information. We denote by:
@@ -156,8 +157,7 @@ module For_RPC : sig
             attested by the delegate. (dynamic) *)
     total_dal_attested_slots : int;
         (** The total number of attested slots during the current cycle
-            (regardless whether this delegate attested them or
-            not). (dynamic) *)
+            for which the delegates had assigned shards. (dynamic) *)
     expected_dal_rewards : Tez_repr.t;
         (** The expected amount of DAL rewards for the delegate, assuming a
             sufficient DAL participation (see [sufficient_dal_participation]

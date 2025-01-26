@@ -53,13 +53,13 @@ let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
 let distribute_dal_attesting_rewards ctxt delegate
-    ~dal_attesting_reward_per_shard ~total_dal_attested_slots
-    ~total_active_stake_weight ~active_stake_weight active_stake =
+    ~dal_attesting_reward_per_shard ~total_active_stake_weight
+    ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
   let*! denounced_in_cycle =
     Dal_already_denounced_storage.is_denounced ctxt delegate
   in
-  let* ctxt, dal_attested_slots_by_delegate =
+  let* ctxt, dal_participation =
     Delegate_missed_attestations_storage
     .get_and_reset_delegate_dal_participation
       ctxt
@@ -68,8 +68,7 @@ let distribute_dal_attesting_rewards ctxt delegate
   let sufficient_dal_participation =
     Delegate_missed_attestations_storage.is_dal_participation_sufficient
       ctxt
-      ~dal_attested_slots_by_delegate
-      ~total_dal_attested_slots
+      dal_participation
   in
   let expected_dal_shards =
     Delegate_missed_attestations_storage
@@ -102,23 +101,22 @@ let distribute_dal_attesting_rewards ctxt delegate
       dal_rewards
 
 let maybe_distribute_dal_attesting_rewards ctxt delegate
-    ~dal_attesting_reward_per_shard ~total_dal_attested_slots
-    ~total_active_stake_weight ~active_stake_weight active_stake =
+    ~dal_attesting_reward_per_shard ~total_active_stake_weight
+    ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
   Raw_context.Dal.only_if_incentives_enabled
     ctxt
     ~default:(fun ctxt -> return (ctxt, []))
     (fun ctxt ->
-      let dal_attesting_reward_per_shard, total_dal_attested_slots =
-        match (dal_attesting_reward_per_shard, total_dal_attested_slots) with
-        | Some v1, Some v2 -> (v1, v2)
-        | _ -> (* unreachable *) (Tez_repr.zero, 0l)
+      let dal_attesting_reward_per_shard =
+        match dal_attesting_reward_per_shard with
+        | Some v -> v
+        | _ -> (* unreachable *) Tez_repr.zero
       in
       distribute_dal_attesting_rewards
         ctxt
         delegate
         ~dal_attesting_reward_per_shard
-        ~total_dal_attested_slots
         ~total_active_stake_weight
         ~active_stake_weight
         active_stake)
@@ -142,17 +140,15 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   let total_active_stake_weight =
     Stake_repr.staking_weight total_active_stake
   in
-  let* dal_attesting_reward_per_shard, total_dal_attested_slots =
+  let* dal_attesting_reward_per_shard =
     Raw_context.Dal.only_if_incentives_enabled
       ctxt
-      ~default:(fun _ctxt -> return (None, None))
+      ~default:(fun _ctxt -> return None)
       (fun ctxt ->
         let*? dal_attesting_reward_per_shard =
           Delegate_rewards.dal_attesting_reward_per_shard ctxt
         in
-        let+ total_opt = Storage.Dal.Total_attested_slots.find ctxt in
-        let total = match total_opt with None -> Some 0l | v -> v in
-        (Some dal_attesting_reward_per_shard, total))
+        return @@ Some dal_attesting_reward_per_shard)
   in
   let* delegates = Stake_storage.get_selected_distribution ctxt last_cycle in
   List.fold_left_es
@@ -198,7 +194,6 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
           ctxt
           delegate
           ~dal_attesting_reward_per_shard
-          ~total_dal_attested_slots
           ~total_active_stake_weight
           ~active_stake_weight
           active_stake

@@ -2839,7 +2839,7 @@ let record_attesting_participation ctxt dal_attestation =
   | Some validators ->
       Slot.Map.fold_es
         (fun initial_slot
-             ((consensus_pk : Consensus_key.pk), power, _dal_power)
+             ((consensus_pk : Consensus_key.pk), power, dal_power)
              ctxt ->
           let participation =
             if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
@@ -2853,10 +2853,11 @@ let record_attesting_participation ctxt dal_attestation =
               ~participation
               ~attesting_power:power
           in
-          Dal_apply.record_dal_participation
+          Dal_apply.record_participation
             ctxt
             consensus_pk.delegate
             initial_slot
+            ~dal_power
             dal_attestation)
         validators
         ctxt

@@ -99,22 +99,36 @@ let apply_publish_commitment ctxt operation ~source =
   let* ctxt = Dal.Slot.register_slot_header ctxt slot_header ~source in
   return (ctxt, slot_header)
 
-let record_dal_participation ctxt delegate tb_slot dal_attestation =
+let record_participation ctxt delegate tb_slot ~dal_power dal_attestation =
   let open Lwt_result_syntax in
   let*? () = Dal.assert_feature_enabled ctxt in
   Dal.only_if_incentives_enabled
     ctxt
     ~default:(fun ctxt -> return ctxt)
     (fun ctxt ->
-      let number_of_attested_slots =
-        match Slot.Map.find_opt tb_slot (Dal.Attestation.attestations ctxt) with
-        | None -> 0
-        | Some delegate_attestation ->
-            Dal.Attestation.(
-              intersection dal_attestation delegate_attestation
-              |> number_of_attested_slots)
-      in
-      Delegate.record_dal_participation ctxt ~delegate ~number_of_attested_slots)
+      if Compare.Int.(dal_power = 0) then
+        (* the delegate is not in the DAL committee, there is no need to update
+           the participation *)
+        return ctxt
+      else
+        let number_of_slots_attested_by_delegate =
+          match
+            Slot.Map.find_opt tb_slot (Dal.Attestation.attestations ctxt)
+          with
+          | None -> 0
+          | Some delegate_attestation ->
+              Dal.Attestation.(
+                intersection dal_attestation delegate_attestation
+                |> number_of_attested_slots)
+        in
+        let number_of_protocol_attested_slots =
+          Dal.Attestation.number_of_attested_slots dal_attestation
+        in
+        Delegate.record_dal_participation
+          ctxt
+          ~delegate
+          ~number_of_slots_attested_by_delegate
+          ~number_of_protocol_attested_slots)
 
 let finalisation ctxt =
   let open Lwt_result_syntax in

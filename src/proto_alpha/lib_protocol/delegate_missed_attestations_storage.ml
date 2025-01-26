@@ -122,33 +122,49 @@ let record_attesting_participation ctxt ~delegate ~participation
                 contract
                 {remaining_slots; missed_levels = 1}))
 
-let record_dal_participation ctxt ~delegate ~number_of_attested_slots =
+let record_dal_participation ctxt ~delegate
+    ~number_of_slots_attested_by_delegate ~number_of_protocol_attested_slots =
   let open Lwt_result_syntax in
-  if Compare.Int.(number_of_attested_slots = 0) then return ctxt
+  if Compare.Int.(number_of_protocol_attested_slots = 0) then
+    (* then the number of slots attested by the delegate is also 0 *)
+    return ctxt
   else
     let contract = Contract_repr.Implicit delegate in
     let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
     match result with
-    | Some already_attested_slots ->
-        Storage.Contract.Attested_dal_slots.update
-          ctxt
-          contract
-          Int32.(add already_attested_slots (of_int number_of_attested_slots))
+    | Some past_participation ->
+        let participation =
+          Storage.
+            {
+              attested_slots =
+                past_participation.attested_slots
+                + number_of_slots_attested_by_delegate;
+              attestable_slots =
+                past_participation.attestable_slots
+                + number_of_protocol_attested_slots;
+            }
+        in
+        Storage.Contract.Attested_dal_slots.update ctxt contract participation
     | None ->
         Storage.Contract.Attested_dal_slots.init
           ctxt
           contract
-          (Int32.of_int number_of_attested_slots)
+          {
+            attested_slots = number_of_slots_attested_by_delegate;
+            attestable_slots = number_of_protocol_attested_slots;
+          }
 
-let is_dal_participation_sufficient ctxt ~dal_attested_slots_by_delegate
-    ~total_dal_attested_slots =
+let is_dal_participation_sufficient ctxt participation =
   let open Q in
   let minimal_dal_participation_ratio =
     (Raw_context.constants ctxt).dal.minimal_participation_ratio
   in
-  geq
-    (of_int32 dal_attested_slots_by_delegate)
-    (mul (of_int32 total_dal_attested_slots) minimal_dal_participation_ratio)
+  Compare.Int.(participation.Storage.attestable_slots = 0)
+  || leq
+       minimal_dal_participation_ratio
+       (div
+          (of_int participation.attested_slots)
+          (of_int participation.attestable_slots))
 
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
@@ -203,13 +219,13 @@ let get_and_maybe_reset_delegate_dal_participation ~reset ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
   match result with
-  | None -> return (ctxt, 0l)
-  | Some num_slots ->
+  | None -> return (ctxt, Storage.{attested_slots = 0; attestable_slots = 0})
+  | Some participation ->
       let*! ctxt =
         if reset then Storage.Contract.Attested_dal_slots.remove ctxt contract
         else Lwt.return ctxt
       in
-      return (ctxt, num_slots)
+      return (ctxt, participation)
 
 let get_and_reset_delegate_dal_participation =
   get_and_maybe_reset_delegate_dal_participation ~reset:true
@@ -358,18 +374,9 @@ module For_RPC = struct
             ~total_active_stake_weight
             ~active_stake_weight
         in
-        let* dal_attested_slots_by_delegate =
-          get_delegate_dal_participation ctxt delegate
-        in
-        let* total_dal_attested_slots =
-          let+ total_opt = Storage.Dal.Total_attested_slots.find ctxt in
-          Option.value ~default:0l total_opt
-        in
+        let* participation = get_delegate_dal_participation ctxt delegate in
         let sufficient_dal_participation =
-          is_dal_participation_sufficient
-            ctxt
-            ~dal_attested_slots_by_delegate
-            ~total_dal_attested_slots
+          is_dal_participation_sufficient ctxt participation
         in
         let*! denounced =
           Dal_already_denounced_storage.is_denounced ctxt delegate
@@ -387,9 +394,8 @@ module For_RPC = struct
         return
           {
             expected_assigned_shards_per_slot;
-            delegate_attested_dal_slots =
-              Int32.to_int dal_attested_slots_by_delegate;
-            total_dal_attested_slots = Int32.to_int total_dal_attested_slots;
+            delegate_attested_dal_slots = participation.Storage.attested_slots;
+            total_dal_attested_slots = participation.attestable_slots;
             expected_dal_rewards;
             sufficient_dal_participation;
             denounced;

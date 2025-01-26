@@ -68,13 +68,15 @@ val apply_publish_commitment :
   source:Contract.t ->
   (t * Dal.Slot.Header.t) tzresult
 
-(** [record_dal_participation ctxt delegate tb_slot dal_attestation] records the
-    number of protocol-attested slots (given in [dal_attestation] attested by
-    [delegate] (with the initial TB slot [tb_slot]) in the current block. *)
-val record_dal_participation :
+(** [record_dal_participation ctxt delegate tb_slot ~dal_power dal_attestation]
+    records the number of protocol-attested slots (given in [dal_attestation]
+    attested by [delegate] (with the initial TB slot [tb_slot] and [dal_power]
+    assigned shards per slot) in the current block. *)
+val record_participation :
   t ->
   Signature.Public_key_hash.t ->
   Slot.t ->
+  dal_power:int ->
   Dal.Attestation.t ->
   t tzresult Lwt.t
 

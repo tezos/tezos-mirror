@@ -2343,7 +2343,8 @@ module Delegate : sig
   val record_dal_participation :
     context ->
     delegate:Signature.Public_key_hash.t ->
-    number_of_attested_slots:int ->
+    number_of_slots_attested_by_delegate:int ->
+    number_of_protocol_attested_slots:int ->
     context tzresult Lwt.t
 
   val current_frozen_deposits :

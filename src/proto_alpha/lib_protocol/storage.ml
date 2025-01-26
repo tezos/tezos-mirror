@@ -161,6 +161,21 @@ module Missed_attestations_info = struct
       (obj2 (req "remaining_slots" int31) (req "missed_levels" int31))
 end
 
+type dal_delegate_participation = {attested_slots : int; attestable_slots : int}
+
+module Dal_delegate_participation = struct
+  type t = dal_delegate_participation
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {attested_slots; attestable_slots} ->
+        (attested_slots, attestable_slots))
+      (fun (attested_slots, attestable_slots) ->
+        {attested_slots; attestable_slots})
+      (obj2 (req "attested_slots" int31) (req "attestable_slots" int31))
+end
+
 (* TODO #6918: move closer to its only use left after P *)
 module Slashed_deposits_history = struct
   type slashed_percentage = Percentage.t
@@ -302,7 +317,7 @@ module Contract = struct
       (struct
         let name = ["attested_dal_slots"]
       end)
-      (Encoding.Int32)
+      (Dal_delegate_participation)
 
   module Manager =
     Indexed_context.Make_map
