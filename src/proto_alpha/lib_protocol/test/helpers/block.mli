@@ -134,7 +134,7 @@ val check_constants_consistency : Constants.Parametric.t -> unit tzresult Lwt.t
 val genesis :
   ?commitments:Commitment.t list ->
   ?consensus_committee_size:int ->
-  ?consensus_threshold:int ->
+  ?consensus_threshold_size:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
@@ -417,7 +417,7 @@ val bake_until_cycle :
 (** Common util function to create parameters for [initial_context] function *)
 val prepare_initial_context_params :
   ?consensus_committee_size:int ->
-  ?consensus_threshold:int ->
+  ?consensus_threshold_size:int ->
   ?min_proposal_quorum:int32 ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->

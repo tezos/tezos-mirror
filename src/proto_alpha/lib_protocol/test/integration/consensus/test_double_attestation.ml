@@ -103,7 +103,7 @@ let test_valid_double_attestation_evidence () =
           Default_parameters.constants_test.issuance_weights with
           base_total_issued_per_minute = Tez.zero;
         };
-      consensus_threshold = 0;
+      consensus_threshold_size = 0;
     }
   in
   let* genesis, _contracts = Context.init_with_constants2 constants in
@@ -231,7 +231,7 @@ let test_valid_double_attestation_evidence () =
     attestations but on different branches succeeds. *)
 let test_different_branch () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk = Block.bake genesis in
   let* attester, _slots = Context.get_attester (B blk) in
   let* attestation_a = Op.raw_attestation ~delegate:attester blk in
@@ -255,7 +255,7 @@ let test_different_branch () =
     and are otherwise identical. *)
 let test_different_slots () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk = Block.bake genesis in
   let* attesters = Context.get_attesters (B blk) in
   let delegate, slot1, slot2 =
@@ -290,7 +290,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     }
   in
   let* genesis, _contracts =
-    Context.init3 ~consensus_threshold:0 ~issuance_weights ()
+    Context.init3 ~consensus_threshold_size:0 ~issuance_weights ()
   in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
@@ -399,7 +399,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Then the delegate is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_staggered () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init3 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init3 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -474,7 +474,7 @@ let test_two_double_attestation_evidences_staggered () =
     is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_consecutive_cycles () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init3 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init3 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -545,7 +545,7 @@ let test_two_double_attestation_evidences_consecutive_cycles () =
       valid attestation fails. *)
 let test_invalid_double_attestation () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n ~consensus_threshold:0 10 () in
+  let* genesis, _contracts = Context.init_n ~consensus_threshold_size:0 10 () in
   let* b = Block.bake genesis in
   let* attestation = Op.raw_attestation b in
   let* b = Block.bake ~operation:(Operation.pack attestation) b in
@@ -561,7 +561,7 @@ let test_invalid_double_attestation () =
    incorrect ordering of the attestations fails. *)
 let test_invalid_double_attestation_variant () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* b = Block.bake_until_cycle_end genesis in
   let* blk_1, blk_2 = block_fork b in
   let* blk_a = Block.bake blk_1 in
@@ -584,7 +584,7 @@ let test_invalid_double_attestation_variant () =
 (** Check that a future-cycle double attestation fails. *)
 let test_too_early_double_attestation_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* b = Block.bake_until_cycle_end genesis in
   let* blk_1, blk_2 = block_fork b in
   let* blk_a = Block.bake blk_1 in
@@ -603,7 +603,7 @@ let test_too_early_double_attestation_evidence () =
     to create a double_attestation anymore. *)
 let test_too_late_double_attestation_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -625,7 +625,7 @@ let test_too_late_double_attestation_evidence () =
     attestations made by two different attesters fails. *)
 let test_different_delegates () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* genesis = Block.bake genesis in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
@@ -648,7 +648,7 @@ let test_different_delegates () =
     attestation fails. *)
 let test_wrong_delegate () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -723,7 +723,7 @@ let test_freeze_more_with_low_balance =
             Default_parameters.constants_test.issuance_weights with
             base_total_issued_per_minute = Tez.zero;
           };
-        consensus_threshold = 0;
+        consensus_threshold_size = 0;
         origination_size = 0;
         consensus_rights_delay = 5;
       }
@@ -868,7 +868,7 @@ let test_freeze_more_with_low_balance =
 (** Injecting a valid double attestation multiple times raises an error. *)
 let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in

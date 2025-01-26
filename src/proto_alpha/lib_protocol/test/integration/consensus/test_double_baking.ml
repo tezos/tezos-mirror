@@ -81,7 +81,7 @@ let double_baking ctxt ?(correct_order = true) bh1 bh2 =
     exposed by a double baking evidence operation. *)
 let test_valid_double_baking_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* c = Context.get_constants (B genesis) in
   let p =
     c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
@@ -165,7 +165,7 @@ let double_attestation ctxt ?(correct_order = true) op1 op2 =
 
 let test_valid_double_baking_followed_by_double_attesting () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
   let* b = Block.bake genesis in
   let* blk_a, blk_b = block_fork ~policy:(By_account baker1) contracts b in
@@ -246,7 +246,7 @@ let block_fork_diff b =
 
 let test_valid_double_attesting_followed_by_double_baking () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
   let* blk_1, blk_2 = block_fork_diff genesis in
   let* blk_a = Block.bake blk_1 in
@@ -327,7 +327,11 @@ let test_valid_double_attesting_followed_by_double_baking () =
 let test_payload_producer_gets_evidence_rewards () =
   let open Lwt_result_syntax in
   let* genesis, contracts =
-    Context.init_n ~consensus_threshold:0 ~consensus_committee_size:64 10 ()
+    Context.init_n
+      ~consensus_threshold_size:0
+      ~consensus_committee_size:64
+      10
+      ()
   in
   let* c = Context.get_constants (B genesis) in
   let p =
@@ -477,7 +481,7 @@ let test_same_blocks () =
    incorrect ordering of the block headers fails. *)
 let test_incorrect_order () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_a, blk_b = block_fork ~policy:(By_round 0) contracts genesis in
   double_baking (B genesis) ~correct_order:false blk_a.header blk_b.header
   |> fun operation ->
@@ -490,7 +494,7 @@ let test_incorrect_order () =
     different levels fails. *)
 let test_different_levels () =
   let open Lwt_result_syntax in
-  let* b, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* b, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_a, blk_b = block_fork ~policy:(By_round 0) contracts b in
   let* blk_b_2 = Block.bake blk_b in
   double_baking (B blk_a) blk_a.header blk_b_2.header |> fun operation ->
@@ -503,7 +507,7 @@ let test_different_levels () =
     blocks fails. *)
 let test_too_early_double_baking_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* b = Block.bake_until_cycle_end genesis in
   let* blk_a, blk_b = block_fork ~policy:(By_round 0) contracts b in
   double_baking (B b) blk_a.header blk_b.header |> fun operation ->
@@ -518,7 +522,7 @@ let test_too_early_double_baking_evidence () =
    --, it is not possible to create a double baking operation anymore. *)
 let test_too_late_double_baking_evidence () =
   let open Lwt_result_syntax in
-  let* b, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* b, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_a, blk_b = block_fork ~policy:(By_round 0) contracts b in
   let* blk =
     Block.bake_until_n_cycle_end (Constants.denunciation_period + 1) blk_a
@@ -536,7 +540,7 @@ let test_too_late_double_baking_evidence () =
    double baking operation. *)
 let test_just_in_time_double_baking_evidence () =
   let open Lwt_result_syntax in
-  let* b, contracts = Context.init2 ~consensus_threshold:0 () in
+  let* b, contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* Constants.{parametric = {blocks_per_cycle; _}; _} =
     Context.get_constants (B b)
   in
@@ -602,7 +606,7 @@ let test_wrong_signer () =
    same evidence doesn't lead to slashing the offender twice) *)
 let test_double_evidence () =
   let open Lwt_result_syntax in
-  let* blk, (c1, c2, _c3) = Context.init3 ~consensus_threshold:0 () in
+  let* blk, (c1, c2, _c3) = Context.init3 ~consensus_threshold_size:0 () in
   let* blk_a, blk_b = block_fork (c1, c2) blk in
   let* blk = Block.bake_until_cycle_end blk_a in
   double_baking (B blk) blk_a.header blk_b.header |> fun evidence ->

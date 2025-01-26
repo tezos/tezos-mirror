@@ -113,7 +113,7 @@ let context_init =
     {
       Context.default_test_constants with
       zk_rollup = {Context.default_test_constants.zk_rollup with enable = true};
-      consensus_threshold = 0;
+      consensus_threshold_size = 0;
     }
 
 (* Check that the expected origination fees are paid. *)

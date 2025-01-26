@@ -754,7 +754,7 @@ let test_live_blocks store_dir =
       Default_parameters.
         {
           constants_test with
-          consensus_threshold = 0;
+          consensus_threshold_size = 0;
           max_operations_time_to_live;
         }
     in

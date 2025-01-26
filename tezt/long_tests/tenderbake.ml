@@ -66,11 +66,15 @@ let write_parameter_file ?consensus_threshold protocol ~minimal_block_delay
     in
     Option.value ~default consensus_threshold
   in
+  let consensus_threshold_name =
+    if Protocol.(number protocol >= 022) then "consensus_threshold_size"
+    else "consensus_threshold"
+  in
   let overrides =
     [
       (["minimal_block_delay"], `String_of_int minimal_block_delay);
       (["delay_increment_per_round"], `String_of_int delay_increment_per_round);
-      (["consensus_threshold"], `Int consensus_threshold);
+      ([consensus_threshold_name], `Int consensus_threshold);
     ]
   in
   Log.info

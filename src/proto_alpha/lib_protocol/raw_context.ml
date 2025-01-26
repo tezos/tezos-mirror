@@ -1211,7 +1211,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  minimal_block_delay;
                  delay_increment_per_round;
                  consensus_committee_size;
-                 consensus_threshold;
+                 consensus_threshold_size;
                  minimal_participation_ratio;
                  limit_of_delegation_over_baking;
                  percentage_of_frozen_deposits_slashed_per_double_baking;
@@ -1263,7 +1263,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             minimal_block_delay;
             delay_increment_per_round;
             consensus_committee_size;
-            consensus_threshold;
+            consensus_threshold_size;
             minimal_participation_ratio;
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
@@ -1553,7 +1553,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             minimal_block_delay;
             delay_increment_per_round;
             consensus_committee_size;
-            consensus_threshold;
+            consensus_threshold_size = consensus_threshold;
             minimal_participation_ratio;
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;

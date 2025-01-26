@@ -31,7 +31,7 @@ open Alpha_context
 let init ?hard_gas_limit_per_block () =
   let open Lwt_result_syntax in
   let+ b, (src0, src1, src2) =
-    Context.init3 ?hard_gas_limit_per_block ~consensus_threshold:0 ()
+    Context.init3 ?hard_gas_limit_per_block ~consensus_threshold_size:0 ()
   in
   let baker =
     match src0 with Implicit v -> v | Originated _ -> assert false

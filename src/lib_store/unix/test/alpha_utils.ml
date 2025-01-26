@@ -424,7 +424,7 @@ let default_genesis_parameters =
       parameters_of_constants
         {
           constants_sandbox with
-          consensus_threshold = 0;
+          consensus_threshold_size = 0;
           proof_of_work_threshold = -1L;
         })
     with

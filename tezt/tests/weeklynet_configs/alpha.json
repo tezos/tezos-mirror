@@ -56,7 +56,7 @@
     "minimal_block_delay": "4",
     "delay_increment_per_round": "4",
     "consensus_committee_size": 7000,
-    "consensus_threshold": 4667,
+    "consensus_threshold_size": 4667,
     "minimal_participation_ratio": {
         "numerator": 2,
         "denominator": 3

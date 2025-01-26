@@ -104,7 +104,7 @@ let initiated_params descrs nb_accounts =
     Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
       {
         Context.default_test_constants with
-        consensus_threshold = 0;
+        consensus_threshold_size = 0;
         consensus_committee_size;
         dal =
           {

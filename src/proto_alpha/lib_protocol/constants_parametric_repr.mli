@@ -238,7 +238,7 @@ type t = {
   minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   (* in slots *)
-  consensus_threshold : int;
+  consensus_threshold_size : int;
   (* in slots *)
   limit_of_delegation_over_baking : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)

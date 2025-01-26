@@ -42,7 +42,7 @@ open Tezos_micheline
 let test_mint_deposit_withdraw_implicit_transfer () =
   let open Lwt_result_wrap_syntax in
   let* block, (account, another_account) =
-    Context.init2 ~consensus_threshold:0 ()
+    Context.init2 ~consensus_threshold_size:0 ()
   in
   let baker = Context.Contract.pkh account in
   let* ticketer, _, block =
@@ -152,7 +152,7 @@ let test_mint_deposit_withdraw_implicit_transfer () =
 let test_contract_as_ticket_transfer_destination () =
   let open Lwt_result_wrap_syntax in
   let* block, (account, another_account) =
-    Context.init2 ~consensus_threshold:0 ()
+    Context.init2 ~consensus_threshold_size:0 ()
   in
   let baker = Context.Contract.pkh account in
   let* ticketer, _, block =

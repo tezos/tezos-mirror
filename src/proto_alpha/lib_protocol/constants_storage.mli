@@ -80,7 +80,7 @@ val sc_rollup : Raw_context.t -> Constants_parametric_repr.sc_rollup
 
 val consensus_committee_size : Raw_context.t -> int
 
-val consensus_threshold : Raw_context.t -> int
+val consensus_threshold_size : Raw_context.t -> int
 
 val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 

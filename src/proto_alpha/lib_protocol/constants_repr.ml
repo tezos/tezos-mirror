@@ -203,8 +203,9 @@ let check_constants constants =
   let* () =
     error_unless
       Compare.Int.(
-        constants.consensus_threshold >= 0
-        && constants.consensus_threshold <= constants.consensus_committee_size)
+        constants.consensus_threshold_size >= 0
+        && constants.consensus_threshold_size
+           <= constants.consensus_committee_size)
       (Invalid_protocol_constants
          "The consensus threshold must be greater than or equal to 0 and less \
           than or equal to the consensus commitee size.")
@@ -380,7 +381,7 @@ let check_constants constants =
 
 module Generated = struct
   type t = {
-    consensus_threshold : int;
+    consensus_threshold_size : int;
     issuance_weights : Constants_parametric_repr.issuance_weights;
   }
 
@@ -388,8 +389,10 @@ module Generated = struct
     (* The weights are expressed in [(256 * 80)]th of the total
        reward, because it is the smallest proportion used so far *)
     (* let f = consensus_committee_size / 3 in *)
-    let consensus_threshold = (consensus_committee_size * 2 / 3) + 1 in
-    let bonus_committee_size = consensus_committee_size - consensus_threshold in
+    let consensus_threshold_size = (consensus_committee_size * 2 / 3) + 1 in
+    let bonus_committee_size =
+      consensus_committee_size - consensus_threshold_size
+    in
     let base_total_issued_per_minute = Tez_repr.of_mutez_exn 80_007_812L in
     let reward_parts_whole = 20480 (* = 256 * 80 *) in
     let reward_parts_half = 10240 (* = reward_parts_whole / 2 *) in
@@ -427,7 +430,7 @@ module Generated = struct
       |> to_int
     in
     {
-      consensus_threshold;
+      consensus_threshold_size;
       issuance_weights =
         {
           base_total_issued_per_minute;

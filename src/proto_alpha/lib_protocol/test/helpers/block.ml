@@ -575,7 +575,7 @@ let validate_bootstrap_accounts
     (function Exit -> return_unit | exc -> Lwt.reraise exc)
 
 let prepare_initial_context_params ?consensus_committee_size
-    ?consensus_threshold ?min_proposal_quorum ?level ?cost_per_byte
+    ?consensus_threshold_size ?min_proposal_quorum ?level ?cost_per_byte
     ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
@@ -605,8 +605,10 @@ let prepare_initial_context_params ?consensus_committee_size
       ~default:constants.cycles_per_voting_period
       cycles_per_voting_period
   in
-  let consensus_threshold =
-    Option.value ~default:constants.consensus_threshold consensus_threshold
+  let consensus_threshold_size =
+    Option.value
+      ~default:constants.consensus_threshold_size
+      consensus_threshold_size
   in
   let consensus_committee_size =
     Option.value
@@ -680,7 +682,7 @@ let prepare_initial_context_params ?consensus_committee_size
       min_proposal_quorum;
       cost_per_byte;
       consensus_committee_size;
-      consensus_threshold;
+      consensus_threshold_size;
       sc_rollup =
         {
           constants.sc_rollup with
@@ -730,7 +732,7 @@ let prepare_initial_context_params ?consensus_committee_size
 
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
-let genesis ?commitments ?consensus_committee_size ?consensus_threshold
+let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
     ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
@@ -743,7 +745,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
   let* constants, shell, hash =
     prepare_initial_context_params
       ?consensus_committee_size
-      ?consensus_threshold
+      ?consensus_threshold_size
       ?min_proposal_quorum
       ?level
       ?cost_per_byte

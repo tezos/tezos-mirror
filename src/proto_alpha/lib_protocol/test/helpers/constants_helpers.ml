@@ -83,8 +83,8 @@ module Set = struct
   let consensus_committee_size consensus_committee_size (c : t) =
     {c with consensus_committee_size}
 
-  let consensus_threshold consensus_threshold (c : t) =
-    {c with consensus_threshold}
+  let consensus_threshold_size consensus_threshold_size (c : t) =
+    {c with consensus_threshold_size}
 
   let limit_of_delegation_over_baking limit_of_delegation_over_baking (c : t) =
     {c with limit_of_delegation_over_baking}

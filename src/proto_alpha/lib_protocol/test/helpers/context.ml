@@ -261,7 +261,7 @@ let get_baking_reward_fixed_portion ctxt =
 
 let get_bonus_reward ctxt ~attesting_power =
   let open Lwt_result_wrap_syntax in
-  let* {Constants.parametric = {consensus_threshold; _} as csts; _} =
+  let* {Constants.parametric = {consensus_threshold_size; _} as csts; _} =
     get_constants ctxt
   in
   let*?@ baking_reward_bonus_per_slot =
@@ -269,7 +269,7 @@ let get_bonus_reward ctxt ~attesting_power =
       csts
       ~reward_kind:Baking_reward_bonus_per_slot
   in
-  let multiplier = max 0 (attesting_power - consensus_threshold) in
+  let multiplier = max 0 (attesting_power - consensus_threshold_size) in
   return Tez_helpers.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
 let get_attesting_reward ctxt ~expected_attesting_power =
@@ -703,7 +703,7 @@ let tup_get : type a r. (a, r) tup -> a list -> r =
 
 let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_delegations ?bootstrap_consensus_keys ?consensus_committee_size
-    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts ?level
+    ?consensus_threshold_size ?min_proposal_quorum ?bootstrap_contracts ?level
     ?cost_per_byte ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
@@ -727,7 +727,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     Block.genesis
       ?commitments
       ?consensus_committee_size
-      ?consensus_threshold
+      ?consensus_threshold_size
       ?min_proposal_quorum
       ?bootstrap_contracts
       ?level

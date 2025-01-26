@@ -52,7 +52,7 @@ open Alpha_context
       previously. *)
 let test_cycle () =
   let open Lwt_result_syntax in
-  let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* b, _contracts = Context.init_n ~consensus_threshold_size:0 5 () in
   let* csts = Context.get_constants (B b) in
   let blocks_per_cycle = csts.parametric.blocks_per_cycle in
   let pp fmt x = Format.fprintf fmt "%ld" x in
@@ -84,7 +84,7 @@ let test_bake_n_cycles n () =
   let open Lwt_result_syntax in
   let open Block in
   let policy = By_round 0 in
-  let* block, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* block, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* (_block : block) = Block.bake_until_n_cycle_end ~policy n block in
   return_unit
 
@@ -105,7 +105,7 @@ let fold_es n init f =
       start of the current voting period. *)
 let test_voting_power_cache () =
   let open Lwt_result_syntax in
-  let* genesis, delegate1 = Context.init1 ~consensus_threshold:0 () in
+  let* genesis, delegate1 = Context.init1 ~consensus_threshold_size:0 () in
   let delegate1 = Account.pkh_of_contract_exn delegate1 in
   let check_voting_power_update
       (previous_current_voting_power, previous_voting_power) block =
@@ -177,7 +177,7 @@ let test_voting_power_cache () =
 (** test that after baking, one gets the baking reward fixed portion. *)
 let test_basic_baking_reward () =
   let open Lwt_result_syntax in
-  let* genesis, baker = Context.init1 ~consensus_threshold:0 () in
+  let* genesis, baker = Context.init1 ~consensus_threshold_size:0 () in
   let* b = Block.bake genesis in
   let baker_pkh = Context.Contract.pkh baker in
   let* bal = Context.Contract.balance (B b) baker in
@@ -216,7 +216,7 @@ let get_contract_for_pkh contracts pkh =
     [b2].  *)
 let test_rewards_block_and_payload_producer () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init_n ~consensus_threshold:1 10 () in
+  let* genesis, contracts = Context.init_n ~consensus_threshold_size:1 10 () in
   let* baker_b1 = Context.get_baker (B genesis) ~round:Round.zero in
   let* baker_b1_contract = get_contract_for_pkh contracts baker_b1 in
   let* b1 = Block.bake ~policy:(By_round 0) genesis in
@@ -352,7 +352,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
   let* b0, (account1, _account2) =
     Context.init2
       ~bootstrap_balances:[initial_bal1; tpr]
-      ~consensus_threshold:0
+      ~consensus_threshold_size:0
       ()
   in
   let pkh1 = Context.Contract.pkh account1 in
@@ -398,7 +398,7 @@ let test_committee_sampling () =
       {
         Default_parameters.constants_test with
         consensus_committee_size;
-        consensus_threshold = 0;
+        consensus_threshold_size = 0;
       }
     in
     let parameters =

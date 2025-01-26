@@ -163,7 +163,9 @@ let test_pay_fee () =
     enough tez to pay for the fee. *)
 let test_not_tez_in_contract_to_pay_fee () =
   let open Lwt_result_syntax in
-  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract_1, contract_2) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
   let* balance = Context.Contract.balance (B b) contract_1 in
   let*? amount = balance -? Tez.one in
@@ -215,7 +217,7 @@ let test_multiple_originations () =
 (** Cannot originate two contracts with the same context's counter. *)
 let test_counter () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~consensus_threshold:0 () in
+  let* b, contract = Context.init1 ~consensus_threshold_size:0 () in
   let* op1, _ =
     Op.contract_origination
       (B b)
@@ -240,7 +242,7 @@ let test_counter () =
 
 let test_unparsable_script () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~consensus_threshold:0 () in
+  let* b, contract = Context.init1 ~consensus_threshold_size:0 () in
   let open Alpha_context in
   (* Craft an ill-typed origination's contract. *)
   let pkh =

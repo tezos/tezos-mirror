@@ -1187,7 +1187,10 @@ let test_create_mockup_config_show_init_roundtrip protocols =
       JSON.annotate ~origin:"constant_parametric_constants"
       @@ `O
            ((* DO NOT EDIT the value consensus_threshold this is actually a constant, not a parameter *)
-            ("consensus_threshold", `Float 0.0)
+            ( (if Protocol.(number protocol >= 022) then
+                 "consensus_threshold_size"
+               else "consensus_threshold"),
+              `Float 0.0 )
            ::
            (if Protocol.number protocol >= 019 then
               [

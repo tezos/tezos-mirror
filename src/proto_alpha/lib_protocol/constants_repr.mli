@@ -153,7 +153,7 @@ val check_constants : Constants_parametric_repr.t -> unit tzresult
 
 module Generated : sig
   type t = {
-    consensus_threshold : int;
+    consensus_threshold_size : int;
     issuance_weights : Constants_parametric_repr.issuance_weights;
   }
 

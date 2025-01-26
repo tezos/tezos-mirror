@@ -133,7 +133,9 @@ let test_negative_amount () =
     storage increase. *)
 let test_no_tez_to_pay () =
   let open Lwt_result_syntax in
-  let* b, (source, baker, receiver) = Context.init3 ~consensus_threshold:0 () in
+  let* b, (source, baker, receiver) =
+    Context.init3 ~consensus_threshold_size:0 ()
+  in
   let* b, destination = contract_originate b source in
   let pkh_for_bake = Context.Contract.pkh baker in
   let* inc =
@@ -177,7 +179,7 @@ let test_no_contract () =
 let test_effectiveness () =
   let open Lwt_result_syntax in
   let* b, (source, _contract_source) =
-    Context.init2 ~consensus_threshold:0 ()
+    Context.init2 ~consensus_threshold_size:0 ()
   in
   let script =
     "{parameter unit; storage int; code { CDR ; PUSH int 65536 ; MUL ; NIL \

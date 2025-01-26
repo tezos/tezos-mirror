@@ -135,7 +135,7 @@ let test_transfer_zero_implicit () =
 (** Transfer to originated contract. *)
 let test_transfer_to_originate_with_fee () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~consensus_threshold:0 () in
+  let* b, contract = Context.init1 ~consensus_threshold_size:0 () in
   let* fee = two_over_n_of_balance (B b) contract 10L in
   (* originated contract, paying a fee to originated this contract *)
   let* operation, new_contract =
@@ -170,7 +170,7 @@ let test_transfer_amount_of_contract_balance () =
 (** Transfer to oneself. *)
 let test_transfers_to_self () =
   let open Lwt_result_syntax in
-  let* b, (contract, _) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract, _) = Context.init2 ~consensus_threshold_size:0 () in
   let* amount = two_over_n_of_balance (B b) contract 3L in
   let pkh1 = Context.Contract.pkh contract in
   let* b, _ =
@@ -196,7 +196,9 @@ let test_transfers_to_self () =
 (** Forgot to add the valid transaction into the block. *)
 let test_missing_transaction () =
   let open Lwt_result_syntax in
-  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract_1, contract_2) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
   let pkh1 = Context.Contract.pkh contract_1 in
@@ -214,7 +216,7 @@ let test_missing_transaction () =
 (** Transfer zero tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_zero_implicit_with_bal_src_as_fee () =
   let open Lwt_result_syntax in
-  let* b, dest = Context.init1 ~consensus_threshold:0 () in
+  let* b, dest = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let src_pkh = account.Account.pkh in
   let src = Contract.Implicit src_pkh in
@@ -251,7 +253,7 @@ let test_transfer_zero_implicit_with_bal_src_as_fee () =
 (** Transfer zero tez to an originated contract, with fee equals balance of src. *)
 let test_transfer_zero_to_originated_with_bal_src_as_fee () =
   let open Lwt_result_syntax in
-  let* b, dest = Context.init1 ~consensus_threshold:0 () in
+  let* b, dest = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let src = Contract.Implicit account.Account.pkh in
   let* operation = Op.transaction (B b) dest src (Tez.of_mutez_exn 100L) in
@@ -273,7 +275,7 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
 (** Transfer one tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_one_to_implicit_with_bal_src_as_fee () =
   let open Lwt_result_syntax in
-  let* b, dest = Context.init1 ~consensus_threshold:0 () in
+  let* b, dest = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let src = Contract.Implicit account.Account.pkh in
   let* operation = Op.transaction (B b) dest src (Tez.of_mutez_exn 100L) in
@@ -306,7 +308,7 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
 (** Implicit to Implicit. *)
 let test_transfer_from_implicit_to_implicit_contract () =
   let open Lwt_result_syntax in
-  let* b, bootstrap_contract = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap_contract = Context.init1 ~consensus_threshold_size:0 () in
   let account_a = Account.new_account () in
   let account_b = Account.new_account () in
   let src = Contract.Implicit account_a.Account.pkh in
@@ -346,7 +348,7 @@ let test_transfer_from_implicit_to_implicit_contract () =
 (** Implicit to originated. *)
 let test_transfer_from_implicit_to_originated_contract () =
   let open Lwt_result_syntax in
-  let* b, bootstrap_contract = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap_contract = Context.init1 ~consensus_threshold_size:0 () in
   let contract = bootstrap_contract in
   let account = Account.new_account () in
   let src = Contract.Implicit account.Account.pkh in
@@ -388,7 +390,9 @@ let test_transfer_from_implicit_to_originated_contract () =
 
 let multiple_transfer n ?fee amount =
   let open Lwt_result_syntax in
-  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract_1, contract_2) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   let* b = Incremental.begin_construction b in
   let* b = n_transactions n b ?fee contract_1 contract_2 amount in
   let* (_ : Block.t) = Incremental.finalize_block b in
@@ -411,7 +415,7 @@ let test_block_with_multiple_transfers_pay_fee () =
     3- Apply multiple transfers with fees. *)
 let test_block_with_multiple_transfers_with_without_fee () =
   let open Lwt_result_syntax in
-  let* b, contracts = Context.init_n ~consensus_threshold:0 8 () in
+  let* b, contracts = Context.init_n ~consensus_threshold_size:0 8 () in
   let contracts = Array.of_list contracts in
   let* b = Incremental.begin_construction b in
   let hundred = of_int 100 in
@@ -439,7 +443,9 @@ let test_block_with_multiple_transfers_with_without_fee () =
 (** Build a chain that has 10 blocks. *)
 let test_build_a_chain () =
   let open Lwt_result_syntax in
-  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract_1, contract_2) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   let ten = of_int 10 in
   let* (_ : Block.t) =
     List.fold_left_es
@@ -478,7 +484,9 @@ let test_empty_implicit () =
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
   let open Lwt_result_syntax in
-  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract_1, contract_2) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   let* balance1 = Context.Contract.balance (B b) contract_1 in
   let* balance2 = Context.Contract.balance (B b) contract_2 in
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
@@ -522,7 +530,7 @@ let test_balance_too_low fee () =
 let test_balance_too_low_two_transfers fee () =
   let open Lwt_result_syntax in
   let* b, (contract_1, contract_2, contract_3) =
-    Context.init3 ~consensus_threshold:0 ()
+    Context.init3 ~consensus_threshold_size:0 ()
   in
   let* i = Incremental.begin_construction b in
   let* balance = Context.Contract.balance (I i) contract_1 in
@@ -561,7 +569,9 @@ let test_balance_too_low_two_transfers fee () =
 (** The counter is already used for the previous operation. *)
 let invalid_counter () =
   let open Lwt_result_syntax in
-  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract_1, contract_2) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   let* op1 = Op.transaction (B b) contract_1 contract_2 Tez.one in
   let* op2 = Op.transaction (B b) contract_1 contract_2 Tez.one in
   let* b = Block.bake ~operation:op1 b in
@@ -817,7 +827,7 @@ let script =
     balance. *)
 let test_storage_fees_and_internal_operation () =
   let open Lwt_result_syntax in
-  let* initial_block, contract = Context.init1 ~consensus_threshold:0 () in
+  let* initial_block, contract = Context.init1 ~consensus_threshold_size:0 () in
   let null_string = Expr.from_string "\"\"" in
   let caller = Account.new_account () in
   (* Initialize a caller account. *)

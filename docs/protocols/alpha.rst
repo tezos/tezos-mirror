@@ -77,6 +77,8 @@ Protocol parameters
 - Lower the number of blocks per cycle (``blocks_per_cycle``) for
   ghostnet to 10800 (~12 hours). (MR :gl:`!15196`)
 
+- Rename ``consensus_threshold`` to ``consensus_threshold_size``. (MR :gl:`!15979`)
+
 Bug Fixes
 ---------
 
