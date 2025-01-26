@@ -26,7 +26,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let spawn ?runner command = Process.spawn ?runner "npx" ("eth-cli" :: command)
+let spawn ?runner command =
+  if Option.is_some (Sys.getenv_opt "TEZT_NO_NPX") then
+    Process.spawn ?runner "/usr/local/lib/node_modules/eth-cli/bin/run" command
+  else Process.spawn ?runner "npx" ("eth-cli" :: command)
 
 let spawn_command_and_read_string ?runner ?expect_failure command =
   let process = spawn ?runner command in

@@ -1073,6 +1073,7 @@ module Tezt = struct
         ("TESTS", Tezt_core.TSL.show tezt_tests);
         ("TEZT_RETRY", string_of_int tezt_retry);
         ("TEZT_PARALLEL", string_of_int tezt_parallel);
+        ("TEZT_NO_NPX", "true");
       ]
     in
     let artifacts =
