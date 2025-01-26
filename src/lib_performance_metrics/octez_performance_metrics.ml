@@ -24,6 +24,22 @@ module type REGISTRY = sig
   val directories : data_dir_element list
 end
 
+let can_run_command cmd =
+  let open Lwt_syntax in
+  let+ status =
+    Lwt_process.with_process_full
+      ("which", [|"which"; cmd|])
+      (fun pc -> pc#status)
+  in
+  match status with Unix.WEXITED 0 -> true | _ -> false
+
+let supports_performance_metrics () =
+  let open Lwt_syntax in
+  let+ cmd_support =
+    Lwt.all [can_run_command "lsof"; can_run_command "ps"; can_run_command "du"]
+  in
+  List.for_all Fun.id cmd_support
+
 module Make (R : REGISTRY) = struct
   include R
 
