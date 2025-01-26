@@ -559,6 +559,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       if prover then
         Cryptobox.init_prover_dal
           ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+          ~fetch_trusted_setup:false
           ()
       else Lwt.return (Ok ())
     in
@@ -7099,6 +7100,7 @@ let dal_crypto_benchmark () =
       let* result =
         init_prover_dal
           ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+          ~fetch_trusted_setup:false
           ()
       in
       Log.info "SRS loaded." ;

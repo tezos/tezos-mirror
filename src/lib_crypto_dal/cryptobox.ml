@@ -1203,22 +1203,40 @@ module Internal_for_tests = struct
   let slot_as_polynomial_length = Parameters_check.slot_as_polynomial_length
 end
 
-let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) () =
+let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) ~fetch_trusted_setup
+    () =
   let open Lwt_result_syntax in
+  let load_trusted_setup_parameters srsu_g1_path srsu_g2_path =
+    let* srs_g1, srs_g2 =
+      initialisation_parameters_from_files
+        ~srsu_g1_path
+        ~srsu_g2_path
+        ~srs_size:(1 lsl srs_size_log2)
+    in
+    let initialisation_parameters = Prover {is_fake = false; srs_g1; srs_g2} in
+    Lwt.return (load_parameters initialisation_parameters)
+  in
+  let download_trusted_setup errors =
+    if fetch_trusted_setup then
+      let*! () =
+        Event.(emit installing_trusted_setup)
+          Trusted_setup.dal_trusted_setup_folder
+      in
+      let* () = Trusted_setup.download_list Trusted_setup.defaults in
+      let srsu_g1_path, srsu_g2_path = Trusted_setup.output_files in
+      load_trusted_setup_parameters srsu_g1_path srsu_g2_path
+    else Lwt_result.fail errors
+  in
   Lwt.catch
     (fun () ->
-      let* initialisation_parameters =
+      let*! load_params =
         let*? srsu_g1_path, srsu_g2_path = find_srs_files () in
-        let* srs_g1, srs_g2 =
-          initialisation_parameters_from_files
-            ~srsu_g1_path
-            ~srsu_g2_path
-            ~srs_size:(1 lsl srs_size_log2)
-        in
-        return (Prover {is_fake = false; srs_g1; srs_g2})
+        load_trusted_setup_parameters srsu_g1_path srsu_g2_path
       in
-      Lwt.return (load_parameters initialisation_parameters))
-    (fun exn -> tzfail (Failed_to_load_trusted_setup (Printexc.to_string exn)))
+      TzLwtreslib.Result.bind_error_s load_params download_trusted_setup)
+    (fun exn ->
+      download_trusted_setup
+        [Failed_to_load_trusted_setup (Printexc.to_string exn)])
 
 module Config = struct
   type t = Dal_config.t = {activated : bool; bootstrap_peers : string list}

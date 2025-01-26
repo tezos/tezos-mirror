@@ -236,6 +236,9 @@ DAL node
 - **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
   argument has been removed. (MR :gl:`!15554`)
 
+- **Feature** The DAL node downloads trusted setup files when launched in observer
+   or operator mode. (MR :gl:`!16102`)
+
 Protocol
 ~~~~~~~~
 

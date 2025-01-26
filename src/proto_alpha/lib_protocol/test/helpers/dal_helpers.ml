@@ -50,6 +50,7 @@ let dal_prover_srs =
   lazy
     (Cryptobox.init_prover_dal
        ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+       ~fetch_trusted_setup:false
        ())
 
 let mk_cryptobox dal_params =

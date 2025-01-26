@@ -12,8 +12,12 @@
   octez-libs.data-encoding
   octez-libs.crypto-dal.dal-config
   octez-libs.bls12-381-polynomial
+  octez-libs.cohttp-lwt-unix
+  octez-libs.lwt-result-stdlib
   lwt.unix
-  octez-libs.kzg)
+  octez-libs.kzg
+  octez-libs.event-logging
+  octez-libs.base)
  (flags
   (:standard)
   -open Tezos_stdlib
