@@ -645,10 +645,12 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
 }
 
 /// Errors that occur from interacting with the [MachineState]
-#[derive(Debug, derive_more::Display, derive_more::From, thiserror::Error)]
+#[derive(Debug, derive_more::From, thiserror::Error)]
 pub enum MachineError {
-    #[display(fmt = "Address out of bounds")]
+    #[error("Address out of bounds")]
     AddressError(OutOfBounds),
+
+    #[error("Device tree error: {0}")]
     DeviceTreeError(vm_fdt::Error),
 }
 
