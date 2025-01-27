@@ -70,6 +70,8 @@ Client
 - Allow tz4 (BLS) addresses to be registered as delegate and or as consensus
   keys. (MR :gl:`!15302`)
 
+ - **Breaking change** Removed read-write commands specific to ParisC. (MR :gl:`!16431`)
+
 Baker
 -----
 
