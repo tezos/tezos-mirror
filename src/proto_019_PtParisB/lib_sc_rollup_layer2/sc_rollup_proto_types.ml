@@ -331,10 +331,14 @@ module Game = struct
         Move {choice = Sc_rollup.Tick.to_z choice; step = step_to_octez step}
 
   let index_of_octez Octez_smart_rollup.Game.{alice; bob} =
-    Sc_rollup.Game.Index.make alice bob
+    Sc_rollup.Game.Index.make
+      (Signature.V1.Of_V_latest.get_public_key_hash_exn alice)
+      (Signature.V1.Of_V_latest.get_public_key_hash_exn bob)
 
   let index_to_octez Sc_rollup.Game.Index.{alice; bob} =
-    Octez_smart_rollup.Game.make_index alice bob
+    Octez_smart_rollup.Game.make_index
+      (Signature.V_latest.Of_V1.public_key_hash alice)
+      (Signature.V_latest.Of_V1.public_key_hash bob)
 
   let player_of_octez : Octez_smart_rollup.Game.player -> player = function
     | Alice -> Alice
@@ -434,7 +438,7 @@ module Game = struct
         {other; their_commitment; our_commitment; parent_commitment} : conflict
       =
     {
-      other;
+      other = Signature.V1.Of_V_latest.get_public_key_hash_exn other;
       their_commitment = Commitment.of_octez their_commitment;
       our_commitment = Commitment.of_octez our_commitment;
       parent_commitment;
@@ -445,7 +449,7 @@ module Game = struct
         {other; their_commitment; our_commitment; parent_commitment} :
       Octez_smart_rollup.Game.conflict =
     {
-      other;
+      other = Signature.Of_V1.public_key_hash other;
       their_commitment = Commitment.to_octez their_commitment;
       our_commitment = Commitment.to_octez our_commitment;
       parent_commitment;
