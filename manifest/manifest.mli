@@ -844,6 +844,9 @@ type bisect_ppx = No | Yes | With_sigterm
 
     - [path]: the path to the directory of the [dune] file that will define this target.
 
+    - [enabled_if] Conditionally disables a target. A disabled target
+      cannot be built and will not be installed.
+
     - [with_macos_security_framework]: Default value is [false]. When set to
       [true], the [-ccopt "-framework Security"]flag is added at link time for
       macOS system. *)
@@ -901,6 +904,7 @@ type 'a maker =
   ?extra_authors:string list ->
   ?with_macos_security_framework:bool ->
   path:string ->
+  ?enabled_if:Dune.s_expr ->
   'a ->
   target
 
