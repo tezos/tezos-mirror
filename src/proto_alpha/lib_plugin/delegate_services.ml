@@ -239,6 +239,9 @@ type new_info = {
   deactivated : bool;
   is_forbidden : bool;
   participation : Delegate.For_RPC.participation_info;
+  (* The dal_participation is an optional value for the case where DAL
+     incentives are disabled. *)
+  dal_participation : Delegate.For_RPC.dal_participation_info option;
   grace_period : Cycle.t;
   active_staking_parameters : Staking_parameters_repr.t;
   pending_staking_parameters : pending_staking_parameters list;
@@ -280,7 +283,7 @@ type new_info = {
    - staking_balance (equals total_staked + total_delegated
    - delegated_balance (equals external_staked + external_delegated) *)
 
-let conv25 ty =
+let conv26 ty =
   Data_encoding.conv
     (fun ( x0,
            x1,
@@ -306,13 +309,14 @@ let conv25 ty =
            x21,
            x22,
            x23,
-           x24 ) ->
+           x24,
+           x25 ) ->
       ( (x0, x1, x2, x3, x4, x5, x6, x7, x8, x9),
         ( (x10, x11, x12, x13, x14, x15, x16, x17, x18, x19),
-          (x20, x21, x22, x23, x24) ) ))
+          (x20, x21, x22, x23, x24, x25) ) ))
     (fun ( (x0, x1, x2, x3, x4, x5, x6, x7, x8, x9),
            ( (x10, x11, x12, x13, x14, x15, x16, x17, x18, x19),
-             (x20, x21, x22, x23, x24) ) ) ->
+             (x20, x21, x22, x23, x24, x25) ) ) ->
       ( x0,
         x1,
         x2,
@@ -337,18 +341,19 @@ let conv25 ty =
         x21,
         x22,
         x23,
-        x24 ))
+        x24,
+        x25 ))
     ty
 
-let obj25 f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-    f20 f21 f22 f23 f24 =
-  conv25
+let obj26 f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
+    f20 f21 f22 f23 f24 f25 =
+  conv26
     Data_encoding.(
       merge_objs
         (obj10 f0 f1 f2 f3 f4 f5 f6 f7 f8 f9)
         (merge_objs
            (obj10 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19)
-           (obj5 f20 f21 f22 f23 f24)))
+           (obj6 f20 f21 f22 f23 f24 f25)))
 
 let info_encoding =
   let open Data_encoding in
@@ -358,6 +363,7 @@ let info_encoding =
            deactivated;
            is_forbidden;
            participation;
+           dal_participation;
            grace_period;
            active_staking_parameters;
            pending_staking_parameters;
@@ -389,6 +395,7 @@ let info_encoding =
         deactivated,
         is_forbidden,
         participation,
+        dal_participation,
         grace_period,
         active_staking_parameters,
         pending_staking_parameters,
@@ -419,6 +426,7 @@ let info_encoding =
            deactivated,
            is_forbidden,
            participation,
+           dal_participation,
            grace_period,
            active_staking_parameters,
            pending_staking_parameters,
@@ -450,6 +458,7 @@ let info_encoding =
         deactivated;
         is_forbidden;
         participation;
+        dal_participation;
         grace_period;
         active_staking_parameters;
         pending_staking_parameters;
@@ -477,11 +486,12 @@ let info_encoding =
         stakers;
         delegators;
       })
-    (obj25
+    (obj26
        (* General baking information *)
        (req "deactivated" bool)
        (req "is_forbidden" bool)
        (req "participation" participation_info_encoding)
+       (opt "dal_participation" dal_participation_info_encoding)
        (req "grace_period" Cycle.encoding)
        (req "active_staking_parameters" Staking_parameters_repr.encoding)
        (req
@@ -1212,6 +1222,17 @@ let info ctxt pkh =
   let* deactivated = Delegate.deactivated ctxt pkh in
   let is_forbidden = Delegate.is_forbidden_delegate ctxt pkh in
   let* participation = Delegate.For_RPC.participation_info ctxt pkh in
+  let* dal_participation =
+    let dal_incentives_enable =
+      Constants.(parametric ctxt).dal.incentives_enable
+    in
+    if dal_incentives_enable then
+      let* dal_participation =
+        Delegate.For_RPC.dal_participation_info ctxt pkh
+      in
+      return_some dal_participation
+    else return_none
+  in
   let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
   let* active_staking_parameters =
     Delegate.Staking_parameters.of_delegate ctxt pkh
@@ -1258,6 +1279,7 @@ let info ctxt pkh =
       deactivated;
       is_forbidden;
       participation;
+      dal_participation;
       grace_period;
       active_staking_parameters;
       pending_staking_parameters;
@@ -1519,6 +1541,7 @@ let info ctxt block pkh =
          deactivated;
          is_forbidden = _;
          participation = _;
+         dal_participation = _;
          grace_period;
          active_staking_parameters = _;
          pending_staking_parameters = _;

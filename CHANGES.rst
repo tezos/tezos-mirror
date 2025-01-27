@@ -46,6 +46,11 @@ Node
   ``/chain/{chain_id}/protocols/{protocol_hash}``) to retrieve protocol
   activation levels of the chain. (MR :gl:`!15447`)
 
+- **Breaking change** RPC /chains/main/blocks/head/context/delegates/<pkh>'s
+  result now contains a field about DAL participation information when DAL
+  incentives flag is set. This introduces a breaking change for applications
+  using the binary encoding format. (MR :gl:`!16430`)
+
 Client
 ------
 
