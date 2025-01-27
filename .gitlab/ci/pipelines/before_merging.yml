@@ -1408,8 +1408,6 @@ opam:all_6:
     matrix:
     - package:
       - tezt-tezos
-      - tezos-protocol-genesis
-      - tezos-protocol-demo-noops
       - tezos-openapi
       - tezos-dal-node-services
       - tezos-benchmark
@@ -1417,9 +1415,11 @@ opam:all_6:
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-performance-metrics
+      - octez-libs
       - octez-l2-libs
       - efunc_core
       - dal_node_migrations
+      - bls12-381
 
 opam:exec_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1560,9 +1560,7 @@ opam:all_2:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-wasm-debugger-lib
       - octez-smart-rollup-node-lib
-      - octez-smart-rollup-node-alpha
       - octez-protocol-alpha-libs
       - octez-protocol-021-PsQuebec-libs
       - octez-protocol-020-PsParisC-libs
@@ -1570,6 +1568,8 @@ opam:all_2:
       - octez-protocol-018-Proxford-libs
       - octez-protocol-017-PtNairob-libs
       - octez-protocol-016-PtMumbai-libs
+      - octez-protocol-005-PsBabyM1-libs
+      - octez-protocol-004-Pt24m4xi-libs
       - octez-protocol-003-PsddFKi3-libs
       - octez-protocol-002-PsYLVpVv-libs
       - octez-protocol-001-PtCJ7pwo-libs
@@ -1645,6 +1645,8 @@ opam:all_1:
   parallel:
     matrix:
     - package:
+      - octez-smart-rollup-wasm-debugger-lib
+      - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtParisB
       - octez-smart-rollup-node-PtNairob
       - octez-smart-rollup-node-PsQuebec
@@ -1733,8 +1735,8 @@ opam:all_3:
       - octez-protocol-008-PtEdo2Zk-libs
       - octez-protocol-007-PsDELPH1-libs
       - octez-protocol-006-PsCARTHA-libs
-      - octez-protocol-005-PsBabyM1-libs
-      - octez-protocol-004-Pt24m4xi-libs
+      - octez-node-config
+      - octez-crawler
 
 opam:exec_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1874,6 +1876,8 @@ opam:all_4:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-010-PtGRANAD
+      - tezos-protocol-009-PsFLoren
       - tezos-protocol-008-PtEdoTez
       - tezos-protocol-008-PtEdo2Zk
       - tezos-protocol-007-PsDELPH1
@@ -1886,8 +1890,6 @@ opam:all_4:
       - tezos-protocol-001-PtCJ7pwo
       - tezos-protocol-000-Ps9mPmXa
       - tezos-dal-node-lib
-      - octez-node-config
-      - octez-crawler
 
 opam:exec_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1963,9 +1965,7 @@ opam:exec_1:
       - octez-codec
       - octez-client
       - octez-baker-PsQuebec
-      - octez-baker-PsParisC
       - octez-accuser-PsQuebec
-      - octez-accuser-PsParisC
 
 opam:all_5:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -2036,6 +2036,8 @@ opam:all_5:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-genesis
+      - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
       - tezos-protocol-021-PsQuebec
@@ -2049,8 +2051,6 @@ opam:all_5:
       - tezos-protocol-013-PtJakart
       - tezos-protocol-012-Psithaca
       - tezos-protocol-011-PtHangz2
-      - tezos-protocol-010-PtGRANAD
-      - tezos-protocol-009-PsFLoren
 
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -2126,12 +2126,10 @@ opam:all_7:
       - octez-rust-deps
       - octez-riscv-api
       - octez-protocol-compiler-compat
-      - octez-libs
       - octez-internal-libs
       - octez-distributed-lwt-internal
       - octez-distributed-internal
       - octez-alcotezt
-      - bls12-381
 
 trigger:debian_repository_partial_auto:
   stage: test
