@@ -28,10 +28,15 @@ you start using them, you probably want to use `octez-evm-node check config
 
 ### Bug fixes
 
+#### CLI
+
+- Fix the initial kernel used by default for Etherlink Mainnet (`--network
+  mainnet` on a newly created data directory). (!16409)
+
 #### RPCs
 
 - `eth_getLogs` now accepts `null` as a valid value for the `topics` parameter.
-  (!todo)
+  (!16357)
 
 ### Internals
 
