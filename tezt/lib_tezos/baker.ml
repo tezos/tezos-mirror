@@ -189,18 +189,10 @@ let run ?env ?event_level ?event_sections_levels (baker : t) =
     (* From Protocol Q, the flag --force-apply has been replaced by
        --force-apply-from-round, the following maintains back-compatibility with
        ParisC tests. *)
-    if
-      Protocol.number baker.persistent_state.protocol
-      > Protocol.number Protocol.ParisC
-    then
-      Cli_arg.optional_arg
-        "force-apply-from-round"
-        string_of_int
-        baker.persistent_state.force_apply_from_round
-    else
-      Cli_arg.optional_switch
-        "force-apply"
-        (Option.is_some baker.persistent_state.force_apply_from_round)
+    Cli_arg.optional_arg
+      "force-apply-from-round"
+      string_of_int
+      baker.persistent_state.force_apply_from_round
   in
   let operations_pool =
     Cli_arg.optional_arg
