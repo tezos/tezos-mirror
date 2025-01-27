@@ -113,6 +113,9 @@ let maybe_recover_bond node_ctxt =
     | None -> return_unit
     | Some (Single operating_pkh) -> (
         let* staked_on_commitment =
+          let*? operating_pkh =
+            Signature.Of_V_latest.get_public_key_hash operating_pkh
+          in
           RPC.Sc_rollup.staked_on_commitment
             (new Protocol_client_context.wrap_full node_ctxt.cctxt)
             (node_ctxt.cctxt#chain, `Head 0)
@@ -213,7 +216,10 @@ let process_included_l1_operation (type kind) ~catching_up
   | ( Sc_rollup_timeout _,
       Sc_rollup_timeout_result {game_status = Ended end_status; _} ) -> (
       match end_status with
-      | Loser {loser; reason} when Node_context.is_operator node_ctxt loser ->
+      | Loser {loser; reason}
+        when Node_context.is_operator
+               node_ctxt
+               (Tezos_crypto.Signature.Of_V1.public_key_hash loser) ->
           let result =
             match reason with
             | Conflict_resolved -> Sc_rollup_node_errors.Conflict_resolved
@@ -226,8 +232,13 @@ let process_included_l1_operation (type kind) ~catching_up
       | Draw ->
           let stakers =
             match operation with
-            | Sc_rollup_refute {opponent; _} -> [source; opponent]
-            | Sc_rollup_timeout {stakers = {alice; bob}; _} -> [alice; bob]
+            | Sc_rollup_refute {opponent; _} ->
+                [source; Tezos_crypto.Signature.Of_V1.public_key_hash opponent]
+            | Sc_rollup_timeout {stakers = {alice; bob}; _} ->
+                [
+                  Tezos_crypto.Signature.Of_V1.public_key_hash alice;
+                  Tezos_crypto.Signature.Of_V1.public_key_hash bob;
+                ]
             | _ -> assert false
           in
           fail_when
@@ -251,7 +262,9 @@ let process_included_l1_operation (type kind) ~catching_up
       match Node_context.get_operator node_ctxt Operating with
       | Some (Single operating_pkh) ->
           fail_when
-            Signature.Public_key_hash.(operating_pkh = staker)
+            Tezos_crypto.Signature.Public_key_hash.(
+              operating_pkh
+              = Tezos_crypto.Signature.Of_V1.public_key_hash staker)
             Sc_rollup_node_errors.Exit_bond_recovered_bailout_mode
       | _ -> return_unit)
   | ( Sc_rollup_execute_outbox_message {output_proof; _},
@@ -294,6 +307,11 @@ let process_included_l1_operation (type kind) ~catching_up
             (* No need to check whitelist updates for historical data. *)
           then return_unit
           else
+            let whitelist_update =
+              List.map
+                Tezos_crypto.Signature.Of_V1.public_key_hash
+                whitelist_update
+            in
             let*? () =
               Node_context.check_op_in_whitelist_or_bailout_mode
                 node_ctxt
@@ -367,6 +385,7 @@ let process_l1_block_operations ~catching_up node_ctxt (head : Layer1.header) =
       =
     let open Lwt_result_syntax in
     let* () = accu in
+    let source = Tezos_crypto.Signature.Of_V1.public_key_hash source in
     process_l1_operation ~catching_up node_ctxt head ~source operation result
   in
   let apply_internal (type kind) accu ~source:_
