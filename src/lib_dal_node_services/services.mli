@@ -126,6 +126,17 @@ val get_slot_status :
   ; query : unit >
   service
 
+(** Returns the last (finalized) L1 level which was processed by the DAL \
+    node. *)
+val get_last_processed_level :
+  < meth : [`GET]
+  ; input : unit
+  ; output : int32
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
 (** Update the list of profiles tracked by the DAL node.
     Note that it does not take the bootstrap profile as it
     is incompatible with other profiles. *)

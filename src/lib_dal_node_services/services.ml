@@ -179,6 +179,22 @@ let get_slot_status :
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
       / "status")
 
+let get_last_processed_level :
+    < meth : [`GET]
+    ; input : unit
+    ; output : int32
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Returns the last (finalized) L1 level which was processed by the DAL \
+       node."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.int32
+    Tezos_rpc.Path.(open_root / "last_processed_level")
+
 let patch_profiles :
     < meth : [`PATCH]
     ; input : Operator_profile.t
