@@ -124,6 +124,18 @@ val default_arg :
   ('a, 'ctx) parameter ->
   ('a, 'ctx) arg
 
+(** Create an argument that will contain the [~default] value if it
+    contains no value (i.e. if it's a switch). To use such argument,
+    it must be enabled in [dispatch]. *)
+val arg_or_switch :
+  doc:string ->
+  ?short:char ->
+  long:string ->
+  placeholder:string ->
+  default:string ->
+  ('a, 'ctx) parameter ->
+  ('a option, 'ctx) arg
+
 (** Create a boolean switch.
     The value will be set to [true] if the switch is provided and [false] if it is not. *)
 val switch :
@@ -913,8 +925,17 @@ type error += Help : _ command option -> error
 type error += Version : error
 
 (** Find and call the applicable command on the series of arguments.
-    @raise Failure if the command list would be ambiguous. *)
-val dispatch : 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
+    Option [enable_argDefSwitch] is [false] by default.
+    @raise Failure if the command list would be ambiguous.
+    @raise Failure if [enable_argDefSwitch = false] and such option
+      exists in any command.
+*)
+val dispatch :
+  ?enable_argDefSwitch:bool ->
+  'ctx command list ->
+  'ctx ->
+  string list ->
+  unit tzresult Lwt.t
 
 (** Parse the global options, and return their value, with the rest of
     the command to be parsed. *)
