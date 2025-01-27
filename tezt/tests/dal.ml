@@ -8224,6 +8224,200 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
          expected %R") ;
   unit
 
+let pair_up ~error_msg =
+  let rec pair_up = function
+    | [] -> []
+    | [_] -> Test.fail ~__LOC__ error_msg
+    | x :: y :: rest -> (x, y) :: pair_up rest
+  in
+  pair_up
+
+let extract_dal_balance_updates balance_updates =
+  List.filter_map
+    (fun (json1, json2) ->
+      let change1 = JSON.(json1 |-> "change" |> as_int) in
+      let change2 = JSON.(json2 |-> "change" |> as_int) in
+      Check.(
+        (-change1 = change2)
+          ~__LOC__
+          int
+          ~error_msg:"Expected 'change' to match; got %L and %R") ;
+      let kind = JSON.(json1 |-> "kind" |> as_string) in
+      if
+        (not (String.equal kind "minted"))
+        && not (String.equal kind "accumulator")
+      then
+        Test.fail
+          ~__LOC__
+          "Expected a 'minted' or 'accumulator' kind, got '%s'"
+          kind ;
+      let category1 = JSON.(json1 |-> "category" |> as_string) in
+      if String.equal category1 "DAL attesting rewards" then
+        let kind2 = JSON.(json2 |-> "kind" |> as_string) in
+        match kind2 with
+        | "burned" ->
+            let category2 = JSON.(json2 |-> "category" |> as_string) in
+            Check.(
+              (category2 = "lost DAL attesting rewards")
+                ~__LOC__
+                string
+                ~error_msg:
+                  "Expected a 'lost DAL attesting rewards' category, got %L") ;
+            let delegate = JSON.(json2 |-> "delegate" |> as_string) in
+            Some (`Lost (delegate, change2, json2))
+        | "freezer" ->
+            let delegate =
+              JSON.(json2 |-> "staker" |-> "baker_own_stake" |> as_string)
+            in
+            Some (`Got (delegate, change2, json2))
+        | "contract" ->
+            let delegate = JSON.(json2 |-> "contract" |> as_string) in
+            Some (`Got (delegate, change2, json2))
+        | _ -> Test.fail ~__LOC__ "Unexpected balance update kind %s" kind2
+      else None)
+    balance_updates
+
+(* This function checks the fields of the [dal_participation] RPC result. It is
+   supposed to be used only by the test scenario below, as it assumes
+   [expected_attested_shards] is either 0 or [expected_attestable_shards],
+   [denounced] is [false], and there are only two kinds of transfers, both to
+   the delegate itself, as there are no co-stakers in the scenario below.. *)
+let check_participation_and_rewards participation ~expected_assigned_shards
+    ~expected_attestable_slots ~attesting_reward_per_shard dal_balance_updates
+    delegate ~sufficient_participation =
+  let json = participation in
+  let denounced = JSON.(json |-> "denounced" |> as_bool) in
+  Check.(
+    (denounced = false)
+      ~__LOC__
+      bool
+      ~error_msg:"The delegate was unexpectedly denounced") ;
+  let expected_assigned_shards_per_slot =
+    JSON.(json |-> "expected_assigned_shards_per_slot" |> as_int)
+  in
+  Check.(
+    (expected_assigned_shards_per_slot = expected_assigned_shards)
+      ~__LOC__
+      int
+      ~error_msg:"Unexpected number of assigned shards. Expected %R, got %L") ;
+  let delegate_attested_dal_slots =
+    JSON.(json |-> "delegate_attested_dal_slots" |> as_int)
+  in
+  let expected_attested_slots =
+    if sufficient_participation then expected_attestable_slots else 0
+  in
+  Check.(
+    (delegate_attested_dal_slots = expected_attested_slots)
+      ~__LOC__
+      int
+      ~error_msg:"Expected that the delegate has attested %L slots, got %R") ;
+  let delegate_attestable_dal_slots =
+    JSON.(json |-> "delegate_attestable_dal_slots" |> as_int)
+  in
+  Check.(
+    (delegate_attestable_dal_slots = expected_attestable_slots)
+      ~__LOC__
+      int
+      ~error_msg:"Expected that there are %L attestable slots, got %R") ;
+  let sufficient_dal_participation =
+    JSON.(json |-> "sufficient_dal_participation" |> as_bool)
+  in
+  Check.(
+    (sufficient_dal_participation = sufficient_participation)
+      ~__LOC__
+      bool
+      ~error_msg:"Expected sufficient_dal_participation to be %R, got %L") ;
+  let expected_dal_rewards = JSON.(json |-> "expected_dal_rewards" |> as_int) in
+  let dal_rewards = expected_assigned_shards * attesting_reward_per_shard in
+  Check.(
+    (expected_dal_rewards = dal_rewards)
+      ~__LOC__
+      int
+      ~error_msg:
+        ("Unexpected rewards for delegate " ^ delegate ^ ": expected %L, got %R")) ;
+  let get_delegate = function
+    | `Got (delegate, _amount, _json) | `Lost (delegate, _amount, _json) ->
+        delegate
+  in
+  let dal_rewards =
+    List.filter_map
+      (fun item ->
+        let item_delegate = get_delegate item in
+        if String.equal item_delegate delegate then Some item else None)
+      dal_balance_updates
+  in
+  let get_json_list =
+    List.map (function `Got (_, _, json) | `Lost (_, _, json) ->
+        JSON.encode json)
+  in
+  let rewards =
+    if sufficient_participation then
+      match dal_rewards with
+      | [`Got (_, amount1, _); `Got (_, amount2, _)] ->
+          (* one corresponds to the liquid rewards and one to the frozen ones (but
+             we do not care here) *)
+          amount1 + amount2
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "Unexpected balance updates for the delegate %s: %a"
+            delegate
+            Format.(pp_print_list pp_print_string)
+            (get_json_list dal_rewards)
+    else
+      match dal_rewards with
+      | [`Lost (_, amount, _)] -> amount
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "Unexpected balance updates for the delegate %s: %a"
+            delegate
+            Format.(pp_print_list pp_print_string)
+            (get_json_list dal_rewards)
+  in
+  Check.(
+    (expected_dal_rewards = rewards)
+      ~__LOC__
+      int
+      ~error_msg:
+        ("Unexpected rewards for delegate " ^ delegate ^ ": expected %L, got %R"))
+
+let check_participation_and_rewards node ~expected_assigned_shards
+    ~expected_attestable_slots =
+  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata_raw () in
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  let balance_updates =
+    pair_up
+      balance_updates
+      ~error_msg:"The list of balance updates has an odd number of elements"
+  in
+  let dal_balance_updates = extract_dal_balance_updates balance_updates in
+  let* attesting_reward_per_shard =
+    let* json =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_issuance_expected_issuance ()
+    in
+    return @@ JSON.(json |=> 0 |-> "dal_attesting_reward_per_shard" |> as_int)
+  in
+  return @@ fun delegate ~sufficient_participation ->
+  (* Note that at the last level in the cycle we lose information about the
+     total_dal_attested_slots *)
+  let* participation =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_delegate_dal_participation
+         ~block:"head~1"
+         delegate
+  in
+  return
+  @@ check_participation_and_rewards
+       participation
+       ~expected_assigned_shards
+       ~expected_attestable_slots
+       ~attesting_reward_per_shard
+       dal_balance_updates
+       delegate
+       ~sufficient_participation
+
 (* We have one DAL attester node. During the second cycle, one of the bakers
    does not DAL attest sufficiently. We check that the attesters receive or not
    the DAL rewards depending on their participation. *)
@@ -8233,14 +8427,24 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
-  assert (blocks_per_cycle >= dal_parameters.Dal.Parameters.attestation_lag) ;
-  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  (* This constraint makes the test simpler; it could be lifted. *)
+  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
+  let expected_assigned_shards =
+    let number_of_shards = dal_parameters.cryptobox.number_of_shards in
+    let num_delegates = Array.length Account.Bootstrap.keys in
+    number_of_shards * blocks_per_cycle / num_delegates
+  in
   let all_delegates =
     Account.Bootstrap.keys |> Array.to_list
     |> List.map (fun key -> key.Account.public_key_hash)
   in
-  let delegate_a = List.hd all_delegates in
+  let delegate_without_dal = List.hd all_delegates in
   let rest_delegates = List.tl all_delegates in
+  let delegate_with_dal = List.hd rest_delegates in
+  Log.info
+    "delegate not running DAL: %s, delegate running DAL: %s"
+    delegate_without_dal
+    delegate_with_dal ;
   let* level =
     let* first_level = Node.get_level node in
     let block = string_of_int first_level in
@@ -8249,6 +8453,7 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
   let blocks_to_bake = blocks_per_cycle - 1 - level.cycle_position in
   Log.info "Publish a slot for %d levels, up to the end of cycle" blocks_to_bake ;
   let* () =
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
     repeat blocks_to_bake (fun () ->
         let wait_slot ~published_level:_ ~slot_index:_ = unit in
         let* _res =
@@ -8268,6 +8473,17 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
     Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
   in
   assert (level.cycle_position = blocks_per_cycle - 1) ;
+
+  let* check =
+    let expected_attestable_slots = 0 in
+    check_participation_and_rewards
+      node
+      ~expected_assigned_shards
+      ~expected_attestable_slots
+  in
+  let* () = check delegate_without_dal ~sufficient_participation:true in
+
+  Log.info "Bake for one more cycle" ;
   let dal_node_endpoint =
     Dal_node.as_rpc_endpoint dal_node |> Endpoint.as_string
   in
@@ -8278,40 +8494,19 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
       ~dal_node_endpoint
       client
   in
-  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata_raw () in
-  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
-  let dal_rewards =
-    List.filter
-      (fun json ->
-        JSON.(json |-> "kind" |> as_string) |> String.equal "minted"
-        && JSON.(json |-> "category" |> as_string)
-           |> String.equal "DAL attesting rewards")
-      balance_updates
+
+  let* check =
+    (* [-1] because the participation is obtained one level before the cycle end;
+       and another [-1] because the slot for the first level in the cycle was not
+       published *)
+    let expected_attestable_slots = blocks_per_cycle - 2 in
+    check_participation_and_rewards
+      node
+      ~expected_assigned_shards
+      ~expected_attestable_slots
   in
-  (* For each delegate getting rewards there are two "minted" token transfers;
-     and there's one for the delegate losing rewards. *)
-  Check.(List.length dal_rewards = 1 + (2 * List.length rest_delegates))
-    ~__LOC__
-    Check.int
-    ~error_msg:"Expected %R minted DAL-related balance updates, got %L" ;
-  let lost_dal_rewards =
-    List.filter
-      (fun json ->
-        JSON.(json |-> "kind" |> as_string) |> String.equal "burned"
-        && JSON.(json |-> "category" |> as_string)
-           |> String.equal "lost DAL attesting rewards")
-      balance_updates
-  in
-  Check.(List.length lost_dal_rewards = 1)
-    ~__LOC__
-    Check.int
-    ~error_msg:"Expected %R lost DAL reward, got %L" ;
-  let json = List.hd lost_dal_rewards in
-  let losing_delegate = JSON.(json |-> "delegate" |> as_string) in
-  Check.(delegate_a = losing_delegate)
-    ~__LOC__
-    Check.string
-    ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
+  let* () = check delegate_without_dal ~sufficient_participation:false in
+  let* () = check delegate_with_dal ~sufficient_participation:true in
   unit
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
