@@ -1,6 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internal
+
 ## Version 0.15 (2025-01-28)
+
+This release brings a number of quality of life improvements, including the
+support of the [`debug_traceBlockByNumber`] RPC for the `callTracer` tracer,
+the introducion of performance metrics which can be used to monitor the load
+induced by a node to its host system, improved performance for the Bifröst
+kernel when executed natively, as well as a number of bug fixes.
+
+[`debug_traceBlockByNumber`]: https://www.quicknode.com/docs/ethereum/debug_traceBlockByNumber
 
 This release will not apply any migration to the node’s store (version 16),
 meaning it is possible to downgrade to the previous version.
