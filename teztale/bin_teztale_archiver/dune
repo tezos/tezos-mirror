@@ -117,20 +117,6 @@
     PsQuebec_machine.real.ml))))
 
 (rule
- (target PsParisC_machine.real.ml)
- (mode fallback)
- (deps beta_machine.real.ml)
- (action
-  (progn
-   (copy beta_machine.real.ml PsParisC_machine.real.ml)
-   (run
-    sed
-    -i.bak -e s/Tezos_client_beta/Tezos_client_PsParisC/g -e
-    s/Tezos_protocol_beta/Tezos_protocol_PsParisC/g -e
-    s/Tezos_protocol_plugin_beta/Tezos_protocol_plugin_PsParisC/g
-    PsParisC_machine.real.ml))))
-
-(rule
  (target beta_machine.real.ml)
  (mode fallback)
  (deps alpha_machine.real.ml)

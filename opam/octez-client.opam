@@ -15,7 +15,6 @@ depends: [
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
-  "octez-protocol-020-PsParisC-libs" { = version }
   "octez-protocol-021-PsQuebec-libs" { = version }
 ]
 depopts: [
@@ -41,6 +40,7 @@ depopts: [
   "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
   "octez-protocol-019-PtParisB-libs"
+  "octez-protocol-020-PsParisC-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -66,6 +66,7 @@ conflicts: [
   "octez-protocol-017-PtNairob-libs" { != version }
   "octez-protocol-018-Proxford-libs" { != version }
   "octez-protocol-019-PtParisB-libs" { != version }
+  "octez-protocol-020-PsParisC-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
