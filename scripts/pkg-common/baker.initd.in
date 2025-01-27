@@ -56,7 +56,7 @@ accuser="/usr/bin/octez-accuser"
 
 [ "${keepalive}" != "yes" ] && keepalive_opt=""
 
-dalcli=""
+dalcli="--without-dal"
 [ "${dalurl}" != "" ] && dalcli="--dal-node ${dalurl}"
 
 wait_for_bootstrap()
