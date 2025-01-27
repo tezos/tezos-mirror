@@ -142,17 +142,13 @@ let record_dal_participation ctxt ~delegate ~number_of_attested_slots =
 
 let is_dal_participation_sufficient ctxt ~dal_attested_slots_by_delegate
     ~total_dal_attested_slots =
-  let open Z in
+  let open Q in
   let minimal_dal_participation_ratio =
     (Raw_context.constants ctxt).dal.minimal_participation_ratio
   in
   geq
     (of_int32 dal_attested_slots_by_delegate)
-    (div
-       (mul
-          (of_int32 total_dal_attested_slots)
-          minimal_dal_participation_ratio.num)
-       minimal_dal_participation_ratio.den)
+    (mul (of_int32 total_dal_attested_slots) minimal_dal_participation_ratio)
 
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
