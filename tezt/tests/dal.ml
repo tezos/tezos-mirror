@@ -8774,6 +8774,156 @@ let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
   in
   unit
 
+(* [test_denunciation_next_cycle] injects two trapped attestations and
+   inject an accusation for the first one at cycle `c` and another at
+   for the second one at cycle `c + 1`, both injections are expected
+   to succeed. *)
+let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
+    _bootstrap_key =
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let slot_index = 0 in
+  let accused = Constant.bootstrap2 in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let* () = bake_for ~count:2 client in
+  let* shards_with_proofs1 =
+    let* current_level = Node.get_level node in
+    Log.info "Publish first commitment at level %d" current_level ;
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot = Helpers.generate_slot ~slot_size in
+    let commitment, proof, shards_with_proofs =
+      Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+    in
+    let* _op_hash_0 =
+      Helpers.publish_commitment
+        ~source:accused
+        ~index:slot_index
+        ~commitment
+        ~proof
+        client
+    in
+    return shards_with_proofs
+  in
+  let* () = bake_for ~count:1 client in
+  let* shards_with_proofs2 =
+    let* current_level = Node.get_level node in
+    Log.info "Publish second commitment at level %d" current_level ;
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot = Helpers.generate_slot ~slot_size in
+    let commitment, proof, shards_with_proofs =
+      Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+    in
+    let* _op_hash_0 =
+      Helpers.publish_commitment
+        ~source:accused
+        ~index:slot_index
+        ~commitment
+        ~proof
+        client
+    in
+    return shards_with_proofs
+  in
+  let* () = bake_for ~count:(dal_parameters.attestation_lag - 1) client in
+  let* attestation =
+    let* current_level = Node.get_level node in
+    Log.info "Injecting a first attestation at level %d" current_level ;
+    let availability = Slots [slot_index] in
+    let* attestation, _op_hash =
+      inject_dal_attestation
+        ~signer:Constant.bootstrap2
+        ~nb_slots:dal_parameters.number_of_slots
+        availability
+        client
+    in
+    let* signature = Operation.sign attestation client in
+    return (attestation, signature)
+  in
+  let* () =
+    let* shard_assignments =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_dal_shards
+           ~delegates:[accused.public_key_hash]
+           ()
+    in
+    let shard_indexes =
+      JSON.(shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list)
+    in
+    let[@ocaml.warning "-8"] (shard_index :: _) =
+      List.map JSON.as_int shard_indexes
+    in
+    let shard, proof =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+        shards_with_proofs1
+      |> Option.get
+    in
+    let accusation =
+      Operation.Anonymous.dal_entrapment_evidence
+        ~attestation
+        ~slot_index
+        shard
+        proof
+    in
+    let* level_accusation = Node.get_level node in
+    Log.info
+      "Injecting a first accusation (level %d) expected to succeed"
+      level_accusation ;
+    let* (`OpHash _) = Operation.Anonymous.inject accusation client in
+    unit
+  in
+  let* () = bake_for ~count:1 client in
+  let* attestation =
+    let* current_level = Node.get_level node in
+    Log.info "Injecting a second attestation at level %d" current_level ;
+    let availability = Slots [slot_index] in
+    let signer = Constant.bootstrap2 in
+    let* attestation, _op_hash =
+      inject_dal_attestation
+        ~signer
+        ~nb_slots:dal_parameters.number_of_slots
+        availability
+        client
+    in
+    let* signature = Operation.sign attestation client in
+    return (attestation, signature)
+  in
+  let* () =
+    let* shard_assignments =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_dal_shards
+           ~delegates:[accused.public_key_hash]
+           ()
+    in
+    let shard_indexes =
+      JSON.(shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list)
+    in
+    let[@ocaml.warning "-8"] (shard_index :: _) =
+      List.map JSON.as_int shard_indexes
+    in
+    let shard, proof =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+        shards_with_proofs2
+      |> Option.get
+    in
+    let accusation =
+      Operation.Anonymous.dal_entrapment_evidence
+        ~attestation
+        ~slot_index
+        shard
+        proof
+    in
+    let* () = bake_for ~count:blocks_per_cycle client in
+    let* level = Node.get_level node in
+    Log.info
+      "Injecting the second accusation (level %d) expected to succeed"
+      level ;
+    let* (`OpHash _) = Operation.Anonymous.inject accusation client in
+    unit
+  in
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -8821,6 +8971,12 @@ let register ~protocols =
     ~traps_fraction:Q.one
     "inject a duplicated denunciation at different steps"
     test_duplicate_denunciations
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
+  scenario_with_layer1_node
+    ~incentives_enable:true
+    ~traps_fraction:Q.one
+    "inject a denunciation at the next cycle"
+    test_denunciation_next_cycle
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   (* Tests with layer1 and dal nodes *)
   test_dal_node_startup protocols ;
