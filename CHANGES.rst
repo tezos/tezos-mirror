@@ -245,6 +245,9 @@ DAL node
 - **Feature** The DAL node downloads trusted setup files when launched in observer
    or operator mode. (MR :gl:`!16102`)
 
+- Added a new RPC ``/last_processed_level`` to retrieve the last (finalized) L1
+  level processed by a DAL node (MR :gl:`!16420`)
+
 Protocol
 ~~~~~~~~
 
