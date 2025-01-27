@@ -28,8 +28,8 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_dal ?dal_slots ?set_account_code ?max_delayed_inbox_blueprint_length
-    ~output () =
+    ?enable_dal ?dal_slots ?enable_multichain ?set_account_code
+    ?max_delayed_inbox_blueprint_length ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -104,6 +104,7 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ make_instr ~path_prefix:"/evm/feature_flags/" enable_fa_bridge
     @ make_instr ~path_prefix:"/evm/feature_flags/" enable_dal
     @ make_instr ~convert:decimal_list_to_bytes dal_slots
+    @ make_instr ~path_prefix:"/evm/feature_flags/" enable_multichain
     @ make_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
