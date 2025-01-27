@@ -41,8 +41,8 @@ module Get_delegates = struct
 
   module Signature = struct
     include Tezos_crypto.Signature.V1
-    module To_latest = Tezos_crypto.Signature.Of_V1
-    module Of_latest = Tezos_crypto.Signature.Of_V_latest
+    module To_latest = Tezos_crypto.Signature.V_latest.Of_V1
+    module Of_latest = Tezos_crypto.Signature.V1.Of_V_latest
   end
 
   module Contract = struct

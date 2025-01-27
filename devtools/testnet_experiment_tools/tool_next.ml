@@ -162,7 +162,7 @@ let load_client_context (cctxt : ctxt_kind) =
       in
       let i = Random.bits () |> Int32.of_int in
       Bytes.set_int32_be b 0 i ;
-      let _, _, sk = V_latest.generate_key ~algo ~seed:b () in
+      let _, _, sk = generate_key ~algo ~seed:b () in
       sk
   in
   let* delegates_l =
