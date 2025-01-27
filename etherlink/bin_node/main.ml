@@ -2365,7 +2365,8 @@ let snapshot_info_command =
     (prefixes ["snapshot"; "info"] @@ Params.snapshot_file @@ stop)
     (fun () snapshot_file () ->
       let open Lwt_result_syntax in
-      let header, compressed = Evm_node_lib_dev.Snapshots.info ~snapshot_file in
+      let open Evm_node_lib_dev in
+      let header, compressed = Snapshots.info ~snapshot_file in
       let rollup_address, current_level, legacy_block_storage =
         match header with
         | V0_legacy {rollup_address; current_level} ->
@@ -2373,13 +2374,30 @@ let snapshot_info_command =
         | V1 {rollup_address; current_level} ->
             (rollup_address, current_level, false)
       in
+      let pp_rollup fmt () =
+        match
+          List.find_opt
+            (fun network ->
+              Octez_smart_rollup.Address.(
+                rollup_address = Constants.rollup_address network))
+            Constants.supported_networks
+        with
+        | Some net ->
+            Format.fprintf
+              fmt
+              "Etherlink:       %s@,"
+              (Constants.network_name net)
+        | None -> ()
+      in
       Format.printf
         "@[<v 0>Valid EVM node snapshot.@,\
          Format:          %scompressed@,\
-         Rollup address:  %a@,\
+         %aRollup address:  %a@,\
          Current level:   %a@,\
          Block storage:   %s@]@."
         (match compressed with `Compressed -> "" | `Uncompressed -> "un")
+        pp_rollup
+        ()
         Octez_smart_rollup.Address.pp
         rollup_address
         Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
