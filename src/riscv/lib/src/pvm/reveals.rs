@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: MIT
 
 use crate::state_backend::{Atom, Cell, DynArray, DynCells, ManagerBase};
+use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
 
 /// Request content of reveal
 pub struct RevealRequest<M: ManagerBase> {
     // Reveal request payload
-    pub bytes: DynCells<4096, M>,
+    pub bytes: DynCells<REVEAL_REQUEST_MAX_SIZE, M>,
     // Size of reveal request payload
     pub size: Cell<u64, M>,
 }

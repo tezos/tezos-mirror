@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{PvmHooks, PvmStatus};
+use super::{reveals::RevealRequest, PvmHooks, PvmStatus};
 use crate::{
     machine_state::{
         main_memory::MainMemoryLayout,
@@ -14,13 +14,15 @@ use crate::{
     traps::EnvironException,
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+use std::cmp::min;
 use tezos_smart_rollup_constants::{
     core::MAX_INPUT_MESSAGE_SIZE,
     riscv::{
-        SbiError, SBI_CONSOLE_PUTCHAR, SBI_DBCN, SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS,
-        SBI_SHUTDOWN, SBI_SRST, SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256,
-        SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
-        SBI_TEZOS_METADATA_REVEAL,
+        SbiError, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
+        SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_SRST,
+        SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN,
+        SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL,
+        SBI_TEZOS_REVEAL,
     },
 };
 
@@ -336,6 +338,37 @@ where
     Ok(hash.len() as u64)
 }
 
+/// Handle a [SBI_TEZOS_REVEAL] call.
+#[inline]
+fn handle_tezos_reveal<S, ML, CL, M>(
+    machine: &mut MachineState<ML, CL, M>,
+    reveal_request: &mut RevealRequest<M>,
+    status: &mut S,
+) where
+    S: CellReadWrite<Value = PvmStatus>,
+    ML: MainMemoryLayout,
+    CL: CacheLayouts,
+    M: ManagerReadWrite,
+{
+    let request_address = machine.core.hart.xregisters.read(a0);
+    let request_size = machine.core.hart.xregisters.read(a1);
+
+    let mut buffer = vec![0u8; min(request_size as usize, REVEAL_REQUEST_MAX_SIZE)];
+
+    if machine
+        .core
+        .main_memory
+        .read_all(request_address, &mut buffer)
+        .is_err()
+    {
+        return sbi_return_error(machine, SbiError::InvalidAddress);
+    }
+
+    reveal_request.bytes.write_all(0, &buffer);
+    reveal_request.size.write(request_size);
+    status.write(PvmStatus::WaitingForReveal);
+}
+
 /// Handle a [SBI_SHUTDOWN] call.
 #[inline(always)]
 fn handle_legacy_shutdown<ML, CL, M>(machine: &mut MachineState<ML, CL, M>)
@@ -410,6 +443,7 @@ where
 #[inline]
 pub fn handle_call<S, ML, CL, M>(
     status: &mut S,
+    reveal_request: &mut RevealRequest<M>,
     machine: &mut MachineState<ML, CL, M>,
     hooks: &mut PvmHooks,
     env_exception: EnvironException,
@@ -458,6 +492,7 @@ where
                 SBI_TEZOS_ED25519_SIGN => sbi_wrap(machine, handle_tezos_ed25519_sign),
                 SBI_TEZOS_ED25519_VERIFY => sbi_wrap(machine, handle_tezos_ed25519_verify),
                 SBI_TEZOS_BLAKE2B_HASH256 => sbi_wrap(machine, handle_tezos_blake2b_hash256),
+                SBI_TEZOS_REVEAL => handle_tezos_reveal(machine, reveal_request, status),
                 _ => handle_not_supported(machine),
             }
         }

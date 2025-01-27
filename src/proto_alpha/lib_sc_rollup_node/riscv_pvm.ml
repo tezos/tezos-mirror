@@ -55,6 +55,9 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
             (Sc_rollup.First_after
                (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
   | WaitingForMetadata -> return Sc_rollup.(Needs_reveal Reveal_metadata)
+  | WaitingForReveal ->
+      (* TODO: RV-407: Rollup node handles reveal request from riscv pvm *)
+      assert false
 
 module Insert_failure_impl = struct
   let insert_failure _state =

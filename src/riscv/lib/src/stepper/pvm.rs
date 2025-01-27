@@ -130,6 +130,8 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL> 
                     }
                 }
             }
+            // TODO: RV-412: PVM handles reveal result from rollup node
+            PvmStatus::WaitingForReveal => todo!(),
         }
     }
 
