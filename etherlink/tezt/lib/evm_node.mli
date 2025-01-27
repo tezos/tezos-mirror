@@ -574,6 +574,7 @@ val make_kernel_installer_config :
   ?enable_fa_bridge:bool ->
   ?enable_dal:bool ->
   ?dal_slots:int list ->
+  ?enable_multichain:bool ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t

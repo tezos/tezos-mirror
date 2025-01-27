@@ -28,6 +28,7 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  enable_multichain : bool;
 }
 
 (** [uses protocol] returns the list of dependencies for the tests. *)
@@ -88,6 +89,7 @@ val register_test :
   ?history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -131,6 +133,7 @@ val register_test_for_kernels :
   threshold_encryption:bool ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   title:string ->
@@ -173,6 +176,7 @@ val setup_sequencer :
   ?history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list ->
+  enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   Protocol.t ->

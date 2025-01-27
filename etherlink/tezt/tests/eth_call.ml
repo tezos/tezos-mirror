@@ -35,6 +35,7 @@ let register ?genesis_timestamp ?bootstrap_accounts ?(kernels = Kernel.all)
     ?additional_uses
     ?history_mode
     ~enable_dal:false
+    ~enable_multichain:false
     ~threshold_encryption:false
     ~title
     ~tags

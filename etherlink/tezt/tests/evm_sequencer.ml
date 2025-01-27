@@ -209,6 +209,9 @@ let default_dal_registration =
 let ci_enabled_dal_registration =
   Register_both {extra_tags_with = []; extra_tags_without = []}
 
+let default_multichain_registration =
+  Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
+
 let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config body =
   Test.register
@@ -248,7 +251,9 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
     ?websockets
     ?(use_threshold_encryption = default_threshold_encryption_registration)
-    ?(use_dal = default_dal_registration) ~title ~tags body protocols =
+    ?(use_dal = default_dal_registration)
+    ?(use_multichain = default_multichain_registration) ~title ~tags body
+    protocols =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -263,49 +268,60 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     | Register_with_feature -> [(true, [])]
     | Register_without_feature -> [(false, [])]
   in
+  let multichain_cases =
+    match use_multichain with
+    | Register_both {extra_tags_with; extra_tags_without} ->
+        [(false, extra_tags_without); (true, extra_tags_with)]
+    | Register_with_feature -> [(true, [])]
+    | Register_without_feature -> [(false, [])]
+  in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
      Also register the tests with and without FA bridge feature flag. *)
   List.iter
     (fun (threshold_encryption, te_tags) ->
       List.iter
         (fun (enable_dal, dal_tags) ->
-          register_test_for_kernels
-            ~__FILE__
-            ?max_delayed_inbox_blueprint_length
-            ?sequencer_rpc_port
-            ?sequencer_private_rpc_port
-            ?commitment_period
-            ?challenge_window
-            ?genesis_timestamp
-            ?time_between_blocks
-            ?max_blueprints_lag
-            ?max_blueprints_ahead
-            ?max_blueprints_catchup
-            ?catchup_cooldown
-            ?delayed_inbox_timeout
-            ?delayed_inbox_min_levels
-            ?max_number_of_chunks
-            ?bootstrap_accounts
-            ?sequencer
-            ?sequencer_pool_address
-            ~kernels
-            ?da_fee
-            ?minimum_base_fee_per_gas
-            ?preimages_dir
-            ?maximum_allowed_ticks
-            ?maximum_gas_per_transaction
-            ?max_blueprint_lookahead_in_seconds
-            ?enable_fa_bridge
-            ?additional_uses
-            ?rpc_server
-            ?websockets
-            ~threshold_encryption
-            ?history_mode
-            ~enable_dal
-            ~title
-            ~tags:(te_tags @ dal_tags @ tags)
-            body
-            protocols)
+          List.iter
+            (fun (enable_multichain, multichain_tags) ->
+              register_test_for_kernels
+                ~__FILE__
+                ?max_delayed_inbox_blueprint_length
+                ?sequencer_rpc_port
+                ?sequencer_private_rpc_port
+                ?commitment_period
+                ?challenge_window
+                ?genesis_timestamp
+                ?time_between_blocks
+                ?max_blueprints_lag
+                ?max_blueprints_ahead
+                ?max_blueprints_catchup
+                ?catchup_cooldown
+                ?delayed_inbox_timeout
+                ?delayed_inbox_min_levels
+                ?max_number_of_chunks
+                ?bootstrap_accounts
+                ?sequencer
+                ?sequencer_pool_address
+                ~kernels
+                ?da_fee
+                ?minimum_base_fee_per_gas
+                ?preimages_dir
+                ?maximum_allowed_ticks
+                ?maximum_gas_per_transaction
+                ?max_blueprint_lookahead_in_seconds
+                ?enable_fa_bridge
+                ?additional_uses
+                ?rpc_server
+                ?websockets
+                ~threshold_encryption
+                ?history_mode
+                ~enable_dal
+                ~enable_multichain
+                ~title
+                ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
+                body
+                protocols)
+            multichain_cases)
         dal_cases)
     threshold_encryption_cases
 
@@ -658,6 +674,7 @@ let test_patch_state =
     ~__FILE__
     ~kernel:Kernel.Latest
     ~enable_dal:false
+    ~enable_multichain:false
     ~tags:["evm"; "patch"; "state"]
     ~title:"Patch state via command"
     ~time_between_blocks:Nothing
@@ -3273,6 +3290,7 @@ let test_delayed_inbox_flushing_event =
     ~title:"Flush delayed inbox event"
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -8767,7 +8785,11 @@ let test_configuration_service =
       ])
   @@ fun protocol ->
   let* {sequencer; proxy; observer; _} =
-    Setup.setup_sequencer ~mainnet_compat:false ~enable_dal:false protocol
+    Setup.setup_sequencer
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+      protocol
   in
   let* proxy_config = Rpc.configuration proxy in
   let* sequencer_config = Rpc.configuration sequencer in
@@ -9289,6 +9311,7 @@ let test_node_correctly_uses_batcher_heap =
     ~__FILE__
     ~kernel:Kernel.Latest
     ~enable_dal:false
+    ~enable_multichain:false
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown

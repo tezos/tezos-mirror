@@ -309,7 +309,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
-    ?restricted_rpcs ?(enable_dal = false) ?dal_slots ?websockets protocol =
+    ?restricted_rpcs ?(enable_dal = false) ?dal_slots
+    ?(enable_multichain = false) ?websockets protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -382,6 +383,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ?maximum_allowed_ticks
         ~output:output_config
         ~enable_dal
+        ~enable_multichain
         ?dal_slots
         ()
     in
@@ -519,8 +521,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?(additional_uses = []) ?commitment_period ?challenge_window
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs ~setup_mode
-    ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None) ?websockets
-    f protocols =
+    ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None)
+    ~enable_multichain ?websockets f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -543,15 +545,18 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
         ~__FILE__
         ~tags:
           ((if enable_dal then ["dal"; Tag.ci_disabled] else [])
+          @ (if enable_multichain then ["multichain_enabled"; Tag.ci_disabled]
+             else [])
           @ (kernel_tag :: extra_tag :: tags))
         ~uses
         ~title:
           (sf
-             "%s (%s, %s, %s)"
+             "%s (%s, %s, %s, %s)"
              title
              extra_tag
              kernel_tag
-             (if enable_dal then "with dal" else "without dal"))
+             (if enable_dal then "with dal" else "without dal")
+             (if enable_multichain then "multichain" else "single chain"))
         (fun protocol ->
           let* evm_setup =
             setup_evm_kernel
@@ -570,6 +575,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ~setup_mode
               ~enable_dal
               ?dal_slots
+              ~enable_multichain
               ?websockets
               protocol
           in
@@ -581,7 +587,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
     ?maximum_allowed_ticks ?restricted_rpcs ?websockets f protocols =
-  let register ~enable_dal : unit =
+  let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
       ~tags
@@ -602,10 +608,13 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       f
       protocols
       ~enable_dal
+      ~enable_multichain
       ~setup_mode:Setup_proxy
   in
-  register ~enable_dal:false ;
-  register ~enable_dal:true
+  register ~enable_dal:false ~enable_multichain:false ;
+  register ~enable_dal:true ~enable_multichain:false ;
+  register ~enable_dal:false ~enable_multichain:true ;
+  register ~enable_dal:true ~enable_multichain:true
 
 let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?additional_uses ?additional_config ?admin ?commitment_period
@@ -613,7 +622,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
     ?max_blueprints_ahead ?websockets f protocols =
-  let register ~enable_dal : unit =
+  let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
       ~tags
@@ -634,6 +643,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       f
       protocols
       ~enable_dal
+      ~enable_multichain
       ~setup_mode:
         (Setup_sequencer
            {
@@ -643,8 +653,10 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
              max_blueprints_ahead;
            })
   in
-  register ~enable_dal:false ;
-  register ~enable_dal:true
+  register ~enable_dal:false ~enable_multichain:false ;
+  register ~enable_dal:true ~enable_multichain:false ;
+  register ~enable_dal:false ~enable_multichain:true ;
+  register ~enable_dal:true ~enable_multichain:true
 
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
