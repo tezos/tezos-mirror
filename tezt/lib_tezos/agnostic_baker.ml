@@ -22,6 +22,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     remote_mode : bool;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
+    use_dal_node : string option;
   }
 
   type session_state = {mutable ready : bool}
@@ -48,8 +49,8 @@ let set_ready agnostic_baker =
 let create_from_uris ?runner
     ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ?name ?color
     ?event_pipe ?(delegates = []) ?(remote_mode = false)
-    ?(liquidity_baking_toggle_vote = Some Pass) ~base_dir ~node_data_dir
-    ~node_rpc_endpoint () =
+    ?(liquidity_baking_toggle_vote = Some Pass) ?use_dal_node ~base_dir
+    ~node_data_dir ~node_rpc_endpoint () =
   let agnostic_baker =
     create
       ~path
@@ -66,6 +67,7 @@ let create_from_uris ?runner
         pending_ready = [];
         remote_mode;
         liquidity_baking_toggle_vote;
+        use_dal_node;
       }
   in
   agnostic_baker
@@ -74,8 +76,8 @@ let handle_event node ({name; _} : event) =
   match name with "starting_daemon.v0" -> set_ready node | _ -> ()
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = [])
-    ?(remote_mode = false) ?(liquidity_baking_toggle_vote = Some Pass) node
-    client =
+    ?(remote_mode = false) ?(liquidity_baking_toggle_vote = Some Pass)
+    ?use_dal_node node client =
   let agnostic_baker =
     create_from_uris
       ?runner
@@ -83,6 +85,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = [])
       ?name
       ?color
       ?event_pipe
+      ?use_dal_node
       ~delegates
       ~remote_mode
       ~liquidity_baking_toggle_vote
@@ -116,9 +119,14 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
       liquidity_baking_vote_to_string
       agnostic_baker.persistent_state.liquidity_baking_toggle_vote
   in
+  let use_dal_node =
+    match agnostic_baker.persistent_state.use_dal_node with
+    | None -> ["--without-dal"]
+    | Some endpoint -> ["--dal-node"; endpoint]
+  in
   let arguments =
     ["--"; "--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
-    @ run_args @ delegates @ liquidity_baking_toggle_vote
+    @ run_args @ delegates @ liquidity_baking_toggle_vote @ use_dal_node
   in
 
   let on_terminate _ =
@@ -155,7 +163,8 @@ let wait_for_ready agnostic_baker =
 
 let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
     ?name ?color ?event_level ?event_pipe ?event_sections_levels
-    ?(delegates = []) ?remote_mode ?liquidity_baking_toggle_vote node client =
+    ?(delegates = []) ?remote_mode ?liquidity_baking_toggle_vote ?use_dal_node
+    node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -166,6 +175,7 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
       ?event_pipe
       ?remote_mode
       ?liquidity_baking_toggle_vote
+      ?use_dal_node
       ~delegates
       node
       client
