@@ -60,6 +60,14 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+let init_logger () =
+  let counter = ref 1 in
+  fun msg ->
+    let color = Log.Color.(bold ++ FG.blue) in
+    let prefix = "step-" ^ string_of_int !counter in
+    Log.info ~color ~prefix msg ;
+    incr counter
+
 let read_dir dir =
   let* dir = Lwt_unix.opendir dir in
   let rec read_files acc =
@@ -676,7 +684,8 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
     ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
-    ?producer_profiles ?history_mode ?prover ?l1_history_mode variant scenario =
+    ?event_sections_levels ?producer_profiles ?history_mode ?prover
+    ?l1_history_mode variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -712,6 +721,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?commitment_period
         ?challenge_window
         ?activation_timestamp
+        ?event_sections_levels
         ?prover
         ~l1_history_mode
         ~protocol
@@ -844,8 +854,8 @@ let different_delegates pkh =
    list of slot ids or a bitset. *)
 type attestation_availability = Slots of int list | Bitset of bool array
 
-let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
-    ?request ~signer ~nb_slots availability client =
+let craft_dal_attestation ?level ?(round = 0) ?payload_level ~signer ~nb_slots
+    availability client =
   let dal_attestation =
     match availability with
     | Bitset bitset -> bitset
@@ -874,20 +884,34 @@ let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
     in
     Operation.Consensus.get_block_payload_hash ~block client
   in
-  let attestation =
-    Operation.Consensus.attestation
-      ~level
-      ~round
-      ~dal_attestation
-      ~slot
-      ~block_payload_hash
-      ()
-  in
-  let* op = Operation.Consensus.operation ~signer attestation client in
-  let* op_hash = Operation.inject ?force ?error ?request op client in
-  return (op, op_hash)
+  Operation.Consensus.operation
+    ~with_dal:true
+    ~signer
+    (Operation.Consensus.attestation
+       ~level
+       ~round
+       ~dal_attestation
+       ~slot
+       ~block_payload_hash
+       ())
+    client
 
-let inject_dal_attestations ?payload_level ?level ?round ?force
+let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
+    ?request ~signer ~nb_slots availability client =
+  let* op =
+    craft_dal_attestation
+      ?level
+      ~round
+      ?payload_level
+      ~signer
+      ~nb_slots
+      availability
+      client
+  in
+  let* oph = Operation.inject ?force ?error ?request op client in
+  return (op, oph)
+
+let inject_dal_attestations ?payload_level ?level ?round ?force ?request
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
     client =
   Lwt_list.map_s
@@ -897,6 +921,7 @@ let inject_dal_attestations ?payload_level ?level ?round ?force
         ?level
         ?round
         ?force
+        ?request
         ~signer
         ~nb_slots
         availability
@@ -956,6 +981,10 @@ let get_validated_dal_attestations_in_mempool node for_level =
          || String.equal kind "endorsement_with_dal")
     validated
   |> return
+
+let wait_for_classified oph node =
+  let filter json = if JSON.as_string json = oph then Some () else None in
+  Node.wait_for node "operation_classified.v0" filter
 
 let test_one_committee_per_level _protocol _parameters _cryptobox node _client
     _bootstrap_key =
@@ -8364,6 +8393,251 @@ let test_inject_accusation _protocol dal_parameters cryptobox node client
     ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
   unit
 
+(* Publishing and attesting should work.
+   A producer DAL node publishes "Hello world!" (produced with key [bootstrap1]) on a slot.
+   An attestation, which attests the block is emitted with key [bootstrap2].
+   The published commitment is attested.*)
+let test_producer_attester (_protocol : Protocol.t)
+    (dal_params : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
+    (node : Node.t) (client : Client.t) (_dal_node : Dal_node.t) : unit Lwt.t =
+  let log_step = init_logger () in
+  let index = 3 in
+  let slot_size = dal_params.cryptobox.slot_size in
+  log_step "Declaration of a producer" ;
+  let producer_node = Dal_node.create ~name:"producer" ~node () in
+  let* () = Dal_node.init_config ~producer_profiles:[index] producer_node in
+  let* () = Dal_node.run ~wait_ready:true producer_node in
+  log_step "Two blocks are baked, because why not" ;
+  let* () = bake_for ~count:2 client in
+  log_step "The producer crafts a commitment and publish it" ;
+  let message = Helpers.make_slot ~slot_size "Hello world!" in
+  let* _pid =
+    Helpers.publish_and_store_slot
+      client
+      producer_node
+      Constant.bootstrap1
+      ~index
+      message
+  in
+  let* lvl_publish = Client.level client in
+  let lag = dal_params.attestation_lag in
+  Log.info "We are at level %d and the lag is %d" lvl_publish lag ;
+  (* We bake [lag] blocks, one which will include the publication of the commitment
+     and [lag-1] just to wait. *)
+  log_step "Let's wait for the attestation lag while baking" ;
+  let* () = bake_for ~count:lag client in
+  log_step "It is now time to attest" ;
+  (* We want the attestation to be included in the block [lag] after the one containing the shards,
+     so we have to inject them now. *)
+  let* _ =
+    inject_dal_attestations
+      ~nb_slots:dal_params.number_of_slots
+        (* Since the attestation threshold of the test is set to 1%,
+           having only [bootstrap2] signing is sufficient. *)
+      ~signers:[Constant.bootstrap2]
+      (Slots [index])
+      client
+  in
+  let* lvl_attest = Client.level client in
+  Check.(
+    (lvl_publish + lag = lvl_attest)
+      int
+      ~error_msg:"Current level of the client is unexpected") ;
+  log_step "Bake a block containing this attestation" ;
+  let map_alias = List.map (fun x -> x.Account.alias) in
+  (* Since the function [bake_for] crafts the attestation for delegates,
+     we do not want it to craft a concurrent attestation for [bootstrap2].
+     One which attests a DAL slot has already been injected. *)
+  let* () =
+    bake_for
+      ~delegates:
+        (`For
+          (map_alias Constant.[bootstrap1; bootstrap3; bootstrap4; bootstrap5]))
+      client
+  in
+  log_step "Bake a few more blocks before calling RPC" ;
+  let final_block_promise =
+    wait_for_layer1_final_block producer_node (lvl_attest + 2)
+  in
+  let* () = bake_for ~count:3 client in
+  let* () = final_block_promise in
+  log_step "Call to the RPC of the DAL node to check that the slot is attested." ;
+  let* status =
+    Dal_RPC.(
+      call producer_node
+      (* The level the commitment is included in a block is the first one crafted after publication. *)
+      @@ get_level_slot_status ~slot_level:(lvl_publish + 1) ~slot_index:index)
+  in
+  Log.info "Status is %a" Format.pp_print_string status ;
+  log_step "Final check." ;
+  Check.(
+    (status = "attested")
+      string
+      ~error_msg:"Published slot was supposed to be attested.") ;
+  unit
+
+(* Check if the [attester_did_not_attest_slot] warning is correctly emitted.
+   This test is a variation of [test_producer_attester] where an attestation
+   not attesting the published DAL slot is injected. *)
+let test_attester_did_not_attest_slot (_protocol : Protocol.t)
+    (dal_params : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
+    (node : Node.t) (client : Client.t) (_dal_node : Dal_node.t) : unit Lwt.t =
+  let log_step = init_logger () in
+  let index = 3 in
+  let slot_size = dal_params.cryptobox.slot_size in
+  log_step "Declaration of a producer" ;
+  let producer_node = Dal_node.create ~name:"producer" ~node () in
+  let* () = Dal_node.init_config ~producer_profiles:[index] producer_node in
+  let* () = Dal_node.run ~wait_ready:true producer_node in
+  log_step "Declaration of an attester" ;
+  let attester_node = Dal_node.create ~name:"attester" ~node () in
+  let* () =
+    Dal_node.init_config
+      ~peers:[Dal_node.listen_addr producer_node]
+      ~attester_profiles:[Constant.bootstrap2.public_key_hash]
+      attester_node
+  in
+  let* () = Dal_node.run ~wait_ready:true attester_node in
+  log_step
+    "We promise the attester_did_not_attest_slot will be emitted by the \
+     [attester node]" ;
+  let not_attested_by_bootstrap2_promise =
+    Dal_node.wait_for attester_node "attester_did_not_attest_slot.v0" (fun _ ->
+        Some ())
+  in
+  log_step "The producer crafts a commitment and publish it" ;
+  let message = Helpers.make_slot ~slot_size "Hello world!" in
+  let* _pid =
+    Helpers.publish_and_store_slot
+      client
+      producer_node
+      Constant.bootstrap1
+      ~index
+      message
+  in
+  let* lvl_publish = Client.level client in
+  let lag = dal_params.attestation_lag in
+  Log.info "We are at level %d and the lag is %d" lvl_publish lag ;
+  (* If one wants to see all the node events, they should use [Node.log_events node] *)
+  (* We bake [lag] blocks, one which will include the publication of the commitment
+     and [lag-1] just to wait. *)
+  log_step "Let's wait for the attestation lag while baking" ;
+  let* () = bake_for ~count:lag client in
+  log_step
+    "Crafting attestation for [bootstrap3] (with expected DAL attestation)." ;
+  let* op1 =
+    craft_dal_attestation
+      ~nb_slots:dal_params.number_of_slots
+      ~signer:Constant.bootstrap3
+      (Slots [index])
+      client
+  in
+  let* (`OpHash oph1) = Operation.hash op1 client in
+  let op1_promise = wait_for_classified oph1 node in
+  log_step "Crafting attestation for [bootstrap2] (with empty DAL attestation)." ;
+  let* op2 =
+    craft_dal_attestation
+      ~nb_slots:dal_params.number_of_slots
+      ~signer:Constant.bootstrap2
+      (Slots [])
+      client
+  in
+  let* (`OpHash oph2) = Operation.hash op2 client in
+  let op2_promise = wait_for_classified oph2 node in
+  log_step "Injecting the attestations" ;
+  let* _ = Operation.inject op1 client in
+  let* _ = Operation.inject op2 client in
+  log_step "Waiting for the attestations to be classified." ;
+  let* () = Lwt.join [op1_promise; op2_promise] in
+  let* lvl_attest = Node.get_level node in
+  log_step
+    "Attestations should be injected in the validated field of the mempool" ;
+  let is_operation_in_validated_mempool mempool oph =
+    let open JSON in
+    let applied_list = as_list (mempool |-> "validated") in
+    List.exists (fun e -> e |-> "hash" |> as_string = oph) applied_list
+  in
+  let* mempool =
+    Node.RPC.(call node @@ get_chain_mempool_pending_operations ())
+  in
+  Check.is_true
+    (List.for_all (is_operation_in_validated_mempool mempool) [oph1; oph2])
+    ~error_msg:
+      "After injection of the attestations, no operations should remain in the \
+       mempool." ;
+  log_step "Bake a block containing this attestation" ;
+  let map_alias = List.map (fun x -> x.Account.alias) in
+  (* Since the function [bake_for] crafts the attestation for delegates,
+     we do not want it to craft a concurrent attestation for [bootstrap2].
+     One which attests a DAL slot has already been injected. *)
+  let* () =
+    bake_for
+      ~delegates:
+        (`For (map_alias Constant.[bootstrap1; bootstrap4; bootstrap5]))
+      client
+  in
+  log_step "Attestation should be included in the head block." ;
+  let* meta =
+    Node.RPC.(call node @@ get_chain_block_metadata ~block:"head" ())
+  in
+  let attestation_is_in_block =
+    match meta.dal_attestation with
+    | Some dal_attests -> dal_attests.(index)
+    | None -> false
+  in
+  Check.is_true
+    attestation_is_in_block
+    ~error_msg:"Attestation is not included in the head block." ;
+  log_step "Mempool should now be empty" ;
+  let validated_mempool_is_empty mempool =
+    let open JSON in
+    let validated_list = as_list (mempool |-> "validated") in
+    List.length validated_list = 0
+  in
+  let* mempool =
+    Node.RPC.(call node @@ get_chain_mempool_pending_operations ())
+  in
+  Check.is_true
+    (validated_mempool_is_empty mempool)
+    ~error_msg:
+      "After injection of the attestations, no operations should remain in the \
+       mempool." ;
+  log_step "Bake a few more blocks before calling RPC." ;
+  let final_block_promise =
+    wait_for_layer1_final_block producer_node (lvl_attest + 2)
+  in
+  let* () = bake_for ~count:3 client in
+  let* () = final_block_promise in
+  log_step "Call to the RPC of the DAL node to check that the slot is attested." ;
+  let* status =
+    Dal_RPC.(
+      call producer_node
+      (* The level the commitment is included in a block is the first one crafted
+         after publication. *)
+      @@ get_level_slot_status ~slot_level:(lvl_publish + 1) ~slot_index:index)
+  in
+  Log.info "Status is %a" Format.pp_print_string status ;
+  log_step "Final checks." ;
+  Check.(
+    (status = "attested")
+      string
+      ~error_msg:"Published slot was supposed to be attested.") ;
+  (* If the [not_attested_by_bootstrap2_promise] is not fulfilled yet, it means that
+     the [attester_did_not_attest_slot] warning has never been emitted. *)
+  let not_attested_by_bootstrap2 =
+    match Lwt.state not_attested_by_bootstrap2_promise with
+    | Sleep -> false
+    | Return () -> true
+    | Fail exn ->
+        Test.fail "Unexpected exception: '%s'" (Printexc.to_string exn)
+  in
+  Check.is_true
+    ~error_msg:
+      "We expected the slot to be protocol attested, but not by this attester \
+       node."
+    not_attested_by_bootstrap2 ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -8513,6 +8787,19 @@ let register ~protocols =
     ~producer_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
     "GS prune due to negative score, and ihave"
     test_gs_prune_and_ihave
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~attestation_threshold:1
+    ~l1_history_mode:Default_with_refutation
+    "Attester attests produced slot"
+    test_producer_attester
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~attestation_threshold:1
+    ~l1_history_mode:Default_with_refutation
+    ~event_sections_levels:[("prevalidator", `Debug)]
+    "attetster_did_not_attest_slot warning is emitted"
+    test_attester_did_not_attest_slot
     protocols ;
   scenario_with_layer1_and_dal_nodes
     "baker registers profiles with dal node"

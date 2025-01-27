@@ -143,6 +143,36 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
   | Some Auto -> [Some "--history-mode"; Some "auto"]
   | Some (Custom i) -> [Some "--history-mode"; Some (string_of_int i)]
 
+let spawn_config_update ?(peers = []) ?(attester_profiles = [])
+    ?(producer_profiles = []) ?(observer_profiles = [])
+    ?(bootstrap_profile = false) ?history_mode dal_node =
+  spawn_command dal_node @@ List.filter_map Fun.id
+  @@ [Some "config"; Some "update"]
+  @ (if peers = [] then [None]
+     else [Some "--peers"; Some (String.concat "," peers)])
+  @ (if attester_profiles = [] then [None]
+     else
+       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
+  @ (if observer_profiles = [] then [None]
+     else
+       [
+         Some "--observer-profiles";
+         Some (String.concat "," (List.map string_of_int observer_profiles));
+       ])
+  @ (if producer_profiles = [] then [None]
+     else
+       [
+         Some "--producer-profiles";
+         Some (String.concat "," (List.map string_of_int producer_profiles));
+       ])
+  @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
+  @
+  match history_mode with
+  | None -> []
+  | Some Full -> [Some "--history-mode"; Some "full"]
+  | Some Auto -> [Some "--history-mode"; Some "auto"]
+  | Some (Custom i) -> [Some "--history-mode"; Some (string_of_int i)]
+
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
 
@@ -158,6 +188,20 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
   let process =
     spawn_config_init
       ?expected_pow
+      ?peers
+      ?attester_profiles
+      ?producer_profiles
+      ?observer_profiles
+      ?bootstrap_profile
+      ?history_mode
+      dal_node
+  in
+  Process.check process
+
+let update_config ?peers ?attester_profiles ?producer_profiles
+    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
+  let process =
+    spawn_config_update
       ?peers
       ?attester_profiles
       ?producer_profiles
