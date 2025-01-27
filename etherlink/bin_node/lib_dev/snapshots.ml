@@ -146,10 +146,6 @@ module Header = struct
     let open Data_encoding in
     conv (fun h -> ((), h)) (fun ((), h) -> h)
     @@ merge_objs magic_bytes_encoding header_encoding
-
-  let size =
-    Data_encoding.Binary.fixed_length encoding
-    |> WithExceptions.Option.get ~loc:__LOC__
 end
 
 open Snapshot_utils.Make (Header)

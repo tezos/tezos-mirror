@@ -12,6 +12,8 @@ module type READER = sig
 
   val really_input : in_channel -> bytes -> int -> int -> unit
 
+  val input_char : in_channel -> char
+
   val input : in_channel -> bytes -> int -> int -> int
 
   val close_in : in_channel -> unit
@@ -89,8 +91,6 @@ module Make (Header : sig
   type t
 
   val encoding : t Data_encoding.t
-
-  val size : int
 end) =
 struct
   let write_snapshot_header (module Writer : WRITER_OUTPUT) header =
@@ -100,9 +100,21 @@ struct
     Writer.output Writer.out_chan header_bytes 0 (Bytes.length header_bytes)
 
   let read_snapshot_header (module Reader : READER_INPUT) =
-    let header_bytes = Bytes.create Header.size in
-    Reader.really_input Reader.in_chan header_bytes 0 Header.size ;
-    Data_encoding.Binary.of_bytes_exn Header.encoding header_bytes
+    let read_char () =
+      let c = Reader.input_char Reader.in_chan in
+      Bytes.init 1 (fun _ -> c)
+    in
+    let rec loop = function
+      | Data_encoding.Binary.Success {result; size = _; stream = _} -> result
+      | Await k -> loop (k (read_char ()))
+      | Error e ->
+          Format.kasprintf
+            Stdlib.failwith
+            "Error reading snapshot header: %a"
+            Data_encoding.Binary.pp_read_error
+            e
+    in
+    loop (Data_encoding.Binary.read_stream Header.encoding)
 
   let create (module Reader : READER) (module Writer : WRITER) header ~files
       ~dest =

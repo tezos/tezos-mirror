@@ -42,10 +42,6 @@ module Header = struct
           (fun (history_mode, address, head_level, last_commitment) ->
             {version = V0; history_mode; address; head_level; last_commitment});
       ]
-
-  let size =
-    Data_encoding.Binary.fixed_length encoding
-    |> WithExceptions.Option.get ~loc:__LOC__
 end
 
 open Snapshot_utils.Make (Header)
