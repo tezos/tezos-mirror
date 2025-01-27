@@ -38,7 +38,7 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
  *)
 val wait_for_ready : t -> unit Lwt.t
 
-(** Spawn [octez-agnostic-baker run].
+(** Spawn [octez-experimental-agnostic-baker run].
 
     The resulting promise is fulfilled as soon as the agnostic baker has been
     spawned. It continues running in the background. *)

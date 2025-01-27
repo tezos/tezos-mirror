@@ -3,8 +3,8 @@
 
 (executable
  (name main_agnostic_baker)
- (public_name octez-agnostic-baker)
- (package octez-agnostic-baker)
+ (public_name octez-experimental-agnostic-baker)
+ (package octez-experimental-agnostic-baker)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-rustzcash-deps

@@ -20,10 +20,11 @@ let help_arg = "--help"
 let print_help () =
   Format.printf
     "Usage:\n\
-    \  octez-agnostic-baker [OCTEZ-AGNOSTIC-BAKER-COMMANDS] -- \
+    \  octez-experimental-agnostic-baker \
+     [OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS] -- \
      [OCTEZ-BAKER-COMMANDS]@.@." ;
   Format.printf
-    "OCTEZ-AGNOSTIC-BAKER-COMMANDS:\n\
+    "OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS:\n\
     \  %s: display help\n\
     \  %s: path to the octez-baker binaries@.@."
     help_arg

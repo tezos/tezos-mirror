@@ -48,7 +48,7 @@ let starting_daemon =
     ~alternative_color
     ~level:Notice
     ~name:"starting_daemon"
-    ~msg:"agnostic baker started"
+    ~msg:"experimental agnostic baker started"
     ()
 
 let stopping_daemon =

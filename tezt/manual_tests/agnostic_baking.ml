@@ -7,7 +7,7 @@
 
 (* Testing
    -------
-   Component:    Agnostic baker (octez-agnostic-baker)
+   Component:    Agnostic baker (octez-experimental-agnostic-baker)
    Invocation:   dune exec tezt/manual_tests/main.exe -- --file agnostic_baking.ml
    Subject:      Ensure that the agnostic baker behaves as expected
 *)
@@ -158,7 +158,7 @@ let migrate ~migrate_from ~migrate_to ?(use_remote_signer = false) () =
          (Protocol.tag migrate_to)
          remote_signer_text)
     ~tags:["protocol"; "migration"; "agnostic"; "baker"]
-    ~uses:[Constant.octez_agnostic_baker]
+    ~uses:[Constant.octez_experimental_agnostic_baker]
   @@ fun () ->
   let* () =
     perform_protocol_migration
@@ -178,7 +178,7 @@ let start_stop =
     ~__FILE__
     ~title:"Agnostic baker starts and stops"
     ~tags:["sandbox"; "agnostic"; "baker"; "init"]
-    ~uses:[Constant.octez_agnostic_baker]
+    ~uses:[Constant.octez_experimental_agnostic_baker]
   @@ fun () ->
   let* node, client = Client.init_with_node `Client () in
   let* baker = Agnostic_baker.init node client in

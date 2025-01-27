@@ -7999,12 +7999,12 @@ let _octez_node =
             ~section:"bin";
         ]
 
-let _octez_agnostic_baker =
+let _octez_experimental_agnostic_baker =
   public_exe
-    "octez-agnostic-baker"
+    "octez-experimental-agnostic-baker"
     ~path:"src/bin_agnostic_baker"
     ~internal_name:"main_agnostic_baker"
-    ~synopsis:"Tezos: `octez-agnostic-baker` binary for baking"
+    ~synopsis:"Tezos: `octez-experimental-agnostic-baker` binary for baking"
     ~release_status:Unreleased
     ~with_macos_security_framework:true
     ~deps:
