@@ -10,8 +10,8 @@ use super::{
     },
     verify_backend, Array, Atom, DynArray, Layout, Many,
 };
-use crate::{default::ConstDefault, storage::binary};
-use std::collections::BTreeMap;
+use crate::{default::ConstDefault, state_backend, storage::binary};
+use serde::de::Error;
 
 /// Errors that may occur when parsing a Merkle proof
 #[derive(Debug, thiserror::Error)]
@@ -133,7 +133,8 @@ where
                 MerkleProofLeaf::Blind(_) => verify_backend::Region::Absent,
                 MerkleProofLeaf::Read(data) => {
                     let data: [T; LEN] = binary::deserialise(data.as_slice())?;
-                    verify_backend::Region::Present(data)
+                    let data = Box::new(data.map(Some));
+                    verify_backend::Region::Partial(data)
                 }
             }
         } else {
@@ -147,7 +148,7 @@ where
 impl<const LEN: usize> ProofLayout for DynArray<LEN> {
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         let mut pipeline = vec![(0usize, LEN, proof)];
-        let mut pages = BTreeMap::new();
+        let mut pages = Vec::new();
 
         while let Some((start, length, tree)) = pipeline.pop() {
             if length <= super::MERKLE_LEAF_SIZE.get() {
@@ -158,12 +159,20 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
                     continue;
                 };
 
-                let data: Box<[u8]> = binary::deserialise(data)?;
+                let data: Box<[u8; state_backend::MERKLE_LEAF_SIZE.get()]> = {
+                    let data: Box<[u8]> = binary::deserialise(data)?;
+                    data.try_into().map_err(|err: Box<[u8]>| {
+                        bincode::Error::custom(format!(
+                            "Invalid Merkle leaf: expected {} bytes, got {}",
+                            state_backend::MERKLE_LEAF_SIZE.get(),
+                            err.len()
+                        ))
+                    })?
+                };
 
-                // TODO: Check data is the right length.
-                assert_eq!(data.len(), length);
+                let start = verify_backend::PageId::from_address(start);
 
-                pages.insert(start, data);
+                pages.push((start, data));
             } else {
                 // Expecting a branching point.
 
