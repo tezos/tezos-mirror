@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## Version 0.15 (2025-01-28)
+
+This release will not apply any migration to the node’s store (version 16),
+meaning it is possible to downgrade to the previous version.
 
 ### Features
 
@@ -8,6 +11,12 @@
 
 - Implements the RPC endpoint `debug_traceBlockByNumber`, with only the
   `callTracer` at the moment. (!16164)
+- Improve performances of the kernel execution when the native execution is
+  enabled (*e.g.*, `--native-execution-policy rpcs_only`). As a reminder, to
+  this day only the [Bifröst kernel] can be executed natively by the EVM node.
+  (!16335)
+
+[Bifröst kernel]: https://medium.com/etherlink/announcing-bifr%C3%B6st-a-2nd-upgrade-proposal-for-etherlink-mainnet-ef1a7cf9715f
 
 #### Metrics
 
@@ -37,8 +46,8 @@ you start using them, you probably want to use `octez-evm-node check config
 
 - `eth_getLogs` now accepts `null` as a valid value for the `topics` parameter.
   (!16357)
-
-### Internals
+- `eth_getLogs` now correctly interprets block numbers like `earliest`,
+  `finalized`, etc. They were all defaulting to `latest` before. (!16372)
 
 ## Version 0.14 (2025-01-21)
 
