@@ -4,8 +4,22 @@
 
 ### Features
 
+#### RPCs
+
 - Implements the RPC endpoint `debug_traceBlockByNumber`, with only the
   `callTracer` at the moment. (!16164)
+
+#### Metrics
+
+- When the host running the node provides `ps`, `du` and `lsof`, the node will
+  now exports performance metrics. (!16367)
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
 
 - Websocket connections with clients are monitored by default by sending regular
   heartbeats. This feature can be disabled or tweaked by changing

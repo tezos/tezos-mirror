@@ -38,10 +38,14 @@ val start_private_server :
     in [config].
 
     The optional argument [evm_services_methods] can be used to install
-    the EVM services. *)
+    the EVM services.
+
+    If [data_dir] is provided and the host provides the necessary binaries,
+    performance metrics are enabled. *)
 val start_public_server :
   ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
+  ?data_dir:string ->
   Configuration.t ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t

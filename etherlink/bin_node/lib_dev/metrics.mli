@@ -77,3 +77,9 @@ module Rpc : sig
     (unit -> Cohttp_lwt_unix.Server.response_action Lwt.t) ->
     Cohttp_lwt_unix.Server.response_action Lwt.t
 end
+
+module type PERFORMANCE = sig
+  val set_stats : data_dir:string -> unit Lwt.t
+end
+
+val performance_metrics : (module PERFORMANCE) Lazy.t

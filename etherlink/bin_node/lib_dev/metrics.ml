@@ -378,8 +378,37 @@ let record_blueprint_chunks_sent_on_inbox chunks =
 
 let inc_rpc_method ~name = Prometheus.Counter.inc_one (Rpc.method_ name)
 
+module Performance_metrics_config = struct
+  open Octez_performance_metrics
+
+  let registry = registry
+
+  let subsystem = "evm_node"
+
+  let directories =
+    [
+      data_dir_element ~metrics_suffix:"store_sqlite" "store.sqlite";
+      data_dir_element ~metrics_suffix:"store_irmin" "store";
+      data_dir_element ~metrics_suffix:"wasm" "wasm_2_0_0";
+      data_dir_element ~metrics_suffix:"logs" "daily_logs";
+    ]
+end
+
+module type PERFORMANCE = sig
+  val set_stats : data_dir:string -> unit Lwt.t
+end
+
+let performance_metrics : (module PERFORMANCE) Lazy.t =
+  lazy
+    (let module M = Octez_performance_metrics.Make (Performance_metrics_config) in
+    (module M : PERFORMANCE))
+
 let listing () =
   let open Lwt_syntax in
+  let* support = Octez_performance_metrics.supports_performance_metrics () in
+  (* If the host provides the necessary utils, we get performance metrics.
+     To list them, we need to force the evaluation of the Performance module. *)
+  if support then ignore (Lazy.force performance_metrics) ;
   let+ data = CollectorRegistry.(collect registry) in
   let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
   let metrics =
