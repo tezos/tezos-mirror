@@ -4913,6 +4913,12 @@ module Operation : sig
   val unsigned_encoding :
     (Operation.shell_header * packed_contents_list) Data_encoding.t
 
+  (* Encoding to sign and verify attestations signatures
+     with BLS keys. In this encoding, the signed payload is omitting slots to
+     enable BLS proof of possession aggregation. *)
+  val bls_mode_unsigned_encoding :
+    (Operation.shell_header * packed_contents_list) Data_encoding.t
+
   type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
   val raw_encoding : raw Data_encoding.t
@@ -4945,6 +4951,8 @@ module Operation : sig
   type error += Invalid_signature (* `Permanent *)
 
   val unsigned_operation_length : _ operation -> int
+
+  val bls_mode_unsigned_operation_length : _ operation -> int
 
   val check_signature :
     context -> public_key -> Chain_id.t -> _ operation -> unit tzresult

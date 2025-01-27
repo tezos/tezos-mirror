@@ -199,6 +199,8 @@ module Operation = struct
 
   let unsigned_encoding = unsigned_operation_encoding
 
+  let bls_mode_unsigned_encoding = bls_mode_unsigned_operation_encoding
+
   include Operation_repr
 
   let check_signature _ctxt = check_signature unsigned_encoding
