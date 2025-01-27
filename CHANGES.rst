@@ -49,10 +49,20 @@ Node
   ``/chain/{chain_id}/protocols/{protocol_hash}``) to retrieve protocol
   activation levels of the chain. (MR :gl:`!15447`)
 
-- **Breaking change** RPC /chains/main/blocks/head/context/delegates/<pkh>'s
-  result now contains a field about DAL participation information when DAL
-  incentives flag is set. This introduces a breaking change for applications
-  using the binary encoding format. (MR :gl:`!16430`)
+- A new RPC
+  ``/chains/main/blocks/head/context/delegates/<pkh>/dal_participation`` has
+  been added, similar to Tenderbake's ``../participation`` RPC to track bakers'
+  DAL activity. (MR :gl:`!16168`)
+
+- **Breaking change** The RPC
+  ``/chains/main/blocks/head/context/delegates/<pkh>``'s result now contains a
+  new field ``"dal_participation"`` providing DAL participation information when
+  the DAL incentives flag is set. This introduces a breaking change for
+  applications using the binary encoding format. (MR :gl:`!16430`)
+
+- **Breaking change** The output of the RPC
+  ``/chains/main/blocks/head/context/issuance/expected_issuance`` has a new
+  field ``"dal_attesting_reward_per_shard"``. (MR :gl:`!15614`)
 
 Client
 ------
@@ -70,6 +80,9 @@ Baker
 - **Breaking change** For ``proto_alpha``, providing the endpoint of a running
   DAL node is required for the baker to be launched, unless opted out with the
   newly introduced ``--without-dal`` option. (MR :gl:`!16049`)
+
+- **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
+  argument has been removed. (MR :gl:`!15554`)
 
 Accuser
 -------
@@ -247,9 +260,6 @@ DAL node
 - Fixed file descriptor leak in resto affecting connections to the L1 node.
   (MR :gl:`!15322`)
 
-- **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
-  argument has been removed. (MR :gl:`!15554`)
-
 - **Feature** The DAL node downloads trusted setup files when launched in observer
    or operator mode. (MR :gl:`!16102`)
 
@@ -287,15 +297,27 @@ Protocol
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
 
+- A warning has been introduced in case it is observed that the DAL node lags
+  behind the L1 node. (MR :gl:`!15756`)
+
+- Set the message validation function at node startup, fixing
+  https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
+
 Protocol
 ~~~~~~~~
 
-- A new anonymous operation "DAL entrapment evidence" was added. This operation
-  is not valid when the feature flag for DAL incentives is turned off. (MR
-  :gl:`!15677`)
+- The DAL incentives feature flag was turned on. (MR :gl:`!15614`)
 
-Baker
-~~~~~
+- New protocol parameters were added: ``DAL.REWARDS_RATIO``,
+  ``DAL_REWARDS_WEIGHT``, ``MINIMAL_PARTICIPATION_RATIO``,
+  ``TRAPS_FRACTION``. (MRs :gl:`!15503`, :gl:`!15832`)
+
+- DAL rewards are distributed at the end of a cycle for bakers who meet the
+  minimal participation ratio. (MRs :gl:`!15559`, :gl:`!16407`, :gl:`!16408`)
+
+- A new anonymous operation "DAL entrapment evidence" was added. Bakers that do
+  not detect traps lose the corresponding DAL rewards. (MRs :gl:`!15677`,
+  :gl:`!15832`, :gl:`!15836`, :gl:`!16253`, :gl:`!16224`, :gl:`16322`)
 
 Miscellaneous
 -------------
