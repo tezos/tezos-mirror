@@ -59,6 +59,20 @@ pub fn read_h256_be(host: &impl Runtime, path: &impl Path) -> anyhow::Result<H25
 }
 
 /// Return a 32 bytes hash from storage at the given `path`.
+///
+/// NB: The given bytes are interpreted in big endian order.
+pub fn read_h256_be_opt(
+    host: &impl Runtime,
+    path: &impl Path,
+) -> Result<Option<H256>, Error> {
+    match host.store_read_all(path) {
+        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(Some(H256::from_slice(&bytes))),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Return a 32 bytes hash from storage at the given `path`.
 /// If the path is not found, `default` is returned.
 ///
 /// NB: The given bytes are interpreted in big endian order.
@@ -67,10 +81,9 @@ pub fn read_h256_be_default(
     path: &impl Path,
     default: H256,
 ) -> Result<H256, Error> {
-    match host.store_read_all(path) {
-        Ok(bytes) if bytes.len() == WORD_SIZE => Ok(H256::from_slice(&bytes)),
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(err.into()),
+    match read_h256_be_opt(host, path)? {
+        Some(v) => Ok(v),
+        None => Ok(default),
     }
 }
 
