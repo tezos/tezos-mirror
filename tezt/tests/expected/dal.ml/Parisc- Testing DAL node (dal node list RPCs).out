@@ -7,6 +7,9 @@ Available services:
       Performs health checks on the DAL node, evaluating key components of
       the DAL node. Returns a health status indicating whether the DAL node
       is 'Up', 'Down', or 'Degraded' based on the results of these checks. 
+  - GET /last_processed_level
+      Returns the last (finalized) L1 level which was processed by the DAL
+      node. 
   + levels/<int32>/slots/<int>/
     - GET /levels/<int32>/slots/<int>/commitment
         Return the accepted commitment associated to the given slot index and
