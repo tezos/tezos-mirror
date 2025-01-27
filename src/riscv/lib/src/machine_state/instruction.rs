@@ -12,6 +12,7 @@
 //! when blocks are built in the block cache. This avoids the runtime overhead caused by
 //! dispatching every time an instruction is run.
 
+mod constructors;
 pub mod tagged_instruction;
 
 use super::{
@@ -327,13 +328,11 @@ pub enum OpCode {
     CSwsp,
     CJr,
     CJalr,
-    CLi,
     CLui,
     CAddi,
     CAddi16sp,
     CAddi4spn,
     CSlli,
-    CMv,
     CAdd,
     CAnd,
     COr,
@@ -341,7 +340,6 @@ pub enum OpCode {
     CSub,
     CAddw,
     CSubw,
-    CNop,
 
     // RV64C compressed instructions
     CLd,
@@ -360,6 +358,9 @@ pub enum OpCode {
     Beqz,
     Bnez,
     J,
+    Mv,
+    Li,
+    Nop,
 }
 
 impl OpCode {
@@ -535,13 +536,13 @@ impl OpCode {
             Self::CJalr => Args::run_cjalr,
             Self::Beqz => Args::run_beqz,
             Self::Bnez => Args::run_bnez,
-            Self::CLi => Args::run_cli,
+            Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
             Self::CAddi => Args::run_caddi,
             Self::CAddi16sp => Args::run_caddi16spn,
             Self::CAddi4spn => Args::run_caddi4spn,
             Self::CSlli => Args::run_cslli,
-            Self::CMv => Args::run_cmv,
+            Self::Mv => Args::run_mv,
             Self::CAdd => Args::run_cadd,
             Self::CAnd => Args::run_cand,
             Self::COr => Args::run_cor,
@@ -549,7 +550,7 @@ impl OpCode {
             Self::CSub => Args::run_csub,
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
-            Self::CNop => Args::run_cnop,
+            Self::Nop => Args::run_nop,
             Self::CLd => Args::run_cld,
             Self::CLdsp => Args::run_cldsp,
             Self::CSd => Args::run_csd,
@@ -580,8 +581,8 @@ impl OpCode {
         use OpCode::*;
 
         match self {
-            CMv => Some(Args::run_cmv),
-            CNop => Some(Args::run_cnop),
+            Mv => Some(Args::run_mv),
+            Nop => Some(Args::run_nop),
             CAdd => Some(Args::run_cadd),
             _ => None,
         }
@@ -1241,13 +1242,13 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_cadd, run_cadd);
-    impl_cr_nz_type!(c::run_cmv, run_cmv);
+    impl_cr_nz_type!(c::run_mv, run_mv);
     impl_load_type!(run_clw);
     impl_cload_sp_type!(run_clwsp);
     impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
-    impl_ci_type!(run_cli, non_zero);
+    impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
     impl_ci_type!(run_caddi, non_zero);
     impl_ci_type!(run_caddi4spn);
@@ -1293,8 +1294,8 @@ impl Args {
         Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
     }
 
-    fn run_cnop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
-        c::run_cnop(icb);
+    fn run_nop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+        c::run_nop(icb);
         icb.ok(Next(self.width))
     }
 
@@ -1991,10 +1992,9 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Bnez,
                 args: args.into(),
             },
-            InstrCacheable::CLi(args) => Instruction {
-                opcode: OpCode::CLi,
-                args: args.into(),
-            },
+            InstrCacheable::CLi(args) => {
+                Instruction::new_li(args.rd_rs1, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CLui(args) => Instruction {
                 opcode: OpCode::CLui,
                 args: args.into(),
@@ -2027,10 +2027,9 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Andi,
                 args: args.into(),
             },
-            InstrCacheable::CMv(args) => Instruction {
-                opcode: OpCode::CMv,
-                args: args.into(),
-            },
+            InstrCacheable::CMv(args) => {
+                Instruction::new_mv(args.rd_rs1, args.rs2, InstrWidth::Compressed)
+            }
             InstrCacheable::CAdd(args) => Instruction {
                 opcode: OpCode::CAdd,
                 args: args.into(),
@@ -2051,13 +2050,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CSub,
                 args: args.into(),
             },
-            InstrCacheable::CNop => Instruction {
-                opcode: OpCode::CNop,
-                args: Args {
-                    width: InstrWidth::Compressed,
-                    ..Args::DEFAULT
-                },
-            },
+            InstrCacheable::CNop => Instruction::new_nop(InstrWidth::Compressed),
 
             // RV64C compressed instructions
             InstrCacheable::CLd(args) => Instruction {

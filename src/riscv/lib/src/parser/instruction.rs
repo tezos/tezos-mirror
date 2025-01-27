@@ -431,6 +431,7 @@ pub enum InstrCacheable {
     CJalr(CRJTypeArgs),
     CBeqz(CIBTypeArgs),
     CBnez(CIBTypeArgs),
+    /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
     CLi(CIBNZTypeArgs),
     CLui(CIBNZTypeArgs),
     CAddi(CIBNZTypeArgs),
@@ -440,6 +441,7 @@ pub enum InstrCacheable {
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),
     CAndi(CIBTypeArgs),
+    /// `C.MV` - Copies the value in register `rs2` into register `rd_rs1`.
     CMv(CNZRTypeArgs),
     CAdd(CNZRTypeArgs),
     CAnd(CRTypeArgs),
@@ -448,6 +450,8 @@ pub enum InstrCacheable {
     CSub(CRTypeArgs),
     CAddw(CRTypeArgs),
     CSubw(CRTypeArgs),
+    /// `C.NOP` - Does not change any user-visible state, except for advancing the pc and
+    /// incrementing any applicable performance counters. Equivalent to `NOP`.
     CNop,
 
     // RV64C compressed instructions
@@ -463,8 +467,12 @@ pub enum InstrCacheable {
     CFsd(FStoreArgs),
     CFsdsp(CSSDTypeArgs),
 
-    Unknown { instr: u32 },
-    UnknownCompressed { instr: u16 },
+    Unknown {
+        instr: u32,
+    },
+    UnknownCompressed {
+        instr: u16,
+    },
 }
 
 impl ConstDefault for InstrCacheable {

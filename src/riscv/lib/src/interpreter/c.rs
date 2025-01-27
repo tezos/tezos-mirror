@@ -19,19 +19,20 @@ pub fn run_cadd(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegis
     icb.xregister_write(rd_rs1, result)
 }
 
-/// `C.MV` CR-type compressed instruction
-///
 /// Copies the value in register `rs2` into register `rd_rs1`.
-pub fn run_cmv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
+///
+/// Relevant RISC-V opcodes:
+/// - C.MV
+pub fn run_mv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
     let rs2_val = icb.xregister_read(rs2);
     icb.xregister_write(rd_rs1, rs2_val)
 }
 
-/// C.NOP CI-type compressed instruction
+/// Does nothing.
 ///
-/// Does not change any user-visible state, except for advancing the pc and
-/// incrementing any applicable performance counters. Equivalent to `NOP`.
-pub fn run_cnop(_icb: &mut impl ICB) {}
+/// Relevant RISC-V opcodes:
+/// - C.NOP
+pub fn run_nop(_icb: &mut impl ICB) {}
 
 #[cfg(test)]
 mod tests {
@@ -60,7 +61,7 @@ mod tests {
 
             run_cadd(&mut state, nz::a3, nz::a4);
             assert_eq!(state.hart.xregisters.read_nz(nz::a3), res);
-            run_cmv(&mut state, nz::a4, nz::a3);
+            run_mv(&mut state, nz::a4, nz::a3);
             assert_eq!(state.hart.xregisters.read_nz(nz::a4), res);
         }
     });

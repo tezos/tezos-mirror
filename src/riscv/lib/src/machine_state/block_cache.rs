@@ -970,7 +970,7 @@ mod tests {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::CLi,
+            opcode: OpCode::Li,
             args: TaggedArgs {
                 rd: nz::a0.into(),
                 imm: 1,
@@ -998,7 +998,7 @@ mod tests {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::CLi,
+            opcode: OpCode::Li,
             args: TaggedArgs {
                 rd: nz::a0.into(),
                 imm: 1,
@@ -1025,7 +1025,7 @@ mod tests {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::CLi,
+            opcode: OpCode::Li,
             args: TaggedArgs {
                 rd: nz::a0.into(),
                 imm: 1,
@@ -1057,7 +1057,7 @@ mod tests {
         let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, T1K);
 
         let compressed = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::CLi,
+            opcode: OpCode::Li,
             args: TaggedArgs {
                 rd: nz::a0.into(),
                 imm: 1,
