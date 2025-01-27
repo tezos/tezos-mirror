@@ -1326,7 +1326,12 @@ let run ~data_dir ~configuration_override =
   in
   (* Set proto number of slots hook. *)
   Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
-  let* profile_ctxt = build_profile_context config in
+  let* profile_ctxt =
+    let+ profile_ctxt = build_profile_context config in
+    Profile_manager.resolve_random_observer_profile
+      profile_ctxt
+      proto_parameters
+  in
   let*? () =
     Profile_manager.validate_slot_indexes
       profile_ctxt
