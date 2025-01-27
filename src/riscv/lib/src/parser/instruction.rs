@@ -473,6 +473,13 @@ pub enum InstrCacheable {
     UnknownCompressed {
         instr: u16,
     },
+
+    Hint {
+        instr: u32,
+    },
+    HintCompressed {
+        instr: u16,
+    },
 }
 
 impl ConstDefault for InstrCacheable {
@@ -698,7 +705,8 @@ impl InstrCacheable {
             | Csrrwi(_)
             | Csrrsi(_)
             | Csrrci(_)
-            | Unknown { instr: _ } => InstrWidth::Uncompressed,
+            | Unknown { instr: _ }
+            | Hint { instr: _ } => InstrWidth::Uncompressed,
 
             // 2 bytes instructions (compressed instructions)
             CLw(_)
@@ -737,7 +745,8 @@ impl InstrCacheable {
             | CFldsp(_)
             | CFsd(_)
             | CFsdsp(_)
-            | UnknownCompressed { instr: _ } => InstrWidth::Compressed,
+            | UnknownCompressed { instr: _ }
+            | HintCompressed { instr: _ } => InstrWidth::Compressed,
         }
     }
 }
@@ -1211,6 +1220,9 @@ impl fmt::Display for InstrCacheable {
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
+
+            Hint { instr } => write!(f, "hint {:x}", instr),
+            HintCompressed { instr } => write!(f, "hint.c {:x}", instr),
         }
     }
 }
