@@ -8637,6 +8637,143 @@ let test_attester_did_not_attest_slot (_protocol : Protocol.t)
     not_attested_by_bootstrap2 ;
   unit
 
+(* [test_duplicate_denunciations] publishes a commitment for slot [0].
+   The test then injects a DAL trapped attestation at level [2] and
+   after baking [attestation_lag] blocks, it attempts to:
+
+   - inject a first denunciation that is expected to succeed,
+
+   - inject a second denunciation built using a different shard that
+     is a trap as well, but using the same slot and the same l1 level,
+     where each try is expected to fail. The injection temptatives are
+     done:
+     1. at the next block level (expecting delegate already denounced)
+     2. at the next cycle (expecting delegate already denounced)
+     3. at the next-next cycle (expecting outdated evidence)
+*)
+let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
+    _bootstrap_key =
+  let slot_index = 0 in
+  Log.info "Bake two blocks" ;
+  let* () = bake_for ~count:2 client in
+  let accused = Constant.bootstrap2 in
+  let* current_level = Node.get_level node in
+  let* shards_with_proofs =
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot = Helpers.generate_slot ~slot_size in
+    let commitment, proof, shards_with_proofs =
+      Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+    in
+    Log.info "Publish commitment at level %d" current_level ;
+    let* _op_hash_0 =
+      Helpers.publish_commitment
+        ~source:accused
+        ~index:slot_index
+        ~commitment
+        ~proof
+        client
+    in
+    return shards_with_proofs
+  in
+  let* () = bake_for ~count:dal_parameters.attestation_lag client in
+  let* current_level = Node.get_level node in
+  Log.info "Injecting an attestation at level %d" current_level ;
+  let availability = Slots [slot_index] in
+  let signer = Constant.bootstrap2 in
+  let* attestation, _op_hash =
+    inject_dal_attestation
+      ~signer
+      ~nb_slots:dal_parameters.number_of_slots
+      availability
+      client
+  in
+  let* signature = Operation.sign attestation client in
+  let attestation = (attestation, signature) in
+  let* shard_assignments =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_dal_shards
+         ~delegates:[accused.public_key_hash]
+         ()
+  in
+  let shard_indexes =
+    JSON.(shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list)
+  in
+  let[@ocaml.warning "-8"] (shard_index_1 :: shard_index_2 :: _) =
+    List.map JSON.as_int shard_indexes
+  in
+  let accusation =
+    let shard1, proof1 =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index_1)
+        shards_with_proofs
+      |> Option.get
+    in
+    Operation.Anonymous.dal_entrapment_evidence
+      ~attestation
+      ~slot_index
+      shard1
+      proof1
+  in
+  let accusation_dup =
+    let shard2, proof2 =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index_2)
+        shards_with_proofs
+      |> Option.get
+    in
+    Operation.Anonymous.dal_entrapment_evidence
+      ~attestation
+      ~slot_index
+      shard2
+      proof2
+  in
+  let* level_accusation = Node.get_level node in
+  Log.info
+    "Injecting a first accusation (level %d) expected to succeed"
+    level_accusation ;
+  let* (`OpHash _) = Operation.Anonymous.inject accusation client in
+  let* () = bake_for client in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Injecting the second accusation at the next level (level %d), expected to \
+     fail because the faulty delegate is already denounced"
+    current_level ;
+  let* (`OpHash _) =
+    Operation.Anonymous.inject
+      accusation_dup
+      client
+      ~error:Operation_core.already_dal_denounced
+  in
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let* () = bake_for ~count:blocks_per_cycle client in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Injecting at the next cycle (level %d), expected to fail because the \
+     delegate is already denounced for this level"
+    current_level ;
+  let* (`OpHash _) =
+    Operation.Anonymous.inject
+      accusation_dup
+      client
+      ~error:Operation_core.already_dal_denounced
+  in
+  let* () = bake_for ~count:blocks_per_cycle client in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Injecting at the next cycle (level %d), expected to fail because the DAL \
+     denunciation is outdated"
+    current_level ;
+  let* (`OpHash _) =
+    Operation.Anonymous.inject
+      accusation_dup
+      client
+      ~error:Operation_core.outdated_dal_denunciation
+  in
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -8679,7 +8816,12 @@ let register ~protocols =
     "inject accusation"
     test_inject_accusation
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
-
+  scenario_with_layer1_node
+    ~incentives_enable:true
+    ~traps_fraction:Q.one
+    "inject a duplicated denunciation at different steps"
+    test_duplicate_denunciations
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   (* Tests with layer1 and dal nodes *)
   test_dal_node_startup protocols ;
   scenario_with_layer1_and_dal_nodes
