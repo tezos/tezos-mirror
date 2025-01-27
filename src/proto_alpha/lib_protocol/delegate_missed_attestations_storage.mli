@@ -48,9 +48,6 @@ val expected_dal_shards_per_slot_for_given_active_stake :
   active_stake_weight:int64 ->
   int
 
-(** Removes the [Storage.Dal.Total_attested_slots] value from the context. *)
-val remove_total_dal_attested_slots : Raw_context.t -> Raw_context.t Lwt.t
-
 type level_participation = Participated | Didn't_participate
 
 (** Update the participation of a delegate as a validator in the current cycle

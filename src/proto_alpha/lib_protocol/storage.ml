@@ -2269,13 +2269,6 @@ module Dal = struct
         end)
   end
 
-  module Total_attested_slots =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["total_attested_slots"]
-      end)
-      (Encoding.Int32)
-
   module Denounced_delegates =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Raw_context)

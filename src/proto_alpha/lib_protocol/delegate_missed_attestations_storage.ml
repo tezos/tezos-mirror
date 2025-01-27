@@ -57,9 +57,6 @@ let expected_dal_shards_per_slot_for_given_active_stake ctxt
           (Z.of_int number_of_shards_per_cycle))
        (Z.of_int64 total_active_stake_weight))
 
-let remove_total_dal_attested_slots ctxt =
-  Storage.Dal.Total_attested_slots.remove ctxt
-
 type level_participation = Participated | Didn't_participate
 
 (* Note that the participation for the last block of a cycle is

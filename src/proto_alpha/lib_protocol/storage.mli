@@ -1084,10 +1084,6 @@ module Dal : sig
           (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list
   end
 
-  (** The number of protocol-attested DAL slots for the current cycle. *)
-  module Total_attested_slots :
-    Single_data_storage with type t := Raw_context.t and type value = Int32.t
-
   (** Set of delegates denounced in the current cycle. It is used to not
     distribute rewards for such delegates. *)
   module Denounced_delegates :
