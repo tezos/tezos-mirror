@@ -86,55 +86,49 @@ init_rollup_node() {
 }
 
 init_evm_node() {
-  trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node, .tezos-evm-node}"' ERR
+  trap 'script_failed "{.tezos-node, .tezos-smart-rollup-node, .octez-evm-node}"' ERR
+  if [ "$TRACK_SMART_ROLLUP_NODE" = "false" ]; then
+    EVM_NODE_CONFIG_ARGS+=("--dont-track-rollup-node")
+  fi
   echo "creating evm node config"
-  case "$1" in
-  proxy)
-    run_in_docker_compose proxy init config --evm-node-endpoint https://relay.mainnet.etherlink.com --rollup-node-endpoint http://rollup-node:8932 --cors-origins '*' --cors-headers '*' --rpc-addr 0.0.0.0 --rpc-port 8545 --keep-alive
-    ;;
-  observer)
-    run_in_docker_compose observer init config --evm-node-endpoint https://relay.mainnet.etherlink.com --rollup-node-endpoint http://rollup-node:8932 --cors-origins '*' --cors-headers '*' --rpc-addr 0.0.0.0 --rpc-port 8545 --keep-alive
-    # download snapshot and import it.
-    if [[ -n ${EVM_NODE_SNAPSHOT_URL} ]]; then
-      # Do not download the snapshot if it already exists.
-      if [ ! -e "${HOST_TEZOS_DATA_DIR}/evm-snapshot" ]; then
-        wget -O "${HOST_TEZOS_DATA_DIR}/evm-snapshot" "${EVM_NODE_SNAPSHOT_URL}"
-      else
-        echo "Snapshot ${HOST_TEZOS_DATA_DIR}/evm-snapshot already exists, using it."
-      fi
-      echo "importing snapshot ${HOST_TEZOS_DATA_DIR}/evm-snapshot"
-      run_in_docker_compose observer snapshot import /home/tezos/evm-snapshot
+  # here we do "eval" + ${EVM_NODE_CONFIG_ARGS[*]} else the command
+  # fails (or shellcheck is unhappy).
+  eval "run_in_docker_compose evm-node init config ${EVM_NODE_CONFIG_ARGS[*]}"
+  # download snapshot and import it.
+  if [[ -n ${EVM_NODE_SNAPSHOT_URL} ]]; then
+    # Do not download the snapshot if it already exists.
+    if [ ! -e "${HOST_TEZOS_DATA_DIR}/evm-snapshot" ]; then
+      wget -O "${HOST_TEZOS_DATA_DIR}/evm-snapshot" "${EVM_NODE_SNAPSHOT_URL}"
+    else
+      echo "Snapshot ${HOST_TEZOS_DATA_DIR}/evm-snapshot already exists, using it."
     fi
-    ;;
-  *)
-    cat << EOF
-Available evm node profile are "proxy" and "observer"
-EOF
-    ;;
-  esac
-
+    echo "importing snapshot ${HOST_TEZOS_DATA_DIR}/evm-snapshot"
+    run_in_docker_compose evm-node snapshot import /home/tezos/evm-snapshot
+  fi
 }
 
 init() {
   docker_update_images
-  init_octez_node
-  docker_compose up octez-node -d
-  echo "waiting for the octez-node to be bootstrapped"
-  # The while loop allows to ignore the possible first iteration where
-  # the endpoint is not up yet (while the container starts).
-  while ! run_in_docker_compose curl-runner --max-time 1200 http://octez-node:8732/monitor/bootstrapped; do
-    sleep 5.
-  done
-  init_rollup_node
-  OCTEZ_NODE_ENDPOINT="${ARCHIVE_OCTEZ_NODE_ENDPOINT}" docker_compose up rollup-node -d
-  echo "waiting for the rollup-node to be bootstrapped"
-  # The while loop allows to ignore the possible first iteration where
-  # the endpoint is not up yet (while the container starts).
-  while ! run_in_docker_compose curl-runner --max-time 1200 http://rollup-node:8932/local/synchronized; do
-    sleep 5.
-  done
+  if [ "$TRACK_SMART_ROLLUP_NODE" = "true" ]; then
+    init_octez_node
+    docker_compose up octez-node -d
+    echo "waiting for the octez-node to be bootstrapped"
+    # The while loop allows to ignore the possible first iteration where
+    # the endpoint is not up yet (while the container starts).
+    while ! run_in_docker_compose curl-runner --max-time 1200 http://octez-node:8732/monitor/bootstrapped; do
+      sleep 5.
+    done
+    init_rollup_node
+    OCTEZ_NODE_ENDPOINT="${ARCHIVE_OCTEZ_NODE_ENDPOINT}" docker_compose up rollup-node -d
+    echo "waiting for the rollup-node to be bootstrapped"
+    # The while loop allows to ignore the possible first iteration where
+    # the endpoint is not up yet (while the container starts).
+    while ! run_in_docker_compose curl-runner --max-time 1200 http://rollup-node:8932/local/synchronized; do
+      sleep 5.
+    done
+  fi
 
-  init_evm_node "$@"
+  init_evm_node
   docker_compose stop
 }
 
@@ -152,14 +146,18 @@ init_rollup_node)
   init_rollup_node
   ;;
 init_evm_node)
-  init_evm_node "$@"
+  init_evm_node
   ;;
 init)
   assert_init_can_run
-  init "${2:-observer}"
+  init
   ;;
 run)
-  docker_compose up --profile "${2:-observer}" -d
+  if [ "$TRACK_SMART_ROLLUP_NODE" = "true" ]; then
+    docker_compose up -d
+  else
+    docker_compose up evm-node -d
+  fi
   ;;
 restart)
   docker_compose restart
@@ -167,10 +165,10 @@ restart)
 *)
   cat << EOF
 Available commands:
-  - init (proxy | observer):
-    initialize the full stack. By default runs observer.
-  - run (proxy | observer)
-    execute docker compose up. By default runs observer.
+  - init:
+    initialize the full stack.
+  - run:
+    execute docker compose up.
   - restart
     execute docker compose restart
 EOF
