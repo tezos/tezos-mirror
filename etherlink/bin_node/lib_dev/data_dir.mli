@@ -11,6 +11,7 @@ val store_path : data_dir:string -> string
 type store_info = {
   rollup_address : Address.t;
   current_number : Ethereum_types.quantity;
+  legacy_block_storage : bool;
 }
 
 (** [export_store ~data_dir ~output_db_file] exports the store database with
