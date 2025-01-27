@@ -396,6 +396,7 @@ type etherlink_configuration = {
 type configuration = {
   with_dal : bool;
   stake : int list;
+  bakers : string list; (* unencrypted secret keys *)
   stake_machine_type : string list option;
   dal_node_producers : int list; (* slot indices *)
   observer_slot_indices : int list;
@@ -1510,9 +1511,13 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys )
 
-let init_baker cloud (configuration : configuration) ~bootstrap teztale account
-    i agent =
-  let stake = List.nth configuration.stake i in
+let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
+    account i agent =
+  let stake =
+    match stake with
+    | None -> List.nth configuration.stake i
+    | Some stake -> stake
+  in
   let name = Format.asprintf "baker-node-%d" i in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -2218,6 +2223,13 @@ let init ~(configuration : configuration) etherlink_configuration cloud
            next_agent ~name)
     |> Lwt.all
   in
+  let* bakers_agents =
+    configuration.bakers
+    |> List.mapi (fun i _stake ->
+           let name = Format.asprintf "baker-%d" i in
+           next_agent ~name)
+    |> Lwt.all
+  in
   let* producers_agents =
     configuration.dal_node_producers
     |> List.map (fun slot_index ->
@@ -2269,12 +2281,26 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           bootstrap_agent
           network
   in
-  let* bakers =
+  let* fresh_bakers =
     Lwt_list.mapi_p
       (fun i (agent, account) ->
         init_baker cloud configuration ~bootstrap teztale account i agent)
       (List.combine attesters_agents baker_accounts)
   in
+  let* bakers_with_secret_keys =
+    Lwt_list.mapi_p
+      (fun i (agent, sk) ->
+        let sk = Account.Unencrypted sk in
+        let client = Client.create () in
+        let alias = Format.asprintf "baker-%02d" i in
+        let* () = Client.import_secret_key client sk ~alias in
+        let* account = Client.show_address ~alias client in
+        (* A bit random, to fix later. *)
+        let stake = 1 in
+        init_baker ~stake cloud configuration ~bootstrap teztale account i agent)
+      (List.combine bakers_agents configuration.bakers)
+  in
+  let bakers = fresh_bakers @ bakers_with_secret_keys in
   let* constants =
     RPC_core.call
       bootstrap.node_rpc_endpoint
@@ -2625,10 +2651,12 @@ let configuration, etherlink_configuration =
   let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
   let bootstrap_dal_node_identity_file = Cli.bootstrap_dal_node_identity_file in
   let with_dal = Cli.with_dal in
+  let bakers = Cli.bakers in
   let t =
     {
       with_dal;
       stake;
+      bakers;
       stake_machine_type;
       dal_node_producers;
       observer_slot_indices;
