@@ -21,5 +21,8 @@ dev-repo: "git+https://github.com/thierry-martinez/stdcompat.git"
 version: "19"
 name: "stdcompat"
 url {
-  src: "git+https://github.com/thierry-martinez/stdcompat.git"
+  src: "https://github.com/thierry-martinez/stdcompat/archive/d53390d788027fe0a2282c4745eb3d1626341f99.tar.gz"
+  checksum: [
+    "sha256=1324c4c5a2fdcefe254459f81083dedd1e6dd61efe59498e9b4aa27d5e0a3d4d"
+  ]
 }

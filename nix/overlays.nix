@@ -10,6 +10,11 @@
     prev.repository.select {
       opams = [
         {
+          name = "stdcompat";
+          opam = ../opam/virtual/stdcompat.opam.locked;
+          version = "19";
+        }
+        {
           name = "octez-deps";
           opam = ../opam/virtual/octez-deps.opam.locked;
         }
