@@ -107,6 +107,12 @@ pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 
+// Path to the Multichain feature flag. If there is nothing at this path,
+// a single chain is used.
+#[allow(dead_code)]
+pub const ENABLE_MULTICHAIN: RefPath =
+    RefPath::assert_from(b"/evm/feature_flags/enable_multichain");
+
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 const EVM_DA_FEE: RefPath =
