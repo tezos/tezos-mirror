@@ -327,7 +327,7 @@ module For_RPC = struct
   type dal_participation_info = {
     expected_assigned_shards_per_slot : int;
     delegate_attested_dal_slots : int;
-    total_dal_attested_slots : int;
+    delegate_attestable_dal_slots : int;
     expected_dal_rewards : Tez_repr.t;
     sufficient_dal_participation : bool;
     denounced : bool;
@@ -352,7 +352,7 @@ module For_RPC = struct
           {
             expected_assigned_shards_per_slot = 0;
             delegate_attested_dal_slots = 0;
-            total_dal_attested_slots = 0;
+            delegate_attestable_dal_slots = 0;
             expected_dal_rewards = Tez_repr.zero;
             sufficient_dal_participation = false;
             denounced = false;
@@ -392,7 +392,7 @@ module For_RPC = struct
           {
             expected_assigned_shards_per_slot;
             delegate_attested_dal_slots = participation.Storage.attested_slots;
-            total_dal_attested_slots = participation.attestable_slots;
+            delegate_attestable_dal_slots = participation.attestable_slots;
             expected_dal_rewards;
             sufficient_dal_participation;
             denounced;

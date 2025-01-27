@@ -150,27 +150,27 @@ let dal_participation_info_encoding =
            {
              expected_assigned_shards_per_slot;
              delegate_attested_dal_slots;
-             total_dal_attested_slots;
+             delegate_attestable_dal_slots;
              expected_dal_rewards;
              sufficient_dal_participation;
              denounced;
            } ->
       ( expected_assigned_shards_per_slot,
         delegate_attested_dal_slots,
-        total_dal_attested_slots,
+        delegate_attestable_dal_slots,
         expected_dal_rewards,
         sufficient_dal_participation,
         denounced ))
     (fun ( expected_assigned_shards_per_slot,
            delegate_attested_dal_slots,
-           total_dal_attested_slots,
+           delegate_attestable_dal_slots,
            expected_dal_rewards,
            sufficient_dal_participation,
            denounced ) ->
       {
         expected_assigned_shards_per_slot;
         delegate_attested_dal_slots;
-        total_dal_attested_slots;
+        delegate_attestable_dal_slots;
         expected_dal_rewards;
         sufficient_dal_participation;
         denounced;
@@ -178,7 +178,7 @@ let dal_participation_info_encoding =
     (obj6
        (req "expected_assigned_shards_per_slot" int31)
        (req "delegate_attested_dal_slots" int31)
-       (req "total_dal_attested_slots" int31)
+       (req "delegate_attestable_dal_slots" int31)
        (req "expected_dal_rewards" Tez.encoding)
        (req "sufficient_dal_participation" bool)
        (req "denounced" bool))
@@ -905,20 +905,20 @@ module S = struct
          shards assigned to the delegate in the cycle per DAL slot. The field \
          'delegate_attested_dal_slots' represents the number of attested DAL \
          slots which are also attested by the delegate, while \
-         'total_dal_attested_slots' provides the total number of DAL slots \
-         attested during the cycle for which the delegate had shards assigned. \
-         The 'expected_dal_rewards' field specifies the expected amount of \
-         rewards for the delegate based on DAL participation, provided the \
-         delegate meets the required participation. Whether this threshold is \
-         currently met is determined by the 'sufficient_dal_participation' \
-         flag, which is true if currently the delegate has sufficiently \
-         participated in attesting DAL slots declared to be attested by the \
-         protocol. Note that this flag may evolve during the cycle. Also note, \
-         in particular, that if no DAL no DAL slots have been globally \
-         attested during the cycle (i.e., when 'total_dal_attested_slots' is \
-         zero), the flag is true. The 'denounced' field specifies whether the \
-         delegate was denounced for not detecting traps during the current \
-         cycle."
+         'delegate_attestable_dal_slots' provides the total number of DAL \
+         slots attested during the cycle for which the delegate had shards \
+         assigned. The 'expected_dal_rewards' field specifies the expected \
+         amount of rewards for the delegate based on DAL participation, \
+         provided the delegate meets the required participation. Whether this \
+         threshold is currently met is determined by the \
+         'sufficient_dal_participation' flag, which is true if currently the \
+         delegate has sufficiently participated in attesting DAL slots \
+         declared to be attested by the protocol. Note that this flag may \
+         evolve during the cycle. Also note, in particular, that if no DAL no \
+         DAL slots have been globally attested during the cycle (i.e., when \
+         'delegate_attestable_dal_slots' is zero), the flag is true. The \
+         'denounced' field specifies whether the delegate was denounced for \
+         not detecting traps during the current cycle."
       ~query:RPC_query.empty
       ~output:dal_participation_info_encoding
       RPC_path.(path / "dal_participation")

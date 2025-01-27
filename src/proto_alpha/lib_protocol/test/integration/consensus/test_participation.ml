@@ -161,8 +161,8 @@ let check_no_dal_participation
       0
   in
   let* () =
-    (* No slot is attested globally. *)
-    Assert.equal_int ~loc:__LOC__ dal_info.total_dal_attested_slots 0
+    (* No slot is attested globally, so no slot is attestable. *)
+    Assert.equal_int ~loc:__LOC__ dal_info.delegate_attestable_dal_slots 0
   in
   let* () =
     (* No attested slot is also attested by this delegate. *)

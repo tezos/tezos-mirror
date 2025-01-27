@@ -152,7 +152,7 @@ module For_RPC : sig
     delegate_attested_dal_slots : int;
         (** The number of attested slots during the current cycle that are
             attested by the delegate. (dynamic) *)
-    total_dal_attested_slots : int;
+    delegate_attestable_dal_slots : int;
         (** The total number of attested slots during the current cycle
             for which the delegates had assigned shards. (dynamic) *)
     expected_dal_rewards : Tez_repr.t;
