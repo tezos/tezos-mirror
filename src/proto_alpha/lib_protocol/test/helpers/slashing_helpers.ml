@@ -46,14 +46,14 @@ module Misbehaviour_repr = struct
       (duplicate_op :
         a Protocol.Alpha_context.Kind.consensus Protocol.Alpha_context.operation)
       =
-    let ( ({slot = _; level; round; block_payload_hash = _} :
-            Protocol.Alpha_context.consensus_content),
-          kind ) =
+    let level, round, kind =
       match duplicate_op.protocol_data.contents with
-      | Single (Preattestation consensus_content) ->
-          (consensus_content, Double_preattesting)
-      | Single (Attestation {consensus_content; _}) ->
-          (consensus_content, Double_attesting)
+      | Single (Preattestation {level; round; _}) ->
+          (level, round, Double_preattesting)
+      | Single (Attestation {consensus_content = {level; round; _}; _})
+      | Single
+          (Attestations_aggregate {consensus_content = {level; round; _}; _}) ->
+          (level, round, Double_attesting)
     in
     let level =
       Protocol.Alpha_context.Raw_level.Internal_for_tests.to_repr level

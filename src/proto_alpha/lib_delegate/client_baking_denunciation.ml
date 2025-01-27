@@ -96,6 +96,22 @@ type 'a state = {
   mutable ops_stream_stopper : unit -> unit;
 }
 
+type error += Aggregate_denunciation_not_implemented
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"client_baking_denunciation.aggregate_denunciation_not_implemented"
+    ~title:"Aggregate denunciation not implemented"
+    ~description:"Denunciation of aggregate operations is not yet implemented"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Denunciation of aggregate operations is not yet implemented")
+    Data_encoding.empty
+    (function Aggregate_denunciation_not_implemented -> Some () | _ -> None)
+    (fun () -> Aggregate_denunciation_not_implemented)
+
 let create_state ~preserved_levels blocks_stream ops_stream ops_stream_stopper =
   let clean_frequency = max 1 (preserved_levels / 10) in
   let validators_rights = Validators_cache.create (preserved_levels + 2) in
@@ -140,17 +156,27 @@ let get_block_offset level =
 
 let get_payload_hash (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
+  let open Lwt_result_syntax in
   match (op_kind, op.protocol_data.contents) with
   | Preattestation, Single (Preattestation consensus_content)
   | Attestation, Single (Attestation {consensus_content; _}) ->
-      consensus_content.block_payload_hash
+      return consensus_content.block_payload_hash
+  | Attestations_aggregate, Single (Attestations_aggregate _) ->
+      (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
+         handle denunciation for aggregates. *)
+      tzfail Aggregate_denunciation_not_implemented
 
 let get_slot (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
+  let open Lwt_result_syntax in
   match (op_kind, op.protocol_data.contents) with
   | Preattestation, Single (Preattestation consensus_content)
   | Attestation, Single (Attestation {consensus_content; _}) ->
-      consensus_content.slot
+      return consensus_content.slot
+  | Attestations_aggregate, Single (Attestations_aggregate _) ->
+      (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
+         handle denunciation for aggregates. *)
+      tzfail Aggregate_denunciation_not_implemented
 
 let double_consensus_op_evidence (type kind) :
     kind consensus_operation_type ->
@@ -163,15 +189,26 @@ let double_consensus_op_evidence (type kind) :
     bytes Environment.Error_monad.shell_tzresult Lwt.t = function
   | Attestation -> Plugin.RPC.Forge.double_attestation_evidence
   | Preattestation -> Plugin.RPC.Forge.double_preattestation_evidence
+  | Attestations_aggregate ->
+      fun _ _ ~branch:_ ~op1:_ ~op2:_ () ->
+        (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
+           handle denunciation for aggregates. *)
+        Lwt_result_syntax.tzfail Aggregate_denunciation_not_implemented
 
 let lookup_recorded_consensus (type kind) consensus_key
-    (op_kind : kind consensus_operation_type) map : kind recorded_consensus =
+    (op_kind : kind consensus_operation_type) map :
+    (kind recorded_consensus, error trace) result Lwt.t =
+  let open Lwt_result_syntax in
   match Delegate_map.find consensus_key map with
-  | None -> No_operation_seen
+  | None -> return No_operation_seen
   | Some {attestation; preattestation} -> (
       match op_kind with
-      | Attestation -> attestation
-      | Preattestation -> preattestation)
+      | Attestation -> return attestation
+      | Preattestation -> return preattestation
+      | Attestations_aggregate ->
+          (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
+             handle denunciation for aggregates. *)
+          tzfail Aggregate_denunciation_not_implemented)
 
 let add_consensus_operation (type kind) consensus_key
     (op_kind : kind consensus_operation_type)
@@ -190,7 +227,8 @@ let add_consensus_operation (type kind) consensus_key
       in
       match op_kind with
       | Attestation -> Some {record with attestation = recorded_operation}
-      | Preattestation -> Some {record with preattestation = recorded_operation})
+      | Preattestation -> Some {record with preattestation = recorded_operation}
+      | Attestations_aggregate -> x)
     map
 
 let get_validator_rights state cctxt level =
@@ -245,7 +283,10 @@ let process_consensus_op (type kind) state cctxt
                state.consensus_operations_table
                (chain_id, level, round)
         in
-        match lookup_recorded_consensus consensus_key op_kind round_map with
+        let* recorded_consensus =
+          lookup_recorded_consensus consensus_key op_kind round_map
+        in
+        match recorded_consensus with
         | No_operation_seen ->
             return
             @@ HLevel.add
@@ -257,74 +298,84 @@ let process_consensus_op (type kind) state cctxt
                     (Operation_seen
                        {operation = new_op; previously_denounced_oph = None})
                     round_map)
-        | Operation_seen {operation = existing_op; previously_denounced_oph}
-          when Block_payload_hash.(
-                 get_payload_hash op_kind existing_op
-                 <> get_payload_hash op_kind new_op)
-               || Slot.(get_slot op_kind existing_op <> slot)
-               || Block_hash.(existing_op.shell.branch <> new_op.shell.branch)
-          ->
-            (* Same level, round, and delegate, and:
-               different payload hash OR different slot OR different branch *)
-            let new_op_hash, existing_op_hash =
-              (Operation.hash new_op, Operation.hash existing_op)
-            in
-            let op1, op2 =
-              if Operation_hash.(new_op_hash < existing_op_hash) then
-                (new_op, existing_op)
-              else (existing_op, new_op)
-            in
-            let*! block = get_block_offset level in
-            let chain = `Hash chain_id in
-            let* block_hash =
-              Alpha_block_services.hash cctxt ~chain ~block ()
-            in
-            let* bytes =
-              double_consensus_op_evidence
-                op_kind
-                cctxt
-                (`Hash chain_id, block)
-                ~branch:block_hash
-                ~op1
-                ~op2
-                ()
-            in
-            let bytes = Signature.concat bytes Signature.zero in
-            let double_op_detected, double_op_denounced =
-              Events.(
-                match op_kind with
-                | Attestation ->
-                    (double_attestation_detected, double_attestation_denounced)
-                | Preattestation ->
-                    ( double_preattestation_detected,
-                      double_preattestation_denounced ))
-            in
-            let*! () =
-              Events.(emit double_op_detected) (new_op_hash, existing_op_hash)
-            in
-            let* op_hash =
-              Shell_services.Injection.private_operation cctxt ~chain bytes
-            in
-            let*! () =
-              match previously_denounced_oph with
-              | Some oph -> Events.(emit double_consensus_already_denounced) oph
-              | None -> Lwt.return_unit
-            in
-            HLevel.replace
-              state.consensus_operations_table
-              (chain_id, level, round)
-              (add_consensus_operation
-                 consensus_key
-                 op_kind
-                 (Operation_seen
-                    {
-                      operation = new_op;
-                      previously_denounced_oph = Some op_hash;
-                    })
-                 round_map) ;
-            let*! () = Events.(emit double_op_denounced) (op_hash, bytes) in
-            return_unit
-        | _ -> return_unit)
+        | Operation_seen {operation = existing_op; previously_denounced_oph} ->
+            let* existing_payload_hash = get_payload_hash op_kind existing_op in
+            let* new_payload_hash = get_payload_hash op_kind new_op in
+            let* existing_slot = get_slot op_kind existing_op in
+            if
+              Block_payload_hash.(existing_payload_hash <> new_payload_hash)
+              || Slot.(existing_slot <> slot)
+              || Block_hash.(existing_op.shell.branch <> new_op.shell.branch)
+            then (
+              (* Same level, round, and delegate, and:
+                 different payload hash OR different slot OR different branch *)
+              let new_op_hash, existing_op_hash =
+                (Operation.hash new_op, Operation.hash existing_op)
+              in
+              let op1, op2 =
+                if Operation_hash.(new_op_hash < existing_op_hash) then
+                  (new_op, existing_op)
+                else (existing_op, new_op)
+              in
+              let*! block = get_block_offset level in
+              let chain = `Hash chain_id in
+              let* block_hash =
+                Alpha_block_services.hash cctxt ~chain ~block ()
+              in
+              let* bytes =
+                double_consensus_op_evidence
+                  op_kind
+                  cctxt
+                  (`Hash chain_id, block)
+                  ~branch:block_hash
+                  ~op1
+                  ~op2
+                  ()
+              in
+              let bytes = Signature.concat bytes Signature.zero in
+              let* double_op_detected, double_op_denounced =
+                Events.(
+                  match op_kind with
+                  | Attestation ->
+                      return
+                        ( double_attestation_detected,
+                          double_attestation_denounced )
+                  | Preattestation ->
+                      return
+                        ( double_preattestation_detected,
+                          double_preattestation_denounced )
+                  | Attestations_aggregate ->
+                      (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
+                         handle denunciation for aggregates. *)
+                      tzfail Aggregate_denunciation_not_implemented)
+              in
+              let*! () =
+                Events.(emit double_op_detected) (new_op_hash, existing_op_hash)
+              in
+              let* op_hash =
+                Shell_services.Injection.private_operation cctxt ~chain bytes
+              in
+              let*! () =
+                match previously_denounced_oph with
+                | Some oph ->
+                    Events.(emit double_consensus_already_denounced) oph
+                | None -> Lwt.return_unit
+              in
+              HLevel.replace
+                state.consensus_operations_table
+                (chain_id, level, round)
+                (add_consensus_operation
+                   consensus_key
+                   op_kind
+                   (Operation_seen
+                      {
+                        operation = new_op;
+                        previously_denounced_oph = Some op_hash;
+                      })
+                   round_map) ;
+              let*! () = Events.(emit double_op_denounced) (op_hash, bytes) in
+              return_unit)
+            else return_unit)
 
 let process_operations (cctxt : #Protocol_client_context.full) state
     (attestations : 'a list) ~packed_op chain_id =

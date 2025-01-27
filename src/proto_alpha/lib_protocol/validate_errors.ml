@@ -121,6 +121,9 @@ module Consensus = struct
         conflict : operation_conflict;
       }
     | Consensus_operation_not_allowed
+    | Aggregate_disabled
+    | Aggregate_in_mempool
+    | Aggregate_not_implemented
 
   let () =
     register_error_kind
@@ -346,7 +349,40 @@ module Consensus = struct
         Format.fprintf ppf "Validation of consensus operation if forbidden ")
       Data_encoding.empty
       (function Consensus_operation_not_allowed -> Some () | _ -> None)
-      (fun () -> Consensus_operation_not_allowed)
+      (fun () -> Consensus_operation_not_allowed) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.aggregate_operation_not_allowed_in_mempool"
+      ~title:"Aggregate operation not allowed in mempool"
+      ~description:"Aggregate operations are not allowed in a mempool"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "Aggregate operations are not allowed in a mempool")
+      Data_encoding.empty
+      (function Aggregate_in_mempool -> Some () | _ -> None)
+      (fun () -> Aggregate_in_mempool) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.aggregate_disabled"
+      ~title:"Aggregate operations disabled"
+      ~description:
+        "Aggregate operations are disabled by the corresponding feature flag"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "Aggregate operations are disabled by the corresponding feature flag")
+      Data_encoding.empty
+      (function Aggregate_disabled -> Some () | _ -> None)
+      (fun () -> Aggregate_disabled) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.aggregate_not_implemented"
+      ~title:"Aggregate operations not implemented"
+      ~description:"Aggregate operations are not implemented yet"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "Aggregate operations are not implemented yet")
+      Data_encoding.empty
+      (function Aggregate_not_implemented -> Some () | _ -> None)
+      (fun () -> Aggregate_not_implemented)
 end
 
 module Voting = struct
@@ -711,6 +747,7 @@ module Anonymous = struct
         level : Raw_level.t;
         last_cycle : Cycle.t;
       }
+    | Aggregate_denunciation_not_implemented
 
   let () =
     register_error_kind
@@ -891,7 +928,19 @@ module Anonymous = struct
             Some (kind, level, last_cycle)
         | _ -> None)
       (fun (kind, level, last_cycle) ->
-        Outdated_denunciation {kind; level; last_cycle})
+        Outdated_denunciation {kind; level; last_cycle}) ;
+    register_error_kind
+      `Permanent
+      ~id:"operations.validation.aggregate_denunciation_not_implemented"
+      ~title:"Aggregate denunciation not implemented"
+      ~description:"Denunciation of aggregate operations is not yet implemented"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "Denunciation of aggregate operations is not yet implemented")
+      Data_encoding.empty
+      (function Aggregate_denunciation_not_implemented -> Some () | _ -> None)
+      (fun () -> Aggregate_denunciation_not_implemented)
 
   type error +=
     | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}

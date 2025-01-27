@@ -79,6 +79,9 @@ module Consensus : sig
         kind : consensus_operation_kind;
         conflict : operation_conflict;
       }
+    | Aggregate_disabled
+    | Aggregate_in_mempool
+    | Aggregate_not_implemented
 end
 
 (** Errors that may arise while validating a voting operation. *)
@@ -226,6 +229,7 @@ module Anonymous : sig
         delegate : Signature.Public_key_hash.t;
         conflict : operation_conflict;
       }
+    | Aggregate_denunciation_not_implemented
 end
 
 (** Errors that may arise while validating a manager operation. *)

@@ -47,6 +47,8 @@ type t = {
   consensus_pkh : Signature.Public_key_hash.t;
 }
 
+val encoding : t Data_encoding.t
+
 val zero : t
 
 val pp : Format.formatter -> t -> unit

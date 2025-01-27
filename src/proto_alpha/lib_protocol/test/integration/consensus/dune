@@ -41,7 +41,8 @@
   test_participation
   test_preattestation_functor
   test_preattestation
-  test_seed))
+  test_seed
+  test_aggregate))
 
 (executable
  (name main)

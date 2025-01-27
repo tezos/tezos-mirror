@@ -30,6 +30,7 @@
     Defines kinds of operations that can be performed on chain:
     - preattestation
     - attestation
+    - attestations_aggregate
     - double baking evidence
     - double preattestation evidence
     - double attestation evidence
@@ -67,13 +68,20 @@ module Kind : sig
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type attestations_aggregate_consensus_kind =
+    | Attestations_aggregate_consensus_kind
+
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Attestations_aggregate_kind
+        : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -176,6 +184,14 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Attestations_aggregate
+      : Kind.attestations_aggregate consensus_operation_type
+
+type consensus_aggregate_content = {
+  level : Raw_level_repr.t;
+  round : Round_repr.t;
+  block_payload_hash : Block_payload_hash.t;
+}
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -251,6 +267,12 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  (* Aggregate of attestations without dal_content. *)
+  | Attestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot_repr.t list;
+    }
+      -> Kind.attestations_aggregate contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their
      nonces after a given number of cycles to keep their block rewards
@@ -602,11 +624,11 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Attestation} and {!Preattestation} > {!Proposals} > {!Ballot} >
-   {!Double_preattestation_evidence} > {!Double_attestation_evidence} >
-   {!Double_baking_evidence} > {!Dal_entrapment_evidence} > {!Vdf_revelation} >
-   {!Seed_nonce_revelation} > {!Activate_account} > {!Drain_delegate} >
-   {!Manager_operation}.
+   {!Attestations_aggregate}, {!Attestation} and {!Preattestation} >
+   {!Proposals} > {!Ballot} > {!Double_preattestation_evidence} >
+   {!Double_attestation_evidence} > {!Double_baking_evidence} >
+   {!Dal_entrapment_evidence} > {!Vdf_revelation} > {!Seed_nonce_revelation} >
+   {!Activate_account} > {!Drain_delegate} > {!Manager_operation}.
 
    {!Attestation} and {!Preattestation} are compared by the pair of their
    [level] and [round] such as the farther to the current state [level] and
@@ -616,6 +638,13 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    attester has, the smaller is its smallest [slot]), and then the number of the
    DAL attested slots, the more the better. When the pair is equal and comparing
    an {!Attestation} to a {!Preattestation}, the {!Attestation} is better.
+
+   {!Attestations_aggregate} are compared to {!Attestations} and
+   {!Preattestations} by the pair of their [level] and [round] as well. If the
+   pairs are equal, an {!Attestation_aggregate} is preferred over an
+   {!Attestation} or a {!Preattestation}. For equal pairs, two
+   {!Attestations_aggregate} are compared by their [committee] in lexicographic
+   order.
 
    Two voting operations are compared in the lexicographic order of
    the pair of their [period] and [source]. A {!Proposals} is better
@@ -680,6 +709,8 @@ module Encoding : sig
   val attestation_case : Kind.attestation case
 
   val attestation_with_dal_case : Kind.attestation case
+
+  val attestations_aggregate_case : Kind.attestations_aggregate case
 
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 

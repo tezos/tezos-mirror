@@ -33,7 +33,7 @@ let show_mode = function
   | Construction -> "Construction"
   | Mempool -> "Mempool"
 
-type kind = Preattestation | Attestation
+type kind = Preattestation | Attestation | Aggregate
 
 (** Craft an attestation or preattestation, and bake a block
     containing it (in application or construction modes) or inject it
@@ -69,6 +69,13 @@ let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
         Op.attestation
           ?delegate
           ?slot
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          attested_block
+    | Aggregate ->
+        Op.attestations_aggregate
           ?level
           ?round
           ?block_payload_hash
