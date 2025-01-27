@@ -488,7 +488,6 @@ mod tests {
     use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::storage::store_last_info_per_level_timestamp;
-    use crate::Timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;

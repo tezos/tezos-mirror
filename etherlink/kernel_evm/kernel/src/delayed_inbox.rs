@@ -3,11 +3,10 @@
 
 use crate::{
     bridge::Deposit,
-    current_timestamp,
     event::Event,
     inbox::{Transaction, TransactionContent},
     linked_list::LinkedList,
-    storage,
+    storage::{self, read_last_info_per_level_timestamp},
 };
 use anyhow::Result;
 use evm_execution::fa_bridge::deposit::FaDeposit;
@@ -325,7 +324,7 @@ impl DelayedInbox {
         &mut self,
         host: &mut Host,
     ) -> Result<bool> {
-        let now = current_timestamp(host);
+        let now = read_last_info_per_level_timestamp(host)?;
         let timeout = storage::delayed_inbox_timeout(host)?;
         let current_level = storage::read_l1_level(host)?;
         let min_levels = storage::delayed_inbox_min_levels(host)?;
@@ -388,8 +387,8 @@ impl DelayedInbox {
 mod tests {
     use super::DelayedInbox;
     use super::Hash;
-    use crate::current_timestamp;
     use crate::inbox::Transaction;
+    use crate::storage::read_last_info_per_level_timestamp;
     use primitive_types::{H160, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -435,7 +434,8 @@ mod tests {
 
         let tx: Transaction = dummy_transaction(0);
 
-        let timestamp: Timestamp = current_timestamp(&mut host);
+        let timestamp: Timestamp =
+            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(&mut host, tx.clone(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
@@ -461,7 +461,8 @@ mod tests {
             content: Ethereum(tx_(12)),
         };
 
-        let timestamp: Timestamp = current_timestamp(&mut host);
+        let timestamp: Timestamp =
+            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
         let res = delayed_inbox.save_transaction(&mut host, tx, timestamp, 0);
 
         assert!(res.is_err());

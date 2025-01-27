@@ -11,13 +11,13 @@
 use crate::block_storage;
 use crate::configuration::fetch_limits;
 use crate::fees::simulation_add_gas_for_fees;
-use crate::storage::{read_sequencer_pool_address, read_tracer_input};
+use crate::storage::{
+    read_last_info_per_level_timestamp, read_sequencer_pool_address, read_tracer_input,
+};
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
-use crate::{
-    current_timestamp, parsable, parsing, retrieve_chain_id, tick_model, CONFIG,
-};
+use crate::{parsable, parsing, retrieve_chain_id, tick_model, CONFIG};
 
 use evm_execution::account_storage::account_path;
 use evm_execution::trace::TracerInput;
@@ -425,7 +425,13 @@ impl Evaluation {
                 let timestamp = self
                     .timestamp
                     .map(|timestamp| U256::from(timestamp.as_u64()))
-                    .unwrap_or_else(|| U256::from(current_timestamp(host).as_u64()));
+                    .unwrap_or_else(|| {
+                        U256::from(
+                            read_last_info_per_level_timestamp(host)
+                                .unwrap_or(Timestamp::from(0))
+                                .as_u64(),
+                        )
+                    });
 
                 let base_fee_per_gas = minimum_base_fee_per_gas;
                 let block_fees =
@@ -647,7 +653,7 @@ mod tests {
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
-    use crate::{current_timestamp, retrieve_block_fees, retrieve_chain_id};
+    use crate::{retrieve_block_fees, retrieve_chain_id};
 
     use super::*;
 
@@ -725,7 +731,8 @@ mod tests {
     where
         Host: Runtime,
     {
-        let timestamp = current_timestamp(host);
+        let timestamp =
+            read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");

@@ -32,6 +32,11 @@
   block. (!15609)
 - The kernel always reboots between the application of
   blocks. (!16274)
+- Use the timestamp provided by the `Info_per_level` internal message instead
+  of trying to predict the current timestamp (notably in the context of the
+  delayed inbox). It has been demonstrated that the prediction is
+  over-approximated after a Layer 1 downtime, which is the most likely scenario
+  triggering a flush of the delayed inbox. (!16425)
 
 ### Bug fixes
 

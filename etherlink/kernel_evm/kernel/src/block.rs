@@ -626,7 +626,6 @@ mod tests {
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::current_timestamp;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::inbox::Transaction;
@@ -634,6 +633,7 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::inbox::TransactionContent::EthereumDelayed;
     use crate::storage::read_block_in_progress;
+    use crate::storage::read_last_info_per_level_timestamp;
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
@@ -1288,7 +1288,8 @@ mod tests {
     }
 
     fn first_block<MockHost: Runtime>(host: &mut MockHost) -> BlockConstants {
-        let timestamp = current_timestamp(host);
+        let timestamp =
+            read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let chain_id = retrieve_chain_id(host);
         let block_fees = retrieve_block_fees(host);
