@@ -115,6 +115,16 @@ let stake =
     (Clap.list_of_int ~dummy:[100] "stake")
     (match network with `Sandbox -> [100] | _ -> [])
 
+let bakers =
+  Clap.list_string
+    ~section
+    ~long:"bakers"
+    ~placeholder:"<unencrypted pkh> <unencrypted pkh>"
+    ~description:
+      "Specify a baker secret key to bake with. While [--stake] is mostly used \
+       for private networks, this one can be used on public networks."
+    ()
+
 let stake_machine_type =
   let stake_machine_type_typ =
     Clap.list ~name:"stake_machine_type" ~dummy:["foo"] Fun.id Fun.id
