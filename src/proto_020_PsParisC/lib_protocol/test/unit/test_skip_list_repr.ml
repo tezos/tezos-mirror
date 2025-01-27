@@ -61,7 +61,7 @@ let test_skip_list_proof_size () =
      flakiness in the test.
 
   *)
-  let () = Random.init 0xC0FFEE in
+  let () = Random.init 0x0ACAB0 in
   let best_basis = 4 in
 
   (*

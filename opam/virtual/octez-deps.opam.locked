@@ -27,6 +27,8 @@ depends: [
   "base" {= "v0.16.3"}
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
+  "base-domains" {= "base"}
+  "base-nnp" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
   "base64" {= "3.5.1"}
@@ -156,10 +158,10 @@ depends: [
   "multipart_form" {= "0.6.0"}
   "multipart_form-lwt" {= "0.6.0"}
   "num" {= "1.5-1"}
-  "ocaml" {= "4.14.2"}
-  "ocaml-base-compiler" {= "4.14.2"}
-  "ocaml-compiler-libs" {= "v0.12.4"}
-  "ocaml-config" {= "2"}
+  "ocaml" {= "5.2.1"}
+  "ocaml-base-compiler" {= "5.2.1"}
+  "ocaml-compiler-libs" {= "v0.17.0"}
+  "ocaml-config" {= "3"}
   "ocaml-options-vanilla" {= "1"}
   "ocaml-syntax-shims" {= "1.0.0"}
   "ocaml-version" {= "3.6.9"}
@@ -173,7 +175,7 @@ depends: [
   "ocplib-endian" {= "1.2"}
   "ohex" {= "0.2.0"}
   "opentelemetry" {= "0.10"}
-  "rope" {= "0.6.2"}
+  "rope" {= "0.6.3"}
   "optint" {= "0.3.0"}
   "ordering" {= "3.16.1"}
   "parsexp" {= "v0.16.0"}

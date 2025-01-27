@@ -102,6 +102,9 @@ export OPAMYES="${OPAMYES:=true}"
 # If we use opam depext, it will probably not install the right version.
 OPAMASSUMEDEPEXTS=true opam install conf-rust conf-rust-2021
 
+# Pin packages that are needed for OCaml 5
+opam pin add https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99 -n -y
+
 # Opam < 2.1 uses opam-depext as a plugin, later versions provide the option `--depext-only`.
 # We assume Opam >= 2.0.0 (2.0.0 was released in 2018; Debian Buster already had Opam 2.0.3).
 case $(opam --version) in

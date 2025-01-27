@@ -13,7 +13,7 @@ depends: [
   "zarith" { >= "1.13" & < "1.14" }
   "octez-libs"
   "lwt" { >= "5.7.0" }
-  "rope" { = "0.6.2" }
+  "rope" { >= "0.6.2" }
   "secp256k1-internal" { >= "0.4.0" }
   "digestif" { >= "0.9.0" }
   "fmt" { >= "0.8.7" }

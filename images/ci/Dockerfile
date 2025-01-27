@@ -164,10 +164,14 @@ WORKDIR /home/tezos
 # Create an opam-repository directory that is a clone of the public opam repository
 # filtered to only keep packages which we actually need.
 COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked ./
+
+COPY --chown=tezos:tezos stdcompat.opam.locked ./
+
 # Run the script, then clean up; we only need the result of the script (the opam repository).
 RUN ./create_opam_repo.sh \
   && rm create_opam_repo.sh \
   && rm octez-deps.opam.locked \
+  && rm stdcompat.opam.locked \
   && rm version.sh
 
 # Needed by 'opam admin cache' below

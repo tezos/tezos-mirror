@@ -5003,6 +5003,15 @@ documentation:linkcheck:
   - make -C docs redirectcheck
   - make -C docs linkcheck
 
+trigger:ocaml4_manual:
+  stage: manual
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/ocaml4_manual.yml
+
 trigger:homebrew:
   stage: manual
   rules:
