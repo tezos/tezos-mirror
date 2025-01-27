@@ -265,6 +265,12 @@ module Slots_handlers = struct
         Slot_manager.get_slot_pages ~reconstruct_if_missing:true ctxt slot_id)
 end
 
+module Node = struct
+  let get_last_processed_level ctxt () () =
+    Node_context.get_store ctxt
+    |> Store.last_processed_level |> Store.Last_processed_level.load
+end
+
 module Profile_handlers = struct
   let patch_profiles ctxt () operator_profiles =
     let open Lwt_result_syntax in
@@ -748,6 +754,10 @@ let register :
        Tezos_rpc.Directory.register0
        Services.health
        (Health.get_health ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register0
+       Services.get_last_processed_level
+       (Node.get_last_processed_level ctxt)
 
 let register_plugin node_ctxt =
   let open Lwt_syntax in
