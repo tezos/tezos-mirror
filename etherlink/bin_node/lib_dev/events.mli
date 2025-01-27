@@ -166,6 +166,9 @@ val download_failed : string -> download_error -> unit Lwt.t
 
 val importing_snapshot : unit -> unit Lwt.t
 
+(** Emit a warning that the imported snapshot uses the legacy block storage. *)
+val importing_legacy_snapshot : unit -> unit Lwt.t
+
 val exporting_snapshot : string -> unit Lwt.t
 
 val still_exporting_snapshot :

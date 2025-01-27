@@ -323,11 +323,15 @@ let check_header ~populated ~force ~data_dir (header : Header.t) :
         (rollup_address, current_level, Some (history_mode, first_level), false)
   in
   let* () =
-    when_ ((not populated) && header_legacy && not force) @@ fun () ->
-    failwith
-      "Snapshot uses legacy block storage, please import a snapshot generated \
-       from a more recent node (or use --force to still import the legacy \
-       snapshot)."
+    if (not populated) && header_legacy && not force then
+      failwith
+        "Snapshot uses legacy block storage, please import a snapshot \
+         generated from a more recent node (or use --force to still import the \
+         legacy snapshot)."
+    else if header_legacy then
+      let*! () = Events.importing_legacy_snapshot () in
+      return_unit
+    else return_unit
   in
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
