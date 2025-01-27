@@ -119,11 +119,13 @@ let test_update_consensus_key =
   let* _, client =
     Client.init_with_protocol ~parameter_file ~protocol `Client ()
   in
-  let* key_a = Client.gen_and_show_keys client in
-  let* key_b = Client.gen_and_show_keys client in
-  let* key_c = Client.gen_and_show_keys client in
-  let* key_bls = Client.gen_and_show_keys ~sig_alg:"bls" client in
-  let* destination = Client.gen_and_show_keys client in
+  let* key_a = Client.gen_and_show_keys ~alias:"tezt_1" client in
+  let* key_b = Client.gen_and_show_keys ~alias:"tezt_2" client in
+  let* key_c = Client.gen_and_show_keys ~alias:"tezt_3" client in
+  let* key_bls =
+    Client.gen_and_show_keys ~alias:"tezt_4" ~sig_alg:"bls" client
+  in
+  let* destination = Client.gen_and_show_keys client ~alias:"tezt_5" in
 
   let* () =
     Client.transfer
