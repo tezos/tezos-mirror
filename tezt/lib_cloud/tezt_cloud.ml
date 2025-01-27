@@ -33,11 +33,6 @@ module Alert = struct
     Alert_manager.alert ?route alert
 end
 
-module Configuration = struct
-  include Env
-  include Configuration
-end
-
 module Cloud = Cloud
 
 let register_docker_push ~tags =

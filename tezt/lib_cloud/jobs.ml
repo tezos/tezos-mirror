@@ -12,7 +12,9 @@ module Cli = C
 
 let docker_build =
   let cache = Hashtbl.create 11 in
-  fun ?(docker_image = Env.Gcp {alias = Env.dockerfile_alias}) ~push () ->
+  fun ?(docker_image = Agent.Configuration.Gcp {alias = Env.dockerfile_alias})
+      ~push
+      () ->
     if Hashtbl.mem cache docker_image then (
       Log.info "Docker image is already built. Nothing to do" ;
       Lwt.return_unit)

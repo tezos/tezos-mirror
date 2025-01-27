@@ -13,7 +13,7 @@ type t
     be opened and [ports_per_vm] specifies the number of opened ports from
     the [base_port]. The promise returned by this function is fulfilled
     when all the vms are deployed. Consequently, it can take some time. *)
-val deploy : configurations:Configuration.t list -> t Lwt.t
+val deploy : configurations:Agent.Configuration.t list -> t Lwt.t
 
 (** [get_agents t] returns the list of agents deployed. *)
 val agents : t -> Agent.t list

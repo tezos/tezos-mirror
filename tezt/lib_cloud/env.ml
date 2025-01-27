@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type docker_image = Gcp of {alias : string} | Octez_release of {tag : string}
-
 let tezt_cloud =
   match Cli.tezt_cloud with
   | Some tezt_cloud -> tezt_cloud
@@ -67,11 +65,6 @@ let open_telemetry = Cli.open_telemetry
 let alert_handlers = Cli.alert_handlers
 
 let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
-
-let docker_image =
-  (* In localhost mode, we don't want to interact with GCP. The image is taken
-     locally. *)
-  Gcp {alias = dockerfile_alias}
 
 let dockerfile = Path.dockerfile ~alias:dockerfile_alias
 
@@ -136,17 +129,6 @@ let registry_uri () =
   let* project_id = project_id () in
   let uri = Format.asprintf "%s/%s/%s" hostname project_id docker_registry in
   Lwt.return uri
-
-let uri_of_docker_image docker_image =
-  match (docker_image, mode) with
-  | Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
-      let* registry_uri = registry_uri () in
-      Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
-  | Gcp {alias}, `Localhost -> Lwt.return alias
-  | Octez_release _, (`Cloud | `Host | `Orchestrator) ->
-      let* registry_uri = registry_uri () in
-      Lwt.return (Format.asprintf "%s/octez" registry_uri)
-  | Octez_release _, `Localhost -> Lwt.return "octez"
 
 let rec wait_process ?(sleep = 4) ~is_ready ~run () =
   let process = run () in

@@ -168,7 +168,7 @@ let machine_type =
     ~description:
       "Can specify a GCP machine type (see \
        https://cloud.google.com/compute/docs/general-purpose-machines#c3d_series)"
-    "n1-standard-2"
+    Types.Agent_configuration.default_gcp_machine_type
 
 let dockerfile_alias =
   Clap.optional_string
@@ -318,4 +318,4 @@ let binaries_path =
     ~description:
       "Where to find binaries in the docker image by default (default is: \
        '/tmp/tezt-runners')"
-    (Filename.get_temp_dir_name () // "tezt-runners")
+    Types.Agent_configuration.default_gcp_binaries_path

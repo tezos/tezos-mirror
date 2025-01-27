@@ -10,6 +10,44 @@
 (** Datatype for an agent *)
 type t
 
+module Configuration : sig
+  type docker_image =
+    | Gcp of {alias : string}
+    | Octez_release of {tag : string}
+
+  type vm = private {
+    machine_type : string;
+    docker_image : docker_image;
+    max_run_duration : int option;
+    binaries_path : string;
+    os : Types.Os.t;
+  }
+
+  type t = {name : string; vm : vm}
+
+  val uri_of_docker_image : docker_image -> string Lwt.t
+
+  (** [make ?machine_type ()] is a smart-constructor to make a VM
+      configuration.
+
+    Default value for [max_run_duration] is [7200].
+
+    Default value for [machine_type] is [n1-standard-2].
+
+    Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
+    is the value provided by the environement variable [$TEZT_CLOUD].
+    *)
+  val make :
+    ?os:Types.Os.t ->
+    ?binaries_path:string ->
+    ?max_run_duration:int option ->
+    ?machine_type:string ->
+    ?docker_image:docker_image ->
+    ?name:string ->
+    unit ->
+    t
+end
+
 (** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name ()]
     creates an [agent] from the given parameters. [~next_available_port] should
     always provide an available port or raise [Not_found] otherwise.

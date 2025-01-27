@@ -50,7 +50,8 @@ module Remote = struct
       ~configurations =
     let* () = Terraform.VM.Workspace.select workspace_name in
     let* docker_image =
-      Env.uri_of_docker_image vm_configuration.Configuration.docker_image
+      Agent.Configuration.uri_of_docker_image
+        vm_configuration.Agent.Configuration.docker_image
     in
     let machine_type = vm_configuration.machine_type in
     let max_run_duration = vm_configuration.max_run_duration in
@@ -139,7 +140,7 @@ module Remote = struct
     let* agents =
       workspace_deploy
         ~workspace_name
-        ~vm_configuration:configuration.Configuration.vm
+        ~vm_configuration:configuration.Agent.Configuration.vm
         ~configurations:[configuration]
         ~number_of_vms:1
     in
@@ -184,10 +185,10 @@ module Remote = struct
     let workspaces_info =
       (* VMs are grouped per group of configuration. Each group leads to one workspace. *)
       List.to_seq configurations
-      |> Seq.group (fun Configuration.{vm; name = _} configuration ->
+      |> Seq.group (fun Agent.Configuration.{vm; name = _} configuration ->
              vm = configuration.vm)
       |> Seq.mapi (fun i seq ->
-             let Configuration.{vm = vm_configuration; _} =
+             let Agent.Configuration.{vm = vm_configuration; _} =
                Seq.uncons seq |> Option.get |> fst
              in
              let workspace_name = Format.asprintf "%s-%d" Env.tezt_cloud i in
@@ -206,7 +207,7 @@ module Remote = struct
            ->
              let* () =
                Jobs.docker_build
-                 ~docker_image:vm_configuration.Configuration.docker_image
+                 ~docker_image:vm_configuration.Agent.Configuration.docker_image
                  ~push:Env.push_docker
                  ()
              in
@@ -287,7 +288,7 @@ module Localhost = struct
     Format.asprintf
       "teztcloud-%s-%s"
       Env.tezt_cloud
-      configuration.Configuration.name
+      configuration.Agent.Configuration.name
 
   let deploy ~configurations () =
     let number_of_vms = List.length configurations in
@@ -313,12 +314,13 @@ module Localhost = struct
              let publish_ports = (start, stop, start, stop) in
              let* () =
                Jobs.docker_build
-                 ~docker_image:configuration.Configuration.vm.docker_image
+                 ~docker_image:configuration.Agent.Configuration.vm.docker_image
                  ~push:false
                  ()
              in
              let* docker_image =
-               Env.uri_of_docker_image configuration.vm.docker_image
+               Agent.Configuration.uri_of_docker_image
+                 configuration.vm.docker_image
              in
              let process =
                Docker.run
@@ -383,7 +385,7 @@ module Localhost = struct
                ~point
                ~configuration
                ~next_available_port:(fun () -> next_port point)
-               ~name:configuration.Configuration.name
+               ~name:configuration.Agent.Configuration.name
                ())
     in
     Lwt.return {number_of_vms; processes; base_port; ports_per_vm; agents}

@@ -7,7 +7,7 @@
 
 let agent_name = Format.asprintf "%s-proxy" Env.tezt_cloud
 
-let make_config () = Configuration.make ~name:agent_name ()
+let make_config () = Agent.Configuration.make ~name:agent_name ()
 
 let get_agent agents =
   match List.find_opt (fun agent -> Agent.name agent = agent_name) agents with
@@ -100,7 +100,7 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
      This requires the docker image to contain all the binaries used by the
      proxy agent.
   *)
-  let Configuration.{vm = {binaries_path; _}; name = _} =
+  let Agent.Configuration.{vm = {binaries_path; _}; name = _} =
     Agent.configuration proxy_agent
   in
   let* output =

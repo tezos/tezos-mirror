@@ -13,7 +13,7 @@ type t
 val register :
   ?proxy_files:string list ->
   ?proxy_args:string list ->
-  ?vms:Configuration.t list ->
+  ?vms:Agent.Configuration.t list ->
   __FILE__:string ->
   title:string ->
   tags:string list ->
@@ -23,8 +23,6 @@ val register :
   unit
 
 val agents : t -> Agent.t list
-
-val get_configuration : Agent.t -> Configuration.t
 
 val push_metric :
   t ->
