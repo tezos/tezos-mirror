@@ -493,7 +493,6 @@ let test_staking =
     ~__FILE__
     ~title:
       "Staking - test staking with delegate and staker in a simple scenario"
-    ~supports:Protocol.(From_protocol (number ParisC))
     ~tags:
       [
         "adaptive_issuance";
@@ -1471,7 +1470,6 @@ let check_rpc_ok client rpc =
 let test_fix_delegated_balance =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number ParisC))
     ~title:"Test protocol fix for delegated balance rpc"
     ~tags:["rpc"; "delegated_balance"]
   @@ fun protocol ->
