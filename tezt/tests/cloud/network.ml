@@ -16,8 +16,8 @@ let to_string = function
   | `Sandbox -> "sandbox"
 
 let default_protocol : t -> Protocol.t = function
-  | `Mainnet -> ParisC
-  | `Ghostnet -> ParisC
+  | `Mainnet -> Quebec
+  | `Ghostnet -> Quebec
   | `Weeklynet _ -> Alpha
   | `Sandbox -> Alpha
 
