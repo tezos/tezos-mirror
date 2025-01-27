@@ -150,7 +150,10 @@ let outbox_message_summary (output : Sc_rollup.output) =
   let summary =
     match output with
     | {message = Whitelist_update pkhs; _} ->
-        Outbox_message.Whitelist_update pkhs
+        Outbox_message.Whitelist_update
+          (Option.map
+             (List.map Tezos_crypto.Signature.Of_V1.public_key_hash)
+             pkhs)
     | {message = Atomic_transaction_batch {transactions}; _} ->
         let transactions = List.map outbox_transaction_summary transactions in
         Transaction_batch transactions
