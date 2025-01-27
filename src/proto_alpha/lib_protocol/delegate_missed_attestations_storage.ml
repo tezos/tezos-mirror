@@ -130,7 +130,7 @@ let record_dal_participation ctxt ~delegate
     return ctxt
   else
     let contract = Contract_repr.Implicit delegate in
-    let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
+    let* result = Storage.Contract.Dal_participation.find ctxt contract in
     match result with
     | Some past_participation ->
         let participation =
@@ -144,9 +144,9 @@ let record_dal_participation ctxt ~delegate
                 + number_of_protocol_attested_slots;
             }
         in
-        Storage.Contract.Attested_dal_slots.update ctxt contract participation
+        Storage.Contract.Dal_participation.update ctxt contract participation
     | None ->
-        Storage.Contract.Attested_dal_slots.init
+        Storage.Contract.Dal_participation.init
           ctxt
           contract
           {
@@ -217,12 +217,12 @@ let check_and_reset_delegate_participation ctxt delegate =
 let get_and_maybe_reset_delegate_dal_participation ~reset ctxt delegate =
   let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
-  let* result = Storage.Contract.Attested_dal_slots.find ctxt contract in
+  let* result = Storage.Contract.Dal_participation.find ctxt contract in
   match result with
   | None -> return (ctxt, Storage.{attested_slots = 0; attestable_slots = 0})
   | Some participation ->
       let*! ctxt =
-        if reset then Storage.Contract.Attested_dal_slots.remove ctxt contract
+        if reset then Storage.Contract.Dal_participation.remove ctxt contract
         else Lwt.return ctxt
       in
       return (ctxt, participation)

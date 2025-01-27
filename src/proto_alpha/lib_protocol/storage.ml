@@ -311,11 +311,11 @@ module Contract = struct
       end)
       (Missed_attestations_info)
 
-  module Attested_dal_slots =
+  module Dal_participation =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["attested_dal_slots"]
+        let name = ["dal_delegate_participation"]
       end)
       (Dal_delegate_participation)
 
