@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -9593,6 +9593,51 @@ let test_init_config_mainnet network =
   Regression.capture config ;
   unit
 
+let test_filling_max_slots_cant_lead_to_out_of_memory =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "slots"; "out_of_memory"]
+    ~title:
+      "Calling a contract that fills the maximum amount of slots leads to \
+       OutOfGas not an out of memory error"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* slot_filler = Solidity_contracts.slot_filler () in
+  let* () = Eth_cli.add_abi ~label:slot_filler.label ~abi:slot_filler.abi () in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:slot_filler.label
+         ~bin:slot_filler.bin)
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let* failure =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:slot_filler.label
+      ~expect_failure:true
+      ~address:contract_address
+      ~method_call:"fillSlots()"
+      ()
+  in
+  let contains s sub =
+    let re = Str.regexp_string sub in
+    try
+      ignore (Str.search_forward re s 0) ;
+      true
+    with Not_found -> false
+  in
+  let error_out_of_gas = "Error(OutOfGas)" in
+  if contains failure error_out_of_gas then unit
+  else Test.fail "Test should fail with error: %s" error_out_of_gas
+
 let protocols = Protocol.all
 
 let () =
@@ -9723,4 +9768,5 @@ let () =
   test_websocket_logs_event [Protocol.Alpha] ;
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
   test_init_config_mainnet "mainnet" ;
-  test_init_config_mainnet "testnet"
+  test_init_config_mainnet "testnet" ;
+  test_filling_max_slots_cant_lead_to_out_of_memory protocols

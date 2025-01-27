@@ -33,7 +33,9 @@ let spawn ?runner command =
 
 let spawn_command_and_read_string ?runner ?expect_failure command =
   let process = spawn ?runner command in
-  Process.check_and_read_stdout ?expect_failure process
+  if expect_failure = Some true then
+    Process.check_and_read_stderr ?expect_failure process
+  else Process.check_and_read_stdout ?expect_failure process
 
 let spawn_command ?runner ?expect_failure command =
   let process = spawn ?runner command in

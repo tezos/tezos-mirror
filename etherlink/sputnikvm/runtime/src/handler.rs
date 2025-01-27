@@ -1,4 +1,6 @@
-use crate::{CallScheme, Capture, Context, CreateScheme, ExitError, ExitReason, Machine, Opcode, Stack};
+use crate::{
+	CallScheme, Capture, Context, CreateScheme, ExitError, ExitReason, Machine, Opcode, Stack,
+};
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
 
@@ -34,9 +36,9 @@ pub trait Handler {
 	/// Get code of address.
 	fn code(&self, address: H160) -> Vec<u8>;
 	/// Get storage value of address at index.
-	fn storage(&self, address: H160, index: H256) -> H256;
+	fn storage(&mut self, address: H160, index: H256) -> H256;
 	/// Get original storage value of address at index.
-	fn original_storage(&self, address: H160, index: H256) -> H256;
+	fn original_storage(&mut self, address: H160, index: H256) -> H256;
 
 	/// Get the gas left value.
 	fn gas_left(&self) -> U256;

@@ -199,7 +199,7 @@ pub fn gaslimit<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	Control::Continue
 }
 
-pub fn sload<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
+pub fn sload<H: Handler>(runtime: &mut Runtime, handler: &mut H) -> Control<H> {
 	pop!(runtime, index);
 	let value = handler.storage(runtime.context.address, index);
 	push!(runtime, value);
@@ -387,14 +387,7 @@ pub fn call<H: Handler>(runtime: &mut Runtime, scheme: CallScheme, handler: &mut
 		None
 	};
 
-	match handler.call(
-		to.into(),
-		transfer,
-		input,
-		gas,
-		scheme,
-		context,
-	) {
+	match handler.call(to.into(), transfer, input, gas, scheme, context) {
 		Capture::Exit((reason, return_data)) => {
 			match super::finish_call(runtime, out_len, out_offset, reason, return_data) {
 				Ok(()) => Control::Continue,

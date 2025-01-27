@@ -405,3 +405,10 @@ let reentrancy_test () =
     ~label:"reentrancy_tester"
     ~contract:"ReentrancyTester"
     ~evm_version:"shanghai"
+
+let slot_filler () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/slot_filler.sol")
+    ~label:"slot_filler"
+    ~contract:"SlotFiller"
+    ~evm_version:"shanghai"

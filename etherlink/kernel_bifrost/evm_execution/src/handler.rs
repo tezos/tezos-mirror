@@ -2078,7 +2078,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             .unwrap_or_default()
     }
 
-    fn storage(&self, address: H160, index: H256) -> H256 {
+    fn storage(&mut self, address: H160, index: H256) -> H256 {
         self.get_account(address)
             .ok()
             .flatten()
@@ -2086,7 +2086,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             .unwrap_or_default()
     }
 
-    fn original_storage(&self, address: H160, index: H256) -> H256 {
+    fn original_storage(&mut self, address: H160, index: H256) -> H256 {
         self.get_original_account(address)
             .ok()
             .flatten()
