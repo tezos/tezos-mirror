@@ -171,6 +171,21 @@ impl Instruction {
             },
         }
     }
+
+    fn new_nop(width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Nop,
+            args: Args {
+                // We are adding a default values for rd, rs1 and rs2 as NonZeroXRegister::x1
+                // to be explicit that they are of NonZeroXRegister type.
+                rd: NonZeroXRegister::x1.into(),
+                rs1: NonZeroXRegister::x1.into(),
+                rs2: NonZeroXRegister::x1.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 /// Opcodes map to the operation performed over the state - allowing us to
@@ -372,7 +387,6 @@ pub enum OpCode {
     CSub,
     CAddw,
     CSubw,
-    CNop,
 
     // RV64C compressed instructions
     CLd,
@@ -393,6 +407,7 @@ pub enum OpCode {
     J,
     Mv,
     Li,
+    Nop,
 }
 
 impl OpCode {
@@ -582,7 +597,7 @@ impl OpCode {
             Self::CSub => Args::run_csub,
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
-            Self::CNop => Args::run_cnop,
+            Self::Nop => Args::run_nop,
             Self::CLd => Args::run_cld,
             Self::CLdsp => Args::run_cldsp,
             Self::CSd => Args::run_csd,
@@ -614,7 +629,7 @@ impl OpCode {
 
         match self {
             Mv => Some(Args::run_mv),
-            CNop => Some(Args::run_cnop),
+            Nop => Some(Args::run_nop),
             CAdd => Some(Args::run_cadd),
             _ => None,
         }
@@ -1326,8 +1341,8 @@ impl Args {
         Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
     }
 
-    fn run_cnop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
-        c::run_cnop(icb);
+    fn run_nop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+        c::run_nop(icb);
         icb.ok(Next(self.width))
     }
 
@@ -2082,13 +2097,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CSub,
                 args: args.into(),
             },
-            InstrCacheable::CNop => Instruction {
-                opcode: OpCode::CNop,
-                args: Args {
-                    width: InstrWidth::Compressed,
-                    ..Args::DEFAULT
-                },
-            },
+            InstrCacheable::CNop => Instruction::new_nop(InstrWidth::Compressed),
 
             // RV64C compressed instructions
             InstrCacheable::CLd(args) => Instruction {

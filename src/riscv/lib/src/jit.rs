@@ -122,7 +122,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
 
         for i in instr.iter() {
             match i.opcode {
-                OpCode::CNop => {
+                OpCode::Nop => {
                     builder.steps += 1;
                     builder.pc_offset += i.width() as u64;
                 }

@@ -28,11 +28,11 @@ pub fn run_mv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegiste
     icb.xregister_write(rd_rs1, rs2_val)
 }
 
-/// C.NOP CI-type compressed instruction
+/// Does nothing.
 ///
-/// Does not change any user-visible state, except for advancing the pc and
-/// incrementing any applicable performance counters. Equivalent to `NOP`.
-pub fn run_cnop(_icb: &mut impl ICB) {}
+/// Relevant RISC-V opcodes:
+/// - C.NOP
+pub fn run_nop(_icb: &mut impl ICB) {}
 
 #[cfg(test)]
 mod tests {

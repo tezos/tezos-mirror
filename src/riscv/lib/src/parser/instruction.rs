@@ -450,6 +450,8 @@ pub enum InstrCacheable {
     CSub(CRTypeArgs),
     CAddw(CRTypeArgs),
     CSubw(CRTypeArgs),
+    /// `C.NOP` - Does not change any user-visible state, except for advancing the pc and
+    /// incrementing any applicable performance counters. Equivalent to `NOP`.
     CNop,
 
     // RV64C compressed instructions
