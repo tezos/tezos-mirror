@@ -84,6 +84,14 @@ module Commands = struct
          https://docs.tezos.com/tutorials/join-dal-baker."
       ()
 
+  let healthy_dal_node =
+    declare_0
+      ~section
+      ~name:"healthy_dal_node"
+      ~level:Notice
+      ~msg:"The DAL node is healthy."
+      ()
+
   let unhealthy_dal_node =
     declare_2
       ~section
