@@ -118,12 +118,13 @@ let random_algo ~rng_state : Signature.algo =
   | 3 -> Bls
   | _ -> assert false
 
-let gen_algo = QCheck2.Gen.oneofl [Signature.Ed25519; Secp256k1; P256; Bls]
+let gen_algo =
+  QCheck2.Gen.oneofl [Tezos_crypto.Signature.Ed25519; Secp256k1; P256; Bls]
 
 let gen_pkh =
   let open QCheck2.Gen in
   let+ algo = gen_algo in
-  let pkh, _pk, _sk = Signature.generate_key ~algo () in
+  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key ~algo () in
   pkh
 
 let gen_stakers =
@@ -266,6 +267,9 @@ let gen_slot_history =
         ( Raw_level.of_int32_exn lvl,
           List.map
             (fun (h, publisher, status) ->
+              let publisher =
+                Signature.Of_V_latest.get_public_key_hash_exn publisher
+              in
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
                 Contract.Implicit publisher,
                 status ))
@@ -297,6 +301,9 @@ let gen_slot_history_cache =
         ( Raw_level.of_int32_exn lvl,
           List.map
             (fun (h, publisher, status) ->
+              let publisher =
+                Signature.Of_V_latest.get_public_key_hash_exn publisher
+              in
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
                 Contract.Implicit publisher,
                 status ))
