@@ -91,14 +91,6 @@ let yes_wallet =
     ~path:"./_build/default/devtools/yes_wallet/yes_wallet.exe"
     ()
 
-(* To be removed after Paris is frozen *)
-let _octez_accuser_PsParisC =
-  Uses.make ~tag:"accuser_psparisc" ~path:"./octez-accuser-PsParisC" ()
-
-(* To be removed after Paris is frozen *)
-let _octez_baker_PsParisC =
-  Uses.make ~tag:"baker_psparisc" ~path:"./octez-baker-PsParisC" ()
-
 module WASM = struct
   let dal_echo_kernel =
     Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm" ()

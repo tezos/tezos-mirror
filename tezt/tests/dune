@@ -48,7 +48,6 @@
   src_proto_021_PsQuebec_lib_delegate_test_tezt_lib
   src_proto_021_PsQuebec_lib_dal_test_tezt_lib
   src_proto_021_PsQuebec_lib_client_test_tezt_lib
-  src_proto_020_PsParisC_lib_sc_rollup_node_test_tezt_lib
   src_lib_workers_test_tezt_lib
   src_lib_webassembly_tests_tezt_lib
   src_lib_wasmer_test_tezt_lib

@@ -11,7 +11,6 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-protocol-020-PsParisC-libs.client
-  octez-protocol-020-PsParisC-libs.dal
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
   tezos-protocol-020-PsParisC.protocol
@@ -54,7 +53,6 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_020_PsParisC
-  -open Tezos_dal_020_PsParisC
   -open Tezos_protocol_020_PsParisC
   -open Tezos_protocol_plugin_020_PsParisC
   -open Tezos_protocol_020_PsParisC_parameters

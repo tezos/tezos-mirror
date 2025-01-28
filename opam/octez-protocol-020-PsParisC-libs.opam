@@ -19,13 +19,6 @@ depends: [
   "uri" { >= "3.1.0" }
   "octez-rustzcash-deps" { with-test & = version }
   "octez-proto-libs" { = version }
-  "octez-version" { = version }
-  "octez-node-config" { = version }
-  "tezos-dal-node-services" { = version }
-  "lwt-canceler" { >= "0.3" & < "0.4" }
-  "lwt-exit"
-  "octez-protocol-compiler" { = version }
-  "tezos-dal-node-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
 ]
