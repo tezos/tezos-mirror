@@ -400,7 +400,7 @@ oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
@@ -419,7 +419,9 @@ oc.build_arm64-released:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -455,7 +457,7 @@ oc.build_arm64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
@@ -476,7 +478,9 @@ oc.build_arm64-exp-dev-extra:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -558,7 +562,7 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
@@ -576,7 +580,9 @@ oc.build:static-x86_64-linux-binaries:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -650,7 +656,7 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
@@ -668,7 +674,9 @@ oc.build:static-arm64-linux-binaries:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -741,7 +749,7 @@ oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
@@ -760,7 +768,9 @@ oc.build_x86_64-released:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -848,7 +858,7 @@ oc.build_x86_64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
@@ -875,7 +885,9 @@ oc.build_x86_64-exp-dev-extra:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
