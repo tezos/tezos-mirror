@@ -237,8 +237,7 @@ enum CompressedAccessInfo {
     ReadWrite(Vec<u8>),
 }
 
-// TODO: RV-237 Ensure consistency between `RootHashable` and `Merkleisable`
-// implementations
+// TODO: RV-414: Remove `Merkleisable` trait
 pub trait Merkleisable {
     /// Build the Merkle tree described by the layouat of the data.
     fn to_merkle_tree(&self) -> Result<MerkleTree, HashError>;

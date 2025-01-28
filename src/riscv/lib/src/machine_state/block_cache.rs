@@ -86,8 +86,8 @@ use super::{main_memory::Address, ProgramCounterUpdate};
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::parser::instruction::InstrWidth;
 use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
-    ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+    self, proof_backend, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase,
+    ManagerClone, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
 };
 use crate::traps::{EnvironException, Exception};
 use crate::{cache_utils::FenceCounter, state_backend::FnManager};
@@ -111,7 +111,7 @@ pub struct ICallLayout<ML> {
     _pd: PhantomData<ML>,
 }
 
-impl<ML: MainMemoryLayout> crate::state_backend::Layout for ICallLayout<ML> {
+impl<ML: MainMemoryLayout> state_backend::Layout for ICallLayout<ML> {
     type Allocated<M: state_backend::ManagerBase> = EnrichedCell<ICallPlaced<ML>, M>;
 
     fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
@@ -120,15 +120,21 @@ impl<ML: MainMemoryLayout> crate::state_backend::Layout for ICallLayout<ML> {
     }
 }
 
-impl<ML: MainMemoryLayout> crate::state_backend::CommitmentLayout for ICallLayout<ML> {
-    fn state_hash(
-        state: AllocatedOf<Self, Ref<'_, state_backend::owned_backend::Owned>>,
-    ) -> Result<Hash, HashError> {
+impl<ML: MainMemoryLayout> state_backend::CommitmentLayout for ICallLayout<ML> {
+    fn state_hash(state: state_backend::RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
     }
 }
 
-impl<ML: MainMemoryLayout> crate::state_backend::ProofLayout for ICallLayout<ML> {
+impl<ML: MainMemoryLayout> state_backend::ProofLayout for ICallLayout<ML> {
+    fn to_proof(
+        state: state_backend::RefProofGenOwnedAlloc<Self>,
+    ) -> Result<proof_backend::merkle::MerkleTree, HashError> {
+        let cell = state.cell_ref();
+        let serialised = proof_backend::ProofEnrichedCell::serialise_inner_enriched_cell(cell)?;
+        proof_backend::merkle::MerkleTree::make_merkle_leaf(serialised, cell.get_access_info())
+    }
+
     fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {
         let leaf = proof.into_leaf()?;
 
@@ -206,14 +212,18 @@ impl state_backend::Layout for AddressCellLayout {
 }
 
 impl state_backend::CommitmentLayout for AddressCellLayout {
-    fn state_hash(
-        state: AllocatedOf<Self, Ref<'_, state_backend::owned_backend::Owned>>,
-    ) -> Result<Hash, HashError> {
+    fn state_hash(state: state_backend::RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
     }
 }
 
 impl state_backend::ProofLayout for AddressCellLayout {
+    fn to_proof(
+        state: state_backend::RefProofGenOwnedAlloc<Self>,
+    ) -> Result<proof_backend::merkle::MerkleTree, HashError> {
+        <Atom<Address> as state_backend::ProofLayout>::to_proof(state)
+    }
+
     fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {
         <Atom<Address> as state_backend::ProofLayout>::from_proof(proof)
     }
