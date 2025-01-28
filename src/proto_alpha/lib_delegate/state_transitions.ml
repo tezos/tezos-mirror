@@ -93,8 +93,8 @@ let make_consensus_vote_batch state proposal kind =
   let batch_content = {level; round; block_payload_hash} in
   let delegates_and_slots =
     List.map
-      (fun delegate_slot ->
-        (delegate_slot.consensus_key_and_delegate, delegate_slot.first_slot))
+      (fun (delegate_slot : delegate_slot) ->
+        (delegate_slot.delegate, delegate_slot.first_slot))
       (Delegate_slots.own_delegates state.level_state.delegate_slots)
   in
   (* The branch is the latest finalized block. *)
@@ -724,7 +724,7 @@ let end_of_round state current_round =
          level block arrive. Meanwhile, we are idle *)
       let new_state = update_current_phase new_state Idle in
       do_nothing new_state
-  | Some {consensus_key_and_delegate; _} ->
+  | Some {delegate; _} ->
       let latest_proposal = state.level_state.latest_proposal in
       if Baking_state.is_first_block_in_protocol latest_proposal then
         (* Do not inject a block for the previous protocol! (Let the
@@ -738,13 +738,13 @@ let end_of_round state current_round =
               ( current_round,
                 state.level_state.current_level,
                 new_round,
-                consensus_key_and_delegate ))
+                delegate ))
         in
         (* We have a delegate, we need to determine what to inject *)
         let* action =
           (propose_block_action
              new_state
-             consensus_key_and_delegate
+             delegate
              new_round
              ~last_proposal:state.level_state.latest_proposal
            [@profiler.record_s
@@ -769,7 +769,7 @@ let time_to_prepare_next_level_block state at_round =
       (* Unreachable: the [Time_to_prepare_next_level_block] event can only be
          triggered when we have a slot and an elected block *)
       assert false
-  | Some elected_block, Some {consensus_key_and_delegate; _} ->
+  | Some elected_block, Some {delegate; _} ->
       let attestations = elected_block.attestation_qc in
       let new_level_state =
         {state.level_state with next_level_proposed_round = Some at_round}
@@ -780,7 +780,7 @@ let time_to_prepare_next_level_block state at_round =
            ~attestations
            ~predecessor:elected_block.proposal.block
            new_state
-           consensus_key_and_delegate
+           delegate
            at_round
          [@profiler.record_s
            {verbosity = Debug} "create propose fresh block action"])

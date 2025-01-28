@@ -247,7 +247,7 @@ let sign_block_header global_state proposer unsigned_block_header =
           (may_sign_block
              cctxt
              block_location
-             ~delegate:proposer.public_key_hash
+             ~delegate:proposer.Consensus_key.id
              ~level
              ~round [@profiler.record_s {verbosity = Debug} "may sign"])
         in
@@ -257,7 +257,7 @@ let sign_block_header global_state proposer unsigned_block_header =
               (record_block
                  cctxt
                  block_location
-                 ~delegate:proposer.public_key_hash
+                 ~delegate:proposer.id
                  ~level
                  ~round [@profiler.record_s {verbosity = Debug} "record block"])
             in
@@ -284,15 +284,7 @@ let sign_block_header global_state proposer unsigned_block_header =
 let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     =
   let open Lwt_result_syntax in
-  let {
-    predecessor;
-    round;
-    delegate = (consensus_key, _) as delegate;
-    kind;
-    force_apply;
-  } =
-    block_to_bake
-  in
+  let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
   let*! () =
     Events.(
       emit
@@ -351,7 +343,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     (generate_seed_nonce_hash
        ?timeout:global_state.config.remote_calls_timeout
        global_state.config.Baking_configuration.nonce
-       consensus_key
+       delegate.consensus_key
        injection_level
      [@profiler.record_s {verbosity = Info} "generate seed nonce hash"])
   in
@@ -423,7 +415,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let* signed_block_header =
     (sign_block_header
        global_state
-       consensus_key
+       delegate.consensus_key
        unsigned_block_header
      [@profiler.record_s {verbosity = Info} "sign block header"])
   in
@@ -521,17 +513,15 @@ let process_dal_rpc_result state delegate level round =
 
 let may_get_dal_content state consensus_vote =
   let open Lwt_result_syntax in
-  let {delegate = _consensus_key, pkh; vote_consensus_content; _} =
-    consensus_vote
-  in
+  let {delegate; vote_consensus_content; _} = consensus_vote in
   let level, round =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
   let promise_opt =
     List.assoc_opt
-      ~equal:Signature.Public_key_hash.equal
-      pkh
+      ~equal:Delegate_id.equal
+      delegate.delegate_id
       state.level_state.dal_attestable_slots
   in
   match promise_opt with
@@ -551,12 +541,10 @@ let may_get_dal_content state consensus_vote =
              Lwt.return (`RPC_result tz_res));
           ]
       in
-      process_dal_rpc_result state pkh level round res
+      process_dal_rpc_result state delegate.delegate_id level round res
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
-  let {delegate = consensus_key, _; vote_consensus_content; _} =
-    consensus_vote
-  in
+  let {delegate; vote_consensus_content; _} = consensus_vote in
   let level, round =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
@@ -566,13 +554,13 @@ let is_authorized (global_state : global_state) highwatermarks consensus_vote =
     | Preattestation ->
         Baking_highwatermarks.may_sign_preattestation
           highwatermarks
-          ~delegate:consensus_key.public_key_hash
+          ~delegate:delegate.consensus_key.id
           ~level
           ~round
     | Attestation ->
         Baking_highwatermarks.may_sign_attestation
           highwatermarks
-          ~delegate:consensus_key.public_key_hash
+          ~delegate:delegate.consensus_key.id
           ~level
           ~round
   in
@@ -610,8 +598,8 @@ let authorized_consensus_votes global_state
         (* Record all consensus votes new highwatermarks as one batch *)
         let delegates =
           List.map
-            (fun ({delegate = ck, _; _} : unsigned_consensus_vote) ->
-              ck.public_key_hash)
+            (fun ({delegate; _} : unsigned_consensus_vote) ->
+              delegate.consensus_key.id)
             authorized_votes
         in
         let record_all_consensus_vote =
@@ -654,7 +642,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
-  let {vote_kind; vote_consensus_content; delegate = ck, _; dal_content} =
+  let {vote_kind; vote_consensus_content; delegate; dal_content} =
     unsigned_consensus_vote
   in
   let shell = {Tezos_base.Operation.branch} in
@@ -684,7 +672,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
       Operation.unsigned_encoding
       unsigned_operation
   in
-  let sk_uri = ck.secret_key_uri in
+  let sk_uri = delegate.consensus_key.secret_key_uri in
   let* signature =
     sign
       ?timeout:global_state.config.remote_calls_timeout
@@ -953,13 +941,11 @@ let compute_round (proposal : proposal) round_durations =
 let notice_delegates_without_slots all_delegates delegate_slots level =
   let delegates_without_slots =
     List.filter
-      (fun {Baking_state.public_key_hash; _} ->
+      (fun {Baking_state.Consensus_key.id; _} ->
         not
         @@ List.exists
-             (fun {
-                    consensus_key_and_delegate = consensus_key, _pkh_with_rights;
-                    _;
-                  } -> public_key_hash = consensus_key.public_key_hash)
+             (fun ({delegate = {consensus_key; _}; _} : delegate_slot) ->
+               id = consensus_key.id)
              (Baking_state.Delegate_slots.own_delegates delegate_slots))
       all_delegates
   in

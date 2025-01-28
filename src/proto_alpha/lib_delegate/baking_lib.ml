@@ -114,10 +114,7 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let*! () =
     cctxt#message
       "@[<v 2>Preattesting for:@ %a@]"
-      Format.(
-        pp_print_list
-          ~pp_sep:pp_print_space
-          Baking_state.pp_consensus_key_and_delegate)
+      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.Delegate.pp)
       (List.map
          (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
          consensus_batch.unsigned_consensus_votes)
@@ -157,10 +154,7 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let*! () =
     cctxt#message
       "@[<v 2>Attesting for:@ %a@]"
-      Format.(
-        pp_print_list
-          ~pp_sep:pp_print_space
-          Baking_state.pp_consensus_key_and_delegate)
+      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.Delegate.pp)
       (List.map
          (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
          consensus_batch.unsigned_consensus_votes)
@@ -442,11 +436,11 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             match proposal_acceptance with
             | Invalid | Outdated_proposal -> (
                 match round_proposer state ~level:`Current round with
-                | Some {consensus_key_and_delegate; _} ->
+                | Some {delegate; _} ->
                     let*! action =
                       State_transitions.propose_block_action
                         state
-                        consensus_key_and_delegate
+                        delegate
                         round
                         ~last_proposal:state.level_state.latest_proposal
                     in
@@ -533,11 +527,11 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
   match proposal_validity with
   | Invalid | Outdated_proposal -> (
       match Baking_state.round_proposer state ~level:`Current round with
-      | Some {consensus_key_and_delegate; _} ->
+      | Some {delegate; _} ->
           let*! action =
             State_transitions.propose_block_action
               state
-              consensus_key_and_delegate
+              delegate
               round
               ~last_proposal:state.level_state.latest_proposal
           in

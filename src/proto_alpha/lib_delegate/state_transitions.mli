@@ -56,11 +56,7 @@ val handle_proposal :
     given that there was already a proposal at the current level, the last one
     being [last_proposal]. *)
 val propose_block_action :
-  state ->
-  consensus_key_and_delegate ->
-  Round.t ->
-  last_proposal:proposal ->
-  action Lwt.t
+  state -> Delegate.t -> Round.t -> last_proposal:proposal -> action Lwt.t
 
 (** Increase the current round and propose at the new round (same
     level), if the baker has a proposer slot. *)

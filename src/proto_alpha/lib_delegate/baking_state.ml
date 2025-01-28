@@ -29,69 +29,99 @@ open Baking_errors
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
-(** A consensus key (aka, a validator) is identified by its alias name, its
+module Consensus_key_id = struct
+  type t = Signature.Public_key_hash.t
+
+  let to_pkh pkh = pkh
+
+  let compare = Signature.Public_key_hash.compare
+
+  let encoding = Signature.Public_key_hash.encoding
+
+  let pp = Signature.Public_key_hash.pp
+
+  module Table = Signature.Public_key_hash.Table
+end
+
+module Consensus_key = struct
+  (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
-type consensus_key = {
-  alias : string option;
-  public_key : Signature.Public_key.t;
-  public_key_hash : Signature.Public_key_hash.t;
-  secret_key_uri : Client_keys.sk_uri;
-}
+  type t = {
+    alias : string option;
+    id : Consensus_key_id.t;
+    public_key : Signature.Public_key.t;
+    secret_key_uri : Client_keys.sk_uri;
+  }
 
-let consensus_key_encoding =
-  let open Data_encoding in
-  conv
-    (fun {alias; public_key; public_key_hash; secret_key_uri} ->
-      ( alias,
-        public_key,
-        public_key_hash,
-        Uri.to_string (secret_key_uri :> Uri.t) ))
-    (fun (alias, public_key, public_key_hash, secret_key_uri) ->
-      {
-        alias;
-        public_key;
-        public_key_hash;
-        secret_key_uri =
-          (match Client_keys.make_sk_uri (Uri.of_string secret_key_uri) with
-          | Ok sk -> sk
-          | Error e -> Format.kasprintf Stdlib.failwith "%a" pp_print_trace e);
-      })
-    (obj4
-       (req "alias" (option string))
-       (req "public_key" Signature.Public_key.encoding)
-       (req "public_key_hash" Signature.Public_key_hash.encoding)
-       (req "secret_key_uri" string))
+  let make ~alias ~public_key ~public_key_hash ~secret_key_uri =
+    {alias; public_key; id = public_key_hash; secret_key_uri}
 
-let pp_consensus_key fmt {alias; public_key_hash; _} =
-  match alias with
-  | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp public_key_hash
-  | Some alias ->
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {alias; public_key; id; secret_key_uri} ->
+        (alias, public_key, id, Uri.to_string (secret_key_uri :> Uri.t)))
+      (fun (alias, public_key, id, secret_key_uri) ->
+        {
+          alias;
+          public_key;
+          id;
+          secret_key_uri =
+            (match Client_keys.make_sk_uri (Uri.of_string secret_key_uri) with
+            | Ok sk -> sk
+            | Error e -> Format.kasprintf Stdlib.failwith "%a" pp_print_trace e);
+        })
+      (obj4
+         (req "alias" (option string))
+         (req "public_key" Signature.Public_key.encoding)
+         (req "public_key_hash" Signature.Public_key_hash.encoding)
+         (req "secret_key_uri" string))
+
+  let pp fmt {alias; id; _} =
+    match alias with
+    | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp id
+    | Some alias ->
+        Format.fprintf fmt "%s (%a)" alias Signature.Public_key_hash.pp id
+end
+
+module Delegate_id = struct
+  type t = Signature.public_key_hash
+
+  let of_pkh pkh = pkh
+
+  let to_pkh pkh = pkh
+
+  let equal = Signature.Public_key_hash.equal
+
+  let encoding = Signature.Public_key_hash.encoding
+
+  let pp = Signature.Public_key_hash.pp
+end
+
+module Delegate = struct
+  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {consensus_key; delegate_id} -> (consensus_key, delegate_id))
+      (fun (consensus_key, delegate_id) -> {consensus_key; delegate_id})
+      (merge_objs
+         Consensus_key.encoding
+         (obj1 (req "delegate" Delegate_id.encoding)))
+
+  let pp fmt {consensus_key; delegate_id} =
+    if Signature.Public_key_hash.equal consensus_key.id delegate_id then
+      Consensus_key.pp fmt consensus_key
+    else
       Format.fprintf
         fmt
-        "%s (%a)"
-        alias
-        Signature.Public_key_hash.pp
-        public_key_hash
-
-type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
-
-let consensus_key_and_delegate_encoding =
-  let open Data_encoding in
-  merge_objs
-    consensus_key_encoding
-    (obj1 (req "delegate" Signature.Public_key_hash.encoding))
-
-let pp_consensus_key_and_delegate fmt (consensus_key, delegate) =
-  if Signature.Public_key_hash.equal consensus_key.public_key_hash delegate then
-    pp_consensus_key fmt consensus_key
-  else
-    Format.fprintf
-      fmt
-      "%a@,on behalf of %a"
-      pp_consensus_key
-      consensus_key
-      Signature.Public_key_hash.pp
-      delegate
+        "%a@,on behalf of %a"
+        Consensus_key.pp
+        consensus_key
+        Delegate_id.pp
+        delegate_id
+end
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
@@ -116,7 +146,7 @@ type block_info = {
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
   round_timestamps :
-    (Timestamp.time * Round.t * consensus_key_and_delegate)
+    (Timestamp.time * Round.t * Delegate.t)
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
@@ -191,7 +221,7 @@ let block_info_encoding =
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
 type delegate_slot = {
-  consensus_key_and_delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   first_slot : Slot.t;
   attesting_power : int;
 }
@@ -228,7 +258,7 @@ end
 type delegate_slots = Delegate_slots.t
 
 type dal_attestable_slots =
-  (Signature.Public_key_hash.t
+  (Delegate_id.t
   * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
   list
 
@@ -281,7 +311,7 @@ type manager_operations_infos = {
 type prepared_block = {
   signed_block_header : block_header;
   round : Round.t;
-  delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   operations : Tezos_base.Operation.t list list;
   manager_operations_infos : manager_operations_infos option;
   baking_votes : Per_block_votes_repr.per_block_votes;
@@ -359,7 +389,7 @@ type block_kind =
 type block_to_bake = {
   predecessor : block_info;
   round : Round.t;
-  delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   kind : block_kind;
   force_apply : bool;
 }
@@ -391,7 +421,7 @@ let pp_consensus_vote_kind fmt = function
 type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;
-  delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   dal_content : dal_content option;
 }
 
@@ -593,7 +623,7 @@ type global_state = {
   (* the validation mode used by the baker*)
   validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)
-  delegates : consensus_key list;
+  delegates : Consensus_key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
@@ -733,7 +763,7 @@ let unsigned_consensus_vote_encoding =
     (obj4
        (req "vote_kind" vote_kind_encoding)
        (req "vote_consensus_content" consensus_content_encoding)
-       (req "delegate" consensus_key_and_delegate_encoding)
+       (req "delegate" Delegate.encoding)
        (opt "dal_content" dal_content_encoding))
 
 let signed_consensus_vote_encoding =
@@ -791,7 +821,7 @@ let forge_event_encoding =
       (obj6
          (req "header" (dynamic_size Block_header.encoding))
          (req "round" Round.encoding)
-         (req "delegate" consensus_key_and_delegate_encoding)
+         (req "delegate" Delegate.encoding)
          (req
             "operations"
             (list (list (dynamic_size Tezos_base.Operation.encoding))))
@@ -1004,9 +1034,9 @@ let may_load_attestable_data state =
 
 module DelegateSet = struct
   include Set.Make (struct
-    type t = consensus_key
+    type t = Consensus_key.t
 
-    let compare {public_key_hash = pkh; _} {public_key_hash = pkh'; _} =
+    let compare Consensus_key.{id = pkh; _} Consensus_key.{id = pkh'; _} =
       Signature.Public_key_hash.compare pkh pkh'
   end)
 
@@ -1014,9 +1044,8 @@ module DelegateSet = struct
     let exception Found of elt in
     try
       iter
-        (fun ({public_key_hash; _} as delegate) ->
-          if Signature.Public_key_hash.equal pkh public_key_hash then
-            raise (Found delegate)
+        (fun ({id; _} as delegate) ->
+          if Signature.Public_key_hash.equal pkh id then raise (Found delegate)
           else ())
         s ;
       None
@@ -1037,7 +1066,7 @@ let delegate_slots attesting_rights delegates =
           | Some consensus_key ->
               let attesting_slot =
                 {
-                  consensus_key_and_delegate = (consensus_key, delegate);
+                  delegate = {consensus_key; delegate_id = delegate};
                   first_slot;
                   attesting_power;
                 }
@@ -1172,7 +1201,7 @@ let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
     config
     pp_validation_mode
     validation_mode
-    Format.(pp_print_list pp_consensus_key)
+    Format.(pp_print_list Consensus_key.pp)
     delegates
 
 let pp_option pp fmt = function
@@ -1248,32 +1277,25 @@ let pp_elected_block fmt {proposal; attestation_qc} =
     proposal.block
     (List.length attestation_qc)
 
-let pp_delegate_slot fmt
-    {consensus_key_and_delegate; first_slot; attesting_power} =
+let pp_delegate_slot fmt {delegate; first_slot; attesting_power} =
   Format.fprintf
     fmt
     "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attesting_power: %d"
     Slot.pp
     first_slot
-    pp_consensus_key_and_delegate
-    consensus_key_and_delegate
+    Delegate.pp
+    delegate
     attesting_power
 
 (* this type is only used below for pretty-printing *)
-type delegate_slots_for_pp = {
-  attester : consensus_key_and_delegate;
-  all_slots : Slot.t list;
-}
+type delegate_slots_for_pp = {attester : Delegate.t; all_slots : Slot.t list}
 
 let delegate_slots_for_pp delegate_slot_map =
   SlotMap.fold
-    (fun slot {consensus_key_and_delegate; first_slot; attesting_power = _} acc ->
+    (fun slot {delegate; first_slot; attesting_power = _} acc ->
       match SlotMap.find first_slot acc with
       | None ->
-          SlotMap.add
-            first_slot
-            {attester = consensus_key_and_delegate; all_slots = [slot]}
-            acc
+          SlotMap.add first_slot {attester = delegate; all_slots = [slot]} acc
       | Some {attester; all_slots} ->
           SlotMap.add first_slot {attester; all_slots = slot :: all_slots} acc)
     delegate_slot_map
@@ -1292,7 +1314,7 @@ let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
           Format.fprintf
             fmt
             "attester: %a, power: %d, first 10 slots: %a"
-            pp_consensus_key_and_delegate
+            Delegate.pp
             attester
             (List.length all_slots)
             (Format.pp_print_list
@@ -1301,8 +1323,7 @@ let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
             (List.filteri (fun i _ -> i < 10) all_slots)))
     (SlotMap.bindings (delegate_slots_for_pp own_delegate_slots))
 
-let pp_prepared_block fmt
-    {signed_block_header; delegate = consensus_key_and_delegate; _} =
+let pp_prepared_block fmt {signed_block_header; delegate; _} =
   Format.fprintf
     fmt
     "predecessor block hash: %a, payload hash: %a, level: %ld, delegate: %a"
@@ -1311,8 +1332,8 @@ let pp_prepared_block fmt
     Block_payload_hash.pp_short
     signed_block_header.protocol_data.contents.payload_hash
     signed_block_header.shell.level
-    pp_consensus_key_and_delegate
-    consensus_key_and_delegate
+    Delegate.pp
+    delegate
 
 let pp_level_state fmt
     {
@@ -1405,7 +1426,7 @@ let pp_forge_event fmt =
     fprintf
       fmt
       "for delegate %a at level %ld (round %a)"
-      pp_consensus_key_and_delegate
+      Delegate.pp
       unsigned_consensus_vote.delegate
       (Raw_level.to_int32 unsigned_consensus_vote.vote_consensus_content.level)
       Round.pp
@@ -1416,7 +1437,7 @@ let pp_forge_event fmt =
       fprintf
         fmt
         "block ready for delegate: %a at level %ld (round: %a)"
-        pp_consensus_key_and_delegate
+        Delegate.pp
         delegate
         signed_block_header.shell.level
         Round.pp

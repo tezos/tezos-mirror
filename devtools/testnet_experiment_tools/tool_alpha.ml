@@ -207,12 +207,11 @@ let load_client_context (cctxt : ctxt_kind) =
 
 let get_delegates (cctxt : Protocol_client_context.full) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
-    {
-      Baking_state.alias = Some alias;
-      public_key_hash;
-      public_key;
-      secret_key_uri;
-    }
+    Baking_state.Consensus_key.make
+      ~alias:(Some alias)
+      ~public_key_hash
+      ~public_key
+      ~secret_key_uri
   in
   let* keys = Client_keys.get_keys cctxt in
   let delegates = List.map proj_delegate keys in
@@ -222,7 +221,8 @@ let get_delegates (cctxt : Protocol_client_context.full) =
       cctxt
       (List.filter_map
          (function
-           | {Baking_state.alias = Some alias; _} -> Some alias | _ -> None)
+           | {Baking_state.Consensus_key.alias = Some alias; _} -> Some alias
+           | _ -> None)
          delegates)
   in
   let delegates_no_duplicates = List.sort_uniq compare delegates in

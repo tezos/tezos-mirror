@@ -310,8 +310,7 @@ let rec first_own_round_in_range delegate_slots ~committee_size ~included_min
             (* Impossible because [Round.of_int] builds a sound round. *) None
         | Ok slot -> (
             match Delegate_slots.own_slot_owner delegate_slots ~slot with
-            | Some {consensus_key_and_delegate; _} ->
-                Some (round, consensus_key_and_delegate)
+            | Some {delegate; _} -> Some (round, delegate)
             | None ->
                 first_own_round_in_range
                   delegate_slots

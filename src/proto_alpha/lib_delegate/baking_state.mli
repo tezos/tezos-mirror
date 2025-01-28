@@ -27,32 +27,74 @@ open Protocol
 open Alpha_context
 
 (** {2 Consensus key type and functions} *)
+module Consensus_key_id : sig
+  type t
 
-type consensus_key = {
-  alias : string option;
-  public_key : Signature.public_key;
-  public_key_hash : Signature.public_key_hash;
-  secret_key_uri : Client_keys.sk_uri;
-}
+  (** Only use at library frontiers *)
+  val to_pkh : t -> Signature.public_key_hash
 
-val consensus_key_encoding : consensus_key Data_encoding.t
+  val compare : t -> t -> int
 
-val pp_consensus_key : Format.formatter -> consensus_key -> unit
+  val encoding : t Data_encoding.t
 
-type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
+  val pp : Format.formatter -> t -> unit
 
-val consensus_key_and_delegate_encoding :
-  consensus_key_and_delegate Data_encoding.t
+  module Table : sig
+    include Hashtbl.SeededS with type key = t
 
-val pp_consensus_key_and_delegate :
-  Format.formatter -> consensus_key_and_delegate -> unit
+    val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
+end
+
+module Consensus_key : sig
+  type t = private {
+    alias : string option;
+    id : Consensus_key_id.t;
+    public_key : Signature.public_key;
+    secret_key_uri : Client_keys.sk_uri;
+  }
+
+  val make :
+    alias:string option ->
+    public_key:Signature.public_key ->
+    public_key_hash:Signature.public_key_hash ->
+    secret_key_uri:Client_keys.sk_uri ->
+    t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
 
 (** {2 Delegates slots type and functions} *)
+module Delegate_id : sig
+  type t
+
+  (** Only use at library frontiers *)
+  val of_pkh : Signature.public_key_hash -> t
+
+  (** Only use at library frontiers *)
+  val to_pkh : t -> Signature.public_key_hash
+
+  val equal : t -> t -> bool
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
+
+module Delegate : sig
+  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
 
 (** A delegate slot consists of the delegate's consensus key, its public key
     hash, its first slot, and its attesting power at some level. *)
 type delegate_slot = {
-  consensus_key_and_delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   first_slot : Slot.t;
   attesting_power : int;
 }
@@ -89,7 +131,7 @@ val compute_delegate_slots :
   ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
-  consensus_key list ->
+  Consensus_key.t list ->
   delegate_slots tzresult Lwt.t
 
 (** {2 Consensus operations types functions} *)
@@ -98,7 +140,7 @@ val compute_delegate_slots :
    at some level (as obtained through the [get_attestable_slots] RPC). See usage
    in {!level_state}. *)
 type dal_attestable_slots =
-  (Signature.Public_key_hash.t
+  (Delegate_id.t
   * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
   list
 
@@ -114,7 +156,7 @@ val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
 type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;
-  delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   dal_content : dal_content option;
 }
 
@@ -148,7 +190,7 @@ val make_unsigned_consensus_vote_batch :
   consensus_vote_kind ->
   batch_content ->
   batch_branch:Block_hash.t ->
-  (consensus_key_and_delegate * Slot.t) list ->
+  (Delegate.t * Slot.t) list ->
   unsigned_consensus_vote_batch
 
 (** [dal_content_map_p f unsigned_consensus_vote_batch] map each
@@ -358,8 +400,7 @@ type block_kind =
 type block_to_bake = {
   predecessor : block_info;
   round : Round.t;
-  delegate : consensus_key_and_delegate;
-      (** Delegate that have the right to bake the block. *)
+  delegate : Delegate.t;  (** Delegate that have the right to bake the block. *)
   kind : block_kind;  (** Either a reproposal or a fresh proposal *)
   force_apply : bool;
       (** if true, while baking the block, try and apply the block and its
@@ -393,7 +434,7 @@ val manager_operations_infos_encoding : manager_operations_infos Data_encoding.t
 type prepared_block = {
   signed_block_header : block_header;
   round : Round.t;
-  delegate : consensus_key_and_delegate;
+  delegate : Delegate.t;
   operations : Tezos_base.Operation.t list list;
   manager_operations_infos : manager_operations_infos option;
   baking_votes : Per_block_votes_repr.per_block_votes;
@@ -433,7 +474,7 @@ val pp_validation_mode : Format.formatter -> validation_mode -> unit
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
   round_timestamps :
-    (Timestamp.time * Round.t * consensus_key_and_delegate)
+    (Timestamp.time * Round.t * Delegate.t)
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
@@ -450,7 +491,7 @@ type global_state = {
   operation_worker : Operation_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
-  delegates : consensus_key list;
+  delegates : Consensus_key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
