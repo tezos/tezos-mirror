@@ -9,6 +9,8 @@ type store_info = {
   rollup_address : Address.t;
   current_number : Ethereum_types.quantity;
   legacy_block_storage : bool;
+  history_mode : Configuration.history_mode;
+  first_number : Ethereum_types.quantity;
 }
 
 let store_path ~data_dir = Filename.Infix.(data_dir // "store")
@@ -49,14 +51,22 @@ let export_store ~data_dir ~output_db_file =
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   Evm_store.use store @@ fun conn ->
   let* metadata = Evm_store.Metadata.get conn in
-  let* current_number, _ = Evm_store.Context_hashes.get_latest conn in
   let* legacy_block_storage = Evm_store.Block_storage_mode.legacy conn in
+  let* current = Evm_store.Context_hashes.find_latest conn in
+  let* first = Evm_store.Context_hashes.find_earliest conn in
+  let*? current_number, first_number =
+    match (current, first) with
+    | None, _ | _, None -> error_with "No data in store, cannot export."
+    | Some (cur, _), Some (first, _) -> Ok (cur, first)
+  in
   let* () = Evm_store.vacuum ~conn ~output_db_file in
   return
     {
       rollup_address = metadata.smart_rollup_address;
       current_number;
       legacy_block_storage;
+      history_mode = metadata.history_mode;
+      first_number;
     }
 
 let use ~data_dir k =

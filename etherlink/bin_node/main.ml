@@ -2371,7 +2371,7 @@ let snapshot_info_command =
         match header with
         | V0_legacy {rollup_address; current_level} ->
             (rollup_address, current_level, true)
-        | V1 {rollup_address; current_level} ->
+        | V1 {rollup_address; current_level; _} ->
             (rollup_address, current_level, false)
       in
       let pp_rollup fmt () =

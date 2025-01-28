@@ -115,6 +115,8 @@ module Header = struct
     | V1 of {
         rollup_address : Address.t;
         current_level : Ethereum_types.quantity;
+        history_mode : Configuration.history_mode;
+        first_level : Ethereum_types.quantity;
       }
 
   let cur_level_encoding =
@@ -142,15 +144,17 @@ module Header = struct
         case
           ~title:"evm_node.snapshot_header.v1"
           (Tag 1)
-          (obj2
+          (obj4
              (req "rollup_address" Address.encoding)
-             (req "current_level" cur_level_encoding))
+             (req "current_level" cur_level_encoding)
+             (req "history_mode" Configuration.history_mode_encoding)
+             (req "first_level" cur_level_encoding))
           (function
-            | V1 {rollup_address; current_level} ->
-                Some (rollup_address, current_level)
+            | V1 {rollup_address; current_level; history_mode; first_level} ->
+                Some (rollup_address, current_level, history_mode, first_level)
             | _ -> None)
-          (fun (rollup_address, current_level) ->
-            V1 {rollup_address; current_level});
+          (fun (rollup_address, current_level, history_mode, first_level) ->
+            V1 {rollup_address; current_level; history_mode; first_level});
       ]
 
   let encoding =
@@ -192,14 +196,20 @@ let export ?snapshot_file ~compression ~data_dir () =
     (* Export SQLite database *)
     Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
     let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-    let* {rollup_address; current_number = current_level; legacy_block_storage}
-        =
+    let* {
+           rollup_address;
+           current_number = current_level;
+           legacy_block_storage;
+           history_mode;
+           first_number = first_level;
+         } =
       Data_dir.export_store ~data_dir ~output_db_file
     in
     let header =
       if legacy_block_storage then
         Header.(V0_legacy {rollup_address; current_level})
-      else Header.(V1 {rollup_address; current_level})
+      else
+        Header.(V1 {rollup_address; current_level; history_mode; first_level})
     in
     let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
     let writer =
@@ -263,7 +273,7 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     match header with
     | V0_legacy {rollup_address; current_level} ->
         (rollup_address, current_level)
-    | V1 {rollup_address; current_level} -> (rollup_address, current_level)
+    | V1 {rollup_address; current_level; _} -> (rollup_address, current_level)
   in
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in

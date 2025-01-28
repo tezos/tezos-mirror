@@ -28,6 +28,8 @@ module Header : sig
     | V1 of {
         rollup_address : Address.t;
         current_level : Ethereum_types.quantity;
+        history_mode : Configuration.history_mode;
+        first_level : Ethereum_types.quantity;
       }  (** Snapshots with Sqlite3 block storage *)
 
   (** Fixed size metadata encoding. *)
