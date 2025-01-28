@@ -146,8 +146,16 @@ module Term = struct
 
   let attester_profile_arg =
     let open Cmdliner in
-    let decoder string =
-      match Signature.Public_key_hash.of_b58check_opt string with
+    let decoder arg =
+      let arg =
+        (* If the argument is wrapped with quotes, unwrap it. *)
+        if
+          String.starts_with ~prefix:"\"" arg
+          && String.ends_with ~suffix:"\"" arg
+        then String.sub arg 1 (String.length arg - 2)
+        else arg
+      in
+      match Signature.Public_key_hash.of_b58check_opt arg with
       | None -> Error (`Msg "Unrecognized profile")
       | Some pkh -> Ok pkh
     in
