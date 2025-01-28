@@ -25,6 +25,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let q_encoding cond error_msg =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(den > Z.zero) && cond num den then Ok (Q.make num den)
+        else Error error_msg)
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let positive_q_encoding = q_encoding (fun num _den -> Compare.Z.(num > Z.zero))
+
+let non_negative_q_encoding =
+  q_encoding (fun num _den -> Compare.Z.(num >= Z.zero))
+
+let between_zero_and_one_q_encoding =
+  q_encoding (fun num den -> Compare.Z.(num >= Z.zero && num <= den))
+
+let between_zero_and_excluding_one_q_encoding =
+  q_encoding (fun num den -> Compare.Z.(num >= Z.zero && num < den))
+
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
@@ -32,7 +52,23 @@ type dal = {
   attestation_lag : int;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
+  minimal_participation_ratio : Q.t;
+  rewards_ratio : Q.t;
+  traps_fraction : Q.t;
 }
+
+let minimal_participation_ratio_encoding =
+  between_zero_and_one_q_encoding
+    "dal.minimal_participation_ratio must be a value between zero and one"
+
+let rewards_ratio_encoding =
+  between_zero_and_excluding_one_q_encoding
+    "dal.rewards_ratio must be a value between zero (inclusive) and one \
+     (exclusive)"
+
+let traps_fraction_encoding =
+  between_zero_and_one_q_encoding
+    "traps_fraction must be a value between zero and one"
 
 let dal_encoding =
   let open Data_encoding in
@@ -44,18 +80,27 @@ let dal_encoding =
            attestation_lag;
            attestation_threshold;
            cryptobox_parameters;
+           minimal_participation_ratio;
+           rewards_ratio;
+           traps_fraction;
          } ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
           attestation_lag,
-          attestation_threshold ),
+          attestation_threshold,
+          minimal_participation_ratio,
+          rewards_ratio,
+          traps_fraction ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
              number_of_slots,
              attestation_lag,
-             attestation_threshold ),
+             attestation_threshold,
+             minimal_participation_ratio,
+             rewards_ratio,
+             traps_fraction ),
            cryptobox_parameters ) ->
       {
         feature_enable;
@@ -64,14 +109,22 @@ let dal_encoding =
         attestation_lag;
         attestation_threshold;
         cryptobox_parameters;
+        minimal_participation_ratio;
+        rewards_ratio;
+        traps_fraction;
       })
     (merge_objs
-       (obj5
+       (obj8
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
           (req "number_of_slots" uint16)
           (req "attestation_lag" uint8)
-          (req "attestation_threshold" uint8))
+          (req "attestation_threshold" uint8)
+          (req
+             "minimal_participation_ratio"
+             minimal_participation_ratio_encoding)
+          (req "rewards_ratio" rewards_ratio_encoding)
+          (req "traps_fraction" traps_fraction_encoding))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
@@ -186,12 +239,7 @@ type adaptive_rewards_params = {
 type adaptive_issuance = {
   global_limit_of_staking_over_baking : int;
   edge_of_staking_over_delegation : int;
-  launch_ema_threshold : int32;
   adaptive_rewards_params : adaptive_rewards_params;
-  activation_vote_enable : bool;
-  autostaking_enable : bool;
-  force_activation : bool;
-  ns_enable : bool;
 }
 
 type issuance_weights = {
@@ -201,12 +249,14 @@ type issuance_weights = {
   attesting_reward_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
+  dal_rewards_weight : int;
 }
 
 type t = {
   consensus_rights_delay : int;
   blocks_preservation_cycles : int;
   delegate_parameters_activation_delay : int;
+  tolerated_inactivity_period : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
@@ -231,12 +281,11 @@ type t = {
   delay_increment_per_round : Period_repr.t;
   minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
-  consensus_threshold : int;
+  consensus_threshold_size : int;
   limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
-  percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
   max_slashing_per_block : Percentage.t;
-  max_slashing_threshold : int;
+  max_slashing_threshold : Ratio_repr.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
@@ -249,6 +298,9 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
+  aggregate_attestation : bool;
+  allow_tz4_delegate_enable : bool;
+  all_bakers_attest_activation_level : Raw_level_repr.t option;
 }
 
 let sc_rollup_encoding =
@@ -353,48 +405,20 @@ let zk_rollup_encoding =
        (req "zk_rollup_max_ticket_payload_size" int31))
 
 let extremum_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num > Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Extremum Parameter: only positive values allowed")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  positive_q_encoding
+    "Invalid Reward Extremum Parameter: only positive values allowed"
 
 let center_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero && num <= den) then
-          Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Parameter: dead zone center can only be between 0 \
-             and 1")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  between_zero_and_one_q_encoding
+    "Invalid Reward Parameter: dead zone center can only be between 0 and 1"
 
 let radius_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else
-          Error
-            "Invalid Reward Parameter: dead zone radius must be non-negative")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  non_negative_q_encoding
+    "Invalid Reward Parameter: dead zone radius must be non-negative"
 
 let growth_rate_encoding =
-  Data_encoding.(
-    conv_with_guard
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) ->
-        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
-        else Error "Invalid Reward Parameter: growth rate must be non-negative")
-      (obj2 (req "numerator" z) (req "denominator" z)))
+  non_negative_q_encoding
+    "Invalid Reward Parameter: growth rate must be non-negative"
 
 let adaptive_rewards_params_encoding =
   let open Data_encoding in
@@ -461,48 +485,23 @@ let adaptive_issuance_encoding =
     (fun {
            global_limit_of_staking_over_baking;
            edge_of_staking_over_delegation;
-           launch_ema_threshold;
            adaptive_rewards_params;
-           activation_vote_enable;
-           autostaking_enable;
-           force_activation;
-           ns_enable;
          } ->
       ( global_limit_of_staking_over_baking,
         edge_of_staking_over_delegation,
-        launch_ema_threshold,
-        adaptive_rewards_params,
-        activation_vote_enable,
-        autostaking_enable,
-        force_activation,
-        ns_enable ))
+        adaptive_rewards_params ))
     (fun ( global_limit_of_staking_over_baking,
            edge_of_staking_over_delegation,
-           launch_ema_threshold,
-           adaptive_rewards_params,
-           activation_vote_enable,
-           autostaking_enable,
-           force_activation,
-           ns_enable ) ->
+           adaptive_rewards_params ) ->
       {
         global_limit_of_staking_over_baking;
         edge_of_staking_over_delegation;
-        launch_ema_threshold;
         adaptive_rewards_params;
-        activation_vote_enable;
-        autostaking_enable;
-        force_activation;
-        ns_enable;
       })
-    (obj8
+    (obj3
        (req "global_limit_of_staking_over_baking" uint8)
        (req "edge_of_staking_over_delegation" uint8)
-       (req "adaptive_issuance_launch_ema_threshold" int32)
-       (req "adaptive_rewards_params" adaptive_rewards_params_encoding)
-       (req "adaptive_issuance_activation_vote_enable" bool)
-       (req "autostaking_enable" bool)
-       (req "adaptive_issuance_force_activation" bool)
-       (req "ns_enable" bool))
+       (req "adaptive_rewards_params" adaptive_rewards_params_encoding))
 
 let issuance_weights_encoding =
   let open Data_encoding in
@@ -514,6 +513,7 @@ let issuance_weights_encoding =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight;
           } :
            issuance_weights) ->
       ( base_total_issued_per_minute,
@@ -521,13 +521,15 @@ let issuance_weights_encoding =
         baking_reward_bonus_weight,
         attesting_reward_weight,
         seed_nonce_revelation_tip_weight,
-        vdf_revelation_tip_weight ))
+        vdf_revelation_tip_weight,
+        dal_rewards_weight ))
     (fun ( base_total_issued_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
            attesting_reward_weight,
            seed_nonce_revelation_tip_weight,
-           vdf_revelation_tip_weight ) ->
+           vdf_revelation_tip_weight,
+           dal_rewards_weight ) ->
       {
         base_total_issued_per_minute;
         baking_reward_fixed_portion_weight;
@@ -535,14 +537,16 @@ let issuance_weights_encoding =
         attesting_reward_weight;
         seed_nonce_revelation_tip_weight;
         vdf_revelation_tip_weight;
+        dal_rewards_weight;
       })
-    (obj6
+    (obj7
        (req "base_total_issued_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "attesting_reward_weight" int31)
        (req "seed_nonce_revelation_tip_weight" int31)
-       (req "vdf_revelation_tip_weight" int31))
+       (req "vdf_revelation_tip_weight" int31)
+       (req "dal_rewards_weight" int31))
 
 let encoding =
   let open Data_encoding in
@@ -550,7 +554,8 @@ let encoding =
     (fun c ->
       ( ( ( c.consensus_rights_delay,
             c.blocks_preservation_cycles,
-            c.delegate_parameters_activation_delay ),
+            c.delegate_parameters_activation_delay,
+            c.tolerated_inactivity_period ),
           ( c.blocks_per_cycle,
             c.blocks_per_commitment,
             c.nonce_revelation_threshold,
@@ -574,11 +579,10 @@ let encoding =
               c.minimal_block_delay,
               c.delay_increment_per_round,
               c.consensus_committee_size,
-              c.consensus_threshold ),
+              c.consensus_threshold_size ),
             ( ( c.minimal_participation_ratio,
                 c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
-                c.percentage_of_frozen_deposits_slashed_per_double_attestation,
                 c.max_slashing_per_block,
                 c.max_slashing_threshold,
                 c.testnet_dictator,
@@ -588,11 +592,15 @@ let encoding =
                   c.cache_sampler_state_cycles ),
                 ( c.dal,
                   ( (c.sc_rollup, c.zk_rollup),
-                    (c.adaptive_issuance, c.direct_ticket_spending_enable) ) )
-              ) ) ) ) ))
+                    ( c.adaptive_issuance,
+                      ( c.direct_ticket_spending_enable,
+                        c.aggregate_attestation,
+                        c.allow_tz4_delegate_enable,
+                        c.all_bakers_attest_activation_level ) ) ) ) ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
-               delegate_parameters_activation_delay ),
+               delegate_parameters_activation_delay,
+               tolerated_inactivity_period ),
              ( blocks_per_cycle,
                blocks_per_commitment,
                nonce_revelation_threshold,
@@ -616,11 +624,10 @@ let encoding =
                  minimal_block_delay,
                  delay_increment_per_round,
                  consensus_committee_size,
-                 consensus_threshold ),
+                 consensus_threshold_size ),
                ( ( minimal_participation_ratio,
                    limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
-                   percentage_of_frozen_deposits_slashed_per_double_attestation,
                    max_slashing_per_block,
                    max_slashing_threshold,
                    testnet_dictator,
@@ -630,12 +637,16 @@ let encoding =
                      cache_sampler_state_cycles ),
                    ( dal,
                      ( (sc_rollup, zk_rollup),
-                       (adaptive_issuance, direct_ticket_spending_enable) ) ) )
-               ) ) ) ) ->
+                       ( adaptive_issuance,
+                         ( direct_ticket_spending_enable,
+                           aggregate_attestation,
+                           allow_tz4_delegate_enable,
+                           all_bakers_attest_activation_level ) ) ) ) ) ) ) ) ) ->
       {
         consensus_rights_delay;
         blocks_preservation_cycles;
         delegate_parameters_activation_delay;
+        tolerated_inactivity_period;
         blocks_per_cycle;
         blocks_per_commitment;
         nonce_revelation_threshold;
@@ -660,10 +671,9 @@ let encoding =
         delay_increment_per_round;
         minimal_participation_ratio;
         consensus_committee_size;
-        consensus_threshold;
+        consensus_threshold_size;
         limit_of_delegation_over_baking;
         percentage_of_frozen_deposits_slashed_per_double_baking;
-        percentage_of_frozen_deposits_slashed_per_double_attestation;
         max_slashing_per_block;
         max_slashing_threshold;
         testnet_dictator;
@@ -676,13 +686,17 @@ let encoding =
         zk_rollup;
         adaptive_issuance;
         direct_ticket_spending_enable;
+        aggregate_attestation;
+        allow_tz4_delegate_enable;
+        all_bakers_attest_activation_level;
       })
     (merge_objs
        (merge_objs
-          (obj3
+          (obj4
              (req "consensus_rights_delay" uint8)
              (req "blocks_preservation_cycles" uint8)
-             (req "delegate_parameters_activation_delay" uint8))
+             (req "delegate_parameters_activation_delay" uint8)
+             (req "tolerated_inactivity_period" uint8))
           (obj8
              (req "blocks_per_cycle" int32)
              (req "blocks_per_commitment" int32)
@@ -715,19 +729,16 @@ let encoding =
                 (req "minimal_block_delay" Period_repr.encoding)
                 (req "delay_increment_per_round" Period_repr.encoding)
                 (req "consensus_committee_size" int31)
-                (req "consensus_threshold" int31))
+                (req "consensus_threshold_size" int31))
              (merge_objs
-                (obj8
+                (obj7
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
                       Percentage.encoding)
-                   (req
-                      "percentage_of_frozen_deposits_slashed_per_double_attestation"
-                      Percentage.encoding)
                    (req "max_slashing_per_block" Percentage.encoding)
-                   (req "max_slashing_threshold" int31)
+                   (req "max_slashing_threshold" Ratio_repr.encoding)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
@@ -741,7 +752,13 @@ let encoding =
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            (obj1 (req "direct_ticket_spending_enable" bool))))))))))
+                            (obj4
+                               (req "direct_ticket_spending_enable" bool)
+                               (req "aggregate_attestation" bool)
+                               (req "allow_tz4_delegate_enable" bool)
+                               (req
+                                  "all_bakers_attest_activation_level"
+                                  (option Raw_level_repr.encoding)))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a

@@ -890,7 +890,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) Quebec (* Alpha predecessor *)
+  | (* Alpha predecessor *) Next (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -907,8 +907,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "quebec_021") then
-          return (Quebec, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "next") then
+          return (Next, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -939,30 +939,6 @@ let get_previous_protocol_constants ctxt =
 (* Start of code to remove at next automatic protocol snapshot *)
 
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
-let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
-    ~blocks_per_commitment =
-  let open Lwt_result_syntax in
-  let* cycle_eras = get_cycle_eras ctxt in
-  let current_era = Level_repr.current_era cycle_eras in
-  let current_cycle =
-    let level_position =
-      Int32.sub level (Raw_level_repr.to_int32 current_era.first_level)
-    in
-    Cycle_repr.add
-      current_era.first_cycle
-      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
-  in
-  let new_cycle_era =
-    Level_repr.
-      {
-        first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
-        first_cycle = Cycle_repr.succ current_cycle;
-        blocks_per_cycle;
-        blocks_per_commitment;
-      }
-  in
-  let*? new_cycle_eras = Level_repr.add_cycle_era new_cycle_era cycle_eras in
-  set_cycle_eras ctxt new_cycle_eras
 
 (* End of code to remove at next automatic protocol snapshot *)
 
@@ -1292,33 +1268,40 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | Quebec ->
-        (* See {!Constants_parametric_repr} for instructions on how to
-           add or modify a constant. *)
+    | Next ->
+        (*
+            FIXME chain_id is used for Q to Next migration and nomore after.
+            We ignored for automatic stabilisation, should it be removed in
+            Beta?
+        *)
+        ignore chain_id ;
         let module Previous = Constants_parametric_previous_repr in
         let*! c = get_previous_protocol_constants ctxt in
         let dal =
           let ({
                  feature_enable;
-                 incentives_enable = _;
+                 incentives_enable;
                  number_of_slots;
                  attestation_lag;
                  attestation_threshold;
                  cryptobox_parameters;
+                 minimal_participation_ratio;
+                 rewards_ratio;
+                 traps_fraction;
                }
                 : Previous.dal) =
             c.dal
           in
           {
             Constants_parametric_repr.feature_enable;
-            incentives_enable = true;
+            incentives_enable;
             number_of_slots;
             attestation_lag;
             attestation_threshold;
             cryptobox_parameters;
-            minimal_participation_ratio = Q.(64 // 100);
-            rewards_ratio = Q.(1 // 10);
-            traps_fraction = Q.(5 // 10000);
+            minimal_participation_ratio;
+            rewards_ratio;
+            traps_fraction;
           }
         in
         let reveal_activation_level =
@@ -1433,37 +1416,41 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         in
         let adaptive_issuance =
           let ({
-                 global_limit_of_staking_over_baking = _;
+                 global_limit_of_staking_over_baking;
                  edge_of_staking_over_delegation;
-                 launch_ema_threshold = _;
                  adaptive_rewards_params = _;
-                 activation_vote_enable = _;
-                 autostaking_enable = _;
-                 force_activation = _;
-                 ns_enable = _;
                }
                 : Previous.adaptive_issuance) =
             c.adaptive_issuance
           in
           Constants_parametric_repr.
             {
-              global_limit_of_staking_over_baking = 9;
+              global_limit_of_staking_over_baking;
               edge_of_staking_over_delegation;
               adaptive_rewards_params;
             }
         in
-        (* update the weights, but do not update [base_total_issued_per_minute] *)
         let issuance_weights =
-          let Constants_repr.Generated.
-                {consensus_threshold_size = _; issuance_weights} =
-            Constants_repr.Generated.generate
-              ~consensus_committee_size:c.consensus_committee_size
-              ~dal_rewards_ratio:dal.rewards_ratio
+          let ({
+                 base_total_issued_per_minute;
+                 baking_reward_fixed_portion_weight;
+                 baking_reward_bonus_weight;
+                 attesting_reward_weight;
+                 seed_nonce_revelation_tip_weight;
+                 vdf_revelation_tip_weight;
+                 dal_rewards_weight;
+               }
+                : Previous.issuance_weights) =
+            c.issuance_weights
           in
           {
-            issuance_weights with
-            base_total_issued_per_minute =
-              c.issuance_weights.base_total_issued_per_minute;
+            Constants_parametric_repr.base_total_issued_per_minute;
+            baking_reward_fixed_portion_weight;
+            baking_reward_bonus_weight;
+            attesting_reward_weight;
+            seed_nonce_revelation_tip_weight;
+            vdf_revelation_tip_weight;
+            dal_rewards_weight;
           }
         in
         let constants =
@@ -1471,6 +1458,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  consensus_rights_delay;
                  blocks_preservation_cycles;
                  delegate_parameters_activation_delay;
+                 tolerated_inactivity_period;
                  blocks_per_cycle;
                  blocks_per_commitment;
                  nonce_revelation_threshold;
@@ -1494,25 +1482,26 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  minimal_block_delay;
                  delay_increment_per_round;
                  consensus_committee_size;
-                 consensus_threshold;
+                 consensus_threshold_size;
                  minimal_participation_ratio;
                  limit_of_delegation_over_baking;
                  percentage_of_frozen_deposits_slashed_per_double_baking;
-                 percentage_of_frozen_deposits_slashed_per_double_attestation =
-                   _;
                  max_slashing_per_block;
-                 max_slashing_threshold = _;
+                 max_slashing_threshold;
                  (* The `testnet_dictator` should absolutely be None on mainnet *)
                  testnet_dictator;
                  initial_seed;
                  cache_script_size;
-                 cache_stake_distribution_cycles = _;
-                 cache_sampler_state_cycles = _;
+                 cache_stake_distribution_cycles;
+                 cache_sampler_state_cycles;
                  dal = _;
                  sc_rollup = _;
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
+                 aggregate_attestation;
+                 allow_tz4_delegate_enable;
+                 all_bakers_attest_activation_level;
                }
                 : Previous.t) =
             c
@@ -1521,8 +1510,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
+            tolerated_inactivity_period;
             blocks_per_cycle;
-            tolerated_inactivity_period = 2;
             blocks_per_commitment;
             nonce_revelation_threshold;
             cycles_per_voting_period;
@@ -1545,64 +1534,27 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             minimal_block_delay;
             delay_increment_per_round;
             consensus_committee_size;
-            consensus_threshold_size = consensus_threshold;
+            consensus_threshold_size;
             minimal_participation_ratio;
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
             max_slashing_per_block;
-            max_slashing_threshold = Ratio_repr.{numerator = 1; denominator = 3};
+            max_slashing_threshold;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator;
             initial_seed;
             cache_script_size;
-            cache_stake_distribution_cycles =
-              consensus_rights_delay + Constants_repr.slashing_delay + 2;
-            cache_sampler_state_cycles =
-              consensus_rights_delay + Constants_repr.slashing_delay + 2;
+            cache_stake_distribution_cycles;
+            cache_sampler_state_cycles;
             dal;
             sc_rollup;
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
-            aggregate_attestation = false;
-            allow_tz4_delegate_enable = false;
-            all_bakers_attest_activation_level = None;
+            aggregate_attestation;
+            allow_tz4_delegate_enable;
+            all_bakers_attest_activation_level;
           }
-        in
-        let new_constants : Constants_parametric_repr.t option =
-          (* This check is used to trigger the constants changes at migration on
-             this protocol for mainnet *)
-          if
-            Chain_id.(chain_id = Constants_repr.mainnet_id)
-            && Compare.Int32.(constants.blocks_per_cycle > 10800l)
-            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
-          then
-            Some
-              {
-                constants with
-                blocks_per_cycle = 10800l;
-                cycles_per_voting_period = 14l;
-              }
-          else if
-            (* for ghostnet with block_time = 4s *)
-            Compare.Int32.(constants.blocks_per_cycle > 10800l)
-            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 4L)
-          then Some {constants with blocks_per_cycle = 10800l}
-          else None
-        in
-        let* ctxt, constants =
-          match new_constants with
-          | Some new_constants ->
-              let* ctxt =
-                update_cycle_eras
-                  ctxt
-                  level
-                  ~prev_blocks_per_cycle:constants.blocks_per_cycle
-                  ~blocks_per_cycle:new_constants.blocks_per_cycle
-                  ~blocks_per_commitment:new_constants.blocks_per_commitment
-              in
-              return (ctxt, new_constants)
-          | None -> return (ctxt, constants)
         in
         let*! ctxt = add_constants ctxt constants in
 

@@ -26,6 +26,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Protocol-specific constants.
+
+    When the protocol is activated via migration from its predecessor
+    (e.g. on mainnet, ghostnet, <proto-name>net), these constants are
+    fully controlled by {!Raw_context.prepare_first_block}, which
+    copies over the value from the previous protocol for most
+    constants, but may also modify some of them and/or initialize new
+    constants.
+
+    When the protocol is activated from Genesis, e.g. in most tests,
+    constant values must be provided through a parameter file (or
+    internal arguments, depending of the level of abstraction). Typical
+    default values for various situations are available in
+    [lib_parameters/default_parameters.ml].
+
+    Note that there are also "hard" constants (non-parametric: cannot
+    be adjusted in tests) which are defined in {!Constants_repr}.
+
+    Documentation on individual constants can be found either in this
+    file or in [lib_parameters/default_parameters.ml]. Eventually, we
+    would like to keep the constant's documentation mainly into
+    [lib_parameters/default_parameters.ml] as it allows it to be
+    rights next to each constant's current value, no matter whether the
+    constant has been updated in the current protocol or not (whereas
+    only the values of modified constants can be found in
+    {!Raw_context.prepare_first_block}, so it's not a good place to put
+    the documentation).
+
+    In order to add or modify a protocol constant, you should
+    therefore:
+
+    - Add/update its value in {!Raw_context.prepare_first_block}, in
+      the branch of the pattern matching corresponding to [alpha]'s
+      predecessor.
+
+    - Add/update the same value in [lib_parameters/default_parameters.ml].
+
+    - Add/update the documentation on the constant in
+      [lib_parameters/default_parameters.ml]. If the constant is already
+      documented elsewhere, please move the documentation there.
+
+    (The CI will fail if you don't update [default_parameters.ml] accordingly.)
+*)
+
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
@@ -33,6 +77,11 @@ type dal = {
   attestation_lag : int;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
+  minimal_participation_ratio : Q.t;
+      (* the ratio of the protocol-attested slots that need to be attested by an
+         attester in order to receive rewards *)
+  rewards_ratio : Q.t; (* the ratio of DAL rewards versus total rewards *)
+  traps_fraction : Q.t; (* probability that a given shard is a trap *)
 }
 
 val dal_encoding : dal Data_encoding.t
@@ -136,24 +185,8 @@ type adaptive_issuance = {
     int;
   edge_of_staking_over_delegation :
     (* Weight of staking over delegation. *) int;
-  launch_ema_threshold : (* Threshold of the activation vote *) int32;
   adaptive_rewards_params :
     (* Parameters for the reward mechanism *) adaptive_rewards_params;
-  activation_vote_enable :
-    (* If set to true, reaching the launch_ema_threshold in the adaptive
-       issuance activation vote triggers the activation of the adaptive
-       inflation feature; otherwise the activation vote has no effect. *)
-    bool;
-  autostaking_enable :
-    (* If set to true, a stake/unstake/finalize operation will be triggered for
-       all delegate at end of cycle. *)
-    bool;
-  force_activation :
-    (* For testing purposes. If set to true, the adaptive issuance feature is
-       enabled without waiting to reach the launch_ema_threshold.*)
-    bool;
-  ns_enable : (* If set to true, enables the NS feature *)
-              bool;
 }
 
 type issuance_weights = {
@@ -169,18 +202,16 @@ type issuance_weights = {
   attesting_reward_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
+  dal_rewards_weight : int;
 }
 
 type t = {
-  (* Number of cycles after which computed consensus rights are used to actually
-     participate in the consensus *)
   consensus_rights_delay : int;
   (* Number of past cycles about which the protocol hints the shell that it should
      keep them in its history. *)
   blocks_preservation_cycles : int;
-  (* Number of cycles after which submitted delegate parameters are being
-     used. *)
   delegate_parameters_activation_delay : int;
+  tolerated_inactivity_period : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
@@ -207,14 +238,13 @@ type t = {
   minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   (* in slots *)
-  consensus_threshold : int;
+  consensus_threshold_size : int;
   (* in slots *)
   limit_of_delegation_over_baking : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
-  percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
   max_slashing_per_block : Percentage.t;
-  max_slashing_threshold : int;
+  max_slashing_threshold : Ratio_repr.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;
@@ -228,6 +258,10 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
+  (* attestation aggregation feature flag *)
+  aggregate_attestation : bool;
+  allow_tz4_delegate_enable : bool;
+  all_bakers_attest_activation_level : Raw_level_repr.t option;
 }
 
 val encoding : t Data_encoding.encoding
