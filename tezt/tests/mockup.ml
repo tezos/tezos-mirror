@@ -1083,10 +1083,16 @@ let test_create_mockup_config_show_init_roundtrip protocols =
       | None -> (
           match JSON.(schema |-> "$ref" |> as_string_opt) with
           | Some r -> r
-          | None ->
-              Test.fail
-                "Schema %s is missing both [type] and [$ref] field"
-                (JSON.encode schema))
+          | None -> (
+              match
+                JSON.(schema |-> "oneOf" |=> 0 |-> "type" |> as_string_opt)
+              with
+              | Some r -> r
+              | None ->
+                  Test.fail
+                    "Schema %s doesn't have either a [type], [$ref], or \
+                     [oneOf] field"
+                    (JSON.encode schema)))
     in
     let numerical_of_string ~typ value =
       JSON.(

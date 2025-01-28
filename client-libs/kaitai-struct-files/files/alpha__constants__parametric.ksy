@@ -25,6 +25,14 @@ types:
       type: center_dz
     - id: radius_dz
       type: radius_dz
+  all_bakers_attest_activation_level:
+    seq:
+    - id: all_bakers_attest_activation_level_tag
+      type: u1
+      enum: all_bakers_attest_activation_level_tag
+    - id: some
+      type: s4be
+      if: (all_bakers_attest_activation_level_tag == all_bakers_attest_activation_level_tag::some)
   alpha__mutez:
     seq:
     - id: alpha__mutez
@@ -207,6 +215,9 @@ types:
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
 enums:
+  all_bakers_attest_activation_level_tag:
+    0: none
+    1: some
   bool:
     0: false
     255: true
@@ -360,9 +371,5 @@ seq:
 - id: allow_tz4_delegate_enable
   type: u1
   enum: bool
-- id: all_bakers_attest_activation_level_tag
-  type: u1
-  enum: bool
 - id: all_bakers_attest_activation_level
-  type: s4be
-  if: (all_bakers_attest_activation_level_tag == bool::true)
+  type: all_bakers_attest_activation_level

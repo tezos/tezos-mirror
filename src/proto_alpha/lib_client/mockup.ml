@@ -391,10 +391,8 @@ let mem_init :
 
          If [v1] and [v2] are objects, then the resulting value is an object where
            - each field that is only present in either v1 and v2 is copied as is.
-             however, if the value in [v2] is explicitly [Some `Null], then the field is
-             absent in the result.
            - if a field is present in both [v1] and [v2], then its value in the
-             result is merge recursively. *)
+             result is merged recursively. *)
       let rec merge_objects (v1 : Data_encoding.Json.t)
           (v2 : Data_encoding.Json.t) : Data_encoding.Json.t =
         match (v1, v2) with
@@ -404,7 +402,6 @@ let mem_init :
               List.iter
                 (fun (k2, v2) ->
                   match (String.Hashtbl.find_opt tbl k2, v2) with
-                  | _, `Null -> String.Hashtbl.remove tbl k2
                   | Some v1, v2 ->
                       String.Hashtbl.replace tbl k2 (merge_objects v1 v2)
                   | None, v2 -> String.Hashtbl.add tbl k2 v2)
