@@ -89,12 +89,7 @@ OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
 rm -rf packages/"$dummy_pkg" packages/octez-deps
 
 echo "Add safer hashes."
-NOHASHLIST="stdcompat"
 opam admin list --short | while read -r line ; do
-    if echo "$NOHASHLIST" | grep -qw "$line"; then
-        echo "No hash for $line"
-    else
-        opam admin add-hashes sha256 sha512 -p $line
-    fi
+  opam admin add-hashes sha256 sha512 -p $line
 done
 cd ..
