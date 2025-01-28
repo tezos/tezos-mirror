@@ -97,6 +97,9 @@ you start using them, you probably want to use `octez-evm-node check config
 - `eth_getLogs` now correctly interprets block numbers like `earliest`,
   `finalized`, etc. They were all defaulting to `latest` before. (!16372)
 
+- New snapshot header for Sqlite3 block storage. Snapshots in the previous
+  format are called legacy as reported by the `snapshot info` command. (!16435)
+
 ## Version 0.14 (2025-01-21)
 
 This version contains UX improvements for displaying progress regarding snapshot
