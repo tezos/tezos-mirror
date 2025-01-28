@@ -89,6 +89,11 @@ val liquidity_baking_vote_to_string : liquidity_baking_vote -> string
     then [--liquidity-baking-toggle-vote x] is passed. The default
     value is [Some Pass].
 
+    [use_dal_node] is passed to the agnostic baker daemon through the
+    [--without-dal] or [--dal-node <uri>] flags. If the flag is [None], the
+    former option is passed, otherwise if the flag is [Some <uri>], then the
+    latter option is passed. The default value is [None].
+
     If [remote_mode] is specified, the agnostic baker will run in RPC-only mode.
  *)
 val create :
@@ -100,6 +105,7 @@ val create :
   ?delegates:string list ->
   ?remote_mode:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?use_dal_node:string ->
   Node.t ->
   Client.t ->
   t
@@ -127,6 +133,7 @@ val create_from_uris :
   ?delegates:string list ->
   ?remote_mode:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?use_dal_node:string ->
   base_dir:string ->
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
@@ -180,6 +187,7 @@ val init :
   ?delegates:string list ->
   ?remote_mode:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?use_dal_node:string ->
   Node.t ->
   Client.t ->
   t Lwt.t
