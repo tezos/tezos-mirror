@@ -1,12 +1,12 @@
-Protocol Alpha
+Protocol Next
 ==============
 
-This page documents the changes brought by protocol Alpha with respect
+This page documents the changes brought by protocol Next with respect
 to Quebec (see :ref:`naming_convention`).
 
 For changes brought by Quebec with respect to Paris, see :doc:`../protocols/021_quebec`.
 
-The code can be found in directory :src:`src/proto_alpha` of the ``master``
+The code can be found in directory :src:`src/proto_next` of the ``master``
 branch of Octez.
 
 Environment Version
