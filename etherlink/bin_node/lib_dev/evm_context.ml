@@ -254,7 +254,7 @@ module State = struct
 
   let maybe_split_context ctxt conn timestamp level =
     let open Lwt_result_syntax in
-    match ctxt.configuration.experimental_features.history_mode with
+    match ctxt.configuration.history_mode with
     | Archive -> return_none
     | Rolling ->
         let split =
@@ -271,8 +271,7 @@ module State = struct
                      add
                        last_split_timestamp
                        (of_int
-                          ctxt.configuration.experimental_features
-                            .garbage_collector_parameters
+                          ctxt.configuration.garbage_collector_parameters
                             .split_frequency_in_seconds)))
         in
         if split then (
@@ -281,9 +280,7 @@ module State = struct
           let*! () = Evm_context_events.gc_split level timestamp in
           let* number_of_chunks = Evm_store.Irmin_chunks.count conn in
           let max_number_of_chunks =
-            ctxt.configuration.experimental_features
-              .garbage_collector_parameters
-              .number_of_chunks
+            ctxt.configuration.garbage_collector_parameters.number_of_chunks
           in
           let* () =
             if number_of_chunks > max_number_of_chunks then
@@ -1202,8 +1199,7 @@ module State = struct
       ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url () =
     let open Lwt_result_syntax in
     let*! () =
-      Evm_context_events.start_history_mode
-        configuration.experimental_features.history_mode
+      Evm_context_events.start_history_mode configuration.history_mode
     in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1242,7 +1238,7 @@ module State = struct
         check_metadata
           ~store_metadata
           ~smart_rollup_address
-          ~history_mode:configuration.experimental_features.history_mode
+          ~history_mode:configuration.history_mode
           conn
       in
       let* () =
@@ -1277,7 +1273,7 @@ module State = struct
     in
 
     let* last_split_block =
-      match configuration.experimental_features.history_mode with
+      match configuration.history_mode with
       | Rolling -> Evm_store.Irmin_chunks.latest conn
       | Archive -> return_none
     in

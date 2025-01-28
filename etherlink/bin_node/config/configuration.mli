@@ -85,8 +85,6 @@ type experimental_features = {
   blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
   overwrite_simulation_tick_limit : bool;
-  garbage_collector_parameters : garbage_collector_parameters;
-  history_mode : history_mode;
   rpc_server : rpc_server;
   enable_websocket : bool;
   max_websocket_message_length : int;
@@ -172,6 +170,8 @@ type t = {
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
+  garbage_collector_parameters : garbage_collector_parameters;
+  history_mode : history_mode;
 }
 
 val history_mode_encoding : history_mode Data_encoding.t

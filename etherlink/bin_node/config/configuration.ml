@@ -55,8 +55,6 @@ type experimental_features = {
   blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
   overwrite_simulation_tick_limit : bool;
-  garbage_collector_parameters : garbage_collector_parameters;
-  history_mode : history_mode;
   rpc_server : rpc_server;
   enable_websocket : bool;
   max_websocket_message_length : int;
@@ -135,6 +133,8 @@ type t = {
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
+  garbage_collector_parameters : garbage_collector_parameters;
+  history_mode : history_mode;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -145,6 +145,8 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
   }
 
 let default_enable_send_raw_transaction = true
+
+let default_history_mode = Archive
 
 let default_garbage_collector_parameters =
   {split_frequency_in_seconds = 86_400; number_of_chunks = 14}
@@ -162,8 +164,6 @@ let default_experimental_features =
     drop_duplicate_on_injection = false;
     blueprints_publisher_order_enabled = false;
     overwrite_simulation_tick_limit = false;
-    garbage_collector_parameters = default_garbage_collector_parameters;
-    history_mode = Archive;
     rpc_server = Resto;
     enable_websocket = false;
     max_websocket_message_length = default_max_socket_message_length;
@@ -784,8 +784,6 @@ let experimental_features_encoding =
            blueprints_publisher_order_enabled;
            enable_send_raw_transaction;
            overwrite_simulation_tick_limit;
-           garbage_collector_parameters;
-           history_mode;
            rpc_server;
            enable_websocket;
            max_websocket_message_length;
@@ -796,8 +794,6 @@ let experimental_features_encoding =
           enable_send_raw_transaction,
           None,
           overwrite_simulation_tick_limit,
-          garbage_collector_parameters,
-          history_mode,
           None ),
         ( rpc_server,
           enable_websocket,
@@ -808,8 +804,6 @@ let experimental_features_encoding =
              enable_send_raw_transaction,
              _node_transaction_validation,
              overwrite_simulation_tick_limit,
-             garbage_collector_parameters,
-             history_mode,
              _next_wasm_runtime ),
            ( rpc_server,
              enable_websocket,
@@ -820,8 +814,6 @@ let experimental_features_encoding =
         blueprints_publisher_order_enabled;
         enable_send_raw_transaction;
         overwrite_simulation_tick_limit;
-        garbage_collector_parameters;
-        history_mode;
         rpc_server;
         enable_websocket;
         max_websocket_message_length;
@@ -868,16 +860,6 @@ let experimental_features_encoding =
                 eth_call succeeded."
              bool
              default_experimental_features.overwrite_simulation_tick_limit)
-          (dft
-             "garbage_collector_parameters"
-             ~description:"Garbage collector parameterse."
-             garbage_collector_parameters_encoding
-             default_experimental_features.garbage_collector_parameters)
-          (dft
-             "history_mode"
-             ~description:"History mode."
-             history_mode_encoding
-             default_experimental_features.history_mode)
           (opt
              "next_wasm_runtime"
              ~description:
@@ -1140,6 +1122,8 @@ let encoding ?network data_dir : t Data_encoding.t =
            fee_history;
            kernel_execution;
            finalized_view;
+           garbage_collector_parameters;
+           history_mode;
          } ->
       ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
@@ -1151,7 +1135,12 @@ let encoding ?network data_dir : t Data_encoding.t =
             experimental_features,
             proxy,
             fee_history ),
-          (kernel_execution, public_rpc, private_rpc, finalized_view) ) ))
+          ( kernel_execution,
+            public_rpc,
+            private_rpc,
+            finalized_view,
+            garbage_collector_parameters,
+            history_mode ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1162,7 +1151,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                experimental_features,
                proxy,
                fee_history ),
-             (kernel_execution, public_rpc, private_rpc, finalized_view) ) ) ->
+             ( kernel_execution,
+               public_rpc,
+               private_rpc,
+               finalized_view,
+               garbage_collector_parameters,
+               history_mode ) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -1181,6 +1175,8 @@ let encoding ?network data_dir : t Data_encoding.t =
         fee_history;
         kernel_execution;
         finalized_view;
+        garbage_collector_parameters;
+        history_mode;
       })
     (merge_objs
        (obj4
@@ -1238,7 +1234,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj4
+          (obj6
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1256,7 +1252,17 @@ let encoding ?network data_dir : t Data_encoding.t =
                    synonym for `finalized`."
                 "finalized_view"
                 bool
-                false))))
+                false)
+             (dft
+                "retention_period"
+                ~description:"How much history is retained for rolling nodes."
+                garbage_collector_parameters_encoding
+                default_garbage_collector_parameters)
+             (dft
+                "history_mode"
+                ~description:"History mode of the EVM node"
+                history_mode_encoding
+                default_history_mode))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1496,6 +1502,8 @@ module Cli = struct
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
       finalized_view;
+      garbage_collector_parameters = default_garbage_collector_parameters;
+      history_mode = default_history_mode;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -1784,6 +1792,8 @@ module Cli = struct
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
       finalized_view = finalized_view || configuration.finalized_view;
+      garbage_collector_parameters = configuration.garbage_collector_parameters;
+      history_mode = configuration.history_mode;
     }
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
