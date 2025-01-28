@@ -2367,12 +2367,15 @@ let snapshot_info_command =
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
       let header, compressed = Snapshots.info ~snapshot_file in
-      let rollup_address, current_level, legacy_block_storage =
+      let rollup_address, current_level, legacy_block_storage, history_info =
         match header with
         | V0_legacy {rollup_address; current_level} ->
-            (rollup_address, current_level, true)
-        | V1 {rollup_address; current_level; _} ->
-            (rollup_address, current_level, false)
+            (rollup_address, current_level, true, None)
+        | V1 {rollup_address; current_level; history_mode; first_level} ->
+            ( rollup_address,
+              current_level,
+              false,
+              Some (history_mode, first_level) )
       in
       let pp_rollup fmt () =
         match
@@ -2389,12 +2392,25 @@ let snapshot_info_command =
               (Constants.network_name net)
         | None -> ()
       in
+      let pp_history fmt () =
+        match history_info with
+        | None -> ()
+        | Some (history_mode, first_level) ->
+            Format.fprintf
+              fmt
+              "@,History mode:    %s@,First level:     %a"
+              (match history_mode with
+              | Archive -> "Archive"
+              | Rolling -> "Rolling")
+              Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
+              first_level
+      in
       Format.printf
         "@[<v 0>Valid EVM node snapshot.@,\
          Format:          %scompressed@,\
          %aRollup address:  %a@,\
          Current level:   %a@,\
-         Block storage:   %s@]@."
+         Block storage:   %s%a@]@."
         (match compressed with `Compressed -> "" | `Uncompressed -> "un")
         pp_rollup
         ()
@@ -2402,7 +2418,9 @@ let snapshot_info_command =
         rollup_address
         Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
         current_level
-        (if legacy_block_storage then "Legacy" else "Sqlite3") ;
+        (if legacy_block_storage then "Legacy" else "Sqlite3")
+        pp_history
+        () ;
       return_unit)
 
 let patch_state_command =
