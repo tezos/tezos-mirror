@@ -1,5 +1,8 @@
 Name: octez-zcash-params
-Version: 1.0.0
+Version: %{version}
+%if "%{epoch}" != ""
+Epoch: %{epoch}
+%endif
 Release: 1%{?dist}
 Summary: Octez zcash parameters
 License: MIT
@@ -10,7 +13,6 @@ License: MIT
 mkdir -p %{buildroot}/usr/share/zcash-params
 install -m 0755 $HOME/rpmbuild/SPECS/zcash-params/* %{buildroot}/usr/share/zcash-params
 %files
-%exclude /usr/lib/.build-id
 /usr/share/zcash-params*
 %postun
 %post

@@ -1,5 +1,8 @@
 Name: octez-client
-Version: 1.0.0
+Version: %{version}
+%if "%{epoch}" != ""
+Epoch: %{epoch}
+%endif
 Release: 1%{?dist}
 Summary: Client for interacting with the Tezos blockchain
 License: MIT
@@ -23,7 +26,6 @@ gzip %{buildroot}%{_mandir}/man1/octez-admin-client.1
 install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-codec.1 %{buildroot}%{_mandir}/man1/octez-codec.1
 gzip %{buildroot}%{_mandir}/man1/octez-codec.1
 %files
-%exclude /usr/lib/.build-id
 /usr/bin/octez-client
 /usr/bin/octez-admin-client
 /usr/bin/octez-codec

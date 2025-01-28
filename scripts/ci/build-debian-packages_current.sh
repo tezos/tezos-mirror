@@ -20,7 +20,10 @@ eval "$(opam env)"
 eval "$(dpkg-architecture)"
 
 # Build octez debian packages
-make "dpkg-$1"
+make all
+# shellcheck disable=SC2155
+export TIMESTAMP="$(date -d "$CI_PIPELINE_CREATED_AT" '+%Y%m%d%H%M')" &&
+  ./scripts/dpkg/make_dpkg.sh "scripts/dpkg/$1"
 
 echo "Version of Octez: $(dune exec src/lib_version/exe/octez_print_version.exe)"
 

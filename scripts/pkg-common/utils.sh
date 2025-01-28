@@ -124,13 +124,13 @@ getOctezVersion() {
     RET=$(echo "$VERSION" | tr '-' '~')
     ;;
   SoftRelease)
-    RET=$(date +'%Y%m%d%H%M')+$(echo "${CI_COMMIT_TAG:-}" | tr '-' '_')
+    RET=$TIMESTAMP+$(echo "${CI_COMMIT_TAG:-}" | tr '-' '_')
     ;;
   Master | TestBranch)
-    RET=$(date +'%Y%m%d%H%M')+$COMMIT_SHORT_SHA
+    RET=$TIMESTAMP+$COMMIT_SHORT_SHA
     ;;
   *)
-    RET=$(date +'%Y%m%d%H%M')+$COMMIT_SHORT_SHA
+    RET=$TIMESTAMP+$COMMIT_SHORT_SHA
     ;;
   esac
 

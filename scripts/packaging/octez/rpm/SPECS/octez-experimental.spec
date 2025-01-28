@@ -1,5 +1,8 @@
 Name: octez-experimental
-Version: 1.0.0
+Version: %{version}
+%if "%{epoch}" != ""
+Epoch: %{epoch}
+%endif
 Release: 1%{?dist}
 Summary: Octez experimental binaries
 License: MIT
@@ -20,7 +23,6 @@ install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-protocol-compiler %{buildroo
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-smart-rollup-wasm-debugger %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-snoop %{buildroot}/usr/bin/
 %files
-%exclude /usr/lib/.build-id
 /usr/bin/octez-protocol-compiler
 /usr/bin/octez-smart-rollup-wasm-debugger
 /usr/bin/octez-snoop

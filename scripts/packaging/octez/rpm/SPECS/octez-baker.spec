@@ -1,5 +1,8 @@
 Name: octez-baker
-Version: 1.0.0
+Version: %{version}
+%if "%{epoch}" != ""
+Epoch: %{epoch}
+%endif
 Release: 1%{?dist}
 Summary: Octez baking software for the Tezos blockchain.
 License: MIT
@@ -32,7 +35,6 @@ install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-accuser-next.default %
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-baker-active.default %{buildroot}/etc/default/octez-baker-active
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-baker-next.default %{buildroot}/etc/default/octez-baker-next
 %files
-%exclude /usr/lib/.build-id
 /usr/bin/octez-baker-*
 /usr/bin/octez-accuser-*
 /usr/share/octez-baker/wait-for-node-up.sh

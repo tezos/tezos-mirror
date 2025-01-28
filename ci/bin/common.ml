@@ -849,7 +849,9 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "opam init --bare --disable-sandboxing";
       "make build-deps";
       "eval $(opam env)";
-      "make $TARGET-$GROUP";
+      "make all";
+      "export TIMESTAMP=$(date -d \"$CI_PIPELINE_CREATED_AT\" '+%Y%m%d%H%M')";
+      "./scripts/rpm/make_rpm.sh";
       "DISTRO=$(echo \"$DISTRIBUTION\" | cut -d':' -f1)";
       "RELEASE=$(echo \"$DISTRIBUTION\" | cut -d':' -f2)";
       "mkdir -p packages/$DISTRO/$RELEASE";

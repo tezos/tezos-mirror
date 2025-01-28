@@ -13,6 +13,8 @@ myhome=${1:-scripts/dpkg}
 common=scripts/pkg-common
 dieonwarn=${dieonwarn:-1}
 
+export TIMESTAMP="${TIMESTAMP-$(date +'%Y%m%d%H%M')}"
+
 #shellcheck disable=SC1091
 . ${common}/utils.sh
 protocols=${protocols:?protocols not specified} # Not used?
