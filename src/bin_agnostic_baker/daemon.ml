@@ -153,6 +153,7 @@ let monitor_voting_periods ~state head_stream =
    monitored heads. *)
 let may_start_initial_baker state =
   let open Lwt_result_syntax in
+  let*! () = Agnostic_baker_events.(emit experimental_binary) () in
   let rec may_start ?last_known_proto ~head_stream () =
     let* protocol_hash =
       Rpc_services.get_next_protocol_hash ~node_addr:state.node_endpoint

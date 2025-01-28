@@ -48,7 +48,7 @@ let starting_daemon =
     ~alternative_color
     ~level:Notice
     ~name:"starting_daemon"
-    ~msg:"agnostic baker started"
+    ~msg:"experimental agnostic baker started"
     ()
 
 let stopping_daemon =
@@ -88,3 +88,16 @@ let period_status =
     ~msg:"new block on {period} period (remaining period duration {remaining})"
     ("period", string)
     ("remaining", int31)
+
+(* Warning *)
+let experimental_binary =
+  declare_0
+    ~section
+    ~alternative_color
+    ~level:Warning
+    ~name:"experimental_binary"
+    ~msg:
+      "[WARNING] As the name suggests, this binary is EXPERIMENTAL, therefore \
+       it is intended for testing purposes only. Please do not use it on \
+       `mainnet`."
+    ()

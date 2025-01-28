@@ -45,8 +45,9 @@ let set_ready agnostic_baker =
   | Running status -> status.session_state.ready <- true) ;
   trigger_ready agnostic_baker (Some ())
 
-let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
-    ?name ?color ?event_pipe ?(delegates = []) ?(remote_mode = false)
+let create_from_uris ?runner
+    ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ?name ?color
+    ?event_pipe ?(delegates = []) ?(remote_mode = false)
     ?(liquidity_baking_toggle_vote = Some Pass) ~base_dir ~node_data_dir
     ~node_rpc_endpoint () =
   let agnostic_baker =
@@ -152,9 +153,9 @@ let wait_for_ready agnostic_baker =
         resolver :: agnostic_baker.persistent_state.pending_ready ;
       check_event agnostic_baker "agnostic baker started" promise
 
-let init ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name ?color
-    ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
-    ?remote_mode ?liquidity_baking_toggle_vote node client =
+let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
+    ?name ?color ?event_level ?event_pipe ?event_sections_levels
+    ?(delegates = []) ?remote_mode ?liquidity_baking_toggle_vote node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
