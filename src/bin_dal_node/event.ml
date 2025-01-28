@@ -763,6 +763,23 @@ let trap_injection =
     ("slot_index", Data_encoding.int31)
     ("shard_index", Data_encoding.int31)
 
+let trap_injection_failure =
+  declare_6
+    ~section
+    ~name:"trap_injection_failure"
+    ~msg:
+      "Failed to inject an entrapment evidence for delegate {delegate}, \
+       published level {published_level}, attested level {attested_level}, \
+       slot index {slot_index}, shard index {shard_index}: {error}"
+    ~level:Warning
+    ~pp6:pp_print_trace
+    ("delegate", Signature.Public_key_hash.encoding)
+    ("published_level", Data_encoding.int32)
+    ("attested_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
+    ("shard_index", Data_encoding.int31)
+    ("error", trace_encoding)
+
 let trap_check_failure =
   declare_3
     ~section
