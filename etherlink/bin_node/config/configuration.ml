@@ -1287,19 +1287,11 @@ let save ~force ~data_dir config =
     Lwt_utils_unix.Json.write_file config_file json
 
 module Json_syntax = struct
-  let ( |-?> ) json field =
-    match json with
-    | `O assoc -> List.assoc ~equal:String.equal field assoc
-    | _ -> None
+  let ( |-> ) = Ezjsonm.find_opt
 
-  let ( |?-?> ) json field =
-    match json with
-    | Some (`O assoc) -> List.assoc ~equal:String.equal field assoc
-    | _ -> None
+  let ( |->! ) = Ezjsonm.find
 
-  let ( |?> ) x f = match x with Some x -> f x | None -> None
-
-  let as_bool_opt = function `Bool b -> Some b | _ -> None
+  let ( |?> ) x f = Option.map f x
 end
 
 (* Syntactic checks related to deprecations *)
@@ -1310,9 +1302,9 @@ let precheck json =
       let open Json_syntax in
       (* Conflicts between [.proxy.finalized_view] and [.finalized_view] *)
       let proxy_conf =
-        json |-?> "proxy" |?-?> "finalized_view" |?> as_bool_opt
+        json |-> ["proxy"; "finalized_view"] |?> Ezjsonm.get_bool
       in
-      let toplevel_conf = json |-?> "finalized_view" |?> as_bool_opt in
+      let toplevel_conf = json |-> ["finalized_view"] |?> Ezjsonm.get_bool in
       let* () =
         match (proxy_conf, toplevel_conf) with
         | Some b, Some b' ->
@@ -1322,8 +1314,9 @@ let precheck json =
         | _ -> return_unit
       in
       let next_wasm_runtime_conf =
-        json |-?> "experimental_features" |?-?> "next_wasm_runtime"
-        |?> as_bool_opt
+        json
+        |-> ["experimental_features"; "next_wasm_runtime"]
+        |?> Ezjsonm.get_bool
       in
       let* () =
         match next_wasm_runtime_conf with
@@ -1334,8 +1327,9 @@ let precheck json =
         | _ -> return_unit
       in
       let node_transaction_validation_conf =
-        json |-?> "experimental_features" |?-?> "node_transaction_validation"
-        |?> as_bool_opt
+        json
+        |-> ["experimental_features"; "node_transaction_validation"]
+        |?> Ezjsonm.get_bool
       in
       let* () =
         match node_transaction_validation_conf with
