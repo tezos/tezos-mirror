@@ -809,6 +809,16 @@ let double_baking ctxt bh1 bh2 =
     protocol_data = Operation_data {contents; signature = None};
   }
 
+let dal_entrapment ctxt attestation slot_index shard_with_proof =
+  let contents =
+    Single (Dal_entrapment_evidence {attestation; slot_index; shard_with_proof})
+  in
+  let branch = Context.branch ctxt in
+  {
+    shell = {branch};
+    protocol_data = Operation_data {contents; signature = None};
+  }
+
 let seed_nonce_revelation ctxt level nonce =
   {
     shell = {branch = Context.branch ctxt};

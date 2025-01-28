@@ -362,6 +362,13 @@ val double_baking :
   Block_header.block_header ->
   Operation.packed
 
+val dal_entrapment :
+  Context.t ->
+  Kind.attestation operation ->
+  Dal.Slot_index.t ->
+  Dal.Shard_with_proof.t ->
+  Operation.packed
+
 val activation :
   Context.t ->
   Signature.Public_key_hash.t ->
