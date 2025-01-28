@@ -65,11 +65,15 @@ The **staked ratio** is the ratio of staked tez to the total supply. It is compu
 .. code-block:: python
 
   def staked_ratio(cycle):
-    return total_frozen_stake(cycle + 1 + consensus_rights_delay) / total_supply(cycle)
+    return total_frozen_stake(cycle + 1 + issuance_modification_delay) / total_supply(cycle)
 
 Where:
 
-- ``consensus_rights_delay`` (2) is the delay in cycles for a delegate to receive rights.
+- ``issuance_modification_delay`` is a :ref:`derived protocol
+  constant<protocol_constants_alpha>` which is set to the same value
+  as ``CONSENSUS_RIGHTS_DELAY`` (see :ref:`active_stake_alpha`), that
+  is, 2 cycles.
+
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
@@ -287,7 +291,7 @@ Issuance rate
 ......................
 
 Finally, as mentioned before, the nominal adaptive issuance rate [1]_
-for a cycle ``c + consensus_rights_delay + 1`` is defined as the sum
+for a cycle ``c + issuance_modification_delay + 1`` is defined as the sum
 of the static rate and the dynamic rate computed for the cycle ``c``,
 bounded within the :ref:`minimum and maximum rates
 <minimum_and_maximum_rates_alpha>`, along with the :ref:`adaptive
@@ -296,7 +300,7 @@ maximum <adaptive_maximum_alpha>`, computed for the cycle ``c + 1``.
 .. code-block:: python
 
   def issuance_rate(cycle):
-    adjusted_cycle = cycle - consensus_rights_delay
+    adjusted_cycle = cycle - issuance_modification_delay
     static_rate = static_rate(adjusted_cycle - 1)
     dynamic_rate = dynamic_rate(adjusted_cycle - 1)
     minimum_rate = minimum_rate(adjusted_cycle)
@@ -350,7 +354,7 @@ The coefficient to apply for reward computation is defined as follows.
 
   def reward_coeff(cycle):
     rate = issuance_rate(cycle)
-    total_supply = total_supply(cycle - consensus_rights_delay - 1)
+    total_supply = total_supply(cycle - issuance_modification_delay - 1)
     return (rate / 525600) * total_supply / base_total_issued_per_minute
 
 Where:
@@ -432,7 +436,7 @@ The `RPC endpoint
 <https://tezos.gitlab.io/active/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
 ``/issuance/expected_issuance`` reports the precomputed values of all
 participation rewards for the provided block and the next
-``consensus_rights_delay`` cycles.
+``issuance_modification_delay`` cycles.
 
 
 .. [1]
