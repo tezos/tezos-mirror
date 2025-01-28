@@ -5,11 +5,12 @@
 //! A JIT library for compilation of sequences (or blocks) of RISC-V
 //! instructions to native code.
 
+mod builder;
 pub mod state_access;
 
+use self::builder::Builder;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::instruction::OpCode;
-use crate::machine_state::main_memory::Address;
 use crate::machine_state::main_memory::MainMemoryLayout;
 use crate::machine_state::MachineCoreState;
 use crate::traps::EnvironException;
@@ -209,42 +210,6 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         //         entry block. Compilation has succeeded & therefore this produced code
         //         is safe to call.
         unsafe { std::mem::transmute(code) }
-    }
-}
-
-/// Builder context used when lowering individual instructions within a block.
-struct Builder<'a> {
-    builder: FunctionBuilder<'a>,
-    ptr: Type,
-    steps_ptr_val: Value,
-    steps: usize,
-    pc_val: Value,
-    pc_offset: Address,
-}
-
-impl<'a> Builder<'a> {
-    /// Consume the builder, allowing for the function under construction to be [`finalised`].
-    ///
-    /// [`finalised`]: JIT::finalise
-    fn end(mut self) {
-        // flush steps
-        let steps = self
-            .builder
-            .ins()
-            .load(self.ptr, MemFlags::trusted(), self.steps_ptr_val, 0);
-        let steps = self.builder.ins().iadd_imm(steps, self.steps as i64);
-        self.builder
-            .ins()
-            .store(MemFlags::trusted(), steps, self.steps_ptr_val, 0);
-
-        // flush pc
-        let pc = self
-            .builder
-            .ins()
-            .iadd_imm(self.pc_val, self.pc_offset as i64);
-        self.builder.ins().return_(&[pc]);
-
-        self.builder.finalize();
     }
 }
 
