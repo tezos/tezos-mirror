@@ -10,7 +10,7 @@
 set -e
 
 OUT_DIR=$(dirname "$0")
-CARGO_TARGET_DIR="${OCTEZ_RUST_DEPS_TARGET_DIR:-$OUT_DIR/target}"
+CARGO_TARGET_DIR="${OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR:-$OUT_DIR/target}"
 
 # Make sure the subsequent processes have access to these.
 export OCTEZ_RUST_DEPS_NO_WASMER_HEADERS=1
