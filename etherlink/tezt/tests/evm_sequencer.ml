@@ -7867,6 +7867,20 @@ let test_fa_bridge_feature_flag =
          Durable_storage_path.enable_fa_bridge) ;
   unit
 
+let test_multichain_feature_flag =
+  register_all
+    ~tags:["multichain"; "feature_flag"]
+    ~title:"Check the multichain feature value in storage"
+  @@ fun {sequencer; enable_multichain; _} _protocol ->
+  let*@ flag =
+    Rpc.state_value sequencer Durable_storage_path.enable_multichain
+  in
+  Check.(Option.is_some flag = enable_multichain)
+    Check.bool
+    ~error_msg:
+      "Multichain feature flag in the durable storage is %L, expected %R" ;
+  unit
+
 let test_trace_call =
   register_all
     ~kernels:[Latest]
@@ -9836,6 +9850,7 @@ let () =
   test_trace_transaction_call protocols ;
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
+  test_multichain_feature_flag protocols ;
   test_trace_call protocols ;
   test_trace_empty_block protocols ;
   test_trace_block protocols ;
