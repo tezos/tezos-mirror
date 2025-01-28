@@ -150,7 +150,7 @@ let default_dal =
   Constants.Parametric.
     {
       feature_enable = true;
-      incentives_enable = false;
+      incentives_enable = true;
       number_of_slots = 32;
       attestation_lag = 8;
       attestation_threshold = 66;
@@ -167,10 +167,11 @@ let default_dal =
          that we have x = a/b with a and b smallest such that they are relatively
          prime, and (a+1, b+1) are relatively prime as well. The value x = 63%
          works as well. *)
-      rewards_ratio = Q.zero;
+      rewards_ratio = Q.(1 // 10);
       (* This value determines the value of
-         [issuance_weights.dal_rewards_ratio]. When computing the actual
-         rewards, their values are ignored when [incentives_enable = false]. *)
+         [issuance_weights.dal_rewards_weight]. When computing the actual
+         rewards, [dal_rewards_weight] is ignored when [incentives_enable =
+         false]. *)
       traps_fraction = Q.(5 // 10000);
     }
 
@@ -312,7 +313,7 @@ let constants_mainnet : Constants.Parametric.t =
         vdf_revelation_tip_weight;
         (* 1/20480 of block rewards *)
         dal_rewards_weight;
-        (* 0 for now; it depends on the value of [dal.rewards_ratio] *)
+        (* 2275; it depends on the value of [dal.rewards_ratio] *)
       };
     hard_storage_limit_per_operation = Z.of_int 60_000;
     cost_per_byte = Tez.of_mutez_exn 250L;

@@ -258,17 +258,22 @@ DAL node
 Protocol
 ~~~~~~~~
 
+- The DAL incentives feature flag was turned on. (MR :gl:`!15614`)
+
+- **Change** The output of the RPC ``context/issuance/expected_issuance`` has a
+  new field ``"dal_attesting_reward_per_shard"`` (MR :gl:`!15614`)
+
 - A new RPC ``/chains/main/blocks/head/context/delegates/<pkh>/dal_participation``
   similar to Tenderbake's ``/participation`` RPC to track bakers' DAL activity
   (MR :gl:`!16168`)
-- A new antonymous operation "DAL entrapment evidence" was added. This operation
-  is not valid when the feature flag for DAL incentives is turned off. (MR
-  :gl:`!15677`)
+
 - A new anonymous operation "DAL entrapment evidence" was added. This operation
   is not valid when the feature flag for DAL incentives is turned off. (MRs
   :gl:`!15677`, :gl:`!15832`, :gl:`!15836`)
+
 - Set the message validation function at node startup, fixing
   https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
+
 - A warning has been introduced in case it is observed that the DAL node lags
   behind the L1 node. (MR :gl:`!15756`)
 

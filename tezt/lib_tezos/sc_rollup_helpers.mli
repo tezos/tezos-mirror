@@ -124,6 +124,7 @@ val setup_l1 :
   ?riscv_pvm_enable:bool ->
   ?minimal_block_delay:int ->
   ?dal_incentives:bool ->
+  ?dal_rewards_weight:int ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 

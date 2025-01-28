@@ -30,6 +30,7 @@ type expected_rewards = {
   baking_reward_fixed_portion : Tez.t;
   baking_reward_bonus_per_slot : Tez.t;
   attesting_reward_per_slot : Tez.t;
+  dal_attesting_reward_per_shard : Tez.t;
   seed_nonce_revelation_tip : Tez.t;
   vdf_revelation_tip : Tez.t;
 }
@@ -42,6 +43,7 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
            baking_reward_fixed_portion;
            baking_reward_bonus_per_slot;
            attesting_reward_per_slot;
+           dal_attesting_reward_per_shard;
            seed_nonce_revelation_tip;
            vdf_revelation_tip;
          } ->
@@ -50,28 +52,32 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
         baking_reward_bonus_per_slot,
         attesting_reward_per_slot,
         seed_nonce_revelation_tip,
-        vdf_revelation_tip ))
+        vdf_revelation_tip,
+        dal_attesting_reward_per_shard ))
     (fun ( cycle,
            baking_reward_fixed_portion,
            baking_reward_bonus_per_slot,
            attesting_reward_per_slot,
            seed_nonce_revelation_tip,
-           vdf_revelation_tip ) ->
+           vdf_revelation_tip,
+           dal_attesting_reward_per_shard ) ->
       {
         cycle;
         baking_reward_fixed_portion;
         baking_reward_bonus_per_slot;
         attesting_reward_per_slot;
+        dal_attesting_reward_per_shard;
         seed_nonce_revelation_tip;
         vdf_revelation_tip;
       })
-    (obj6
+    (obj7
        (req "cycle" Cycle.encoding)
        (req "baking_reward_fixed_portion" Tez.encoding)
        (req "baking_reward_bonus_per_slot" Tez.encoding)
        (req "attesting_reward_per_slot" Tez.encoding)
        (req "seed_nonce_revelation_tip" Tez.encoding)
-       (req "vdf_revelation_tip" Tez.encoding))
+       (req "vdf_revelation_tip" Tez.encoding)
+       (req "dal_attesting_reward_per_shard" Tez.encoding))
 
 module S = struct
   open Data_encoding
@@ -205,6 +211,10 @@ let collect_expected_rewards ~ctxt =
       let*? baking_reward_fixed_portion = baking_reward_fixed_portion ctxt in
       let*? baking_reward_bonus_per_slot = baking_reward_bonus_per_slot ctxt in
       let*? attesting_reward_per_slot = attesting_reward_per_slot ctxt in
+      let*? dal_attesting_reward_per_shard =
+        if csts.dal.incentives_enable then dal_attesting_reward_per_shard ctxt
+        else ok Tez.zero
+      in
       let*? seed_nonce_revelation_tip = seed_nonce_revelation_tip ctxt in
       let*? vdf_revelation_tip = vdf_revelation_tip ctxt in
       return
@@ -213,6 +223,7 @@ let collect_expected_rewards ~ctxt =
           baking_reward_fixed_portion;
           baking_reward_bonus_per_slot;
           attesting_reward_per_slot;
+          dal_attesting_reward_per_shard;
           seed_nonce_revelation_tip;
           vdf_revelation_tip;
         }
@@ -238,6 +249,12 @@ let collect_expected_rewards ~ctxt =
       let*? attesting_reward_per_slot =
         reward_from_constants ~coeff csts ~reward_kind:Attesting_reward_per_slot
       in
+      let*? dal_attesting_reward_per_shard =
+        reward_from_constants
+          ~coeff
+          csts
+          ~reward_kind:Dal_attesting_reward_per_shard
+      in
       let*? seed_nonce_revelation_tip =
         reward_from_constants ~coeff csts ~reward_kind:Seed_nonce_revelation_tip
       in
@@ -250,6 +267,7 @@ let collect_expected_rewards ~ctxt =
           baking_reward_fixed_portion;
           baking_reward_bonus_per_slot;
           attesting_reward_per_slot;
+          dal_attesting_reward_per_shard;
           seed_nonce_revelation_tip;
           vdf_revelation_tip;
         }

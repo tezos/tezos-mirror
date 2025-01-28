@@ -331,14 +331,6 @@ let check_constants constants =
          "The DAL committee must be a subset of the Tenderbake committee.")
   in
   let* () =
-    error_when
-      (Q.(constants.dal.rewards_ratio > zero)
-      && not constants.dal.incentives_enable)
-      (Invalid_protocol_constants
-         "When DAL incentives are not enabled, the DAL rewards_ratio should be \
-          zero.")
-  in
-  let* () =
     error_unless
       Q.(constants.dal.rewards_ratio < one)
       (Invalid_protocol_constants

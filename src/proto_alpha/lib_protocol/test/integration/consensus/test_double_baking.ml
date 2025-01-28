@@ -73,6 +73,14 @@ let double_baking ctxt ?(correct_order = true) bh1 bh2 =
   let bh1, bh2 = order_block_hashes ~correct_order bh1 bh2 in
   Op.double_baking ctxt bh1 bh2
 
+let constants_no_rewards =
+  let constants = Default_parameters.constants_test in
+  {
+    constants with
+    issuance_weights = {constants.issuance_weights with dal_rewards_weight = 0};
+    consensus_threshold_size = 0;
+  }
+
 (****************************************************************)
 (*                        Tests                                 *)
 (****************************************************************)
@@ -81,8 +89,9 @@ let double_baking ctxt ?(correct_order = true) bh1 bh2 =
     exposed by a double baking evidence operation. *)
 let test_valid_double_baking_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
+  let* genesis, contracts = Context.init_with_constants2 constants_no_rewards in
   let* c = Context.get_constants (B genesis) in
+  assert (c.parametric.issuance_weights.dal_rewards_weight = 0) ;
   let p =
     c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
   in
@@ -165,7 +174,7 @@ let double_attestation ctxt ?(correct_order = true) op1 op2 =
 
 let test_valid_double_baking_followed_by_double_attesting () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
+  let* genesis, contracts = Context.init_with_constants2 constants_no_rewards in
   let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
   let* b = Block.bake genesis in
   let* blk_a, blk_b = block_fork ~policy:(By_account baker1) contracts b in
@@ -246,7 +255,7 @@ let block_fork_diff b =
 
 let test_valid_double_attesting_followed_by_double_baking () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init2 ~consensus_threshold_size:0 () in
+  let* genesis, contracts = Context.init_with_constants2 constants_no_rewards in
   let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
   let* blk_1, blk_2 = block_fork_diff genesis in
   let* blk_a = Block.bake blk_1 in
@@ -327,11 +336,8 @@ let test_valid_double_attesting_followed_by_double_baking () =
 let test_payload_producer_gets_evidence_rewards () =
   let open Lwt_result_syntax in
   let* genesis, contracts =
-    Context.init_n
-      ~consensus_threshold_size:0
-      ~consensus_committee_size:64
-      10
-      ()
+    let constants = {constants_no_rewards with consensus_committee_size = 64} in
+    Context.init_with_constants_n constants 10
   in
   let* c = Context.get_constants (B genesis) in
   let p =
