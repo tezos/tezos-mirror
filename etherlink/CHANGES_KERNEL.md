@@ -12,6 +12,9 @@
   available via Octez EVM Node deployments. (!15490)
 - The VM is now relying on cache to make r/w access to storage indexes
   which improves time performances on the execution side. (!15812)
+- The kernel uses events to make the sequencer aware of delayed transaction
+  flush. This significantly reduces the risk of sequencer downtime due to
+  unforseen flush event. (!15621 !15841)
 
 ### Internal
 
