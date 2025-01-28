@@ -1,0 +1,14 @@
+
+./octez-client --mode mockup normalize data '{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}' of type 'list (pair nat nat nat nat)'
+{ Pair 0 3 6 9 ; Pair 1 4 7 10 ; Pair 2 5 8 11 }
+
+./octez-client --mode mockup normalize data '{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}' of type 'list (pair nat nat nat nat)' --unparsing-mode Readable
+{ Pair 0 3 6 9 ; Pair 1 4 7 10 ; Pair 2 5 8 11 }
+
+./octez-client --mode mockup normalize data '{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}' of type 'list (pair nat nat nat nat)' --unparsing-mode Optimized
+{ { 0 ; 3 ; 6 ; 9 } ; { 1 ; 4 ; 7 ; 10 } ; { 2 ; 5 ; 8 ; 11 } }
+
+./octez-client --mode mockup normalize data '{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}' of type 'list (pair nat nat nat nat)' --unparsing-mode Optimized_legacy
+{ Pair 0 (Pair 3 (Pair 6 9)) ;
+  Pair 1 (Pair 4 (Pair 7 10)) ;
+  Pair 2 (Pair 5 (Pair 8 11)) }

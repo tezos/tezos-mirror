@@ -1,0 +1,23 @@
+{ parameter nat ;
+  storage (list nat) ;
+  code { CAR @counter ;
+         NIL @acc nat ;
+         SWAP ;
+         DUP @cmp_num ;
+         PUSH nat 0 ;
+         { COMPARE ; NEQ } ;
+         LOOP { DUP ;
+                DIP { SWAP } ;
+                CONS @acc ;
+                SWAP ;
+                PUSH nat 1 ;
+                SWAP ;
+                SUB @counter ;
+                DUP ;
+                DIP { ABS } ;
+                PUSH int 0 ;
+                { COMPARE ; NEQ } } ;
+         CONS ;
+         NIL operation ;
+         PAIR } }
+
