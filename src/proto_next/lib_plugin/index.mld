@@ -1,16 +1,16 @@
-{0 Octez-protocol-alpha-libs: octez protocol alpha libraries}
+{0 Octez-protocol-next-libs: octez protocol next libraries}
 
-This is a package containing some libraries related to the Tezos alpha protocol.
+This is a package containing some libraries related to the Tezos next protocol.
 
 It contains the following libraries:
 
-- {{!module-Tezos_alpha_test_helpers}Tezos_alpha_test_helpers}: Protocol testing framework
-- {{!module-Tezos_baking_alpha}Tezos_baking_alpha}: Base library for `tezos-baker/accuser`
-- {{!module-Tezos_baking_alpha_commands}Tezos_baking_alpha_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_alpha}Tezos_client_alpha}: Protocol specific library for `octez-client`
-- {{!module-Tezos_dal_alpha}Tezos_dal_alpha}: Protocol specific library for the Data availability Layer
-- {{!module-Tezos_layer2_utils_alpha}Tezos_layer2_utils_alpha}: Protocol specific library for Layer 2 utils
-- {{!module-Tezos_protocol_plugin_alpha}Tezos_protocol_plugin_alpha}: Protocol plugin
-- {{!module-Tezos_protocol_plugin_alpha_registerer}Tezos_protocol_plugin_alpha_registerer}: Protocol plugin registerer
-- {{!module-Tezos_smart_rollup_alpha}Tezos_smart_rollup_alpha}: Protocol specific library of helpers for `tezos-smart-rollup`
-- {{!module-Tezos_smart_rollup_layer2_alpha}Tezos_smart_rollup_layer2_alpha}: Protocol specific library for `tezos-smart-rollup`
+- {{!module-Tezos_baking_next}Tezos_baking_next}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_next_commands}Tezos_baking_next_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_next}Tezos_client_next}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dal_next}Tezos_dal_next}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_next}Tezos_layer2_utils_next}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_next_test_helpers}Tezos_next_test_helpers}: Protocol testing framework
+- {{!module-Tezos_protocol_plugin_next}Tezos_protocol_plugin_next}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_next_registerer}Tezos_protocol_plugin_next_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_layer2_next}Tezos_smart_rollup_layer2_next}: Protocol specific library for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_next}Tezos_smart_rollup_next}: Protocol specific library of helpers for `tezos-smart-rollup`

@@ -1,0 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_layer2_utils_next)
+ (public_name octez-protocol-next-libs.layer2-utils)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-next.protocol
+  octez-protocol-next-libs.client)
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable
+   (link_flags -linkall -cclib -lblst -cclib -loctez_rustzcash_deps))
+  (libraries bls12-381.archive octez-rustzcash-deps))
+ (preprocess (pps ppx_expect))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_next
+  -open Tezos_client_next))
