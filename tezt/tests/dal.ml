@@ -8243,9 +8243,7 @@ let test_attesters_receive_dal_rewards protocol dal_parameters _cryptobox node
   let rest_delegates = List.tl all_delegates in
 
   let* first_level = Node.get_level node in
-  let middle_of_cycle_level =
-    first_level + blocks_per_cycle + (blocks_per_cycle / 4)
-  in
+  let middle_of_cycle_level = first_level + blocks_per_cycle in
   let last_level = first_level + (2 * blocks_per_cycle) in
   Log.info
     "Bake from first_level = %d to last_level = %d"

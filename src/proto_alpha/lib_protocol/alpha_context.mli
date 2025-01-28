@@ -2343,7 +2343,8 @@ module Delegate : sig
   val record_dal_participation :
     context ->
     delegate:Signature.Public_key_hash.t ->
-    number_of_attested_slots:int ->
+    number_of_slots_attested_by_delegate:int ->
+    number_of_protocol_attested_slots:int ->
     context tzresult Lwt.t
 
   val current_frozen_deposits :
@@ -2535,7 +2536,7 @@ module Delegate : sig
     type dal_participation_info = {
       expected_assigned_shards_per_slot : int;
       delegate_attested_dal_slots : int;
-      total_dal_attested_slots : int;
+      delegate_attestable_dal_slots : int;
       expected_dal_rewards : Tez.t;
       sufficient_dal_participation : bool;
       denounced : bool;

@@ -54,6 +54,15 @@ module Consecutive_round_zero :
 
 type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
+type dal_delegate_participation = {
+  (* the number of slots attested by the delegate *)
+  attested_slots : int;
+  (* the number of protocol-attested slots that could have been attested by the
+     baker (that is, the baker had at least one assigned shard for the relevant
+     levels *)
+  attestable_slots : int;
+}
+
 module Slashed_deposits_history : sig
   type slashed_percentage = Percentage.t
 
@@ -152,12 +161,11 @@ module Contract : sig
        and type value = missed_attestations_info
        and type t := Raw_context.t
 
-  (** The number of protocol-attested DAL slots attested by a delegate during a
-      cycle. *)
-  module Attested_dal_slots :
+  (** The DAL participation of a delegate during a cycle. *)
+  module Dal_participation :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = Int32.t
+       and type value = dal_delegate_participation
        and type t := Raw_context.t
 
   (** The manager of a contract *)
@@ -1075,10 +1083,6 @@ module Dal : sig
              attested or to access its attestation ratio). *)
           (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list
   end
-
-  (** The number of protocol-attested DAL slots for the current cycle. *)
-  module Total_attested_slots :
-    Single_data_storage with type t := Raw_context.t and type value = Int32.t
 
   (** Set of delegates denounced in the current cycle. It is used to not
     distribute rewards for such delegates. *)
