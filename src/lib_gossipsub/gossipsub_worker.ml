@@ -968,7 +968,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | None -> Some (Int64.add 5L heartbeat_ticks)
           | Some x ->
               Some
-                (Int64.mul x 2L |> Int64.max 300L |> Int64.add heartbeat_ticks))
+                (Int64.mul x 2L |> Int64.min 300L |> Int64.add heartbeat_ticks))
         t.state.unreachable_points
     in
     t.state <- {t.state with unreachable_points}
