@@ -105,16 +105,17 @@ if [ "$RELEASETYPE" = "Master" ]; then
   # [add repository]
   apt-get install -y sudo gpg curl
 
-  curl "https://packages.nomadic-labs.com/$distribution/octez.asc" |
-    sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
-  echo "deb [arch=amd64] https://packages.nomadic-labs.com/$distribution $release main" |
+  curl -s "https://packages.nomadic-labs.com/$distribution/octez.asc" |
+    sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://packages.nomadic-labs.com/$distribution $release main" |
     sudo tee /etc/apt/sources.list.d/octez.list
   apt-get update
   # [end add repository]
 else
   apt-get install -y sudo gpg curl
-  REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
-  curl "https://$bucket.storage.googleapis.com/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+  curl -s "https://$bucket.storage.googleapis.com/$distribution/octez.asc" |
+    sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
+  REPO="deb [signed-by=/etc/apt/keyrings/octez.gpg] https://$bucket.storage.googleapis.com/$distribution $release main"
   echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
   apt-get update
 fi

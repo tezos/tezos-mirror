@@ -104,9 +104,9 @@ ARG CI_COMMIT_REF_NAME
 
 RUN apt-get update && apt-get install -y gpg curl
 
-RUN curl https://tezos-linux-repo.storage.googleapis.com/next/debian/octez.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+RUN curl https://tezos-linux-repo.storage.googleapis.com/next/debian/octez.asc | gpg --dearmor -o /etc/apt/keyrings/octez.gpg
 
-RUN echo "deb [arch=amd64] https://tezos-linux-repo.storage.googleapis.com/next/${CI_COMMIT_REF_NAME}/debian bookworm main" > /etc/apt/sources.list.d/octez.list
+RUN echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://tezos-linux-repo.storage.googleapis.com/next/${CI_COMMIT_REF_NAME}/debian bookworm main" > /etc/apt/sources.list.d/octez.list
 
 RUN apt-get update
 RUN apt-get install -y octez-node
