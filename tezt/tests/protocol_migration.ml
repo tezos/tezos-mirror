@@ -374,7 +374,7 @@ let list_count_p p l =
   in
   aux 0 l
 
-let is_attestation ~protocol op =
+let is_attestation ~protocol:_ op =
   let kind = JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string) in
   String.equal
     kind

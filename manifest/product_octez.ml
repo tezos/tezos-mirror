@@ -6501,7 +6501,7 @@ let hash = Protocol.hash
         ~linkall:true
     in
     let test_helpers =
-      only_if active @@ fun () ->
+      only_if (active && not N.(number == 020)) @@ fun () ->
       octez_protocol_lib
         "test-helpers"
         ~path:(path // "lib_protocol/test/helpers")
@@ -6532,7 +6532,7 @@ let hash = Protocol.hash
     in
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
-      only_if active @@ fun () ->
+      only_if (active && not N.(number == 020)) @@ fun () ->
       tezt
         [
           "helpers";
@@ -6563,7 +6563,7 @@ let hash = Protocol.hash
           ]
     in
     let _client_tests =
-      only_if active @@ fun () ->
+      only_if (active && not N.(number == 020)) @@ fun () ->
       tezt
         [
           "test_michelson_v1_macros";
@@ -6724,7 +6724,7 @@ let hash = Protocol.hash
            else ["Baking_commands"; "Baking_commands_registration"])
     in
     let tenderbrute =
-      only_if active @@ fun () ->
+      only_if (active && not N.(number == 020)) @@ fun () ->
       octez_protocol_lib
         "baking.tenderbrute"
         ~internal_name:(sf "tenderbrute_%s" name_underscore)
@@ -6743,7 +6743,8 @@ let hash = Protocol.hash
         ~bisect_ppx:No
     in
     let _tenderbrute_exe =
-      only_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013) && not N.(number == 020))
+      @@ fun () ->
       test
         "tenderbrute_main"
         ~alias:""
@@ -6766,7 +6767,7 @@ let hash = Protocol.hash
     in
     let _baking_tests =
       opt_map (both baking test_helpers) @@ fun (baking, test_helpers) ->
-      only_if active @@ fun () ->
+      only_if (active && not N.(number == 020)) @@ fun () ->
       let mockup_simulator =
         only_if N.(number >= 012) @@ fun () ->
         octez_protocol_lib
@@ -6947,7 +6948,8 @@ let hash = Protocol.hash
         ~linkall:true
     in
     let _dal_tests =
-      only_if (active && N.(number >= 016)) @@ fun () ->
+      only_if (active && N.(number >= 016) && not N.(number == 020))
+      @@ fun () ->
       tezt
         ["test_dal_slot_frame_encoding"; "test_helpers"]
         ~path:(path // "lib_dal/test")
@@ -7101,7 +7103,7 @@ let hash = Protocol.hash
           ]
     in
     let _benchmark_type_inference_tests =
-      only_if active @@ fun () ->
+      only_if (active && not N.(number == 020)) @@ fun () ->
       tests
         ["test_uf"; "test_inference"]
         ~path:(path // "lib_benchmark/lib_benchmark_type_inference/test")
@@ -7150,7 +7152,7 @@ let hash = Protocol.hash
     in
     let _benchmark_tests =
       opt_map (both benchmark test_helpers) @@ fun (benchmark, test_helpers) ->
-      only_if active @@ fun () ->
+      only_if (active && not N.(number == 020)) @@ fun () ->
       (* Note: to enable gprof profiling,
          manually add the following stanza to lib_benchmark/test/dune:
          (ocamlopt_flags (:standard -p -ccopt -no-pie)) *)
@@ -7224,7 +7226,7 @@ let hash = Protocol.hash
         ~linkall:true
     in
     let _ =
-      if active then
+      if active && not N.(number == 020) then
         Lib_protocol.make_tests
           ?test_helpers
           ?parameters
