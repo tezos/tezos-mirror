@@ -95,6 +95,11 @@ Protocol parameters
   which is no longer used since the activation of Adaptive Slashing in
   the Paris protocol. (MR :gl:`!15223`)
 
+- Removed obsolete feature flags ``autostaking_enable``,
+  ``ns_enable``, ``activation_vote_enable``,
+  ``adaptive_issuance.launch_ema_threshold``, and ``force_activation``
+  (MRs :gl:`!15215`, :gl:`!15223`, :gl:`!15211`)
+
 Bug Fixes
 ---------
 
@@ -115,8 +120,5 @@ Minor Changes
 Internal
 --------
 
-- Removed obsolete feature flags and code related to adaptive issuance
-  activation, auto-staking, and old slashing. (MRs :gl:`!15215`,
-  :gl:`!15223`, :gl:`!15211`)
 - Added a stub RISC-V module for the protocol environment 
   and used it in the protocol implementation for the RISC-V PVM. (MRs :gl:`!15921`)
