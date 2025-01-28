@@ -368,7 +368,7 @@ let baker_early_preattestation_test =
             Option.map (fun v -> (fst v, true)) !status.validated
           in
           status := {!status with validated}
-    | "preattestation_injected.v0" | "preendorsement_injected.v0" -> (
+    | "preattestation_injected.v0" -> (
         match (!status.validated, !status.applied) with
         | Some (_, false), Some _ ->
             failwith
@@ -389,7 +389,7 @@ let baker_early_preattestation_test =
             then Lwt.wakeup preattestations_resolver ()
         | None, _ | Some (_, true), _ ->
             () (* Only pre-attestation for the wanted proposal are recorded *))
-    | "attestation_injected.v0" | "endorsement_injected.v0" -> (
+    | "attestation_injected.v0" -> (
         match (!status.validated, !status.applied) with
         | Some (_, false), None ->
             failwith

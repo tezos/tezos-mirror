@@ -977,8 +977,7 @@ let get_validated_dal_attestations_in_mempool node for_level =
       let level = JSON.(contents |-> "level" |> as_int) in
       level = for_level
       && JSON.(contents |-> "kind" |> as_string) |> fun kind ->
-         String.equal kind "attestation_with_dal"
-         || String.equal kind "endorsement_with_dal")
+         String.equal kind "attestation_with_dal")
     validated
   |> return
 
@@ -2197,7 +2196,7 @@ let test_dal_node_startup =
     ~title:"dal node startup"
     ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
-    ~supports:(Protocol.From_protocol 21)
+    ~supports:(Protocol.From_protocol 22)
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in

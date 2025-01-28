@@ -189,18 +189,10 @@ let run ?env ?event_level ?event_sections_levels (baker : t) =
     (* From Protocol Q, the flag --force-apply has been replaced by
        --force-apply-from-round, the following maintains back-compatibility with
        ParisC tests. *)
-    if
-      Protocol.number baker.persistent_state.protocol
-      > Protocol.number Protocol.ParisC
-    then
-      Cli_arg.optional_arg
-        "force-apply-from-round"
-        string_of_int
-        baker.persistent_state.force_apply_from_round
-    else
-      Cli_arg.optional_switch
-        "force-apply"
-        (Option.is_some baker.persistent_state.force_apply_from_round)
+    Cli_arg.optional_arg
+      "force-apply-from-round"
+      string_of_int
+      baker.persistent_state.force_apply_from_round
   in
   let operations_pool =
     Cli_arg.optional_arg
@@ -444,17 +436,17 @@ let show_block json =
     let prequorum = json |-> "prequorum" in
     if is_null prequorum then "None"
     else
-      let ops = prequorum |-> "preendorsements" |> as_list in
+      let ops = prequorum |-> "preattestation" |> as_list in
       let expected_level_and_round =
         (prequorum |-> "level" |> as_int, prequorum |-> "round" |> as_int)
       in
-      let expected_kind = "preendorsement" in
+      let expected_kind = "preattestation" in
       show_operations ~loc:__LOC__ ~expected_kind ~expected_level_and_round ops
   in
   let quorum =
     match json |-> "quorum" |> as_list with
     | [] -> "[]"
-    | ops -> show_operations ~loc:__LOC__ ~expected_kind:"endorsement" ops
+    | ops -> show_operations ~loc:__LOC__ ~expected_kind:"attestation" ops
   in
   sf
     "block={hash=%s, level=%d, round=%d, prequorum=%s, quorum=%s}"

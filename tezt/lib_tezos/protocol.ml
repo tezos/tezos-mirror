@@ -25,13 +25,11 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Quebec | ParisC | Alpha
+type t = Quebec | Alpha
 
-let all = [Quebec; ParisC; Alpha]
+let all = [Quebec; Alpha]
 
-let encoding =
-  Data_encoding.string_enum
-    [("parisc", ParisC); ("alpha", Alpha); ("quebec", Quebec)]
+let encoding = Data_encoding.string_enum [("alpha", Alpha); ("quebec", Quebec)]
 
 type constants =
   | Constants_sandbox
@@ -45,21 +43,19 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | Quebec -> "Quebec" | ParisC -> "Parisc"
+let name = function Alpha -> "Alpha" | Quebec -> "Quebec"
 
-let number = function ParisC -> 020 | Quebec -> 021 | Alpha -> 022
+let number = function Quebec -> 021 | Alpha -> 022
 
 let directory = function
   | Quebec -> "proto_021_PsQuebec"
   | Alpha -> "proto_alpha"
-  | ParisC -> "proto_020_PsParisC"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | ParisC -> "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
   | Quebec -> "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
@@ -271,10 +267,7 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let previous_protocol = function
-  | Alpha -> Some Quebec
-  | Quebec -> Some ParisC
-  | ParisC -> None
+let previous_protocol = function Alpha -> Some Quebec | Quebec -> None
 
 let has_predecessor p = previous_protocol p <> None
 

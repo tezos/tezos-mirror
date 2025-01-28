@@ -4,7 +4,6 @@ This is a package containing some libraries related to the Tezos 020-PsParisC pr
 
 It contains the following libraries:
 
-- {{!module-Tezos_020_PsParisC_test_helpers}Tezos_020_PsParisC_test_helpers}: Protocol testing framework
 - {{!module-Tezos_baking_020_PsParisC}Tezos_baking_020_PsParisC}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_020_PsParisC_commands}Tezos_baking_020_PsParisC_commands}: Protocol-specific commands for baking
 - {{!module-Tezos_client_020_PsParisC}Tezos_client_020_PsParisC}: Protocol specific library for `octez-client`

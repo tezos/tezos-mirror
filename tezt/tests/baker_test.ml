@@ -321,11 +321,7 @@ let baker_check_consensus_branch =
     @@ RPC.get_chain_mempool_pending_operations ~outdated:false ()
   in
 
-  let branch_s, branch_lvl =
-    if Protocol.number protocol >= Protocol.number ParisC then ("grandparent", 2)
-    else ("parent", 1)
-  in
-  Log.info "Check that consensus operations are branched on %s block" branch_s ;
+  Log.info "Check that consensus operations are branched on grandparent block" ;
   let ops = JSON.(mempool |-> "validated" |> as_list) in
   assert (not ([] = ops)) ;
   Tezos_base__TzPervasives.List.iter_s
@@ -336,9 +332,7 @@ let baker_check_consensus_branch =
 
       let* target_branch =
         Client.RPC.call client
-        @@ RPC.get_chain_block_header
-             ~block:(string_of_int (level - branch_lvl))
-             ()
+        @@ RPC.get_chain_block_header ~block:(string_of_int (level - 2)) ()
       in
       let target_branch = JSON.(target_branch |-> "hash" |> as_string) in
 

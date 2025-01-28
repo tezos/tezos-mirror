@@ -19,7 +19,6 @@ open Rpc.Syntax
 let protocol_of_string s =
   match String.lowercase_ascii s with
   | "alpha" -> Protocol.Alpha
-  | "parisc" | "paris" -> Protocol.ParisC
   | "quebec" -> Protocol.Quebec
   | s -> failwith (sf "%s is an invalid protocol" s)
 
