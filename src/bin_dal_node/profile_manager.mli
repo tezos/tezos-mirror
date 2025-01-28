@@ -38,6 +38,10 @@ val is_bootstrap_profile : t -> bool
     proofs. *)
 val is_prover_profile : t -> bool
 
+(** [is_empty profile] returns [true] if it is an [Operator] profile
+    which is empty. *)
+val is_empty : t -> bool
+
 (** [is_attester_only_profile profile] returns [true] if the node has an
     operator profile, with at least one attester role and no producer nor
     observer roles. *)
