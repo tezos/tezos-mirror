@@ -107,8 +107,8 @@ The field ``kind`` allows to identify the type of container account, it can have
       - just a ``"delegate"`` to designate collectively the deposits of all
         stakers and the delegate itself.
     - the field ``"cycle"`` contains either the cycle at which the funds have been
-      unstaked or the last unslashable cycle (``MAX_SLASHING_PERIOD +
-      CONSENSUS_RIGHTS_DELAY`` before current cycle) if it is greater than the unstaking
+      unstaked or the last unslashable cycle (``CONSENSUS_RIGHTS_DELAY +
+      SLASHING_DELAY + 1`` before current cycle) if it is greater than the unstaking
       cycle.
   - ``"bonds"`` represents the accounts of frozen bonds.
     Bonds are like deposits.
