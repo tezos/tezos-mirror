@@ -204,6 +204,9 @@ module Plugin = struct
   let is_attested attestation slot_index =
     match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
 
+  let is_delegate _ctxt ~pkh:_ =
+    failwith "Plugin.ParisC.is_delegate is not available"
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list = struct

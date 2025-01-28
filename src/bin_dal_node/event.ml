@@ -800,3 +800,13 @@ let trap_delegate_attestation_not_found =
     ("shard_index", Data_encoding.int31)
     ("published_level", Data_encoding.int32)
     ("attested_level", Data_encoding.int32)
+
+let registered_pkh_not_a_delegate =
+  declare_1
+    ~section
+    ~name:"register_pkh_not_a_delegate"
+    ~msg:
+      "The public key hash {pkh} registered by PATCH /profiles is not a \
+       delegate."
+    ~level:Warning
+    ("pkh", Signature.Public_key_hash.encoding)

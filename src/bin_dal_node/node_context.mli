@@ -168,6 +168,13 @@ val fetch_committee :
 (** [version ctxt] returns the current version of the node *)
 val version : t -> Types.Version.t
 
+(** Emit a warning for each public key hash in the given operator profile (if
+    any) that is not that of a L1-registered delegate. The optional [level]
+    argument is used to specify for which level to obtain the plugin; if not
+    given the last process level is used (if found in the store). *)
+val warn_if_attesters_not_delegates :
+  t -> ?level:int32 -> Operator_profile.t -> unit tzresult Lwt.t
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point

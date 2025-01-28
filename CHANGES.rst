@@ -252,6 +252,8 @@ DAL node
 
 - Added a new RPC ``/last_processed_level`` to retrieve the last (finalized) L1
   level processed by a DAL node (MR :gl:`!16420`)
+- A warning is emitted when registering a public key hash (as an attester
+  profile) that does not correspond to that of a delegate. (MR :gl:`!16336`)
 
 Protocol
 ~~~~~~~~

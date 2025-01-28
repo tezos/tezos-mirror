@@ -176,6 +176,11 @@ module type T = sig
     proof:Cryptobox.shard_proof ->
     unit tzresult Lwt.t
 
+  val is_delegate :
+    Tezos_rpc.Context.generic ->
+    pkh:Signature.Public_key_hash.t ->
+    bool tzresult Lwt.t
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list : sig
