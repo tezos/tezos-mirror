@@ -285,3 +285,7 @@ conflicts: [
   "result" {< "1.5"}
 ]
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+pin-depends: [
+  "stdcompat.19"
+  "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99"
+]
