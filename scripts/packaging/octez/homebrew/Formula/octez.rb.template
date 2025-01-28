@@ -49,7 +49,7 @@ class Octez < Formula
       make build-deps
 
       eval $(opam env)
-      make release
+      make
     EOS
 
     chmod 0755, buildpath/"script.sh"
