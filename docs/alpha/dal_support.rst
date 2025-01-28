@@ -77,7 +77,35 @@ Any baker that can take part in consensus is eligible for rewards.
 
 Bakers meeting the minimum participation ratio ``MINIMAL_PARTICIPATION_RATIO`` over a cycle, set to 64%, receive rewards for that cycle.
 
-The participation ratio of the baker is the proportion of slots the baker attested over the total number of slots deemed available by the protocol in the cycle.
+The participation ratio of the baker is the proportion of slots the baker attested over the slots that were attestable by this baker during the cycle. Both slot numbers only count those slots that are deemed available by the protocol.
+
+A new RPC ``GET /chains/main/blocks/<block>/delegates/<pkh>/dal_participation`` can be used to obtain the DAL participation information for a given baker. The output contains the following fields:
+
+- ``expected_assigned_shards_per_slot``: the number of shards assigned to this baker (per slot) in the current cycle
+- ``delegate_attested_dal_slots``: the number of DAL slots the baker has attested so far
+- ``delegate_attestable_dal_slots``: the number of DAL slots that are attestable by the baker
+- ``expected_dal_rewards``: the rewards (in mutez) the delegate will receive if it meets the participation threshold and is not denounced
+- ``sufficient_dal_participation``: a Boolean flag indicating if the delegate’s current attestation rate meets the threshold (64%) to qualify for rewards
+- ``denounced``: a Boolean flag indicating if the delegate has been denounced in the current cycle.
+
+A delegate's participation is the ratio between ``delegate_attested_dal_slots`` and ``delegate_attestable_dal_slots``.
+
+All fields except ``expected_assigned_shards_per_slot`` and ``expected_dal_rewards`` may vary depending on the moment of the call during a cycle.
+
+As an example (with made up numbers), let's consider the following output:
+
+.. code-block:: javascript
+
+  {
+    "expected_assigned_shards_per_slot": 409,
+    "delegate_attested_dal_slots": 2,
+    "delegate_attestable_dal_slots": 5,
+    "expected_dal_rewards": "1278125",
+    "sufficient_dal_participation": false,
+    "denounced": false
+  }
+
+corresponding to the following scenario. Suppose there are five delegates with equal baking power, ``8`` blocks per cycle, and ``256`` shards per slot. The delegate is expected to be assigned 409 shards per slot (because ``256 * 8 / 5 ≈ 409``). If the delegate reached ``64%`` participation, it would receive ``1,278,125`` μꜩ. However, the delegate has only attested ``2`` out of ``5`` available slots (``~40%``), which is currently below the ``64%`` threshold and disqualifies it from rewards unless it improves participation within this cycle.
 
 DAL participation rewards
 -------------------------
@@ -89,6 +117,16 @@ The value of ``DAL_REWARDS_WEIGHT`` is such that it represents ``DAL_REWARDS_RAT
 
 The rewards are distributed at the end of a cycle, and are computed in the same manner as for the other :ref:`participation rewards<adaptive_rewards_alpha>`.
 For instance, the stakers' share of these reward is proportional to the weight of their stake in relation to their baker's baking power.
+
+The metadata of the last block of a cycle contains the :doc:`balance updates<token_management>` corresponding to the allocated DAL rewards for that cycle. These balance updates are identified by two categories for DAL rewards, analogous to consensus attestation rewards, namely:
+
+- DAL attesting rewards (kind: ``"minted"``, category: ``"DAL attesting rewards"``) and
+- lost DAL attesting rewards (kind: ``"burned"``, category: ``"lost DAL attesting rewards"``).
+
+
+The RPC ``GET /chains/main/blocks/<block>/context/issuance/expected_issuance`` has a new field ``"dal_attesting_reward_per_shard"`` indicating the DAL reward allocated for a single shard.
+A delegate’s total potential DAL rewards in a cycle are then: ``expected_dal_rewards = expected_assigned_shards_per_slot * dal_attesting_reward_per_shard``, where the ``expected_dal_rewards`` and ``expected_assigned_shards_per_slot`` are the values given by the ``dal_participation`` RPC (see above).
+
 
 Trap mechanism
 --------------
