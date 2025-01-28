@@ -1368,10 +1368,43 @@ let precheck json =
       return_unit)
     (fun _exn -> failwith "Syntax error in the configuration file")
 
+(* Syntactic config patching to migrate stabilized experimental features. *)
+let migrate_experimental_feature ?new_path ?(transform = Fun.id) path json =
+  let open Json_syntax in
+  let new_path = Option.value new_path ~default:path in
+  let exp_path = "experimental_features" :: path in
+  let value = json |-> new_path in
+  let experimental_value = json |-> exp_path in
+  match (value, experimental_value) with
+  | None, Some v ->
+      (* Experimental feature present, but stabilized feature not set. *)
+      let json = Ezjsonm.update json exp_path None in
+      Ezjsonm.update json new_path (Some (transform v))
+  | _, _ -> (* Don't override otherwise *) json
+
+let migrate_stabilized_experimental_features json =
+  let open Json_syntax in
+  json
+  |> migrate_experimental_feature ["history_mode"] ~new_path:["history"]
+  |> migrate_experimental_feature
+       ["garbage_collector_parameters"]
+       ~new_path:["history"]
+       ~transform:(fun json ->
+         let split_frequency_in_seconds =
+           json |->! ["split_frequency_in_seconds"] |> Ezjsonm.get_int
+         in
+         if split_frequency_in_seconds <> 86400 then
+           Stdlib.failwith
+             "experimental_features.garbage_collector_parameters.split_frequency_in_seconds \
+              must be 86400, use new format." ;
+         let nb = json |->! ["number_of_chunks"] in
+         `O [("mode", `String "rolling"); ("retention", nb)])
+
 let load_file ?network ~data_dir path =
   let open Lwt_result_syntax in
   let* json = Lwt_utils_unix.Json.read_file path in
   let* () = precheck json in
+  let json = migrate_stabilized_experimental_features json in
   let config = Data_encoding.Json.destruct (encoding ?network data_dir) json in
   return config
 
