@@ -7331,6 +7331,8 @@ let hash = Protocol.hash
 
   let _021_PsQuebec = active (Name.v "PsQuebec" 021)
 
+  let _next = active (Name.dev "next")
+
   let alpha = active (Name.dev "alpha")
 
   let all = List.rev !all_rev
