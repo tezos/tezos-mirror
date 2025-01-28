@@ -37,6 +37,10 @@
 
 ### Internal
 
+- Snapshot headers now include history mode to check they match on import and
+  and the node now refuses to import archive snapshots with less
+  history. (!16458)
+
 ## Version 0.15 (2025-01-28)
 
 This release brings a number of quality of life improvements, including the
