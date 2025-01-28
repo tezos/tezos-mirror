@@ -2,7 +2,7 @@
 DAL integration
 ===============
 
-The integration for the :doc:`DAL <../shell/dal>` within the economic protocol relies on three operations:
+The :doc:`DAL <../shell/dal>`'s integration within the economic protocol relies on three operations:
 
 #. ``DAL_publish_commitment``: a manager operation, allowing anyone to publish a DAL commitment
 #. ``attestation``: the existing :ref:`consensus operation <consensus_operations_alpha>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
