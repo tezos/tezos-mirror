@@ -977,8 +977,7 @@ let get_validated_dal_attestations_in_mempool node for_level =
       let level = JSON.(contents |-> "level" |> as_int) in
       level = for_level
       && JSON.(contents |-> "kind" |> as_string) |> fun kind ->
-         String.equal kind "attestation_with_dal"
-         || String.equal kind "endorsement_with_dal")
+         String.equal kind "attestation_with_dal")
     validated
   |> return
 

@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Functor for the common parts of all Tezos daemons: node, baker,
-    endorser and accuser. Handles event handling in particular. *)
+(** Functor for the common parts of all Tezos daemons: node, baker and accuser.
+    Handles event handling in particular. *)
 
 module type PARAMETERS = sig
   type persistent_state

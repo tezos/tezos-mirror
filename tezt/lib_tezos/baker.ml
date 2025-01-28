@@ -436,17 +436,17 @@ let show_block json =
     let prequorum = json |-> "prequorum" in
     if is_null prequorum then "None"
     else
-      let ops = prequorum |-> "preendorsements" |> as_list in
+      let ops = prequorum |-> "preattestation" |> as_list in
       let expected_level_and_round =
         (prequorum |-> "level" |> as_int, prequorum |-> "round" |> as_int)
       in
-      let expected_kind = "preendorsement" in
+      let expected_kind = "preattestation" in
       show_operations ~loc:__LOC__ ~expected_kind ~expected_level_and_round ops
   in
   let quorum =
     match json |-> "quorum" |> as_list with
     | [] -> "[]"
-    | ops -> show_operations ~loc:__LOC__ ~expected_kind:"endorsement" ops
+    | ops -> show_operations ~loc:__LOC__ ~expected_kind:"attestation" ops
   in
   sf
     "block={hash=%s, level=%d, round=%d, prequorum=%s, quorum=%s}"
