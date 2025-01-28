@@ -298,9 +298,24 @@ pub struct StorageKey {
     pub index: H256,
 }
 
+#[derive(Clone, Copy)]
+pub enum CacheStorageValue {
+    Read(StorageValue),
+    Write(H256),
+}
+
+impl CacheStorageValue {
+    pub fn h256(&self) -> H256 {
+        match self {
+            CacheStorageValue::Read(storage_value) => storage_value.h256(),
+            CacheStorageValue::Write(storage_value) => *storage_value,
+        }
+    }
+}
+
 /// The layer cache is associating a storage slot which is an
-/// address and an index (StorageKey) to a value (H256).
-pub type LayerCache = HashMap<StorageKey, StorageValue>;
+/// address and an index (StorageKey) to a value (CacheStorageValue).
+pub type LayerCache = HashMap<StorageKey, CacheStorageValue>;
 
 /// The storage cache is associating at each layer (usize) its
 /// own cache (LayerCache). For each slot that is modified or
@@ -1683,7 +1698,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         if let Some(cache) = self.storage_cache.get(&0) {
             for (StorageKey { address, index }, value) in cache.iter() {
-                if let StorageValue::Hit(value) = value {
+                if let CacheStorageValue::Write(value) = value {
                     let mut account = self.get_or_create_account(*address)?;
                     account.set_storage(self.host, index, value)?;
                 }
@@ -2118,7 +2133,7 @@ fn update_cache<Host: Runtime>(
     handler: &mut EvmHandler<'_, Host>,
     address: H160,
     index: H256,
-    value: StorageValue,
+    value: CacheStorageValue,
     layer: usize,
 ) {
     if let Some(cache) = handler.storage_cache.get_mut(&layer) {
@@ -2135,11 +2150,11 @@ fn find_storage_key<Host: Runtime>(
     address: H160,
     index: H256,
     current_layer: usize,
-) -> Option<StorageValue> {
+) -> Option<H256> {
     for layer in (0..=current_layer).rev() {
         if let Some(cache) = handler.storage_cache.get(&layer) {
             if let Some(value) = cache.get(&StorageKey { address, index }) {
-                return Some(*value);
+                return Some(value.h256());
             }
         }
     }
@@ -2169,7 +2184,7 @@ fn cached_storage_access<Host: Runtime>(
     layer: usize,
 ) -> H256 {
     if let Some(value) = find_storage_key(handler, address, index, layer) {
-        value.h256()
+        value
     } else {
         let value = handler
             .get_account(address)
@@ -2180,7 +2195,13 @@ fn cached_storage_access<Host: Runtime>(
         // This condition will help avoiding unecessary write access
         // in the durable storage at the end of the transaction.
         if let Some(value) = value {
-            update_cache(handler, address, index, value, layer);
+            update_cache(
+                handler,
+                address,
+                index,
+                CacheStorageValue::Read(value),
+                layer,
+            );
         }
 
         value.map(|x| x.h256()).unwrap_or_default()
@@ -2250,7 +2271,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 .unwrap_or_default();
 
             self.original_storage_cache
-                .insert(key, StorageValue::Hit(value));
+                .insert(key, CacheStorageValue::Read(StorageValue::Hit(value)));
 
             value
         }
@@ -2367,7 +2388,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         value: H256,
     ) -> Result<(), ExitError> {
         let layer = self.evm_account_storage.stack_depth();
-        update_cache(self, address, index, StorageValue::Hit(value), layer);
+        update_cache(self, address, index, CacheStorageValue::Write(value), layer);
         Ok(())
     }
 
