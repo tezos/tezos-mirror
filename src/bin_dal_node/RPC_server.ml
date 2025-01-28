@@ -612,17 +612,22 @@ module Health = struct
   let get_health ctxt () () =
     let open Lwt_result_syntax in
     let open Types.Health in
+    let profiles = Node_context.get_profile_ctxt ctxt in
+    let no_profile = Profile_manager.is_empty profiles in
     let* points = Node_context.P2P.get_points ctxt in
     let topics = Node_context.P2P.Gossipsub.get_topics ctxt in
     let connections = Node_context.P2P.Gossipsub.get_connections ctxt in
-    match (points, topics, connections) with
-    | [], _, _ ->
+    match (points, no_profile, topics, connections) with
+    | [], _, _, _ ->
         let checks = [("p2p", Down)] in
         return {status = Down; checks}
-    | _, [], _ ->
+    | _, true, _, _ ->
+        let checks = [("p2p", Up); ("Has registered profiles", No)] in
+        return {status = Degraded; checks}
+    | _, _, [], _ ->
         let checks = [("p2p", Up); ("topics", Ko)] in
         return {status = Degraded; checks}
-    | _, _, [] ->
+    | _, _, _, [] ->
         let checks = [("p2p", Up); ("topics", Ok); ("gossipsub", Down)] in
         return {status = Degraded; checks}
     | _ ->
