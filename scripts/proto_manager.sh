@@ -417,7 +417,7 @@ function alpha_rst() {
 This page documents the changes brought by protocol Alpha with respect
 to %s (see :ref:\`naming_convention\`).
 
-For changes brought by Paris with respect to Oxford, see :doc:\`../protocols/019_paris\`.
+For changes brought by Quebec with respect to Paris, see :doc:\`../protocols/021_quebec\`.
 
 The code can be found in directory :src:\`src/proto_alpha\` of the \`\`master\`\`
 branch of Octez.
@@ -776,12 +776,12 @@ function update_protocol_tests() {
     if [[ ${command} == "copy" ]]; then
       sed "/let proto_${source_label}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
       sed "/| payload when String.equal payload Constants.proto_${source_label}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
-      sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${source_label}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_beta_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
+      sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${source_label}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_${label}_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
       sed -r "s/${capitalized_source} -> (V.*)/ ${capitalized_source} -> \1 | ${capitalized_label} -> \1/" -i.old src/lib_scoru_wasm/wasm_vm.ml
     else
       sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
       sed "/| payload when String.equal payload Constants.proto_${protocol_source}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
-      sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${protocol_source}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_beta_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
+      sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${protocol_source}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_${label}_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
       sed -r "s/Proto_${protocol_source} -> (V.*)/ Proto_${protocol_source} -> \1 | ${capitalized_label} -> \1/" -i.old src/lib_scoru_wasm/wasm_vm.ml
     fi
     ocamlformat -i src/lib_scoru_wasm/constants.ml
@@ -823,8 +823,10 @@ function update_source() {
     cp "teztale/bin_teztale_archiver/${source_short_hash}_machine.real.ml" "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     git add "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${label}/g" -i.old "teztale/bin_teztale_archiver/${label}_machine.real.ml"
-    sed -e "s/${protocol_source}/${version}/g" \
-      -e "s/${capitalized_source}/${capitalized_label}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+    # sed -e "s/${protocol_source}/${version}/g" \
+    #   -e "s/${capitalized_source}/${capitalized_label}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+    sed -e "/module Malpha = Alpha_machine.M/i \ module M${label} = ${capitalized_label}_machine.M" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+
     ocamlformat -i "teztale/bin_teztale_archiver/${label}_machine.real.ml"
   fi
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
@@ -986,7 +988,7 @@ function update_tezt_tests() {
     commit "tezt: update protocol tag in alcotezt"
   else
     temp_file=$(mktemp)
-    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail +2 | tac > "${temp_file}"
+    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail -n +2 | tac > "${temp_file}"
     echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
     echo "  | Some _ -> assert false" >> "${temp_file}"
     mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
@@ -1347,7 +1349,7 @@ function generate_doc() {
     sed "/alpha_long .*/i${line}" -i docs/Makefile
     line=$(printf "%s_short%*s= %s" "${label}" $((8 - ${#label})) '' "$label")
     sed "/alpha_short .*/i${label}_short = ${label}" -i docs/Makefile
-    sed -i.old -e "s/alpha\/rpc\.rst/alpha\/rpc.rst ${label}\/rpc.rst/g" docs/Makefile
+    sed -i.old -e "/[#>]/! s/alpha\/rpc\.rst/alpha\/rpc.rst ${label}\/rpc.rst/g" docs/Makefile
     sed -i.old -r "s/alpha\/octez-\*\.html/alpha\/octez-*.html ${label}\/octez-*.html/g" docs/Makefile
   fi
   commit "docs: update docs Makefile"
@@ -1516,7 +1518,7 @@ function misc_removals() {
 
   #if deleting a protocol in stabilisation
   if [[ ${source_label} == "${protocol_source}" ]]; then
-    sed "/| Tezt_tezos.Protocol.Beta -> */d" -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+    sed "/| Tezt_tezos.Protocol.${capitalized_label} -> */d" -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   else
 
     sed -i.old -e "/| Tezt_tezos.Protocol.${capitalized_label} ->/,+4d" devtools/testnet_experiment_tools/testnet_experiment_tools.ml
