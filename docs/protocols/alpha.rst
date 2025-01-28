@@ -55,7 +55,7 @@ Operation receipts
 Errors
 ------
 
-- tz4 (BLS) addresses are not forbidden to be registered as delegate and or as
+- tz4 (BLS) addresses are allowed to be registered as delegate and or as
   consensus keys if the ``allow_tz4_delegate_enable`` feature flag is set. (MR
   :gl:`!15302`)
 
@@ -90,6 +90,24 @@ Protocol parameters
   from cycle ``n`` still happens at the end of cycle ``n +
   max_slashing_period - 1 = n + slashing_delay``. (MR :gl:`!15990`)
 
+- Reduced the ``cache_stake_distribution_cycles`` and
+  ``cache_sampler_state_cycles`` protocol constants from 8 cycles to 5
+  cycles, in order to reduce memory consumption. Only
+  ``consensus_rights_delay + slashing_delay + 2 = 2 + 1 + 2 = 5``
+  cycles are needed, but these constants were not updated when
+  ``consensus_rights_delay`` was lowered from 5 to 2 in the Paris
+  protocol. (MR :gl:`!14396`)
+
+- Removed obsolete field
+  ``percentage_of_frozen_deposits_slashed_per_double_attestation``,
+  which is no longer used since the activation of Adaptive Slashing in
+  the Paris protocol. (MR :gl:`!15223`)
+
+- Removed obsolete feature flags ``autostaking_enable``,
+  ``ns_enable``, ``activation_vote_enable``,
+  ``adaptive_issuance.launch_ema_threshold``, and ``force_activation``
+  (MRs :gl:`!15215`, :gl:`!15223`, :gl:`!15211`)
+
 Bug Fixes
 ---------
 
@@ -97,12 +115,16 @@ Minor Changes
 -------------
 
 - Added a feature flag to enable the aggregation of block attestation lists into
-  a single aggregate operation. (MR :gl:!15283)
+  a single aggregate operation. (MR :gl:`!15283`)
 
 - Added a feature flag which would allow tz4 (BLS) addresses as delegate and or
   as consensus keys. (MR :gl:`!15311`)
 
-- Added a feature flag for allowing all bakers to attest. (MR :gl:`!15584`, :gl:`!15764`)
+- Added a feature-controlling parameter
+  ``all_bakers_attest_activation_level``. It is currently set to
+  ``null``, which means that the all-bakers-attest feature will not be
+  active at all in the current protocol. (MRs :gl:`!15584`,
+  :gl:`!15764`, :gl:`!16380`)
 
 - Changed the type of the protocol constant ``max_slashing_threshold`` from
   ``int`` to ``Ratio.t``. (MR :gl:`!15765`)
@@ -110,8 +132,5 @@ Minor Changes
 Internal
 --------
 
-- Removed obsolete feature flags and code related to adaptive issuance
-  activation, auto-staking, and old slashing. (MRs :gl:`!15215`,
-  :gl:`!15223`, :gl:`!15211`)
 - Added a stub RISC-V module for the protocol environment 
   and used it in the protocol implementation for the RISC-V PVM. (MRs :gl:`!15921`)
