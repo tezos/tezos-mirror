@@ -45,6 +45,9 @@ pub const SBI_TEZOS_REVEAL: u64 = 0x09;
 /// Maximum size of Reveal Request
 pub const REVEAL_REQUEST_MAX_SIZE: usize = 4096;
 
+/// Maximum size of Reveal Response Data
+pub const REVEAL_DATA_MAX_SIZE: usize = 4096;
+
 /// Standard SBI errors
 #[derive(Debug, Copy, Clone)]
 #[repr(i64)]

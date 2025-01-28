@@ -21,7 +21,7 @@ use std::cmp::min;
 use tezos_smart_rollup_constants::{
     core::MAX_INPUT_MESSAGE_SIZE,
     riscv::{
-        SbiError, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
+        SbiError, REVEAL_DATA_MAX_SIZE, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
         SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_SRST,
         SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN,
         SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL,
@@ -206,6 +206,53 @@ where
 
         // [origination_level] should not wrap around and become negative.
         Ok(origination_level as u64)
+    });
+
+    true
+}
+
+/// Provide reveal data in response to a reveal request. Returns `false`
+/// if the machine is not expecting reveal.
+pub fn provide_reveal_response<S, ML, CL, M>(
+    status: &mut S,
+    machine: &mut MachineState<ML, CL, M>,
+    reveal_data: &[u8],
+) -> bool
+where
+    S: CellReadWrite<Value = PvmStatus>,
+    CL: CacheLayouts,
+    ML: MainMemoryLayout,
+    M: ManagerReadWrite,
+{
+    // This method should only do something when we're waiting for reveal.
+    if status.read() != PvmStatus::WaitingForReveal {
+        return false;
+    }
+
+    // We're evaluating again after this.
+    status.write(PvmStatus::Evaluating);
+
+    sbi_wrap(machine, |machine| {
+        // These arguments should have been set by the previous SBI call.
+        let arg_buffer_addr = machine.core.hart.xregisters.read(a2);
+        let arg_buffer_size = machine.core.hart.xregisters.read(a3);
+
+        let memory_write_size = min(
+            REVEAL_DATA_MAX_SIZE,
+            min(arg_buffer_size as usize, reveal_data.len()),
+        );
+
+        // The argument address is a virtual address. We need to translate it to
+        // a physical address.
+        let phys_dest_addr = machine.core.translate(arg_buffer_addr, AccessType::Store)?;
+
+        // TODO: RV-425 Cross-page memory accesses are not translated correctly
+        machine
+            .core
+            .main_memory
+            .write_all(phys_dest_addr, &reveal_data[..memory_write_size])?;
+
+        Ok(memory_write_size as u64)
     });
 
     true
