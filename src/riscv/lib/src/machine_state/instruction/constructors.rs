@@ -9,7 +9,7 @@ use crate::{
 };
 
 impl Instruction {
-    pub(super) fn new_mv(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
+    pub(crate) fn new_mv(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Mv,
             args: Args {
@@ -24,7 +24,7 @@ impl Instruction {
         }
     }
 
-    pub(super) fn new_li(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+    pub(crate) fn new_li(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Li,
             args: Args {
@@ -40,7 +40,7 @@ impl Instruction {
         }
     }
 
-    pub(super) fn new_nop(width: InstrWidth) -> Self {
+    pub(crate) fn new_nop(width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Nop,
             args: Args {

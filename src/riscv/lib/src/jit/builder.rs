@@ -75,15 +75,17 @@ impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
 }
 
 impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> ICB for Builder<'a, ML, JSA> {
-    type XValue = ();
+    type XValue = Value;
     type IResult<Value> = Value;
 
-    fn xregister_read(&mut self, _reg: XRegister) -> Self::XValue {
-        todo!("RV-404: implement xregister read/write support")
+    fn xregister_read(&mut self, reg: XRegister) -> Self::XValue {
+        self.jsa_call
+            .xreg_read(&mut self.builder, self.core_ptr_val, reg)
     }
 
-    fn xregister_write(&mut self, _reg: XRegister, _value: Self::XValue) {
-        todo!("RV-404: implement xregister read/write support")
+    fn xregister_write(&mut self, reg: XRegister, value: Self::XValue) {
+        self.jsa_call
+            .xreg_write(&mut self.builder, self.core_ptr_val, reg, value)
     }
 
     fn xvalue_wrapping_add(&mut self, _lhs: Self::XValue, _rhs: Self::XValue) -> Self::XValue {
