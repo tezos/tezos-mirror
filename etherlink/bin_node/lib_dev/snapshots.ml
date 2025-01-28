@@ -266,14 +266,20 @@ let check_snapshot_exists snapshot_file =
   let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
   fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
 
+let pp_history_mode fmt h =
+  Format.pp_print_string
+    fmt
+    (match h with Configuration.Archive -> "archive" | Rolling -> "rolling")
+
 let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     =
   let open Lwt_result_syntax in
-  let header_rollup_address, header_current_level =
+  let header_rollup_address, header_current_level, header_history =
     match header with
     | V0_legacy {rollup_address; current_level} ->
-        (rollup_address, current_level)
-    | V1 {rollup_address; current_level; _} -> (rollup_address, current_level)
+        (rollup_address, current_level, None)
+    | V1 {rollup_address; current_level; history_mode; _} ->
+        (rollup_address, current_level, Some history_mode)
   in
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
@@ -286,6 +292,18 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
         fail_unless
           Address.(header_rollup_address = r)
           (Incorrect_rollup (header_rollup_address, r))
+  in
+  let* () =
+    match (header_history, metadata) with
+    | None, _ | _, None -> return_unit
+    | Some header_hist, Some {history_mode; _} ->
+        unless (header_hist = history_mode) @@ fun () ->
+        failwith
+          "Cannot import %a snapshot into %a EVM node."
+          pp_history_mode
+          header_hist
+          pp_history_mode
+          history_mode
   in
   let* latest_context = Evm_store.Context_hashes.find_latest conn in
   let* () =
