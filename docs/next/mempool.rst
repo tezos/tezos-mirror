@@ -2,27 +2,27 @@ Mempool
 =======
 
 The economic protocol provides a :package-api:`protocol-side mempool
-module<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Mempool_validation/index.html>`
+module<tezos-protocol-next/Tezos_raw_protocol_next/Mempool_validation/index.html>`
 data structure intended for use by the shell prevalidator (see
 :doc:`../shell/prevalidation`) and by ``octez-baker`` to incrementally accumulate operations
 that can be safely used to bake a new block.
 
 It ensures that :
 
-- Every operation contained are :ref:`valid<operation_validity_alpha>`;
+- Every operation contained are :ref:`valid<operation_validity_next>`;
 
-- every operation are :ref:`co-valid<co-valid_operations_alpha>`: they can be
+- every operation are :ref:`co-valid<co-valid_operations_next>`: they can be
   safely included in a block in any arbitrary order, meaning operations commute;
 
 - the merging of two mempools also maintains the aforementioned
   properties.
 
 The protocol leverages the :ref:`partial construction
-mode<partial_construction_alpha>` to incrementally validate new operations while
+mode<partial_construction_next>` to incrementally validate new operations while
 maintaining the aforementioned invariants.
 
 During validation, operations are never actually applied, as it is unnecessary
-for asserting their :ref:`validity<operation_validity_alpha>`.
+for asserting their :ref:`validity<operation_validity_next>`.
 
 Merging Mempools
 ----------------

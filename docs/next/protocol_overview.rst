@@ -30,10 +30,10 @@ Validity conditions are implemented in the ``apply`` function which is
 called whenever the node processes a block---see the dedicated
 :doc:`protocol validation and operation<validation>` entry for further
 detail into the validation and application process for
-:ref:`blocks<block_validation_overview_alpha>` and their
-:ref:`operations<operation_validity_alpha>`.
+:ref:`blocks<block_validation_overview_next>` and their
+:ref:`operations<operation_validity_next>`.
 
-.. _shell_proto_interact_alpha:
+.. _shell_proto_interact_next:
 
 Shell-protocol interaction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -52,30 +52,30 @@ that the shell uses when receiving a new block:
 - The shell changes the head of the chain to this new block only if
   the block is :doc:`valid<../shell/validation>`, and it has a higher
   fitness than the current head; a block is
-  :ref:`valid<block_validation_overview_alpha>` only if all the
+  :ref:`valid<block_validation_overview_next>` only if all the
   operations included are also
-  :ref:`valid<operation_validity_alpha>`.
+  :ref:`valid<operation_validity_next>`.
 
 The support provided by the protocol for validating blocks can be
 modulated by different :ref:`validation
-modes<validation_modes_alpha>`. They allow using this same
+modes<validation_modes_next>`. They allow using this same
 interface for quite different use cases, as follows:
 
-- being able to :ref:`apply<full_application_alpha>` a block,
+- being able to :ref:`apply<full_application_next>` a block,
   typically used by the shell's :doc:`validator <../shell/validation>`
   component;
-- being able to :ref:`construct<full_construction_alpha>` a block,
+- being able to :ref:`construct<full_construction_next>` a block,
   typically used by the baker daemon to *bake* -- that is, to produce
   -- a new block;
-- being able to :ref:`partially construct<partial_construction_alpha>`
+- being able to :ref:`partially construct<partial_construction_next>`
   a block, typically used by the :doc:`prevalidator
   <../shell/prevalidation>` to determine valid operations in the
   mempool; and,
-- being able to :ref:`pre-apply<partial_application_alpha>` a
+- being able to :ref:`pre-apply<partial_application_next>` a
   block, typically used in the :doc:`validator <../shell/validation>`
   to precheck a block, avoiding to further consider invalid blocks.
 
-.. _block_contents_alpha:
+.. _block_contents_next:
 
 Blocks, Operations and their Validation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,7 +87,7 @@ Blocks, Operations and their Validation
 
 A block consists of a header and operations. A block's header is
 composed of two parts: :ref:`the protocol-agnostic part<shell_header>`
-and :ref:`the protocol-specific part<proto_block_header_alpha>`.
+and :ref:`the protocol-specific part<proto_block_header_next>`.
 This separation enables the shell to interact with different
 protocols. Each Tezos economic protocol can specify different kinds of
 operations, which are described further in detail in
@@ -101,7 +101,7 @@ safely included in the Tezos blockchain -- and *application* --
 that is, how the effects of operations and blocks are taken into
 account -- for this economic protocol.
 
-.. _protocol_constants_alpha:
+.. _protocol_constants_next:
 
 Protocol constants
 ~~~~~~~~~~~~~~~~~~
@@ -123,10 +123,10 @@ The *list* of protocol constants can be found in the OCaml APIs:
 
 - fixed protocol constants are defined in the module
   :package-api:`Constants_repr
-  <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_repr/index.html>`
+  <tezos-protocol-next/Tezos_raw_protocol_next/Constants_repr/index.html>`
 - parametric constants are defined in the module
   :package-api:`Constants_parametric_repr
-  <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_parametric_repr/index.html>`
+  <tezos-protocol-next/Tezos_raw_protocol_next/Constants_parametric_repr/index.html>`
 
 The *values* of protocol constants in any given protocol can be found using specific RPC calls:
 
@@ -136,10 +136,10 @@ The *values* of protocol constants in any given protocol can be found using spec
 Further documentation of various protocol constants can be found in the subsystems where they conceptually belong.
 See, for example:
 
-- :ref:`proof-of-stake parameters <ps_constants_alpha>`
-- :ref:`consensus-related parameters <cs_constants_alpha>`
-- :ref:`randomness generation parameters <rg_constants_alpha>`
-- :ref:`DAL parameters <dal_constants_alpha>`
+- :ref:`proof-of-stake parameters <ps_constants_next>`
+- :ref:`consensus-related parameters <cs_constants_next>`
+- :ref:`randomness generation parameters <rg_constants_next>`
+- :ref:`DAL parameters <dal_constants_next>`
 
 See also
 ~~~~~~~~
