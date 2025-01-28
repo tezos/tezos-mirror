@@ -9,6 +9,7 @@ type error +=
   | Lost_node_connection
   | Cannot_connect_to_node of string
   | Cannot_decode_node_data of string
+  | Missing_current_baker
 
 let () =
   Error_monad.register_error_kind
@@ -41,4 +42,13 @@ let () =
     ~pp:(fun ppf err -> Format.fprintf ppf "Cannot decode node data: %s" err)
     Data_encoding.(obj1 (req "err" string))
     (function Cannot_decode_node_data err -> Some err | _ -> None)
-    (fun err -> Cannot_decode_node_data err)
+    (fun err -> Cannot_decode_node_data err) ;
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"agnostic_baker.missing_current_baker"
+    ~title:"Missing current baker"
+    ~description:"The current baker binary is missing."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Missing current baker")
+    Data_encoding.(unit)
+    (function Missing_current_baker -> Some () | _ -> None)
+    (fun () -> Missing_current_baker)

@@ -8010,8 +8010,8 @@ let _octez_experimental_agnostic_baker =
         octez_rustzcash_deps;
         bls12_381_archive;
         data_encoding |> open_;
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
         octez_validation |> open_;
         octez_client_base_unix |> open_;
         octez_client_base |> open_;

@@ -186,6 +186,18 @@ module Daemon (Event : EVENTS) = struct
     Lwt.wakeup t.stopper (0, Lwt_unix.WSTOPPED 0) ;
     shutdown t
 
+  let run_process t ~binary_path ~arguments () =
+    let open Lwt_result_syntax in
+    let process =
+      Lwt_process.open_process_none
+        ~stdout:`Keep
+        ~stderr:`Keep
+        (binary_path, arguments)
+    in
+    let*! () = Event.(emit process_started) process#pid in
+    t.server <- Some process ;
+    return t
+
   let run_process_with_sockets t ~process_name ?socket_prefix ?executable_name
       ~handshake () =
     let open Lwt_result_syntax in
