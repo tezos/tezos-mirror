@@ -7,7 +7,7 @@ last_proto_version=$(echo "${last_proto_name}" | cut -d'_' -f2 | sed 's/^0*//')
 new_proto_version=$(printf "%03d" $((last_proto_version + 1)))
 
 make octez-protocol-compiler
-./scripts/snapshot_alpha_and_link.sh "${new_proto_version}" next
+./scripts/snapshot_alpha_and_link.sh "${new_proto_version}" notnext
 ./scripts/slim-mode.sh on
 make
 
