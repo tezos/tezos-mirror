@@ -90,6 +90,14 @@ Protocol parameters
   from cycle ``n`` still happens at the end of cycle ``n +
   max_slashing_period - 1 = n + slashing_delay``. (MR :gl:`!15990`)
 
+- Reduced the ``cache_stake_distribution_cycles`` and
+  ``cache_sampler_state_cycles`` protocol constants from 8 cycles to 5
+  cycles, in order to reduce memory consumption. Only
+  ``consensus_rights_delay + slashing_delay + 2 = 2 + 1 + 2 = 5``
+  cycles are needed, but these constants were not updated when
+  ``consensus_rights_delay`` was lowered from 5 to 2 in the Paris
+  protocol. (MR :gl:`!14396`)
+
 - Removed obsolete field
   ``percentage_of_frozen_deposits_slashed_per_double_attestation``,
   which is no longer used since the activation of Adaptive Slashing in
