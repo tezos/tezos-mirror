@@ -129,10 +129,11 @@ let monitor_heads ~node_addr =
 
 let hot_swap_baker ~state ~next_protocol_hash =
   let open Lwt_result_syntax in
-  let (module CurrentBaker : BAKER), current_baker =
+  let* (module CurrentBaker : BAKER), current_baker =
     match state.current_baker with
-    | Some (Baker (module Baker), baker) -> ((module Baker), baker)
-    | None -> assert false
+    | Some (Baker (module Baker), baker) ->
+        return ((module Baker : BAKER), baker)
+    | None -> tzfail Missing_current_baker
   in
   let next_proto_status = Parameters.protocol_status next_protocol_hash in
   let*! () =
@@ -183,10 +184,10 @@ let monitor_voting_periods ~state head_stream =
         let* next_protocol_hash =
           Rpc_services.get_next_protocol_hash ~node_addr
         in
-        let current_protocol_hash =
+        let* current_protocol_hash =
           match state.current_baker with
-          | None -> assert false
-          | Some (_, v) -> v.protocol_hash
+          | None -> tzfail Missing_current_baker
+          | Some (_, v) -> return v.protocol_hash
         in
         let* () =
           if not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
