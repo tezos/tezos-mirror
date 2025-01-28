@@ -33,9 +33,10 @@ open Alpha_context
     - Add entries [None] for the slot's pages in the store, if the slot
       is not confirmed. *)
 
-type error += Dal_invalid_page_for_slot of Dal.Page.t
+type Environment.Error_monad.error += Dal_invalid_page_for_slot of Dal.Page.t
 
 let () =
+  let open Environment.Error_monad in
   register_error_kind
     `Permanent
     ~id:"dal_pages_request.dal_invalid_page_for_slot"
@@ -105,7 +106,7 @@ let get_slot_pages =
 
 let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
     ~published_level ~index =
-  let open Lwt_result_syntax in
+  let open Environment.Error_monad.Lwt_result_syntax in
   let* published_in_block_hash =
     Node_context.hash_of_level node_ctxt (Raw_level.to_int32 published_level)
   in
@@ -217,25 +218,28 @@ let slot_attestation_status ?attestation_threshold_percent
   return @@ if Option.is_some commitment_res then `Attested else `Unattested
 
 let get_page node_ctxt ~inbox_level page_id =
-  let open Lwt_result_syntax in
+  let open Environment.Error_monad.Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
   let* pages =
     download_confirmed_slot_pages node_ctxt ~published_level ~index
   in
-  match List.nth_opt pages page_index with
-  | Some page ->
-      let*! () =
-        Event.(emit page_reveal)
-          ( index,
-            page_index,
-            Raw_level.to_int32 published_level,
-            inbox_level,
-            page )
-      in
-      return @@ Some page
-  | None -> tzfail @@ Dal_invalid_page_for_slot page_id
+  let*! res =
+    match List.nth_opt pages page_index with
+    | None -> tzfail @@ Dal_invalid_page_for_slot page_id
+    | Some page ->
+        let*! () =
+          Event.(emit page_reveal)
+            ( index,
+              page_index,
+              Raw_level.to_int32 published_level,
+              inbox_level,
+              page )
+        in
+        return (Some page)
+  in
+  Lwt.return @@ Environment.wrap_tzresult res
 
 let slot_id_is_valid
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
