@@ -1,0 +1,82 @@
+
+trace
+  - UNPAIR (interp) @ location: 8
+    [ (Pair 7 (Some 3)) ]
+  - UNPAIR (entry) @ location: 8
+    [ (Pair 7 (Some 3)) ]
+    - log/SWAP (exit) @ location: 8
+      [ 7
+        (Some 3) ]
+  - SWAP (entry) @ location: 9
+    [ 7
+      (Some 3) ]
+    - log/MAP (exit) @ location: 9
+      [ (Some 3)
+        7 ]
+  - MAP (entry) @ location: 11
+    [ (Some 3)
+      7 ]
+    - log/DIP (exit) @ location: 11
+      [ 3
+        7 ]
+  - DIP (entry) @ location: 12
+    [ 3
+      7 ]
+    - log/DUP (exit) @ location: 12
+      [ 7 ]
+  - DUP (entry) @ location: 14
+    [ 7 ]
+    - log/[halt] (exit) @ location: 14
+      [ 7
+        7 ]
+  - [halt] (entry) @ location: 14
+    [ 7
+      7 ]
+    - control: KUndip
+    - control: KCons
+    - log/ADD (exit) @ location: 12
+      [ 3
+        7
+        7 ]
+  - ADD (entry) @ location: 15
+    [ 3
+      7
+      7 ]
+    - log/[halt] (exit) @ location: 15
+      [ 10
+        7 ]
+  - [halt] (entry) @ location: 11
+    [ 10
+      7 ]
+    - control: KMap_head
+    - log/DIP (exit) @ location: 11
+      [ (Some 10)
+        7 ]
+  - DIP (entry) @ location: 16
+    [ (Some 10)
+      7 ]
+    - log/DROP (exit) @ location: 16
+      [ 7 ]
+  - DROP (entry) @ location: 18
+    [ 7 ]
+    - log/[halt] (exit) @ location: 18
+      [  ]
+  - [halt] (entry) @ location: 18
+    [  ]
+    - control: KUndip
+    - control: KCons
+    - log/NIL (exit) @ location: 16
+      [ (Some 10) ]
+  - NIL (entry) @ location: 19
+    [ (Some 10) ]
+    - log/PAIR (exit) @ location: 19
+      [ {}
+        (Some 10) ]
+  - PAIR (entry) @ location: 21
+    [ {}
+      (Some 10) ]
+    - log/[halt] (exit) @ location: 21
+      [ (Pair {} (Some 10)) ]
+  - [halt] (entry) @ location: 7
+    [ (Pair {} (Some 10)) ]
+    - control: KNil
