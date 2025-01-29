@@ -1419,8 +1419,8 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?retry ?description
-    ~__POS__ ~stage ~name script : tezos_job =
+    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?timeout ?retry
+    ?description ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
@@ -1431,6 +1431,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?tag
     ?allow_failure
     ?parallel
+    ?timeout
     ?retry
     ?description
     ~__POS__

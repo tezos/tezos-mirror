@@ -478,6 +478,7 @@ val job_docker_authenticated :
   ?tag:tag ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?parallel:Gitlab_ci.Types.parallel ->
+  ?timeout:Gitlab_ci.Types.time_interval ->
   ?retry:Gitlab_ci.Types.retry ->
   ?description:string ->
   __POS__:string * int * int * int ->
