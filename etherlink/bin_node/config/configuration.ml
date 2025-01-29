@@ -8,6 +8,11 @@
 
 type supported_network = Mainnet | Testnet
 
+let pp_supported_network fmt network =
+  Format.pp_print_string
+    fmt
+    (match network with Mainnet -> "mainnet" | Testnet -> "testnet")
+
 let strictly_positive_encoding = Data_encoding.ranged_int 1 ((1 lsl 30) - 1)
 
 type log_filter_config = {

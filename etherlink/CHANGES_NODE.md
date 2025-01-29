@@ -51,6 +51,11 @@ you start using them, you probably want to use `octez-evm-node check config
   `experimental_features.monitor_websocket_heartbeat` in the
   configuration. (!16197)
 
+- The observer mode option `--init-from-snapshot` can now take an
+  snapshot provider url. the EVM node in will download and import a
+  recent snapshot from it instead of the trusted source for fresh data
+  directories. (!16138)
+
 ### Bug fixes
 
 #### CLI

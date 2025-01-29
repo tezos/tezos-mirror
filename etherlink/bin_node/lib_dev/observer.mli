@@ -9,7 +9,7 @@
     event-loop of the Observer, consuming the blueprints received from
     the EVM node endpoint, unless [no_sync] is true.
 
-    If [init_from_snapshot] is [true] and [network] is set, then the node will
+    If [init_from_snapshot] and [network] is set, then the node will
     fetch and import the latest known snapshot for this [network] if [data_dir]
     was not already created. *)
 val main :
@@ -18,6 +18,6 @@ val main :
   data_dir:string ->
   config:Configuration.t ->
   no_sync:bool ->
-  init_from_snapshot:bool ->
+  init_from_snapshot:string option ->
   unit ->
   unit tzresult Lwt.t
