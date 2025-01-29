@@ -1555,6 +1555,7 @@ module Images = struct
         ~arch
         ~skip_docker_initialization:true
         ~stage
+        ~timeout:(Minutes 90)
         ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
         ~description:("Build internal CI images for " ^ arch_to_string_alt arch)
         ~ci_docker_hub:false

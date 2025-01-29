@@ -15,7 +15,7 @@ oc.docker:ci:amd64:
   tags:
   - gcp
   dependencies: []
-  timeout: 60 minutes
+  timeout: 90 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
@@ -35,7 +35,7 @@ oc.docker:ci:arm64:
   tags:
   - gcp_arm64
   dependencies: []
-  timeout: 60 minutes
+  timeout: 90 minutes
   before_script: []
   script:
   - ./images/ci_create_ci_images.sh
