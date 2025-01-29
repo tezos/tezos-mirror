@@ -54,6 +54,9 @@ module MakeBaker (Name : Lwt_process_watchdog.NAME) : BAKER = struct
     let* () = Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash in
     Watchdog.stop baker.process
 
+  (** [spawn_baker protocol_hash ~binaries_directory ~baker_args] spawns a baker
+      for the given [protocol_hash] using the [~binaries_directory] as path for
+      the baker binary and with [~baker_args] as command line arguments. *)
   let spawn_baker protocol_hash ~binaries_directory ~baker_args =
     let open Lwt_result_syntax in
     let args_as_string =
@@ -103,6 +106,9 @@ type 'a state = {
 
 type 'a t = 'a state
 
+(** [monitor_heads ~node_addr] creates a stream which returns the data
+    of the heads of the current network; this information is received
+    from the RPC calls at the endpoint given by [~node_addr]. *)
 let monitor_heads ~node_addr =
   let open Lwt_result_syntax in
   let uri = Format.sprintf "%s/monitor/heads/main" node_addr in
@@ -127,6 +133,10 @@ let monitor_heads ~node_addr =
   ignore (loop () : unit Lwt.t) ;
   return stream
 
+(** [hot_swap_baker ~state ~next_protocol_hash] performs a swap in the current
+    [~state] of the agnostic baker, exchanging the current baker with the one
+    corresponding to [~next_protocol_hash]. This is done by shutting down the
+    current baking binary and generating the new binary instead. *)
 let hot_swap_baker ~state ~next_protocol_hash =
   let open Lwt_result_syntax in
   let* (module CurrentBaker : BAKER), current_baker =
@@ -168,6 +178,10 @@ let hot_swap_baker ~state ~next_protocol_hash =
   state.current_baker <- Some new_baker ;
   return_unit
 
+(** [monitor_voting_periods ~state head_stream] creates a process which listens
+    to the [head_stream] stream (which returns the data of the heads of the network
+    chain) in order to know when to "hot swap" (fork) the current protocol baking
+    binary with the one associated with the next protocol. *)
 let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
   let node_addr = state.node_endpoint in
@@ -200,11 +214,11 @@ let monitor_voting_periods ~state head_stream =
   let* () = loop () in
   return_unit
 
-(* Aims to start the baker associated to the current protocol. If
-   the protocol is considered as frozen (not active anymore), and
-   there is thus no actual baker binary anymore, the initial phase
-   consist in waiting until an active protocol is observed on
-   monitored heads. *)
+(** [may_start_initial_baker state] aims to start the baker associated
+    to the current protocol. If the protocol is considered as [frozen] (not
+    [active] anymore), and there is thus no actual baker binary anymore, the
+    initial phase consists in waiting until an [active] protocol is observed on
+    monitored heads function. *)
 let may_start_initial_baker state =
   let open Lwt_result_syntax in
   let*! () = Agnostic_baker_events.(emit experimental_binary) () in
