@@ -939,10 +939,10 @@ macro_rules! cr_instr {
 }
 
 macro_rules! cc_instr {
-    ($enum_variant:ident, $imm_f:expr, $instr:expr) => {
+    ($enum_variant:ident, $imm:expr, $instr:expr) => {
         $enum_variant(CIBTypeArgs {
             rd_rs1: c_rs1p($instr),
-            imm: $imm_f($instr),
+            imm: $imm,
         })
     };
 }
@@ -1214,7 +1214,7 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 // The code points with rd == x0 and nzimm == 0 encode the C.NOP instruction;
                 // the remaining code points with nzimm != 0 encode HINTs."
                 (0, X0) => CNop,
-                (0, _) | (_, X0) => UnknownCompressed { instr },
+                (0, _) | (_, X0) => HintCompressed { instr },
                 (imm, NonZero(rd_rs1)) => CAddi(CIBNZTypeArgs { rd_rs1, imm }),
             },
             C_F3_1 => match (ci_imm(instr), split_x0(c_rd_rs1(instr))) {
@@ -1222,7 +1222,7 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 (imm, NonZero(rd_rs1)) => CAddiw(CIBNZTypeArgs { rd_rs1, imm }),
             },
             C_F3_2 => match split_x0(c_rd_rs1(instr)) {
-                X0 => UnknownCompressed { instr },
+                X0 => HintCompressed { instr },
                 NonZero(rd_rs1) => CLi(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_imm(instr),
@@ -1232,22 +1232,26 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 if u16::bits_subset(instr, 6, 2) == 0 && !u16::bit(instr, 12) {
                     return Instr::Cacheable(UnknownCompressed { instr });
                 };
-                match split_x0(c_rd_rs1(instr)) {
-                    NonZero(NonZeroXRegister::x2) => CAddi16sp(CJTypeArgs {
+                match (split_x0(c_rd_rs1(instr)), ci_imm(instr)) {
+                    (NonZero(NonZeroXRegister::x2), _) => CAddi16sp(CJTypeArgs {
                         imm: ci_addi16sp_imm(instr),
                     }),
-                    X0 => UnknownCompressed { instr },
-                    NonZero(rd_rs1) => CLui(CIBNZTypeArgs {
+                    (_, 0) => UnknownCompressed { instr },
+                    (X0, _) => HintCompressed { instr },
+                    (NonZero(rd_rs1), _) => CLui(CIBNZTypeArgs {
                         rd_rs1,
                         imm: ci_imm(instr) << 12,
                     }),
                 }
             }
-            C_F3_4 => match c_q1_10(instr) {
-                C_Q1_0 => cc_instr!(CSrli, cb_shamt_imm, instr),
-                C_Q1_1 => cc_instr!(CSrai, cb_shamt_imm, instr),
-                C_Q1_2 => cc_instr!(CAndi, cb_andi_imm, instr),
-                C_Q1_3 => match (u16::bit(instr, 12), c_q1_5(instr)) {
+            // RV64C declares that `shamt == 0` here is for HINTS.
+            C_F3_4 => match (c_q1_10(instr), cb_shamt_imm(instr)) {
+                (C_Q1_0, 0) => HintCompressed { instr },
+                (C_Q1_0, imm) => cc_instr!(CSrli, imm, instr),
+                (C_Q1_1, 0) => HintCompressed { instr },
+                (C_Q1_1, imm) => cc_instr!(CSrai, imm, instr),
+                (C_Q1_2, _) => cc_instr!(CAndi, cb_andi_imm(instr), instr),
+                (C_Q1_3, _) => match (u16::bit(instr, 12), c_q1_5(instr)) {
                     (false, C_Q1_0) => cr_instr!(CSub, instr),
                     (false, C_Q1_1) => cr_instr!(CXor, instr),
                     (false, C_Q1_2) => cr_instr!(COr, instr),
@@ -1259,13 +1263,14 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 _ => UnknownCompressed { instr },
             },
             C_F3_5 => CJ(CJTypeArgs { imm: cj_imm(instr) }),
-            C_F3_6 => cc_instr!(CBeqz, cb_imm, instr),
-            C_F3_7 => cc_instr!(CBnez, cb_imm, instr),
+
+            C_F3_6 => cc_instr!(CBeqz, cb_imm(instr), instr),
+            C_F3_7 => cc_instr!(CBnez, cb_imm(instr), instr),
             _ => UnknownCompressed { instr },
         },
         OP_C2 => match c_funct3(instr) {
             C_F3_0 => match (cslli_imm(instr), split_x0(c_rd_rs1(instr))) {
-                (_, X0) | (0, _) => UnknownCompressed { instr },
+                (_, X0) | (0, _) => HintCompressed { instr },
                 (imm, NonZero(rd_rs1)) => CSlli(CIBNZTypeArgs { rd_rs1, imm }),
             },
             C_F3_1 => CFldsp(CIBDTypeArgs {
@@ -1293,7 +1298,8 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 split_x0(c_rs2(instr)),
             ) {
                 (true, X0, X0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
-                (_, X0, _) => UnknownCompressed { instr },
+                (_, X0, X0) => UnknownCompressed { instr },
+                (_, X0, NonZero(_)) => HintCompressed { instr },
                 (true, NonZero(rs1), X0) => CJalr(CRJTypeArgs { rs1 }),
                 (true, NonZero(rd_rs1), NonZero(rs2)) => CAdd(CNZRTypeArgs { rd_rs1, rs2 }),
                 (false, NonZero(rs1), X0) => CJr(CRJTypeArgs { rs1 }),
@@ -1474,7 +1480,7 @@ mod tests {
     fn test_3() {
         let bytes: [u8; 5] = [0x1, 0x5, 0x64, 0x1b, 0x4];
         let expected = [
-            Instr::Cacheable(UnknownCompressed {
+            Instr::Cacheable(HintCompressed {
                 instr: u16::from_le_bytes([0x1, 0x5]),
             }),
             Instr::Cacheable(CAddi4spn(CIBTypeArgs {
