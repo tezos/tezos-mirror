@@ -18,8 +18,10 @@ else
   PREFIX=
 fi
 
+#shellcheck disable=SC2317
 # Function to run apt-get with retries and exponential backoff for a specific error
 apt_get_with_retries() {
+  set +x
   # Maximum retries
   max_retries=5
   # Initial delay in seconds
@@ -27,25 +29,40 @@ apt_get_with_retries() {
 
   # Loop for retries
   for i in $(seq 1 "$max_retries"); do
-    echo "Attempt $i of $max_retries..."
 
+    set +e
     # Run apt-get and capture the output and exit status
     output=$(apt-get "$@" 2>&1)
     status=$?
+    set -e
 
     # Check if apt-get succeeded
-    if [ $status -eq 0 ]; then
+    if [ "$status" -eq 0 ]; then
+      echo "$output"
+      set -x
       return 0
     fi
 
-    # Check for the specific error message pattern
-    echo "$output" | grep -q "File has unexpected size" && echo "$output" | grep -q "Mirror sync in progress"
+    case "$output" in
+    *"Mirror sync in progress"*)
+      retry=1
+      ;;
+    *"Unknown error executing apt-key"*)
+      retry=1
+      ;;
+    *)
+      retry=0
+      ;;
+    esac
 
     #shellcheck disable=SC2181
-    if [ $? -eq 0 ]; then
+    if [ "$retry" -eq 1 ]; then
       # If the specific error occurs, retry with exponential backoff
-      echo "Error detected: Mirror sync in progress. Retrying in $delay seconds..."
+      echo "-----------"
+      echo "Attempt $i of $max_retries..."
+      echo "Error detected. Retrying in $delay seconds..."
       echo "$output"
+      echo "-----------"
       sleep "$delay"
       # Exponential backoff (doubling the delay)
       # 1 + 3 + 9 + 27 + 81 = 31, so we wait 121s maximum
