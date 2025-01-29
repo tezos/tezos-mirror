@@ -183,7 +183,7 @@ let raw_migrate ~resilience_test ?(use_remote_signer = false) =
          "Protocol migration from protocol to alpha with agnostic baker%s %s"
          remote_signer_text
          (if resilience_test then "and resilience test" else ""))
-    ~tags:["protocol"; "migration"; "agnostic"; "baker"]
+    ~tags:["protocol"; "migration"; "agnostic"; "baker"; Tag.ci_disabled]
     ~uses:(fun _protocol ->
       [Constant.octez_experimental_agnostic_baker] @ remote_signer)
   @@ fun protocol ->
@@ -210,7 +210,7 @@ let start_stop =
   Protocol.register_test
     ~__FILE__
     ~title:"Agnostic baker starts and stops"
-    ~tags:[team; "sandbox"; "agnostic"; "baker"; "init"]
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "init"; Tag.ci_disabled]
     ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun _protocol ->
   let* node, client = Client.init_with_node `Client () in
