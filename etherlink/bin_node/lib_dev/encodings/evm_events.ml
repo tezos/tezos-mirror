@@ -138,9 +138,6 @@ module Delayed_transaction = struct
 
   let pp fmt {raw; kind; _} =
     Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
-
-  let pp_short fmt {kind; hash; _} =
-    Format.fprintf fmt "%a: %a" pp_kind kind pp_hash hash
 end
 
 module Upgrade = struct
@@ -330,7 +327,7 @@ let pp fmt = function
   | Upgrade_event {hash; timestamp} ->
       Format.fprintf
         fmt
-        "Upgrade:@ hash %a,@ timestamp: %a"
+        "Kernel will upgrade to %a at %a"
         pp_hash
         hash
         Time.Protocol.pp_hum
@@ -339,33 +336,36 @@ let pp fmt = function
       {sequencer; pool_address = Address (Hex address); timestamp} ->
       Format.fprintf
         fmt
-        "Sequencer upgrade:@ sequencer:@ %a,pool_address %s,@ timestamp: %a"
+        "Sequencer address will upgrade to %a at %a with pool address %s"
         Signature.Public_key.pp
         sequencer
-        address
         Time.Protocol.pp_hum
         timestamp
-  | Blueprint_applied {number = Qty number; hash = Block_hash (Hex hash)} ->
+        address
+  | Blueprint_applied {number = Qty number; hash} ->
       Format.fprintf
         fmt
-        "Blueprint applied:@,number:%a@ hash: %s"
+        "Block %a (%a) applied"
         Z.pp_print
         number
+        pp_block_hash
         hash
-  | New_delayed_transaction delayed_transaction ->
+  | New_delayed_transaction {kind; hash; raw = _} ->
       Format.fprintf
         fmt
-        "New delayed transaction:@ %a"
-        Delayed_transaction.pp_short
-        delayed_transaction
+        "New %a (%a)"
+        Delayed_transaction.pp_kind
+        kind
+        pp_hash
+        hash
   | Flush_delayed_inbox {transactions = _; timestamp; level = Qty level} ->
       Format.fprintf
         fmt
-        "Flush delayed inbox:@,timestamp:%a@, level: %a"
-        Time.Protocol.pp
-        timestamp
+        "Flushed delayed inbox at level %a at %a"
         Z.pp_print
         level
+        Time.Protocol.pp_hum
+        timestamp
 
 let encoding =
   let open Data_encoding in

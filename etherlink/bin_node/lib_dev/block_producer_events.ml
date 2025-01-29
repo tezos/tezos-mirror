@@ -39,9 +39,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"block_producer_locked"
-      ~msg:
-        "Transaction pool is locked, block production as well. The sequencer \
-         is progressing too far in advance in comparison to the rollup node."
+      ~msg:"Transaction pool and block production are locked."
       ~level:Error
       ()
 end

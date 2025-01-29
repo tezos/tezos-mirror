@@ -29,10 +29,7 @@ let blueprint_application =
   declare_6
     ~name:"blueprint_application"
     ~section
-    ~msg:
-      "Applied a blueprint for level {level} at {timestamp} containing \
-       {txs_nb} transactions for {gas_used} gas leading to creating block \
-       {block_hash} in {process_time}."
+    ~msg:"Head is now {level}, applied in {process_time}"
     ~level:Notice
     ~pp6:Time.System.Span.pp_hum
     ("level", Data_encoding.n)

@@ -31,7 +31,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"evm_events_new_event"
-      ~msg:"Evm events follower: applying {event}"
+      ~msg:"{event}"
       ~level:Debug
       ~pp1:Evm_events.pp
       ("event", Evm_events.encoding)
@@ -51,8 +51,8 @@ module Event = struct
       ~section
       ~name:"evm_events_follower_diverged"
       ~msg:
-        "The rollup diverged, blueprint {level} leaded to block hash \
-         {expected_hash}, but locally has {found_hash}."
+        "Rollup node diverged on level {level}, confirmed {expected_hash} \
+         instead of {found_hash}."
       ~level:Error
       ("level", Data_encoding.n)
       ("expected_hash", Ethereum_types.block_hash_encoding)
@@ -62,9 +62,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_follower_upstream_blueprint_applied"
-      ~msg:
-        "The rollup node kernel applied blueprint {level} leading to creating \
-         block {hash}."
+      ~msg:"Rollup node confirmed {level} ({hash})"
       ~level:Notice
       ("level", Data_encoding.n)
       ("hash", Ethereum_types.block_hash_encoding)
@@ -73,9 +71,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_follower_missing_blueprint"
-      ~msg:
-        "The rollup diverged, blueprint {level} not found in local state \
-         (block hash: {expected_hash})."
+      ~msg:"Rollup node diverged at {level}, {expected_hash} not found locally."
       ~level:Error
       ("level", Data_encoding.n)
       ("expected_hash", Ethereum_types.block_hash_encoding)
@@ -84,7 +80,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"evm_events_follower_rollup_node_ahead"
-      ~msg:"Blueprint {level} was confirmed before we received it."
+      ~msg:"Rollup node confirmed {level} before we received it."
       ~level:Warning
       ("level", Data_encoding.n)
 
@@ -92,9 +88,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_follower_out_of_sync"
-      ~msg:
-        "Evm node sequencer received finalized level {received} but was \
-         expected {expected}"
+      ~msg:"Rollup node confimed {expected}, but we have applied {received}."
       ~level:Error
       ("received", Data_encoding.int32)
       ("expected", Data_encoding.int32)
@@ -103,7 +97,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_request_failed"
-      ~msg:"[Warning]: Request {view} failed: {errors}"
+      ~msg:"Request {view} failed: {errors}"
       ~level:Warning
       ("view", Evm_events_follower_types.Request.encoding)
       ~pp1:Evm_events_follower_types.Request.pp
@@ -134,9 +128,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"evm_events_follower_rollup_level_already_processed"
-      ~msg:
-        "The rollup level {level} given to the evm events follower was already \
-         seen, skipping it."
+      ~msg:"Rollup node level {level} was already processed, skipping it."
       ~level:Info
       ("level", Data_encoding.int32)
 
@@ -155,8 +147,7 @@ module Event = struct
       ~section
       ~name:"flush_delayed_inbox"
       ~msg:
-        "The delayed inbox has been flushed in a blueprint at level {level} \
-         (timestamp: {timestamp})."
+        "Rollup node flushed the delayed inbox at level {level} ({timestamp})."
       ~level:Notice
       ("timestamp", Time.Protocol.encoding)
       ("level", Data_encoding.n)
