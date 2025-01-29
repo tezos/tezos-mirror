@@ -14,49 +14,6 @@
 
 let team = Tag.layer1
 
-(* Boilerplate code to create a user-migratable node. Used in the tests below. *)
-let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
-    ~migration_level ~migrate_to () =
-  let* node =
-    Node.init
-      ?name:node_name
-      ~patch_config:
-        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-           [(migration_level, migrate_to)])
-      ([Node.Synchronisation_threshold 0; Private_mode] @ more_node_args)
-  in
-  let* client = Client.(init ?name:client_name ~endpoint:(Node node) ()) in
-  Lwt.return (client, node)
-
-(** [block_check ?level ~expected_block_type ~migrate_to ~migrate_from client]
-    is generic check that a block of type [expected_block_type] contains
-    (protocol) metatadata conforming to its type at [level]. **)
-let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
-  let block =
-    match level with Some level -> Some (string_of_int level) | None -> None
-  in
-  let* metadata =
-    Client.RPC.call client @@ RPC.get_chain_block_metadata ?block ()
-  in
-  let protocol = metadata.protocol in
-  let next_protocol = metadata.next_protocol in
-  (match expected_block_type with
-  | `Migration ->
-      Check.(
-        (next_protocol = Protocol.hash migrate_to)
-          string
-          ~error_msg:"expected next protocol to be %R, got %L") ;
-      Check.(
-        (protocol = Protocol.hash migrate_from)
-          string
-          ~error_msg:"expected (from) protocol to be %R, got %L")
-  | `Non_migration ->
-      Check.(
-        (next_protocol = protocol)
-          string
-          ~error_msg:"expected a non migration block ")) ;
-  Lwt.return_unit
-
 let wait_for_active_protocol_waiting agnostic_baker =
   Agnostic_baker.wait_for
     agnostic_baker
@@ -81,7 +38,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, node =
-    user_migratable_node_init
+    Protocol_migration.user_migratable_node_init
       ?node_name
       ?client_name
       ~migration_level
@@ -102,7 +59,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
           let Account.{alias; public_key_hash; _} = account in
           Client.import_signer_key client ~alias ~public_key_hash uri)
         keys
-    else Lwt.return_unit
+    else unit
   in
   Log.info "Node %s initialized" (Node.name node) ;
   let baker = Agnostic_baker.create node client in
@@ -147,7 +104,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
       Log.info
         "New pre-migration baker process is taking over (pid: %d)"
         new_pid ;
-      Lwt.return_unit)
+      unit)
     else unit
   in
   (* Wait one block before the new protocol activation to register the
@@ -165,7 +122,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
   (* Ensure that the block before migration is consistent *)
   Log.info "Checking migration block consistency" ;
   let* () =
-    block_check
+    Protocol_migration.block_check
       ~expected_block_type:`Migration
       client
       ~migrate_from
@@ -176,7 +133,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
   (* Ensure that we migrated *)
   Log.info "Checking migration block consistency" ;
   let* () =
-    block_check
+    Protocol_migration.block_check
       ~expected_block_type:`Non_migration
       client
       ~migrate_from
@@ -205,12 +162,12 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
       Log.info
         "New post-migration baker process is taking over (pid: %d)"
         new_pid ;
-      Lwt.return_unit)
+      unit)
     else unit
   in
   let* _level = Node.wait_for_level node baked_blocks_after_migration in
   let* () = Agnostic_baker.terminate baker in
-  Lwt.return_unit
+  unit
 
 let raw_migrate ~resilience_test ?(use_remote_signer = false) =
   let remote_signer_text, remote_signer =
