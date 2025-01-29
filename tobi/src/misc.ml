@@ -49,6 +49,10 @@ let unit = Ok ()
 
 let ( let* ) r f = match r with Ok x -> f x | Error _ as e -> e
 
+let wrap_errors context = function
+  | Ok _ as x -> x
+  | Error {code; message} -> Error {code; message = context :: message}
+
 let iter_r (type e) iter container f =
   let exception E of e error in
   try

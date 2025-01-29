@@ -109,6 +109,15 @@ val unit : (unit, 'a) result
 (** The bind operator of the error monad. *)
 val ( let* ) : ('a, 'b) result -> ('a -> ('c, 'b) result) -> ('c, 'b) result
 
+(** {3 Transforming Errors} *)
+
+(** Wrap errors to give them more context.
+
+    For instance, you can write [wrap_errors "failed to read file" @@ ...]
+    at the beginning of a function to prepend ["failed to read file"] to the [message]
+    of all errors. *)
+val wrap_errors : string -> ('a, 'b error) result -> ('a, 'b error) result
+
 (** {3 Error-Monad Versions of Standard Library Functions} *)
 
 (** Those functions are similar to their [Stdlib] counterpart, except that
