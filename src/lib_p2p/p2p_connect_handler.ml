@@ -739,10 +739,28 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                         (point, lazy (Printexc.to_string ex))
                     in
                     Lwt.return_error (TzTrace.make (error_of_exn ex))
-                | `Connection_failed ->
+                | `Connection_unreachable ->
                     let*! () =
                       Events.(emit connect_error)
-                        (point, lazy "connection failed")
+                        (point, lazy "connection unreachable")
+                    in
+                    tzfail P2p_errors.Connection_failed
+                | `Connection_refused ->
+                    let*! () =
+                      Events.(emit connect_error)
+                        (point, lazy "connection refused")
+                    in
+                    tzfail P2p_errors.Connection_failed
+                | `Connection_canceled ->
+                    let*! () =
+                      (* The canceler is set only when we shut down
+                         the P2p. *)
+                      if Lwt_canceler.canceling canceler then
+                        Events.(emit connect_error)
+                          (point, lazy "connection canceled (shutting down)")
+                      else
+                        Events.(emit connect_error)
+                          (point, lazy "connection canceled (timeout)")
                     in
                     tzfail P2p_errors.Connection_failed)
               r)

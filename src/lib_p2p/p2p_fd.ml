@@ -95,7 +95,11 @@ type read_write_error =
   | `Connection_locally_closed
   | unexpected_error ]
 
-type connect_error = [`Connection_failed | unexpected_error]
+type connect_error =
+  [ `Connection_refused
+  | `Connection_unreachable
+  | `Connection_canceled
+  | unexpected_error ]
 
 type accept_error =
   [`System_error of exn | `Socket_error of exn | unexpected_error]
@@ -314,13 +318,13 @@ let connect t saddr =
     (function
       | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
           let*! () = close ~reason:TCP_connection_refused t in
-          Lwt.return_error `Connection_failed
+          Lwt.return_error `Connection_refused
       | Unix.Unix_error (Unix.EHOSTUNREACH, _, _) ->
           let*! () = close ~reason:TCP_connection_unreachable t in
-          Lwt.return_error `Connection_failed
+          Lwt.return_error `Connection_unreachable
       | Lwt.Canceled ->
           let*! () = close ~reason:TCP_connection_canceled t in
-          Lwt.return_error `Connection_failed
+          Lwt.return_error `Connection_canceled
       | ex ->
           let*! () =
             close
