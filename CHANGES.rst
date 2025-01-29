@@ -233,6 +233,10 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- **Bugfix** From v21.2, the DAL node tries to recontact peers after
+  the connection attempt failed. However, this MR fixes the timing
+  when those attempts were made (MR :gl:`!16466`)
+
 - **Feature** The DAL node stores now a peers.json file in its
   directory when it is shutdown with SIGINT. This file is read if it
   exists when starting the DAL node to restore previous known
@@ -317,7 +321,7 @@ Protocol
 
 - A new anonymous operation "DAL entrapment evidence" was added. Bakers that do
   not detect traps lose the corresponding DAL rewards. (MRs :gl:`!15677`,
-  :gl:`!15832`, :gl:`!15836`, :gl:`!16253`, :gl:`!16224`, :gl:`16322`)
+  :gl:`!15832`, :gl:`!15836`, :gl:`!16253`, :gl:`!16224`, :gl:`!16322`)
 
 Miscellaneous
 -------------
