@@ -79,7 +79,14 @@ let load_file filename =
       in
       Ok {pervasive_paths; components}
 
-let load_not_cached () = load_file "tobi/config"
+let load_not_cached (version : Version.t) =
+  match version with
+  | Dev -> load_file "tobi/config"
+  | Old version ->
+      Git.with_checkout_into_tmp
+        ~git_reference:version
+        ~path:"tobi/config"
+        (fun checkout -> load_file checkout.tmp_path)
 
 (* Memoization makes it easy to load the configuration only once for a given version. *)
 let load = memoize load_not_cached

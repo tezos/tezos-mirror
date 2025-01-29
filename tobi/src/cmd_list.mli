@@ -8,4 +8,4 @@
 open Misc
 
 (** Run the [list] CLI command. *)
-val run : verbose:bool -> (unit, [> `failed] error) result
+val run : verbose:bool -> Version.t -> (unit, [> `failed] error) result
