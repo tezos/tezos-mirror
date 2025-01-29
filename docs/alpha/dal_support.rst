@@ -53,7 +53,7 @@ When a commitment is published at a certain level, say level ``n``, the correspo
 Block metadata
 --------------
 
-In the block’s metadata, there is a specific field for the DAL. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``AVAILABILITY_THRESHOLD`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
+In the block’s metadata, there is a specific field for the DAL, called ``"dal_attestation"``. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``AVAILABILITY_THRESHOLD`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
 
 Therefore, for data committed (published) at level ``n``, the slot's availability is determined by the metadata of the block at level ``n + ATTESTATION_LAG``. Consequently, a smart rollup can only utilize this data from level ``n + ATTESTATION_LAG + 1`` onward.
 
