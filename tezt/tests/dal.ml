@@ -158,7 +158,7 @@ let wait_for_layer1_final_block dal_node level =
    round used when injecting DAL attestation operations. Note that it is
    normally not necessary to bake with a particular delegate, therefore there is
    no downside to set the case [`All] as the default. *)
-let bake_for ?(delegates = `All) ?count client =
+let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
   let keys =
     match delegates with
     | `All ->
@@ -166,7 +166,7 @@ let bake_for ?(delegates = `All) ?count client =
         []
     | `For keys -> keys
   in
-  Client.bake_for_and_wait client ~keys ?count
+  Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
 
 (* Bake until a block at some given [level] has been finalized and
    processed by the given [dal_nodes]. The head level after this is
@@ -1630,7 +1630,7 @@ let () =
    the level at which it was published. *)
 let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
     slot_producer_dal_node source ~index ~wait_slot
-    ~number_of_extra_blocks_to_bake content =
+    ~number_of_extra_blocks_to_bake ?delegates content =
   let* commitment, proof =
     Helpers.store_slot slot_producer_dal_node ~slot_index:index content
   in
@@ -1649,7 +1649,7 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
       client
   in
   (* Bake a first block to include the operation. *)
-  let* () = bake_for client in
+  let* () = bake_for ?delegates client in
   (* Check that the operation is included. *)
   let* included_manager_operations =
     let manager_operation_pass = 3 in
@@ -1667,7 +1667,11 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
       ~error_msg:"DAL commitment publishment operation not found in head block."
   in
   (* Bake some more blocks to finalize the block containing the publication. *)
-  let* () = bake_for ~count:number_of_extra_blocks_to_bake client in
+  let* () =
+    if number_of_extra_blocks_to_bake > 0 then
+      bake_for ~count:number_of_extra_blocks_to_bake ?delegates client
+    else unit
+  in
   (* Wait for the shards to be received *)
   let* res = p in
   return (published_level, commitment, res)
@@ -8220,67 +8224,61 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
          expected %R") ;
   unit
 
-(* We have one DAL attester node, and two baker daemons (for a two-sized
-   partition of the attesters). The first baker daemon runs as expected, the
-   other one runs without a DAL node for a small part of a cycle (so that its
-   participation is smaller than the required ratio, but non-zero). We check
-   that the attesters receive or not the DAL rewards depending on which daemon
-   they run on. *)
-let test_attesters_receive_dal_rewards protocol dal_parameters _cryptobox node
+(* We have one DAL attester node. During the second cycle, one of the bakers
+   does not DAL attest sufficiently. We check that the attesters receive or not
+   the DAL rewards depending on their participation. *)
+let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
     client dal_node =
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   assert (blocks_per_cycle >= dal_parameters.Dal.Parameters.attestation_lag) ;
-
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
   let all_delegates =
     Account.Bootstrap.keys |> Array.to_list
-    |> List.map (fun key -> key.Account.alias)
+    |> List.map (fun key -> key.Account.public_key_hash)
   in
   let delegate_a = List.hd all_delegates in
   let rest_delegates = List.tl all_delegates in
-
-  let* first_level = Node.get_level node in
-  let middle_of_cycle_level = first_level + blocks_per_cycle in
-  let last_level = first_level + (2 * blocks_per_cycle) in
-  Log.info
-    "Bake from first_level = %d to last_level = %d"
-    first_level
-    last_level ;
-  let _promise =
-    slot_producer
-      ~slot_index:0
-      ~slot_size:dal_parameters.cryptobox.slot_size
-      ~from:first_level
-      ~into:last_level
-      dal_node
-      node
-      client
-  in
-  let* baker_a =
-    Baker.init ~protocol ~dal_node ~delegates:[delegate_a] node client
-  in
-  let* client_b = Client.init ~endpoint:(Node node) () in
-  let* baker_b =
-    Baker.init ~protocol ~dal_node ~delegates:rest_delegates node client_b
-  in
-  let* _level = Node.wait_for_level node middle_of_cycle_level in
-  let* () = Baker.terminate baker_a in
-  Log.info "Restart one of the bakers without a DAL node." ;
-  let* baker_a = Baker.init ~protocol ~delegates:[delegate_a] node client in
-  let* _level = Node.wait_for_level node last_level in
-  let* () = Baker.terminate baker_a in
-  let* () = Baker.terminate baker_b in
-  (* the last block in the cycle *)
-  let block = string_of_int (last_level - 1) in
   let* level =
+    let* first_level = Node.get_level node in
+    let block = string_of_int first_level in
     Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ~block ()
   in
-  assert (level.cycle_position = blocks_per_cycle - 1) ;
-  let* metadata =
-    Node.RPC.call node @@ RPC.get_chain_block_metadata_raw ~block ()
+  let blocks_to_bake = blocks_per_cycle - 1 - level.cycle_position in
+  Log.info "Publish a slot for %d levels, up to the end of cycle" blocks_to_bake ;
+  let* () =
+    repeat blocks_to_bake (fun () ->
+        let wait_slot ~published_level:_ ~slot_index:_ = unit in
+        let* _res =
+          publish_store_and_wait_slot
+            node
+            client
+            dal_node
+            Constant.bootstrap1
+            ~index:0
+            ~wait_slot
+            ~number_of_extra_blocks_to_bake:0
+          @@ Helpers.make_slot ~slot_size "content"
+        in
+        unit)
   in
+  let* level =
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
+  in
+  assert (level.cycle_position = blocks_per_cycle - 1) ;
+  let dal_node_endpoint =
+    Dal_node.as_rpc_endpoint dal_node |> Endpoint.as_string
+  in
+  let* () =
+    bake_for
+      ~delegates:(`For rest_delegates)
+      ~count:blocks_per_cycle
+      ~dal_node_endpoint
+      client
+  in
+  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata_raw () in
   let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
   let dal_rewards =
     List.filter
@@ -8290,7 +8288,9 @@ let test_attesters_receive_dal_rewards protocol dal_parameters _cryptobox node
            |> String.equal "DAL attesting rewards")
       balance_updates
   in
-  Check.(List.length dal_rewards > 1)
+  (* For each delegate getting rewards there are two "minted" token transfers;
+     and there's one for the delegate losing rewards. *)
+  Check.(List.length dal_rewards = 1 + (2 * List.length rest_delegates))
     ~__LOC__
     Check.int
     ~error_msg:"Expected %R minted DAL-related balance updates, got %L" ;
@@ -8308,7 +8308,7 @@ let test_attesters_receive_dal_rewards protocol dal_parameters _cryptobox node
     ~error_msg:"Expected %R lost DAL reward, got %L" ;
   let json = List.hd lost_dal_rewards in
   let losing_delegate = JSON.(json |-> "delegate" |> as_string) in
-  Check.(Account.Bootstrap.keys.(0).public_key_hash = losing_delegate)
+  Check.(delegate_a = losing_delegate)
     ~__LOC__
     Check.string
     ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
@@ -9206,13 +9206,8 @@ let register ~protocols =
     test_new_attester_attests
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~uses:(fun protocol -> [Protocol.baker protocol])
     ~number_of_slots:1
     ~producer_profiles:[0]
-    ~activation_timestamp:Now
-    ~minimal_block_delay:"3"
-    ~incentives_enable:true
-    ~dal_rewards_weight:5120
     "attesters receive DAL rewards"
     test_attesters_receive_dal_rewards
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
