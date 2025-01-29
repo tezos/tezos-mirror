@@ -112,15 +112,33 @@ let inject_entrapment_evidences (type block_info)
                       trap_injection
                       ( delegate,
                         published_level,
-                        shard.Cryptobox.index,
-                        slot_index ))
+                        attested_level,
+                        slot_index,
+                        shard.Cryptobox.index ))
                 in
-                Plugin.inject_entrapment_evidence
-                  rpc_ctxt
-                  ~attested_level
-                  attestation
-                  ~slot_index
-                  ~shard
-                  ~proof:shard_proof
+                let*! res =
+                  Plugin.inject_entrapment_evidence
+                    rpc_ctxt
+                    ~attested_level
+                    attestation
+                    ~slot_index
+                    ~shard
+                    ~proof:shard_proof
+                in
+                match res with
+                | Ok () -> return_unit
+                | Error err ->
+                    let*! () =
+                      Event.(
+                        emit
+                          trap_injection_failure
+                          ( delegate,
+                            published_level,
+                            attested_level,
+                            slot_index,
+                            shard.Cryptobox.index,
+                            err ))
+                    in
+                    return_unit
               else return_unit)
             traps_to_inject)
