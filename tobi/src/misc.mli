@@ -141,3 +141,30 @@ val list_iter_r :
 
 (** Error-monad version of [List.map]. *)
 val list_map_r : 'b list -> ('b -> ('a, 'c) result) -> ('a list, 'c) result
+
+(** {2 Pretty-Printing} *)
+
+module PP : sig
+  (** Pretty-printing values using OCaml syntax, with indentation.
+
+      This is an alternative to the [Format] module.
+      With [PP] you only have to write functions to embed values;
+      you do not have to think about opening boxes at all. *)
+
+  (** Values. *)
+  type t =
+    | Bool of bool
+    | Char of char
+    | Int of int
+    | Float of float
+    | String of string
+    | List of t list
+    | Variant of string * t list
+    | Tuple of t list
+    | Record of (string * t) list
+
+  (** Pretty-print a value.
+
+      The result is valid OCaml code, which can be convenient when debugging. *)
+  val pp : Format.formatter -> t -> unit
+end
