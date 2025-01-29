@@ -2111,6 +2111,11 @@ impl From<&InstrCacheable> for Instruction {
                     ..Args::DEFAULT
                 },
             },
+
+            InstrCacheable::Hint { instr: _ } => Instruction::new_nop(InstrWidth::Uncompressed),
+            InstrCacheable::HintCompressed { instr: _ } => {
+                Instruction::new_nop(InstrWidth::Compressed)
+            }
         }
     }
 }
