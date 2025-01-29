@@ -230,7 +230,7 @@ module Dune = struct
       ?default_implementation ?implements ?modules
       ?modules_without_implementation ?modes
       ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
-      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?wrapped
+      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?wrapped ?enabled_if
       (names : string list) =
     [
       V
@@ -337,6 +337,7 @@ module Dune = struct
             ] );
           (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
           ctypes;
+          (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
         ];
     ]
 
@@ -1257,6 +1258,7 @@ module Target = struct
     dep_files : string list;
     dep_globs : string list;
     dep_globs_rec : string list;
+    enabled_if : Dune.s_expr option;
   }
 
   and preprocessor =
@@ -1484,6 +1486,7 @@ module Target = struct
     ?extra_authors:string list ->
     ?with_macos_security_framework:bool ->
     path:string ->
+    ?enabled_if:Dune.s_expr ->
     'a ->
     t option
 
@@ -1502,7 +1505,8 @@ module Target = struct
       ?synopsis ?description ?(time_measurement_ppx = false)
       ?(available : available = Always) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ?(with_macos_security_framework = false) ?(source = []) ~path names =
+      ?(with_macos_security_framework = false) ?(source = []) ~path ?enabled_if
+      names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1891,6 +1895,7 @@ module Target = struct
         dep_files;
         dep_globs;
         dep_globs_rec;
+        enabled_if;
       }
 
   let public_lib ?internal_name =
@@ -2433,6 +2438,7 @@ module Sub_lib = struct
        ?extra_authors
        ?with_macos_security_framework
        ~path
+       ?enabled_if
        public_name ->
     let product = container.product in
     if Option.is_some opam then
@@ -2521,6 +2527,7 @@ module Sub_lib = struct
       ?extra_authors
       ?with_macos_security_framework
       ?source
+      ?enabled_if
 end
 
 (*****************************************************************************)
@@ -2888,6 +2895,7 @@ let generate_dune (internal : Target.internal) =
       ?ctypes
       ~private_modules:internal.private_modules
       ?wrapped:internal.wrapped
+      ?enabled_if:internal.enabled_if
     :: documentation :: create_empty_files :: internal.dune)
 
 (* [Explicitly_unreleased i]: this opam package was explicitly specified not to be released
