@@ -22,4 +22,14 @@ let run ~verbose version =
       List.iter (echo "  - %s") (path :: other_paths)) ;
     (* Output opam file path. *)
     echo "- opam: %s" component.opam ;
+    (* Output dependencies. *)
+    let* component = Component.load component.name version in
+    (Fun.flip List.iter component.dependencies @@ function
+     | Internal {name; version; with_test} ->
+         echo
+           "- depends on component: %s.%s%s"
+           name
+           (Version.show version)
+           (if with_test then " (only for tests)" else "")
+     | External _ -> ()) ;
     unit
