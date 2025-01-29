@@ -81,6 +81,8 @@ module Qty : sig
   val zero : quantity
 
   val ( = ) : quantity -> quantity -> bool
+
+  val ( < ) : quantity -> quantity -> bool
 end
 
 val quantity_encoding : quantity Data_encoding.t

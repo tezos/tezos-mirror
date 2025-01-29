@@ -63,21 +63,6 @@ type error +=
   | Receipt_not_found of hash
   | Too_many_logs of {limit : int}
 
-(** [height_from_param (module Rollup_node_rpc) from to_] returns the
-    block height for params [from] and [to_] as a tuple.
-*)
-let height_from_param (module Rollup_node_rpc : Services_backend_sig.S)
-    from_block to_block =
-  let open Lwt_result_syntax in
-  let open Block_parameter in
-  let* from_block =
-    Rollup_node_rpc.block_param_to_block_number (Block_parameter from_block)
-  in
-  let* to_block =
-    Rollup_node_rpc.block_param_to_block_number (Block_parameter to_block)
-  in
-  return (from_block, to_block)
-
 let valid_range log_filter_config (Qty from) (Qty to_) =
   Z.(
     to_ >= from
@@ -102,15 +87,18 @@ let validate_range log_filter_config
           ~full_transaction_object:false
           block_hash
       in
-      return (block.number, block.number)
+      return_some (block.number, block.number)
   | {from_block; to_block; _} ->
-      let from_block = Option.value ~default:Latest from_block in
-      let to_block = Option.value ~default:Latest to_block in
-      let* from_block, to_block =
-        height_from_param (module Rollup_node_rpc) from_block to_block
+      let get_block_number block_param =
+        Rollup_node_rpc.block_param_to_block_number
+          (Block_parameter
+             (Option.value ~default:Block_parameter.Latest block_param))
       in
-      if valid_range log_filter_config from_block to_block then
-        return (from_block, to_block)
+      let* from_block = get_block_number from_block in
+      let* to_block = get_block_number to_block in
+      if from_block > to_block then return_none
+      else if valid_range log_filter_config from_block to_block then
+        return_some (from_block, to_block)
       else
         tzfail (Block_range_too_large {limit = log_filter_config.max_nb_blocks})
 
@@ -150,27 +138,30 @@ let validate_bloom_filter (filter : Filter.t) =
 (* Parsing a filter into a simpler representation, this is the
    input validation step *)
 let validate_filter log_filter_config
-    (module Rollup_node_rpc : Services_backend_sig.S) :
-    Filter.t -> valid_filter tzresult Lwt.t =
- fun filter ->
+    (module Rollup_node_rpc : Services_backend_sig.S) filter =
   let open Lwt_result_syntax in
-  let* from_block, to_block =
+  let* range =
     validate_range log_filter_config (module Rollup_node_rpc) filter
   in
-  let* () = validate_topics filter in
-  let bloom = make_bloom filter in
-  let address =
-    Option.map (function Filter.Single a -> [a] | Vec l -> l) filter.address
-    |> Option.value ~default:[]
-  in
-  return
-    {
-      from_block;
-      to_block;
-      bloom;
-      topics = Option.value ~default:[] filter.topics;
-      address;
-    }
+  match range with
+  | None -> return_none
+  | Some (from_block, to_block) ->
+      let* () = validate_topics filter in
+      let bloom = make_bloom filter in
+      let address =
+        Option.map
+          (function Filter.Single a -> [a] | Vec l -> l)
+          filter.address
+        |> Option.value ~default:[]
+      in
+      return_some
+        {
+          from_block;
+          to_block;
+          bloom;
+          topics = Option.value ~default:[] filter.topics;
+          address;
+        }
 
 let hex_to_bytes h = hex_to_bytes h |> Bytes.of_string
 
@@ -293,32 +284,39 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
   let* filter =
     validate_filter log_filter_config (module Rollup_node_rpc) filter
   in
-  let (Qty from) = filter.from_block in
-  let (Qty to_) = filter.to_block in
-  let length = Z.(to_int (to_ - from)) + 1 in
-  let block_numbers =
-    split_in_chunks ~chunk_size:log_filter_config.chunk_size ~length ~base:from
-  in
-  let* logs, _n_logs =
-    List.fold_left_es
-      (function
-        | acc_logs, n_logs ->
-            fun chunk ->
-              (* Apply the filter to the entire chunk concurrently *)
-              let* new_logs =
-                Lwt_result.map List.concat
-                @@ List.filter_map_ep
-                     (filter_one_block (module Rollup_node_rpc) filter)
-                     chunk
-              in
-              let n_new_logs = List.length new_logs in
-              if n_logs + n_new_logs > log_filter_config.max_nb_logs then
-                tzfail (Too_many_logs {limit = log_filter_config.max_nb_logs})
-              else return (acc_logs @ new_logs, n_logs + n_new_logs))
-      ([], 0)
-      block_numbers
-  in
-  return logs
+  match filter with
+  | None -> return []
+  | Some filter ->
+      let (Qty from) = filter.from_block in
+      let (Qty to_) = filter.to_block in
+      let length = Z.(to_int (to_ - from)) + 1 in
+      let block_numbers =
+        split_in_chunks
+          ~chunk_size:log_filter_config.chunk_size
+          ~length
+          ~base:from
+      in
+      let* logs, _n_logs =
+        List.fold_left_es
+          (function
+            | acc_logs, n_logs ->
+                fun chunk ->
+                  (* Apply the filter to the entire chunk concurrently *)
+                  let* new_logs =
+                    Lwt_result.map List.concat
+                    @@ List.filter_map_ep
+                         (filter_one_block (module Rollup_node_rpc) filter)
+                         chunk
+                  in
+                  let n_new_logs = List.length new_logs in
+                  if n_logs + n_new_logs > log_filter_config.max_nb_logs then
+                    tzfail
+                      (Too_many_logs {limit = log_filter_config.max_nb_logs})
+                  else return (acc_logs @ new_logs, n_logs + n_new_logs))
+          ([], 0)
+          block_numbers
+      in
+      return logs
 
 (* Errors registration *)
 
