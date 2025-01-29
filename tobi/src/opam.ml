@@ -269,3 +269,165 @@ let parse_file filename =
       filename
       ~reason:
         [sf "in Opam.%s: unsupported case:@.%a@?" function_name PP.pp value]
+
+module Install = struct
+  type directory =
+    | Lib
+    | Lib_root
+    | Libexec
+    | Libexec_root
+    | Bin
+    | Sbin
+    | Toplevel
+    | Share
+    | Share_root
+    | Etc
+    | Doc
+    | Stublibs
+    | Man
+    | Misc
+
+  type field_item = {source_path : string; target_path : string option}
+
+  type field = {directory : directory; items : field_item list}
+
+  type file = {
+    directory : directory;
+    source_path : string;
+    target_path_relative_to_prefix : string;
+    permissions : int;
+  }
+
+  (* [.install] files are lists of "fields", with a key denoting the directory
+     where to install the files. But not exactly: each directory is treated
+     slightly differently; for instance [lib] is not [lib/] but [lib/NAME]
+     where [NAME] is the package name; [libexec] is the same as [lib] except
+     that the execution flag must be set in the file's permissions; etc.
+     So instead of storing directories as a string, we store them using a variant.
+     [as_directory] converts into this variant. *)
+  let as_directory = function
+    | "lib" -> Lib
+    | "lib_root" -> Lib_root
+    | "libexec" -> Libexec
+    | "libexec_root" -> Libexec_root
+    | "bin" -> Bin
+    | "sbin" -> Sbin
+    | "toplevel" -> Toplevel
+    | "share" -> Share
+    | "share_root" -> Share_root
+    | "etc" -> Etc
+    | "doc" -> Doc
+    | "stublibs" -> Stublibs
+    | "man" -> Man
+    | "misc" -> Misc
+    | s -> unsupported "Install.as_directory" (String s)
+
+  (* Field items are single files to install.
+     They can be annotated with the target path where to install the file,
+     or not, in which case a default target is used. *)
+  let as_field_item (value : OpamParserTypes.FullPos.value) =
+    match value.pelem with
+    | String source_path -> {source_path; target_path = None}
+    | Option
+        ( {pelem = String source_path; _},
+          {pelem = [{pelem = String target_path; _}]; _} ) ->
+        {source_path; target_path = Some target_path}
+    | _ -> unsupported "Install.as_field_item" (pp_opam_value value)
+
+  (* Fields are keys (directories) associated with a list of files to install
+     in the corresponding directory. *)
+  let as_field (item : OpamParserTypes.FullPos.opamfile_item) =
+    match item.pelem with
+    | Variable (directory, {pelem = List items; _}) ->
+        let directory = as_directory directory.pelem in
+        let items = List.map as_field_item items.pelem in
+        {directory; items}
+    | _ -> unsupported "Install.as_field" (pp_opam_item item)
+
+  let as_file ~package_name directory {source_path; target_path} =
+    (* Give meaning to the [directory].
+       The actual meaning depends on the [package_name]
+       and, for man pages, on the file extension. *)
+    let directory_path =
+      match directory with
+      | Lib | Libexec -> "lib" // package_name
+      | Lib_root | Libexec_root -> "lib"
+      | Bin -> "bin"
+      | Sbin -> "sbin"
+      | Toplevel -> "lib/toplevel"
+      | Share -> "share" // package_name
+      | Share_root -> "share"
+      | Etc -> "etc" // package_name
+      | Doc -> "doc" // package_name
+      | Stublibs -> "lib/stublibs"
+      | Man -> (
+          match target_path with
+          | Some _ -> "man"
+          | None -> (
+              match Filename.extension source_path with
+              | ".1" -> "man/man1"
+              | ".2" -> "man/man2"
+              | ".3" | ".3o" -> "man/man3"
+              | ".4" -> "man/man4"
+              | ".5" -> "man/man5"
+              | ".6" -> "man/man6"
+              | ".7" -> "man/man7"
+              | ".8" -> "man/man8"
+              | ".9" -> "man/man9"
+              | extension ->
+                  (* There may be other subsections to support in the future,
+                     but it's hard to predict which ones. *)
+                  unsupported
+                    "Install.list"
+                    (Variant ("Man", [Record [("extension", String extension)]]))
+              ))
+      | Misc ->
+          (* [Misc] seems dangerous because it allows to install files anywhere
+             on the file system, not just in [_opam]. For now we don't need it. *)
+          unsupported "Install.list" (Variant ("Misc", []))
+    in
+    (* Decide where the file will be installed. *)
+    let target_path_relative_to_directory =
+      match target_path with
+      | None -> Filename.basename source_path
+      | Some target_path -> target_path
+    in
+    let target_path_relative_to_prefix =
+      directory_path // target_path_relative_to_directory
+    in
+    (* Decide whether to set the execution flag of the installed file. *)
+    let permissions =
+      match directory with
+      | Lib | Lib_root | Toplevel | Share | Share_root | Etc | Doc | Man | Misc
+        ->
+          0o644
+      | Libexec | Libexec_root | Bin | Sbin | Stublibs -> 0o755
+    in
+    {directory; source_path; target_path_relative_to_prefix; permissions}
+
+  let parse_file ~package_name ~filename =
+    try
+      if not (Sys.file_exists filename) then fail "file not found: %s" filename
+      else
+        (* Parse using the opam-file-format library. This gives a low-level AST. *)
+        let* items =
+          try Ok (OpamParser.FullPos.file filename).file_contents with
+          | OpamLexer.Error msg -> fail "failed to parse %s: %s" filename msg
+          | Parsing.Parse_error -> fail "failed to parse %s" filename
+        in
+        (* Give meaning to the low-level AST. *)
+        let fields = List.map as_field items in
+        let files =
+          List.flatten @@ Fun.flip List.map fields
+          @@ fun {directory; items} ->
+          Fun.flip List.map items @@ fun item ->
+          as_file ~package_name directory item
+        in
+        Ok files
+    with Unsupported {function_name; value} ->
+      fail
+        "failed to parse %s"
+        filename
+        ~reason:
+          [sf "in Opam.%s: unsupported case:@.%a@?" function_name PP.pp value]
+end

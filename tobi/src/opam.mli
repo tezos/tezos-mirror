@@ -72,3 +72,50 @@ val pp : t -> PP.t
 
 (** Parse a [.opam] file. *)
 val parse_file : string -> (t, [> `failed]) r
+
+module Install : sig
+  (** Parse Opam [.install] files and give meaning to them. *)
+
+  (** Target directories.
+
+      See https://opam.ocaml.org/doc/Manual.html#lt-pkgname-gt-install
+      for the meaning of each directory. *)
+  type directory =
+    | Lib
+    | Lib_root
+    | Libexec
+    | Libexec_root
+    | Bin
+    | Sbin
+    | Toplevel
+    | Share
+    | Share_root
+    | Etc
+    | Doc
+    | Stublibs
+    | Man
+    | Misc
+
+  (** Semantics of a file in a [.install] file.
+
+      [directory] is the target directory where to install the file.
+
+      [source_path] is the path where the original file can be found.
+
+      [target_path_relative_to_prefix] is the path, relative to [_opam],
+      where to install the file. It is deduced from [directory], the package name,
+      and the extension of [source_path].
+
+      [permissions] is the permissions that the files should have once installed.
+      It depends on [directory]. *)
+  type file = {
+    directory : directory;
+    source_path : string;
+    target_path_relative_to_prefix : string;
+    permissions : int;
+  }
+
+  (** Parse an Opam [.install] file. *)
+  val parse_file :
+    package_name:string -> filename:string -> (file list, [> `failed]) r
+end
