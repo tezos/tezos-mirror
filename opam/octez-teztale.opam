@@ -49,6 +49,7 @@ depopts: [
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
   "octez-protocol-021-PsQuebec-libs"
+  "octez-protocol-next-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [

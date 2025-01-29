@@ -1,0 +1,40 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_client_next)
+ (public_name octez-protocol-next-libs.client)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  tezos-protocol-next.protocol
+  tezos-protocol-next.protocol.lifted
+  octez-shell-libs.mockup-registration
+  octez-shell-libs.proxy
+  octez-shell-libs.signer-backends
+  octez-protocol-next-libs.plugin
+  tezos-protocol-next.parameters
+  octez-libs.rpc
+  octez-protocol-next-libs.smart-rollup
+  uri)
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable
+   (link_flags -linkall -cclib -lblst -cclib -loctez_rustzcash_deps))
+  (libraries bls12-381.archive octez-rustzcash-deps))
+ (preprocess (pps ppx_expect))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_protocol_next
+  -open Tezos_protocol_next_lifted
+  -open Tezos_protocol_plugin_next
+  -open Tezos_protocol_next_parameters
+  -open Tezos_smart_rollup_next))

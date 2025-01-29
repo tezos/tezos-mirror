@@ -9,9 +9,11 @@ mainnet_evm_kernel: etherlink/kernel_evm/kernel/tests/resources/mainnet_evm_kern
 evm_kernel: evm_kernel.wasm
 accuser_psquebec: octez-accuser-PsQuebec
 accuser_alpha: octez-accuser-alpha
+accuser_next: octez-accuser-next
 admin_client: octez-admin-client
 baker_psquebec: octez-baker-PsQuebec
 baker_alpha: octez-baker-alpha
+baker_next: octez-baker-next
 client: octez-client
 codec: octez-codec
 dac_client: octez-dac-client

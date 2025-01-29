@@ -1406,16 +1406,16 @@ opam:all_6:
   parallel:
     matrix:
     - package:
-      - tezt-tezos
+      - tezos-protocol-next
       - tezos-protocol-genesis
-      - tezos-openapi
+      - tezos-protocol-demo-noops
+      - tezos-protocol-demo-counter
       - tezos-dal-node-services
       - tezos-benchmark
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-performance-metrics
-      - octez-libs
       - octez-l2-libs
       - efunc_core
       - dal_node_migrations
@@ -1559,7 +1559,9 @@ opam:all_2:
   parallel:
     matrix:
     - package:
+      - octez-smart-rollup-wasm-debugger-lib
       - octez-smart-rollup-node-lib
+      - octez-protocol-next-libs
       - octez-protocol-alpha-libs
       - octez-protocol-021-PsQuebec-libs
       - octez-protocol-020-PsParisC-libs
@@ -1567,8 +1569,6 @@ opam:all_2:
       - octez-protocol-018-Proxford-libs
       - octez-protocol-017-PtNairob-libs
       - octez-protocol-016-PtMumbai-libs
-      - octez-protocol-004-Pt24m4xi-libs
-      - octez-protocol-003-PsddFKi3-libs
       - octez-protocol-002-PsYLVpVv-libs
       - octez-protocol-001-PtCJ7pwo-libs
       - octez-protocol-000-Ps9mPmXa-libs
@@ -1643,13 +1643,82 @@ opam:all_1:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-wasm-debugger-lib
+      - octez-smart-rollup-node-next
       - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtParisB
       - octez-smart-rollup-node-PtNairob
       - octez-smart-rollup-node-PsQuebec
       - octez-smart-rollup-node-PsParisC
       - octez-smart-rollup-node-Proxford
+
+opam:exec_2:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/dune.inc'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/**/*.ml*
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    when: delayed
+    start_in: 2 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 60 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
+  parallel:
+    matrix:
+    - package:
+      - octez-experimental-agnostic-baker
 
 opam:all_3:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1720,7 +1789,6 @@ opam:all_3:
   parallel:
     matrix:
     - package:
-      - tezos-client-genesis
       - tezos-client-demo-counter
       - octez-rpc-process
       - octez-protocol-015-PtLimaPt-libs
@@ -1734,76 +1802,8 @@ opam:all_3:
       - octez-protocol-007-PsDELPH1-libs
       - octez-protocol-006-PsCARTHA-libs
       - octez-protocol-005-PsBabyM1-libs
-      - octez-crawler
-
-opam:exec_2:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: packaging
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
-    when: delayed
-    start_in: 2 minutes
-  - changes:
-    - '**/*.dune.inc'
-    - '**/*.opam'
-    - '**/dune'
-    - '**/dune-project'
-    - '**/dune-workspace'
-    - '**/dune.inc'
-    - .gitlab/ci/jobs/packaging/opam:prepare.yml
-    - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/**/*.ml*
-    - scripts/opam-prepare-repo.sh
-    - scripts/version.sh
-    when: delayed
-    start_in: 2 minutes
-  needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  timeout: 60 minutes
-  cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  before_script:
-  - eval $(opam env)
-  - mkdir -p $CI_PROJECT_DIR/opam_logs
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - opam remote add dev-repo ./_opam-repo-for-release
-  - opam install --yes ${package}.dev
-  - opam reinstall --yes --with-test ${package}.dev
-  after_script:
-  - eval $(opam env)
-  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
-    SCCACHE_IDLE_TIMEOUT: "0"
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - opam_logs/
-    when: always
-  retry: 2
-  parallel:
-    matrix:
-    - package:
-      - octez-experimental-agnostic-baker
+      - octez-protocol-004-Pt24m4xi-libs
+      - octez-protocol-003-PsddFKi3-libs
 
 opam:exec_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1943,8 +1943,6 @@ opam:all_4:
   parallel:
     matrix:
     - package:
-      - tezos-protocol-009-PsFLoren
-      - tezos-protocol-008-PtEdoTez
       - tezos-protocol-008-PtEdo2Zk
       - tezos-protocol-007-PsDELPH1
       - tezos-protocol-006-PsCARTHA
@@ -1956,7 +1954,9 @@ opam:all_4:
       - tezos-protocol-001-PtCJ7pwo
       - tezos-protocol-000-Ps9mPmXa
       - tezos-dal-node-lib
+      - tezos-client-genesis
       - octez-node-config
+      - octez-crawler
 
 opam:exec_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -2103,8 +2103,6 @@ opam:all_5:
   parallel:
     matrix:
     - package:
-      - tezos-protocol-demo-noops
-      - tezos-protocol-demo-counter
       - tezos-protocol-alpha
       - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
@@ -2118,6 +2116,8 @@ opam:all_5:
       - tezos-protocol-012-Psithaca
       - tezos-protocol-011-PtHangz2
       - tezos-protocol-010-PtGRANAD
+      - tezos-protocol-009-PsFLoren
+      - tezos-protocol-008-PtEdoTez
 
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -2188,11 +2188,14 @@ opam:all_7:
   parallel:
     matrix:
     - package:
+      - tezt-tezos
+      - tezos-openapi
       - octez-smart-rollup-wasm-debugger-plugin
       - octez-rustzcash-deps
       - octez-rust-deps
       - octez-riscv-api
       - octez-protocol-compiler-compat
+      - octez-libs
       - octez-internal-libs
       - octez-distributed-lwt-internal
       - octez-distributed-internal

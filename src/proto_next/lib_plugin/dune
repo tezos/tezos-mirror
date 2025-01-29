@@ -1,0 +1,36 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_plugin_next)
+ (public_name octez-protocol-next-libs.plugin)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-next.protocol
+  octez-protocol-next-libs.smart-rollup)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_next
+  -open Tezos_smart_rollup_next)
+ (modules (:standard \ Plugin_registerer)))
+
+(documentation (package octez-protocol-next-libs))
+
+(library
+ (name tezos_protocol_plugin_next_registerer)
+ (public_name octez-protocol-next-libs.plugin-registerer)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-next.embedded-protocol
+  octez-protocol-next-libs.plugin
+  octez-shell-libs.validation)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_embedded_protocol_next
+  -open Tezos_protocol_plugin_next
+  -open Tezos_validation)
+ (modules Plugin_registerer))

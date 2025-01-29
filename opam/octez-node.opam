@@ -66,6 +66,8 @@ depopts: [
   "octez-protocol-019-PtParisB-libs"
   "tezos-protocol-020-PsParisC"
   "octez-protocol-020-PsParisC-libs"
+  "tezos-protocol-next"
+  "octez-protocol-next-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -109,6 +111,8 @@ conflicts: [
   "octez-protocol-019-PtParisB-libs" { != version }
   "tezos-protocol-020-PsParisC" { != version }
   "octez-protocol-020-PsParisC-libs" { != version }
+  "tezos-protocol-next" { != version }
+  "octez-protocol-next-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]

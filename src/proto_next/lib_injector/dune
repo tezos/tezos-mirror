@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_injector_next)
+ (package tezos-injector-next)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-next.protocol
+  octez-injector
+  octez-protocol-next-libs.client
+  octez-shell-libs.client-base
+  octez-protocol-next-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_next
+  -open Octez_injector
+  -open Tezos_client_next
+  -open Tezos_client_base
+  -open Tezos_protocol_plugin_next))

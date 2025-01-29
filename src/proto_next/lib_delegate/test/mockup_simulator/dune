@@ -1,0 +1,33 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_next_mockup_simulator)
+ (public_name octez-protocol-next-libs.bakings.mockup-simulator)
+ (libraries
+  octez-libs.base
+  tezos-protocol-next.protocol
+  octez-protocol-next-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-next-libs.baking
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base-unix
+  tezos-protocol-next.parameters
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-proxy
+  octez-shell-libs.mockup-commands
+  octez-protocol-next-libs.baking.tenderbrute
+  tezt.core)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_next
+  -open Tezos_protocol_next.Protocol
+  -open Tezos_client_next
+  -open Tezos_client_commands
+  -open Tezos_baking_next
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_next_parameters
+  -open Tenderbrute_next
+  -open Tezt_core))

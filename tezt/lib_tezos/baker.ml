@@ -209,7 +209,8 @@ let run ?env ?event_level ?event_sections_levels (baker : t) =
   let without_dal =
     Cli_arg.optional_switch
       "without-dal"
-      (baker.persistent_state.protocol = Protocol.Alpha
+      (Protocol.number baker.persistent_state.protocol
+       > Protocol.number Protocol.Quebec
       && Option.is_none baker.persistent_state.dal_node_rpc_endpoint)
   in
   let dal_node_timeout_percentage =

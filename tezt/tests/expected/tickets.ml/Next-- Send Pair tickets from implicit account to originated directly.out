@@ -1,0 +1,48 @@
+
+./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint save --arg 'Pair "[CONTRACT_HASH]" (Pair "Ticket" 1)'
+Node is bootstrapped.
+Estimated gas: 3081.619 units (will add 100 for safety)
+Estimated storage: 44 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000635
+    Expected counter: 4
+    Gas limit: 3182
+    Storage limit: 64 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000635
+      payload fees(the block proposer) ....... +ꜩ0.000635
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Entrypoint: save
+      Parameter: (Pair "[CONTRACT_HASH]" (Pair "Ticket" 1))
+      This transaction was successfully applied
+      Updated storage:
+        { Pair 0x01fb08747351ab3652f772910c4565880d8df616f800 (Pair "Ticket" 1) }
+      Storage size: 238 bytes
+      Paid storage size diff: 44 bytes
+      Consumed gas: 3081.553
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.011
+        storage fees ........................... +ꜩ0.011
+      Ticket updates:
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "Ticket"
+        Account updates:
+          [PUBLIC_KEY_HASH] ... -1
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "Ticket"
+        Account updates:
+          [CONTRACT_HASH] ... +1
+

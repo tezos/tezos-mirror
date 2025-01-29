@@ -1,0 +1,253 @@
+
+trace
+  - CAR (interp) @ location: 9
+    [ (Pair { "abc" ; "xyz" } { "zyx" ; "cba" }) ]
+  - CAR (entry) @ location: 9
+    [ (Pair { "abc" ; "xyz" } { "zyx" ; "cba" }) ]
+    - log/NIL (exit) @ location: 9
+      [ { "abc" ; "xyz" } ]
+  - NIL (entry) @ location: 10
+    [ { "abc" ; "xyz" } ]
+    - log/SWAP (exit) @ location: 10
+      [ {}
+        { "abc" ; "xyz" } ]
+  - SWAP (entry) @ location: 12
+    [ {}
+      { "abc" ; "xyz" } ]
+    - log/PAIR (exit) @ location: 12
+      [ { "abc" ; "xyz" }
+        {} ]
+  - PAIR (entry) @ location: 13
+    [ { "abc" ; "xyz" }
+      {} ]
+    - log/LEFT (exit) @ location: 13
+      [ (Pair { "abc" ; "xyz" } {}) ]
+  - LEFT (entry) @ location: 14
+    [ (Pair { "abc" ; "xyz" } {}) ]
+    - log/LOOP_LEFT (exit) @ location: 14
+      [ (Left (Pair { "abc" ; "xyz" } {})) ]
+  - LOOP_LEFT (entry) @ location: 41
+    [ (Left (Pair { "abc" ; "xyz" } {})) ]
+    - control: KLoop_in_left
+    - log/DUP (exit) @ location: 41
+      [ (Pair { "abc" ; "xyz" } {}) ]
+  - DUP (entry) @ location: 19
+    [ (Pair { "abc" ; "xyz" } {}) ]
+    - log/CAR (exit) @ location: 19
+      [ (Pair { "abc" ; "xyz" } {})
+        (Pair { "abc" ; "xyz" } {}) ]
+  - CAR (entry) @ location: 20
+    [ (Pair { "abc" ; "xyz" } {})
+      (Pair { "abc" ; "xyz" } {}) ]
+    - log/DIP (exit) @ location: 20
+      [ { "abc" ; "xyz" }
+        (Pair { "abc" ; "xyz" } {}) ]
+  - DIP (entry) @ location: 21
+    [ { "abc" ; "xyz" }
+      (Pair { "abc" ; "xyz" } {}) ]
+    - log/CDR (exit) @ location: 21
+      [ (Pair { "abc" ; "xyz" } {}) ]
+  - CDR (entry) @ location: 23
+    [ (Pair { "abc" ; "xyz" } {}) ]
+    - log/[halt] (exit) @ location: 23
+      [ {} ]
+  - [halt] (entry) @ location: 23
+    [ {} ]
+    - control: KUndip
+    - control: KCons
+    - log/IF_CONS (exit) @ location: 21
+      [ { "abc" ; "xyz" }
+        {} ]
+  - IF_CONS (entry) @ location: 24
+    [ { "abc" ; "xyz" }
+      {} ]
+    - log/SWAP (exit) @ location: 24
+      [ "abc"
+        { "xyz" }
+        {} ]
+  - SWAP (entry) @ location: 26
+    [ "abc"
+      { "xyz" }
+      {} ]
+    - log/DIP (exit) @ location: 26
+      [ { "xyz" }
+        "abc"
+        {} ]
+  - DIP (entry) @ location: 27
+    [ { "xyz" }
+      "abc"
+      {} ]
+    - log/CONS (exit) @ location: 27
+      [ "abc"
+        {} ]
+  - CONS (entry) @ location: 29
+    [ "abc"
+      {} ]
+    - log/[halt] (exit) @ location: 29
+      [ { "abc" } ]
+  - [halt] (entry) @ location: 29
+    [ { "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - log/PAIR (exit) @ location: 27
+      [ { "xyz" }
+        { "abc" } ]
+  - PAIR (entry) @ location: 30
+    [ { "xyz" }
+      { "abc" } ]
+    - log/LEFT (exit) @ location: 30
+      [ (Pair { "xyz" } { "abc" }) ]
+  - LEFT (entry) @ location: 31
+    [ (Pair { "xyz" } { "abc" }) ]
+    - log/[halt] (exit) @ location: 31
+      [ (Left (Pair { "xyz" } { "abc" })) ]
+  - [halt] (entry) @ location: 41
+    [ (Left (Pair { "xyz" } { "abc" })) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 24
+      [ (Left (Pair { "xyz" } { "abc" })) ]
+  - [halt] (entry) @ location: 41
+    [ (Left (Pair { "xyz" } { "abc" })) ]
+    - control: KLoop_in_left
+    - log/DUP (exit) @ location: 41
+      [ (Pair { "xyz" } { "abc" }) ]
+  - DUP (entry) @ location: 19
+    [ (Pair { "xyz" } { "abc" }) ]
+    - log/CAR (exit) @ location: 19
+      [ (Pair { "xyz" } { "abc" })
+        (Pair { "xyz" } { "abc" }) ]
+  - CAR (entry) @ location: 20
+    [ (Pair { "xyz" } { "abc" })
+      (Pair { "xyz" } { "abc" }) ]
+    - log/DIP (exit) @ location: 20
+      [ { "xyz" }
+        (Pair { "xyz" } { "abc" }) ]
+  - DIP (entry) @ location: 21
+    [ { "xyz" }
+      (Pair { "xyz" } { "abc" }) ]
+    - log/CDR (exit) @ location: 21
+      [ (Pair { "xyz" } { "abc" }) ]
+  - CDR (entry) @ location: 23
+    [ (Pair { "xyz" } { "abc" }) ]
+    - log/[halt] (exit) @ location: 23
+      [ { "abc" } ]
+  - [halt] (entry) @ location: 23
+    [ { "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - log/IF_CONS (exit) @ location: 21
+      [ { "xyz" }
+        { "abc" } ]
+  - IF_CONS (entry) @ location: 24
+    [ { "xyz" }
+      { "abc" } ]
+    - log/SWAP (exit) @ location: 24
+      [ "xyz"
+        {}
+        { "abc" } ]
+  - SWAP (entry) @ location: 26
+    [ "xyz"
+      {}
+      { "abc" } ]
+    - log/DIP (exit) @ location: 26
+      [ {}
+        "xyz"
+        { "abc" } ]
+  - DIP (entry) @ location: 27
+    [ {}
+      "xyz"
+      { "abc" } ]
+    - log/CONS (exit) @ location: 27
+      [ "xyz"
+        { "abc" } ]
+  - CONS (entry) @ location: 29
+    [ "xyz"
+      { "abc" } ]
+    - log/[halt] (exit) @ location: 29
+      [ { "xyz" ; "abc" } ]
+  - [halt] (entry) @ location: 29
+    [ { "xyz" ; "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - log/PAIR (exit) @ location: 27
+      [ {}
+        { "xyz" ; "abc" } ]
+  - PAIR (entry) @ location: 30
+    [ {}
+      { "xyz" ; "abc" } ]
+    - log/LEFT (exit) @ location: 30
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - LEFT (entry) @ location: 31
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - log/[halt] (exit) @ location: 31
+      [ (Left (Pair {} { "xyz" ; "abc" })) ]
+  - [halt] (entry) @ location: 41
+    [ (Left (Pair {} { "xyz" ; "abc" })) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 24
+      [ (Left (Pair {} { "xyz" ; "abc" })) ]
+  - [halt] (entry) @ location: 41
+    [ (Left (Pair {} { "xyz" ; "abc" })) ]
+    - control: KLoop_in_left
+    - log/DUP (exit) @ location: 41
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - DUP (entry) @ location: 19
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - log/CAR (exit) @ location: 19
+      [ (Pair {} { "xyz" ; "abc" })
+        (Pair {} { "xyz" ; "abc" }) ]
+  - CAR (entry) @ location: 20
+    [ (Pair {} { "xyz" ; "abc" })
+      (Pair {} { "xyz" ; "abc" }) ]
+    - log/DIP (exit) @ location: 20
+      [ {}
+        (Pair {} { "xyz" ; "abc" }) ]
+  - DIP (entry) @ location: 21
+    [ {}
+      (Pair {} { "xyz" ; "abc" }) ]
+    - log/CDR (exit) @ location: 21
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - CDR (entry) @ location: 23
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - log/[halt] (exit) @ location: 23
+      [ { "xyz" ; "abc" } ]
+  - [halt] (entry) @ location: 23
+    [ { "xyz" ; "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - log/IF_CONS (exit) @ location: 21
+      [ {}
+        { "xyz" ; "abc" } ]
+  - IF_CONS (entry) @ location: 24
+    [ {}
+      { "xyz" ; "abc" } ]
+    - log/RIGHT (exit) @ location: 24
+      [ { "xyz" ; "abc" } ]
+  - RIGHT (entry) @ location: 35
+    [ { "xyz" ; "abc" } ]
+    - log/[halt] (exit) @ location: 35
+      [ (Right { "xyz" ; "abc" }) ]
+  - [halt] (entry) @ location: 41
+    [ (Right { "xyz" ; "abc" }) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 24
+      [ (Right { "xyz" ; "abc" }) ]
+  - [halt] (entry) @ location: 41
+    [ (Right { "xyz" ; "abc" }) ]
+    - control: KLoop_in_left
+    - control: KCons
+    - log/NIL (exit) @ location: 41
+      [ { "xyz" ; "abc" } ]
+  - NIL (entry) @ location: 41
+    [ { "xyz" ; "abc" } ]
+    - log/PAIR (exit) @ location: 41
+      [ {}
+        { "xyz" ; "abc" } ]
+  - PAIR (entry) @ location: 43
+    [ {}
+      { "xyz" ; "abc" } ]
+    - log/[halt] (exit) @ location: 43
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - [halt] (entry) @ location: 8
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - control: KNil

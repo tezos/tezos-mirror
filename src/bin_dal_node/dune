@@ -40,6 +40,9 @@
   octez-crawler
   memtrace
   octez-protocol-021-PsQuebec-libs.dal
+  (select void_for_linking-octez-protocol-next-libs-dal from
+   (octez-protocol-next-libs.dal -> void_for_linking-octez-protocol-next-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-next-libs-dal.empty))
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
@@ -70,4 +73,6 @@
 
 (rule
  (action
-  (progn (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))
+  (progn
+   (write-file void_for_linking-octez-protocol-next-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

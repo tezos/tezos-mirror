@@ -11,6 +11,7 @@
   octez-node-config
   octez-shell-libs.store
   tezos-protocol-021-PsQuebec.protocol
+  tezos-protocol-next.protocol
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags

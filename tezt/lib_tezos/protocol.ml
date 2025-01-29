@@ -25,11 +25,13 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Quebec | Alpha
+type t = Next | Quebec | Alpha
 
-let all = [Quebec; Alpha]
+let all = [Next; Quebec; Alpha]
 
-let encoding = Data_encoding.string_enum [("alpha", Alpha); ("quebec", Quebec)]
+let encoding =
+  Data_encoding.string_enum
+    [("alpha", Alpha); ("next", Next); ("quebec", Quebec)]
 
 type constants =
   | Constants_sandbox
@@ -43,12 +45,13 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | Quebec -> "Quebec"
+let name = function Alpha -> "Alpha" | Next -> "Next" | Quebec -> "Quebec"
 
-let number = function Quebec -> 021 | Alpha -> 022
+let number = function Quebec -> 021 | Next -> 022 | Alpha -> 023
 
 let directory = function
   | Quebec -> "proto_021_PsQuebec"
+  | Next -> "proto_next"
   | Alpha -> "proto_alpha"
 
 (* Test tags must be lowercase. *)
@@ -57,6 +60,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Quebec -> "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+  | Next -> "PtHyCPGM8ud7PZdFR5Cx1GYJ6KSnFwkD6FrCAykz5ogvjMurFxp"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =
@@ -77,7 +81,10 @@ let parameter_file ?(constants = default_constants) protocol =
   let name = constants_to_string constants in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
-let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
+let daemon_name = function
+  | Alpha -> "alpha"
+  | Next -> "next"
+  | p -> String.sub (hash p) 0 8
 
 let protocol_dependent_uses ~tag ~path =
   let make protocol =
@@ -98,6 +105,7 @@ let baker = protocol_dependent_uses ~tag:"baker_" ~path:"./octez-baker-"
 
 let encoding_prefix = function
   | Alpha -> "alpha"
+  | Next -> "next"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
 
 type parameter_overrides =
@@ -271,7 +279,10 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let previous_protocol = function Alpha -> Some Quebec | Quebec -> None
+let previous_protocol = function
+  | Alpha -> Some Next
+  | Next -> Some Quebec
+  | Quebec -> None
 
 let has_predecessor p = previous_protocol p <> None
 

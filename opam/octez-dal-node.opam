@@ -24,10 +24,12 @@ depends: [
   "octez-protocol-021-PsQuebec-libs" { = version }
 ]
 depopts: [
+  "octez-protocol-next-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
+  "octez-protocol-next-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

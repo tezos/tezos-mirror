@@ -1,0 +1,63 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_next_parameters)
+ (public_name tezos-protocol-next.parameters)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-proto-libs.protocol-environment
+  tezos-protocol-next.protocol)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_next)
+ (modules (:standard \ gen)))
+
+(executable
+ (name gen)
+ (libraries
+  octez-rustzcash-deps
+  bls12-381.archive
+  octez-libs.base
+  tezos-protocol-next.parameters
+  tezos-protocol-next.protocol)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_next_parameters
+  -open Tezos_protocol_next)
+ (modules gen))
+
+(rule
+ (targets sandbox-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --sandbox)))
+
+(rule
+ (targets test-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --test)))
+
+(rule
+ (targets mainnet-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet)))
+
+(rule
+ (targets mainnet-with-chain-id-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet-with-chain-id)))
+
+(install
+ (package tezos-protocol-next)
+ (section lib)
+ (files
+  sandbox-parameters.json test-parameters.json mainnet-parameters.json
+  mainnet-with-chain-id-parameters.json))

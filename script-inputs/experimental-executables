@@ -4,3 +4,5 @@ etherlink-governance-observer
 octez-evm-node
 octez-accuser-alpha
 octez-baker-alpha
+octez-accuser-next
+octez-baker-next
