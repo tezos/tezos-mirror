@@ -4676,6 +4676,30 @@ let generate_opam_dependency_graph ?(source = []) ?(without = [])
   (* Output the DOT file. *)
   write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
 
+let generate_tobi_cfg () =
+  write "tobi/config" @@ fun fmt ->
+  pp_do_not_edit ~comment_start:"#" fmt () ;
+  (* The following paths are needed to build most components:
+     - [dune-project]: Dune always needs such a file, and in our case it also
+       needs it for packages to be declared;
+     - [dune]: contains some rules that are needed to build various components,
+       such as the rule for [static-link-flags.sexp] which is used by most executables;
+     - [scripts/custom-flags.sh]: needed by a rule from the [dune] file;
+     - [src/rustzcash_deps/include]: needed to build a dependency of [octez-libs]. *)
+  Format.fprintf
+    fmt
+    "__pervasive: dune, dune-project, scripts/custom-flags.sh, \
+     src/rustzcash_deps/include@." ;
+  Target.iter_internal_by_opam @@ fun package internals ->
+  let paths =
+    List.fold_left
+      (fun acc (internal : Target.internal) -> String_set.add internal.path acc)
+      String_set.empty
+      internals
+    |> String_set.elements
+  in
+  Format.fprintf fmt "%s: %s@." package (String.concat ", " paths)
+
 let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     =
   Printexc.record_backtrace true ;
@@ -4712,7 +4736,8 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
          packages_dir
          opam_release_graph
          add_to_meta_package)
-      release
+      release ;
+    generate_tobi_cfg ()
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
