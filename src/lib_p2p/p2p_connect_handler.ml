@@ -745,6 +745,15 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                         (point, lazy "connection unreachable")
                     in
                     tzfail P2p_errors.Connection_failed
+                | `Network_unreachable ->
+                    (* This may happen when we try to reach an ipv6
+                       address and there is no ipv6 interface on the
+                       host. *)
+                    let*! () =
+                      Events.(emit connect_error)
+                        (point, lazy "network unreachable")
+                    in
+                    tzfail P2p_errors.Connection_failed
                 | `Connection_refused ->
                     let*! () =
                       Events.(emit connect_error)

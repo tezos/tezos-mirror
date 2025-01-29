@@ -210,6 +210,8 @@ module Self_identification = struct
         match e with
         | `Connection_unreachable ->
             Format.pp_print_string ppf "Connection Connection_unreachable"
+        | `Network_unreachable ->
+            Format.pp_print_string ppf "Connection Network_unreachable"
         | `Connection_refused ->
             Format.pp_print_string ppf "Connection Connection_refused"
         | `Connection_canceled ->

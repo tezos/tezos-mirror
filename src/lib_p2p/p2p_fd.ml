@@ -98,6 +98,7 @@ type read_write_error =
 type connect_error =
   [ `Connection_refused
   | `Connection_unreachable
+  | `Network_unreachable
   | `Connection_canceled
   | unexpected_error ]
 
@@ -325,6 +326,9 @@ let connect t saddr =
       | Lwt.Canceled ->
           let*! () = close ~reason:TCP_connection_canceled t in
           Lwt.return_error `Connection_canceled
+      | Unix.Unix_error (ENETUNREACH, _, _) ->
+          let*! () = close ~reason:TCP_network_unreachable t in
+          Lwt.return_error `Network_unreachable
       | ex ->
           let*! () =
             close

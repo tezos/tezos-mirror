@@ -225,8 +225,8 @@ module Low_level = struct
     let*! r = raw_connect sched addr port in
     match r with
     | Error
-        ( `Connection_unreachable | `Connection_refused | `Connection_canceled
-        | `Unexpected_error _ ) ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled | `Unexpected_error _ ) ->
         Lwt.fail Alcotest.Test_error
     | Ok fd ->
         let* () =
