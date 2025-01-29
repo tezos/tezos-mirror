@@ -9,6 +9,15 @@
   storage requires more than 250GBytes of disk, while the new block storage
   requires around 180GBytes. (!16412)
 - CLI command `list events`, allows listing events relative to the EVM node. (!16446)
+- The garbage collector is now stabilized. Configuration parameters
+  `experimental_features.history_mode` and
+  `experimental_features.garbage_collector_parameters` are moved at top level
+  and the corresponding experimental features are deprecated. The number of days
+  to keep can now also be provided simply as days, with e.g.
+  ```json
+  "history": { "mode": "rolling", "retention": 14 }
+  ```
+  (!16465)
 
 ### Bug fixes
 
