@@ -1319,6 +1319,20 @@ module Json_syntax = struct
   let ( |?> ) x f = Option.map f x
 end
 
+let warn =
+  Format.kasprintf @@ fun s ->
+  let reset = Pretty_printing.add_ansi_marking Format.err_formatter in
+  Format.eprintf "@{<fg_yellow>[Warning] %s@}@." s ;
+  reset ()
+
+let warn_deprecated json path =
+  let open Json_syntax in
+  match json |-> path with
+  | None -> ()
+  | Some _ -> warn "Deprecated configuration field %s" (String.concat "." path)
+
+let warn_deprecated json = List.iter (warn_deprecated json)
+
 (* Syntactic checks related to deprecations *)
 let precheck json =
   let open Lwt_result_syntax in
@@ -1364,6 +1378,14 @@ let precheck json =
                set to `false` anymore."
         | _ -> return_unit
       in
+      warn_deprecated
+        json
+        [
+          ["experimental_features"; "next_wasm_runtime"];
+          ["experimental_features"; "node_transaction_validation"];
+          ["experimental_features"; "history_mode"];
+          ["experimental_features"; "garbage_collector_parameters"];
+        ] ;
 
       return_unit)
     (fun _exn -> failwith "Syntax error in the configuration file")
