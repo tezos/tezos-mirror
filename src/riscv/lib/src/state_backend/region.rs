@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    hash::{self, Hash, HashError, HashWriter, RootHashable},
     proof_backend::{
         merkle::{AccessInfo, AccessInfoAggregatable},
         ProofGen,
@@ -13,7 +12,6 @@ use super::{
     ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
 };
 use std::borrow::Borrow;
-use std::num::NonZeroUsize;
 
 /// Link a stored value directly with a derived value -
 /// that would either be expensive to compute each time, or cannot
@@ -185,12 +183,6 @@ impl<'de, E: serde::Deserialize<'de>, M: ManagerDeserialise> serde::Deserialize<
     {
         let region = Cells::deserialize(deserializer)?;
         Ok(Self { region })
-    }
-}
-
-impl<E: serde::Serialize, M: ManagerSerialise> RootHashable for Cell<E, M> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
     }
 }
 
@@ -412,15 +404,6 @@ where
     }
 }
 
-impl<V: EnrichedValue, M: ManagerSerialise> RootHashable for EnrichedCell<V, M>
-where
-    V::E: serde::Serialize,
-{
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
-    }
-}
-
 impl<V: EnrichedValue, M: ManagerSerialise> AccessInfoAggregatable
     for EnrichedCell<V, Ref<'_, ProofGen<M>>>
 where
@@ -454,12 +437,6 @@ where
     {
         let cell = M::deserialise_enriched_cell(deserializer)?;
         Ok(Self { cell })
-    }
-}
-
-impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> RootHashable for Cells<E, LEN, M> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
     }
 }
 
@@ -582,62 +559,6 @@ impl<const LEN: usize, M: ManagerRead, N: ManagerRead> PartialEq<DynCells<LEN, N
 
 impl<const LEN: usize, M: ManagerRead> Eq for DynCells<LEN, M> {}
 
-// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
-/// Size of the Merkle leaf used for Merkleising [`DynCells`].
-pub const MERKLE_LEAF_SIZE: NonZeroUsize =
-    // SAFETY: This constant is non-zero.
-    unsafe { NonZeroUsize::new_unchecked(4096) };
-
-// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
-/// Arity of the Merkle tree used for Merkleising [`DynCells`].
-pub const MERKLE_ARITY: usize = 3;
-
-// TODO RV-398: Move to `merkle` once `RootHashable` is removed
-/// Helper function which allows iterating over chunks of a dynamic region
-/// and writing them to a writer. The last chunk may be smaller than the
-/// Merkle leaf size. The implementations of `CommitmentLayout` and `ProofLayout`
-/// for dynamic regions both use it, ensuring consistency between the two.
-pub(crate) fn chunks_to_writer<
-    const LEN: usize,
-    T: std::io::Write,
-    F: Fn(usize) -> [u8; MERKLE_LEAF_SIZE.get()],
->(
-    writer: &mut T,
-    read: F,
-) -> Result<(), std::io::Error> {
-    let merkle_leaf_size = MERKLE_LEAF_SIZE.get();
-    assert!(LEN >= merkle_leaf_size);
-
-    let mut address = 0;
-
-    while address + merkle_leaf_size <= LEN {
-        writer.write_all(read(address).as_slice())?;
-        address += merkle_leaf_size;
-    }
-
-    // When the last chunk is smaller than `MERKLE_LEAF_SIZE`,
-    // read the last `MERKLE_LEAF_SIZE` bytes and pass a subslice containing
-    // only the bytes not previously read to the writer.
-    if address != LEN {
-        address += merkle_leaf_size;
-        let buffer = read(LEN.saturating_sub(merkle_leaf_size));
-        writer.write_all(&buffer[address.saturating_sub(LEN)..])?;
-    };
-
-    Ok(())
-}
-
-impl<const LEN: usize, M: ManagerRead> RootHashable for DynCells<LEN, M> {
-    fn hash(&self) -> Result<Hash, HashError> {
-        let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
-        let read =
-            |address| -> [u8; MERKLE_LEAF_SIZE.get()] { M::dyn_region_read(&self.region, address) };
-        chunks_to_writer::<LEN, _, _>(&mut writer, read)?;
-        let hashes = writer.finalise()?;
-        hash::build_custom_merkle_hash(MERKLE_ARITY, hashes)
-    }
-}
-
 impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
     fn clone(&self) -> Self {
         Self {
@@ -648,7 +569,6 @@ impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{chunks_to_writer, MERKLE_LEAF_SIZE};
     use crate::{
         backend_test,
         default::ConstDefault,
@@ -657,9 +577,7 @@ pub(crate) mod tests {
             Array, DynCells, Elem, FnManagerIdent, ManagerAlloc, ManagerBase,
         },
     };
-    use proptest::prelude::*;
     use serde::ser::SerializeTuple;
-    use std::io::Cursor;
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
     #[repr(packed)]
@@ -890,43 +808,4 @@ pub(crate) mod tests {
         let buffer = bincode::serialize(&region.struct_ref::<FnManagerIdent>()).unwrap();
         assert_eq!(buffer[..8], [22, 11, 24, 13, 26, 15, 28, 17]);
     });
-
-    const LENS: [usize; 4] = [0, 1, 535, 4095];
-    const _: () = {
-        if MERKLE_LEAF_SIZE.get() != 4096 {
-            panic!(
-                "Test values in `LENS` assume a specific MERKLE_LEAF_SIZE, change them accordingly"
-            );
-        }
-    };
-
-    // Test `chunks_to_writer` with a variety of lengths
-    macro_rules! generate_test_chunks_to_writer {
-        ( $( $name:ident, $i:expr ),* ) => {
-            $(
-                proptest! {
-                    #[test]
-                    fn $name(
-                        data in proptest::collection::vec(any::<u8>(), 4 * MERKLE_LEAF_SIZE.get() + LENS[$i])
-                    ) {
-                        const LEN: usize = 4 * MERKLE_LEAF_SIZE.get() + LENS[$i];
-
-                        let read = |pos: usize| {
-                            assert!(pos + MERKLE_LEAF_SIZE.get() <= LEN);
-                            data[pos..pos + MERKLE_LEAF_SIZE.get()].try_into().unwrap()
-                        };
-
-                        let mut writer = Cursor::new(Vec::new());
-                        chunks_to_writer::<LEN, _, _>(&mut writer, read).unwrap();
-                        assert_eq!(writer.into_inner(), data);
-                    }
-                }
-            )*
-        }
-    }
-
-    generate_test_chunks_to_writer!(test_chunks_to_writer_0, 0);
-    generate_test_chunks_to_writer!(test_chunks_to_writer_1, 1);
-    generate_test_chunks_to_writer!(test_chunks_to_writer_2, 2);
-    generate_test_chunks_to_writer!(test_chunks_to_writer_3, 3);
 }

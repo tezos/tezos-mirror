@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    chunks_to_writer,
-    hash::{self, Hash, HashError, HashWriter, RootHashable, DIGEST_SIZE},
-    Array, Atom, DynArray, Layout, Many, RefOwnedAlloc, MERKLE_ARITY, MERKLE_LEAF_SIZE,
+    hash::{self, Hash, HashError, HashWriter},
+    proof_backend::merkle::{chunks_to_writer, MERKLE_ARITY, MERKLE_LEAF_SIZE},
+    Array, Atom, DynArray, Layout, Many, RefOwnedAlloc,
 };
 use crate::default::ConstDefault;
 
@@ -50,7 +50,7 @@ where
 {
     fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
         let hashes = [A::state_hash(state.0)?, B::state_hash(state.1)?];
-        hashes.hash()
+        Hash::combine(&hashes)
     }
 }
 
@@ -66,7 +66,7 @@ where
             B::state_hash(state.1)?,
             C::state_hash(state.2)?,
         ];
-        hashes.hash()
+        Hash::combine(&hashes)
     }
 }
 
@@ -84,7 +84,7 @@ where
             C::state_hash(state.2)?,
             D::state_hash(state.3)?,
         ];
-        hashes.hash()
+        Hash::combine(&hashes)
     }
 }
 
@@ -104,7 +104,7 @@ where
             D::state_hash(state.3)?,
             E::state_hash(state.4)?,
         ];
-        hashes.hash()
+        Hash::combine(&hashes)
     }
 }
 
@@ -126,7 +126,7 @@ where
             E::state_hash(state.4)?,
             F::state_hash(state.5)?,
         ];
-        hashes.hash()
+        Hash::combine(&hashes)
     }
 }
 
@@ -153,15 +153,10 @@ where
     I: IntoIterator<Item = RefOwnedAlloc<'a, T>>,
     T: CommitmentLayout,
 {
-    let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * LEN);
+    let hashes: Vec<Hash> = iter
+        .into_iter()
+        .map(T::state_hash)
+        .collect::<Result<Vec<_>, _>>()?;
 
-    iter.into_iter().try_for_each(|e| {
-        hashes.extend_from_slice(T::state_hash(e)?.as_ref());
-        Ok::<(), HashError>(())
-    })?;
-
-    // TODO RV-250: Instead of building the whole input and hashing it,
-    // we should use incremental hashing, which isn't currently supported
-    // in `tezos_crypto_rs`.
-    Hash::blake2b_hash_bytes(&hashes)
+    Hash::combine(&hashes)
 }

@@ -5,7 +5,7 @@
 use super::{
     Cell, EnrichedValue, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite, ManagerWrite,
 };
-use crate::state_backend::{owned_backend::Owned, MERKLE_LEAF_SIZE};
+use crate::state_backend::{owned_backend::Owned, proof_backend::merkle::MERKLE_LEAF_SIZE};
 use range_collections::RangeSet2;
 use std::{
     array,

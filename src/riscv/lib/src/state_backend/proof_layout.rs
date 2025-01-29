@@ -4,17 +4,16 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    chunks_to_writer, hash,
-    hash::{HashError, RootHashable},
+    hash,
+    hash::HashError,
     proof_backend::{
-        merkle::{MerkleTree, MerkleWriter},
+        merkle::{chunks_to_writer, MerkleTree, MerkleWriter, MERKLE_ARITY, MERKLE_LEAF_SIZE},
         proof::{MerkleProof, MerkleProofLeaf},
         tree::Tree,
     },
-    verify_backend, Array, Atom, DynArray, Layout, Many, RefProofGenOwnedAlloc, MERKLE_ARITY,
-    MERKLE_LEAF_SIZE,
+    verify_backend, Array, Atom, DynArray, Layout, Many, RefProofGenOwnedAlloc,
 };
-use crate::{default::ConstDefault, state_backend, storage::binary};
+use crate::{default::ConstDefault, storage::binary};
 use serde::de::Error;
 
 /// Errors that may occur when parsing a Merkle proof
@@ -188,7 +187,7 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
         let mut pages = Vec::new();
 
         while let Some((start, length, tree)) = pipeline.pop() {
-            if length <= super::MERKLE_LEAF_SIZE.get() {
+            if length <= MERKLE_LEAF_SIZE.get() {
                 // Must be a leaf.
 
                 let super::ProofPart::Present(data) = tree.into_leaf()? else {
@@ -196,12 +195,12 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
                     continue;
                 };
 
-                let data: Box<[u8; state_backend::MERKLE_LEAF_SIZE.get()]> = {
+                let data: Box<[u8; MERKLE_LEAF_SIZE.get()]> = {
                     let data: Box<[u8]> = binary::deserialise(data)?;
                     data.try_into().map_err(|err: Box<[u8]>| {
                         bincode::Error::custom(format!(
                             "Invalid Merkle leaf: expected {} bytes, got {}",
-                            state_backend::MERKLE_LEAF_SIZE.get(),
+                            MERKLE_LEAF_SIZE.get(),
                             err.len()
                         ))
                     })?
@@ -213,8 +212,8 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
             } else {
                 // Expecting a branching point.
 
-                let branches = tree.into_branches::<{ super::MERKLE_ARITY }>()?;
-                let branch_max_length = length.div_ceil(super::MERKLE_ARITY);
+                let branches = tree.into_branches::<{ MERKLE_ARITY }>()?;
+                let branch_max_length = length.div_ceil(MERKLE_ARITY);
 
                 let mut branch_start = start;
                 let mut length_left = length;
@@ -244,7 +243,7 @@ where
 {
     fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         let children = vec![A::to_merkle_tree(state.0)?, B::to_merkle_tree(state.1)?];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -265,7 +264,7 @@ where
             B::to_merkle_tree(state.1)?,
             C::to_merkle_tree(state.2)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -288,7 +287,7 @@ where
             C::to_merkle_tree(state.2)?,
             D::to_merkle_tree(state.3)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -318,7 +317,7 @@ where
             D::to_merkle_tree(state.3)?,
             E::to_merkle_tree(state.4)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -351,7 +350,7 @@ where
             E::to_merkle_tree(state.4)?,
             F::to_merkle_tree(state.5)?,
         ];
-        Ok(MerkleTree::Node(children.hash()?, children))
+        MerkleTree::make_merkle_node(children)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -417,5 +416,5 @@ where
         .map(T::to_merkle_tree)
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(MerkleTree::Node(children.hash()?, children))
+    MerkleTree::make_merkle_node(children)
 }

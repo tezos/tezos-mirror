@@ -9,10 +9,24 @@ use super::{
     DynAccess,
 };
 use crate::state_backend::{
-    hash::{Hash, HashError, RootHashable},
+    hash::{Hash, HashError},
     proof_backend::tree::{impl_modify_map_collect, ModifyResult},
 };
-use std::convert::Infallible;
+use std::{convert::Infallible, num::NonZeroUsize};
+
+// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
+/// Size of the Merkle leaf used for Merkleising [`DynArrays`].
+///
+/// [`DynArrays`]: [`crate::state_backend::layout::DynArray`]
+pub const MERKLE_LEAF_SIZE: NonZeroUsize =
+    // SAFETY: This constant is non-zero.
+    unsafe { NonZeroUsize::new_unchecked(4096) };
+
+// TODO RV-322: Choose optimal Merkleisation parameters for main memory.
+/// Arity of the Merkle tree used for Merkleising [`DynArrays`].
+///
+/// [`DynArrays`]: [`crate::state_backend::layout::DynArray`]
+pub const MERKLE_ARITY: usize = 3;
 
 /// A variable-width Merkle tree with [`AccessInfo`] metadata for leaves.
 ///
@@ -39,6 +53,14 @@ impl MerkleTree {
     pub fn make_merkle_leaf(data: Vec<u8>, access_info: AccessInfo) -> Result<Self, HashError> {
         let hash = Hash::blake2b_hash_bytes(&data)?;
         Ok(MerkleTree::Leaf(hash, access_info, data))
+    }
+
+    /// Make a Merkle tree consisting of a node which combines the given
+    /// child trees.
+    pub fn make_merkle_node(children: Vec<Self>) -> Result<Self, HashError> {
+        let children_hashes: Vec<Hash> = children.iter().map(|t| t.root_hash()).collect();
+        let node_hash = Hash::combine(children_hashes.as_slice())?;
+        Ok(MerkleTree::Node(node_hash, children))
     }
 
     /// Compress all fully blindable subtrees to a single leaf node, obtaining a [`CompressedMerkleTree`].
@@ -76,7 +98,7 @@ impl MerkleTree {
                             CompresedNode(hash, _) => (hash, None),
                         }
                     })
-                    .unzip::<_, _, Vec<&Hash>, Vec<_>>();
+                    .unzip::<_, _, Vec<Hash>, Vec<_>>();
 
                 // Obtain the compression type of all children
                 // if all children have been compressed successfully to the same type of leaf.
@@ -86,7 +108,7 @@ impl MerkleTree {
                     .flatten();
 
                 let compressed_tree = match compression {
-                    Some(access) => CompresedLeaf(RootHashable::hash(&hashes)?, access),
+                    Some(access) => CompresedLeaf(Hash::combine(hashes.as_slice())?, access),
                     None => CompresedNode(hash, compact_children),
                 };
 
@@ -99,12 +121,6 @@ impl MerkleTree {
     /// given tree.
     pub fn to_merkle_proof(self) -> Result<MerkleProof, HashError> {
         Ok(self.compress()?.into())
-    }
-}
-
-impl RootHashable for MerkleTree {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Ok(self.root_hash())
     }
 }
 
@@ -293,6 +309,43 @@ impl_aggregatable_for_tuple!(A, B, C, D);
 impl_aggregatable_for_tuple!(A, B, C, D, E);
 impl_aggregatable_for_tuple!(A, B, C, D, E, F);
 
+/// Helper function which allows iterating over chunks of a dynamic array
+/// and writing them to a writer. The last chunk may be smaller than the
+/// Merkle leaf size. The implementations of [`CommitmentLayout`] and
+/// [`ProofLayout`] for both use it, ensuring consistency between the two.
+///
+/// [`CommitmentLayout`]: crate::state_backend::commitment_layout::CommitmentLayout
+/// [`ProofLayout`]: crate::state_backend::proof_layout::ProofLayout
+pub(crate) fn chunks_to_writer<
+    const LEN: usize,
+    T: std::io::Write,
+    F: Fn(usize) -> [u8; MERKLE_LEAF_SIZE.get()],
+>(
+    writer: &mut T,
+    read: F,
+) -> Result<(), std::io::Error> {
+    let merkle_leaf_size = MERKLE_LEAF_SIZE.get();
+    assert!(LEN >= merkle_leaf_size);
+
+    let mut address = 0;
+
+    while address + merkle_leaf_size <= LEN {
+        writer.write_all(read(address).as_slice())?;
+        address += merkle_leaf_size;
+    }
+
+    // When the last chunk is smaller than `MERKLE_LEAF_SIZE`,
+    // read the last `MERKLE_LEAF_SIZE` bytes and pass a subslice containing
+    // only the bytes not previously read to the writer.
+    if address != LEN {
+        address += merkle_leaf_size;
+        let buffer = read(LEN.saturating_sub(merkle_leaf_size));
+        writer.write_all(&buffer[address.saturating_sub(LEN)..])?;
+    };
+
+    Ok(())
+}
+
 /// Writer which splits data in fixed-sized chunks and produces a [`MerkleTree`]
 /// with a given arity in which each leaf represents a chunk.
 pub struct MerkleWriter {
@@ -367,7 +420,7 @@ impl MerkleWriter {
 
         while self.leaves.len() > 1 {
             for chunk in self.leaves.chunks(self.arity) {
-                next_level.push(MerkleTree::Node(chunk.hash()?, chunk.to_vec()));
+                next_level.push(MerkleTree::make_merkle_node(chunk.to_vec())?)
             }
 
             std::mem::swap(&mut self.leaves, &mut next_level);
@@ -416,19 +469,15 @@ impl MerkleTree {
                     Hash::blake2b_hash_bytes(data).is_ok_and(|h| h == *hash)
                 }
                 Self::Node(hash, children) => {
-                    // TODO RV-250: Instead of building the whole input and
-                    // hashing it, we should use incremental hashing, which
-                    // isn't currently supported in `tezos_crypto_rs`.
-                    //
-                    // Check the hash of this node and push children to deque to be checked
-                    let mut hashes: Vec<u8> = Vec::with_capacity(
-                        crate::state_backend::hash::DIGEST_SIZE * children.len(),
-                    );
-                    children.iter().for_each(|child| {
-                        deque.push_back(child);
-                        hashes.extend_from_slice(child.root_hash().as_ref())
-                    });
-                    Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
+                    let children_hashes: Vec<Hash> = children
+                        .iter()
+                        .map(|child| {
+                            deque.push_back(child);
+                            child.root_hash()
+                        })
+                        .collect();
+
+                    Hash::combine(&children_hashes).is_ok_and(|h| h == *hash)
                 }
             };
             if !is_valid_hash {
@@ -441,15 +490,19 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
-    use super::{AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree};
+    use super::{
+        chunks_to_writer, AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree,
+        MERKLE_LEAF_SIZE,
+    };
     use crate::state_backend::{
-        hash::{Hash, HashError, RootHashable, DIGEST_SIZE},
+        hash::{Hash, HashError},
         proof_backend::proof::{MerkleProof, MerkleProofLeaf},
     };
     use proptest::prelude::*;
+    use std::io::Cursor;
 
     impl CompressedMerkleTree {
-        /// Get the root hash of a compreessed Merkle tree
+        /// Get the root hash of a compressed Merkle tree
         fn root_hash(&self) -> Hash {
             match self {
                 Self::Node(hash, _) => *hash,
@@ -472,17 +525,15 @@ mod tests {
                         }
                     },
                     Self::Node(hash, children) => {
-                        // TODO RV-250: Instead of building the whole input and
-                        // hashing it, we should use incremental hashing, which
-                        // isn't currently supported in `tezos_crypto_rs`.
-                        //
-                        // Check the hash of this node and push children to deque to be checked
-                        let mut hashes: Vec<u8> = Vec::with_capacity(DIGEST_SIZE * children.len());
-                        children.iter().for_each(|child| {
-                            deque.push_back(child);
-                            hashes.extend_from_slice(child.root_hash().as_ref())
-                        });
-                        Hash::blake2b_hash_bytes(&hashes).is_ok_and(|h| h == *hash)
+                        let children_hashes: Vec<Hash> = children
+                            .iter()
+                            .map(|child| {
+                                deque.push_back(child);
+                                child.root_hash()
+                            })
+                            .collect();
+
+                        Hash::combine(&children_hashes).is_ok_and(|h| h == *hash)
                     }
                 };
                 if !is_valid_hash {
@@ -493,20 +544,13 @@ mod tests {
         }
     }
 
-    impl RootHashable for Vec<u8> {
-        fn hash(&self) -> Result<Hash, HashError> {
-            Hash::blake2b_hash_bytes(self)
-        }
-    }
-
     fn m_l(data: &[u8], access: AccessInfo) -> Result<MerkleTree, HashError> {
         let hash = Hash::blake2b_hash_bytes(data)?;
         Ok(MerkleTree::Leaf(hash, access, data.to_vec()))
     }
 
     fn m_t(left: MerkleTree, right: MerkleTree) -> Result<MerkleTree, HashError> {
-        let hash = RootHashable::hash(&(left.root_hash(), right.root_hash()))?;
-        Ok(MerkleTree::Node(hash, vec![left, right]))
+        MerkleTree::make_merkle_node(vec![left, right])
     }
 
     #[test]
@@ -584,33 +628,24 @@ mod tests {
 
             // Not even though structurally the code has the same arborescent shape,
             // the proof shape is changed, some nodes becoming leaves now. (subtrees being compressed)
-            let proof_no_access = MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                [
-                    Hash::blake2b_hash_bytes(&l[4])?,
-                    [
-                        Hash::blake2b_hash_bytes(&l[5])?,
-                        Hash::blake2b_hash_bytes(&l[6])?,
-                    ]
-                    .hash()?,
-                ]
-                .hash()?,
-            ));
+            let proof_no_access = MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                Hash::blake2b_hash_bytes(&l[4])?,
+                Hash::combine(&[
+                    Hash::blake2b_hash_bytes(&l[5])?,
+                    Hash::blake2b_hash_bytes(&l[6])?,
+                ])?,
+            ])?));
 
-            let proof_write = MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                [
-                    [
-                        Hash::blake2b_hash_bytes(&l[7])?,
-                        Hash::blake2b_hash_bytes(&l[8])?,
-                    ]
-                    .hash()?,
-                    [
-                        Hash::blake2b_hash_bytes(&l[9])?,
-                        Hash::blake2b_hash_bytes(&l[10])?,
-                    ]
-                    .hash()?,
-                ]
-                .hash()?,
-            ));
+            let proof_write = MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                Hash::combine(&[
+                    Hash::blake2b_hash_bytes(&l[7])?,
+                    Hash::blake2b_hash_bytes(&l[8])?,
+                ])?,
+                Hash::combine(&[
+                    Hash::blake2b_hash_bytes(&l[9])?,
+                    Hash::blake2b_hash_bytes(&l[10])?,
+                ])?,
+            ])?));
 
             let proof_read = MerkleProof::Node(vec![
                 MerkleProof::Node(vec![
@@ -641,25 +676,19 @@ mod tests {
                     merkle_proof_leaf(&l[18], NoAccess)?,
                     MerkleProof::Node(vec![
                         merkle_proof_leaf(&l[19], NoAccess)?,
-                        MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                            [
-                                Hash::blake2b_hash_bytes(&l[20])?,
-                                Hash::blake2b_hash_bytes(&l[21])?,
-                            ]
-                            .hash()?,
-                        )),
+                        MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                            Hash::blake2b_hash_bytes(&l[20])?,
+                            Hash::blake2b_hash_bytes(&l[21])?,
+                        ])?)),
                     ]),
                 ]),
                 MerkleProof::Node(vec![
                     MerkleProof::Node(vec![
                         merkle_proof_leaf(&l[22], ReadWrite)?,
-                        MerkleProof::Leaf(MerkleProofLeaf::Blind(
-                            [
-                                Hash::blake2b_hash_bytes(&l[23])?,
-                                Hash::blake2b_hash_bytes(&l[24])?,
-                            ]
-                            .hash()?,
-                        )),
+                        MerkleProof::Leaf(MerkleProofLeaf::Blind(Hash::combine(&[
+                            Hash::blake2b_hash_bytes(&l[23])?,
+                            Hash::blake2b_hash_bytes(&l[24])?,
+                        ])?)),
                     ]),
                     merkle_proof_leaf(&l[25], Read)?,
                 ]),
@@ -681,7 +710,7 @@ mod tests {
 
             assert_eq!(merkle_tree.to_merkle_proof().unwrap(), proof);
             assert_eq!(
-                compressed_merkle_proof.hash().unwrap(),
+                compressed_merkle_proof.root_hash().unwrap(),
                 merkle_tree_root_hash
             );
 
@@ -758,4 +787,41 @@ mod tests {
 
         check(t_root, root);
     }
+
+    const LENS: [usize; 4] = [0, 1, 535, 4095];
+    const _: () = {
+        if MERKLE_LEAF_SIZE.get() != 4096 {
+            panic!(
+                "Test values in `LENS` assume a specific MERKLE_LEAF_SIZE, change them accordingly"
+            );
+        }
+    };
+
+    // Test `chunks_to_writer` with a variety of lengths
+    macro_rules! generate_test_chunks_to_writer {
+        ( $name:ident, $i:expr ) => {
+            proptest! {
+                #[test]
+                fn $name(
+                    data in proptest::collection::vec(any::<u8>(), 4 * MERKLE_LEAF_SIZE.get() + LENS[$i])
+                ) {
+                    const LEN: usize = 4 * MERKLE_LEAF_SIZE.get() + LENS[$i];
+
+                    let read = |pos: usize| {
+                        assert!(pos + MERKLE_LEAF_SIZE.get() <= LEN);
+                        data[pos..pos + MERKLE_LEAF_SIZE.get()].try_into().unwrap()
+                    };
+
+                    let mut writer = Cursor::new(Vec::new());
+                    chunks_to_writer::<LEN, _, _>(&mut writer, read).unwrap();
+                    assert_eq!(writer.into_inner(), data);
+                }
+            }
+        }
+    }
+
+    generate_test_chunks_to_writer!(test_chunks_to_writer_0, 0);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_1, 1);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_2, 2);
+    generate_test_chunks_to_writer!(test_chunks_to_writer_3, 3);
 }
