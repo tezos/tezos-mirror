@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Simple
+open Internal_event.Simple
 
 (* DAL node event definitions *)
 
