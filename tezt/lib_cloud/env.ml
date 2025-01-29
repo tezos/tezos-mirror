@@ -32,7 +32,7 @@ let prometheus_export = Cli.prometheus_export
 
 let prometheus_port = Cli.prometheus_port
 
-let prometheus_snapshot_filename = Cli.prometheus_snapshot_filename
+let prometheus_export_path = Cli.prometheus_export_path
 
 let prometheus_snapshots = Cli.prometheus_snapshots
 

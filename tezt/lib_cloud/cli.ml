@@ -140,11 +140,11 @@ let prometheus_port =
          default_prometheus_port)
     default_prometheus_port
 
-let prometheus_snapshot_filename =
+let prometheus_export_path =
   Clap.optional_string
     ~section
-    ~long:"prometheus-snapshot-filename"
-    ~description:"Name of the prometheus snapshot file"
+    ~long:"prometheus-export-path"
+    ~description:"Path of the prometheus snapshot"
     ()
 
 let prometheus_snapshots =
@@ -159,7 +159,7 @@ let prometheus_snapshots =
     | filename, None -> filename
   in
   let typ =
-    Clap.typ ~name:"prometheus-snapshot" ~dummy:("", None) ~parse ~show
+    Clap.typ ~name:"prometheus-snapshot-imported" ~dummy:("", None) ~parse ~show
   in
   Clap.list
     typ
