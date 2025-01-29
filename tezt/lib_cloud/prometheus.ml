@@ -351,15 +351,12 @@ let start ~alerts agents =
 
 let snapshots_path = "/prometheus" // "data" // "snapshots"
 
-let export_snapshot {snapshot_filename; name; _} =
+let export_snapshot {snapshot_filename; name; port; _} =
   Log.info "Exporting snapshot..." ;
   let* stdout =
     Process.run_and_read_stdout
       "curl"
-      [
-        "-XPOST";
-        sf "http://localhost:%d/api/v1/admin/tsdb/snapshot" Env.prometheus_port;
-      ]
+      ["-XPOST"; sf "http://localhost:%d/api/v1/admin/tsdb/snapshot" port]
   in
   let json = JSON.parse ~origin:"Prometheus.export" stdout in
   let snapshot_name = JSON.(json |-> "data" |-> "name" |> as_string) in
