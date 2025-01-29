@@ -15,11 +15,6 @@
     "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
     "overwrite_simulation_tick_limit": false,
-    "garbage_collector_parameters": {
-      "split_frequency_in_seconds": 86400,
-      "number_of_chunks": 14
-    },
-    "history_mode": "archive",
     "rpc_server": "resto",
     "enable_websocket": false,
     "max_websocket_message_length": 4194304,
@@ -47,7 +42,8 @@
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
   },
-  "finalized_view": false
+  "finalized_view": false,
+  "history": "archive"
 }
 {
   "log_filter": {
@@ -77,11 +73,6 @@
     "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
     "overwrite_simulation_tick_limit": false,
-    "garbage_collector_parameters": {
-      "split_frequency_in_seconds": 86400,
-      "number_of_chunks": 14
-    },
-    "history_mode": "archive",
     "rpc_server": "resto",
     "enable_websocket": false,
     "max_websocket_message_length": 4194304,
@@ -109,7 +100,8 @@
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
   },
-  "finalized_view": false
+  "finalized_view": false,
+  "history": "archive"
 }
 {
   "log_filter": {
@@ -132,11 +124,6 @@
     "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
     "overwrite_simulation_tick_limit": false,
-    "garbage_collector_parameters": {
-      "split_frequency_in_seconds": 86400,
-      "number_of_chunks": 14
-    },
-    "history_mode": "archive",
     "rpc_server": "resto",
     "enable_websocket": false,
     "max_websocket_message_length": 4194304,
@@ -165,5 +152,6 @@
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
   },
-  "finalized_view": false
+  "finalized_view": false,
+  "history": "archive"
 }
