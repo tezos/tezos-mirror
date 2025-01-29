@@ -32,6 +32,7 @@ depends: [
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
   "checkseum" { != "0.5.0" }
+  "clap" { >= "0.3.0" }
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
   "cohttp" { >= "5.3.1" }
