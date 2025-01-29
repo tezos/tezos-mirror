@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "octez-deps"
-version: "~dev"
+version: "dev"
 synopsis:
   "Virtual package depending on Octez dependencies (profile: octez-deps)"
 description:
@@ -55,7 +55,6 @@ depends: [
   "conduit" {= "7.1.0"}
   "conduit-lwt" {= "7.1.0"}
   "conduit-lwt-unix" {= "7.1.0"}
-  "conf-autoconf" {= "0.2"}
   "conf-bash" {= "1"}
   "conf-cmake" {= "1"}
   "conf-g++" {= "1.0"}
@@ -65,13 +64,13 @@ depends: [
   "conf-libev" {= "4-12"}
   "conf-libffi" {= "2.0.0"}
   "conf-libssl" {= "4"}
-  "conf-pkg-config" {= "3"}
-  "conf-postgresql" {= "1"}
+  "conf-pkg-config" {= "4"}
+  "conf-postgresql" {= "2"}
   "conf-rust" {= "0.1"}
   "conf-sqlite3" {= "1"}
   "conf-which" {= "1"}
   "conf-zlib" {= "1"}
-  "cppo" {= "1.7.0"}
+  "cppo" {= "1.8.0"}
   "crowbar" {= "0.2.1"}
   "crunch" {= "3.3.1"}
   "csexp" {= "1.5.2"}
@@ -86,13 +85,13 @@ depends: [
   "dream" {= "1.0.0~alpha7"}
   "dream-httpaf" {= "1.0.0~alpha3"}
   "dream-pure" {= "1.0.0~alpha2"}
-  "dune" {= "3.16.1"}
-  "dune-build-info" {= "3.16.1"}
-  "dune-configurator" {= "3.16.1"}
-  "dune-private-libs" {= "3.16.1"}
-  "dune-site" {= "3.16.1"}
+  "dune" {= "3.17.2"}
+  "dune-build-info" {= "3.17.2"}
+  "dune-configurator" {= "3.17.2"}
+  "dune-private-libs" {= "3.17.2"}
+  "dune-site" {= "3.17.2"}
   "duration" {= "0.2.1"}
-  "dyn" {= "3.16.1"}
+  "dyn" {= "3.17.2"}
   "either" {= "1.0.0"}
   "eqaf" {= "0.10"}
   "ezgzip" {= "0.2.3"}
@@ -130,7 +129,7 @@ depends: [
   "ledgerwallet-tezos" {= "0.4.1"}
   "logs" {= "0.7.0"}
   "lru" {= "0.3.1"}
-  "lwt" {= "5.8.0"}
+  "lwt" {= "5.9.0"}
   "lwt-canceler" {= "0.3"}
   "lwt-dllist" {= "1.0.1"}
   "lwt-exit" {= "1.0"}
@@ -164,7 +163,7 @@ depends: [
   "ocaml-config" {= "3"}
   "ocaml-options-vanilla" {= "1"}
   "ocaml-syntax-shims" {= "1.0.0"}
-  "ocaml-version" {= "3.6.9"}
+  "ocaml-version" {= "3.7.3"}
   "ocamlbuild" {= "0.15.0"}
   "ocamlfind" {= "1.9.6"}
   "ocamlformat" {= "0.26.2"}
@@ -175,14 +174,13 @@ depends: [
   "ocplib-endian" {= "1.2"}
   "ohex" {= "0.2.0"}
   "opentelemetry" {= "0.10"}
-  "rope" {= "0.6.3"}
   "optint" {= "0.3.0"}
-  "ordering" {= "3.16.1"}
+  "ordering" {= "3.17.2"}
   "parsexp" {= "v0.16.0"}
   "pbrt" {= "3.1.1"}
   "pecu" {= "0.7"}
-  "postgresql" {= "5.0.0"}
-  "pp" {= "1.2.0"}
+  "postgresql" {= "5.1.3"}
+  "pp" {= "2.0.0"}
   "pprint" {= "20230830"}
   "ppx_assert" {= "v0.16.0"}
   "ppx_base" {= "v0.16.0"}
@@ -191,7 +189,7 @@ depends: [
   "ppx_derivers" {= "1.2.1"}
   "ppx_deriving" {= "6.0.3"}
   "ppx_enumerate" {= "v0.16.0"}
-  "ppx_expect" {= "v0.16.0"}
+  "ppx_expect" {= "v0.16.1"}
   "ppx_globalize" {= "v0.16.0"}
   "ppx_hash" {= "v0.16.0"}
   "ppx_here" {= "v0.16.0"}
@@ -211,30 +209,31 @@ depends: [
   "ptime" {= "1.2.0"}
   "pure-splitmix" {= "0.3"}
   "pyml" {= "20231101"}
-  "qcheck-alcotest" {= "0.22"}
-  "qcheck-core" {= "0.22"}
+  "qcheck-alcotest" {= "0.23"}
+  "qcheck-core" {= "0.23"}
   "re" {= "1.12.0"}
   "react" {= "1.2.2"}
   "repr" {= "0.7.0"}
   "result" {= "1.5"}
   "ringo" {= "1.1.0"}
+  "rope" {= "0.6.3"}
   "rresult" {= "0.7.0"}
   "rusage" {= "1.0.0"}
   "safepass" {= "3.1"}
   "secp256k1-internal" {= "0.4.0"}
   "semaphore-compat" {= "1.0.2"}
   "seq" {= "base"}
-  "seqes" {= "0.2"}
+  "seqes" {= "0.3"}
   "sexplib" {= "v0.16.0"}
   "sexplib0" {= "v0.16.0"}
-  "sqlite3" {= "5.2.0"}
+  "sqlite3" {= "5.3.0"}
   "ssl" {= "0.7.0"}
   "stdcompat" {= "19"}
   "stdint" {= "0.7.2"}
   "stdio" {= "v0.16.0"}
   "stdlib-random" {= "1.2.0"}
   "stdlib-shims" {= "0.3.0"}
-  "stdune" {= "3.16.1"}
+  "stdune" {= "3.17.2"}
   "stringext" {= "1.6.0"}
   "tar" {= "2.6.0"}
   "tar-unix" {= "2.6.0"}
@@ -283,7 +282,9 @@ conflicts: [
   "resto-directory"
   "resto-json"
   "result" {< "1.5"}
+  "websocket"
 ]
+available: os-family != "windows"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 pin-depends: [
   "stdcompat.19"
