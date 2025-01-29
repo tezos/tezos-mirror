@@ -34,6 +34,8 @@ let str_split_once str char =
       let right = String.sub str (pos + 1) (String.length str - pos - 1) in
       Some (left, right)
 
+let close fd = try Unix.close fd with Unix.Unix_error _ -> ()
+
 type 'a error = {code : 'a; message : string list}
 
 type ('a, 'e) r = ('a, 'e error) result

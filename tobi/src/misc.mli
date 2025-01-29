@@ -44,6 +44,9 @@ val memoize : ('a -> 'b) -> 'a -> 'b
     - [str_split_once "a,b,c" ','] is [Some ("a", "b,c")]. *)
 val str_split_once : string -> char -> (string * string) option
 
+(** Same as [Unix.close], but ignore errors. *)
+val close : Unix.file_descr -> unit
+
 (** {2 Error Handling} *)
 
 (** Errors.
