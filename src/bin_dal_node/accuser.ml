@@ -112,8 +112,9 @@ let inject_entrapment_evidences (type block_info)
                       trap_injection
                       ( delegate,
                         published_level,
-                        shard.Cryptobox.index,
-                        slot_index ))
+                        attested_level,
+                        slot_index,
+                        shard.Cryptobox.index ))
                 in
                 Plugin.inject_entrapment_evidence
                   rpc_ctxt
