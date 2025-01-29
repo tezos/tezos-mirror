@@ -12,3 +12,5 @@ let parse = function "dev" -> Dev | v -> Old v
 let show = function Dev -> "dev" | Old v -> v
 
 let equal = (( = ) : t -> t -> bool)
+
+let head = Old "HEAD"
