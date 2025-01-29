@@ -52,21 +52,8 @@ oc.build-ocaml4:
   - oc.build-deps-ocaml4
   dependencies: []
   timeout: 60 minutes
-  cache:
-    key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/ocaml4_job/build_ocaml4_octez.sh
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_IDLE_TIMEOUT: "0"
   retry:
     max: 1
     when:
