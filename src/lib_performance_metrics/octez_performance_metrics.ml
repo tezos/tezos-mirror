@@ -24,19 +24,29 @@ module type REGISTRY = sig
   val directories : data_dir_element list
 end
 
-let can_run_command cmd =
+let run_without_error cmd args =
   let open Lwt_syntax in
   let+ status =
     Lwt_process.with_process_full
-      ("which", [|"which"; cmd|])
+      (cmd, Array.of_list (cmd :: args))
       (fun pc -> pc#status)
   in
   match status with Unix.WEXITED 0 -> true | _ -> false
 
 let supports_performance_metrics () =
   let open Lwt_syntax in
+  let pid = Unix.getpid () in
   let+ cmd_support =
-    Lwt.all [can_run_command "lsof"; can_run_command "ps"; can_run_command "du"]
+    Lwt.all
+      [
+        run_without_error "which" ["lsof"];
+        (* `ps` with BusyBox (used by Alpine) does not support the `-p` option,
+           so `which` is not enough. *)
+        run_without_error
+          "ps"
+          ["-p"; string_of_int pid; "-o"; "%cpu,%mem,vsz,rss"];
+        run_without_error "which" ["du"];
+      ]
   in
   List.for_all Fun.id cmd_support
 
