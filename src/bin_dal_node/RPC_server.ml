@@ -319,12 +319,12 @@ module Profile_handlers = struct
             | Error `Not_found ->
                 (* that is, it was not published *)
                 Lwt.return_none
-            | Error (`Other tztrace) ->
+            | Error (`Other error) ->
                 let* () =
-                  Event.(
-                    emit
-                      slot_header_status_storage_error
-                      (published_level, slot_index, tztrace))
+                  Event.emit_slot_header_status_storage_error
+                    ~published_level
+                    ~slot_index
+                    ~error
                 in
                 Lwt.return_none
             | Ok res -> (
@@ -333,13 +333,11 @@ module Profile_handlers = struct
                     Lwt.return_some (`Not_ok (slot_index, num_stored))
                 | status ->
                     let* () =
-                      Event.(
-                        emit
-                          unexpected_slot_header_status
-                          ( published_level,
-                            slot_index,
-                            `Waiting_attestation,
-                            status ))
+                      Event.emit_unexpected_slot_header_status
+                        ~published_level
+                        ~slot_index
+                        ~expected_status:`Waiting_attestation
+                        ~got_status:status
                     in
                     Lwt.return_none))
         number_of_stored_shards_per_slot
@@ -354,11 +352,11 @@ module Profile_handlers = struct
           List.filter_map (function `Ok v -> Some v | `Not_ok _ -> None) ok
         in
         (* TODO: improve (do not go twice through the list)  *)
-        let indexes, _ = List.split ok in
-        Event.(
-          emit
-            get_attestable_slots_ok_notice
-            (attester, published_level, indexes))
+        let slots_indices, _ = List.split ok in
+        Event.emit_get_attestable_slots_ok_notice
+          ~attester
+          ~published_level
+          ~slots_indices
     in
     let* () =
       if List.is_empty not_ok then Lwt.return_unit
@@ -376,13 +374,11 @@ module Profile_handlers = struct
             (fun (idx, _, _) -> idx)
             count_received_incomplete_shards_per_slot
         in
-        Event.(
-          emit
-            get_attestable_slots_not_ok_warning
-            ( attester,
-              published_level,
-              indexes,
-              count_received_incomplete_shards_per_slot ))
+        Event.emit_get_attestable_slots_not_ok_warning
+          ~attester
+          ~published_level
+          ~slots_indices:indexes
+          ~slot_indexes_with_details:count_received_incomplete_shards_per_slot
     in
     Lwt.return_unit
 
@@ -405,10 +401,9 @@ module Profile_handlers = struct
         (* We check that the baker is not in advance wrt the DAL node, which would
            mean that the DAL node is lagging. We allow a slack of 1 level. *)
         if Int32.succ current_level < current_baker_level then
-          Event.(
-            emit
-              get_attestable_slots_future_level_warning
-              (current_level, current_baker_level))
+          Event.emit_get_attestable_slots_future_level_warning
+            ~current_level
+            ~current_baker_level
         else Lwt.return_unit
     | _ ->
         (* We simply don't do anything if we couldn't obtain the
@@ -431,12 +426,10 @@ module Profile_handlers = struct
         | Error _ ->
             (* assume the worst, that it is a trap *)
             let*! () =
-              Event.(
-                emit
-                  trap_check_failure
-                  ( slot_id.Types.Slot_id.slot_level,
-                    slot_id.slot_index,
-                    shard_index ))
+              Event.emit_trap_check_failure
+                ~published_level:slot_id.Types.Slot_id.slot_level
+                ~slot_index:slot_id.slot_index
+                ~shard_index
             in
             return false)
       assigned_shard_indexes
@@ -834,5 +827,5 @@ let install_finalizer rpc_server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = shutdown rpc_server in
-  let* () = Event.(emit shutdown_node exit_status) in
+  let* () = Event.emit_shutdown_node ~exit_status in
   Tezos_base_unix.Internal_event_unix.close ()

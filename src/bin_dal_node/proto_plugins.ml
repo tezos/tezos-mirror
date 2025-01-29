@@ -52,10 +52,10 @@ let resolve_plugin_by_hash proto_hash =
   let plugin_opt = Dal_plugin.get proto_hash in
   match plugin_opt with
   | None ->
-      let*! () = Event.(emit no_protocol_plugin proto_hash) in
+      let*! () = Event.emit_no_protocol_plugin ~proto_hash in
       tzfail (No_plugin_for_proto {proto_hash})
   | Some plugin ->
-      let*! () = Event.(emit protocol_plugin_resolved proto_hash) in
+      let*! () = Event.emit_protocol_plugin_resolved ~proto_hash in
       return plugin
 
 let resolve_plugin_for_level cctxt ~level =

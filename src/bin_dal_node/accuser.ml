@@ -41,14 +41,12 @@ let filter_injectable_traps ~attested_level ~published_level attestation_map
       match attestation_opt with
       | None ->
           let*! () =
-            Event.(
-              emit
-                trap_delegate_attestation_not_found
-                ( delegate,
-                  slot_index,
-                  shard.Cryptobox.index,
-                  published_level,
-                  attested_level ))
+            Event.emit_trap_delegate_attestation_not_found
+              ~delegate
+              ~slot_index
+              ~shard_index:shard.Cryptobox.index
+              ~published_level
+              ~attested_level
           in
           Lwt.return_none
       | Some (_attestation, None) ->
@@ -107,14 +105,12 @@ let inject_entrapment_evidences (type block_info)
                    shard_proof ) ->
               if Plugin.is_attested dal_attestation slot_index then
                 let*! () =
-                  Event.(
-                    emit
-                      trap_injection
-                      ( delegate,
-                        published_level,
-                        attested_level,
-                        slot_index,
-                        shard.Cryptobox.index ))
+                  Event.emit_trap_injection
+                    ~delegate
+                    ~published_level
+                    ~attested_level
+                    ~shard_index:shard.Cryptobox.index
+                    ~slot_index
                 in
                 let*! res =
                   Plugin.inject_entrapment_evidence
@@ -127,17 +123,15 @@ let inject_entrapment_evidences (type block_info)
                 in
                 match res with
                 | Ok () -> return_unit
-                | Error err ->
+                | Error error ->
                     let*! () =
-                      Event.(
-                        emit
-                          trap_injection_failure
-                          ( delegate,
-                            published_level,
-                            attested_level,
-                            slot_index,
-                            shard.Cryptobox.index,
-                            err ))
+                      Event.emit_trap_injection_failure
+                        ~delegate
+                        ~published_level
+                        ~attested_level
+                        ~slot_index
+                        ~shard_index:shard.Cryptobox.index
+                        ~error
                     in
                     return_unit
               else return_unit)

@@ -79,22 +79,25 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
     else
       let*! res = get_predecessor crawler_lib hash shell_header.level in
       match res with
-      | Error err ->
+      | Error error ->
           let*! () =
-            Event.(emit failed_to_fetch_block)
-              ("hash", Int32.pred shell_header.level, !last_notified_level, err)
+            Event.emit_failed_to_fetch_block
+              ~type_:"hash"
+              ~level:(Int32.pred shell_header.level)
+              ~last_notified:!last_notified_level
+              ~error
           in
           return acc
       | Ok (pred_hash, _level) -> (
           let*! res = fetch_tezos_shell_header cctxt headers_cache pred_hash in
           match res with
-          | Error err ->
+          | Error error ->
               let*! () =
-                Event.(emit failed_to_fetch_block)
-                  ( "hash",
-                    Int32.pred shell_header.level,
-                    !last_notified_level,
-                    err )
+                Event.emit_failed_to_fetch_block
+                  ~type_:"hash"
+                  ~level:(Int32.pred shell_header.level)
+                  ~last_notified:!last_notified_level
+                  ~error
               in
               return acc
           | Ok pred_shell_header ->
@@ -106,10 +109,10 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
   let process (hash, Block_header.{shell = shell_header; _}) =
     let shell_header_level = shell_header.level in
     let*! () =
-      Event.(
-        emit
-          layer1_node_new_head
-          (hash, shell_header_level, shell_header.fitness))
+      Event.emit_layer1_node_new_head
+        ~hash
+        ~level:shell_header_level
+        ~fitness:shell_header.fitness
     in
     Dal_metrics.new_layer1_head ~head_level:shell_header_level ;
     cache_shell_header headers_cache hash shell_header ;

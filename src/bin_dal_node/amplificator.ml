@@ -187,7 +187,7 @@ module Reconstruction_process_worker = struct
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
     let* () = read_init_message_from_parent ic in
-    let*! () = Event.(emit crypto_process_started (Unix.getpid ())) in
+    let*! () = Event.emit_crypto_process_started ~pid:(Unix.getpid ()) in
     let rec loop () =
       let*! query_id = Lwt_io.read_int ic in
       (* Read query from main dal process *)
@@ -208,7 +208,7 @@ module Reconstruction_process_worker = struct
         |> List.to_seq
       in
 
-      let*! () = Event.(emit crypto_process_received_query query_id) in
+      let*! () = Event.emit_crypto_process_received_query ~query_id in
 
       (* crypto computation *)
       let* proved_shards_encoded =
@@ -216,7 +216,7 @@ module Reconstruction_process_worker = struct
       in
 
       (* Sends back the proved_shards_encoded to the main dal process *)
-      let*! () = Event.(emit crypto_process_sending_reply query_id) in
+      let*! () = Event.emit_crypto_process_sending_reply ~query_id in
       let len = Bytes.length proved_shards_encoded in
       let*! () = Lwt_io.write_int oc query_id in
       let*! () = Lwt_io.write_int oc len in
@@ -242,7 +242,7 @@ let query_sender_job {query_pipe; process; _} =
       Lwt_pipe.Unbounded.pop query_pipe
     in
     let oc = Process_worker.output_channel process in
-    let*! () = Event.(emit main_process_sending_query query_id) in
+    let*! () = Event.emit_main_process_sending_query ~query_id in
     (* Serialization: query_id, then shards *)
     let*! () = Lwt_io.write_int oc query_id in
     let* () =
@@ -293,7 +293,7 @@ let reply_receiver_job {process; query_store; _} node_context =
             ]
       | `Message msg -> return msg
     in
-    let*! () = Event.(emit main_process_received_reply id) in
+    let*! () = Event.emit_main_process_received_reply ~query_id:id in
     let shards, shard_proofs =
       Data_encoding.Binary.of_bytes_exn proved_shards_encoding msg
     in
@@ -314,7 +314,9 @@ let reply_receiver_job {process; query_store; _} node_context =
         gs_worker
     in
     let*! () =
-      Event.(emit reconstruct_finished (slot_id.slot_level, slot_id.slot_index))
+      Event.emit_reconstruct_finished
+        ~level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
     in
     let duration = Unix.gettimeofday () -. reconstruction_start_time in
     Dal_metrics.update_amplification_complete_duration duration ;
@@ -424,7 +426,7 @@ let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
   in
   let length = Query_store.length amplificator.query_store in
   let () = Dal_metrics.update_amplification_queue_length length in
-  let*! () = Event.(emit main_process_enqueue_query query_id) in
+  let*! () = Event.emit_main_process_enqueue_query ~query_id in
   let () =
     Lwt_pipe.Unbounded.push
       amplificator.query_pipe
@@ -439,13 +441,11 @@ let amplify node_store commitment (slot_id : Types.slot_id)
   let reconstruction_start_time = Unix.gettimeofday () in
   Dal_metrics.reconstruction_started () ;
   let*! () =
-    Event.(
-      emit
-        reconstruct_started
-        ( slot_id.slot_level,
-          slot_id.slot_index,
-          number_of_already_stored_shards,
-          number_of_shards ))
+    Event.emit_reconstruct_started
+      ~level:slot_id.slot_level
+      ~slot_index:slot_id.slot_index
+      ~number_of_received_shards:number_of_already_stored_shards
+      ~number_of_shards
   in
   let shards =
     Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
@@ -495,13 +495,11 @@ let try_amplification commitment slot_metrics slot_id amplificator =
   then return_unit
   else
     (* We have enough shards to reconstruct the whole slot. *)
-    with_amplification_lock
-      node_ctxt
-      slot_id
-      ~on_error:
-        Event.(
-          fun err ->
-            emit reconstruct_error (slot_id.slot_level, slot_id.slot_index, err))
+    with_amplification_lock node_ctxt slot_id ~on_error:(fun error ->
+        Event.emit_reconstruct_error
+          ~level:slot_id.slot_level
+          ~slot_index:slot_id.slot_index
+          ~error)
     @@ fun () ->
     (* Wait a random delay between 1 and 2 seconds before starting
        the reconstruction; this is to give some slack to receive
@@ -514,10 +512,10 @@ let try_amplification commitment slot_metrics slot_id amplificator =
              (amplification_random_delay_max -. amplification_random_delay_min))
     in
     let*! () =
-      Event.(
-        emit
-          reconstruct_starting_in
-          (slot_id.slot_level, slot_id.slot_index, random_delay))
+      Event.emit_reconstruct_starting_in
+        ~level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+        ~delay:random_delay
     in
     let*! () = Lwt_unix.sleep random_delay in
     (* Count again the stored shards because we may have received
@@ -532,10 +530,9 @@ let try_amplification commitment slot_metrics slot_id amplificator =
     if number_of_already_stored_shards = number_of_shards then (
       Dal_metrics.update_amplification_abort_reconstruction_duration duration ;
       let*! () =
-        Event.(
-          emit
-            reconstruct_no_missing_shard
-            (slot_id.slot_level, slot_id.slot_index))
+        Event.emit_reconstruct_no_missing_shard
+          ~level:slot_id.slot_level
+          ~slot_index:slot_id.slot_index
       in
       Dal_metrics.reconstruction_aborted () ;
       return_unit)

@@ -135,8 +135,8 @@ let load_profile_ctxt ctxt =
   let* res = Profile_manager.load_profile_ctxt ~base_dir in
   match res with
   | Ok pctxt -> return_some pctxt
-  | Error err ->
-      let* () = Event.(emit loading_profiles_failed err) in
+  | Error error ->
+      let* () = Event.emit_loading_profiles_failed ~error in
       return_none
 
 let set_profile_ctxt ctxt ?(save = true) pctxt =
@@ -147,7 +147,7 @@ let set_profile_ctxt ctxt ?(save = true) pctxt =
     let* res = Profile_manager.save_profile_ctxt ctxt.profile_ctxt ~base_dir in
     match res with
     | Ok () -> return_unit
-    | Error err -> Event.(emit saving_profiles_failed err)
+    | Error error -> Event.emit_saving_profiles_failed ~error
   else return_unit
 
 let get_config ctxt = ctxt.config
@@ -225,7 +225,7 @@ let warn_if_attesters_not_delegates ctxt ?level operator_profiles =
           (fun pkh ->
             let* is_delegate = Plugin.is_delegate cctxt ~pkh in
             if not is_delegate then
-              let*! () = Event.(emit registered_pkh_not_a_delegate pkh) in
+              let*! () = Event.emit_registered_pkh_not_a_delegate ~pkh in
               return_unit
             else return_unit)
           pkh_set)

@@ -195,10 +195,10 @@ module Shards = struct
             in
             let () = Dal_metrics.shard_stored () in
             let*! () =
-              Event.(
-                emit
-                  stored_slot_shard
-                  (slot_id.slot_level, slot_id.slot_index, index))
+              Event.emit_stored_slot_shard
+                ~published_level:slot_id.slot_level
+                ~slot_index:slot_id.slot_index
+                ~shard_index:index
             in
             return_unit)
         shards
@@ -276,7 +276,9 @@ module Slots = struct
       |> Errors.other_lwt_result
     in
     let*! () =
-      Event.(emit stored_slot_content (slot_id.slot_level, slot_id.slot_index))
+      Event.emit_stored_slot_content
+        ~published_level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
     in
     return_unit
 
@@ -443,8 +445,10 @@ module Statuses = struct
       |> Errors.other_lwt_result
     in
     let*! () =
-      Event.(
-        emit stored_slot_status (slot_id.slot_level, slot_id.slot_index, status))
+      Event.emit_stored_slot_status
+        ~published_level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+        ~status
     in
     return_unit
 
@@ -662,7 +666,7 @@ let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
       Lwt_utils_unix.create_dir skip_list_cells_data_dir
     else Lwt.return_unit
   in
-  let*! () = Event.(emit dal_node_sqlite3_store_init ()) in
+  let*! () = Event.emit_dal_node_sqlite3_store_init () in
   Dal_store_sqlite3.Skip_list_cells.init
     ~data_dir:skip_list_cells_data_dir
     ~perm
@@ -717,7 +721,11 @@ let cache_entry node_store commitment slot shares shard_proofs =
 let upgrade_from_v0_to_v1 ~base_dir =
   let open Lwt_syntax in
   let ( // ) = Filename.Infix.( // ) in
-  let* () = Event.(emit store_upgrade_start (Version.make 0, Version.make 1)) in
+  let* () =
+    Event.emit_store_upgrade_start
+      ~old_version:(Version.make 0)
+      ~new_version:(Version.make 1)
+  in
   let rec move_directory_contents src dst =
     let stream = Lwt_unix.files_of_directory src in
     Lwt_stream.iter_s
@@ -741,10 +749,10 @@ let upgrade_from_v0_to_v1 ~base_dir =
             let src_path = src // name in
             let dst_path = dst // name in
             let* () =
-              Event.(
-                emit
-                  store_upgrade_error_moving_directory
-                  (src_path, dst_path, Printexc.to_string exn))
+              Event.emit_store_upgrade_error_moving_directory
+                ~src:src_path
+                ~dst:dst_path
+                ~exn:(Printexc.to_string exn)
             in
             Lwt.return_unit))
       stream
@@ -755,10 +763,9 @@ let upgrade_from_v0_to_v1 ~base_dir =
         (fun () -> Lwt_unix.mkdir new_path 0o700)
         (fun exn ->
           let* () =
-            Event.(
-              emit
-                store_upgrade_error_creating_directory
-                (new_path, Printexc.to_string exn))
+            Event.emit_store_upgrade_error_creating_directory
+              ~path:new_path
+              ~exn:(Printexc.to_string exn)
           in
           Lwt.return ())
     in
@@ -790,12 +797,16 @@ let upgrade_from_v0_to_v1 ~base_dir =
         else Lwt.return ())
       stream
   in
-  Event.(emit store_upgraded (Version.make 0, Version.make 1))
+  Event.emit_store_upgraded
+    ~old_version:(Version.make 0)
+    ~new_version:(Version.make 1)
 
 let upgrade_from_v1_to_v2 ~base_dir =
   let open Lwt_result_syntax in
   let*! () =
-    Event.(emit store_upgrade_start (Version.make 1, Version.make 2))
+    Event.emit_store_upgrade_start
+      ~old_version:(Version.make 1)
+      ~new_version:(Version.make 2)
   in
   (* Initialize both stores and migrate. *)
   let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
@@ -852,7 +863,11 @@ let upgrade_from_v1_to_v2 ~base_dir =
       let*! () = Lwt_utils_unix.remove_dir (store_dir // "hashes") in
       let*! () = Lwt_utils_unix.remove_dir (store_dir // "cells") in
       (* The storage upgrade has been done. *)
-      let*! () = Event.(emit store_upgraded (Version.make 1, Version.make 2)) in
+      let*! () =
+        Event.emit_store_upgraded
+          ~old_version:(Version.make 1)
+          ~new_version:(Version.make 2)
+      in
       return_unit
   | Error err ->
       (* Clean the sqlite store unless the storage backend was already set to sqlite. *)
@@ -871,7 +886,7 @@ let upgrade_from_v1_to_v2 ~base_dir =
         | Some SQLite3 -> Lwt.return_unit
       in
       (* The store upgrade failed. *)
-      let*! () = Event.(emit store_upgrade_error ()) in
+      let*! () = Event.emit_store_upgrade_error () in
       Format.eprintf "%a" Error_monad.pp_print_trace err ;
       fail err
 
@@ -937,7 +952,7 @@ let init config =
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
   let* skip_list_cells_store = init_sqlite_skip_list_cells_store base_dir in
-  let*! () = Event.(emit store_is_ready ()) in
+  let*! () = Event.emit_store_is_ready () in
   return
     {
       shards;

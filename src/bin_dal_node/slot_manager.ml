@@ -142,7 +142,11 @@ let get_slot_content_from_shards cryptobox store slot_id =
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
   let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
-  let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
+  let*! () =
+    Event.emit_fetched_slot
+      ~size:(Bytes.length slot)
+      ~shards:(Seq.length shards)
+  in
   return slot
 
 let get_slot_content ~reconstruct_if_missing ctxt slot_id =
@@ -220,10 +224,10 @@ let maybe_register_trap ctxt message_id message =
         ~shard_proof
   | Ok false -> ()
   | Error _ ->
-      Event.(
-        emit__dont_wait__use_with_care
-          trap_registration_fail
-          (delegate, slot_index, shard_index))
+      Event.emit_dont_wait__trap_registration_fail
+        ~delegate
+        ~slot_index
+        ~shard_index
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment slot polynomial =
