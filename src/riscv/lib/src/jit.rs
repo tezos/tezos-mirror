@@ -5,13 +5,18 @@
 //! A JIT library for compilation of sequences (or blocks) of RISC-V
 //! instructions to native code.
 
+mod builder;
 pub mod state_access;
 
+use self::builder::Builder;
+use self::state_access::register_jsa_symbols;
+use self::state_access::JsaCalls;
+use self::state_access::JsaImports;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::instruction::OpCode;
-use crate::machine_state::main_memory::Address;
 use crate::machine_state::main_memory::MainMemoryLayout;
 use crate::machine_state::MachineCoreState;
+use crate::machine_state::ProgramCounterUpdate;
 use crate::traps::EnvironException;
 use cranelift::codegen::ir::types::I64;
 use cranelift::codegen::settings::SetError;
@@ -21,11 +26,12 @@ use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::Linkage;
 use cranelift_module::Module;
+use cranelift_module::ModuleError;
 use state_access::JitStateAccess;
 use thiserror::Error;
 
 /// Alias for the function signature produced by the JIT compilation.
-type JitFn<ML, JSA> = unsafe extern "C" fn(&mut MachineCoreState<ML, JSA>, u64, &mut usize) -> u64;
+type JitFn<ML, JSA> = unsafe extern "C" fn(&mut MachineCoreState<ML, JSA>, u64, &mut usize);
 
 /// A jit-compiled function that can be [called] over [`MachineCoreState`].
 ///
@@ -47,8 +53,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JCall<ML, JSA> {
         pc: u64,
         steps: &mut usize,
     ) -> Result<(), EnvironException> {
-        let new_pc = (self.fun)(core, pc, steps);
-        core.hart.pc.write(new_pc);
+        (self.fun)(core, pc, steps);
         Ok(())
     }
 }
@@ -65,6 +70,9 @@ pub enum JitError {
     /// Constructing the Cranelift builder failed.
     #[error("Unable to initialise builder {0}")]
     BuilderFailure(#[from] CodegenError),
+    /// Unable to register external [`JitStateAccess`] functionality.
+    #[error("Unable to register external JSA functions: {0}")]
+    JsaRegistration(#[from] ModuleError),
 }
 
 /// The JIT is responsible for compiling blocks of instructions to machine code,
@@ -83,10 +91,11 @@ pub struct JIT<ML: MainMemoryLayout, JSA: JitStateAccess> {
     /// functions.
     module: JITModule,
 
+    /// Imported [JitStateAccess] functions.
+    jsa_imports: JsaImports<ML, JSA>,
+
     /// Counter for naming of functions
     next_id: usize,
-
-    _pd: std::marker::PhantomData<(ML, JSA)>,
 }
 
 impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
@@ -101,15 +110,18 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         let isa_builder = cranelift_native::builder().map_err(JitError::UnsupportedPlatform)?;
         let isa = isa_builder.finish(settings::Flags::new(flag_builder))?;
 
-        let builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
-        let module = JITModule::new(builder);
+        let mut builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+        register_jsa_symbols::<ML, JSA>(&mut builder);
+
+        let mut module = JITModule::new(builder);
+        let jsa_imports = JsaImports::declare_in_module(&mut module)?;
 
         Ok(Self {
             builder_context: FunctionBuilderContext::new(),
             ctx: codegen::Context::new(),
             module,
             next_id: 0,
-            _pd: std::marker::PhantomData,
+            jsa_imports,
         })
     }
 
@@ -123,8 +135,19 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         for i in instr.iter() {
             match i.opcode {
                 OpCode::Nop => {
+                    let lower = OpCode::Nop.to_lowering()?;
+                    let pc_update = unsafe {
+                        // # SAFETY: lower is called with args from the same instruction that it
+                        // was derived
+                        (lower)(i.args(), &mut builder)
+                    };
+
+                    let ProgramCounterUpdate::Next(width) = pc_update else {
+                        unreachable!("Nop bumps pc by instruction width");
+                    };
+
+                    builder.pc_offset += width as u64;
                     builder.steps += 1;
-                    builder.pc_offset += i.width() as u64;
                 }
                 _ => return None,
             }
@@ -148,14 +171,12 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     /// # Return
     ///
     /// | `steps: usize`                | `int`                           |
-    fn start(&mut self) -> Builder<'_> {
+    fn start(&mut self) -> Builder<'_, ML, JSA> {
         let ptr = self.module.target_config().pointer_type();
 
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
         self.ctx.func.signature.params.push(AbiParam::new(I64));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
-
-        self.ctx.func.signature.returns.push(AbiParam::new(ptr));
 
         let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
 
@@ -165,16 +186,21 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         builder.switch_to_block(entry_block);
         builder.seal_block(entry_block);
 
+        let core_ptr_val = builder.block_params(entry_block)[0];
         let pc_val = builder.block_params(entry_block)[1];
         let steps_ptr_val = builder.block_params(entry_block)[2];
 
-        Builder {
+        let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports);
+
+        Builder::<'_, ML, JSA> {
             builder,
             ptr,
+            core_ptr_val,
             steps_ptr_val,
             steps: 0,
             pc_val,
             pc_offset: 0,
+            jsa_call,
         }
     }
 
@@ -209,42 +235,6 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         //         entry block. Compilation has succeeded & therefore this produced code
         //         is safe to call.
         unsafe { std::mem::transmute(code) }
-    }
-}
-
-/// Builder context used when lowering individual instructions within a block.
-struct Builder<'a> {
-    builder: FunctionBuilder<'a>,
-    ptr: Type,
-    steps_ptr_val: Value,
-    steps: usize,
-    pc_val: Value,
-    pc_offset: Address,
-}
-
-impl<'a> Builder<'a> {
-    /// Consume the builder, allowing for the function under construction to be [`finalised`].
-    ///
-    /// [`finalised`]: JIT::finalise
-    fn end(mut self) {
-        // flush steps
-        let steps = self
-            .builder
-            .ins()
-            .load(self.ptr, MemFlags::trusted(), self.steps_ptr_val, 0);
-        let steps = self.builder.ins().iadd_imm(steps, self.steps as i64);
-        self.builder
-            .ins()
-            .store(MemFlags::trusted(), steps, self.steps_ptr_val, 0);
-
-        // flush pc
-        let pc = self
-            .builder
-            .ins()
-            .iadd_imm(self.pc_val, self.pc_offset as i64);
-        self.builder.ins().return_(&[pc]);
-
-        self.builder.finalize();
     }
 }
 
