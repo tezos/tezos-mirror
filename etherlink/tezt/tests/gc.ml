@@ -20,10 +20,7 @@
 
 open Rpc.Syntax
 
-let register ?genesis_timestamp
-    ?(garbage_collector_parameters =
-      Evm_node.{split_frequency_in_seconds = 100; number_of_chunks = 5}) ~title
-    ~tags f =
+let register ?genesis_timestamp ?(retention_period = 5) ~title ~tags f =
   Test.register
     ~__FILE__
     ~title
@@ -38,27 +35,24 @@ let register ?genesis_timestamp
         Constant.smart_rollup_installer;
       ]
   @@ fun () ->
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~garbage_collector_parameters
-      ~history_mode:Rolling
-      ()
-  in
+  let patch_config = Evm_node.patch_config_with_experimental_feature () in
   let* sequencer =
-    Helpers.init_sequencer_sandbox ?genesis_timestamp ~patch_config ()
+    Helpers.init_sequencer_sandbox
+      ?genesis_timestamp
+      ~history_mode:(Rolling retention_period)
+      ~patch_config
+      ()
   in
   f sequencer
 
+let days n = Ptime.Span.of_int_s (n * 86400)
+
 let test_gc_boundaries () =
-  let genesis_timestamp =
-    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
-  in
-  let garbage_collector_parameters =
-    Evm_node.{split_frequency_in_seconds = 1; number_of_chunks = 3}
-  in
+  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
+  let genesis_timestamp = Client.At genesis_time in
   register
     ~genesis_timestamp
-    ~garbage_collector_parameters
+    ~retention_period:3
     ~title:"GC boundaries"
     ~tags:["boundaries"; "earliest"]
   @@ fun sequencer ->
@@ -72,7 +66,11 @@ let test_gc_boundaries () =
   let* _ =
     fold 9 () (fun i () ->
         let level = level + i + 1 in
-        let timestamp = sf "2020-01-01T00:00:0%dZ" (i + 1) in
+        let timestamp =
+          (* Move one day every block *)
+          Ptime.add_span genesis_time (days (i + 1))
+          |> Option.get |> Client.Time.to_notation
+        in
         let wait_for_split = Evm_node.wait_for_split ~level sequencer in
         let wait_for_gc =
           if level > 3 then
@@ -124,15 +122,11 @@ let test_gc_boundaries () =
   unit
 
 let test_switch_history_mode () =
-  let genesis_timestamp =
-    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
-  in
-  let garbage_collector_parameters =
-    Evm_node.{split_frequency_in_seconds = 1; number_of_chunks = 2}
-  in
+  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
+  let genesis_timestamp = Client.At genesis_time in
   register
     ~genesis_timestamp
-    ~garbage_collector_parameters
+    ~retention_period:2
     ~title:"Switch history mode (rolling -> archive)"
     ~tags:["history_mode"]
   @@ fun sequencer ->
@@ -146,11 +140,12 @@ let test_switch_history_mode () =
   let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
   let* _ =
     fold 3 () (fun i () ->
-        let* _ =
-          Rpc.produce_block
-            ~timestamp:(sf "2020-01-01T00:00:0%dZ" (i + 1))
-            sequencer
+        let timestamp =
+          (* Move one day every block *)
+          Ptime.add_span genesis_time (days (i + 1))
+          |> Option.get |> Client.Time.to_notation
         in
+        let* _ = Rpc.produce_block ~timestamp sequencer in
         unit)
   and* _ = wait_for_gc in
   let*@ earliest_block = Rpc.get_block_by_number ~block:"earliest" sequencer in
@@ -161,12 +156,7 @@ let test_switch_history_mode () =
   let* () =
     Evm_node.Config_file.update
       sequencer
-      JSON.(
-        update
-          "experimental_features"
-          (put
-             ( "history_mode",
-               annotate ~origin:"history_mode" (`String "archive") )))
+      (Evm_node.patch_config_gc ~history_mode:Archive)
   in
   let wait_for_archive =
     Evm_node.wait_for_start_history_mode ~history_mode:"archive" sequencer
