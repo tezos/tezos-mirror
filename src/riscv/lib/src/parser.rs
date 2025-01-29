@@ -488,72 +488,92 @@ const FM_8: u32 = 0b1000;
 pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use InstrCacheable::*;
     use InstrUncacheable::*;
+    // RV64I (Chapter 5.4) and RV64C (Chapter 16.7) describe the code points associated
+    // with HINT instructions. We do not implement any HINT logic, but decode all these
+    // as `Hint` or `HintCompresssed` opcodes, which we translate to NOPs in `machine_state`.
     let i = match opcode(instr) {
         // R-type instructions
         OP_ARITH => match funct3(instr) {
-            F3_0 => match funct7(instr) {
-                F7_0 => r_instr!(Add, instr),
-                F7_1 => r_instr!(Mul, instr),
-                F7_20 => r_instr!(Sub, instr),
+            F3_0 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Add, instr),
+                (F7_1, _) => r_instr!(Mul, instr),
+                (F7_20, x0) => Hint { instr },
+                (F7_20, _) => r_instr!(Sub, instr),
                 _ => Unknown { instr },
             },
-            F3_4 => match funct7(instr) {
-                F7_0 => r_instr!(Xor, instr),
-                F7_1 => r_instr!(Div, instr),
+            F3_4 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Xor, instr),
+                (F7_1, _) => r_instr!(Div, instr),
                 _ => Unknown { instr },
             },
-            F3_6 => match funct7(instr) {
-                F7_0 => r_instr!(Or, instr),
-                F7_1 => r_instr!(Rem, instr),
+            F3_6 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Or, instr),
+                (F7_1, _) => r_instr!(Rem, instr),
                 _ => Unknown { instr },
             },
-            F3_7 => match funct7(instr) {
-                F7_0 => r_instr!(And, instr),
-                F7_1 => r_instr!(Remu, instr),
+            F3_7 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(And, instr),
+                (F7_1, _) => r_instr!(Remu, instr),
                 _ => Unknown { instr },
             },
-            F3_1 => match funct7(instr) {
-                F7_0 => r_instr!(Sll, instr),
-                F7_1 => r_instr!(Mulh, instr),
+            F3_1 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Sll, instr),
+                (F7_1, _) => r_instr!(Mulh, instr),
                 _ => Unknown { instr },
             },
-            F3_5 => match funct7(instr) {
-                F7_0 => r_instr!(Srl, instr),
-                F7_1 => r_instr!(Divu, instr),
-                F7_20 => r_instr!(Sra, instr),
+            F3_5 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Srl, instr),
+                (F7_1, _) => r_instr!(Divu, instr),
+                (F7_20, x0) => Hint { instr },
+                (F7_20, _) => r_instr!(Sra, instr),
                 _ => Unknown { instr },
             },
 
-            F3_2 => match funct7(instr) {
-                F7_0 => r_instr!(Slt, instr),
-                F7_1 => r_instr!(Mulhsu, instr),
+            F3_2 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Slt, instr),
+                (F7_1, _) => r_instr!(Mulhsu, instr),
                 _ => Unknown { instr },
             },
 
-            F3_3 => match funct7(instr) {
-                F7_0 => r_instr!(Sltu, instr),
-                F7_1 => r_instr!(Mulhu, instr),
+            F3_3 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Sltu, instr),
+                (F7_1, _) => r_instr!(Mulhu, instr),
                 _ => Unknown { instr },
             },
 
             _ => Unknown { instr },
         },
         OP_ARITH_W => match funct3(instr) {
-            F3_0 => match funct7(instr) {
-                F7_0 => r_instr!(Addw, instr),
-                F7_1 => r_instr!(Mulw, instr),
-                F7_20 => r_instr!(Subw, instr),
+            F3_0 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Addw, instr),
+                (F7_1, _) => r_instr!(Mulw, instr),
+                (F7_20, x0) => Hint { instr },
+                (F7_20, _) => r_instr!(Subw, instr),
                 _ => Unknown { instr },
             },
-            F3_1 => r_instr!(Sllw, instr),
+            F3_1 => match rd(instr) {
+                x0 => Hint { instr },
+                _ => r_instr!(Sllw, instr),
+            },
             F3_4 => match funct7(instr) {
                 F7_1 => r_instr!(Divw, instr),
                 _ => Unknown { instr },
             },
-            F3_5 => match funct7(instr) {
-                F7_0 => r_instr!(Srlw, instr),
-                F7_1 => r_instr!(Divuw, instr),
-                F7_20 => r_instr!(Sraw, instr),
+            F3_5 => match (funct7(instr), rd(instr)) {
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => r_instr!(Srlw, instr),
+                (F7_1, _) => r_instr!(Divuw, instr),
+                (F7_20, x0) => Hint { instr },
+                (F7_20, _) => r_instr!(Sraw, instr),
                 _ => Unknown { instr },
             },
 
@@ -570,24 +590,41 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         },
 
         // I-type instructions
-        OP_ARITH_I => match funct3(instr) {
-            F3_0 => i_instr!(Addi, instr),
-            F3_4 => i_instr!(Xori, instr),
-            F3_6 => i_instr!(Ori, instr),
-            F3_7 => i_instr!(Andi, instr),
-            F3_1 => match imm_11_6(instr) {
+        OP_ARITH_I => match (funct3(instr), rd(instr)) {
+            (F3_0, x0) => match (rs1(instr), i_imm(instr)) {
+                (x0, 0) => Addi(instruction::ITypeArgs {
+                    rd: x0,
+                    rs1: x0,
+                    imm: 0,
+                }),
+                (x0, _) | (_, 0) => Hint { instr },
+                (rs1, imm) => Addi(instruction::ITypeArgs { rd: x0, rs1, imm }),
+            },
+            (F3_0, _) => i_instr!(Addi, instr),
+            (F3_4, x0) => Hint { instr },
+            (F3_4, _) => i_instr!(Xori, instr),
+            (F3_6, x0) => Hint { instr },
+            (F3_6, _) => i_instr!(Ori, instr),
+            (F3_7, x0) => Hint { instr },
+            (F3_7, _) => i_instr!(Andi, instr),
+            (F3_1, rd) => match (imm_11_6(instr), rd) {
                 // imm[0:5] -> shift amount
-                F7_0 => i_instr!(Slli, instr),
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => i_instr!(Slli, instr),
                 _ => Unknown { instr },
             },
-            F3_5 => match imm_11_6(instr) {
+            (F3_5, rd) => match (imm_11_6(instr), rd) {
                 // imm[6:11] -> type of shift, imm[0:5] -> shift amount
-                F7_0 => i_instr!(Srli, instr),
-                F7_20 => i_instr!(Srai, instr),
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => i_instr!(Srli, instr),
+                (F7_20, x0) => Hint { instr },
+                (F7_20, _) => i_instr!(Srai, instr),
                 _ => Unknown { instr },
             },
-            F3_2 => i_instr!(Slti, instr),
-            F3_3 => i_instr!(Sltiu, instr),
+            (F3_2, x0) => Hint { instr },
+            (F3_2, _) => i_instr!(Slti, instr),
+            (F3_3, x0) => Hint { instr },
+            (F3_3, _) => i_instr!(Sltiu, instr),
             _ => Unknown { instr },
         },
         OP_LOAD => match funct3(instr) {
@@ -600,24 +637,32 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
             F3_6 => i_instr!(Lwu, instr),
             _ => Unknown { instr },
         },
-        OP_ARITH_IW => match funct3(instr) {
-            F3_0 => i_instr!(Addiw, instr),
-            F3_1 => match imm_11_6(instr) {
+        OP_ARITH_IW => match (funct3(instr), rd(instr)) {
+            (F3_0, x0) => Hint { instr },
+            (F3_0, _) => i_instr!(Addiw, instr),
+            (F3_1, rd) => match (imm_11_6(instr), rd) {
                 // imm[0:4] -> shift amount
-                F7_0 => i_instr!(Slliw, instr),
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => i_instr!(Slliw, instr),
                 _ => Unknown { instr },
             },
-            F3_5 => match imm_11_6(instr) {
+            (F3_5, rd) => match (imm_11_6(instr), rd) {
                 // imm[6:11] -> type of shift, imm[0:4] -> shift amount
-                F7_0 => i_instr!(Srliw, instr),
-                F7_20 => i_instr!(Sraiw, instr),
+                (F7_0, x0) => Hint { instr },
+                (F7_0, _) => i_instr!(Srliw, instr),
+                (F7_20, x0) => Hint { instr },
+                (F7_20, _) => i_instr!(Sraiw, instr),
                 _ => Unknown { instr },
             },
             _ => Unknown { instr },
         },
         OP_SYNCH => match funct3(instr) {
             F3_0 => match fm(instr) {
-                FM_0 => return Instr::Uncacheable(fence_instr!(Fence, instr)),
+                FM_0 => match (bits(instr, 20, 4), bits(instr, 24, 4)) {
+                    (0, _) => Hint { instr },
+                    (_, 0) => Hint { instr },
+                    (_, _) => return Instr::Uncacheable(fence_instr!(Fence, instr)),
+                },
                 FM_8 => return Instr::Uncacheable(fence_instr!(FenceTso, instr)),
                 _ => Unknown { instr },
             },
@@ -719,8 +764,14 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         },
 
         // U-type instructions
-        OP_LUI => u_instr!(Lui, instr),
-        OP_AUIPC => u_instr!(Auipc, instr),
+        OP_LUI => match rd(instr) {
+            x0 => Hint { instr },
+            _ => u_instr!(Lui, instr),
+        },
+        OP_AUIPC => match rd(instr) {
+            x0 => Hint { instr },
+            _ => u_instr!(Auipc, instr),
+        },
 
         // F/D-type instructions
         OP_FP => match fmt(instr) {
