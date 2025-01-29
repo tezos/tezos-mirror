@@ -346,6 +346,7 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 RUN apk update \
  && apk add --no-cache curl npm git file make jq websocat \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
+ procps-ng \
  # We need datadog-ci to send JUnit files to Datadog in tezt
  # jobs. Cf. [scripts/ci/tezt.sh].
  # Version number should be kept in sync with the one of the
