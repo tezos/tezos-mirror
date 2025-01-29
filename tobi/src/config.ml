@@ -15,6 +15,13 @@ let pervasive_paths config = config.pervasive_paths
 
 let components config = config.components
 
+let find_component_by_name name config =
+  match
+    List.find_opt (fun component -> component.name = name) config.components
+  with
+  | None -> error `not_found "component not found in configuration"
+  | Some component -> Ok component
+
 (* Read and parse [filename]. *)
 let load_file filename =
   match open_in filename with
