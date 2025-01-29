@@ -5,15 +5,7 @@
 
 use crate::{
     machine_state::registers::XValue,
-    state_backend::{
-        self as backend,
-        hash::HashError,
-        proof_backend::{
-            merkle::{MerkleTree, Merkleisable},
-            ProofGen,
-        },
-        ManagerDeserialise, ManagerSerialise, Ref,
-    },
+    state_backend::{self as backend, ManagerDeserialise, ManagerSerialise},
 };
 use serde::{Deserialize, Serialize};
 use std::mem;
@@ -115,10 +107,6 @@ pub trait MainMemoryLayout: backend::ProofLayout + backend::CommitmentLayout + '
 
     /// Clone the dynamic region.
     fn clone_data<M: backend::ManagerClone>(data: &Self::Allocated<M>) -> Self::Allocated<M>;
-
-    fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Allocated<Ref<'_, ProofGen<M>>>,
-    ) -> Result<MerkleTree, HashError>;
 }
 
 impl<const BYTES: usize> MainMemoryLayout for backend::DynArray<BYTES> {
@@ -176,12 +164,6 @@ impl<const BYTES: usize> MainMemoryLayout for backend::DynArray<BYTES> {
 
     fn clone_data<M: backend::ManagerClone>(data: &Self::Allocated<M>) -> Self::Allocated<M> {
         data.clone()
-    }
-
-    fn to_merkle_tree<M: backend::ManagerRead>(
-        data: &Self::Allocated<Ref<'_, ProofGen<M>>>,
-    ) -> Result<MerkleTree, HashError> {
-        data.to_merkle_tree()
     }
 }
 
@@ -304,14 +286,6 @@ where
     {
         let data = L::deserialise_data(deserializer)?;
         Ok(Self { data })
-    }
-}
-
-impl<L: MainMemoryLayout, M: backend::ManagerRead> Merkleisable
-    for MainMemory<L, Ref<'_, ProofGen<M>>>
-{
-    fn to_merkle_tree(&self) -> Result<MerkleTree, HashError> {
-        L::to_merkle_tree(&self.data)
     }
 }
 

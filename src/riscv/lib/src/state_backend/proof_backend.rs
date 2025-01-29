@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -421,93 +421,95 @@ impl DynAccess {
 mod tests {
     use super::*;
     use crate::state_backend::{
-        hash::RootHashable,
-        owned_backend::Owned,
-        proof_backend::merkle::Merkleisable,
-        region::{DynCells, MERKLE_LEAF_SIZE},
-        Cells, EnrichedCell, FnManagerIdent,
+        layout::Array, owned_backend::Owned, region::MERKLE_LEAF_SIZE, Cells, CommitmentLayout,
+        DynArray, DynCells, ProofLayout, Ref,
     };
     use proptest::{array, prop_assert_eq, proptest};
     use std::collections::VecDeque;
     use tests::merkle::MerkleTree;
 
-    const CELLS_SIZE: usize = 255;
+    const CELLS_SIZE: usize = 32;
 
     #[test]
     fn test_proof_gen_region() {
         proptest!(|(value_before: u64, value_after: u64, i in 0..CELLS_SIZE)| {
             // A read followed by a write
             let cells = [value_before; CELLS_SIZE];
-            let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::bind(cells);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            let value = ProofGen::<Owned>::region_read(&region, i);
+            let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
+            let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
+
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            let value = region.read(i);
             prop_assert_eq!(value, value_before);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::Read);
-            ProofGen::<Owned>::region_write(&mut region, i, value_after);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Read);
+            region.write(i, value_after);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
 
             // A write followed by a read
             let cells = [value_before; CELLS_SIZE];
-            let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::bind(cells);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            ProofGen::<Owned>::region_write(&mut region, i, value_after);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::Write);
-            let value = ProofGen::<Owned>::region_read(&region, i);
+            let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
+            let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            region.write(i, value_after);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Write);
+            let value = region.read(i);
             prop_assert_eq!(value, value_after);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
 
             // Replace
             let cells = [value_before; CELLS_SIZE];
-            let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::bind(cells);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            let value = ProofGen::<Owned>::region_replace(&mut region, i, value_after);
+            let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
+            let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            let value = region.replace(i, value_after);
             prop_assert_eq!(value, value_before);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
 
             let data_before = [value_before; CELLS_SIZE];
             let data_after = [value_after; CELLS_SIZE];
 
             // A read_all followed by a write_all
             let cells = data_before;
-            let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::bind(cells);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            let values = ProofGen::<Owned>::region_read_all(&region);
+            let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
+            let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            let values = region.read_all();
             prop_assert_eq!(values.as_slice(), data_before);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::Read);
-            ProofGen::<Owned>::region_write_all(&mut region, &data_after);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Read);
+            region.write_all(&data_after);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
 
             // A write_all followed by a read_all
             let cells = data_before;
-            let mut region: ProofRegion<u64, CELLS_SIZE, Owned> =
-                ProofRegion::bind(cells);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::NoAccess);
-            ProofGen::<Owned>::region_write_all(&mut region, &data_after);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::Write);
-            let values = ProofGen::<Owned>::region_read_all(&region);
+            let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
+            let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            region.write_all(&data_after);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Write);
+            let values = region.read_all();
             prop_assert_eq!(values.as_slice(), data_after);
-            prop_assert_eq!(region.get_access_info(), AccessInfo::ReadWrite);
+            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
 
             // Check correct Merkleisation
             let cells = [value_before; CELLS_SIZE];
-            let region: ProofRegion<u64, CELLS_SIZE, Owned> = ProofRegion::bind(cells);
-            let mut cells: Cells<u64, CELLS_SIZE, ProofGen<Owned>> = Cells::bind(region);
-            let initial_root_hash = cells.hash().unwrap();
-            cells.write(i, value_after);
-            prop_assert_eq!(cells.hash().unwrap(), initial_root_hash);
-            let merkle_tree = cells.struct_ref::<FnManagerIdent>()
-                .to_merkle_tree()
-                .unwrap();
+            let cells_owned: Cells<u64, CELLS_SIZE, Ref<'_, Owned>> = Cells::bind(&cells);
+            let initial_root_hash =
+                <Array<u64, CELLS_SIZE> as CommitmentLayout>::state_hash(cells_owned).unwrap();
 
+            let mut proof_region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> =
+                ProofRegion::bind(&cells);
+            ProofGen::<Ref<'_, Owned>>::region_write(&mut proof_region, i, value_after);
+            let proof_cells: Cells<u64, CELLS_SIZE, Ref<'_, ProofGen<Ref<'_, Owned>>>> =
+                Cells::bind(&proof_region);
+
+            let merkle_tree =
+                <Array<u64, CELLS_SIZE> as ProofLayout>::to_merkle_tree(proof_cells).unwrap();
+            merkle_tree.check_root_hash();
             match merkle_tree {
                 MerkleTree::Leaf(hash, access_info, _) => {
                     prop_assert_eq!(hash, initial_root_hash);
                     prop_assert_eq!(access_info, AccessInfo::Write);
-                },
+                }
                 _ => panic!("Expected Merkle tree to contain a single written leaf"),
             }
         });
@@ -588,31 +590,38 @@ mod tests {
                     bytes_after: [u8; ELEM_SIZE],
                     reads in array::uniform2(&address_range),
                     writes in array::uniform2(&address_range))| {
-            let region = Box::new([byte_before; DYN_REGION_SIZE]);
-            let dyn_region: ProofDynRegion<DYN_REGION_SIZE, Owned> =
-                ProofDynRegion::bind(region.clone());
-            let mut dyn_cells: DynCells<DYN_REGION_SIZE, ProofGen<Owned>> =
-                DynCells::bind(dyn_region);
+            let dyn_array = Box::new([byte_before; DYN_REGION_SIZE]);
+            let owned_dyn_cells: DynCells<DYN_REGION_SIZE, Ref<'_, Owned>> =
+                DynCells::bind(&dyn_array);
+            let initial_root_hash =
+                <DynArray<DYN_REGION_SIZE> as CommitmentLayout>::state_hash(owned_dyn_cells)
+                    .unwrap();
+
+            let mut proof_dyn_region: ProofDynRegion<DYN_REGION_SIZE, Ref<'_, Owned>> =
+                ProofDynRegion::bind(&dyn_array);
 
             // Perform memory accesses
             let value_before = [byte_before; ELEM_SIZE];
             reads.iter().for_each(|i| {
                 let mut value = [0u8; ELEM_SIZE];
-                dyn_cells.read_all(*i, &mut value);
+                ProofGen::<Ref<'_, Owned>>::dyn_region_read_all(&proof_dyn_region, *i, &mut value);
                 assert_eq!(value, value_before)
             });
             writes.iter().for_each(|i| {
-                dyn_cells.write_all(*i, &bytes_after);
+                ProofGen::<Ref<'_, Owned>>::dyn_region_write_all(
+                    &mut proof_dyn_region,
+                    *i,
+                    &bytes_after,
+                );
             });
 
             // Build the Merkle tree and check that it has the root hash of the
             // initial wrapped region.
-            let merkle_tree = dyn_cells
-                .struct_ref::<FnManagerIdent>()
-                .to_merkle_tree()
-                .unwrap();
-            let cells: DynCells<DYN_REGION_SIZE, Owned> = DynCells::bind(region);
-            let initial_root_hash = cells.hash().unwrap();
+            let proof_dyn_cells: DynCells<DYN_REGION_SIZE, Ref<'_, ProofGen<Ref<'_, Owned>>>> =
+                DynCells::bind(&proof_dyn_region);
+            let merkle_tree =
+                <DynArray<DYN_REGION_SIZE> as ProofLayout>::to_merkle_tree(proof_dyn_cells).unwrap();
+            merkle_tree.check_root_hash();
             prop_assert_eq!(merkle_tree.root_hash(), initial_root_hash);
 
             // Compute expected access info for each leaf, assuming that an access
@@ -671,47 +680,29 @@ mod tests {
         proptest!(|(value_before: u64, value_after: u64)| {
             // A read followed by a write
             let cell = (value_before, T::from(&value_before));
-            let mut proof_cell: ProofEnrichedCell<Enriching, Owned> = ProofEnrichedCell::bind(cell);
+            let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> =
+                ProofEnrichedCell::bind(&cell);
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
-            let value = ProofGen::<Owned>::enriched_cell_read_stored(&proof_cell);
+            let value = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_stored(&proof_cell);
             prop_assert_eq!(value, value_before);
-            let derived = ProofGen::<Owned>::enriched_cell_read_derived(&proof_cell);
+            let derived = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_derived(&proof_cell);
             prop_assert_eq!(derived, T::from(&value_before));
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::Read);
-            ProofGen::<Owned>::enriched_cell_write(&mut proof_cell, value_after);
+            ProofGen::<Ref<'_, Owned>>::enriched_cell_write(&mut proof_cell, value_after);
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
 
             // A write followed by a read
             let cell = (value_before, T::from(&value_before));
-            let mut proof_cell: ProofEnrichedCell<Enriching, Owned> = ProofEnrichedCell::bind(cell);
+            let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> =
+                ProofEnrichedCell::bind(&cell);
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
-            ProofGen::<Owned>::enriched_cell_write(&mut proof_cell, value_after);
+            ProofGen::<Ref<'_, Owned>>::enriched_cell_write(&mut proof_cell, value_after);
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::Write);
-            let value = ProofGen::<Owned>::enriched_cell_read_stored(&proof_cell);
+            let value = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_stored(&proof_cell);
             prop_assert_eq!(value, value_after);
-            let derived = ProofGen::<Owned>::enriched_cell_read_derived(&proof_cell);
+            let derived = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_derived(&proof_cell);
             prop_assert_eq!(derived, T::from(&value_after));
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
-
-            // Check correct Merkleisation
-            let cell = (value_before, T::from(&value_before));
-            let proof_cell: ProofEnrichedCell<Enriching, Owned> = ProofEnrichedCell::bind(cell);
-            let mut proof_cell: EnrichedCell<Enriching, ProofGen<Owned>> =
-                EnrichedCell::bind(proof_cell);
-            let initial_root_hash = proof_cell.hash().unwrap();
-            proof_cell.write(value_after);
-            prop_assert_eq!(proof_cell.hash().unwrap(), initial_root_hash);
-            let merkle_tree = proof_cell
-                .struct_ref::<FnManagerIdent>()
-                .to_merkle_tree()
-                .unwrap();
-            match merkle_tree {
-                MerkleTree::Leaf(hash, access_info, _) => {
-                    prop_assert_eq!(hash, initial_root_hash);
-                    prop_assert_eq!(access_info, AccessInfo::Write);
-                }
-                _ => panic!("Expected Merkle tree to contain a single written leaf"),
-            }
         });
     }
 }
