@@ -26,6 +26,8 @@
 
 open Gs_interface.Worker_instance
 
+let pp_sep = Format.pp_print_space
+
 module Events = struct
   include Internal_event.Simple
   open Data_encoding
@@ -161,7 +163,7 @@ module Events = struct
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
       ~pp3:Types.Span.pp
-      ~pp4:(Format.pp_print_list P2p_peer.Id.pp)
+      ~pp4:(Format.pp_print_list ~pp_sep P2p_peer.Id.pp)
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
       ("backoff", Types.Span.encoding)
@@ -176,7 +178,7 @@ module Events = struct
       ~level:Info
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
-      ~pp3:(Format.pp_print_list GS.Message_id.pp)
+      ~pp3:(Format.pp_print_list ~pp_sep GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
       ("message_ids", list Types.Message_id.encoding)
@@ -188,7 +190,7 @@ module Events = struct
       ~msg:"Process IWant from {peer} with message_ids {message_ids}"
       ~level:Info
       ~pp1:P2p_peer.Id.pp
-      ~pp2:(Format.pp_print_list GS.Message_id.pp)
+      ~pp2:(Format.pp_print_list ~pp_sep GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)
       ("message_ids", list Types.Message_id.encoding)
 end
