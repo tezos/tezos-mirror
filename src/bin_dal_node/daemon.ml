@@ -35,22 +35,20 @@ let fetch_dal_config cctxt =
         let delay = min delay_max (delay *. 2.) in
         let* () =
           if delay < delay_max then
-            Event.(
-              emit
-                retry_fetching_node_config_notice
-                (Uri.to_string cctxt#base, delay))
+            Event.emit_retry_fetching_node_config_notice
+              ~endpoint:(Uri.to_string cctxt#base)
+              ~delay
           else
-            Event.(
-              emit
-                retry_fetching_node_config_warning
-                (Uri.to_string cctxt#base, delay))
+            Event.emit_retry_fetching_node_config_warning
+              ~endpoint:(Uri.to_string cctxt#base)
+              ~delay
         in
         let* () = Lwt_unix.sleep delay in
         retry delay
     | Error err -> return_error err
     | Ok dal_config ->
         let* () =
-          Event.(emit fetched_config_success (Uri.to_string cctxt#base))
+          Event.emit_fetched_config_success ~endpoint:(Uri.to_string cctxt#base)
         in
         return_ok dal_config
   in
@@ -109,7 +107,7 @@ module Handler = struct
     match res with
     | Ok () -> `Valid
     | Error err ->
-        let err =
+        let validation_error =
           match err with
           | `Invalid_degree_strictly_less_than_expected {given; expected} ->
               Format.sprintf
@@ -123,18 +121,16 @@ module Handler = struct
           | `Shard_length_mismatch -> "Shard_length_mismatch"
           | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
         in
-        Event.(
-          emit__dont_wait__use_with_care
-            message_validation_error
-            (message_id, err)) ;
+        Event.emit_dont_wait__message_validation_error
+          ~message_id
+          ~validation_error ;
         `Invalid
     | exception exn ->
         (* Don't crash if crypto raised an exception. *)
-        let err = Printexc.to_string exn in
-        Event.(
-          emit__dont_wait__use_with_care
-            message_validation_error
-            (message_id, err)) ;
+        let validation_error = Printexc.to_string exn in
+        Event.emit_dont_wait__message_validation_error
+          ~message_id
+          ~validation_error ;
         `Invalid
 
   let is_bootstrap_node ctxt =
@@ -276,25 +272,28 @@ module Handler = struct
       let* res = Store.Shards.remove shards_store slot_id in
       match res with
       | Ok () ->
-          Event.(
-            emit removed_slot_shards (slot_id.slot_level, slot_id.slot_index))
-      | Error err ->
-          Event.(
-            emit
-              removing_shards_failed
-              (slot_id.slot_level, slot_id.slot_index, err))
+          Event.emit_removed_slot_shards
+            ~published_level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+      | Error error ->
+          Event.emit_removing_shards_failed
+            ~published_level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+            ~error
     in
     let* () =
       let slots_store = Store.slots store in
       let* res = Store.Slots.remove_slot slots_store ~slot_size slot_id in
       match res with
       | Ok () ->
-          Event.(emit removed_slot (slot_id.slot_level, slot_id.slot_index))
-      | Error err ->
-          Event.(
-            emit
-              removing_slot_failed
-              (slot_id.slot_level, slot_id.slot_index, err))
+          Event.emit_removed_slot
+            ~published_level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+      | Error error ->
+          Event.emit_removing_slot_failed
+            ~published_level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+            ~error
     in
     return_unit
 
@@ -315,10 +314,11 @@ module Handler = struct
                  Store.Skip_list_cells.remove store ~attested_level:oldest_level
                in
                match res with
-               | Ok () -> Event.(emit removed_skip_list_cells oldest_level)
-               | Error err ->
-                   Event.(
-                     emit removing_skip_list_cells_failed (oldest_level, err))
+               | Ok () -> Event.emit_removed_skip_list_cells ~level:oldest_level
+               | Error error ->
+                   Event.emit_removing_skip_list_cells_failed
+                     ~level:oldest_level
+                     ~error
              else return_unit
            in
            let number_of_slots =
@@ -331,9 +331,9 @@ module Handler = struct
                  (Store.slot_header_statuses store)
              in
              match res with
-             | Ok () -> Event.(emit removed_status oldest_level)
-             | Error err ->
-                 Event.(emit removing_status_failed (oldest_level, err))
+             | Ok () -> Event.emit_removed_status ~level:oldest_level
+             | Error error ->
+                 Event.emit_removing_status_failed ~level:oldest_level ~error
            in
            List.iter_s
              (fun slot_index ->
@@ -505,10 +505,9 @@ module Handler = struct
                       | _ -> false
                     in
                     if in_committee then
-                      Event.(
-                        emit
-                          warn_attester_not_dal_attesting
-                          (delegate, block_level))
+                      Event.emit_warn_attester_not_dal_attesting
+                        ~attester:delegate
+                        ~attested_level:block_level
                     else (* no assigned shards... *)
                       Lwt.return_unit
                 | Some bitset ->
@@ -518,10 +517,10 @@ module Handler = struct
                           should_be_attested index
                           && not (is_attested bitset index)
                         then
-                          Event.(
-                            emit
-                              warn_attester_did_not_attest_slot
-                              (delegate, index, block_level))
+                          Event.emit_warn_attester_did_not_attest_slot
+                            ~attester:delegate
+                            ~slot_index:index
+                            ~attested_level:block_level
                         else Lwt.return_unit)
                       (0 -- (parameters.number_of_slots - 1)))
             | None | Some _ ->
@@ -633,7 +632,7 @@ module Handler = struct
     Dal_metrics.layer1_block_finalized ~block_level ;
     Dal_metrics.layer1_block_finalized_round ~block_round ;
     let*! () =
-      Event.(emit layer1_node_final_block (block_level, block_round))
+      Event.emit_layer1_node_final_block ~level:block_level ~round:block_round
     in
     (* This should be done at the end of the function. *)
     let last_processed_level_store = Store.last_processed_level store in
@@ -723,7 +722,7 @@ module Handler = struct
           in
           loop ()
     in
-    let*! () = Event.(emit layer1_node_tracking_started ()) in
+    let*! () = Event.emit_layer1_node_tracking_started () in
     loop ()
 end
 
@@ -844,7 +843,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
         when Operator_profile.is_observed_slot slot_index profile -> (
           match amplificator with
           | None ->
-              let*! () = Event.(emit amplificator_uninitialized ()) in
+              let*! () = Event.emit_amplificator_uninitialized () in
               return_unit
           | Some amplificator ->
               Amplificator.try_amplification
@@ -881,25 +880,27 @@ let resolve names =
             name
         in
         let*! () =
-          Event.(emit resolved_bootstrap_points (name, List.length points))
+          Event.emit_resolved_bootstrap_points
+            ~domainname:name
+            ~number:(List.length points)
         in
         return points)
       names
   in
   let*! () =
-    if points = [] then Event.(emit resolved_bootstrap_no_points) ()
-    else Event.(emit resolved_bootstrap_points_total (List.length points))
+    if points = [] then Event.emit_resolved_bootstrap_no_points ()
+    else Event.emit_resolved_bootstrap_points_total ~number:(List.length points)
   in
   return points
 
 let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
   let open Lwt_result_syntax in
-  let*! () = Event.(emit waiting_l1_node_bootstrapped) () in
+  let*! () = Event.emit_waiting_l1_node_bootstrapped () in
   let* stream, _stop = Monitor_services.bootstrapped cctxt in
   let*! () =
     Lwt_stream.iter_s (fun (_hash, _timestamp) -> Lwt.return_unit) stream
   in
-  let*! () = Event.(emit l1_node_bootstrapped) () in
+  let*! () = Event.emit_l1_node_bootstrapped () in
   return_unit
 
 (* This function checks that in case the history mode is Rolling with a custom
@@ -1029,8 +1030,8 @@ let build_profile_context config =
         ~lower_prio:config.Configuration_file.profile
         ~higher_prio:loaded_profile
       |> return
-  | Error err ->
-      let*! () = Event.(emit loading_profiles_failed err) in
+  | Error error ->
+      let*! () = Event.emit_loading_profiles_failed ~error in
       return config.Configuration_file.profile
 
 (* Registers the attester profile context once we have the protocol plugin. This is supposed
@@ -1178,7 +1179,7 @@ let run ~data_dir ~configuration_override =
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  let*! () = Event.(emit starting_node) () in
+  let*! () = Event.emit_starting_node () in
   let* ({
           network_name;
           rpc_addr;
@@ -1196,18 +1197,18 @@ let run ~data_dir ~configuration_override =
     match result with
     | Ok configuration -> return (configuration_override configuration)
     | Error _ ->
-        let*! () = Event.(emit data_dir_not_found data_dir) in
+        let*! () = Event.emit_data_dir_not_found ~path:data_dir in
         (* Store the default configuration if no configuration were found. *)
         let configuration = configuration_override Configuration_file.default in
         let* () = Configuration_file.save configuration in
         return configuration
   in
-  let*! () = Event.(emit configuration_loaded) () in
+  let*! () = Event.emit_configuration_loaded () in
   let cctxt = Rpc_context.make endpoint in
   let* dal_config = fetch_dal_config cctxt in
   let bootstrap_names = points @ dal_config.bootstrap_peers in
   let*! () =
-    if bootstrap_names = [] then Event.(emit config_error_no_bootstrap) ()
+    if bootstrap_names = [] then Event.emit_config_error_no_bootstrap ()
     else Lwt.return_unit
   in
   (* Resolve:
@@ -1412,10 +1413,10 @@ let run ~data_dir ~configuration_override =
   let* () =
     match config.metrics_addr with
     | None ->
-        let*! () = Event.(emit metrics_server_not_starting ()) in
+        let*! () = Event.emit_metrics_server_not_starting () in
         return_unit
     | Some metrics_addr ->
-        let*! () = Event.(emit metrics_server_starting metrics_addr) in
+        let*! () = Event.emit_metrics_server_starting ~endpoint:metrics_addr in
         let*! _metrics_server = Metrics.launch metrics_addr in
         return_unit
   in
@@ -1424,7 +1425,7 @@ let run ~data_dir ~configuration_override =
      will thus already respond to the baker about shards status if queried. *)
   let* rpc_server = RPC_server.(start config ctxt) in
   let _ = RPC_server.install_finalizer rpc_server in
-  let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
+  let*! () = Event.emit_rpc_server_is_ready ~point:rpc_addr in
   (* Wait for the L1 node to be bootstrapped. *)
   let* () = wait_for_l1_bootstrapped cctxt in
   let* proto_plugins =
@@ -1479,12 +1480,12 @@ let run ~data_dir ~configuration_override =
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
-  let*! () = Event.(emit p2p_server_is_ready listen_addr) in
+  let*! () = Event.emit_p2p_server_is_ready ~point:listen_addr in
   (* Start collecting stats related to the Gossipsub worker. *)
   Dal_metrics.collect_gossipsub_metrics gs_worker ;
   (* Register topics with gossipsub worker. *)
   let* () = update_and_register_profiles ctxt in
   (* Start never-ending monitoring daemons *)
-  let*! () = Event.(emit node_is_ready ()) in
+  let*! () = Event.emit_node_is_ready () in
   let* () = daemonize [Handler.new_finalized_head ctxt cctxt crawler] in
   return_unit
