@@ -216,6 +216,10 @@ Smart Rollup node
   (MR :gl:`!15322`)
 
 - Fixed potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
+- Improved error messages for RPC
+  ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
+
+- Fix potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
 
 - New CLI switch ``--unsafe-disable-wasm-kernel-checks`` which allows to bypass
   invalid kernel checks in the WASM VM, for use by jstz. (MR :gl:`!15910`)
