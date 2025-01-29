@@ -491,6 +491,7 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     // RV64I (Chapter 5.4) and RV64C (Chapter 16.7) describe the code points associated
     // with HINT instructions. We do not implement any HINT logic, but decode all these
     // as `Hint` or `HintCompresssed` opcodes, which we translate to NOPs in `machine_state`.
+    // TODO: RV-422: Pass known NonZero `rd` values to Args constructors.
     use XRegisterParsed::*;
     let i = match opcode(instr) {
         // R-type instructions
@@ -1557,5 +1558,103 @@ mod tests {
                 parse_compressed_instruction(i)
             );
         }
+    }
+
+    // Check a HINT encoding for each uncompressed opcode.
+    #[test]
+    fn test_uncompressed_hints() {
+        let bytes: [u8; 120] = [
+            0x37, 0x80, 0x33, 0x33, // LUI X0, 3355520
+            0x17, 0x80, 0x33, 0x33, // AUIPC X0, 3355520
+            0x13, 0x00, 0xA0, 0x36, // ADDI, X0, X0, 874
+            0x13, 0xB0, 0xAC, 0x36, // ORI, X0, X25, 874
+            0x13, 0xC0, 0xAC, 0x36, // XORI, X0, X25, 874
+            0x1B, 0x80, 0x19, 0x00, // ADDIW X0, X11, 1
+            0x33, 0x80, 0x31, 0x00, // ADD X0, X3, X3
+            0x33, 0x80, 0x5A, 0x41, // SUB X0, X21, X21
+            0x33, 0xB0, 0x31, 0x00, // AND X0, X3, X3
+            0x33, 0xC0, 0x31, 0x00, // OR X0, X3, X3
+            0x33, 0xD0, 0x31, 0x00, // XOR X0, X3, X3
+            0x33, 0xE0, 0x31, 0x00, // SLL X0, X3, X3
+            0x33, 0xF0, 0x31, 0x00, // SRL X0, X3, X3
+            0x33, 0xD0, 0x5A, 0x41, // SRA X0, X21, X21
+            0x37, 0x00, 0xC6, 0x00, // ADDW X0, X6, X6
+            0x37, 0x00, 0xC6, 0x40, // SUBW X0, X6, X6
+            0x37, 0x10, 0xC6, 0x00, // SLLW X0, X6, X6
+            0x37, 0x20, 0xC6, 0x00, // SRLW X0, X6, X6
+            0x37, 0x10, 0xC6, 0x40, // SRAW X0, X6, X6
+            0x0F, 0x00, 0x00, 0x0F, // FENCE F, 0
+            0x13, 0x20, 0xA0, 0x36, // SLTI, X0, X0, 874
+            0x13, 0x30, 0xA0, 0x36, // SLTIU, X0, X0, 874
+            0x13, 0x10, 0x44, 0x01, // SLLI X0, X8, 333
+            0x13, 0x50, 0x44, 0x01, // SRLI X0, X8, 333
+            0x13, 0x50, 0x44, 0x41, // SRAI X0, X8, 333
+            0x1B, 0x90, 0x19, 0x00, // SLLIW X0, X11, 1
+            0x1B, 0xD0, 0x19, 0x00, // SRLIW X0, X11, 1
+            0x1B, 0xD0, 0x19, 0x40, // SRAIW X0, X11, 1
+            0x33, 0x90, 0x31, 0x00, // SLT X0, X3, X3
+            0x33, 0xA0, 0x31, 0x00, // SLTU X0, X3, X3
+        ];
+        let expected = [
+            Instr::Cacheable(Hint { instr: 0x33338037 }),
+            Instr::Cacheable(Hint { instr: 0x33338017 }),
+            Instr::Cacheable(Hint { instr: 0x36A00013 }),
+            Instr::Cacheable(Hint { instr: 0x36ACB013 }),
+            Instr::Cacheable(Hint { instr: 0x36ACC013 }),
+            Instr::Cacheable(Hint { instr: 0x0019801B }),
+            Instr::Cacheable(Hint { instr: 0x00318033 }),
+            Instr::Cacheable(Hint { instr: 0x415A8033 }),
+            Instr::Cacheable(Hint { instr: 0x0031B033 }),
+            Instr::Cacheable(Hint { instr: 0x0031C033 }),
+            Instr::Cacheable(Hint { instr: 0x0031D033 }),
+            Instr::Cacheable(Hint { instr: 0x0031E033 }),
+            Instr::Cacheable(Hint { instr: 0x0031F033 }),
+            Instr::Cacheable(Hint { instr: 0x415AD033 }),
+            Instr::Cacheable(Hint { instr: 0x00C60037 }),
+            Instr::Cacheable(Hint { instr: 0x40C60037 }),
+            Instr::Cacheable(Hint { instr: 0x00C61037 }),
+            Instr::Cacheable(Hint { instr: 0x00C62037 }),
+            Instr::Cacheable(Hint { instr: 0x40C61037 }),
+            Instr::Cacheable(Hint { instr: 0x0F00000F }),
+            Instr::Cacheable(Hint { instr: 0x36A02013 }),
+            Instr::Cacheable(Hint { instr: 0x36A03013 }),
+            Instr::Cacheable(Hint { instr: 0x01441013 }),
+            Instr::Cacheable(Hint { instr: 0x01445013 }),
+            Instr::Cacheable(Hint { instr: 0x41445013 }),
+            Instr::Cacheable(Hint { instr: 0x0019901B }),
+            Instr::Cacheable(Hint { instr: 0x0019D01B }),
+            Instr::Cacheable(Hint { instr: 0x4019D01B }),
+            Instr::Cacheable(Hint { instr: 0x00319033 }),
+            Instr::Cacheable(Hint { instr: 0x0031A033 }),
+        ];
+        let instructions = parse_block(&bytes);
+        assert_eq!(instructions, expected);
+    }
+
+    // Check a HINT encoding for each compressed opcode.
+    #[test]
+    fn test_compressed_hints() {
+        let bytes: [u8; 16] = [
+            0x01, 0x02, // C.ADDI x4, 0
+            0x01, 0x40, // C.LI x0, 0
+            0x51, 0x60, // C.LUI X0, 20
+            0x06, 0x80, // C.MV x0, x1
+            0x06, 0x90, // C.ADD x0, x1
+            0x02, 0x00, // C.SLLI x0 0
+            0x01, 0x81, // C.SRLI x6 0
+            0x01, 0x87, // C.SRAI x6 0
+        ];
+        let expected = [
+            Instr::Cacheable(HintCompressed { instr: 0x0201 }),
+            Instr::Cacheable(HintCompressed { instr: 0x4001 }),
+            Instr::Cacheable(HintCompressed { instr: 0x6051 }),
+            Instr::Cacheable(HintCompressed { instr: 0x8006 }),
+            Instr::Cacheable(HintCompressed { instr: 0x9006 }),
+            Instr::Cacheable(HintCompressed { instr: 0x0002 }),
+            Instr::Cacheable(HintCompressed { instr: 0x8101 }),
+            Instr::Cacheable(HintCompressed { instr: 0x8701 }),
+        ];
+        let instructions = parse_block(&bytes);
+        assert_eq!(instructions, expected);
     }
 }
