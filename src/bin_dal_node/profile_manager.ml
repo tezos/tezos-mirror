@@ -46,6 +46,12 @@ let is_prover_profile = function
   | Types.Random_observer -> true
   | Types.Operator p -> Operator_profile.(has_observer p || has_producer p)
 
+let is_empty = function
+  | Types.Bootstrap -> false
+  | Types.Random_observer -> false
+  | Types.Operator operator_profile ->
+      Operator_profile.is_empty operator_profile
+
 let is_attester_only_profile = function
   | Types.Bootstrap -> false
   | Types.Random_observer -> false

@@ -670,7 +670,7 @@ module Version = struct
 end
 
 module Health = struct
-  type status = Up | Degraded | Down | Ok | Ko
+  type status = Up | Degraded | Down | Ok | Ko | No
 
   let status_encoding =
     Data_encoding.string_enum
@@ -680,6 +680,7 @@ module Health = struct
         ("down", Down);
         ("ok", Ok);
         ("ko", Ko);
+        ("no", No);
       ]
 
   type t = {status : status; checks : (string * status) list}
@@ -703,7 +704,8 @@ module Health = struct
       | Degraded -> "degraded"
       | Down -> "down"
       | Ok -> "ok"
-      | Ko -> "ko")
+      | Ko -> "ko"
+      | No -> "no")
 
   let pp fmt {status; checks} =
     Format.fprintf

@@ -371,7 +371,10 @@ module Version : sig
 end
 
 module Health : sig
-  type status = (* TODO: missing doc strings *) Up | Degraded | Down | Ok | Ko
+  (* Those status aims to be relatively obvious to understand from the
+     context. It is ok to have synonymes if it makes sense given the
+     context. *)
+  type status = Up | Degraded | Down | Ok | Ko | No
 
   type t = {status : status; checks : (string * status) list}
 
