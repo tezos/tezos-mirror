@@ -112,6 +112,7 @@ let register_old_protocol_migration_tests () =
 let register_protocol_tests_that_use_supports_correctly () =
   let protocols = Protocol.all in
   Adaptive_issuance.register ~protocols ;
+  Agnostic_baker_test.register ~protocols ;
   Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;

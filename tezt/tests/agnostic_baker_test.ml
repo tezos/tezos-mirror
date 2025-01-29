@@ -8,12 +8,13 @@
 (* Testing
    -------
    Component:    Agnostic baker (octez-experimental-agnostic-baker)
-   Invocation:   dune exec tezt/manual_tests/main.exe -- --file agnostic_baking.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file agnostic_baker_test.ml
    Subject:      Ensure that the agnostic baker behaves as expected
 *)
 
-(** Boilerplate code to create a user-migratable node. Used in the
-    tests below. **)
+let team = Tag.layer1
+
+(* Boilerplate code to create a user-migratable node. Used in the tests below. *)
 let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
     ~migration_level ~migrate_to () =
   let* node =
@@ -211,34 +212,37 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
   let* () = Agnostic_baker.terminate baker in
   Lwt.return_unit
 
-let raw_migrate ~resilience_test ~migrate_from ~migrate_to
-    ?(use_remote_signer = false) () =
-  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+let raw_migrate ~resilience_test ?(use_remote_signer = false) =
+  let remote_signer_text, remote_signer =
+    if use_remote_signer then
+      (" using HTTP remote signer", [Constant.octez_signer])
+    else ("", [])
+  in
+  let parameters = JSON.parse_file (Protocol.parameter_file Protocol.Alpha) in
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      (Format.asprintf
+         "Protocol migration from protocol to alpha with agnostic baker%s %s"
+         remote_signer_text
+         (if resilience_test then "and resilience test" else ""))
+    ~tags:["protocol"; "migration"; "agnostic"; "baker"]
+    ~uses:(fun _protocol ->
+      [Constant.octez_experimental_agnostic_baker] @ remote_signer)
+  @@ fun protocol ->
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   let consensus_rights_delay =
     JSON.(get "consensus_rights_delay" parameters |> as_int)
   in
   (* Migration level is set arbitrarily *)
   let migration_level = blocks_per_cycle in
-  Test.register
-    ~__FILE__
-    ~title:
-      (Format.sprintf
-         "Protocol migration (from %s to %s) with agnostic baker%s %s"
-         (Protocol.tag migrate_from)
-         (Protocol.tag migrate_to)
-         (if use_remote_signer then " using HTTP remote signer" else "")
-         (if resilience_test then " and resilience test" else ""))
-    ~tags:["protocol"; "migration"; "agnostic"; "baker"]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
-  @@ fun () ->
   let* () =
     perform_protocol_migration
       ~use_remote_signer
       ~blocks_per_cycle
       ~migration_level
-      ~migrate_from
-      ~migrate_to
+      ~migrate_from:protocol
+      ~migrate_to:Protocol.Alpha
       ~baked_blocks_after_migration:
         (2 * consensus_rights_delay * blocks_per_cycle)
       ()
@@ -246,35 +250,32 @@ let raw_migrate ~resilience_test ~migrate_from ~migrate_to
   unit
 
 let start_stop =
-  Test.register
+  Protocol.register_test
     ~__FILE__
     ~title:"Agnostic baker starts and stops"
-    ~tags:["sandbox"; "agnostic"; "baker"; "init"]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
-  @@ fun () ->
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "init"]
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+  @@ fun _protocol ->
   let* node, client = Client.init_with_node `Client () in
   let* baker = Agnostic_baker.init node client in
   let* () = Agnostic_baker.wait_for_ready baker in
   let* () = Agnostic_baker.terminate baker in
   unit
 
-let migrate ~migrate_from ~migrate_to =
-  raw_migrate ~resilience_test:false ~migrate_from ~migrate_to
+let migrate = raw_migrate ~resilience_test:false
 
-let migrate_with_resilience_test ~migrate_from ~migrate_to =
-  raw_migrate ~resilience_test:true ~migrate_from ~migrate_to
+let migrate_with_resilience_test = raw_migrate ~resilience_test:true
 
-let register ~migrate_from ~migrate_to =
-  start_stop ;
-  migrate ~migrate_from ~migrate_to ~use_remote_signer:false () ;
-  migrate ~migrate_from ~migrate_to ~use_remote_signer:true () ;
-  migrate_with_resilience_test
-    ~migrate_from
-    ~migrate_to
-    ~use_remote_signer:false
-    () ;
-  migrate_with_resilience_test
-    ~migrate_from
-    ~migrate_to
-    ~use_remote_signer:true
-    ()
+let register ~protocols =
+  start_stop protocols ;
+  let filter_migratable_protocols protocol =
+    (* We want to migrate only from Active protocols *)
+    Agnostic_baker.protocol_status protocol = Active
+  in
+  let migratable_protocols =
+    List.filter filter_migratable_protocols protocols
+  in
+  migrate ~use_remote_signer:false migratable_protocols ;
+  migrate ~use_remote_signer:true migratable_protocols ;
+  migrate_with_resilience_test ~use_remote_signer:false migratable_protocols ;
+  migrate_with_resilience_test ~use_remote_signer:true migratable_protocols
