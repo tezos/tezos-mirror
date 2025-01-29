@@ -64,6 +64,9 @@ val tag : t -> string
 (** Get the full hash of a protocol. *)
 val hash : t -> string
 
+(** Get the short hash of a protocol. *)
+val short_hash : t -> string
+
 (** Hash of protocol genesis *)
 val genesis_hash : string
 
