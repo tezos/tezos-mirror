@@ -268,6 +268,7 @@ while true; do
     ;;
   -f | --from)
     protocol_source="$2"
+    source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
     shift 2
     ;;
   -t | --to)
@@ -677,8 +678,6 @@ function copy_source() {
     fi
   fi
   cd "src/proto_${version}/lib_protocol"
-  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
-  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "TEZOS_PROTOCOL")
   # replace fake hash with real hash, this file doesn't influence the hash
   sed -i.old -e 's/"hash": "[^"]*",/"hash": "'"${long_hash}"'",/' \
     TEZOS_PROTOCOL
@@ -1801,8 +1800,6 @@ function hash() {
 
   log_cyan "Computing hash"
 
-  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
-  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
   source_short_hash=$(echo "${source_hash}" | head -c 8)
   previous_tag=$(grep "${protocol_source}" tezt/lib_alcotezt/alcotezt_utils.ml | sed -e 's/.*->\s*\["\([^"]*\)"\].*/\1/')
   capitalized_previous_tag=$(tr '[:lower:]' '[:upper:]' <<< "${previous_tag:0:1}")${previous_tag:1}
