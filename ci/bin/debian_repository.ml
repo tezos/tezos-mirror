@@ -339,7 +339,7 @@ let jobs pipeline_type =
   in
   (* These test the installability of the current packages *)
   let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
-      ?allow_failure script =
+      ?allow_failure ?before_script script =
     job
       ?allow_failure
       ~__POS__
@@ -350,8 +350,21 @@ let jobs pipeline_type =
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
+      ?before_script
       script
   in
+  let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
+      ?allow_failure script =
+    job_docker_authenticated
+      ?allow_failure
+      ~__POS__
+      ~name
+      ~dependencies
+      ~variables
+      ~stage:Stages.publishing_tests
+      script
+  in
+
   let job_lintian ~__POS__ ~name ~dependencies ~image ?allow_failure script =
     job
       ?allow_failure
@@ -441,10 +454,15 @@ let jobs pipeline_type =
           (Dependent [Job job_apt_repo_debian_current; Job job_apt_repo_debian])
         ~image:Images.debian_bookworm
         ["./docs/introduction/upgrade-bin-deb.sh debian bookworm"];
-      job_install_bin
+      job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm-systemd"
-        ~dependencies:(Dependent [Job job_apt_repo_debian])
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_debian_dependencies;
+               Job job_apt_repo_debian;
+             ])
         ~variables:
           (variables
              ~kind:"systemd-tests"
@@ -453,8 +471,7 @@ let jobs pipeline_type =
                ("DISTRIBUTION", "debian");
                ("RELEASE", "bookworm");
              ])
-        ~image:systemd_test_debian_packages_image
-        ["./docs/introduction/install-bin-deb.sh debian bookworm"];
+        ["./scripts/ci/systemd-debian-test.sh"];
     ]
   in
   let debian_jobs =

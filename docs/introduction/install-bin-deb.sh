@@ -99,7 +99,7 @@ set -x
 
 # these two packages are needed here, but they don't need to appear in the doc
 apt-get update
-apt-get install -y debconf-utils apt-utils
+apt-get install -y debconf-utils apt-utils procps
 
 if [ "$RELEASETYPE" = "Master" ]; then
   # [add repository]
@@ -130,7 +130,7 @@ octez-node octez-node/configure boolean true
 octez-node octez-node/history-mode string full
 octez-node octez-node/network string mainnet
 octez-node octez-node/purge_warning boolean true
-octez-node octez-node/snapshot-import boolean true
+octez-node octez-node/snapshot-import boolean false
 octez-node octez-node/snapshot-no-check boolean true
 debconf debconf/frontend select Noninteractive
 EOF
@@ -144,6 +144,19 @@ fi
 # [install tezos]
 apt-get install -y octez-client
 apt-get install -y octez-node
+
+# If systemd is available we test the service scripts
+if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
+  systemctl enable octez-node
+  systemctl start octez-node
+
+  sleep 5
+  systemctl status octez-node
+
+  journalctl -xeu octez-node.service
+
+fi
+
 apt-get install -y octez-baker
 apt-get install -y octez-dal-node
 
@@ -161,6 +174,11 @@ octez-client --version
 octez-node --version
 "octez-baker-$protocol" --version
 "octez-accuser-$protocol" --version
+
+# If systemd is available we test the service scripts
+if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
+  systemctl stop octez-node
+fi
 
 # [test autopurge]
 apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
