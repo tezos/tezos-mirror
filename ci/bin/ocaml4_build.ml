@@ -36,7 +36,6 @@ let jobs =
       ~dependencies:(Dependent [Job job_docker_build_ocaml4_dependencies])
       ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
       ["./scripts/ci/ocaml4_job/build_ocaml4_octez.sh"]
-    |> enable_sccache ~idle_timeout:"0"
   in
   [job_docker_build_ocaml4_dependencies; job_build_ocaml4]
 
