@@ -301,7 +301,7 @@ let start ~alerts agents =
         "--rm";
         "-d";
         "--name";
-        "prometheus";
+        name;
         "--network";
         "host";
         (* We use the host mode so that in [localhost], prometheus can see the
@@ -351,7 +351,7 @@ let start ~alerts agents =
 
 let snapshots_path = "/prometheus" // "data" // "snapshots"
 
-let export_snapshot {snapshot_filename; _} =
+let export_snapshot {snapshot_filename; name; _} =
   Log.info "Exporting snapshot..." ;
   let* stdout =
     Process.run_and_read_stdout
@@ -370,7 +370,7 @@ let export_snapshot {snapshot_filename; _} =
   in
   let* () =
     Docker.cp
-      "prometheus"
+      name
       ~kind:`To_host
       ~source:(snapshots_path // snapshot_name)
       ~destination
