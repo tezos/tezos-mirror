@@ -7,6 +7,9 @@
 
 (** Miscellaneous definitions. *)
 
+(** Same as [Printf.sprintf]. *)
+val sf : ('a, Format.formatter, unit, string) format4 -> 'a
+
 (** Same as [Filename.concat]. *)
 val ( // ) : string -> string -> string
 

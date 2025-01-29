@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let sf = Format.asprintf
+
 let ( // ) = Filename.concat
 
 let default x = function None -> x | Some x -> x
