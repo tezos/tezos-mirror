@@ -12,6 +12,10 @@ let liquidity_baking_vote_to_string = function
   | On -> "on"
   | Pass -> "pass"
 
+type protocol_status = Active | Frozen | Ignore
+
+let protocol_status = function Protocol.Alpha -> Ignore | _ -> Active
+
 module Parameters = struct
   type persistent_state = {
     delegates : string list;

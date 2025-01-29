@@ -54,6 +54,12 @@ type liquidity_baking_vote = Off | On | Pass
 (** Returns the string representation of a [liquidity_baking_vote]. *)
 val liquidity_baking_vote_to_string : liquidity_baking_vote -> string
 
+(** Protocol status values. *)
+type protocol_status = Active | Frozen | Ignore
+
+(** Returns the protocol status given the full protocol value. *)
+val protocol_status : Protocol.t -> protocol_status
+
 (** Create a agnostic baker.
 
     This function just creates a value of type [t], it does not call {!val:run}.

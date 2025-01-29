@@ -8,53 +8,11 @@
 (* Testing
    -------
    Component:    Agnostic baker (octez-experimental-agnostic-baker)
-   Invocation:   dune exec tezt/manual_tests/main.exe -- --file agnostic_baking.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file agnostic_baker_test.ml
    Subject:      Ensure that the agnostic baker behaves as expected
 *)
 
-(** Boilerplate code to create a user-migratable node. Used in the
-    tests below. **)
-let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
-    ~migration_level ~migrate_to () =
-  let* node =
-    Node.init
-      ?name:node_name
-      ~patch_config:
-        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-           [(migration_level, migrate_to)])
-      ([Node.Synchronisation_threshold 0; Private_mode] @ more_node_args)
-  in
-  let* client = Client.(init ?name:client_name ~endpoint:(Node node) ()) in
-  Lwt.return (client, node)
-
-(** [block_check ?level ~expected_block_type ~migrate_to ~migrate_from client]
-    is generic check that a block of type [expected_block_type] contains
-    (protocol) metatadata conforming to its type at [level]. **)
-let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
-  let block =
-    match level with Some level -> Some (string_of_int level) | None -> None
-  in
-  let* metadata =
-    Client.RPC.call client @@ RPC.get_chain_block_metadata ?block ()
-  in
-  let protocol = metadata.protocol in
-  let next_protocol = metadata.next_protocol in
-  (match expected_block_type with
-  | `Migration ->
-      Check.(
-        (next_protocol = Protocol.hash migrate_to)
-          string
-          ~error_msg:"expected next protocol to be %R, got %L") ;
-      Check.(
-        (protocol = Protocol.hash migrate_from)
-          string
-          ~error_msg:"expected (from) protocol to be %R, got %L")
-  | `Non_migration ->
-      Check.(
-        (next_protocol = protocol)
-          string
-          ~error_msg:"expected a non migration block ")) ;
-  Lwt.return_unit
+let team = Tag.layer1
 
 let wait_for_active_protocol_waiting agnostic_baker =
   Agnostic_baker.wait_for
@@ -80,7 +38,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, node =
-    user_migratable_node_init
+    Protocol_migration.user_migratable_node_init
       ?node_name
       ?client_name
       ~migration_level
@@ -101,7 +59,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
           let Account.{alias; public_key_hash; _} = account in
           Client.import_signer_key client ~alias ~public_key_hash uri)
         keys
-    else Lwt.return_unit
+    else unit
   in
   Log.info "Node %s initialized" (Node.name node) ;
   let baker = Agnostic_baker.create node client in
@@ -146,7 +104,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
       Log.info
         "New pre-migration baker process is taking over (pid: %d)"
         new_pid ;
-      Lwt.return_unit)
+      unit)
     else unit
   in
   (* Wait one block before the new protocol activation to register the
@@ -164,7 +122,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
   (* Ensure that the block before migration is consistent *)
   Log.info "Checking migration block consistency" ;
   let* () =
-    block_check
+    Protocol_migration.block_check
       ~expected_block_type:`Migration
       client
       ~migrate_from
@@ -175,7 +133,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
   (* Ensure that we migrated *)
   Log.info "Checking migration block consistency" ;
   let* () =
-    block_check
+    Protocol_migration.block_check
       ~expected_block_type:`Non_migration
       client
       ~migrate_from
@@ -204,41 +162,44 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
       Log.info
         "New post-migration baker process is taking over (pid: %d)"
         new_pid ;
-      Lwt.return_unit)
+      unit)
     else unit
   in
   let* _level = Node.wait_for_level node baked_blocks_after_migration in
   let* () = Agnostic_baker.terminate baker in
-  Lwt.return_unit
+  unit
 
-let raw_migrate ~resilience_test ~migrate_from ~migrate_to
-    ?(use_remote_signer = false) () =
-  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+let raw_migrate ~resilience_test ?(use_remote_signer = false) =
+  let remote_signer_text, remote_signer =
+    if use_remote_signer then
+      (" using HTTP remote signer", [Constant.octez_signer])
+    else ("", [])
+  in
+  let parameters = JSON.parse_file (Protocol.parameter_file Protocol.Alpha) in
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      (Format.asprintf
+         "Protocol migration from protocol to alpha with agnostic baker%s %s"
+         remote_signer_text
+         (if resilience_test then "and resilience test" else ""))
+    ~tags:["protocol"; "migration"; "agnostic"; "baker"]
+    ~uses:(fun _protocol ->
+      [Constant.octez_experimental_agnostic_baker] @ remote_signer)
+  @@ fun protocol ->
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   let consensus_rights_delay =
     JSON.(get "consensus_rights_delay" parameters |> as_int)
   in
   (* Migration level is set arbitrarily *)
   let migration_level = blocks_per_cycle in
-  Test.register
-    ~__FILE__
-    ~title:
-      (Format.sprintf
-         "Protocol migration (from %s to %s) with agnostic baker%s %s"
-         (Protocol.tag migrate_from)
-         (Protocol.tag migrate_to)
-         (if use_remote_signer then " using HTTP remote signer" else "")
-         (if resilience_test then " and resilience test" else ""))
-    ~tags:["protocol"; "migration"; "agnostic"; "baker"]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
-  @@ fun () ->
   let* () =
     perform_protocol_migration
       ~use_remote_signer
       ~blocks_per_cycle
       ~migration_level
-      ~migrate_from
-      ~migrate_to
+      ~migrate_from:protocol
+      ~migrate_to:Protocol.Alpha
       ~baked_blocks_after_migration:
         (2 * consensus_rights_delay * blocks_per_cycle)
       ()
@@ -246,35 +207,32 @@ let raw_migrate ~resilience_test ~migrate_from ~migrate_to
   unit
 
 let start_stop =
-  Test.register
+  Protocol.register_test
     ~__FILE__
     ~title:"Agnostic baker starts and stops"
-    ~tags:["sandbox"; "agnostic"; "baker"; "init"]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
-  @@ fun () ->
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "init"]
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+  @@ fun _protocol ->
   let* node, client = Client.init_with_node `Client () in
   let* baker = Agnostic_baker.init node client in
   let* () = Agnostic_baker.wait_for_ready baker in
   let* () = Agnostic_baker.terminate baker in
   unit
 
-let migrate ~migrate_from ~migrate_to =
-  raw_migrate ~resilience_test:false ~migrate_from ~migrate_to
+let migrate = raw_migrate ~resilience_test:false
 
-let migrate_with_resilience_test ~migrate_from ~migrate_to =
-  raw_migrate ~resilience_test:true ~migrate_from ~migrate_to
+let migrate_with_resilience_test = raw_migrate ~resilience_test:true
 
-let register ~migrate_from ~migrate_to =
-  start_stop ;
-  migrate ~migrate_from ~migrate_to ~use_remote_signer:false () ;
-  migrate ~migrate_from ~migrate_to ~use_remote_signer:true () ;
-  migrate_with_resilience_test
-    ~migrate_from
-    ~migrate_to
-    ~use_remote_signer:false
-    () ;
-  migrate_with_resilience_test
-    ~migrate_from
-    ~migrate_to
-    ~use_remote_signer:true
-    ()
+let register ~protocols =
+  start_stop protocols ;
+  let filter_migratable_protocols protocol =
+    (* We want to migrate only from Active protocols *)
+    Agnostic_baker.protocol_status protocol = Active
+  in
+  let migratable_protocols =
+    List.filter filter_migratable_protocols protocols
+  in
+  migrate ~use_remote_signer:false migratable_protocols ;
+  migrate ~use_remote_signer:true migratable_protocols ;
+  migrate_with_resilience_test ~use_remote_signer:false migratable_protocols ;
+  migrate_with_resilience_test ~use_remote_signer:true migratable_protocols

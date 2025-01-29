@@ -8003,7 +8003,7 @@ let _octez_experimental_agnostic_baker =
     ~path:"src/bin_agnostic_baker"
     ~internal_name:"main_agnostic_baker"
     ~synopsis:"Tezos: `octez-experimental-agnostic-baker` binary for baking"
-    ~release_status:Unreleased
+    ~release_status:Released
     ~with_macos_security_framework:true
     ~deps:
       [
