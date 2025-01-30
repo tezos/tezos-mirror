@@ -62,7 +62,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_follower_upstream_blueprint_applied"
-      ~msg:"Rollup node confirmed {level} ({hash})"
+      ~msg:"Rollup node confirmed block {level}"
       ~level:Notice
       ("level", Data_encoding.n)
       ("hash", Ethereum_types.block_hash_encoding)
@@ -80,7 +80,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"evm_events_follower_rollup_node_ahead"
-      ~msg:"Rollup node confirmed {level} before we received it."
+      ~msg:"Rollup node confirmed block {level} before we received it."
       ~level:Warning
       ("level", Data_encoding.n)
 
@@ -88,7 +88,9 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_follower_out_of_sync"
-      ~msg:"Rollup node confimed {expected}, but we have applied {received}."
+      ~msg:
+        "Rollup node confimed block {expected}, but we have applied block \
+         {received}."
       ~level:Error
       ("received", Data_encoding.int32)
       ("expected", Data_encoding.int32)
