@@ -578,12 +578,10 @@ impl OpCode {
     /// [InstructionContextBuilder]: ICB
     #[inline(always)]
     pub fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
-        use OpCode::*;
-
         match self {
-            Mv => Some(Args::run_mv),
-            Nop => Some(Args::run_nop),
-            CAdd => Some(Args::run_cadd),
+            Self::Mv => Some(Args::run_mv),
+            Self::Nop => Some(Args::run_nop),
+            Self::CAdd => Some(Args::run_cadd),
             _ => None,
         }
     }
@@ -2030,10 +2028,9 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::CMv(args) => {
                 Instruction::new_mv(args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
-            InstrCacheable::CAdd(args) => Instruction {
-                opcode: OpCode::CAdd,
-                args: args.into(),
-            },
+            InstrCacheable::CAdd(args) => {
+                Instruction::new_cadd(args.rd_rs1, args.rs2, InstrWidth::Compressed)
+            }
             InstrCacheable::CAnd(args) => Instruction {
                 opcode: OpCode::CAnd,
                 args: args.into(),

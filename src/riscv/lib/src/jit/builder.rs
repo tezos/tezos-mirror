@@ -88,8 +88,9 @@ impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> ICB for Builder<'a, ML, JSA>
             .xreg_write(&mut self.builder, self.core_ptr_val, reg, value)
     }
 
-    fn xvalue_wrapping_add(&mut self, _lhs: Self::XValue, _rhs: Self::XValue) -> Self::XValue {
-        todo!("RV-368: jit support for cadd instruction")
+    fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
+        // wrapping add; does not depend on whether operands are signed
+        self.builder.ins().iadd(lhs, rhs)
     }
 
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
