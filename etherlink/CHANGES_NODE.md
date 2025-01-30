@@ -67,8 +67,12 @@ you start using them, you probably want to use `octez-evm-node check config
 
 - `eth_getLogs` now accepts `null` as a valid value for the `topics` parameter.
   (!16357)
+
 - `eth_getLogs` now correctly interprets block numbers like `earliest`,
   `finalized`, etc. They were all defaulting to `latest` before. (!16372)
+
+- `eth_getLogs` now properly supports the [EIP-234](https://eips.ethereum.org/EIPS/eip-234) 
+  introducing the `blockHash` parameter. (!16460)
 
 ## Version 0.14 (2025-01-21)
 

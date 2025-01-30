@@ -287,7 +287,7 @@ module Request = struct
   let eth_unsubscribe ~id =
     {method_ = "eth_unsubscribe"; parameters = `A [`String id]}
 
-  let eth_getLogs ?from_block ?to_block ?address ?topics () =
+  let eth_getLogs ?from_block ?to_block ?address ?topics ?block_hash () =
     let parse_topic = function
       | [] -> `Null
       | [t] -> `String t
@@ -309,7 +309,11 @@ module Request = struct
                @ Option.fold
                    ~none:[]
                    ~some:(fun t -> [("topics", `A (List.map parse_topic t))])
-                   topics));
+                   topics
+               @ Option.fold
+                   ~none:[]
+                   ~some:(fun t -> [("blockHash", `String t)])
+                   block_hash));
         ]
     in
     {method_ = "eth_getLogs"; parameters}
@@ -350,12 +354,19 @@ let get_code ?websocket ~address evm_node =
   return
     (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
 
-let get_logs ?websocket ?from_block ?to_block ?address ?topics evm_node =
+let get_logs ?websocket ?from_block ?to_block ?address ?topics ?block_hash
+    evm_node =
   let* json =
     Evm_node.jsonrpc
       ?websocket
       evm_node
-      (Request.eth_getLogs ?from_block ?to_block ?address ?topics ())
+      (Request.eth_getLogs
+         ?from_block
+         ?to_block
+         ?address
+         ?topics
+         ?block_hash
+         ())
   in
   return
     (decode_or_error
