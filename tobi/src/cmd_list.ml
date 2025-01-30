@@ -20,7 +20,16 @@ let run ~verbose ~installed version =
   if installed && installed_version = None then unit
   else (
     (* Output component name. *)
-    echo "%s" component.name ;
+    echo
+      "%s%s"
+      component.name
+      (match installed_version with
+      | None -> ""
+      | Some commit_hash ->
+          (* Output installation status if relevant. *)
+          if verbose then sf " (installed: %s)" commit_hash
+          else if installed then ""
+          else " (installed)") ;
     if not verbose then unit
     else
       (* Output component paths. *)
