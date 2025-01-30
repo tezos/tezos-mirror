@@ -86,6 +86,28 @@ Baker
 - **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
   argument has been removed. (MR :gl:`!15554`)
 
+Agnostic Baker
+--------------
+
+- Release agnostic baker binary as experimental. (MR :gl:`!16318`)
+
+- Use of a generic watchdog. (MR :gl:`!15508`)
+
+- Change the binary name to ``octez-experimental-agnostic-baker``. (MR :gl:`!16434`)
+
+- Added a mechanism for the agnostic baker to switch on new protocol. (MR :gl:`!15305`)
+
+- Introduced a dummy agnostic baker. (MR :gl:`!15029`)
+
+Overview: The Agnostic Baker is a protocol-independent binary that dynamically determines
+and executes the appropriate baking binary based on the active protocol. It continuously
+monitors the blockchain state and automatically transitions to the correct binary whenever
+a new protocol is detected, such as during migrations or at startup.
+
+Please note that this feature is in an EXPERIMENTAL phase, as clearly suggested by its name.
+Therefore, it should NOT be used on ``mainnet``. For further clarifications, you can consult
+the README from ``src/bin_agnostic_baker``.
+
 Accuser
 -------
 
