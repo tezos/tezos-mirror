@@ -42,3 +42,6 @@ val with_checkout_into_tmp :
   ?other_paths:string list ->
   (checkout_result -> ('a, ([> `failed] as 'b) error) result) ->
   ('a, 'b error) result
+
+(** Run [git rev-parse] to get the commit hash from a Git reference. *)
+val rev_parse : string -> (string, [> `failed] error) result
