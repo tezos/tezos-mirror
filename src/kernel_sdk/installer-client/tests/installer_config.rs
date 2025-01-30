@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 use std::ffi::OsString;
-use std::fs;
+use std::fs::{self, write};
 use std::path::Path;
 use tezos_smart_rollup::core_unsafe::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup::dac::pages::prepare_preimages;
@@ -12,12 +13,15 @@ use tezos_smart_rollup::dac::PreimageHash;
 use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_installer::config::create_installer_config;
+use tezos_smart_rollup_installer::config::{
+    create_installer_config, merge_install_configs,
+};
 use tezos_smart_rollup_installer::installer::with_config_program;
 use tezos_smart_rollup_installer::KERNEL_BOOT_PATH;
 use tezos_smart_rollup_installer_config::binary::owned::{
     OwnedBytes, OwnedConfigInstruction, OwnedConfigProgram,
 };
+use tezos_smart_rollup_installer_config::yaml::YamlConfig;
 use tezos_smart_rollup_mock::MockHost;
 
 fn write_kernel_to_boot_path(host: &mut MockHost, kernel: Vec<u8>) {
@@ -175,6 +179,40 @@ fn yaml_config_set_execute() {
     host.store_read_slice(&to, 0, &mut buffer)
         .expect("Failed to read previously set value");
     let actual = String::from_utf8(buffer).unwrap();
+
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn merge_yaml_configurations_produce_expected_kernel() {
+    // Merge move and set configuration
+    let encoded_setup = merge_install_configs(vec![
+        OsString::from("tests/resources/move_config.yaml"),
+        OsString::from("tests/resources/set_config.yaml"),
+    ])
+    .unwrap();
+
+    // Verify that the deserialized yaml is valid
+    let _yaml_config = YamlConfig::from_string(&encoded_setup).unwrap();
+
+    let merged_config = "/tmp/move_and_set_config.yaml";
+
+    write(merged_config, encoded_setup).unwrap();
+
+    let mut host = MockHost::default();
+
+    // Test that the new merged configuration produce the expected kernel
+    let original_kernel = kernel_from_setup_file(&mut host, merged_config);
+
+    let temporary_path = RefPath::assert_from(b"/temporary/kernel/boot.wasm");
+    let boot_kernel = host.store_read_all(&temporary_path).unwrap();
+    assert_eq!(original_kernel, boot_kernel);
+
+    let to = RefPath::assert_from(b"/tmp/foo");
+    let expected = String::from("Un festival de GADT");
+
+    let encoded_string = host.store_read_all(&to).unwrap();
+    let actual = String::from_utf8(encoded_string).unwrap();
 
     assert_eq!(expected, actual)
 }
