@@ -7674,7 +7674,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 stk
             ),
-            Err(TcError::InvalidValueForType("String(\"ABCD\")".to_string(), Type::Timestamp))
+            Err(TcError::InvalidValueForType(
+                "String(\"ABCD\")".to_string(),
+                Type::Timestamp
+            ))
         );
 
         let stk = &mut tc_stk![];
@@ -7684,7 +7687,10 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 stk
             ),
-            Err(TcError::InvalidValueForType("String(\"3.5\")".to_string(), Type::Timestamp))
+            Err(TcError::InvalidValueForType(
+                "String(\"3.5\")".to_string(),
+                Type::Timestamp
+            ))
         );
     }
 
