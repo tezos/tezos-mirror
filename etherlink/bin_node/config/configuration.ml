@@ -713,22 +713,21 @@ let observer_encoding ?network () =
 
 let garbage_collector_parameters_encoding =
   let open Data_encoding in
+  let int_days =
+    def
+      "days"
+      ~title:"number_of_days"
+      ~description:"Number of days of history to retain"
+      int31
+  in
   conv
-    (fun {split_frequency_in_seconds; number_of_chunks} ->
-      (split_frequency_in_seconds, number_of_chunks))
-    (fun (split_frequency_in_seconds, number_of_chunks) ->
-      {split_frequency_in_seconds; number_of_chunks})
-    (obj2
-       (req
-          "split_frequency_in_seconds"
-          ~description:"Frequency of irmin context split in days"
-          int31)
-       (req
-          "number_of_chunks"
-          ~description:
-            "Number of irmin context chunks kept, the rest is garbage \
-             collected."
-          int31))
+    (function
+      | {split_frequency_in_seconds = 86_400; number_of_chunks} ->
+          number_of_chunks
+      | _ -> Stdlib.failwith "GC split frequency must one day")
+    (fun number_of_chunks ->
+      {split_frequency_in_seconds = 86_400; number_of_chunks})
+    int_days
 
 let rpc_server_encoding =
   let open Data_encoding in
@@ -737,6 +736,39 @@ let rpc_server_encoding =
 let history_mode_encoding =
   let open Data_encoding in
   string_enum [("archive", Archive); ("rolling", Rolling)]
+
+let history_mode_and_gc_parameters_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"archive"
+        (Tag 0)
+        (constant "archive")
+        (function Archive, _ -> Some () | _ -> None)
+        (fun () -> (Archive, default_garbage_collector_parameters));
+      case
+        ~title:"rolling_default_gc"
+        (Tag 1)
+        (constant "rolling")
+        (function
+          | _ ->
+              (* This is a shortcut for rolling with default GC parameters,
+                 never output it. *)
+              None)
+        (fun () -> (Rolling, default_garbage_collector_parameters));
+      case
+        ~title:"rolling"
+        (Tag 2)
+        (obj2
+           (req "mode" (constant "rolling"))
+           (req
+              "retention"
+              ~description:"How much history is retained for rolling nodes."
+              garbage_collector_parameters_encoding))
+        (function Rolling, gc -> Some ((), gc) | _ -> None)
+        (fun ((), gc) -> (Rolling, gc));
+    ]
 
 let monitor_websocket_heartbeat_encoding =
   let open Data_encoding in
@@ -820,7 +852,7 @@ let experimental_features_encoding =
         monitor_websocket_heartbeat;
       })
     (merge_objs
-       (obj8
+       (obj6
           (dft
              ~description:
                "Request the rollup node to filter messages it has already \
@@ -1122,8 +1154,8 @@ let encoding ?network data_dir : t Data_encoding.t =
            fee_history;
            kernel_execution;
            finalized_view;
-           garbage_collector_parameters;
            history_mode;
+           garbage_collector_parameters;
          } ->
       ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
@@ -1139,8 +1171,7 @@ let encoding ?network data_dir : t Data_encoding.t =
             public_rpc,
             private_rpc,
             finalized_view,
-            garbage_collector_parameters,
-            history_mode ) ) ))
+            (history_mode, garbage_collector_parameters) ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1155,8 +1186,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                public_rpc,
                private_rpc,
                finalized_view,
-               garbage_collector_parameters,
-               history_mode ) ) ) ->
+               (history_mode, garbage_collector_parameters) ) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -1175,8 +1205,8 @@ let encoding ?network data_dir : t Data_encoding.t =
         fee_history;
         kernel_execution;
         finalized_view;
-        garbage_collector_parameters;
         history_mode;
+        garbage_collector_parameters;
       })
     (merge_objs
        (obj4
@@ -1234,7 +1264,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj6
+          (obj5
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1254,15 +1284,10 @@ let encoding ?network data_dir : t Data_encoding.t =
                 bool
                 false)
              (dft
-                "retention_period"
-                ~description:"How much history is retained for rolling nodes."
-                garbage_collector_parameters_encoding
-                default_garbage_collector_parameters)
-             (dft
-                "history_mode"
+                "history"
                 ~description:"History mode of the EVM node"
-                history_mode_encoding
-                default_history_mode))))
+                history_mode_and_gc_parameters_encoding
+                (default_history_mode, default_garbage_collector_parameters)))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
