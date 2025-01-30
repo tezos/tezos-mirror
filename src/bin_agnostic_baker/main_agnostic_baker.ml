@@ -28,7 +28,7 @@ let () =
         | exn -> failwith "%s" (Printexc.to_string exn))
   in
   Stdlib.exit
-    (Lwt_main.run
+    (Tezos_base_unix.Event_loop.main_run
        (let*! retcode =
           let*! r = Lwt_exit.wrap_and_exit main_promise in
           match r with

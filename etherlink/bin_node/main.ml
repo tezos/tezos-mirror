@@ -2724,4 +2724,6 @@ let () =
         Short)
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Lwt_main.run (Lwt_exit.wrap_and_exit (dispatch (argv ()))) |> handle_error
+  Tezos_base_unix.Event_loop.main_run
+    (Lwt_exit.wrap_and_exit (dispatch (argv ())))
+  |> handle_error

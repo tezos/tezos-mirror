@@ -706,7 +706,7 @@ let process verbosity singleprocess strict repeat blocks stats_output data_dir
       blocks
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  match Lwt_main.run run with
+  match Tezos_base_unix.Event_loop.main_run run with
   | Ok () -> `Ok ()
   | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
 

@@ -2801,7 +2801,7 @@ let () =
       Lwt_io.(read_line stdin)
       (fun line -> Lwt_io.printl line)
   in
-  Lwt_main.run p_3
+  Tezos_base_unix.Event_loop.main_run p_3
 
 (* ocamlfind opt -linkpkg -thread -package lwt.unix code.ml && ./a.out *)
 ]}
@@ -2835,7 +2835,7 @@ let () =
 
 {[
 let () =
-  Lwt_main.run begin
+  Tezos_base_unix.Event_loop.main_run begin
     Lwt.bind Lwt_io.(read_line stdin) (fun line ->
       Lwt.bind (Lwt_unix.sleep 1.) (fun () ->
         Lwt_io.printf "One second ago, you entered %s\n" line))
@@ -2849,7 +2849,7 @@ let () =
 
 {[
 let () =
-  Lwt_main.run begin
+  Tezos_base_unix.Event_loop.main_run begin
     let%lwt line = Lwt_io.(read_line stdin) in
     let%lwt () = Lwt_unix.sleep 1. in
     Lwt_io.printf "One second ago, you entered %s\n" line
@@ -2869,7 +2869,7 @@ let () =
 open Lwt.Infix
 
 let () =
-  Lwt_main.run begin
+  Tezos_base_unix.Event_loop.main_run begin
     Lwt_io.(read_line stdin) >>= fun line ->
     Lwt_unix.sleep 1. >>= fun () ->
     Lwt_io.printf "One second ago, you entered %s\n" line
@@ -2903,7 +2903,7 @@ let read_int : unit -> int Lwt.t = fun () ->
     Lwt_io.(read_line stdin)
 
 let () =
-  Lwt_main.run begin
+  Tezos_base_unix.Event_loop.main_run begin
     let%lwt number = read_int () in
     Lwt_io.printf "%i\n" number
   end
