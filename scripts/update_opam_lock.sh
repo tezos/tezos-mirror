@@ -82,6 +82,10 @@ export OPAMSWITCH="$tmp_opam_switch"
 # The default timeout (60 seconds) is often not enough.
 export OPAMSOLVERTIMEOUT="${OPAMSOLVERTIMEOUT:-600}"
 
+# Pin stdcompat to a commit that's compatible with OCaml 5.2.1
+echo "---- Pinning stdcompat"
+opam pin add https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99 -n -y
+
 # Ask opam to find a solution that covers both:
 # - 'octez-deps', so that we can compile Octez;
 # - 'octez-dev-deps', so that the solution is compatible with tools that devs
