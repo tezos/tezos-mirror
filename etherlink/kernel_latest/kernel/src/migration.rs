@@ -292,6 +292,17 @@ fn migrate_to<Host: Runtime>(
             }
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V29 => {
+            /// Path used to store to the number of timestamps read.
+            const EVM_INFO_PER_LEVEL_STATS_NUMBERS: RefPath =
+                RefPath::assert_from(b"/evm/info_per_level/stats/numbers");
+            /// Path used to store the sum of distance between blocks.
+            const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
+                RefPath::assert_from(b"/evm/info_per_level/stats/total");
+            host.store_delete(&EVM_INFO_PER_LEVEL_STATS_NUMBERS)?;
+            host.store_delete(&EVM_INFO_PER_LEVEL_STATS_TOTAL)?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
