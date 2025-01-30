@@ -6,15 +6,27 @@ use crate::{
     machine_state::{
         main_memory::{Address, MainMemoryLayout},
         mode::Mode,
-        registers, CacheLayouts, MachineError, MachineState,
+        registers, CacheLayouts, MachineCoreState, MachineError, MachineState,
     },
     program::Program,
-    state_backend::{ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite},
+    state_backend::{
+        AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead,
+        ManagerReadWrite, ManagerWrite, Ref,
+    },
 };
 use std::ffi::CStr;
 
 /// Size of a memory page in bytes
 pub const PAGE_SIZE: u64 = 4096;
+
+/// Thread identifier for the main thread
+const MAIN_THREAD_ID: u64 = 1;
+
+/// Indicates a system call is not supported
+const ENOSYS: i64 = 38;
+
+/// System call number for `set_tid_address` on RISC-V
+const SET_TID_ADDRESS: u64 = 96;
 
 impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL, M> {
     /// Add data to the stack, returning the updated stack pointer.
@@ -122,4 +134,139 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL
 
         Ok(())
     }
+}
+
+/// Layout for the Linux supervisor state
+pub type SupervisorStateLayout = Atom<u64>;
+
+/// Linux supervisor state
+pub struct SupervisorState<M: ManagerBase> {
+    tid_address: Cell<u64, M>,
+}
+
+impl<M: ManagerBase> SupervisorState<M> {
+    /// Bind the given allocated regions to the supervisor state.
+    pub fn bind(space: AllocatedOf<SupervisorStateLayout, M>) -> Self {
+        SupervisorState { tid_address: space }
+    }
+
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<SupervisorStateLayout, F::Output> {
+        self.tid_address.struct_ref::<F>()
+    }
+
+    /// Handle a Linux system call.
+    pub fn handle_system_call(
+        &mut self,
+        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+    ) -> bool
+    where
+        M: ManagerRead + ManagerWrite,
+    {
+        // We need to jump to the next instruction. The ECall instruction which triggered this
+        // function is 4 byte wide.
+        let pc = core.hart.pc.read().saturating_add(4);
+        core.hart.pc.write(pc);
+
+        // Programs targeting a Linux kernel pass the system call number in register a7
+        let system_call_no = core.hart.xregisters.read(registers::a7);
+
+        #[allow(clippy::single_match)]
+        match system_call_no {
+            SET_TID_ADDRESS => return self.handle_set_tid_address(core),
+            _ => {}
+        }
+
+        let xregisters = &core.hart.xregisters;
+
+        // TODO: RV-413: Don't use `eprintln!`
+        eprintln!("> Unimplemented system call: {system_call_no}");
+        eprintln!("\ta0 = {}", xregisters.read(registers::a0));
+        eprintln!("\ta1 = {}", xregisters.read(registers::a1));
+        eprintln!("\ta2 = {}", xregisters.read(registers::a2));
+        eprintln!("\ta3 = {}", xregisters.read(registers::a3));
+        eprintln!("\ta4 = {}", xregisters.read(registers::a4));
+        eprintln!("\ta5 = {}", xregisters.read(registers::a5));
+        eprintln!("\ta6 = {}", xregisters.read(registers::a6));
+
+        core.hart.xregisters.write(registers::a0, -ENOSYS as u64);
+
+        false
+    }
+
+    /// Handle `set_tid_address` system call.
+    ///
+    /// See: https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html
+    fn handle_set_tid_address(
+        &mut self,
+        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+    ) -> bool
+    where
+        M: ManagerRead + ManagerWrite,
+    {
+        // NOTE: `set_tid_address` is mostly important for when a thread terminates. As we don't
+        // really support threading yet, we only save the address and do nothing else.
+        // In the future, when we add threading, this system call needs to be implemented to
+        // support informing other (waiting) threads of termination.
+
+        // The address is passed as the first and only parameter
+        let tid_address = core.hart.xregisters.read(registers::a0);
+        self.tid_address.write(tid_address);
+
+        // The caller expects the Thread ID to be returned
+        core.hart.xregisters.write(registers::a0, MAIN_THREAD_ID);
+
+        true
+    }
+}
+
+impl<M: ManagerClone> Clone for SupervisorState<M> {
+    fn clone(&self) -> Self {
+        Self {
+            tid_address: self.tid_address.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        backend_test, create_state, machine_state::MachineCoreStateLayout, state_backend::DynArray,
+    };
+    use rand::Rng;
+
+    // Check that the `set_tid_address` system call is working correctly.
+    backend_test!(set_tid_address, F, {
+        const MEM_BYTES: usize = 1024;
+        type MemLayout = DynArray<MEM_BYTES>;
+
+        let mut machine_state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<MemLayout>,
+            F,
+            MemLayout
+        );
+
+        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a7, SET_TID_ADDRESS);
+
+        let tid_address = rand::thread_rng().gen_range(0..MEM_BYTES as Address);
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a0, tid_address);
+
+        let result = supervisor_state.handle_system_call(&mut machine_state);
+        assert!(result);
+
+        assert_eq!(supervisor_state.tid_address.read(), tid_address);
+    });
 }

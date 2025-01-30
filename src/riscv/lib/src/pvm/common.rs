@@ -24,6 +24,9 @@ use std::{
     ops::Bound,
 };
 
+#[cfg(feature = "supervisor")]
+use super::linux;
+
 /// PVM configuration
 pub struct PvmHooks<'a> {
     pub putchar_hook: Box<dyn FnMut(u8) + 'a>,
@@ -60,6 +63,17 @@ impl<'a> Default for PvmHooks<'a> {
 }
 
 /// PVM state layout
+#[cfg(feature = "supervisor")]
+pub type PvmLayout<ML, CL> = (
+    state_backend::Atom<u64>,
+    machine_state::MachineStateLayout<ML, CL>,
+    Atom<PvmStatus>,
+    RevealRequestLayout,
+    linux::SupervisorStateLayout,
+);
+
+/// PVM state layout
+#[cfg(not(feature = "supervisor"))]
 pub type PvmLayout<ML, CL> = (
     state_backend::Atom<u64>,
     machine_state::MachineStateLayout<ML, CL>,
@@ -158,6 +172,8 @@ pub struct Pvm<
 > {
     pub(crate) machine_state: machine_state::MachineState<ML, CL, M>,
     reveal_request: RevealRequest<M>,
+    #[cfg(feature = "supervisor")]
+    system_state: linux::SupervisorState<M>,
     version: state_backend::Cell<u64, M>,
     status: Cell<PvmStatus, M>,
 }
@@ -175,6 +191,8 @@ impl<
             machine_state: machine_state::MachineState::bind(space.1),
             status: space.2,
             reveal_request: RevealRequest::bind(space.3),
+            #[cfg(feature = "supervisor")]
+            system_state: linux::SupervisorState::bind(space.4),
         }
     }
 
@@ -188,6 +206,8 @@ impl<
             self.machine_state.struct_ref::<F>(),
             self.status.struct_ref::<F>(),
             self.reveal_request.struct_ref::<F>(),
+            #[cfg(feature = "supervisor")]
+            self.system_state.struct_ref::<F>(),
         )
     }
 
@@ -231,6 +251,8 @@ impl<
     }
 
     /// Handle an exception using the defined Execution Environment.
+    // The conditional compilation below causes some warnings.
+    #[cfg_attr(feature = "supervisor", allow(unused_variables, unreachable_code))]
     pub fn handle_exception(
         &mut self,
         hooks: &mut PvmHooks<'_>,
@@ -239,6 +261,11 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
+        #[cfg(feature = "supervisor")]
+        return self
+            .system_state
+            .handle_system_call(&mut self.machine_state.core);
+
         sbi::handle_call(
             &mut self.status,
             &mut self.reveal_request,
@@ -272,18 +299,25 @@ impl<
     /// the execution environment will still retire an instruction, just not itself.
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
+    // The conditional compilation below causes some warnings.
+    #[cfg_attr(feature = "supervisor", allow(unused_variables, unreachable_code))]
     pub fn eval_max(&mut self, hooks: &mut PvmHooks<'_>, step_bounds: Bound<usize>) -> usize
     where
         M: state_backend::ManagerReadWrite,
     {
         self.machine_state
-            .step_max_handle::<Infallible>(step_bounds, |machine_state, exc| {
+            .step_max_handle::<Infallible>(step_bounds, |machine_state, exception| {
+                #[cfg(feature = "supervisor")]
+                return Ok(self
+                    .system_state
+                    .handle_system_call(&mut machine_state.core));
+
                 Ok(sbi::handle_call(
                     &mut self.status,
                     &mut self.reveal_request,
                     machine_state,
                     hooks,
-                    exc,
+                    exception,
                 ))
             })
             .steps
@@ -348,6 +382,8 @@ impl<
             machine_state: self.machine_state.clone(),
             status: self.status.clone(),
             reveal_request: self.reveal_request.clone(),
+            #[cfg(feature = "supervisor")]
+            system_state: self.system_state.clone(),
         }
     }
 }

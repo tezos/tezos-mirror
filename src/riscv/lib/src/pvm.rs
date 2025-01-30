@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 mod common;
-mod linux;
 pub mod node_pvm;
 mod reveals;
 mod sbi;
+
+#[cfg(feature = "supervisor")]
+mod linux;
 
 pub use common::*;
