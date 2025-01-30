@@ -27,3 +27,14 @@ val command :
   string ->
   string list ->
   (unit, [> `failed] error) result
+
+(** Run an external program and read its output as a list of lines.
+
+    Same as {!command} but returns the list of output lines.
+    The program output is not printed to [stdout], contrary to the default
+    behavior of {!command}. *)
+val command_lines :
+  ?working_directory:string ->
+  string ->
+  string list ->
+  (string list, [> `failed] error) result

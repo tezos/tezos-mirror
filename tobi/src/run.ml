@@ -121,3 +121,14 @@ let command ?working_directory ?on_read_line executable arguments =
   match (read_result, wait_result) with
   | Ok (), Ok () -> unit
   | _, (Error _ as x) | (Error _ as x), Ok _ -> x
+
+let command_lines ?working_directory executable arguments =
+  let lines = ref [] in
+  let* () =
+    command
+      ?working_directory
+      ~on_read_line:(fun line -> lines := line :: !lines)
+      executable
+      arguments
+  in
+  Ok (List.rev !lines)
