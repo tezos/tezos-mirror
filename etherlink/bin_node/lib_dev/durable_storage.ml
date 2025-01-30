@@ -209,7 +209,7 @@ let blocks_by_number read ~full_transaction_object ~number =
       decode_block_hash
   in
   match block_hash_opt with
-  | None -> failwith "Unknown block %a" Z.pp_print level
+  | None -> failwith "Block %a not found" Z.pp_print level
   | Some block_hash -> (
       let* block_opt =
         inspect_durable_and_decode_opt

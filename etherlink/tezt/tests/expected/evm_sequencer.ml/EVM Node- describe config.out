@@ -130,14 +130,6 @@
         boolean
         /* DEPRECATED: You should remove this option from your configuration
            file. */,
-      "block_storage_sqlite3"?:
-        boolean
-        /* Store the blocks and transactions in a sqlite3 database and
-           removes them from the durable storage */,
-      "replay_block_storage_sqlite3"?:
-        boolean
-        /* Replace internal callbacks to support Mainnet's replay with block
-           storage enabled */,
       "overwrite_simulation_tick_limit"?:
         boolean
         /* When enabled, the eth_call method is not subject to the tick

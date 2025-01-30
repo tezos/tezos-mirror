@@ -84,8 +84,6 @@ type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
-  block_storage_sqlite3 : bool;
-  replay_block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector_parameters : garbage_collector_parameters;
   history_mode : history_mode;

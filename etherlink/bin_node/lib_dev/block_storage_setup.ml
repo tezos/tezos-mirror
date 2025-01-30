@@ -86,5 +86,4 @@ let enable ~keep_alive ?evm_node_endpoint store =
       Ok (Bytes.unsafe_of_string s)
     else Wasm_runtime_callbacks.store_get_hash tree key
   in
-  Callback.register "layer2_store__store_get_hash" store_get_hash ;
-  Evm_context_events.replace_store_get_hash ()
+  Callback.register "layer2_store__store_get_hash" store_get_hash

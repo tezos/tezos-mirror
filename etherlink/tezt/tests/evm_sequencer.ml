@@ -237,16 +237,16 @@ let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
   body sequencer
 
 (* Register all variants of a test. *)
-let register_all ?max_delayed_inbox_blueprint_length ?block_storage_sqlite3
-    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
-    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
-    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
-    ?additional_uses ?rpc_server ?websockets
+let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
+    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
+    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
+    ?websockets
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration) ~title ~tags body protocols =
   let dal_cases =
@@ -272,7 +272,6 @@ let register_all ?max_delayed_inbox_blueprint_length ?block_storage_sqlite3
           register_test_for_kernels
             ~__FILE__
             ?max_delayed_inbox_blueprint_length
-            ?block_storage_sqlite3
             ?sequencer_rpc_port
             ?sequencer_private_rpc_port
             ?commitment_period
@@ -2094,7 +2093,6 @@ let test_fa_reentrant_deposit_reverts =
 
 let test_delayed_deposit_from_init_rollup_node =
   register_all
-    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "init"]
@@ -2172,7 +2170,6 @@ let test_init_from_rollup_node_data_dir =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
      Replace by [Any] after the next upgrade
   *)
-    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
@@ -2223,7 +2220,6 @@ let test_init_from_rollup_node_data_dir =
 
 let test_init_from_rollup_node_with_delayed_inbox =
   register_all
-    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~time_between_blocks:Nothing
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "rollup_node"; "init"; "delayed_inbox"; "omit"]
@@ -2483,7 +2479,6 @@ let test_observer_applies_blueprint_when_restarted =
 
 let test_get_balance_block_param =
   register_all
-    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
@@ -2575,7 +2570,6 @@ let test_get_balance_block_param =
 
 let test_get_block_by_number_block_param =
   register_all
-    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
     ~time_between_blocks:Nothing
@@ -6370,7 +6364,6 @@ let test_preimages_endpoint =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
-    ~block_storage_sqlite3:false (* The test uses init from rollup node. *)
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]

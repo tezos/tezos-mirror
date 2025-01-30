@@ -58,7 +58,6 @@ val run_new_observer_node :
 val register_test :
   __FILE__:string ->
   ?max_delayed_inbox_blueprint_length:int ->
-  ?block_storage_sqlite3:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
@@ -103,7 +102,6 @@ val register_test :
 val register_test_for_kernels :
   __FILE__:string ->
   ?max_delayed_inbox_blueprint_length:int ->
-  ?block_storage_sqlite3:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
@@ -144,7 +142,6 @@ val register_test_for_kernels :
 val setup_sequencer :
   ?max_delayed_inbox_blueprint_length:int ->
   ?next_wasm_runtime:bool ->
-  ?block_storage_sqlite3:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   mainnet_compat:bool ->

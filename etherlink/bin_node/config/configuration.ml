@@ -54,8 +54,6 @@ type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
-  block_storage_sqlite3 : bool;
-  replay_block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
   garbage_collector_parameters : garbage_collector_parameters;
   history_mode : history_mode;
@@ -163,8 +161,6 @@ let default_experimental_features =
     enable_send_raw_transaction = default_enable_send_raw_transaction;
     drop_duplicate_on_injection = false;
     blueprints_publisher_order_enabled = false;
-    block_storage_sqlite3 = false;
-    replay_block_storage_sqlite3 = false;
     overwrite_simulation_tick_limit = false;
     garbage_collector_parameters = default_garbage_collector_parameters;
     history_mode = Archive;
@@ -787,8 +783,6 @@ let experimental_features_encoding =
            drop_duplicate_on_injection;
            blueprints_publisher_order_enabled;
            enable_send_raw_transaction;
-           block_storage_sqlite3;
-           replay_block_storage_sqlite3;
            overwrite_simulation_tick_limit;
            garbage_collector_parameters;
            history_mode;
@@ -801,8 +795,6 @@ let experimental_features_encoding =
           blueprints_publisher_order_enabled,
           enable_send_raw_transaction,
           None,
-          block_storage_sqlite3,
-          replay_block_storage_sqlite3,
           overwrite_simulation_tick_limit,
           garbage_collector_parameters,
           history_mode,
@@ -815,8 +807,6 @@ let experimental_features_encoding =
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
              _node_transaction_validation,
-             block_storage_sqlite3,
-             replay_block_storage_sqlite3,
              overwrite_simulation_tick_limit,
              garbage_collector_parameters,
              history_mode,
@@ -829,8 +819,6 @@ let experimental_features_encoding =
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
         enable_send_raw_transaction;
-        block_storage_sqlite3;
-        replay_block_storage_sqlite3;
         overwrite_simulation_tick_limit;
         garbage_collector_parameters;
         history_mode;
@@ -840,7 +828,7 @@ let experimental_features_encoding =
         monitor_websocket_heartbeat;
       })
     (merge_objs
-       (obj10
+       (obj8
           (dft
              ~description:
                "Request the rollup node to filter messages it has already \
@@ -869,20 +857,6 @@ let experimental_features_encoding =
                 configuration file."
              "node_transaction_validation"
              bool)
-          (dft
-             "block_storage_sqlite3"
-             ~description:
-               "Store the blocks and transactions in a sqlite3 database and \
-                removes them from the durable storage"
-             bool
-             default_experimental_features.block_storage_sqlite3)
-          (dft
-             "replay_block_storage_sqlite3"
-             ~description:
-               "Replace internal callbacks to support Mainnet's replay with \
-                block storage enabled"
-             bool
-             false)
           (dft
              "overwrite_simulation_tick_limit"
              ~description:

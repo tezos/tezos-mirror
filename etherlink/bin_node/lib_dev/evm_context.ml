@@ -47,6 +47,7 @@ type t = {
   store : Evm_store.t;
   session : session_state;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
+  legacy_block_storage : bool;
 }
 
 let is_sequencer t = Option.is_some t.sequencer_wallet
@@ -414,7 +415,7 @@ module State = struct
        level). *)
     let latest_finalized_level = Z.max latest_finalized_level number in
     let* block_hash_opt =
-      if ctxt.configuration.experimental_features.block_storage_sqlite3 then
+      if not ctxt.legacy_block_storage then
         Evm_store.Blocks.find_hash_of_number conn (Qty number)
       else
         let*! bytes =
@@ -685,7 +686,7 @@ module State = struct
         in
 
         let* evm_state, receipts =
-          if ctxt.configuration.experimental_features.block_storage_sqlite3 then
+          if not ctxt.legacy_block_storage then
             let* receipts = store_block_unsafe conn evm_state block in
             let*! evm_state = Evm_state.clear_block_storage block evm_state in
             return (evm_state, receipts)
@@ -1281,6 +1282,8 @@ module State = struct
       | Archive -> return_none
     in
 
+    let* legacy_block_storage = Evm_store.Block_storage_mode.legacy conn in
+
     let ctxt =
       {
         configuration;
@@ -1299,13 +1302,12 @@ module State = struct
           };
         store;
         sequencer_wallet;
+        legacy_block_storage;
       }
     in
 
     let* () =
-      when_
-        configuration.experimental_features.replay_block_storage_sqlite3
-        (fun () ->
+      unless legacy_block_storage (fun () ->
           let* ro_store = Evm_store.init ~data_dir ~perm:`Read_only () in
           let* evm_node_endpoint =
             if is_sequencer ctxt then return_none
@@ -1315,11 +1317,11 @@ module State = struct
               | None -> return_none
           in
 
-          Lwt_result.ok
-            (Block_storage_setup.enable
-               ~keep_alive:configuration.keep_alive
-               ?evm_node_endpoint
-               ro_store))
+          Block_storage_setup.enable
+            ~keep_alive:configuration.keep_alive
+            ?evm_node_endpoint
+            ro_store ;
+          return_unit)
     in
 
     let*! () =
@@ -1509,8 +1511,8 @@ module State = struct
           *)
           let (Qty pred_number) = Ethereum_types.Qty.pred blueprint_number in
           let* local_parent_block_hash =
-            if ctxt.configuration.experimental_features.block_storage_sqlite3
-            then Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
+            if not ctxt.legacy_block_storage then
+              Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
             else
               let*! bytes =
                 Evm_state.inspect
@@ -1871,14 +1873,10 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   in
   (* Init the store *)
   let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
-  Evm_store.use store @@ fun conn ->
-  let* () =
-    Evm_store.Context_hashes.store
-      conn
-      (Qty current_blueprint_number)
-      checkpoint
-  in
-  return_unit
+  Evm_store.(
+    use store @@ fun conn ->
+    let* () = Block_storage_mode.force_legacy conn in
+    Context_hashes.store conn (Qty current_blueprint_number) checkpoint)
 
 let reset = State.reset
 

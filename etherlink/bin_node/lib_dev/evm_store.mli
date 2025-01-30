@@ -156,6 +156,17 @@ module Blocks : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+module Block_storage_mode : sig
+  (** [legacy conn] returns [true] if the EVM node storage uses the legacy
+      block storage (i.e., Irmin). *)
+  val legacy : conn -> bool tzresult Lwt.t
+
+  (** [force_legacy conn] forces the node to use the legacy block storage. It
+      is a requirement for the [init from rollup node] command, and should not
+      be used in other context. *)
+  val force_legacy : conn -> unit tzresult Lwt.t
+end
+
 val context_hash_of_block_hash :
   conn -> Ethereum_types.block_hash -> Irmin_context.hash option tzresult Lwt.t
 

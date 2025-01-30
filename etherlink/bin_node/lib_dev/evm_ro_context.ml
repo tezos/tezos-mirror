@@ -89,7 +89,10 @@ let load ?network ?smart_rollup_address ~data_dir configuration =
         return metadata.smart_rollup_address
     | Some smart_rollup_address -> return smart_rollup_address
   in
-
+  let* legacy_mode = Evm_store.(use store Block_storage_mode.legacy) in
+  let* () =
+    when_ legacy_mode @@ fun () -> Lwt_result.ok (Events.legacy_mode ())
+  in
   let ctxt =
     {
       store;
@@ -100,8 +103,7 @@ let load ?network ?smart_rollup_address ~data_dir configuration =
       native_execution_policy =
         configuration.kernel_execution.native_execution_policy;
       smart_rollup_address;
-      block_storage_sqlite3 =
-        configuration.experimental_features.block_storage_sqlite3;
+      block_storage_sqlite3 = not legacy_mode;
       finalized_view = configuration.finalized_view;
     }
   in

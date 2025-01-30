@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Features
+
+- Defaults to the new block storage, which significantly reduces the size of
+  data directories For instance, Mainnet archive nodes using the now legacy
+  storage requires more than 250GBytes of disk, while the new block storage
+  requires around 180GBytes. (!16412)
+
 ### Bug fixes
 
 #### RPCs
@@ -10,10 +17,6 @@
 - `eth_getLogs` now properly supports the [EIP-234](https://eips.ethereum.org/EIPS/eip-234)
   introducing the `blockHash` parameter. (!16460)
 - `eth_getLogs` now returns an empty array instead of an error when `fromBlock` is greater than `toBlock`.
-
-### Features
-
-### Bug fixes
 
 ### Internal
 
