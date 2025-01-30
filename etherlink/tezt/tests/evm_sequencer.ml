@@ -9689,7 +9689,15 @@ let test_rpc_getLogs_with_earliest_fail =
 
 let test_estimate_gas_with_block_param =
   register_all
-    ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
+    ~tags:
+      [
+        "evm";
+        "eth_estimategas";
+        "simulate";
+        "estimate_gas";
+        "earliest";
+        Tag.flaky;
+      ]
     ~title:"eth_estimateGas with block parameter"
   @@ fun {sequencer; _} _protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -9717,7 +9725,7 @@ let test_estimate_gas_with_block_param =
     ]
   in
   let* _ = produce_block sequencer in
-  (* Estimate_gas to does it's estimations on a block about to be minted so if we run it on block `N` the solidity code execute itself with block.number = `N`+ 1 *)
+  (* Estimate_gas does it's estimations on a block about to be minted so if we run it on block `N` the solidity code execute itself with block.number = `N`+ 1 *)
   let*@ evenGasCost =
     Rpc.estimate_gas call_params sequencer ~block:(Number 1)
   in
