@@ -22,6 +22,9 @@ pub const PAGE_SIZE: u64 = 4096;
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
 
+/// [AT_PAGESZ](https://github.com/torvalds/linux/blob/bb066fe812d6fb3a9d01c073d9f1e2fd5a63403b/include/uapi/linux/auxvec.h#L15)
+const AT_PAGESZ: u64 = 6;
+
 /// Indicates a system call is not supported
 const ENOSYS: i64 = 38;
 
@@ -95,9 +98,13 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL
             .map(|arg| self.push_stack(1, arg.to_bytes_with_nul()))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // auxv[0] = [null, null]
+        // auxv[1] = [null, null]
         self.push_stack(8, 0u64.to_le_bytes())?;
         self.push_stack(8, 0u64.to_le_bytes())?;
+
+        // auxv[0] = [AT_PAGESZ, PAGE_SIZE]
+        self.push_stack(8, PAGE_SIZE.to_le_bytes())?;
+        self.push_stack(8, AT_PAGESZ.to_le_bytes())?;
 
         // envp[n] = null
         self.push_stack(8, 0u64.to_le_bytes())?;
