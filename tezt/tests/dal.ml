@@ -8391,10 +8391,26 @@ let check_participation_and_rewards node ~expected_assigned_shards
       balance_updates
       ~error_msg:"The list of balance updates has an odd number of elements"
   in
-  let dal_balance_updates = extract_dal_balance_updates balance_updates in
+  let dal_balance_updates =
+    extract_dal_balance_updates balance_updates
+    |> (* sort them for proper regression output *)
+    List.sort (fun e1 e2 ->
+        match (e1, e2) with
+        | `Got (d1, a1, _), `Got (d2, a2, _)
+        | `Lost (d1, a1, _), `Lost (d2, a2, _) ->
+            let c = String.compare d1 d2 in
+            if c = 0 then a1 - a2 else c
+        | `Got _, `Lost _ -> 1
+        | `Lost _, `Got _ -> -1)
+  in
+  List.iter
+    (function
+      | `Got (_, _, json) | `Lost (_, _, json) ->
+          Regression.capture @@ JSON.encode json)
+    dal_balance_updates ;
   let* attesting_reward_per_shard =
     let* json =
-      Node.RPC.call node
+      Node.RPC.call ~rpc_hooks node
       @@ RPC.get_chain_block_context_issuance_expected_issuance ()
     in
     return @@ JSON.(json |=> 0 |-> "dal_attesting_reward_per_shard" |> as_int)
@@ -8403,7 +8419,7 @@ let check_participation_and_rewards node ~expected_assigned_shards
   (* Note that at the last level in the cycle we lose information about the
      total_dal_attested_slots *)
   let* participation =
-    Node.RPC.call node
+    Node.RPC.call ~rpc_hooks node
     @@ RPC.get_chain_block_context_delegate_dal_participation
          ~block:"head~1"
          delegate
@@ -9403,6 +9419,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~number_of_slots:1
     ~producer_profiles:[0]
+    ~regression:true
     "attesters receive DAL rewards"
     test_attesters_receive_dal_rewards
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
