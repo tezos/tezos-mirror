@@ -44,6 +44,20 @@ val memoize : ('a -> 'b) -> 'a -> 'b
     - [str_split_once "a,b,c" ','] is [Some ("a", "b,c")]. *)
 val str_split_once : string -> char -> (string * string) option
 
+(** Quote a string using [sh] syntax.
+
+    Similar to [Filename.quote], but the result is prettier for humans:
+    - if the string only contains safe characters, it is not quoted;
+    - if the string contains unsafe characters but no single quote character,
+      it is quoted using a single pair of single quotes. *)
+val quote_shell : string -> string
+
+(** Quote a command using [sh] syntax.
+
+    Similar to [Filename.quote_command], but the result is prettier for humans
+    (see {!quote_shell}). *)
+val quote_command : string -> string list -> string
+
 (** Same as [Unix.close], but ignore errors. *)
 val close : Unix.file_descr -> unit
 
