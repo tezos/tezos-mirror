@@ -59,6 +59,8 @@ let quote_command command arguments =
 
 let close fd = try Unix.close fd with Unix.Unix_error _ -> ()
 
+let closedir fd = try Unix.closedir fd with Unix.Unix_error _ -> ()
+
 type 'a error = {code : 'a; message : string list}
 
 type ('a, 'e) r = ('a, 'e error) result

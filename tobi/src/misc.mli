@@ -61,6 +61,9 @@ val quote_command : string -> string list -> string
 (** Same as [Unix.close], but ignore errors. *)
 val close : Unix.file_descr -> unit
 
+(** Same as [Unix.closedir], but ignore errors. *)
+val closedir : Unix.dir_handle -> unit
+
 (** {2 Error Handling} *)
 
 (** Errors.
