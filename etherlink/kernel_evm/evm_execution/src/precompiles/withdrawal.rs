@@ -127,6 +127,134 @@ fn prepare_fast_withdraw_message(
     Some(outbox_message)
 }
 
+fn revert_withdrawal() -> PrecompileOutcome {
+    PrecompileOutcome {
+        exit_status: ExitReason::Revert(ExitRevert::Reverted),
+        output: vec![],
+        withdrawals: vec![],
+        estimated_ticks: tick_model::ticks_of_withdraw(),
+    }
+}
+
+pub struct WithdrawalBase {
+    ticketer: ContractKt1Hash,
+    base_transfer_value: U256,
+    target: Contract,
+    withdrawal_id: U256,
+    ticket: FA2_1Ticket,
+}
+
+pub type BaseWithdrawOutcome = (Option<WithdrawalBase>, Option<PrecompileOutcome>);
+
+pub fn base_withdrawal_preliminary<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    address_str: String,
+    transfer: Transfer,
+) -> Result<BaseWithdrawOutcome, EthereumError> {
+    let Some(target) = Contract::from_b58check(&address_str).ok() else {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Withdrawal precompiled contract: invalid target address string"
+        );
+        return Ok((None, Some(revert_withdrawal())));
+    };
+
+    let base_transfer_value = transfer.value;
+
+    let amount = match mutez_from_wei(base_transfer_value) {
+        Ok(amount) => amount,
+        Err(ErrorMutezFromWei::NonNullRemainder) => {
+            log!(
+                handler.borrow_host(),
+                Info,
+                "Withdrawal precompiled contract: rounding would lose wei"
+            );
+            return Ok((None, Some(revert_withdrawal())));
+        }
+        Err(ErrorMutezFromWei::AmountTooLarge) => {
+            log!(
+                handler.borrow_host(),
+                Info,
+                "Withdrawal precompiled contract: amount is too large"
+            );
+            return Ok((None, Some(revert_withdrawal())));
+        }
+    };
+
+    // Burn the withdrawn amount
+    let mut withdrawal_precompiled = handler.get_or_create_account(WITHDRAWAL_ADDRESS)?;
+    withdrawal_precompiled.balance_remove(handler.borrow_host(), base_transfer_value)?;
+
+    log!(
+        handler.borrow_host(),
+        Info,
+        "Withdrawal of {} to {:?}",
+        amount,
+        target
+    );
+
+    let Some(ticketer) = read_ticketer(handler.borrow_host()) else {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Withdrawal precompiled contract: failed to read ticketer"
+        );
+        return Ok((None, Some(revert_withdrawal())));
+    };
+
+    let mut system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
+    let withdrawal_id =
+        system.withdrawal_counter_get_and_increment(handler.borrow_host())?;
+
+    let Some(ticket) = FA2_1Ticket::new(
+        Contract::Originated(ticketer.clone()),
+        MichelsonPair(0.into(), MichelsonOption(None)),
+        amount,
+    )
+    .ok() else {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Withdrawal precompiled contract: ticket amount is invalid"
+        );
+        return Ok((None, Some(revert_withdrawal())));
+    };
+
+    let outcome = WithdrawalBase {
+        ticketer,
+        base_transfer_value,
+        target,
+        withdrawal_id,
+        ticket,
+    };
+
+    Ok((Some(outcome), None))
+}
+
+pub fn emit_log_and_return<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    message: Withdrawal,
+    estimated_ticks: u64,
+    withdrawal_event: Log,
+) -> Result<PrecompileOutcome, EthereumError> {
+    // TODO we need to measure number of ticks and translate this number into
+    // Ethereum gas units
+
+    let withdrawals = vec![message];
+
+    handler
+        .add_log(withdrawal_event)
+        .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{:?}", e))))?;
+
+    Ok(PrecompileOutcome {
+        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
+        output: vec![],
+        withdrawals,
+        estimated_ticks,
+    })
+}
+
 /// Implementation of Etherlink specific withdrawals precompiled contract.
 pub fn withdrawal_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
@@ -136,14 +264,6 @@ pub fn withdrawal_precompile<Host: Runtime>(
     transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_withdraw(), handler);
-    fn revert_withdrawal() -> PrecompileOutcome {
-        PrecompileOutcome {
-            exit_status: ExitReason::Revert(ExitRevert::Reverted),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks: tick_model::ticks_of_withdraw(),
-        }
-    }
 
     let estimated_gas_cost = estimate_gas_cost(estimated_ticks, handler.gas_price());
     if let Err(err) = handler.record_cost(estimated_gas_cost) {
@@ -181,6 +301,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
     match input {
         // "cda4fee2" is the function selector for `withdraw_base58(string)`
         [0xcd, 0xa4, 0xfe, 0xe2, input_data @ ..] => {
+            // Execute base withdrawal preliminary
             let Some(address_str) = abi::string_parameter(input_data, 0) else {
                 log!(
                     handler.borrow_host(),
@@ -190,82 +311,32 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal());
             };
 
-            let Some(target) = Contract::from_b58check(address_str).ok() else {
+            let (base_withdraw, precompile_outcome) =
+                base_withdrawal_preliminary(handler, address_str.to_string(), transfer)?;
+
+            if let Some(precompile_outcome) = precompile_outcome {
+                return Ok(precompile_outcome);
+            }
+
+            let Some(WithdrawalBase {
+                ticketer,
+                base_transfer_value,
+                target,
+                withdrawal_id,
+                ticket,
+            }) = base_withdraw
+            else {
                 log!(
                     handler.borrow_host(),
                     Info,
-                    "Withdrawal precompiled contract: invalid target address string"
+                    "Withdrawal precompiled contract: failed to execute base withdrawal"
                 );
                 return Ok(revert_withdrawal());
             };
 
-            let amount = match mutez_from_wei(transfer.value) {
-                Ok(amount) => amount,
-                Err(ErrorMutezFromWei::NonNullRemainder) => {
-                    log!(
-                        handler.borrow_host(),
-                        Info,
-                        "Withdrawal precompiled contract: rounding would lose wei"
-                    );
-                    return Ok(revert_withdrawal());
-                }
-                Err(ErrorMutezFromWei::AmountTooLarge) => {
-                    log!(
-                        handler.borrow_host(),
-                        Info,
-                        "Withdrawal precompiled contract: amount is too large"
-                    );
-                    return Ok(revert_withdrawal());
-                }
-            };
-
-            // Burn the withdrawn amount
-            let mut withdrawal_precompiled =
-                handler.get_or_create_account(WITHDRAWAL_ADDRESS)?;
-            withdrawal_precompiled
-                .balance_remove(handler.borrow_host(), transfer.value)?;
-
-            log!(
-                handler.borrow_host(),
-                Info,
-                "Withdrawal of {} to {:?}",
-                amount,
-                target
-            );
-
-            let Some(ticketer) = read_ticketer(handler.borrow_host()) else {
-                log!(
-                    handler.borrow_host(),
-                    Info,
-                    "Withdrawal precompiled contract: failed to read ticketer"
-                );
-                return Ok(revert_withdrawal());
-            };
-
-            let Some(ticket) = FA2_1Ticket::new(
-                Contract::Originated(ticketer.clone()),
-                MichelsonPair(0.into(), MichelsonOption(None)),
-                amount,
-            )
-            .ok() else {
-                log!(
-                    handler.borrow_host(),
-                    Info,
-                    "Withdrawal precompiled contract: ticket amount is invalid"
-                );
-                return Ok(revert_withdrawal());
-            };
-
-            let mut system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
-            let withdrawal_id =
-                system.withdrawal_counter_get_and_increment(handler.borrow_host())?;
-
-            // We use the original amount in order not to lose additional information
-            let withdrawal_event =
-                event_log(&transfer.value, &context.caller, &target, withdrawal_id);
-
+            // Prepare the outbox message
             let parameters = MichelsonPair::<MichelsonContract, FA2_1Ticket>(
-                MichelsonContract(target),
+                MichelsonContract(target.clone()),
                 ticket,
             );
 
@@ -280,22 +351,15 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal());
             };
 
-            // TODO we need to measure number of ticks and translate this number into
-            // Ethereum gas units
+            // Emit log and return
+            let withdrawal_event = event_log(
+                &base_transfer_value,
+                &context.caller,
+                &target,
+                withdrawal_id,
+            );
 
-            let withdrawals = vec![message];
-
-            // Emit withdrawal event
-            handler.add_log(withdrawal_event).map_err(|e| {
-                EthereumError::WrappedError(Cow::from(format!("{:?}", e)))
-            })?;
-
-            Ok(PrecompileOutcome {
-                exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-                output: vec![],
-                withdrawals,
-                estimated_ticks,
-            })
+            emit_log_and_return(handler, message, estimated_ticks, withdrawal_event)
         }
         // "67a32cd7" is the function selector for `fast_withdraw_base58(string,string,bytes)`
         [0x67, 0xa3, 0x2c, 0xd7, input_data @ ..] => {
@@ -310,58 +374,31 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal());
             };
 
-            let Some(target) = Contract::from_b58check(address_str).ok() else {
+            // Execute base withdrawal preliminary
+            let (base_withdraw, precompile_outcome) =
+                base_withdrawal_preliminary(handler, address_str.to_string(), transfer)?;
+
+            if let Some(precompile_outcome) = precompile_outcome {
+                return Ok(precompile_outcome);
+            }
+
+            let Some(WithdrawalBase {
+                ticketer: _,
+                base_transfer_value,
+                target,
+                withdrawal_id,
+                ticket,
+            }) = base_withdraw
+            else {
                 log!(
                     handler.borrow_host(),
                     Info,
-                    "Withdrawal precompiled contract: invalid target address string"
+                    "Withdrawal precompiled contract: failed to execute base withdrawal"
                 );
                 return Ok(revert_withdrawal());
             };
 
-            let amount = match mutez_from_wei(transfer.value) {
-                Ok(amount) => amount,
-                Err(ErrorMutezFromWei::NonNullRemainder) => {
-                    log!(
-                        handler.borrow_host(),
-                        Info,
-                        "Withdrawal precompiled contract: rounding would lose wei"
-                    );
-                    return Ok(revert_withdrawal());
-                }
-                Err(ErrorMutezFromWei::AmountTooLarge) => {
-                    log!(
-                        handler.borrow_host(),
-                        Info,
-                        "Withdrawal precompiled contract: amount is too large"
-                    );
-                    return Ok(revert_withdrawal());
-                }
-            };
-
-            // Burn the withdrawn amount
-            let mut withdrawal_precompiled =
-                handler.get_or_create_account(WITHDRAWAL_ADDRESS)?;
-            withdrawal_precompiled
-                .balance_remove(handler.borrow_host(), transfer.value)?;
-
-            log!(
-                handler.borrow_host(),
-                Info,
-                "Withdrawal of {} to {:?}",
-                amount,
-                target
-            );
-
-            let Some(ticketer) = read_ticketer(handler.borrow_host()) else {
-                log!(
-                    handler.borrow_host(),
-                    Info,
-                    "Withdrawal precompiled contract: failed to read ticketer"
-                );
-                return Ok(revert_withdrawal());
-            };
-
+            // Prepare the outbox message
             let Some(fast_withdrawal) =
                 ContractKt1Hash::from_b58check(fast_withdrawal).ok()
             else {
@@ -374,51 +411,29 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal());
             };
 
-            let Some(ticket) = FA2_1Ticket::new(
-                Contract::Originated(ticketer.clone()),
-                MichelsonPair(0.into(), MichelsonOption(None)),
-                amount,
-            )
-            .ok() else {
+            let timestamp_u256 = handler.block_timestamp();
+
+            let Some(withdrawal_id_nat) =
+                MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id)))
+            else {
                 log!(
                     handler.borrow_host(),
                     Info,
-                    "Withdrawal precompiled contract: ticket amount is invalid"
+                    "Withdrawal precompiled contract: the withdrawal id is negative"
                 );
                 return Ok(revert_withdrawal());
             };
 
-            let mut system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
-            let withdrawal_id =
-                system.withdrawal_counter_get_and_increment(handler.borrow_host())?;
-
-            let timestamp_u256 = handler.block_timestamp();
-            let timestamp = Zarith(u256_to_bigint(handler.block_timestamp()));
-
-            // We use the original amount in order not to lose additional information
             let mut payload_event = payload.clone();
-
-            let withdrawal_event = event_log_fast_withdrawal(
-                &withdrawal_id,
-                &transfer.value, // in wei, uint256
-                &timestamp_u256,
-                &target,
-                &mut payload_event,
-            );
 
             let bytes_payload = MichelsonBytes(payload);
 
-            let withdrawal_id =
-                MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id))).unwrap(); // TODO unwrap
-
-            let timestamp: MichelsonTimestamp = MichelsonTimestamp(timestamp);
-
-            let contract_address = MichelsonContract(target);
-
-            log!(handler.borrow_host(), Info, "past contract address");
+            let timestamp: MichelsonTimestamp =
+                MichelsonTimestamp(Zarith(u256_to_bigint(timestamp_u256)));
+            let contract_address = MichelsonContract(target.clone());
 
             let parameters = MichelsonPair(
-                withdrawal_id,
+                withdrawal_id_nat,
                 MichelsonPair(
                     ticket,
                     MichelsonPair(
@@ -441,22 +456,16 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal());
             };
 
-            // TODO we need to measure number of ticks and translate this number into
-            // Ethereum gas units
+            // Emit log and return
+            let withdrawal_event = event_log_fast_withdrawal(
+                &withdrawal_id,
+                &base_transfer_value,
+                &timestamp_u256,
+                &target,
+                &mut payload_event,
+            );
 
-            let withdrawals = vec![message];
-
-            // Emit withdrawal event
-            handler.add_log(withdrawal_event).map_err(|e| {
-                EthereumError::WrappedError(Cow::from(format!("{:?}", e)))
-            })?;
-
-            Ok(PrecompileOutcome {
-                exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-                output: vec![],
-                withdrawals,
-                estimated_ticks,
-            })
+            emit_log_and_return(handler, message, estimated_ticks, withdrawal_event)
         }
         // TODO A contract "function" to do withdrawal to byte encoded address
         _ => {
