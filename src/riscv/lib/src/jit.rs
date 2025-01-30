@@ -134,8 +134,8 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
 
         for i in instr.iter() {
             match i.opcode {
-                OpCode::Nop => {
-                    let lower = OpCode::Nop.to_lowering()?;
+                opcode @ (OpCode::Nop | OpCode::Mv) => {
+                    let lower = opcode.to_lowering()?;
                     let pc_update = unsafe {
                         // # SAFETY: lower is called with args from the same instruction that it
                         // was derived
@@ -143,7 +143,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
                     };
 
                     let ProgramCounterUpdate::Next(width) = pc_update else {
-                        unreachable!("Nop bumps pc by instruction width");
+                        unreachable!("Nop/Mv bump pc by instruction width");
                     };
 
                     builder.pc_offset += width as u64;
@@ -245,7 +245,7 @@ mod tests {
     use crate::machine_state::block_cache::{Block, ICallLayout, ICallPlaced, CACHE_INSTR};
     use crate::machine_state::main_memory::tests::T1K;
     use crate::machine_state::{MachineCoreState, MachineCoreStateLayout};
-    use crate::parser::instruction::InstrCacheable;
+    use crate::parser::instruction::InstrWidth::*;
     use crate::state_backend::test_helpers::assert_eq_struct;
     use crate::state_backend::{
         AllocatedOf, EnrichedCell, FnManagerIdent, ManagerBase, ManagerReadWrite,
@@ -278,29 +278,30 @@ mod tests {
             &self.buff[..self.len]
         }
 
-        fn construct(&mut self, instr: &[InstrCacheable])
+        fn construct(&mut self, instr: &[Instruction])
         where
             M: ManagerReadWrite,
         {
             self.len = 0;
             for i in instr.iter() {
-                let i = i.into();
-                self.instr[self.len].write(i);
-                self.buff[self.len] = i;
+                self.instr[self.len].write(*i);
+                self.buff[self.len] = *i;
                 self.len += 1;
             }
         }
     }
 
     backend_test!(test_cnop, F, {
+        use Instruction as I;
+
         // Arrange
-        let scenarios: &[&[InstrCacheable]] = &[
-            &[InstrCacheable::CNop],
-            &[InstrCacheable::CNop, InstrCacheable::CNop],
+        let scenarios: &[&[I]] = &[
+            &[I::new_nop(Compressed)],
+            &[I::new_nop(Compressed), I::new_nop(Uncompressed)],
             &[
-                InstrCacheable::CNop,
-                InstrCacheable::CNop,
-                InstrCacheable::CNop,
+                I::new_nop(Uncompressed),
+                I::new_nop(Compressed),
+                I::new_nop(Uncompressed),
             ],
         ];
 
@@ -343,6 +344,74 @@ mod tests {
             );
 
             assert_eq!(interpreted_steps, scenario.len());
+
+            assert_eq_struct(
+                &interpreted.struct_ref::<FnManagerIdent>(),
+                &jitted.struct_ref::<FnManagerIdent>(),
+            );
+        }
+    });
+
+    backend_test!(test_cmv, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+        use Instruction as I;
+
+        // Arrange
+        let scenarios: &[&[I]] = &[
+            &[I::new_mv(x2, x1, Compressed)],
+            &[I::new_mv(x2, x1, Uncompressed)],
+            &[
+                I::new_mv(x2, x1, Compressed),
+                I::new_mv(x3, x2, Uncompressed),
+            ],
+        ];
+
+        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+
+        for scenario in scenarios {
+            let mut interpreted =
+                create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+
+            block.construct(scenario);
+
+            let mut interpreted_steps = 0;
+            let mut jitted_steps = 0;
+
+            let initial_pc = 0;
+            interpreted.hart.pc.write(initial_pc);
+            jitted.hart.pc.write(initial_pc);
+
+            interpreted.hart.xregisters.write_nz(x1, 1);
+            jitted.hart.xregisters.write_nz(x1, 1);
+
+            // Act
+            let fun = jit
+                .compile(block.as_slice())
+                .expect("Compilation of Mv should succeed");
+            let mut block = block.interpreted_block();
+
+            let interpreted_res =
+                block.run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+            let jitted_res = unsafe {
+                // # Safety - the jit is not dropped until after we
+                //            exit the for loop
+                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+            };
+
+            // Assert
+            assert_eq!(jitted_res, interpreted_res);
+            assert_eq!(
+            interpreted_steps, jitted_steps,
+            "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+            );
+
+            assert_eq!(interpreted_steps, scenario.len());
+
+            // every scenario expects x2 to be 1 after
+            assert_eq!(interpreted.hart.xregisters.read_nz(x2), 1);
+            assert_eq!(jitted.hart.xregisters.read_nz(x2), 1);
 
             assert_eq_struct(
                 &interpreted.struct_ref::<FnManagerIdent>(),
