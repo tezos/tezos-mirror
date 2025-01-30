@@ -2377,6 +2377,13 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let aliases = Option.value ~default:(Hashtbl.create 0) aliases in
   let versions = Option.value ~default:(Hashtbl.create 0) versions in
   let otel = Cloud.open_telemetry_endpoint cloud in
+  (* Adds monitoring for all agents for octez-dal-node and octez-node
+     TODO: monitor only specific agents for specific binaries *)
+  let* () =
+    Cloud.register_binary cloud ~group:"DAL" ~name:"octez-dal-node" ()
+  in
+  let* () = Cloud.register_binary cloud ~group:"L1" ~name:"octez-node" () in
+  let* () = Cloud.register_binary cloud ~name:"main.exe" () in
   Lwt.return
     {
       cloud;

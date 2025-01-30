@@ -43,3 +43,11 @@ val add_prometheus_source :
 val add_service : t -> name:string -> url:string -> unit Lwt.t
 
 val open_telemetry_endpoint : t -> string option
+
+val register_binary :
+  t ->
+  ?agents:Agent.t list ->
+  ?group:string ->
+  name:string ->
+  unit ->
+  unit Lwt.t

@@ -192,6 +192,16 @@ let prometheus_scrape_interval =
       "Set the scraping interval of the prometheus instance (default: 5)"
     5
 
+let process_monitoring =
+  Clap.flag
+    ~section
+    ~set_long:"process-monitoring"
+    ~unset_long:"no-process-monitoring"
+    ~description:
+      "Flag to set process monitoring through prometheus process exporter. \
+       Default is set when prometheus is set"
+    prometheus (* Automatically enable when enabling prometheus *)
+
 let website =
   Clap.flag
     ~section

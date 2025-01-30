@@ -273,7 +273,7 @@ resource "google_compute_firewall" "default" {
   # Enable access to Opentelemetry/Jaeger if enabled
   # 4317 used by Otel collector to receive observability data via gRPC
   # 55681 used by Otel collector to receive observability data via JSON
-  # 14250 used by Jaeger to accept data over  gRPC. 
+  # 14250 used by Jaeger to accept data over  gRPC.
   # 16686 Provides access to the Jaeger web UI for tracing visualization.
   allow {
     protocol = "tcp"
@@ -409,5 +409,5 @@ output "zone" {
 output "machine_type" {
   description = "Machine type"
   # All the instances have the same machine type
-  value = module.umig.instances_details[0].machine_type
+  value = length(module.umig.instances_details) > 0 ? module.umig.instances_details[0].machine_type : null
 }

@@ -159,3 +159,7 @@ val run_command :
 (** [dns_domains ()] returns a list of fully qualified domain names (FQDNs) based on current
     configuration (given by [Cli.dns_domains]) and [mode] of operation. *)
 val dns_domains : unit -> string list Lwt.t
+
+(** [process_monitoring] enable the monitoring of process through prometheus-process-exporter
+    needs to enable prometheus too *)
+val process_monitoring : bool

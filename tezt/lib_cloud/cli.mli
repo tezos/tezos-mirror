@@ -74,6 +74,9 @@ val prometheus_snapshots : (string * int option) list
 (** Specify the scraping interval of Prometheus. *)
 val prometheus_scrape_interval : int
 
+(** Enable monitoring of individual processes through prometheus-process-exporter *)
+val process_monitoring : bool
+
 (** When [website] is [true] (default) a website is up for summarizing various
     information related to the experiment. *)
 val website : bool

@@ -503,14 +503,22 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   | None ->
       let default_agent =
         let configuration = Agent.Configuration.make ~name:"default" () in
+        let next_available_port =
+          let cpt = ref 30_000 in
+          fun () ->
+            incr cpt ;
+            !cpt
+        in
+        let process_monitor =
+          if Env.process_monitoring then
+            Some (Process_monitor.init ~listening_port:(next_available_port ()))
+          else None
+        in
         Agent.make
           ~configuration
-          ~next_available_port:
-            (let cpt = ref 30_000 in
-             fun () ->
-               incr cpt ;
-               !cpt)
+          ~next_available_port
           ~name:configuration.name
+          ~process_monitor
           ()
       in
       f
@@ -599,16 +607,25 @@ let agents t =
         t.agents |> List.filter (fun agent -> Agent.name agent <> proxy_name)
       with
       | [] ->
-          let configuration = Agent.Configuration.make () in
+          let configuration = Proxy.make_config () in
+          let next_available_port =
+            let cpt = ref 30_000 in
+            fun () ->
+              incr cpt ;
+              !cpt
+          in
+          let process_monitor =
+            if Env.process_monitoring then
+              Some
+                (Process_monitor.init ~listening_port:(next_available_port ()))
+            else None
+          in
           let default_agent =
             Agent.make
               ~configuration
-              ~next_available_port:
-                (let cpt = ref 30_000 in
-                 fun () ->
-                   incr cpt ;
-                   !cpt)
+              ~next_available_port
               ~name:configuration.name
+              ~process_monitor
               ()
           in
           [default_agent]
@@ -658,3 +675,49 @@ let open_telemetry_endpoint t =
           let address = "localhost" in
           let port = 55681 in
           Some (Format.asprintf "http://%s:%d" address port))
+
+let get_agents = agents
+
+let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
+  if Env.process_monitoring then
+    let agents =
+      match agents with None -> get_agents cloud | Some agents -> agents
+    in
+    Lwt_list.iter_p
+      (fun agent ->
+        match Agent.process_monitor agent with
+        | None -> Lwt.return_unit
+        | Some process_monitor ->
+            let changed =
+              Process_monitor.add_binary process_monitor ~group ~name
+            in
+            if changed then
+              let* () =
+                Process_monitor.reload process_monitor (fun ~detach cmd args ->
+                    Agent.docker_run_command agent ~detach cmd args)
+              in
+              let app_name =
+                Format.asprintf
+                  "%s-prometheus-process-exporter"
+                  (Agent.name agent)
+              in
+              let target =
+                let address = agent |> Agent.runner |> Runner.address in
+                Prometheus.
+                  {
+                    address;
+                    port = Process_monitor.get_port process_monitor;
+                    app_name;
+                  }
+              in
+              (* Reload prometheus *)
+              let* () =
+                match cloud.prometheus with
+                | None -> Lwt.return_unit
+                | Some prometheus ->
+                    Prometheus.add_job prometheus ~name:app_name [target]
+              in
+              Lwt.return_unit
+            else Lwt.return_unit)
+      agents
+  else Lwt.return_unit
