@@ -43,5 +43,10 @@ val with_checkout_into_tmp :
   (checkout_result -> ('a, ([> `failed] as 'b) error) result) ->
   ('a, 'b error) result
 
+(** Test whether a string looks like a Git commit hash.
+
+    This does not check whether the commit actually exists. *)
+val is_a_commit_hash : string -> bool
+
 (** Run [git rev-parse] to get the commit hash from a Git reference. *)
 val rev_parse : string -> (string, [> `failed] error) result
