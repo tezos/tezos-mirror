@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -50,3 +51,10 @@ val setup_completed : unit -> unit Lwt.t
 (** [injecting_transactions nb] advertises [nb] transactions are about to be 
     injected to the relay endpoint with a batch of [eth_sendRawTransaction]. *)
 val injecting_transactions : int -> unit Lwt.t
+
+(** [deploy_erc20 address] advertises an ERC20 contract as been deployed at 
+    address [address]. *)
+val deploy_erc20 : string -> unit Lwt.t
+
+(** [rpc_error error] advertises an RPC produced the error [error]. *)
+val rpc_error : Rpc_encodings.JSONRPC.error -> unit Lwt.t

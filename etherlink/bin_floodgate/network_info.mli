@@ -2,14 +2,20 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  chain_id : Ethereum_types.quantity;
-  base_fee_per_gas : Z.t;
-  gas_limit : Z.t;
-}
+type t = {chain_id : Ethereum_types.quantity; base_fee_per_gas : Z.t}
 
-val fetch :
-  rpc_endpoint:Uri.t -> base_fee_factor:float -> Account.t -> t tzresult Lwt.t
+val fetch : rpc_endpoint:Uri.t -> base_fee_factor:float -> t tzresult Lwt.t
+
+val get_gas_limit :
+  ?data:Ethereum_types.hash ->
+  ?from:Ethereum_types.address ->
+  ?to_:Ethereum_types.address ->
+  ?value:Z.t ->
+  rpc_endpoint:Uri.t ->
+  base_fee_per_gas:Z.t ->
+  unit ->
+  Z.t tzresult Lwt.t

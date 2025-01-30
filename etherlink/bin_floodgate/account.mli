@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -31,9 +31,9 @@ type t = {
           transaction it has injected is accepted. *)
   mutable balance : Z.t;
       (** An underapproximation of the balance of an account, based on its
-          initial balance minus the fees and the funds it has transfered to
-          other addresses. This value is updated by the {!Tx_queue} every time
-          a transaction it has injected is accepted. *)
+      initial balance minus the fees and the funds it has transfered to
+      other addresses. This value is updated by the {!Tx_queue} every time
+      a transaction it has injected is accepted. *)
   public_key : Public_key.t;
   secret_key : Secret_key.t;
 }

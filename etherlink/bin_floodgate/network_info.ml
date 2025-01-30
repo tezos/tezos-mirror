@@ -2,14 +2,11 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  chain_id : Ethereum_types.quantity;
-  base_fee_per_gas : Z.t;
-  gas_limit : Z.t;
-}
+type t = {chain_id : Ethereum_types.quantity; base_fee_per_gas : Z.t}
 
 let get_chain_id ~evm_node_endpoint =
   let open Lwt_result_syntax in
@@ -38,7 +35,8 @@ let get_base_fee_per_gas ~rpc_endpoint =
   let (Qty base_fee_per_gas) = Stdlib.List.hd fee_history.base_fee_per_gas in
   return base_fee_per_gas
 
-let get_gas_limit ~base_fee_per_gas ~rpc_endpoint account =
+let get_gas_limit ?data ?from ?to_ ?(value = Z.one) ~rpc_endpoint
+    ~base_fee_per_gas () =
   let open Lwt_result_syntax in
   let* (Qty gas_limit) =
     Batch.call
@@ -46,23 +44,22 @@ let get_gas_limit ~base_fee_per_gas ~rpc_endpoint account =
       ~evm_node_endpoint:rpc_endpoint
       ~keep_alive:true
       ( {
-          from = Some (Account.address_et account);
-          to_ = Some (Account.address_et account);
+          from;
+          to_;
           gas = None;
           gasPrice = Some (Qty base_fee_per_gas);
-          value = Some (Qty Z.one);
-          data = None;
+          value = Some (Qty value);
+          data;
         },
         Latest )
   in
   return gas_limit
 
-let fetch ~rpc_endpoint ~base_fee_factor account =
+let fetch ~rpc_endpoint ~base_fee_factor =
   let open Lwt_result_syntax in
   let* chain_id = get_chain_id ~evm_node_endpoint:rpc_endpoint in
   let* base_fee_per_gas = get_base_fee_per_gas ~rpc_endpoint in
   let base_fee_per_gas =
     Z.(to_float base_fee_per_gas *. base_fee_factor |> of_float)
   in
-  let* gas_limit = get_gas_limit ~rpc_endpoint ~base_fee_per_gas account in
-  return {chain_id; base_fee_per_gas; gas_limit}
+  return {chain_id; base_fee_per_gas}
