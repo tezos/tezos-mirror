@@ -119,7 +119,10 @@ module Request = struct
     {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
 
   let eth_estimateGas ~eth_call ~block =
-    {method_ = "eth_estimateGas"; parameters = `A [`O eth_call; `String block]}
+    {
+      method_ = "eth_estimateGas";
+      parameters = `A [`O eth_call; block_param_to_json block];
+    }
 
   let eth_getTransactionCount ~address ~block =
     {
@@ -540,12 +543,12 @@ let get_transaction_receipt ?websocket ~tx_hash evm_node =
          |> Option.map Transaction.transaction_receipt_of_json)
        response
 
-let estimate_gas ?websocket eth_call evm_node =
+let estimate_gas ?websocket eth_call ?(block = Latest) evm_node =
   let* response =
     Evm_node.jsonrpc
       ?websocket
       evm_node
-      (Request.eth_estimateGas ~eth_call ~block:"latest")
+      (Request.eth_estimateGas ~eth_call ~block)
   in
   return
   @@ decode_or_error

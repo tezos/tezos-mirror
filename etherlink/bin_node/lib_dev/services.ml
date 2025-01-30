@@ -685,8 +685,8 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             in
             build_with_input ~f module_ parameters
         | Get_estimate_gas.Method ->
-            let f (call, _) =
-              let* result = Backend_rpc.estimate_gas call in
+            let f (call, block) =
+              let* result = Backend_rpc.estimate_gas call block in
               match result with
               | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
               | Ok (Ok {value = _; gas_used = None}) ->
