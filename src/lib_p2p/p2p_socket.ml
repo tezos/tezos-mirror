@@ -223,10 +223,12 @@ module Connection_message = struct
     in
     let buf = Bytes.unsafe_to_string buf in
     match Data_encoding.Binary.read encoding buf pos len with
-    | Error re -> tzfail (P2p_errors.Decoding_error re)
+    | Error re -> tzfail (Tezos_base.Data_encoding_wrapper.Decoding_error re)
     | Ok (next_pos, message) ->
         if next_pos <> pos + len then
-          tzfail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
+          tzfail
+            (Tezos_base.Data_encoding_wrapper.Decoding_error
+               Data_encoding.Binary.Extra_bytes)
         else
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/4604
 
@@ -275,10 +277,12 @@ module Metadata = struct
     let length = String.length buf in
     let encoding = metadata_config.P2p_params.conn_meta_encoding in
     match Data_encoding.Binary.read encoding buf 0 length with
-    | Error re -> tzfail (P2p_errors.Decoding_error re)
+    | Error re -> tzfail (Tezos_base.Data_encoding_wrapper.Decoding_error re)
     | Ok (read_len, message) ->
         if read_len <> length then
-          tzfail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
+          tzfail
+            (Tezos_base.Data_encoding_wrapper.Decoding_error
+               Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -358,10 +362,12 @@ module Ack = struct
     let buf = Bytes.unsafe_to_string buf in
     let length = String.length buf in
     match Data_encoding.Binary.read encoding buf 0 length with
-    | Error re -> tzfail (P2p_errors.Decoding_error re)
+    | Error re -> tzfail (Tezos_base.Data_encoding_wrapper.Decoding_error re)
     | Ok (read_len, message) ->
         if read_len <> length then
-          tzfail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
+          tzfail
+            (Tezos_base.Data_encoding_wrapper.Decoding_error
+               Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -490,7 +496,7 @@ module Reader = struct
             Events.(emit read_error)
               (st.conn.info.P2p_connection.Info.peer_id, err)
           in
-          tzfail (P2p_errors.Decoding_error err)
+          tzfail (Tezos_base.Data_encoding_wrapper.Decoding_error err)
       | Await decode_next_buf ->
           let* buf =
             Crypto.read_chunk

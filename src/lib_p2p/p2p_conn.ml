@@ -105,7 +105,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       worker_loop t callback
   | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
       Error_monad.cancel_with_exceptions t.canceler
-  | Error (P2p_errors.Decoding_error _ :: _) ->
+  | Error (Tezos_base.Data_encoding_wrapper.Decoding_error _ :: _) ->
       let* () = t.greylister ~motive:"decoding error" in
       Error_monad.cancel_with_exceptions t.canceler
   | Error (Canceled :: _) -> Lwt.return_unit
