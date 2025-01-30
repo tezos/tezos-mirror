@@ -2826,8 +2826,6 @@ dependencies = [
 [[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8954f27b00228b1fc669cddfa0e604a40adc5ee443002d3d31abdea0b911fcb6"
 dependencies = [
  "anyhow",
  "blst",
@@ -2853,8 +2851,6 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1fff433d41c778d27df21b91e766e182b05d9a7c1331e1156ee081273d704a4"
 dependencies = [
  "bit-vec",
  "bitvec",
@@ -2871,8 +2867,6 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding_derive"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f614c81c10c1ac47fdb792ce23e928591fca685d534260e073f83bc5d5f080e0"
 dependencies = [
  "lazy_static",
  "once_cell",

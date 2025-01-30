@@ -37,6 +37,7 @@ include Product (struct
       "opam";
       "script-inputs";
       "scripts";
+      "sdk/";
       "irmin/";
       "brassaia/";
       "rust-toolchain";
@@ -572,6 +573,7 @@ let octez_rust_deps =
               [S "source_tree"; S "src"];
               [S "source_tree"; S "../riscv"];
               [S "source_tree"; S "../kernel_sdk"];
+              [S "source_tree"; S "../../sdk/rust"];
             ];
             [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
           ];

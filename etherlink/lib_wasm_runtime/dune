@@ -22,5 +22,6 @@
   (source_tree ../../src/rustzcash_deps)
   (source_tree ../../src/rust_deps/wasmer-3.3.0)
   (source_tree ../../src/kernel_sdk)
+  (source_tree ../../sdk/rust)
   (source_tree src))
  (action (no-infer (bash ./build.sh))))

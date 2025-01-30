@@ -93,8 +93,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 tezos-smart-rollup = "0.2.2"
-tezos_data_encoding = "0.5"
-tezos_crypto_rs = { version = "0.5", default-features = false }
+tezos_data_encoding = "0.6"
+tezos_crypto_rs = { version = "0.6", default-features = false }
 nom = "7.1"
 
 [dev-dependencies]
