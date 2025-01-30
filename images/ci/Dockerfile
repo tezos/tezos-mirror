@@ -346,7 +346,11 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 RUN apk update \
  && apk add --no-cache curl npm git file make jq websocat \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
- procps-ng \
+    procps-ng \
+ ## Add npm from 3.21 main repository instead of 3.20 to get a newer version of nodejs.
+ ## Should solve related hanging problems  cf. https://github.com/npm/cli/issues/4028
+ ## Notes: npm is in community, node in main. npm version is currently identical in 3.20 and 3.21
+ && apk add npm --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main \
  # We need datadog-ci to send JUnit files to Datadog in tezt
  # jobs. Cf. [scripts/ci/tezt.sh].
  # Version number should be kept in sync with the one of the
