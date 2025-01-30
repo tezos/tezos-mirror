@@ -37,6 +37,7 @@
 ### Installer client/kernel
 
 - Add support for using the `set` instruction with large (> 512 byte) values.
+- Add `merge-setup-files` subcommand to merge multiple configuration files in one.
 
 ## Version 0.2.2
 
