@@ -202,9 +202,13 @@ module Plugin = struct
                 | Receipt (Operation_metadata operation_metadata) -> (
                     match operation_metadata.contents with
                     | Single_result (Attestation_result result) ->
+                        let delegate =
+                          Tezos_crypto.Signature.Of_V1.public_key_hash
+                            result.delegate
+                        in
                         Some
                           ( tb_slot,
-                            Some result.delegate,
+                            Some delegate,
                             packed_operation,
                             dal_attestation )
                     | _ ->
@@ -226,8 +230,9 @@ module Plugin = struct
     in
     List.fold_left
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
-        Signature.Public_key_hash.Map.add delegate indexes acc)
-      Signature.Public_key_hash.Map.empty
+        let delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate in
+        Tezos_crypto.Signature.Public_key_hash.Map.add delegate indexes acc)
+      Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
   let dal_attestation (block : block_info) =
@@ -247,6 +252,7 @@ module Plugin = struct
 
   let is_delegate ctxt ~pkh =
     let open Lwt_result_syntax in
+    let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     (* We just want to know whether <pkh> is a delegate. We call
        'context/delegates/<pkh>/deactivated' just because it should be cheaper

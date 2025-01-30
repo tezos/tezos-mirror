@@ -830,7 +830,7 @@ let sources_from_operation ctxt
           []
           committee
       in
-      return sources
+      return @@ map_pkh_env sources
   | Single (Seed_nonce_revelation _)
   | Single (Double_preattestation_evidence _)
   | Single (Double_attestation_evidence _)
