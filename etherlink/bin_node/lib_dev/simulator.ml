@@ -215,14 +215,11 @@ module Make (SimulationBackend : SimulationBackend) = struct
     | Ok (Ok {gas_used = None; _}) ->
         failwith "Internal error: gas used is missing from simulation"
 
-  let estimate_gas call =
+  let estimate_gas call block =
     let open Lwt_result_syntax in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7376
-
-       Gas estimation currently ignores the block parameter. When this is fixed,
-       we need to give the block parameter to the call to
-       {!simulation_version}. *)
-    let* simulation_state = SimulationBackend.get_state () in
+    let* simulation_state =
+      SimulationBackend.get_state ~block:(Block_parameter block) ()
+    in
     let timestamp = Misc.now () in
     let* (Qty maximum_gas_per_transaction) =
       Durable_storage.maximum_gas_per_transaction

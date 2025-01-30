@@ -40,7 +40,9 @@ module Request : sig
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
 
   val eth_estimateGas :
-    eth_call:(string * Ezjsonm.value) list -> block:string -> Evm_node.request
+    eth_call:(string * Ezjsonm.value) list ->
+    block:block_param ->
+    Evm_node.request
 
   val eth_getTransactionCount :
     address:string -> block:string -> Evm_node.request
@@ -225,6 +227,7 @@ val get_transaction_receipt :
 val estimate_gas :
   ?websocket:Websocket.t ->
   (string * Ezjsonm.value) list ->
+  ?block:block_param ->
   Evm_node.t ->
   (int64, error) result Lwt.t
 

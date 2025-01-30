@@ -2151,9 +2151,10 @@ let test_inject_100_transactions =
        hasn't changed" ;
   unit
 
-let check_estimate_gas {evm_node; _} eth_call expected_gas =
+let check_estimate_gas {evm_node; _} eth_call ?(block = Rpc.Latest) expected_gas
+    =
   (* Make the call to the EVM node. *)
-  let*@ r = Rpc.estimate_gas eth_call evm_node in
+  let*@ r = Rpc.estimate_gas eth_call evm_node ~block in
   (* Check the RPC result. *)
   Check.((r >= expected_gas) int64)
     ~error_msg:"Expected result greater than %R, but got %L" ;

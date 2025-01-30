@@ -9694,6 +9694,44 @@ let test_rpc_getLogs_with_earliest_fail =
   Check.((List.length empty_logs = 0) int) ~error_msg:"Expected %R logs, got %L" ;
   unit
 
+let test_estimate_gas_with_block_param =
+  register_all
+    ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
+    ~title:"eth_estimateGas with block parameter"
+  @@ fun {sequencer; _} _protocol ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* gas_consumer = Solidity_contracts.even_block_gas_consumer () in
+  let* () =
+    Eth_cli.add_abi ~label:gas_consumer.label ~abi:gas_consumer.abi ()
+  in
+  let* address_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:gas_consumer.label
+         ~bin:gas_consumer.bin)
+      sequencer
+  in
+  let* data =
+    Eth_cli.encode_method ~abi_label:gas_consumer.label ~method_:"consume()" ()
+  in
+  let call_params =
+    [
+      ("from", `String sender.address);
+      ("to", `String address_contract);
+      ("input", `String data);
+    ]
+  in
+  let* _ = produce_block sequencer in
+  (* Estimate_gas to does it's estimations on a block about to be minted so if we run it on block `N` the solidity code execute itself with block.number = `N`+ 1 *)
+  let*@ evenGasCost =
+    Rpc.estimate_gas call_params sequencer ~block:(Number 1)
+  in
+  let*@ oddGasCost = Rpc.estimate_gas call_params sequencer ~block:(Number 2) in
+  Check.((evenGasCost > oddGasCost) int64 ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -9825,5 +9863,6 @@ let () =
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
   test_init_config_mainnet "mainnet" ;
   test_init_config_mainnet "testnet" ;
+  test_estimate_gas_with_block_param protocols ;
   test_filling_max_slots_cant_lead_to_out_of_memory protocols ;
   test_rpc_getLogs_with_earliest_fail protocols
