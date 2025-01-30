@@ -35,9 +35,12 @@ RELEASES=$*
 
 for release in $RELEASES; do # unstable, jammy, focal ...
   for file in packages/"${DISTRIBUTION}/${release}"/*.deb; do
-    echo "Lintian package $file"
-    lintian "$file" --tag-display-limit 0 --verbose --allow-root
+    (
+      echo "Lintian package $file"
+      lintian "$file" --tag-display-limit 0 --verbose --allow-root
+    ) &
   done
+  wait
 done
 
 if [ ${#FAILED_FILES[@]} -ne 0 ]; then
