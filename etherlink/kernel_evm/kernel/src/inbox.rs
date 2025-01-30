@@ -1427,6 +1427,7 @@ mod tests {
             number: 7.into(),
             nb_chunks: 3,
             chunk_index: 0,
+            chain_id: None,
         };
         let is_valid =
             insert_blueprint_and_read_inbox(head_level, &valid_sk, &pk, &blueprint);

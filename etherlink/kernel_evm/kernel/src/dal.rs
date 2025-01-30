@@ -280,6 +280,7 @@ pub mod tests {
                 nb_chunks: nb_chunks as u16,
                 number,
                 chunk_index: chunk_index as u16,
+                chain_id: None,
             })
             .collect()
     }
