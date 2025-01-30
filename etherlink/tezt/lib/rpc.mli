@@ -116,6 +116,7 @@ val get_logs :
   ?to_block:block_param ->
   ?address:Request.address ->
   ?topics:string list list ->
+  ?block_hash:string ->
   Evm_node.t ->
   (Transaction.tx_log list, error) result Lwt.t
 

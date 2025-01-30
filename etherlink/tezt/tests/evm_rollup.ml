@@ -4292,6 +4292,26 @@ let test_rpc_getLogs =
   Check.((List.length tx1_block_logs = 1) int)
     ~error_msg:"Expected %R logs, got %L" ;
   (* Check no logs after transactions *)
+  (* Check that get_logs using a block hash returns the same logs as get_logs using a block number *)
+  let*@ b = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let*@ logs_by_block_hash =
+    Rpc.get_logs ~block_hash:b.hash ~address:(Single address) evm_node
+  in
+  let*@ logs_by_number =
+    Rpc.get_logs ~from_block:Latest ~to_block:Latest evm_node
+  in
+  Check.((List.length logs_by_number = 1) int)
+    ~error_msg:"Expected %R logs, got %L" ;
+  Check.((List.length logs_by_block_hash = List.length logs_by_number) int)
+    ~error_msg:"Expected %R logs, got %L" ;
+  let logs_by_block_hash =
+    List.map Transaction.extract_log_body logs_by_block_hash
+  in
+  let logs_by_number = List.map Transaction.extract_log_body logs_by_number in
+  Check.(
+    (logs_by_block_hash = logs_by_number)
+      (list (tuple3 string (list string) string)))
+    ~error_msg:"Expected logs %R, got %L" ;
   let*@ _ = produce_block () in
   let*@ no_logs_start = Rpc.block_number evm_node in
   let*@ new_logs =

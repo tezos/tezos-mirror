@@ -93,7 +93,8 @@ let validate_range log_filter_config
     (module Rollup_node_rpc : Services_backend_sig.S) (filter : Filter.t) =
   let open Lwt_result_syntax in
   match filter with
-  | {from_block = Some _; to_block = Some _; block_hash = Some _; _} ->
+  | {block_hash = Some _; from_block = Some _; _}
+  | {block_hash = Some _; to_block = Some _; _} ->
       tzfail Incompatible_block_params
   | {block_hash = Some block_hash; _} ->
       let* block =
