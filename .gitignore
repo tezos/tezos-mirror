@@ -14,6 +14,7 @@ __pycache__
 /_snoop
 /node_modules
 /_opam-repo-for-releases/
+/_tobi/
 
 /test_results
 

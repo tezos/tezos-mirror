@@ -31,3 +31,17 @@ type t = {
 
 (** Load the definition of a component for a given version. *)
 val load : string -> Version.t -> (t, [> `failed]) r
+
+(** Get the cache directory for a component.
+
+    The result is of the form [_tobi/cache/NAME/COMMIT_HASH].
+
+    Fails on [Dev] versions because there is no commit hash for them. *)
+val relative_cache_dir : t -> (string, [> `failed] error) result
+
+(** Test whether a component is available in the cache.
+
+    This checks that the [.install] file exists in [relative_cache_dir].
+    This thus assumes that the current directory is the root of the repository,
+    and that the cache is not brocken. *)
+val available_in_cache : t -> (bool, [> `failed] error) result

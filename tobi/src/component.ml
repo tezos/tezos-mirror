@@ -107,3 +107,18 @@ let load_cached = memoize load_not_cached
 (* The [memoize] function is made for functions with one argument, not two.
    We just have to uncurry. *)
 let load name version = load_cached (name, version)
+
+let relative_cache_dir {name; version; _} =
+  match version with
+  | Dev ->
+      fail
+        "failed to get cache directory for %s"
+        name
+        ~reason:["no cache directory for development versions"]
+  | Old version ->
+      let* commit_hash = Git.rev_parse version in
+      Ok ("_tobi/cache" // name // commit_hash)
+
+let available_in_cache component =
+  let* cache_dir = relative_cache_dir component in
+  Ok (Sys.file_exists (cache_dir // (component.name ^ ".install")))
