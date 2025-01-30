@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Bug fixes
+
+#### RPCs
+
+- `eth_estimateGas` now correctly interprets the block parameter. (!16423)
+- `eth_getLogs` now properly supports the [EIP-234](https://eips.ethereum.org/EIPS/eip-234)
+  introducing the `blockHash` parameter. (!16460)
+- `eth_getLogs` now returns an empty array instead of an error when `fromBlock` is greater than `toBlock`.
+
 ### Features
 
 ### Bug fixes
@@ -67,15 +76,8 @@ you start using them, you probably want to use `octez-evm-node check config
 
 - `eth_getLogs` now accepts `null` as a valid value for the `topics` parameter.
   (!16357)
-
 - `eth_getLogs` now correctly interprets block numbers like `earliest`,
   `finalized`, etc. They were all defaulting to `latest` before. (!16372)
-- `eth_estimateGas` now correctly interprets the block parameter. (!16423)
-
-- `eth_getLogs` now properly supports the [EIP-234](https://eips.ethereum.org/EIPS/eip-234)
-  introducing the `blockHash` parameter. (!16460)
-
-- `eth_getLogs` now returns an empty array instead of an error when `fromBlock` is greater than `toBlock`.
 
 ## Version 0.14 (2025-01-21)
 
