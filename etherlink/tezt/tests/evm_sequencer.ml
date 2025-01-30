@@ -9678,9 +9678,7 @@ let test_rpc_getLogs_with_earliest_fail =
         unit)
   in
   let*@ get_logs_using_number = Rpc.get_logs ~from_block:(Number 0) sequencer in
-  let*@ get_logs_using_earliest =
-    Rpc.get_logs ~from_block:Earliest ~to_block:Latest sequencer
-  in
+  let*@ get_logs_using_earliest = Rpc.get_logs ~from_block:Earliest sequencer in
   Check.(
     (List.length get_logs_using_number = nb_generated_logs)
       int
@@ -9689,6 +9687,11 @@ let test_rpc_getLogs_with_earliest_fail =
     (List.length get_logs_using_earliest = List.length get_logs_using_number)
       int
       ~error_msg:"Expected %R logs using Earliest as from_block, got %L") ;
+  (* Check that when from > to we get an empty list *)
+  let*@ empty_logs =
+    Rpc.get_logs ~from_block:Latest ~to_block:Earliest sequencer
+  in
+  Check.((List.length empty_logs = 0) int) ~error_msg:"Expected %R logs, got %L" ;
   unit
 
 let protocols = Protocol.all

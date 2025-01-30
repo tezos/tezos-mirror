@@ -96,7 +96,11 @@ module Qty = struct
 
   let zero = Qty Z.zero
 
-  let ( = ) (Qty z) (Qty z') = Compare.Z.(z = z')
+  let compare (Qty a) (Qty b) = Compare.Z.compare a b
+
+  let ( < ) a b = compare a b < 0
+
+  let ( = ) a b = compare a b = 0
 end
 
 let quantity_of_z z = Qty z
