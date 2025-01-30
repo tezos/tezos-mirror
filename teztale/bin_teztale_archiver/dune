@@ -108,30 +108,30 @@
 (rule
  (target PsQuebec_machine.real.ml)
  (mode fallback)
- (deps beta_machine.real.ml)
+ (deps next_machine.real.ml)
  (action
   (progn
-   (copy beta_machine.real.ml PsQuebec_machine.real.ml)
+   (copy next_machine.real.ml PsQuebec_machine.real.ml)
    (run
     sed
-    -i.bak -e s/Tezos_client_beta/Tezos_client_PsQuebec/g -e
-    s/Tezos_protocol_beta/Tezos_protocol_PsQuebec/g -e
-    s/Tezos_protocol_plugin_beta/Tezos_protocol_plugin_PsQuebec/g
+    -i.bak -e s/Tezos_client_next/Tezos_client_PsQuebec/g -e
+    s/Tezos_protocol_next/Tezos_protocol_PsQuebec/g -e
+    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PsQuebec/g
     PsQuebec_machine.real.ml))))
 
 (rule
- (target beta_machine.real.ml)
+ (target next_machine.real.ml)
  (mode fallback)
  (deps alpha_machine.real.ml)
  (action
   (progn
-   (copy alpha_machine.real.ml beta_machine.real.ml)
+   (copy alpha_machine.real.ml next_machine.real.ml)
    (run
     sed
-    -i.bak -e s/Tezos_client_alpha/Tezos_client_beta/g -e
-    s/Tezos_protocol_alpha/Tezos_protocol_beta/g -e
-    s/Tezos_protocol_plugin_alpha/Tezos_protocol_plugin_beta/g
-    beta_machine.real.ml))))
+    -i.bak -e s/Tezos_client_alpha/Tezos_client_next/g -e
+    s/Tezos_protocol_alpha/Tezos_protocol_next/g -e
+    s/Tezos_protocol_plugin_alpha/Tezos_protocol_plugin_next/g
+    next_machine.real.ml))))
 
 (rule (action (write-file alpha_machine.no.ml "module M = struct end")))
 
