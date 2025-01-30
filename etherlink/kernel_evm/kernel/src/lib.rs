@@ -20,8 +20,7 @@ use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use storage::{
-    read_chain_id, read_da_fee, read_kernel_version, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, read_minimum_base_fee_per_gas,
+    read_chain_id, read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas,
     read_tracer_input, store_chain_id, store_da_fee, store_kernel_version,
     store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
     STORAGE_VERSION_PATH,
@@ -36,7 +35,6 @@ use tezos_smart_rollup::outbox::{
     OutboxMessage, OutboxMessageWhitelistUpdate, OUTBOX_QUEUE,
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
-use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::runtime::ValueType;
 
 mod apply;
@@ -114,20 +112,6 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
     init_storage_versioning(host)?;
     switch_to_public_rollup(host)?;
     storage_migration(host)
-}
-
-/// Returns the current timestamp for the execution. Based on the last
-/// info per level read (or default timestamp if it was not set), plus the
-/// artifical average block time.
-pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
-    let timestamp =
-        read_last_info_per_level_timestamp(host).unwrap_or_else(|_| Timestamp::from(0));
-    let (numbers, total) =
-        read_last_info_per_level_timestamp_stats(host).unwrap_or((1i64, 0i64));
-    let average_block_time = total / numbers;
-    let seconds = timestamp.i64() + average_block_time;
-
-    Timestamp::from(seconds)
 }
 
 // DO NOT RENAME: function name is used during benchmark

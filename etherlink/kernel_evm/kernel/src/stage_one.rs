@@ -8,11 +8,11 @@ use crate::blueprint_storage::{store_immediate_blueprint, store_inbox_blueprint}
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
 };
-use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
 use crate::event::Event;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::inbox::{ProxyInboxContent, StageOneStatus};
+use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -20,6 +20,7 @@ use tezos_ethereum::block::L2Block;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 
 pub fn fetch_proxy_blueprints<Host: Runtime>(
@@ -36,7 +37,8 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
         enable_fa_bridge,
         garbage_collect_blocks,
     )? {
-        let timestamp = current_timestamp(host);
+        let timestamp =
+            read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let blueprint = Blueprint {
             transactions,
             timestamp,
@@ -53,7 +55,7 @@ fn fetch_delayed_transactions<Host: Runtime>(
     host: &mut Host,
     delayed_inbox: &mut DelayedInbox,
 ) -> anyhow::Result<()> {
-    let timestamp = current_timestamp(host);
+    let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number for the first forced blueprint
     let base = crate::blueprint_storage::read_next_blueprint_number(host)?;
     // Accumulator of how many blueprints we fetched
