@@ -47,12 +47,20 @@ let () =
     (function No_plugin_for_proto {proto_hash} -> Some proto_hash | _ -> None)
     (fun proto_hash -> No_plugin_for_proto {proto_hash})
 
+let last_failed_protocol = ref None
+
 let resolve_plugin_by_hash proto_hash =
   let open Lwt_result_syntax in
   let plugin_opt = Dal_plugin.get proto_hash in
   match plugin_opt with
   | None ->
-      let*! () = Event.emit_no_protocol_plugin ~proto_hash in
+      let*! () =
+        match !last_failed_protocol with
+        | Some hash when Protocol_hash.equal hash proto_hash -> Lwt.return_unit
+        | _ ->
+            last_failed_protocol := Some proto_hash ;
+            Event.emit_no_protocol_plugin ~proto_hash
+      in
       tzfail (No_plugin_for_proto {proto_hash})
   | Some plugin ->
       let*! () = Event.emit_protocol_plugin_resolved ~proto_hash in

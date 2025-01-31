@@ -903,6 +903,30 @@ let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
   let*! () = Event.emit_l1_node_bootstrapped () in
   return_unit
 
+let wait_for_block_with_plugin (cctxt : Rpc_context.t) =
+  let open Lwt_result_syntax in
+  let*! () = Event.emit_waiting_known_plugin () in
+  let* stream, stop = Monitor_services.heads cctxt `Main in
+  let rec wait_for_level () =
+    let*! head_opt = Lwt_stream.get stream in
+    match head_opt with
+    | None -> failwith "Lost the connection with the L1 node"
+    | Some (_hash, header) -> (
+        let*! res =
+          Proto_plugins.resolve_plugin_for_level
+            cctxt
+            ~level:header.Block_header.shell.level
+        in
+        match res with
+        | Error [Proto_plugins.No_plugin_for_proto _] -> wait_for_level ()
+        | Error err ->
+            failwith "Unexpected error: %a" Error_monad.pp_print_trace err
+        | Ok (module Plugin : Dal_plugin.T) ->
+            let () = stop () in
+            return (header, (module Plugin : Dal_plugin.T)))
+  in
+  wait_for_level ()
+
 (* This function checks that in case the history mode is Rolling with a custom
    number of blocks, these number of blocks are sufficient. *)
 let check_history_mode config profile_ctxt proto_parameters =
@@ -1311,15 +1335,14 @@ let run ~data_dir ~configuration_override =
         Gossipsub.Transport_layer.shutdown transport_layer)
   in
   (* Get the current L1 head and its DAL plugin and parameters. *)
-  let* header = Shell_services.Blocks.Header.shell_header cctxt () in
-  let head_level = header.Block_header.level in
-  let* (module Plugin : Dal_plugin.T) =
-    Proto_plugins.resolve_plugin_for_level cctxt ~level:head_level
+  let* header, (module Plugin : Dal_plugin.T) =
+    wait_for_block_with_plugin cctxt
   in
+  let head_level = header.Block_header.shell.level in
   let proto_plugins =
     Proto_plugins.singleton
       ~first_level:head_level
-      ~proto_level:header.proto_level
+      ~proto_level:header.shell.proto_level
       (module Plugin)
   in
   let* proto_parameters =
