@@ -361,6 +361,15 @@ impl<
         )
     }
 
+    /// Provide reveal data in response to a reveal request.
+    /// Returns `false` if the machine is not expecting a reveal.
+    pub fn provide_reveal_response(&mut self, reveal_data: &[u8]) -> bool
+    where
+        M: state_backend::ManagerReadWrite,
+    {
+        sbi::provide_reveal_response(&mut self.status, &mut self.machine_state, reveal_data)
+    }
+
     /// Get the current machine status.
     pub fn status(&self) -> PvmStatus
     where
@@ -591,6 +600,102 @@ mod tests {
         assert_eq!(pvm.status(), PvmStatus::WaitingForReveal);
 
         // After ECALL the reveal_request field should be set correctly
-        assert_eq!(pvm.reveal_request.to_vec(), buffer)
+        assert_eq!(pvm.reveal_request.to_vec(), buffer);
+
+        const REVEAL_DATA_SIZE: usize = 1000;
+        let reveal_data = [1u8; REVEAL_DATA_SIZE];
+
+        // Handle Reveal successfully
+        let outcome = pvm.provide_reveal_response(&reveal_data);
+        assert!(outcome, "Failed to provide reveal data to the PVM");
+
+        // After the reveal the size of the data revealed should be written to a0
+        assert_eq!(
+            pvm.machine_state.core.hart.xregisters.read(a0) as usize,
+            REVEAL_DATA_SIZE
+        );
+
+        let mut reveal_result_buffer = [0u8; REVEAL_DATA_SIZE];
+
+        pvm.machine_state
+            .core
+            .main_memory
+            .read_all(output_address, &mut reveal_result_buffer)
+            .unwrap();
+
+        // Reveal data returned correctly
+        assert_eq!(reveal_result_buffer, reveal_data);
+    });
+
+    backend_test!(test_reveal_insufficient_buffer_size, F, {
+        type ML = M1M;
+        type L = PvmLayout<ML, TestCacheLayouts>;
+
+        // Setup PVM
+        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts);
+        pvm.reset();
+
+        const OUTPUT_BUFFER_SIZE: usize = 10;
+        let input_address = main_memory::FIRST_ADDRESS;
+        let buffer = [1u8, 2, 3, 4];
+        let output_address = input_address + buffer.len() as u64;
+
+        let xregisters = &mut pvm.machine_state.core.hart.xregisters;
+
+        // Configure machine for 'sbi_tezos_reveal'
+        xregisters.write(a7, SBI_FIRMWARE_TEZOS);
+
+        xregisters.write(a6, SBI_TEZOS_REVEAL);
+
+        xregisters.write(a0, input_address);
+
+        xregisters.write(a1, buffer.len() as u64);
+
+        xregisters.write(a2, output_address);
+
+        xregisters.write(a3, OUTPUT_BUFFER_SIZE as u64);
+
+        pvm.machine_state
+            .core
+            .main_memory
+            .write_all(input_address, &buffer)
+            .unwrap();
+
+        assert_eq!(pvm.status(), PvmStatus::Evaluating);
+
+        // Handle the ECALL successfully
+        let outcome =
+            pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
+        assert!(!outcome);
+
+        // After the ECALL we should be waiting for reveal
+        assert_eq!(pvm.status(), PvmStatus::WaitingForReveal);
+
+        // After ECALL the reveal_request field should be set correctly
+        assert_eq!(pvm.reveal_request.to_vec(), buffer);
+
+        const REVEAL_DATA_SIZE: usize = 1000;
+        let reveal_data = [1u8; REVEAL_DATA_SIZE];
+
+        // Handle Reveal successfully
+        let outcome = pvm.provide_reveal_response(&reveal_data);
+        assert!(outcome, "Failed to provide reveal data to the PVM");
+
+        // After the reveal the size of the data revealed should be written to a0
+        assert_eq!(
+            pvm.machine_state.core.hart.xregisters.read(a0) as usize,
+            OUTPUT_BUFFER_SIZE
+        );
+
+        let mut reveal_result_buffer = [0u8; OUTPUT_BUFFER_SIZE];
+
+        pvm.machine_state
+            .core
+            .main_memory
+            .read_all(output_address, &mut reveal_result_buffer)
+            .unwrap();
+
+        // Reveal data returned correctly
+        assert_eq!(reveal_result_buffer, reveal_data[..OUTPUT_BUFFER_SIZE]);
     });
 }

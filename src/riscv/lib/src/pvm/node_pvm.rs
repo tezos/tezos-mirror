@@ -300,6 +300,21 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
             state.tick.write(state.tick.read() + 1);
         })
     }
+
+    /// Set reveal data reponse to pvm state
+    pub fn set_reveal_response(&mut self, reveal_data: &[u8])
+    where
+        M: state_backend::ManagerReadWrite,
+    {
+        self.with_backend_mut(|state| {
+            assert!(
+                state.pvm.provide_reveal_response(reveal_data),
+                "Cannot accept reveal in current state ({})",
+                state.pvm.status()
+            );
+            state.tick.write(state.tick.read() + 1);
+        })
+    }
 }
 
 #[derive(Error, Debug)]
