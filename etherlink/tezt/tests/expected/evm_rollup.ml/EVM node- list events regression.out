@@ -1054,7 +1054,7 @@ blueprint_injection:
       string
 
 blueprint_application:
-  description: Head is now {level}, applied in {process_time}
+  description: Head is now {level}, applied in {process_time}{timestamp}
   level: notice
   section: evm_node.dev
   json format:
