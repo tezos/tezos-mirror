@@ -201,10 +201,10 @@ let pp_file_size fmt size =
       (size / (power / 10) mod 10)
       unit
   in
-  if size / 1_000_000_000 > 0 then pp "GBytes" 1_000_000_000
-  else if size / 1_000_000 > 0 then pp "MBytes" 1_000_000
-  else if size / 1_000 > 0 then pp "KBytes" 1_000
-  else Format.fprintf fmt "%dbytes" size
+  if size / 1_000_000_000 > 0 then pp "GB" 1_000_000_000
+  else if size / 1_000_000 > 0 then pp "MB" 1_000_000
+  else if size / 1_000 > 0 then pp "kB" 1_000
+  else Format.fprintf fmt "%dB" size
 
 let downloading_file =
   Internal_event.Simple.declare_2
