@@ -46,7 +46,7 @@ gitlab_upload() {
   url="${3-${gitlab_octez_package_url}}"
 
   # Upload only if not running in dry-run
-  if [ -z "$dry_run" ]; then
+  if [ -z "${dry_run:-}" ]; then
 
     echo "Upload to ${url}/${remote_file}"
 
