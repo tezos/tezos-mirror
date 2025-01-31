@@ -41,7 +41,13 @@ where
     /// Adds the values in registers `rd_rs1` and `rs2` then sign-extends the
     /// lower 32 bits of the sum and writes the result to register `rd_rs1`.
     pub fn run_caddw(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        self.run_addw(rd_rs1, rs2, rd_rs1)
+        // We do not need to explicitly truncate for the lower bits since wrapping_add
+        // has the same semantics & result on the lower 32 bits irrespective of bit width
+        let lhs = self.read(rd_rs1);
+        let rhs = self.read(rs2);
+        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+        let result = lhs.wrapping_add(rhs) as i32 as u64;
+        self.write(rd_rs1, result)
     }
 
     /// `C.SUBW` CA-type compressed instruction
@@ -50,7 +56,13 @@ where
     /// then sign-extends the lower 32 bits of the difference and writes
     /// the result to register `rd_rs1`.
     pub fn run_csubw(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        self.run_subw(rd_rs1, rs2, rd_rs1)
+        // We do not need to explicitly truncate for the lower bits since wrapping_sub
+        // has the same semantics & result on the lower 32 bits irrespective of bit width
+        let lhs = self.read(rd_rs1);
+        let rhs = self.read(rs2);
+        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+        let result = lhs.wrapping_sub(rhs) as i32 as u64;
+        self.write(rd_rs1, result)
     }
 }
 

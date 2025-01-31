@@ -11,7 +11,7 @@ use crate::{
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
         mode::Mode,
-        registers::{XRegister, XRegisters},
+        registers::{NonZeroXRegister, XRegister, XRegisters},
         MachineCoreState, ProgramCounterUpdate,
     },
     parser::instruction::{FenceSet, InstrWidth},
@@ -37,124 +37,124 @@ where
     /// `ADD` R-type instruction
     ///
     /// Perform val(rs1) + val(rs2) and store the result in `rd`
-    pub fn run_add(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_add(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         let lhs = self.read(rs1);
         let rhs = self.read(rs2);
         // Wrapped addition in two's complement behaves the same for signed and unsigned
         let result = lhs.wrapping_add(rhs);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `SUB` R-type instruction
     ///
     /// Perform val(rs1) - val(rs2) and store the result in `rd`
-    pub fn run_sub(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_sub(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         let lhs = self.read(rs1);
         let rhs = self.read(rs2);
         // Wrapped subtraction in two's complement behaves the same for signed and unsigned
         let result = lhs.wrapping_sub(rhs);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `LUI` U-type instruction
     ///
     /// Set the upper 20 bits of the `rd` register with the `U-type` formatted immediate `imm`
-    pub fn run_lui(&mut self, imm: i64, rd: XRegister) {
+    pub fn run_lui(&mut self, imm: i64, rd: NonZeroXRegister) {
         // Being a `U-type` operation, the immediate is correctly formatted
         // (lower 12 bits cleared and the value is sign-extended)
-        self.write(rd, imm as u64);
+        self.write_nz(rd, imm as u64);
     }
 
     /// `ANDI` I-type instruction
     ///
     /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
-    pub fn run_andi(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_andi(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         let result = self.read(rs1) & (imm as u64);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `ORI` I-type instruction
     ///
     /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
-    pub fn run_ori(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_ori(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         let result = self.read(rs1) | (imm as u64);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `XORI` I-type instruction
     ///
     /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
-    pub fn run_xori(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_xori(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         let result = self.read(rs1) ^ (imm as u64);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `AND` R-type instruction
     ///
     /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
-    pub fn run_and(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_and(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         let result = self.read(rs1) & self.read(rs2);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `OR` R-type instruction
     ///
     /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
-    pub fn run_or(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_or(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         let result = self.read(rs1) | self.read(rs2);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `XOR` R-type instruction
     ///
     /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
-    pub fn run_xor(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_xor(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         let result = self.read(rs1) ^ self.read(rs2);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `SLTI` I-type instruction
     ///
     /// Places the value 1 in `rd` if val(rs1) is less than the immediate
     /// when treated as signed integers, 0 otherwise
-    pub fn run_slti(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_slti(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         let result = if (self.read(rs1) as i64) < imm { 1 } else { 0 };
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `SLTIU` I-type instruction
     ///
     /// Places the value 1 in `rd` if val(rs1) is less than the immediate
     /// when treated as unsigned integers, 0 otherwise
-    pub fn run_sltiu(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_sltiu(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         let result = if self.read(rs1) < (imm as u64) { 1 } else { 0 };
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `SLT` R-type instruction
     ///
     /// Places the value 1 in `rd` if val(rs1) < val(rs2)
     /// when treated as signed integers, 0 otherwise
-    pub fn run_slt(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_slt(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         let result = if (self.read(rs1) as i64) < (self.read(rs2) as i64) {
             1
         } else {
             0
         };
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `SLTU` R-type instruction
     ///
     /// Places the value 1 in `rd` if val(rs1) < val(rs2)
     /// when treated as unsigned integers, 0 otherwise
-    pub fn run_sltu(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_sltu(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         let result = if self.read(rs1) < self.read(rs2) {
             1
         } else {
             0
         };
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 }
 
@@ -163,10 +163,10 @@ where
     M: backend::ManagerReadWrite,
 {
     /// `AUIPC` U-type instruction
-    pub fn run_auipc(&mut self, imm: i64, rd: XRegister) {
+    pub fn run_auipc(&mut self, imm: i64, rd: NonZeroXRegister) {
         // U-type immediates have bits [31:12] set and the lower 12 bits zeroed.
         let rval = self.pc.read().wrapping_add(imm as u64);
-        self.xregisters.write(rd, rval);
+        self.xregisters.write_nz(rd, rval);
     }
 
     /// `EBREAK` instruction
@@ -406,7 +406,7 @@ mod tests {
             main_memory::{tests::T1K, Address},
             mode::Mode,
             registers::{
-                a0, a1, a2, a3, a4, fa0, t0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
+                a0, a1, a2, a3, a4, fa0, nz, t0, t1, t2, t3, t4, XRegisters, XRegistersLayout,
             },
             MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
         },
@@ -434,7 +434,7 @@ mod tests {
             state.hart.xregisters.write(a0, rs1);
             state.hart.xregisters.write(t0, imm as u64);
 
-            state.hart.xregisters.run_add(a0, t0, a0);
+            state.hart.xregisters.run_add(a0, t0, nz::a0);
             assert_eq!(state.hart.xregisters.read(a0), res);
         }
     });
@@ -466,26 +466,26 @@ mod tests {
             state.hart.xregisters.write(t0, imm as u64);
             state.hart.xregisters.run_addi(imm, a0, rd);
             assert_eq!(state.hart.xregisters.read(rd), res);
-            state.hart.xregisters.run_add(a0, t0, a0);
+            state.hart.xregisters.run_add(a0, t0, nz::a0);
             assert_eq!(state.hart.xregisters.read(a0), res);
             // test sub with: res - imm = rs1 and res - rs1 = imm
             state.hart.xregisters.write(a0, res);
             state.hart.xregisters.write(t0, imm as u64);
-            state.hart.xregisters.run_sub(a0, t0, a1);
+            state.hart.xregisters.run_sub(a0, t0, nz::a1);
             assert_eq!(state.hart.xregisters.read(a1), rs1);
             // now rs1 is in register a1
-            state.hart.xregisters.run_sub(a0, a1, a1);
+            state.hart.xregisters.run_sub(a0, a1, nz::a1);
             assert_eq!(state.hart.xregisters.read(a1), imm as u64);
         }
     });
 
     backend_test!(test_auipc, F, {
         let pc_imm_res_rd = [
-            (0, 0, 0, a2),
-            (0, 0xFF_FFF0_0000, 0xFF_FFF0_0000, a0),
-            (0x000A_AAAA, 0xFF_FFF0_0000, 0xFF_FFFA_AAAA, a1),
-            (0xABCD_AAAA_FBC0_D3FE, 0, 0xABCD_AAAA_FBC0_D3FE, t5),
-            (0xFFFF_FFFF_FFF0_0000, 0x10_0000, 0, t6),
+            (0, 0, 0, nz::a2),
+            (0, 0xFF_FFF0_0000, 0xFF_FFF0_0000, nz::a0),
+            (0x000A_AAAA, 0xFF_FFF0_0000, 0xFF_FFFA_AAAA, nz::a1),
+            (0xABCD_AAAA_FBC0_D3FE, 0, 0xABCD_AAAA_FBC0_D3FE, nz::t5),
+            (0xFFFF_FFFF_FFF0_0000, 0x10_0000, 0, nz::t6),
         ];
 
         for (init_pc, imm, res, rd) in pc_imm_res_rd {
@@ -497,7 +497,7 @@ mod tests {
             state.pc.write(init_pc);
             state.run_auipc(imm, rd);
 
-            let read_pc = state.xregisters.read(rd);
+            let read_pc = state.xregisters.read_nz(rd);
 
             assert_eq!(read_pc, res);
         }
@@ -619,27 +619,27 @@ mod tests {
             let positive_imm = imm & !prefix_mask;
 
             state.write(a0, val);
-            state.run_andi(negative_imm as i64, a0, a1);
+            state.run_andi(negative_imm as i64, a0, nz::a1);
             prop_assert_eq!(state.read(a1), val & negative_imm);
 
             state.write(a1, val);
-            state.run_andi(positive_imm as i64, a1, a2);
+            state.run_andi(positive_imm as i64, a1, nz::a2);
             prop_assert_eq!(state.read(a2), val & positive_imm);
 
             state.write(a0, val);
-            state.run_ori(negative_imm as i64, a0, a0);
+            state.run_ori(negative_imm as i64, a0, nz::a0);
             prop_assert_eq!(state.read(a0), val | negative_imm);
 
             state.write(a0, val);
-            state.run_ori(positive_imm as i64, a0, a1);
+            state.run_ori(positive_imm as i64, a0, nz::a1);
             prop_assert_eq!(state.read(a1), val | positive_imm);
 
             state.write(t2, val);
-            state.run_xori(negative_imm as i64, t2, t2);
+            state.run_xori(negative_imm as i64, t2, nz::t2);
             prop_assert_eq!(state.read(t2), val ^ negative_imm);
 
             state.write(t2, val);
-            state.run_xori(positive_imm as i64, t2, t1);
+            state.run_xori(positive_imm as i64, t2, nz::t1);
             prop_assert_eq!(state.read(t1), val ^ positive_imm);
         })
     });
@@ -650,26 +650,26 @@ mod tests {
 
             state.write(a0, v1);
             state.write(t3, v2);
-            state.run_and(t3, a0, a1);
+            state.run_and(t3, a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1 & v2);
 
             state.write(a0, v1);
             state.write(t3, v2);
-            state.run_or(t3, a0, a0);
+            state.run_or(t3, a0, nz::a0);
             prop_assert_eq!(state.read(a0), v1 | v2);
 
             state.write(t2, v1);
             state.write(t3, v2);
-            state.run_xor(t3, t2, t1);
+            state.run_xor(t3, t2, nz::t1);
             prop_assert_eq!(state.read(t1), v1 ^ v2);
 
             // Same register
             state.write(a0, v1);
-            state.run_and(a0, a0, a1);
+            state.run_and(a0, a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1);
-            state.run_or(a0, a0, a1);
+            state.run_or(a0, a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1);
-            state.run_xor(a0, a0, a0);
+            state.run_xor(a0, a0, nz::a0);
             prop_assert_eq!(state.read(a0), 0);
         });
     });
@@ -842,7 +842,7 @@ mod tests {
 
             // U-type immediate sets imm[31:20]
             let imm = imm & 0xFFFF_F000;
-            xregs.run_lui(imm, a3);
+            xregs.run_lui(imm, nz::a3);
             // read value is the expected one
             prop_assert_eq!(xregs.read(a3), imm as u64);
             // it doesn't modify other registers
@@ -864,13 +864,13 @@ mod tests {
         for (v1, v2, exp, expu) in v1_v2_exp_expu {
             xregs.write(a1, v1);
             xregs.write(a2, v2);
-            xregs.run_slt(a1, a2, t0);
+            xregs.run_slt(a1, a2, nz::t0);
             assert_eq!(xregs.read(t0), exp);
-            xregs.run_sltu(a1, a2, t1);
+            xregs.run_sltu(a1, a2, nz::t1);
             assert_eq!(xregs.read(t1), expu);
-            xregs.run_slti(v2 as i64, a1, t0);
+            xregs.run_slti(v2 as i64, a1, nz::t0);
             assert_eq!(xregs.read(t0), exp);
-            xregs.run_sltiu(v2 as i64, a1, t0);
+            xregs.run_sltiu(v2 as i64, a1, nz::t0);
             assert_eq!(xregs.read(t0), expu);
         }
     });

@@ -99,6 +99,18 @@ impl TryFrom<TaggedInstruction> for Instruction {
                 rl: value.args.rl,
                 width: value.args.width,
             },
+            ArgsShape::XSrcNZXDest => Args {
+                rd: value.args.rd.unwrap_nzx()?.into(),
+                rs1: value.args.rs1.unwrap_x()?.into(),
+                rs2: value.args.rs2.unwrap_x()?.into(),
+                imm: value.args.imm,
+                csr: value.args.csr,
+                rs3f: value.args.rs3f,
+                rm: value.args.rm,
+                aq: value.args.aq,
+                rl: value.args.rl,
+                width: value.args.width,
+            },
         };
         Ok(Instruction {
             opcode: value.opcode,
@@ -183,6 +195,18 @@ impl From<Instruction> for TaggedInstruction {
                 rd: unsafe { value.args.rd.nzx.into() },
                 rs1: unsafe { value.args.rs1.nzx.into() },
                 rs2: unsafe { value.args.rs2.nzx.into() },
+                imm: value.args.imm,
+                csr: value.args.csr,
+                rs3f: value.args.rs3f,
+                rm: value.args.rm,
+                aq: value.args.aq,
+                rl: value.args.rl,
+                width: value.args.width,
+            },
+            ArgsShape::XSrcNZXDest => TaggedArgs {
+                rd: unsafe { value.args.rd.nzx.into() },
+                rs1: unsafe { value.args.rs1.x.into() },
+                rs2: unsafe { value.args.rs2.x.into() },
                 imm: value.args.imm,
                 csr: value.args.csr,
                 rs3f: value.args.rs3f,
@@ -295,6 +319,8 @@ pub enum ArgsShape {
     XSrcFSrc,
     // rd, rs1, rs2 => NZX
     NZXSrcNZXDest,
+    // rd => NZX | rs1, rs2 => X
+    XSrcNZXDest,
 }
 
 /// This function maps each opcode to the corresponding ArgsShape that the opcode uses
@@ -303,16 +329,14 @@ pub enum ArgsShape {
 pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
     use OpCode::*;
     match opcode {
-        Add | Sub | Xor | Or | And | Sll | Srl | Sra | Slt | Sltu | Addw | Subw | Sllw | Srlw
-        | Sraw | Addi | Addiw | Xori | Ori | Andi | Slli | Srli | Srai | Slliw | Srliw | Sraiw
-        | Slti | Sltiu | Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Beq | Bne
-        | Blt | Bge | Bltu | Bgeu | Lui | Auipc | Jal | Jalr | Lrw | Scw | Amoswapw | Amoaddw
-        | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd
-        | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
-        | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh
-        | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw
-        | CSwsp | CAddi16sp | CAddi4spn | CAnd | COr | CXor | CSub | CAddw | CSubw | CLd | CSd
-        | CSdsp | Unknown | Beqz | Bnez | J => ArgsShape::XSrcXDest,
+        Addi | Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Beq | Bne | Blt | Bge
+        | Bltu | Bgeu | Jal | Jalr | Lrw | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw
+        | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd
+        | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu
+        | Remw | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw
+        | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CAddi16sp | CAddi4spn
+        | CAnd | COr | CXor | CSub | CAddw | CSubw | CLd | CSd | CSdsp | Unknown | Beqz | Bnez
+        | J => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -330,6 +354,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         Mv | CAdd | CJr | CJalr | CAddi | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp | Nop => {
             ArgsShape::NZXSrcNZXDest
         }
+        Andi | Ori | Xori | Addiw | Add | Sub | And | Or | Xor | Sll | Srl | Sra | Addw | Subw
+        | Sllw | Srlw | Sraw | Slti | Sltiu | Slli | Srli | Srai | Slliw | Srliw | Sraiw | Slt
+        | Sltu | Lui | Auipc => ArgsShape::XSrcNZXDest,
     }
 }
 
@@ -349,7 +376,7 @@ mod tests {
         let instr_xsrc_xdst = Instruction {
             opcode: OpCode::Add,
             args: Args {
-                rd: XRegister::x0.into(),
+                rd: NonZeroXRegister::x1.into(),
                 rs1: XRegister::x0.into(),
                 rs2: XRegister::x0.into(),
                 ..Args::DEFAULT

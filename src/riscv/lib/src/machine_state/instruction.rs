@@ -31,7 +31,8 @@ use crate::{
         CRTypeArgs, CSSDTypeArgs, CSSTypeArgs, CsrArgs, CsriArgs, FCmpArgs, FLoadArgs,
         FR1ArgWithRounding, FR2ArgsWithRounding, FR3ArgsWithRounding, FRArgs, FRegToXRegArgs,
         FRegToXRegArgsWithRounding, FStoreArgs, ITypeArgs, InstrCacheable, InstrRoundingMode,
-        InstrWidth, RTypeArgs, SBTypeArgs, UJTypeArgs, XRegToFRegArgs, XRegToFRegArgsWithRounding,
+        InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs, NonZeroRdUJTypeArgs, RTypeArgs,
+        SBTypeArgs, UJTypeArgs, XRegToFRegArgs, XRegToFRegArgsWithRounding,
     },
     state_backend::{ManagerBase, ManagerReadWrite},
     traps::Exception,
@@ -100,6 +101,11 @@ impl Debug for Instruction {
                         debug_struct.field("rd", &self.args.rd.nzx);
                         debug_struct.field("rs1", &self.args.rs1.nzx);
                         debug_struct.field("rs2", &self.args.rs2.nzx);
+                    }
+                    ArgsShape::XSrcNZXDest => {
+                        debug_struct.field("rd", &self.args.rd.nzx);
+                        debug_struct.field("rs1", &self.args.rs1.x);
+                        debug_struct.field("rs2", &self.args.rs2.x);
                     }
                 }
             }
@@ -678,6 +684,20 @@ macro_rules! impl_r_type {
             Ok(Next(self.width))
         }
     };
+
+    ($fn: ident, non_zero_rd) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart
+                .xregisters
+                .$fn(self.rs1.x, self.rs2.x, self.rd.nzx);
+            Ok(Next(self.width))
+        }
+    };
 }
 
 macro_rules! impl_i_type {
@@ -689,6 +709,18 @@ macro_rules! impl_i_type {
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.x);
+            Ok(Next(self.width))
+        }
+    };
+
+    ($fn: ident, non_zero_rd) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.nzx);
             Ok(Next(self.width))
         }
     };
@@ -1031,36 +1063,36 @@ macro_rules! impl_f_r_type {
 
 impl Args {
     // RV64I R-type instructions
-    impl_r_type!(run_add);
-    impl_r_type!(run_sub);
-    impl_r_type!(run_xor);
-    impl_r_type!(run_or);
-    impl_r_type!(run_and);
-    impl_r_type!(run_sll);
-    impl_r_type!(run_srl);
-    impl_r_type!(run_sra);
-    impl_r_type!(run_slt);
-    impl_r_type!(run_sltu);
-    impl_r_type!(run_addw);
-    impl_r_type!(run_subw);
-    impl_r_type!(run_sllw);
-    impl_r_type!(run_srlw);
-    impl_r_type!(run_sraw);
+    impl_r_type!(run_add, non_zero_rd);
+    impl_r_type!(run_sub, non_zero_rd);
+    impl_r_type!(run_xor, non_zero_rd);
+    impl_r_type!(run_or, non_zero_rd);
+    impl_r_type!(run_and, non_zero_rd);
+    impl_r_type!(run_sll, non_zero_rd);
+    impl_r_type!(run_srl, non_zero_rd);
+    impl_r_type!(run_sra, non_zero_rd);
+    impl_r_type!(run_slt, non_zero_rd);
+    impl_r_type!(run_sltu, non_zero_rd);
+    impl_r_type!(run_addw, non_zero_rd);
+    impl_r_type!(run_subw, non_zero_rd);
+    impl_r_type!(run_sllw, non_zero_rd);
+    impl_r_type!(run_srlw, non_zero_rd);
+    impl_r_type!(run_sraw, non_zero_rd);
 
     // RV64I I-type instructions
     impl_i_type!(run_addi);
-    impl_i_type!(run_addiw);
-    impl_i_type!(run_xori);
-    impl_i_type!(run_ori);
-    impl_i_type!(run_andi);
-    impl_i_type!(run_slli);
-    impl_i_type!(run_srli);
-    impl_i_type!(run_srai);
-    impl_i_type!(run_slliw);
-    impl_i_type!(run_srliw);
-    impl_i_type!(run_sraiw);
-    impl_i_type!(run_slti);
-    impl_i_type!(run_sltiu);
+    impl_i_type!(run_addiw, non_zero_rd);
+    impl_i_type!(run_xori, non_zero_rd);
+    impl_i_type!(run_ori, non_zero_rd);
+    impl_i_type!(run_andi, non_zero_rd);
+    impl_i_type!(run_slli, non_zero_rd);
+    impl_i_type!(run_srli, non_zero_rd);
+    impl_i_type!(run_srai, non_zero_rd);
+    impl_i_type!(run_slliw, non_zero_rd);
+    impl_i_type!(run_srliw, non_zero_rd);
+    impl_i_type!(run_sraiw, non_zero_rd);
+    impl_i_type!(run_slti, non_zero_rd);
+    impl_i_type!(run_sltiu, non_zero_rd);
     impl_load_type!(run_lb);
     impl_load_type!(run_lh);
     impl_load_type!(run_lw);
@@ -1091,7 +1123,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        core.hart.xregisters.run_lui(self.imm, self.rd.x);
+        core.hart.xregisters.run_lui(self.imm, self.rd.nzx);
         Ok(Next(self.width))
     }
 
@@ -1101,7 +1133,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        core.hart.run_auipc(self.imm, self.rd.x);
+        core.hart.run_auipc(self.imm, self.rd.nzx);
         Ok(Next(self.width))
     }
 
@@ -2129,7 +2161,34 @@ impl From<&RTypeArgs> for Args {
     }
 }
 
+impl From<&NonZeroRdRTypeArgs> for Args {
+    fn from(value: &NonZeroRdRTypeArgs) -> Self {
+        Self {
+            rd: value.rd.into(),
+            rs1: value.rs1.into(),
+            rs2: value.rs2.into(),
+            width: InstrWidth::Uncompressed,
+            ..Self::DEFAULT
+        }
+    }
+}
+
 impl ITypeArgs {
+    fn to_args(self, width: InstrWidth) -> Args {
+        Args {
+            rd: self.rd.into(),
+            rs1: self.rs1.into(),
+            // We are adding a default value for rs2 as x0 to be explicit
+            // that it is of XRegister type.
+            rs2: XRegister::x0.into(),
+            imm: self.imm,
+            width,
+            ..Args::DEFAULT
+        }
+    }
+}
+
+impl NonZeroRdITypeArgs {
     fn to_args(self, width: InstrWidth) -> Args {
         Args {
             rd: self.rd.into(),
@@ -2161,6 +2220,21 @@ impl SBTypeArgs {
 
 impl From<&UJTypeArgs> for Args {
     fn from(value: &UJTypeArgs) -> Self {
+        Self {
+            rd: value.rd.into(),
+            // We are adding a default value for rs1 and rs2 as X0
+            // to be explicit that they are of XRegister type.
+            rs1: XRegister::x0.into(),
+            rs2: XRegister::x0.into(),
+            imm: value.imm,
+            width: InstrWidth::Uncompressed,
+            ..Self::DEFAULT
+        }
+    }
+}
+
+impl From<&NonZeroRdUJTypeArgs> for Args {
+    fn from(value: &NonZeroRdUJTypeArgs) -> Self {
         Self {
             rd: value.rd.into(),
             // We are adding a default value for rs1 and rs2 as X0
