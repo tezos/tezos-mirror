@@ -192,7 +192,8 @@ module Remote = struct
                Seq.uncons seq |> Option.get |> fst
              in
              let workspace_name = Format.asprintf "%s-%d" Env.tezt_cloud i in
-             (workspace_name, (vm_configuration, configurations, Seq.length seq)))
+             ( workspace_name,
+               (vm_configuration, List.of_seq seq, Seq.length seq) ))
     in
     let* () = Terraform.Docker_registry.init () in
     let* () = Terraform.VM.init () in

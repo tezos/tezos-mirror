@@ -2703,8 +2703,10 @@ let benchmark () =
                        ~name
                        ()
                    with _ -> default_vm_configuration ~name))
-           | Producer _ | Observer _ | Etherlink_dal_operator
-           | Etherlink_dal_observer _ ->
+           | Producer _ ->
+               let machine_type = configuration.producer_machine_type in
+               Agent.Configuration.make ?docker_image ?machine_type ~name ()
+           | Observer _ | Etherlink_dal_operator | Etherlink_dal_observer _ ->
                Agent.Configuration.make ?docker_image ~name ()
            | Etherlink_operator -> default_vm_configuration ~name
            | Etherlink_producer _ -> default_vm_configuration ~name
