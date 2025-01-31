@@ -62,6 +62,59 @@ let pvm_config ctxt =
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
+type error +=
+  | Incorrect_history_mode of {
+      store_history_mode : Configuration.history_mode;
+      history_mode : Configuration.history_mode;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_cannot_apply_blueprint"
+    ~title:"Cannot apply a blueprint"
+    ~description:
+      "The EVM node could not apply a blueprint on top of its local EVM state."
+    ~pp:(fun ppf local_state_level ->
+      Format.fprintf
+        ppf
+        "The EVM node could not apply a blueprint on top of its local EVM \
+         state at level %a."
+        Z.pp_print
+        local_state_level)
+    Data_encoding.(obj1 (req "current_state_level" n))
+    (function
+      | Cannot_apply_blueprint {local_state_level} -> Some local_state_level
+      | _ -> None)
+    (fun local_state_level -> Cannot_apply_blueprint {local_state_level})
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_incorrect_history_mode"
+    ~title:"Incorrect history mode"
+    ~description:"The EVM has stored data with a different history mode."
+    ~pp:(fun ppf (store_history_mode, history_mode) ->
+      Format.fprintf
+        ppf
+        "The EVM node has stored data with history mode %a, it cannot be run \
+         with history mode %a without risk. Please use the command switch \
+         history mode to change history mode for the node."
+        Configuration.pp_history_mode
+        store_history_mode
+        Configuration.pp_history_mode
+        history_mode)
+    Data_encoding.(
+      obj2
+        (req "store_history_mode_level" Configuration.history_mode_encoding)
+        (req "history_mode_level" Configuration.history_mode_encoding))
+    (function
+      | Incorrect_history_mode {store_history_mode; history_mode} ->
+          Some (store_history_mode, history_mode)
+      | _ -> None)
+    (fun (store_history_mode, history_mode) ->
+      Incorrect_history_mode {store_history_mode; history_mode})
+
 module Types = struct
   type state = t
 
@@ -473,27 +526,6 @@ module State = struct
             expected_block_hash
         in
         return (evm_state, latest_finalized_level)
-
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"evm_node_dev_cannot_apply_blueprint"
-      ~title:"Cannot apply a blueprint"
-      ~description:
-        "The EVM node could not apply a blueprint on top of its local EVM \
-         state."
-      ~pp:(fun ppf local_state_level ->
-        Format.fprintf
-          ppf
-          "The EVM node could not apply a blueprint on top of its local EVM \
-           state at level %a."
-          Z.pp_print
-          local_state_level)
-      Data_encoding.(obj1 (req "current_state_level" n))
-      (function
-        | Cannot_apply_blueprint {local_state_level} -> Some local_state_level
-        | _ -> None)
-      (fun local_state_level -> Cannot_apply_blueprint {local_state_level})
 
   let check_pending_upgrade ctxt timestamp =
     match ctxt.session.pending_upgrade with
@@ -1111,22 +1143,28 @@ module State = struct
         *)
         return Tezos_crypto.Hashed.Smart_rollup_address.zero
 
-  let check_history_mode ~store_history_mode ~history_mode conn =
+  let check_history_mode ?(switch = false) ~store_history_mode ~history_mode
+      conn =
     let open Lwt_result_syntax in
     match store_history_mode with
     | None -> return_unit
     | Some store_history_mode -> (
         match (store_history_mode, history_mode) with
         | Configuration.Archive, Configuration.Archive | Rolling, Rolling ->
+            if switch then
+              Format.printf
+                "History mode is already %a, not switching@."
+                Configuration.pp_history_mode
+                history_mode ;
             return_unit
-        | Archive, Rolling ->
+        | Archive, Rolling when switch ->
             let*! () =
               Evm_context_events.switching_history_mode
                 ~from:Archive
                 ~to_:Rolling
             in
             return_unit
-        | Rolling, Archive ->
+        | Rolling, Archive when switch ->
             (* Switching from rolling to archive is possible, however it does
                not necessarily mean all information are stored, it will just
                stop garbage collecting data. *)
@@ -1138,7 +1176,9 @@ module State = struct
                   Evm_context_events.rolling_to_archive_incomplete_history
                     earliest_level
                 in
-                return_unit))
+                return_unit)
+        | _, _ ->
+            tzfail (Incorrect_history_mode {store_history_mode; history_mode}))
 
   let check_metadata ~store_metadata ~smart_rollup_address ~history_mode conn =
     let open Lwt_result_syntax in
