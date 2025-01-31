@@ -58,7 +58,7 @@ module Name = struct
 
   let encoding = Data_encoding.string
 
-  let base = ["evm_node"; "websocket"]
+  let base = ["evm_node_worker"; "websocket"]
 
   let pp = Format.pp_print_string
 
@@ -154,7 +154,7 @@ end
 module Event = struct
   include Internal_event.Simple
 
-  let section = ["evm_node"; "websocket"; "worker"]
+  let section = ["evm_node"; "websocket"]
 
   let shutdown =
     declare_3
@@ -198,7 +198,7 @@ module Event = struct
       ~pp1:Request.pp
       ("worker_status", Tezos_base.Worker_types.request_status_encoding)
       ~pp2:Tezos_base.Worker_types.pp_status
-      ("errors", Error_monad.trace_encoding)
+      ("errors", Events.trace_encoding)
       ~pp3:Error_monad.pp_print_trace
 
   let request_completed_debug =

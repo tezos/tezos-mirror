@@ -74,7 +74,7 @@ module Event = struct
       ~msg:"Connection with the rollup node failed with {trace}"
       ~level:Error
       ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
+      ("trace", Events.trace_encoding)
 
   let stream_failed =
     declare_1
@@ -83,7 +83,7 @@ module Event = struct
       ~msg:"Stream from the rollup node failed with {trace}"
       ~level:Error
       ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
+      ("trace", Events.trace_encoding)
 end
 
 let disabled = Internal_event.Simple.emit Event.disabled

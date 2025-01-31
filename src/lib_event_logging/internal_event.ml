@@ -490,7 +490,8 @@ module All_definitions = struct
           (registration_exn "invalid event name: %S contains '%c'") ;
         all := Definition (E.section, E.name, ev) :: !all
 
-  let get () = !all
+  let get ?filter () =
+    match filter with Some filter -> List.filter filter !all | None -> !all
 
   let find match_name =
     List.find (function Definition (_, n, _) -> match_name n) !all

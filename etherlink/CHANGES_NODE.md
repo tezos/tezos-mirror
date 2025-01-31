@@ -8,6 +8,7 @@
   data directories For instance, Mainnet archive nodes using the now legacy
   storage requires more than 250GBytes of disk, while the new block storage
   requires around 180GBytes. (!16412)
+- CLI command `list events`, allows listing events relative to the EVM node. (!16446)
 
 ### Bug fixes
 

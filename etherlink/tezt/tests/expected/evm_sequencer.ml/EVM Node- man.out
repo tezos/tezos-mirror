@@ -465,3 +465,8 @@ Miscellaneous commands:
   
   list metrics
     List the metrics exported by the EVM node.
+  
+  list events [-l --level <info>] [-j --json]
+    List the events emitted by the EVM node.
+    -l --level <info>: Set list_events filter level to either `fatal`, `error`, `warning`, `notice` `info`, `debug`
+    -j --json: Enables the display of json schemas

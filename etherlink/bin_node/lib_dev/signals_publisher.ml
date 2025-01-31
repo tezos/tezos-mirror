@@ -41,7 +41,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = Signals_publisher_events.section
+  let base = ["evm_node_worker"; "signal_publisher"]
 
   let pp _ _ = ()
 
