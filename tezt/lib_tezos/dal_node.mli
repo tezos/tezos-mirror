@@ -221,3 +221,41 @@ val load_last_finalized_processed_level : t -> int option Lwt.t
     - [hooks] are attached to the process (defaults to [None]). *)
 val debug_print_store_schemas :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
+
+(** The Proxy module provides functionality to create a proxy server
+    that can intercept and mock responses for DAL node requests. *)
+module Proxy : sig
+  (** A proxy instance. *)
+  type proxy
+
+  (** Represents a possible response from a proxy route. *)
+  type answer = [`Response of string]
+
+  (** A route definition. *)
+  type route
+
+  (** Creates a route for the proxy, containing a [path] pattern and a
+      [callback].
+      The [callback] is provided with the [path] actually matched
+      together with a [fetch_answer] callback to retrieve the DAL node
+      answer for the given [path]. The [path] could be used when one
+      wants to retreive path arguments. The [fetch_answer] callback
+      could be used when one only want to modify a field in the honest
+      response. *)
+  val route :
+    path:Re.Str.regexp ->
+    callback:
+      (path:string ->
+      fetch_answer:(unit -> Ezjsonm.t Lwt.t) ->
+      answer option Lwt.t) ->
+    route
+
+  (** Creates a new proxy instance. *)
+  val make : name:string -> routes:route list -> proxy
+
+  (** Starts running the proxy server. *)
+  val run : proxy -> honest_dal_node:t -> faulty_dal_node:t -> unit
+
+  (** Stops the proxy server. *)
+  val stop : proxy -> unit
+end
