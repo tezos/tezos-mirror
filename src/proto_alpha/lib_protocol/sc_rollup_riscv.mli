@@ -15,6 +15,11 @@ module type Riscv_proto_env_sig = sig
 
   type output
 
+  type output_info = {
+    outbox_level : Bounded.Non_negative_int32.t;
+    message_index : Z.t;
+  }
+
   type output_proof
 
   type hash = Smart_rollup.State_hash.t
@@ -39,7 +44,7 @@ module type Riscv_proto_env_sig = sig
 
   val verify_proof : input option -> proof -> input_request option
 
-  val output_of_output_proof : output_proof -> output
+  val output_info_of_output_proof : output_proof -> output_info
 
   val state_of_output_proof : output_proof -> hash
 

@@ -262,8 +262,8 @@ let process_included_l1_operation (type kind) ~catching_up
           PVM.output_proof_encoding
           output_proof
       in
-      let Sc_rollup.{outbox_level; message_index; _} =
-        PVM.output_of_output_proof output_proof
+      let Sc_rollup.{outbox_level; message_index} =
+        PVM.output_info_of_output_proof output_proof
       in
       let outbox_level = Raw_level.to_int32 outbox_level in
       let message_index = Z.to_int message_index in

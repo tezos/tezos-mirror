@@ -169,7 +169,9 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     PVM.get_outbox level (PVM.Ctxt_wrapper.of_node_pvmstate state)
   in
   let output =
-    List.filter (fun Sc_rollup.{outbox_level; _} -> outbox_level = level) outbox
+    List.filter
+      (fun out -> out.Sc_rollup.output_info.outbox_level = level)
+      outbox
   in
   let*! state_hash = PVM.state_hash (PVM.Ctxt_wrapper.of_node_pvmstate state) in
   let* constants =

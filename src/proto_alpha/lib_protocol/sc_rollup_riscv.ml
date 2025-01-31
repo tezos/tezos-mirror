@@ -15,6 +15,11 @@ module type Riscv_proto_env_sig = sig
 
   type output
 
+  type output_info = {
+    outbox_level : Bounded.Non_negative_int32.t;
+    message_index : Z.t;
+  }
+
   type output_proof
 
   type hash = Smart_rollup.State_hash.t
@@ -39,7 +44,7 @@ module type Riscv_proto_env_sig = sig
 
   val verify_proof : input option -> proof -> input_request option
 
-  val output_of_output_proof : output_proof -> output
+  val output_info_of_output_proof : output_proof -> output_info
 
   val state_of_output_proof : output_proof -> hash
 
@@ -63,6 +68,11 @@ module Riscv_proto_env : Riscv_proto_env_sig = struct
   type proof = unit
 
   type output = unit
+
+  type output_info = {
+    outbox_level : Bounded.Non_negative_int32.t;
+    message_index : Z.t;
+  }
 
   type output_proof = unit
 
@@ -94,7 +104,7 @@ module Riscv_proto_env : Riscv_proto_env_sig = struct
 
   let verify_proof _input _proof = assert false
 
-  let output_of_output_proof _output_proof = assert false
+  let output_info_of_output_proof _output_proof = assert false
 
   let state_of_output_proof _output_proof = assert false
 
@@ -219,8 +229,15 @@ module Protocol_implementation :
       Riscv_proto_env.bytes_to_output_proof
       (bytes Hex)
 
-  let output_of_output_proof output_proof =
-    from_riscv_output @@ Riscv_proto_env.output_of_output_proof output_proof
+  let output_info_of_output_proof output_proof : PS.output_info =
+    let open Riscv_proto_env in
+    let {outbox_level; message_index} =
+      output_info_of_output_proof output_proof
+    in
+    {
+      outbox_level = Raw_level_repr.of_int32_non_negative outbox_level;
+      message_index;
+    }
 
   let state_of_output_proof output_proof =
     Riscv_proto_env.state_of_output_proof output_proof
