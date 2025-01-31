@@ -286,12 +286,9 @@ val spawn_init_config_minimal :
   unit ->
   Process.t
 
-type garbage_collector_parameters = {
-  split_frequency_in_seconds : int;
-  number_of_chunks : int;
-}
-
-type history_mode = Archive | Rolling
+type history_mode =
+  | Archive
+  | Rolling of int  (** Rolling with retention period in days. *)
 
 type rpc_server = Resto | Dream
 
@@ -304,14 +301,15 @@ val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->
   ?next_wasm_runtime:bool ->
-  ?garbage_collector_parameters:garbage_collector_parameters ->
-  ?history_mode:history_mode ->
   ?rpc_server:rpc_server ->
   ?enable_websocket:bool ->
   ?max_websocket_message_length:int ->
   unit ->
   JSON.t ->
   JSON.t
+
+(** Edit garbage collector parameters in the configuration file. *)
+val patch_config_gc : ?history_mode:history_mode -> JSON.t -> JSON.t
 
 (** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr
     ?rpc_port rollup_node_endpoint] creates an EVM node server with
@@ -326,6 +324,7 @@ val init :
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
+  ?history_mode:history_mode ->
   string ->
   t Lwt.t
 

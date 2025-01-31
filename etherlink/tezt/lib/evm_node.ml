@@ -1209,40 +1209,30 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
 
 let endpoint = rpc_endpoint ?local:None
 
-type garbage_collector_parameters = {
-  split_frequency_in_seconds : int;
-  number_of_chunks : int;
-}
-
-type history_mode = Archive | Rolling
+type history_mode = Archive | Rolling of int
 
 type rpc_server = Resto | Dream
+
+let conditional_json_put ~name cond value_json json =
+  if cond then
+    JSON.put
+      (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
+      json
+  else json
+
+let optional_json_put ~name v f json =
+  match v with
+  | None -> json
+  | Some v ->
+      let value_json = f v in
+      JSON.put
+        (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
+        json
 
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
-    ?garbage_collector_parameters ?history_mode ?rpc_server
-    ?(enable_websocket = false) ?max_websocket_message_length () =
-  let conditional_json_put ~name cond value_json json =
-    if cond then
-      JSON.put
-        ( name,
-          JSON.annotate ~origin:"evm_node.experimental_config_patch"
-          @@ value_json )
-        json
-    else json
-  in
-  let optional_json_put ~name v f json =
-    match v with
-    | None -> json
-    | Some v ->
-        let value_json = f v in
-        JSON.put
-          ( name,
-            JSON.annotate ~origin:"evm_node.experimental_config_patch"
-            @@ value_json )
-          json
-  in
+    ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1257,19 +1247,6 @@ let patch_config_with_experimental_feature
        next_wasm_runtime
        ~name:"next_wasm_runtime"
        (`Bool true)
-  |> optional_json_put
-       ~name:"garbage_collector_parameters"
-       garbage_collector_parameters
-       (fun {split_frequency_in_seconds; number_of_chunks} ->
-         `O
-           [
-             ( "split_frequency_in_seconds",
-               `Float (Int.to_float split_frequency_in_seconds) );
-             ("number_of_chunks", `Float (Int.to_float number_of_chunks));
-           ])
-  |> optional_json_put ~name:"history_mode" history_mode (function
-         | Archive -> `String "archive"
-         | Rolling -> `String "rolling")
   |> optional_json_put ~name:"rpc_server" rpc_server (function
          | Resto -> `String "resto"
          | Dream -> `String "dream")
@@ -1285,8 +1262,19 @@ let patch_config_with_experimental_feature
        ~name:"monitor_websocket_heartbeat"
        (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
 
+let patch_config_gc ?history_mode json =
+  json
+  |> optional_json_put ~name:"history" history_mode (function
+         | Archive -> `String "archive"
+         | Rolling retention ->
+             `O
+               [
+                 ("mode", `String "rolling");
+                 ("retention", `Float (float_of_int retention));
+               ])
+
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs rollup_node =
+    ?restricted_rpcs ?history_mode rollup_node =
   let evm_node =
     create
       ?name
@@ -1299,6 +1287,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
+  let* () = Config_file.update evm_node (patch_config_gc ?history_mode) in
   let* () =
     match patch_config with
     | Some patch_config -> Config_file.update evm_node patch_config

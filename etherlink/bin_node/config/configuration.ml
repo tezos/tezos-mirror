@@ -55,8 +55,6 @@ type experimental_features = {
   blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
   overwrite_simulation_tick_limit : bool;
-  garbage_collector_parameters : garbage_collector_parameters;
-  history_mode : history_mode;
   rpc_server : rpc_server;
   enable_websocket : bool;
   max_websocket_message_length : int;
@@ -135,6 +133,8 @@ type t = {
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
+  garbage_collector_parameters : garbage_collector_parameters;
+  history_mode : history_mode;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -145,6 +145,8 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
   }
 
 let default_enable_send_raw_transaction = true
+
+let default_history_mode = Archive
 
 let default_garbage_collector_parameters =
   {split_frequency_in_seconds = 86_400; number_of_chunks = 14}
@@ -162,8 +164,6 @@ let default_experimental_features =
     drop_duplicate_on_injection = false;
     blueprints_publisher_order_enabled = false;
     overwrite_simulation_tick_limit = false;
-    garbage_collector_parameters = default_garbage_collector_parameters;
-    history_mode = Archive;
     rpc_server = Resto;
     enable_websocket = false;
     max_websocket_message_length = default_max_socket_message_length;
@@ -713,22 +713,21 @@ let observer_encoding ?network () =
 
 let garbage_collector_parameters_encoding =
   let open Data_encoding in
+  let int_days =
+    def
+      "days"
+      ~title:"number_of_days"
+      ~description:"Number of days of history to retain"
+      int31
+  in
   conv
-    (fun {split_frequency_in_seconds; number_of_chunks} ->
-      (split_frequency_in_seconds, number_of_chunks))
-    (fun (split_frequency_in_seconds, number_of_chunks) ->
-      {split_frequency_in_seconds; number_of_chunks})
-    (obj2
-       (req
-          "split_frequency_in_seconds"
-          ~description:"Frequency of irmin context split in days"
-          int31)
-       (req
-          "number_of_chunks"
-          ~description:
-            "Number of irmin context chunks kept, the rest is garbage \
-             collected."
-          int31))
+    (function
+      | {split_frequency_in_seconds = 86_400; number_of_chunks} ->
+          number_of_chunks
+      | _ -> Stdlib.failwith "GC split frequency must one day")
+    (fun number_of_chunks ->
+      {split_frequency_in_seconds = 86_400; number_of_chunks})
+    int_days
 
 let rpc_server_encoding =
   let open Data_encoding in
@@ -737,6 +736,39 @@ let rpc_server_encoding =
 let history_mode_encoding =
   let open Data_encoding in
   string_enum [("archive", Archive); ("rolling", Rolling)]
+
+let history_mode_and_gc_parameters_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"archive"
+        (Tag 0)
+        (constant "archive")
+        (function Archive, _ -> Some () | _ -> None)
+        (fun () -> (Archive, default_garbage_collector_parameters));
+      case
+        ~title:"rolling_default_gc"
+        (Tag 1)
+        (constant "rolling")
+        (function
+          | _ ->
+              (* This is a shortcut for rolling with default GC parameters,
+                 never output it. *)
+              None)
+        (fun () -> (Rolling, default_garbage_collector_parameters));
+      case
+        ~title:"rolling"
+        (Tag 2)
+        (obj2
+           (req "mode" (constant "rolling"))
+           (req
+              "retention"
+              ~description:"How much history is retained for rolling nodes."
+              garbage_collector_parameters_encoding))
+        (function Rolling, gc -> Some ((), gc) | _ -> None)
+        (fun ((), gc) -> (Rolling, gc));
+    ]
 
 let monitor_websocket_heartbeat_encoding =
   let open Data_encoding in
@@ -784,8 +816,6 @@ let experimental_features_encoding =
            blueprints_publisher_order_enabled;
            enable_send_raw_transaction;
            overwrite_simulation_tick_limit;
-           garbage_collector_parameters;
-           history_mode;
            rpc_server;
            enable_websocket;
            max_websocket_message_length;
@@ -796,8 +826,6 @@ let experimental_features_encoding =
           enable_send_raw_transaction,
           None,
           overwrite_simulation_tick_limit,
-          garbage_collector_parameters,
-          history_mode,
           None ),
         ( rpc_server,
           enable_websocket,
@@ -808,8 +836,6 @@ let experimental_features_encoding =
              enable_send_raw_transaction,
              _node_transaction_validation,
              overwrite_simulation_tick_limit,
-             garbage_collector_parameters,
-             history_mode,
              _next_wasm_runtime ),
            ( rpc_server,
              enable_websocket,
@@ -820,15 +846,13 @@ let experimental_features_encoding =
         blueprints_publisher_order_enabled;
         enable_send_raw_transaction;
         overwrite_simulation_tick_limit;
-        garbage_collector_parameters;
-        history_mode;
         rpc_server;
         enable_websocket;
         max_websocket_message_length;
         monitor_websocket_heartbeat;
       })
     (merge_objs
-       (obj8
+       (obj6
           (dft
              ~description:
                "Request the rollup node to filter messages it has already \
@@ -868,16 +892,6 @@ let experimental_features_encoding =
                 eth_call succeeded."
              bool
              default_experimental_features.overwrite_simulation_tick_limit)
-          (dft
-             "garbage_collector_parameters"
-             ~description:"Garbage collector parameterse."
-             garbage_collector_parameters_encoding
-             default_experimental_features.garbage_collector_parameters)
-          (dft
-             "history_mode"
-             ~description:"History mode."
-             history_mode_encoding
-             default_experimental_features.history_mode)
           (opt
              "next_wasm_runtime"
              ~description:
@@ -1140,6 +1154,8 @@ let encoding ?network data_dir : t Data_encoding.t =
            fee_history;
            kernel_execution;
            finalized_view;
+           history_mode;
+           garbage_collector_parameters;
          } ->
       ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
@@ -1151,7 +1167,11 @@ let encoding ?network data_dir : t Data_encoding.t =
             experimental_features,
             proxy,
             fee_history ),
-          (kernel_execution, public_rpc, private_rpc, finalized_view) ) ))
+          ( kernel_execution,
+            public_rpc,
+            private_rpc,
+            finalized_view,
+            (history_mode, garbage_collector_parameters) ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1162,7 +1182,11 @@ let encoding ?network data_dir : t Data_encoding.t =
                experimental_features,
                proxy,
                fee_history ),
-             (kernel_execution, public_rpc, private_rpc, finalized_view) ) ) ->
+             ( kernel_execution,
+               public_rpc,
+               private_rpc,
+               finalized_view,
+               (history_mode, garbage_collector_parameters) ) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -1181,6 +1205,8 @@ let encoding ?network data_dir : t Data_encoding.t =
         fee_history;
         kernel_execution;
         finalized_view;
+        history_mode;
+        garbage_collector_parameters;
       })
     (merge_objs
        (obj4
@@ -1238,7 +1264,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj4
+          (obj5
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1256,7 +1282,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                    synonym for `finalized`."
                 "finalized_view"
                 bool
-                false))))
+                false)
+             (dft
+                "history"
+                ~description:"History mode of the EVM node"
+                history_mode_and_gc_parameters_encoding
+                (default_history_mode, default_garbage_collector_parameters)))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1281,20 +1312,26 @@ let save ~force ~data_dir config =
     Lwt_utils_unix.Json.write_file config_file json
 
 module Json_syntax = struct
-  let ( |-?> ) json field =
-    match json with
-    | `O assoc -> List.assoc ~equal:String.equal field assoc
-    | _ -> None
+  let ( |-> ) = Ezjsonm.find_opt
 
-  let ( |?-?> ) json field =
-    match json with
-    | Some (`O assoc) -> List.assoc ~equal:String.equal field assoc
-    | _ -> None
+  let ( |->! ) = Ezjsonm.find
 
-  let ( |?> ) x f = match x with Some x -> f x | None -> None
-
-  let as_bool_opt = function `Bool b -> Some b | _ -> None
+  let ( |?> ) x f = Option.map f x
 end
+
+let warn =
+  Format.kasprintf @@ fun s ->
+  let reset = Pretty_printing.add_ansi_marking Format.err_formatter in
+  Format.eprintf "@{<fg_yellow>[Warning] %s@}@." s ;
+  reset ()
+
+let warn_deprecated json path =
+  let open Json_syntax in
+  match json |-> path with
+  | None -> ()
+  | Some _ -> warn "Deprecated configuration field %s" (String.concat "." path)
+
+let warn_deprecated json = List.iter (warn_deprecated json)
 
 (* Syntactic checks related to deprecations *)
 let precheck json =
@@ -1304,9 +1341,9 @@ let precheck json =
       let open Json_syntax in
       (* Conflicts between [.proxy.finalized_view] and [.finalized_view] *)
       let proxy_conf =
-        json |-?> "proxy" |?-?> "finalized_view" |?> as_bool_opt
+        json |-> ["proxy"; "finalized_view"] |?> Ezjsonm.get_bool
       in
-      let toplevel_conf = json |-?> "finalized_view" |?> as_bool_opt in
+      let toplevel_conf = json |-> ["finalized_view"] |?> Ezjsonm.get_bool in
       let* () =
         match (proxy_conf, toplevel_conf) with
         | Some b, Some b' ->
@@ -1316,8 +1353,9 @@ let precheck json =
         | _ -> return_unit
       in
       let next_wasm_runtime_conf =
-        json |-?> "experimental_features" |?-?> "next_wasm_runtime"
-        |?> as_bool_opt
+        json
+        |-> ["experimental_features"; "next_wasm_runtime"]
+        |?> Ezjsonm.get_bool
       in
       let* () =
         match next_wasm_runtime_conf with
@@ -1328,8 +1366,9 @@ let precheck json =
         | _ -> return_unit
       in
       let node_transaction_validation_conf =
-        json |-?> "experimental_features" |?-?> "node_transaction_validation"
-        |?> as_bool_opt
+        json
+        |-> ["experimental_features"; "node_transaction_validation"]
+        |?> Ezjsonm.get_bool
       in
       let* () =
         match node_transaction_validation_conf with
@@ -1339,14 +1378,55 @@ let precheck json =
                set to `false` anymore."
         | _ -> return_unit
       in
+      warn_deprecated
+        json
+        [
+          ["experimental_features"; "next_wasm_runtime"];
+          ["experimental_features"; "node_transaction_validation"];
+          ["experimental_features"; "history_mode"];
+          ["experimental_features"; "garbage_collector_parameters"];
+        ] ;
 
       return_unit)
     (fun _exn -> failwith "Syntax error in the configuration file")
+
+(* Syntactic config patching to migrate stabilized experimental features. *)
+let migrate_experimental_feature ?new_path ?(transform = Fun.id) path json =
+  let open Json_syntax in
+  let new_path = Option.value new_path ~default:path in
+  let exp_path = "experimental_features" :: path in
+  let value = json |-> new_path in
+  let experimental_value = json |-> exp_path in
+  match (value, experimental_value) with
+  | None, Some v ->
+      (* Experimental feature present, but stabilized feature not set. *)
+      let json = Ezjsonm.update json exp_path None in
+      Ezjsonm.update json new_path (Some (transform v))
+  | _, _ -> (* Don't override otherwise *) json
+
+let migrate_stabilized_experimental_features json =
+  let open Json_syntax in
+  json
+  |> migrate_experimental_feature ["history_mode"] ~new_path:["history"]
+  |> migrate_experimental_feature
+       ["garbage_collector_parameters"]
+       ~new_path:["history"]
+       ~transform:(fun json ->
+         let split_frequency_in_seconds =
+           json |->! ["split_frequency_in_seconds"] |> Ezjsonm.get_int
+         in
+         if split_frequency_in_seconds <> 86400 then
+           Stdlib.failwith
+             "experimental_features.garbage_collector_parameters.split_frequency_in_seconds \
+              must be 86400, use new format." ;
+         let nb = json |->! ["number_of_chunks"] in
+         `O [("mode", `String "rolling"); ("retention", nb)])
 
 let load_file ?network ~data_dir path =
   let open Lwt_result_syntax in
   let* json = Lwt_utils_unix.Json.read_file path in
   let* () = precheck json in
+  let json = migrate_stabilized_experimental_features json in
   let config = Data_encoding.Json.destruct (encoding ?network data_dir) json in
   return config
 
@@ -1496,6 +1576,8 @@ module Cli = struct
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
       finalized_view;
+      garbage_collector_parameters = default_garbage_collector_parameters;
+      history_mode = default_history_mode;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -1784,6 +1866,8 @@ module Cli = struct
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
       finalized_view = finalized_view || configuration.finalized_view;
+      garbage_collector_parameters = configuration.garbage_collector_parameters;
+      history_mode = configuration.history_mode;
     }
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
