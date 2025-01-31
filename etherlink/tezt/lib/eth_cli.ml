@@ -184,6 +184,12 @@ let encode_method ?runner ~abi_label ~method_ () =
   in
   return (String.trim data)
 
+let decode_method ?runner ~abi_label ~method_ () =
+  let* data =
+    spawn_command_and_read_string ?runner ["method:decode"; abi_label; method_]
+  in
+  return (String.trim data)
+
 let gen_eth_account ?runner () =
   spawn_command_and_read_json ?runner ["address:random"] (fun json ->
       Some (Eth_account.of_json json))

@@ -211,6 +211,9 @@ val get_receipt :
 val encode_method :
   ?runner:Runner.t -> abi_label:string -> method_:string -> unit -> string Lwt.t
 
+val decode_method :
+  ?runner:Runner.t -> abi_label:string -> method_:string -> unit -> string Lwt.t
+
 (** [gen_eth_account ()] genarate a fresh eth account. 
     The [runner] optional argument can be specified to execute the command 
     on a remote runner. If omitted, the command is executed locally.*)

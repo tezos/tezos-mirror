@@ -1072,8 +1072,9 @@ let add_address ?force client ~alias ~src =
   spawn_add_address ?force client ~alias ~src |> Process.check
 
 let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?fee ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
-    ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client =
+    ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
+    ?arg ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client
+    =
   spawn_command
     ?env
     ?log_output
@@ -1087,6 +1088,7 @@ let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
         ~some:(fun f -> ["--fee"; Tez.to_string f; "--force-low-fee"])
         fee
     @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "fee-cap" Tez.to_string fee_cap
     @ optional_arg "gas-limit" string_of_int gas_limit
     @ optional_arg "safety-guard" string_of_int safety_guard
     @ optional_arg "storage-limit" string_of_int storage_limit
@@ -1096,9 +1098,9 @@ let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
-let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
-    ?safety_guard ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force
-    ?expect_failure ~amount ~giver ~receiver client =
+let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?fee_cap
+    ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
+    ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
     ?env
     ?log_output
@@ -1107,6 +1109,7 @@ let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     ?wait
     ?burn_cap
     ?fee
+    ?fee_cap
     ?gas_limit
     ?safety_guard
     ?storage_limit
