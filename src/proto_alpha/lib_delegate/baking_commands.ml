@@ -701,28 +701,38 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
 (* This function checks that a DAL node endpoint was given,
    and that the specified DAL node is "healthy",
    (the DAL's nodes 'health' RPC is used for that). *)
-let check_dal_node without_dal dal_node_rpc_ctxt =
-  let open Lwt_result_syntax in
-  let result_emit f x =
-    let*! () = Events.emit f x in
-    return_unit
-  in
-  match (dal_node_rpc_ctxt, without_dal) with
-  | None, true ->
-      (* The user is aware that no DAL node is running, since they explicitly
-         used the [--without-dal] option. However, we do not want to reduce the
-         exposition of bakers to warnings about DAL, so we keep it. *)
-      result_emit Events.no_dal_node_running ()
-  | None, false -> tzfail No_dal_node_endpoint
-  | Some _, true -> tzfail Incompatible_dal_options
-  | Some ctxt, false -> (
-      let*! health = Node_rpc.get_dal_health ctxt in
-      match health with
-      | Ok health -> (
-          match health.status with
-          | Tezos_dal_node_services.Types.Health.Up -> return_unit
-          | _ -> result_emit Events.unhealthy_dal_node (ctxt#base, health))
-      | Error _ -> result_emit Events.unreachable_dal_node ctxt#base)
+let check_dal_node =
+  let last_check_successful = ref false in
+  fun without_dal dal_node_rpc_ctxt ->
+    let open Lwt_result_syntax in
+    let result_emit f x =
+      let*! () = Events.emit f x in
+      return_unit
+    in
+    match (dal_node_rpc_ctxt, without_dal) with
+    | None, true ->
+        (* The user is aware that no DAL node is running, since they explicitly
+           used the [--without-dal] option. However, we do not want to reduce the
+           exposition of bakers to warnings about DAL, so we keep it. *)
+        result_emit Events.no_dal_node_running ()
+    | None, false -> tzfail No_dal_node_endpoint
+    | Some _, true -> tzfail Incompatible_dal_options
+    | Some ctxt, false -> (
+        let*! health = Node_rpc.get_dal_health ctxt in
+        match health with
+        | Ok health -> (
+            match health.status with
+            | Tezos_dal_node_services.Types.Health.Up ->
+                if !last_check_successful then return_unit
+                else (
+                  last_check_successful := true ;
+                  result_emit Events.healthy_dal_node ())
+            | _ ->
+                last_check_successful := false ;
+                result_emit Events.unhealthy_dal_node (ctxt#base, health))
+        | Error _ ->
+            last_check_successful := false ;
+            result_emit Events.unreachable_dal_node ctxt#base)
 
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 

@@ -84,6 +84,14 @@ module Commands = struct
          https://docs.tezos.com/tutorials/join-dal-baker."
       ()
 
+  let healthy_dal_node =
+    declare_0
+      ~section
+      ~name:"healthy_dal_node"
+      ~level:Notice
+      ~msg:"The DAL node is healthy."
+      ()
+
   let unhealthy_dal_node =
     declare_2
       ~section
@@ -91,9 +99,8 @@ module Commands = struct
       ~level:Error
       ~msg:
         "The DAL node running on {endpoint} is not healthy. DAL attestations \
-         cannot be sent.\n\
-         Its health is {health}.\n\
-         Please check your DAL node and possibly restart it."
+         cannot be sent. Its health is {health}. Please check that your DAL \
+         node is configured correctly."
       ~pp1:Uri.pp
       ("endpoint", Tezos_rpc.Encoding.uri_encoding)
       ~pp2:Tezos_dal_node_services.Types.Health.pp
