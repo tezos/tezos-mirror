@@ -1903,11 +1903,12 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_dal")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args2
+       (args3
           (config_key_flag ~name:"enable_multichain")
           (config_key_arg
              ~name:"max_delayed_inbox_blueprint_length"
-             ~placeholder:"1000")))
+             ~placeholder:"1000")
+          (config_key_flag ~name:"enable_fast_withdrawal")))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -1939,7 +1940,9 @@ let make_kernel_config_command =
              enable_fa_bridge,
              enable_dal,
              dal_slots ),
-           (enable_multichain, max_delayed_inbox_blueprint_length) )
+           ( enable_multichain,
+             max_delayed_inbox_blueprint_length,
+             enable_fast_withdrawal ) )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
@@ -1970,6 +1973,7 @@ let make_kernel_config_command =
         ?enable_multichain
         ?set_account_code
         ?max_delayed_inbox_blueprint_length
+        ?enable_fast_withdrawal
         ~output
         ())
 

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -428,6 +428,15 @@ pub fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
 
     let kt1_b58 = String::from_utf8(ticketer.to_vec()).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
+}
+
+// Path to the fast withdrawals feature flag. If there is nothing at this
+// path, fast withdrawals are not used.
+pub const ENABLE_FAST_WITHDRAWAL: RefPath =
+    RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_withdrawal");
+
+pub fn fast_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
+    host.store_read_all(&ENABLE_FAST_WITHDRAWAL).is_ok()
 }
 
 #[cfg(test)]

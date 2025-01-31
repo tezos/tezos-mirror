@@ -8,6 +8,7 @@ use std::borrow::Cow;
 
 use crate::abi::ABI_B22_RIGHT_PADDING;
 use crate::abi::ABI_H160_LEFT_PADDING;
+use crate::fast_withdrawals_enabled;
 use crate::handler::EvmHandler;
 use crate::handler::FastWithdrawalInterface;
 use crate::handler::RouterInterface;
@@ -363,6 +364,17 @@ pub fn withdrawal_precompile<Host: Runtime>(
         }
         // "67a32cd7" is the function selector for `fast_withdraw_base58(string,string,bytes)`
         [0x67, 0xa3, 0x2c, 0xd7, input_data @ ..] => {
+            if !fast_withdrawals_enabled(handler.host) {
+                let output = "The fast withdrawal feature flag is not enabled, \
+                              cannot call this entrypoint.";
+                return Ok(PrecompileOutcome {
+                    exit_status: ExitReason::Revert(ExitRevert::Reverted),
+                    output: output.as_bytes().to_vec(),
+                    withdrawals: vec![],
+                    estimated_ticks: tick_model::ticks_of_withdraw(),
+                });
+            };
+
             let Some((address_str, fast_withdrawal, payload)) =
                 abi::fast_withdrawal_parameters(input_data)
             else {
