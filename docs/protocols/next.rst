@@ -93,6 +93,11 @@ Protocol parameters
   /chains/<chain_id>/blocks/<block_id>/context/constants``. (MR
   :gl:`!16296`)
 
+- Changed the type of the protocol constant ``max_slashing_threshold``
+  from an integer (number of slots) to a ratio (portion of the
+  committee). This does not affect slashing semantics. (MR
+  :gl:`!15765`)
+
 
 One-day cycles and related protocol periods
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -148,9 +153,6 @@ Bug Fixes
 
 Minor Changes
 -------------
-
-- Changed the type of the protocol constant ``max_slashing_threshold`` from
-  ``int`` to ``Ratio.t``. (MR :gl:`!15765`)
 
 Internal
 --------
