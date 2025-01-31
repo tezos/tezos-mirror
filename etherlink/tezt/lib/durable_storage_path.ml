@@ -89,6 +89,8 @@ let reveal_config = "/__tmp/reveal_config"
 
 let enable_fa_bridge = evm "/feature_flags/enable_fa_bridge"
 
+let enable_multichain = evm "/feature_flags/enable_multichain"
+
 module Ticket_table = struct
   let ticket_table =
     sf

@@ -31,6 +31,7 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  enable_multichain : bool;
 }
 
 let uses _protocol =
@@ -198,7 +199,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?history_mode ~enable_dal
-    ?dal_slots ?rpc_server ?websockets protocol =
+    ?dal_slots ~enable_multichain ?rpc_server ?websockets protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -251,6 +252,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?maximum_gas_per_transaction
       ~enable_dal
       ?dal_slots
+      ~enable_multichain
       ?max_blueprint_lookahead_in_seconds
       ~bootstrap_accounts
       ~output:output_config
@@ -368,6 +370,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       boot_sector = output;
       kernel;
       enable_dal;
+      enable_multichain;
     }
 
 (* Register a single variant of a test but for all protocols. *)
@@ -381,8 +384,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
     ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
     ?(additional_uses = []) ?history_mode ~enable_dal
-    ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None) ?rpc_server
-    ?websockets body ~title ~tags protocols =
+    ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
+    ~enable_multichain ?rpc_server ?websockets body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -431,6 +434,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?websockets
         ~enable_dal
         ?dal_slots
+        ~enable_multichain
         ?rpc_server
         protocol
     in
@@ -442,15 +446,17 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
        (the DAL node) runs and it loads the full DAL SRS which takes
        non-negligible memory. *)
     @ (if enable_dal then ["dal"; Tag.memory_3k] else [])
+    @ (if enable_multichain then ["multichain_enabled"] else [])
     @ tags
   in
   let title =
     sf
-      "%s (%s, %s, %s)"
+      "%s (%s, %s, %s, %s)"
       title
       (if threshold_encryption then "te_sequencer" else "sequencer")
       kernel_tag
       (if enable_dal then "with dal" else "without dal")
+      (if enable_multichain then "multichain" else "single chain")
   in
   (* Only register DAL tests for supporting kernels *)
   if (not enable_dal) || Kernel.supports_dal kernel then
@@ -472,8 +478,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
-    ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots ?rpc_server
-    ?websockets ~title ~tags body protocols =
+    ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
+    ~enable_multichain ?rpc_server ?websockets ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -510,6 +516,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?history_mode
         ~enable_dal
         ?dal_slots
+        ~enable_multichain
         ~title
         ~tags
         body
