@@ -43,7 +43,7 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args23
+       (args22
           force_switch
           data_dir_arg
           rpc_addr_arg
@@ -51,6 +51,7 @@ let config_init_command =
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg
+          disable_performance_metrics_arg
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -64,10 +65,12 @@ let config_init_command =
           boot_sector_file_arg
           no_degraded_arg
           gc_frequency_arg
-          history_mode_arg
+          history_mode_arg)
+       (args4
           cors_allowed_origins_arg
-          cors_allowed_headers_arg)
-       (args2 bail_on_disagree_switch unsafe_disable_wasm_kernel_checks_switch))
+          cors_allowed_headers_arg
+          bail_on_disagree_switch
+          unsafe_disable_wasm_kernel_checks_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -80,6 +83,7 @@ let config_init_command =
              acl_override,
              metrics_addr,
              enable_performance_metrics,
+             disable_performance_metrics,
              loser_mode,
              reconnection_delay,
              dal_node_endpoint,
@@ -93,21 +97,29 @@ let config_init_command =
              boot_sector_file,
              no_degraded,
              gc_frequency,
-             history_mode,
-             allowed_origins,
-             allowed_headers ),
-           (bail_on_disagree, unsafe_disable_wasm_kernel_checks) )
+             history_mode ),
+           ( allowed_origins,
+             allowed_headers,
+             bail_on_disagree,
+             unsafe_disable_wasm_kernel_checks ) )
          mode
          sc_rollup_address
          operators
          cctxt ->
+      let* () =
+        when_ (enable_performance_metrics && disable_performance_metrics)
+        @@ fun () ->
+        failwith
+          "Cannot use both --enable-performance-metrics and \
+           --disable-performance-metrics"
+      in
       let* config =
         Configuration.Cli.configuration_from_args
           ~rpc_addr
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -147,7 +159,7 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args8
+       (args9
           data_dir_arg
           mode_arg
           sc_rollup_address_arg
@@ -155,7 +167,8 @@ let legacy_run_command =
           rpc_port_arg
           acl_override_arg
           metrics_addr_arg
-          enable_performance_metrics_arg)
+          enable_performance_metrics_arg
+          disable_performance_metrics_arg)
        (args20
           loser_mode_arg
           reconnection_delay_arg
@@ -185,7 +198,8 @@ let legacy_run_command =
              rpc_port,
              acl_override,
              metrics_addr,
-             enable_performance_metrics ),
+             enable_performance_metrics,
+             disable_performance_metrics ),
            ( loser_mode,
              reconnection_delay,
              dal_node_endpoint,
@@ -207,6 +221,13 @@ let legacy_run_command =
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks ) )
          cctxt ->
+      let* () =
+        when_ (enable_performance_metrics && disable_performance_metrics)
+        @@ fun () ->
+        failwith
+          "Cannot use both --enable-performance-metrics and \
+           --disable-performance-metrics"
+      in
       let* configuration =
         Configuration.Cli.create_or_read_config
           ~data_dir
@@ -214,7 +235,7 @@ let legacy_run_command =
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -255,13 +276,14 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args10
+       (args11
           data_dir_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg
+          disable_performance_metrics_arg
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -293,6 +315,7 @@ let run_command =
              acl_override,
              metrics_addr,
              enable_performance_metrics,
+             disable_performance_metrics,
              loser_mode,
              reconnection_delay,
              dal_node_endpoint,
@@ -317,6 +340,13 @@ let run_command =
          sc_rollup_address
          operators
          cctxt ->
+      let* () =
+        when_ (enable_performance_metrics && disable_performance_metrics)
+        @@ fun () ->
+        failwith
+          "Cannot use both --enable-performance-metrics and \
+           --disable-performance-metrics"
+      in
       let* configuration =
         Configuration.Cli.create_or_read_config
           ~data_dir
@@ -324,7 +354,7 @@ let run_command =
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
@@ -632,10 +662,10 @@ let list_metrics_command =
   command
     ~group
     ~desc:"List the metrics exported by the smart rollup node."
-    (args1 enable_performance_metrics_arg)
+    (args1 disable_performance_metrics_arg)
     (prefixes ["list"; "metrics"] @@ stop)
-  @@ fun enable_performance_metrics ctxt ->
-  let*! metrics = Metrics.listing ~enable_performance_metrics in
+  @@ fun disable_performance_metrics ctxt ->
+  let*! metrics = Metrics.listing ~disable_performance_metrics in
   let*! () = ctxt#message "%s" metrics in
   return_unit
 

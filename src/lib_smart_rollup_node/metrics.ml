@@ -423,9 +423,16 @@ let performance_metrics : (module PERFORMANCE) Lazy.t =
     (let module M = Octez_performance_metrics.Make (Performance_metrics_config) in
     (module M : PERFORMANCE))
 
-let listing ~enable_performance_metrics =
+let listing ~disable_performance_metrics =
   let open Lwt_syntax in
-  if enable_performance_metrics then ignore (Lazy.force_val performance_metrics) ;
+  let* () =
+    if not disable_performance_metrics then (
+      let+ supports =
+        Octez_performance_metrics.supports_performance_metrics ()
+      in
+      if supports then ignore (Lazy.force_val performance_metrics))
+    else return_unit
+  in
   let* data_sc = CollectorRegistry.(collect sc_rollup_node_registry) in
   let+ data_injector = CollectorRegistry.(collect Injector.registry) in
   let data_merged =

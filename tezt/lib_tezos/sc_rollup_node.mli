@@ -386,7 +386,7 @@ val list_metrics :
   ?runner:Runner.t ->
   ?path:string ->
   ?hooks:Process_hooks.t ->
-  ?enable_performance_metrics:bool ->
+  ?disable_performance_metrics:bool ->
   unit ->
   unit Lwt.t
 

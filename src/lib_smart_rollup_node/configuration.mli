@@ -292,7 +292,7 @@ module Cli : sig
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
-    enable_performance_metrics:bool ->
+    disable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->
@@ -326,7 +326,7 @@ module Cli : sig
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
-    enable_performance_metrics:bool ->
+    disable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->

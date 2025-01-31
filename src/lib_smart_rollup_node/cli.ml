@@ -216,8 +216,18 @@ struct
     Tezos_clic.switch
       ~long:"enable-performance-metrics"
       ~doc:
-        "Enable performance metrics when the metrics server is started \
-         (requires lsof, disabled by default)."
+        "Enable performance metrics when the metrics server is started and the \
+         system supports it. DEPRECATED (enabled by default when the system \
+         supports it)."
+      ()
+
+  let disable_performance_metrics_arg :
+      (bool, Client_context.full) Tezos_clic.arg =
+    Tezos_clic.switch
+      ~long:"disable-performance-metrics"
+      ~doc:
+        "Disable performance metrics when the metrics server is started \
+         (enabled by default when system supports it)."
       ()
 
   let dac_observer_endpoint_arg =

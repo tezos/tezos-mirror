@@ -476,7 +476,7 @@ let send_messages_batcher ?rpc_hooks ?batch_size n client sc_node =
   let* () = Client.bake_for_and_wait client in
   return (List.rev rids)
 
-let test_list_metrics_command_regression ~enable_performance_metrics () =
+let test_list_metrics_command_regression ~disable_performance_metrics () =
   Regression.register
     ~__FILE__
     ~tags:["metrics"; "smart_rollup_node"]
@@ -485,11 +485,12 @@ let test_list_metrics_command_regression ~enable_performance_metrics () =
       Format.(
         sprintf
           "Smart rollup node: list metrics regression (%s performance metrics)"
-          (if enable_performance_metrics then "with" else "without"))
+          (if disable_performance_metrics then "without" else "with"))
     ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
-  @@ fun () -> Sc_rollup_node.list_metrics ~hooks ~enable_performance_metrics ()
+  @@ fun () ->
+  Sc_rollup_node.list_metrics ~hooks ~disable_performance_metrics ()
 
 (** Regression test to ensure rollup node store schema does not change without a
     migration. *)
@@ -6959,8 +6960,8 @@ let register ~protocols =
 
 let register_protocol_independent () =
   let protocols = Protocol.[Alpha] in
-  test_list_metrics_command_regression ~enable_performance_metrics:true () ;
-  test_list_metrics_command_regression ~enable_performance_metrics:false () ;
+  test_list_metrics_command_regression ~disable_performance_metrics:true () ;
+  test_list_metrics_command_regression ~disable_performance_metrics:false () ;
   test_store_schema_regression protocols ;
   let with_kind kind =
     test_rollup_node_running ~kind protocols ;
