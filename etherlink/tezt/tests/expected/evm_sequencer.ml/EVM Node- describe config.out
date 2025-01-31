@@ -285,7 +285,7 @@
 $days:
   /* number_of_days
      Number of days of history to retain */
-  integer ∈ [-2^30, 2^30]
+  integer ∈ [0, 2^30]
 $int64:
   /* 64 bit integers
      Decimal representation of 64 bit integers */
