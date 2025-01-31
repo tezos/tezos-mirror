@@ -2305,15 +2305,15 @@ pub(crate) fn typecheck_value<'a>(
         (T::Set(ty), V::Seq(vs)) => TV::Set(typecheck_set(ctx, t, ty, vs)?),
         (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            TV::Map(typecheck_map(ctx, t, tk, tv, vs, |v| v)?)
+            TV::Map(typecheck_map(ctx, t, tk, tv, vs)?)
         }
         (T::BigMap(m), v) => {
-            let (id_opt, vs_opt) = match v {
+            let (id_opt, vs_opt, diff) = match v {
                 // All valid instantiations of big map are mentioned in
                 // https://tezos.gitlab.io/michelson-reference/#type-big_map
-                V::Int(i) => (Some(i.clone()), None),
-                V::Seq(vs) => (None, Some(vs)),
-                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs)),
+                V::Int(i) => (Some(i.clone()), None, false),
+                V::Seq(vs) => (None, Some(vs), false),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs), true),
                 _ => return Err(invalid_value_for_type!()),
             };
 
@@ -2335,7 +2335,7 @@ pub(crate) fn typecheck_value<'a>(
             };
 
             let overlay = if let Some(vs) = vs_opt {
-                typecheck_map(ctx, t, tk, tv, vs, Some)?
+                typecheck_big_map(ctx, t, tk, tv, vs, diff)?
             } else {
                 BTreeMap::default()
             };
@@ -2613,29 +2613,32 @@ fn typecheck_set<'a>(
     .collect::<Result<_, TcError>>()
 }
 
-fn typecheck_map<'a, V>(
+// A helper function that handles the common map-typechecking logic.
+fn typecheck_map_common<'a, V, F>(
     ctx: &mut Ctx,
     map_ty: &Type,
     key_type: &Type,
-    value_type: &Type,
     vs: &[Micheline<'a>],
-    value_mapper: fn(TypedValue<'a>) -> V,
-) -> Result<BTreeMap<TypedValue<'a>, V>, TcError> {
-    ctx.gas.consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
+    check_parse_value: F,
+) -> Result<BTreeMap<TypedValue<'a>, V>, TcError>
+where
+    F: Fn(&Micheline<'a>, &mut Ctx) -> Result<V, TcError>,
+{
+    ctx.gas
+        .consume(gas::tc_cost::construct_map(key_type.size_for_gas(), vs.len())?)?;
+
     let ctx_cell = std::cell::RefCell::new(ctx);
-    let tc_elt = |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
-        match v {
-            Micheline::App(Prim::Elt, [k, v], _) => {
-                let k = typecheck_value(k, ctx, key_type)?;
-                let v = typecheck_value(v, ctx, value_type)?;
-                Ok((k, value_mapper(v)))
+    let tc_elt = |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
+        match mich {
+            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                let k = typecheck_value(k_expr, local_ctx, key_type)?;
+                let v = check_parse_value(v_expr, local_ctx)?;
+                Ok((k, v))
             }
-            _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), map_ty.clone())),
+            _ => Err(TcError::InvalidEltForMap(format!("{mich:?}"), map_ty.clone())),
         }
     };
+
     // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
     // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
     // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
@@ -2649,7 +2652,44 @@ fn typecheck_map<'a, V>(
         to_key: |(k, _)| k,
         ctx: &ctx_cell,
     }
-    .collect::<Result<_, TcError>>()
+    .collect()
+}
+
+fn typecheck_map<'a>(
+    ctx: &mut Ctx,
+    map_ty: &Type,
+    key_type: &Type,
+    value_type: &Type,
+    vs: &[Micheline<'a>],
+) -> Result<BTreeMap<TypedValue<'a>, TypedValue<'a>>, TcError> {
+    // Here, parse_value simply calls `typecheck_value` on the value expression.
+    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
+        typecheck_value(val_expr, local_ctx, value_type)
+    })
+}
+
+fn typecheck_big_map<'a>(
+    ctx: &mut Ctx,
+    map_ty: &Type,
+    key_type: &Type,
+    value_type: &Type,
+    vs: &[Micheline<'a>],
+    diff: bool,
+) -> Result<BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>, TcError> {
+    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
+        if diff {
+            match val_expr {
+                Micheline::App(Prim::Some, [inner_val], _) => {
+                    let v = typecheck_value(inner_val, local_ctx, value_type)?;
+                    Ok(Some(v))
+                }
+                Micheline::App(Prim::None, [], _) => Ok(None),
+                _ => Err(TcError::InvalidEltForMap(format!("{val_expr:?}"), map_ty.clone())),
+            }
+        } else {
+            typecheck_value(val_expr, local_ctx, value_type).map(Some)
+        }
+    })
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
