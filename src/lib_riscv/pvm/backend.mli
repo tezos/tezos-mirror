@@ -28,7 +28,12 @@ type proof = Api.proof
 
 type output_proof = Api.output_proof
 
-type output = Api.output
+type output_info = {
+  message_index : Z.t;
+  outbox_level : Bounded.Non_negative_int32.t;
+}
+
+type output = {info : output_info; encoded_message : string}
 
 module Mutable_state : sig
   type t = Api.mut_state
@@ -98,7 +103,7 @@ val serialise_proof : proof -> bytes
 
 val deserialise_proof : bytes -> (proof, string) result
 
-val output_of_output_proof : output_proof -> output
+val output_info_of_output_proof : output_proof -> output_info
 
 val state_of_output_proof : output_proof -> hash
 
