@@ -259,6 +259,10 @@ val observer_config_dft :
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
+(** [retention ?days ()] returns the GC parameters to retain [days] of history
+    when provided or the default otherwise. *)
+val retention : ?days:int -> unit -> garbage_collector_parameters
+
 module Cli : sig
   val create :
     data_dir:string ->
@@ -296,6 +300,8 @@ module Cli : sig
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
+    ?history_mode:history_mode ->
+    ?garbage_collector_parameters:garbage_collector_parameters ->
     unit ->
     t
 
@@ -332,6 +338,8 @@ module Cli : sig
     ?restricted_rpcs:restricted_rpcs ->
     finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
+    ?history_mode:history_mode ->
+    ?garbage_collector_parameters:garbage_collector_parameters ->
     dal_slots:int trace option ->
     t ->
     t
@@ -372,6 +380,8 @@ module Cli : sig
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
+    ?history_mode:history_mode ->
+    ?garbage_collector_parameters:garbage_collector_parameters ->
     unit ->
     t tzresult Lwt.t
 end

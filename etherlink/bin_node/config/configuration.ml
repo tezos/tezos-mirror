@@ -148,8 +148,10 @@ let default_enable_send_raw_transaction = true
 
 let default_history_mode = Archive
 
-let default_garbage_collector_parameters =
-  {split_frequency_in_seconds = 86_400; number_of_chunks = 14}
+let retention ?(days = 14) () =
+  {split_frequency_in_seconds = 86_400; number_of_chunks = days}
+
+let default_garbage_collector_parameters = retention ()
 
 (* This should be enough for messages we expect to receive in the ethereum
    JSONRPC protocol. *)
@@ -718,7 +720,7 @@ let garbage_collector_parameters_encoding =
       "days"
       ~title:"number_of_days"
       ~description:"Number of days of history to retain"
-      int31
+      (ranged_int 0 ((1 lsl 30) - 1))
   in
   conv
     (function
@@ -1470,7 +1472,8 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network () =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode
+      ?garbage_collector_parameters () =
     let public_rpc =
       default_rpc
         ?rpc_port
@@ -1576,8 +1579,11 @@ module Cli = struct
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
       finalized_view;
-      garbage_collector_parameters = default_garbage_collector_parameters;
-      history_mode = default_history_mode;
+      garbage_collector_parameters =
+        Option.value
+          garbage_collector_parameters
+          ~default:default_garbage_collector_parameters;
+      history_mode = Option.value history_mode ~default:default_history_mode;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -1619,7 +1625,8 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
-      ?proxy_ignore_block_param ~dal_slots configuration =
+      ?proxy_ignore_block_param ?history_mode ?garbage_collector_parameters
+      ~dal_slots configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1866,8 +1873,12 @@ module Cli = struct
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
       finalized_view = finalized_view || configuration.finalized_view;
-      garbage_collector_parameters = configuration.garbage_collector_parameters;
-      history_mode = configuration.history_mode;
+      garbage_collector_parameters =
+        Option.value
+          garbage_collector_parameters
+          ~default:configuration.garbage_collector_parameters;
+      history_mode =
+        Option.value history_mode ~default:configuration.history_mode;
     }
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
@@ -1880,7 +1891,8 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network () =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode
+      ?garbage_collector_parameters () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1935,6 +1947,8 @@ module Cli = struct
           ?restricted_rpcs
           ~finalized_view
           ?proxy_ignore_block_param
+          ?history_mode
+          ?garbage_collector_parameters
           ~dal_slots
           configuration
       in
@@ -1977,6 +1991,8 @@ module Cli = struct
           ?proxy_ignore_block_param
           ?dal_slots
           ?network
+          ?history_mode
+          ?garbage_collector_parameters
           ()
       in
       return config

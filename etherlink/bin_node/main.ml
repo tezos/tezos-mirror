@@ -736,6 +736,32 @@ let num_download_retries =
     ~placeholder:"1"
     Params.int
 
+let history_arg =
+  Tezos_clic.arg
+    ~long:"history"
+    ~doc:
+      "History mode for the EVM node. rolling:n means rolling with n days of \
+       history."
+    ~placeholder:"archive | rolling | rolling:n"
+  @@ Tezos_clic.parameter (fun () s ->
+         let open Lwt_result_syntax in
+         match String.split_on_char ':' s with
+         | ["archive"] -> return Configuration.(Archive, retention ())
+         | ["rolling"] -> return Configuration.(Rolling, retention ())
+         | ["rolling"; n] -> (
+             match int_of_string_opt n with
+             | Some days when days >= 0 ->
+                 return Configuration.(Rolling, retention ~days ())
+             | _ ->
+                 failwith
+                   "Invalid retention period %S for rolling history mode. Must \
+                    be a positive integer number of days."
+                   n)
+         | _ ->
+             failwith
+               "Invalid history mode. Must be either archive, rolling or \
+                rolling:n where n is the number of days to retain history.")
+
 let common_config_args =
   Tezos_clic.args19
     data_dir_arg
@@ -1616,7 +1642,7 @@ If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (merge_options
        common_config_args
-       (args19
+       (args20
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1632,6 +1658,7 @@ mode.|}
           evm_node_endpoint_arg
           bundler_node_endpoint_arg
           sequencer_sidecar_endpoint_arg
+          history_arg
           (* others option *)
           dont_track_rollup_node_arg
           wallet_dir_arg
@@ -1680,6 +1707,7 @@ mode.|}
              evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
              sequencer_sidecar_endpoint,
+             history,
              dont_track_rollup_node,
              wallet_dir,
              force,
@@ -1696,6 +1724,11 @@ mode.|}
             let wallet_ctxt = register_wallet ~wallet_dir () in
             Client_keys.Secret_key.parse_source_string wallet_ctxt str)
           sequencer_str
+      in
+      let history_mode, garbage_collector_parameters =
+        match history with
+        | Some (hist_mode, gc_params) -> (Some hist_mode, Some gc_params)
+        | None -> (None, None)
       in
       let* config =
         Cli.create_or_read_config
@@ -1737,6 +1770,8 @@ mode.|}
           ?dal_slots
           ~finalized_view
           ?network
+          ?history_mode
+          ?garbage_collector_parameters
           ()
       in
       let*! () =
