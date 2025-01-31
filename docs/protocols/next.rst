@@ -55,9 +55,6 @@ Operation receipts
 Errors
 ------
 
-- tz4 (BLS) addresses are allowed to be registered as delegate and or as
-  consensus keys if the ``allow_tz4_delegate_enable`` feature flag is set. (MR
-  :gl:`!15302`)
 
 Protocol parameters
 -------------------
@@ -111,28 +108,38 @@ Protocol parameters
   /chains/<chain_id>/blocks/<block_id>/context/constants``. (MR
   :gl:`!16296`)
 
+
+Feature flags
+^^^^^^^^^^^^^
+
+- Added a feature flag ``aggregate_attestation`` to enable the
+  aggregation of block attestation lists into a single aggregate
+  operation. (MR :gl:`!15283`) (This feature is not active yet in the
+  Next protocol.)
+
+- Added a feature flag ``allow_tz4_delegate_enable`` to allow tz4
+  (BLS) addresses as delegates and/or as consensus keys. (MRs
+  :gl:`!15311`, :gl:`!15302`) (This feature is not active yet in the
+  Next protocol.)
+
+- Added a feature-controlling parameter
+  ``all_bakers_attest_activation_level``. It is set to ``null`` in the
+  Next protocol, which means that the all-bakers-attest feature will
+  not be active at all in this protocol. (MRs :gl:`!15584`,
+  :gl:`!15764`, :gl:`!16380`)
+
 - Removed obsolete feature flags ``autostaking_enable``,
-  ``ns_enable``, ``activation_vote_enable``,
-  ``adaptive_issuance.launch_ema_threshold``, and ``force_activation``
-  (MRs :gl:`!15215`, :gl:`!15223`, :gl:`!15211`)
+  ``ns_enable``, ``activation_vote_enable``, and ``force_activation``,
+  and related parameter
+  ``adaptive_issuance.launch_ema_threshold``. (MRs :gl:`!15215`,
+  :gl:`!15223`, :gl:`!15211`)
+
 
 Bug Fixes
 ---------
 
 Minor Changes
 -------------
-
-- Added a feature flag to enable the aggregation of block attestation lists into
-  a single aggregate operation. (MR :gl:`!15283`)
-
-- Added a feature flag which would allow tz4 (BLS) addresses as delegate and or
-  as consensus keys. (MR :gl:`!15311`)
-
-- Added a feature-controlling parameter
-  ``all_bakers_attest_activation_level``. It is currently set to
-  ``null``, which means that the all-bakers-attest feature will not be
-  active at all in the current protocol. (MRs :gl:`!15584`,
-  :gl:`!15764`, :gl:`!16380`)
 
 - Changed the type of the protocol constant ``max_slashing_threshold`` from
   ``int`` to ``Ratio.t``. (MR :gl:`!15765`)
