@@ -22,7 +22,7 @@ let received_upgrade =
   declare_1
     ~section
     ~name:"received_upgrade"
-    ~msg:"Received an upgrade payload: {payload}"
+    ~msg:"received an upgrade payload: {payload}"
     ~level:Notice
     ("payload", Data_encoding.string)
 
@@ -31,7 +31,7 @@ let pending_upgrade =
     ~section
     ~name:"pending_upgrade"
     ~msg:
-      "Pending upgrade to root hash {root_hash} expected to activate at \
+      "pending upgrade to root hash {root_hash} expected to activate at \
        {timestamp}"
     ~level:Notice
     ("root_hash", Ethereum_types.hash_encoding)
@@ -41,7 +41,7 @@ let applied_upgrade =
   declare_2
     ~section
     ~name:"applied_upgrade"
-    ~msg:"Kernel successfully upgraded to {root_hash} with blueprint {level}"
+    ~msg:"kernel successfully upgraded to {root_hash} with blueprint {level}"
     ~level:Notice
     ("root_hash", Ethereum_types.hash_encoding)
     ("level", Data_encoding.n)
@@ -50,7 +50,7 @@ let failed_upgrade =
   declare_2
     ~section
     ~name:"failed_upgrade"
-    ~msg:"Kernel failed to upgrade to {root_hash} with blueprint {level}"
+    ~msg:"kernel failed to upgrade to {root_hash} with blueprint {level}"
     ~level:Warning
     ("root_hash", Ethereum_types.hash_encoding)
     ("level", Data_encoding.n)
@@ -60,7 +60,7 @@ let ignored_kernel_arg =
     ~section
     ~name:"ignored_kernel_arg"
     ~msg:
-      "Ignored the kernel command-line argument since the EVM state was \
+      "ignored the kernel command-line argument since the EVM state was \
        already initialized"
     ~level:Warning
     ()
@@ -95,8 +95,8 @@ let legacy_mode =
     ~name:"legacy_mode"
     ~level:Warning
     ~msg:
-      "Node is using the (deprecated) legacy block storage. Import a recent \
-       snapshot to start using the new block storage."
+      "node is using the (deprecated) legacy block storage, import a recent \
+       snapshot to start using the new block storage"
     ()
 
 let event_private_server_is_ready =
@@ -126,7 +126,7 @@ let event_shutdown_node =
   Internal_event.Simple.declare_1
     ~section
     ~name:"shutting_down"
-    ~msg:"Stopping the EVM node with {exit_status}"
+    ~msg:"stopping the EVM node with {exit_status}"
     ~level:Notice
     ("exit_status", Data_encoding.int8)
 
@@ -135,7 +135,7 @@ let event_shutdown_rpc_server ~private_ =
   Internal_event.Simple.declare_0
     ~section
     ~name:("shutting_down_" ^ server ^ "_rpc_server")
-    ~msg:("Stopping the" ^ server ^ " RPC server")
+    ~msg:("stopping the" ^ server ^ " RPC server")
     ~level:Notice
     ()
 
@@ -143,7 +143,7 @@ let event_callback_log =
   Internal_event.Simple.declare_3
     ~section
     ~name:"callback_log"
-    ~msg:"Uri: {uri}\nMethod: {method}\nBody: {body}\n"
+    ~msg:"uri: {uri}\nmethod: {method}\nbody: {body}\n"
     ~level:Debug
     ("uri", Data_encoding.string)
     ("method", Data_encoding.string)
@@ -153,7 +153,7 @@ let event_retrying_connect =
   Internal_event.Simple.declare_2
     ~section
     ~name:"retrying_connect"
-    ~msg:"Cannot connect to {endpoint}, retrying in {delay} seconds."
+    ~msg:"cannot connect to {endpoint}, retrying in {delay} seconds"
     ~level:Notice
     ("endpoint", Data_encoding.string)
     ("delay", Data_encoding.float)
@@ -189,7 +189,7 @@ let missing_chain_id =
     ~level:Warning
     ~section
     ~name:"missing_chain_id"
-    ~msg:"Missing chain id: skipping consistency check with selected network"
+    ~msg:"missing chain id: skipping consistency check with selected network"
     ()
 
 let pp_file_size fmt size =
@@ -211,7 +211,7 @@ let downloading_file =
     ~level:Notice
     ~section
     ~name:"downloading_snapshot"
-    ~msg:"Downloading {url}{size}, this might take a while."
+    ~msg:"downloading {url}{size}"
     ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
     ~pp2:
       Format.(
@@ -224,7 +224,7 @@ let download_in_progress =
     ~level:Notice
     ~section
     ~name:"snapshot_download_in_progress"
-    ~msg:"Still downloading {url} after {elapsed_time}{remaining_bytes}."
+    ~msg:"still downloading {url} after {elapsed_time}{remaining_bytes}"
     ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
     ~pp2:(fun fmt elapsed_time ->
       Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
@@ -241,7 +241,7 @@ let importing_snapshot =
     ~level:Notice
     ~section
     ~name:"importing_snapshot"
-    ~msg:"Importing snapshot"
+    ~msg:"importing snapshot"
     ()
 
 let extract_snapshot_archive_in_progress =
@@ -249,7 +249,7 @@ let extract_snapshot_archive_in_progress =
     ~level:Notice
     ~section
     ~name:"extract_snapshot_archive_in_progress"
-    ~msg:"Still extracting archive {name} after {elapsed_time}."
+    ~msg:"still extracting archive {name} after {elapsed_time}"
     ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
     ~pp2:(fun fmt elapsed_time ->
       Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
@@ -293,7 +293,7 @@ let download_failed =
     ~level:Error
     ~section
     ~name:"download_failed"
-    ~msg:"Downloading {url} failed with {error}."
+    ~msg:"downloading {url} failed with {error}"
     ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
     ~pp2:pp_download_error
     ("url", Data_encoding.string)
@@ -320,7 +320,7 @@ let patched_state =
     ~level:Warning
     ~section
     ~name:"patched_state"
-    ~msg:"Key {key} successfully patched, starting from level {level}"
+    ~msg:"key {key} successfully patched, starting from level {level}"
     ("key", Data_encoding.string)
     ("level", Ethereum_types.quantity_encoding)
 
@@ -329,7 +329,7 @@ let preload_kernel =
     ~level:Notice
     ~section
     ~name:"preloaded_kernel"
-    ~msg:"Kernel {version} successfully preloaded"
+    ~msg:"kernel {version} successfully preloaded"
     ("version", Data_encoding.string)
 
 let predownload_kernel =
@@ -337,7 +337,7 @@ let predownload_kernel =
     ~level:Notice
     ~section
     ~name:"predownload_kernel"
-    ~msg:"Kernel {version} successfully predownloaded"
+    ~msg:"kernel {version} successfully predownloaded"
     ("version", Data_encoding.string)
 
 let sandbox_started =
@@ -345,7 +345,7 @@ let sandbox_started =
     ~level:Notice
     ~section
     ~name:"sandbox_started"
-    ~msg:"Starting sandbox mode at level {level}"
+    ~msg:"starting sandbox mode at level {level}"
     ("level", Data_encoding.z)
 
 let cannot_fetch_time_between_blocks =
@@ -354,7 +354,7 @@ let cannot_fetch_time_between_blocks =
     ~section
     ~name:"cannot_fetch_time_between_blocks"
     ~msg:
-      "Could not fetch the maximum time between blocks from remote EVM \
+      "could not fetch the maximum time between blocks from remote EVM \
        endpoint, default to {tbb}: {trace}"
     ~pp1:Configuration.pp_time_between_blocks
     ~pp2:Error_monad.pp_print_trace
@@ -367,7 +367,7 @@ let invalid_node_da_fees =
     ~section
     ~name:"node_da_fees"
     ~msg:
-      "Internal: node gives {node_da_fees} DA fees, whereas kernel gives \
+      "internal: node gives {node_da_fees} DA fees, whereas kernel gives \
        {kernel_da_fees} on block {block_number} with {call}"
     ~pp1:Z.pp_print
     ~pp2:Z.pp_print
@@ -383,7 +383,7 @@ let wasm_pvm_fallback =
     ~level:Warning
     ~section
     ~name:"wasm_pvm_fallback"
-    ~msg:"The node needs to fallback to the WASM PVM to execute a block"
+    ~msg:"the node needs to fallback to the WASM PVM to execute a block"
     ()
 
 let received_upgrade payload = emit received_upgrade payload

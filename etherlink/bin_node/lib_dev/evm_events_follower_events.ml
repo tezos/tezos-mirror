@@ -14,7 +14,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"evm_events_follower_started"
-      ~msg:"Evm events follower has been started"
+      ~msg:"evm events follower has been started"
       ~level:Notice
       ()
 
@@ -22,7 +22,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_unreadable_event"
-      ~msg:"Evm events follower could not parse event {index} of level {level}"
+      ~msg:"evm events follower could not parse event {index} of level {level}"
       ~level:Error
       ("index", Data_encoding.int31)
       ("level", Data_encoding.int32)
@@ -42,7 +42,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"shutting_down_evm_events_follower"
-      ~msg:"Stopping the evm events follower"
+      ~msg:"stopping the evm events follower"
       ~level:Notice
       ()
 
@@ -51,8 +51,8 @@ module Event = struct
       ~section
       ~name:"evm_events_follower_diverged"
       ~msg:
-        "Rollup node diverged on level {level}, confirmed {expected_hash} \
-         instead of {found_hash}."
+        "rollup node diverged on level {level}, confirmed {expected_hash} \
+         instead of {found_hash}"
       ~level:Error
       ("level", Data_encoding.n)
       ("expected_hash", Ethereum_types.block_hash_encoding)
@@ -62,7 +62,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_follower_upstream_blueprint_applied"
-      ~msg:"Rollup node confirmed block {level}"
+      ~msg:"rollup node confirmed block {level}"
       ~level:Notice
       ("level", Data_encoding.n)
       ("hash", Ethereum_types.block_hash_encoding)
@@ -71,7 +71,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_follower_missing_blueprint"
-      ~msg:"Rollup node diverged at {level}, {expected_hash} not found locally."
+      ~msg:"rollup node diverged at {level}, {expected_hash} not found locally"
       ~level:Error
       ("level", Data_encoding.n)
       ("expected_hash", Ethereum_types.block_hash_encoding)
@@ -80,7 +80,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"evm_events_follower_rollup_node_ahead"
-      ~msg:"Rollup node confirmed block {level} before we received it."
+      ~msg:"rollup node confirmed block {level} before we received it"
       ~level:Warning
       ("level", Data_encoding.n)
 
@@ -89,8 +89,8 @@ module Event = struct
       ~section
       ~name:"evm_events_follower_out_of_sync"
       ~msg:
-        "Rollup node confimed block {expected}, but we have applied block \
-         {received}."
+        "rollup node confimed block {expected}, but we have applied block \
+         {received}"
       ~level:Error
       ("received", Data_encoding.int32)
       ("expected", Data_encoding.int32)
@@ -99,7 +99,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"evm_events_request_failed"
-      ~msg:"Request {view} failed: {errors}"
+      ~msg:"request {view} failed: {errors}"
       ~level:Warning
       ("view", Evm_events_follower_types.Request.encoding)
       ~pp1:Evm_events_follower_types.Request.pp
@@ -110,7 +110,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"evm_events_follower_unexpected_key"
-      ~msg:"Unexpected key in {key} /evm/events."
+      ~msg:"unexpected key in {key} /evm/events"
       ~level:Warning
       ("key", Data_encoding.string)
       ~pp1:Format.pp_print_string
@@ -120,8 +120,8 @@ module Event = struct
       ~section
       ~name:"evm_events_follower_unexpected_number_of_events"
       ~msg:
-        "Unexpected number of events in /evm/events. Fetched {fetched}, \
-         expected {expected}."
+        "unexpected number of events in /evm/events, fetched {fetched}, \
+         expected {expected}"
       ~level:Warning
       ("expected", Data_encoding.int31)
       ("fetched", Data_encoding.int31)
@@ -130,7 +130,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"evm_events_follower_rollup_level_already_processed"
-      ~msg:"Rollup node level {level} was already processed, skipping it."
+      ~msg:"rollup node level {level} was already processed, skipping it"
       ~level:Info
       ("level", Data_encoding.int32)
 
@@ -139,8 +139,8 @@ module Event = struct
       ~section
       ~name:"evm_events_follower_fallback"
       ~msg:
-        "Rollup node does not support fetching all events, falling back to \
-         multiple RPCs fetching."
+        "rollup node does not support fetching all events, falling back to \
+         multiple RPCs fetching"
       ~level:Warning
       ()
 
@@ -149,7 +149,7 @@ module Event = struct
       ~section
       ~name:"flush_delayed_inbox"
       ~msg:
-        "Rollup node flushed the delayed inbox at level {level} ({timestamp})."
+        "rollup node flushed the delayed inbox at level {level} ({timestamp})"
       ~level:Notice
       ("timestamp", Time.Protocol.encoding)
       ("level", Data_encoding.n)

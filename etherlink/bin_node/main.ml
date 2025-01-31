@@ -42,7 +42,7 @@ module Event = struct
     Internal_event.Simple.declare_0
       ~section
       ~name:"sequencer_disabled_native_execution"
-      ~msg:"Native execution is disabled in sequencer mode"
+      ~msg:"native execution is disabled in sequencer mode"
       ~level:Warning
       ()
 
@@ -51,8 +51,8 @@ module Event = struct
       ~section
       ~name:"dream_websocket"
       ~msg:
-        "[Warning] Websocket support in Dream is known to be buggy, consider \
-         using Resto as an RPC server or disabling websockets."
+        "websocket support in Dream is known to be buggy, consider using Resto \
+         as an RPC server or disabling websockets"
       ~level:Warning
       ()
 end
