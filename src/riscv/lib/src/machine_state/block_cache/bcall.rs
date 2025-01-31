@@ -3,9 +3,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+//! Switching of execution strategy for blocks.
+//!
+//! Currently just for interperation only, but will expand to cover JIT.
+
 use super::{run_instr, ICallPlaced};
-#[cfg(test)]
-use crate::machine_state::instruction::Instruction;
 use crate::{
     machine_state::{
         main_memory::{Address, MainMemoryLayout},
@@ -15,16 +17,12 @@ use crate::{
     traps::{EnvironException, Exception},
 };
 
-/// A block fetched from the block cache, that can be executed against the machine state.
-pub struct Block<'a, ML: MainMemoryLayout, M: ManagerBase> {
-    pub(super) instr: &'a mut [EnrichedCell<ICallPlaced<ML>, M>],
-}
-
-impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
+/// Functionality required to execute blocks.
+///
+/// In future, will also cover 'construction' of blocks.
+pub trait BCall<ML: MainMemoryLayout, M: ManagerBase> {
     /// The number of instructions contained in the block.
-    pub fn num_instr(&self) -> usize {
-        self.instr.len()
-    }
+    fn num_instr(&self) -> usize;
 
     /// Run a block against the machine state.
     ///
@@ -33,24 +31,22 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
     /// and running a new block.
     ///
     /// There _must_ also be sufficient steps remaining, to execute the block in full.
-    pub fn run_block(
+    fn run_block(
         &mut self,
         core: &mut MachineCoreState<ML, M>,
-        mut instr_pc: Address,
+        instr_pc: Address,
         steps: &mut usize,
     ) -> Result<(), EnvironException>
     where
-        M: ManagerReadWrite,
-    {
-        if let Err(e) = self.run_block_inner(core, &mut instr_pc, steps) {
-            core.handle_step_result(instr_pc, Err(e))?;
-            // If we succesfully handled an error, need to increment steps one more.
-            *steps += 1;
-        }
+        M: ManagerReadWrite;
+}
 
-        Ok(())
-    }
+/// A block fetched from the block cache, that can be executed against the machine state.
+pub struct Block<'a, ML: MainMemoryLayout, M: ManagerBase> {
+    pub(super) instr: &'a mut [EnrichedCell<ICallPlaced<ML>, M>],
+}
 
+impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
     fn run_block_inner(
         &mut self,
         core: &mut MachineCoreState<ML, M>,
@@ -84,14 +80,29 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
 
         Ok(())
     }
+}
 
-    /// Retrieve the underlying instructions contained in the given block.
-    #[cfg(test)]
-    pub(crate) fn to_vec(&self) -> Vec<Instruction>
+impl<'a, ML: MainMemoryLayout, M: ManagerBase> BCall<ML, M> for Block<'a, ML, M> {
+    fn num_instr(&self) -> usize {
+        self.instr.len()
+    }
+
+    fn run_block(
+        &mut self,
+        core: &mut MachineCoreState<ML, M>,
+        mut instr_pc: Address,
+        steps: &mut usize,
+    ) -> Result<(), EnvironException>
     where
-        M: ManagerRead,
+        M: ManagerReadWrite,
     {
-        self.instr.iter().map(|cell| cell.read_stored()).collect()
+        if let Err(e) = self.run_block_inner(core, &mut instr_pc, steps) {
+            core.handle_step_result(instr_pc, Err(e))?;
+            // If we succesfully handled an error, need to increment steps one more.
+            *steps += 1;
+        }
+
+        Ok(())
     }
 }
 

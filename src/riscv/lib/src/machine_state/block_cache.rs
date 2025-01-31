@@ -99,7 +99,7 @@ use crate::{
 };
 use crate::{default::ConstDefault, state_backend::verify_backend};
 use crate::{machine_state::instruction::Args, storage::binary};
-pub use bcall::Block;
+pub use bcall::{BCall, Block};
 use std::marker::PhantomData;
 use std::u64;
 
@@ -684,7 +684,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     ///
     /// *NB* before running any block, you must ensure no partial block
     /// is in progress with [`BlockCache::complete_current_block`].
-    pub fn get_block(&mut self, phys_addr: Address) -> Option<Block<ML, M>>
+    pub fn get_block(&mut self, phys_addr: Address) -> Option<impl BCall<ML, M> + '_>
     where
         M: ManagerRead,
     {
@@ -812,6 +812,19 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
         }
 
         Ok(())
+    }
+
+    /// *TEST ONLY* - retrieve the underlying instructions contained in the entry at the given
+    /// address.
+    #[cfg(test)]
+    pub(crate) fn get_block_instr(&mut self, phys_addr: Address) -> Vec<Instruction>
+    where
+        M: ManagerRead,
+    {
+        let entry = BCL::entry_mut(&mut self.entries, phys_addr);
+
+        let instr = &entry.instr[..entry.len_instr.read() as usize];
+        instr.iter().map(|cell| cell.read_stored()).collect()
     }
 }
 

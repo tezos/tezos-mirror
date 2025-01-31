@@ -36,7 +36,7 @@ use address_translation::{
     translation_cache::{TranslationCache, TranslationCacheLayout},
     PAGE_SIZE,
 };
-use block_cache::BlockCache;
+use block_cache::{BCall, BlockCache};
 pub use cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
 use csregisters::CSRegister;
 use csregisters::{values::CSRValue, CSRRepr};
@@ -471,7 +471,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
         self.block_cache
             .complete_current_block(&mut self.core, steps, max_steps)?;
 
-        while *steps < max_steps {
+        'run: while *steps < max_steps {
             let current_mode = self.core.hart.mode.read();
 
             // Obtain the pc for the next instruction to be executed
@@ -479,24 +479,59 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
             let satp: CSRRepr = self.core.hart.csregisters.read(CSRegister::satp);
 
             let res = match self.translate_instr_address(current_mode, satp, instr_pc) {
-                Ok(phys_addr) => match self.block_cache.get_block(phys_addr).as_mut() {
-                    Some(block) if block.num_instr() <= max_steps - *steps => {
-                        block.run_block(&mut self.core, instr_pc, steps)?;
-                        continue;
-                    }
-                    Some(_) => {
-                        self.block_cache.run_block_partial(
-                            &mut self.core,
-                            phys_addr,
-                            steps,
-                            max_steps,
-                        )?;
-                        // We may not consume all the steps, particularly if we encountered a jump or exception
-                        continue;
-                    }
-                    None => self.run_instr_at(current_mode, satp, instr_pc, phys_addr),
-                },
                 Err(e) => Err(e),
+                Ok(phys_addr) => {
+                    /// Possible scenarios for being unable to execute a block
+                    enum BlockUnexecutable {
+                        /// We have found a block to run, but not enough steps remain to
+                        /// run it, so we run it partially. This is done immediately after
+                        /// the match statement.
+                        NotEnoughSteps,
+                        /// There is no block to run. Therefore we have to do the
+                        /// fetch-run-parse cycle of `run_instr_at`. This may result in a
+                        /// new instruction being pushed to the block cache, so we need to
+                        /// exit the match statement first to run this.
+                        NoBlockFound,
+                    }
+
+                    // Unfornately `block_cache.get_block()` mutable captures the block_cache
+                    // for the lifetime of this match statement - even though internally we
+                    // don't. Rustc cannot see this though, as it's hidden behind a trait.
+                    //
+                    // Therefore, we make use of enum return values to run various options
+                    // depending on whether
+                    // - the block exists
+                    // - we have enough steps to run the block
+                    let run_result = match self.block_cache.get_block(phys_addr) {
+                        Some(mut block) if block.num_instr() <= max_steps - *steps => {
+                            block.run_block(&mut self.core, instr_pc, steps)?;
+
+                            continue 'run;
+                        }
+                        Some(_) => BlockUnexecutable::NotEnoughSteps,
+                        None => BlockUnexecutable::NoBlockFound,
+                    };
+
+                    match run_result {
+                        BlockUnexecutable::NotEnoughSteps => {
+                            // We now run the block partially. Because we're outside the match
+                            // statement, we have access to `self.block_cache` again.
+                            self.block_cache.run_block_partial(
+                                &mut self.core,
+                                phys_addr,
+                                steps,
+                                max_steps,
+                            )?;
+
+                            continue 'run;
+                        }
+                        BlockUnexecutable::NoBlockFound => {
+                            // We did not find a block. Therefore we can now run a single instruction. If
+                            // we had found block, execution would immediately continue at the top-level.
+                            self.run_instr_at(current_mode, satp, instr_pc, phys_addr)
+                        }
+                    }
+                }
             };
 
             self.core.handle_step_result(instr_pc, res)?;
@@ -1279,16 +1314,19 @@ mod tests {
 
         state.step_max(Bound::Included(3));
 
-        let block = state.block_cache.get_block(phys_addr);
-        assert!(block.is_some());
-        assert_eq!(vec![uncompressed], block.unwrap().to_vec());
+        assert!(state.block_cache.get_block(phys_addr).is_some());
+        assert_eq!(
+            vec![uncompressed],
+            state.block_cache.get_block_instr(phys_addr)
+        );
 
-        let block = state.block_cache.get_block(phys_addr + 4);
-        assert!(block.is_none());
+        assert!(state.block_cache.get_block(phys_addr + 4).is_none());
 
-        let block = state.block_cache.get_block(phys_addr + 8);
-        assert!(block.is_some());
-        assert_eq!(vec![uncompressed], block.unwrap().to_vec());
+        assert!(state.block_cache.get_block(phys_addr + 8).is_some());
+        assert_eq!(
+            vec![uncompressed],
+            state.block_cache.get_block_instr(phys_addr + 8)
+        );
     });
 
     // The block cache & instruction cache have separate cache invalidation/overwriting.
@@ -1448,23 +1486,16 @@ mod tests {
         state.step_max(Bound::Included(block_b.len()));
         assert_eq!(phys_addr, state.core.hart.pc.read());
 
+        assert!(state.block_cache.get_block(phys_addr).is_some());
         assert_eq!(
             block_a.as_slice(),
-            state
-                .block_cache
-                .get_block(phys_addr)
-                .unwrap()
-                .to_vec()
-                .as_slice()
+            state.block_cache.get_block_instr(phys_addr).as_slice()
         );
+
+        assert!(state.block_cache.get_block(block_b_addr).is_some());
         assert_eq!(
             block_b.as_slice(),
-            state
-                .block_cache
-                .get_block(block_b_addr)
-                .unwrap()
-                .to_vec()
-                .as_slice()
+            state.block_cache.get_block_instr(block_b_addr).as_slice()
         );
 
         let mut state_step = state.clone();
