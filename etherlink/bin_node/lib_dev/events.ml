@@ -224,17 +224,24 @@ let download_in_progress =
     ~level:Notice
     ~section
     ~name:"snapshot_download_in_progress"
-    ~msg:"still downloading {url} after {elapsed_time}{remaining_bytes}"
+    ~msg:"still downloading {url} after {elapsed_time}{progress}"
     ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
     ~pp2:(fun fmt elapsed_time ->
       Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
     ~pp3:
       Format.(
-        pp_print_option (fun fmt remaining ->
-            fprintf fmt " (%a remaining)" pp_file_size remaining))
+        pp_print_option (fun fmt (remaining, percentage) ->
+            fprintf
+              fmt
+              " (%.1f%%, %a remaining)"
+              percentage
+              pp_file_size
+              remaining))
     ("url", Data_encoding.string)
     ("elapsed_time", Time.System.Span.encoding)
-    ("remaining_bytes", Data_encoding.(option int31))
+    ( "progress",
+      Data_encoding.(
+        option (obj2 (req "remaining_bytes" int31) (req "percentage" float))) )
 
 let importing_snapshot =
   Internal_event.Simple.declare_0
@@ -455,8 +462,17 @@ let missing_chain_id () = emit missing_chain_id ()
 
 let downloading_file ?size url = emit downloading_file (url, size)
 
-let download_in_progress ?remaining_bytes ~elapsed_time url =
-  emit download_in_progress (url, elapsed_time, remaining_bytes)
+let download_in_progress ~size ~remaining_size ~elapsed_time url =
+  let progress =
+    match (size, remaining_size) with
+    | Some size, Some remain ->
+        let percent =
+          float_of_int (size - remain) *. 100. /. float_of_int size
+        in
+        Some (remain, percent)
+    | _ -> None
+  in
+  emit download_in_progress (url, elapsed_time, progress)
 
 let download_failed url reason = emit download_failed (url, reason)
 

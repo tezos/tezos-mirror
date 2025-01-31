@@ -84,16 +84,17 @@ let rec download_file ~keep_alive ~working_dir url =
   let uri = Uri.of_string url in
   let start_time = Ptime_clock.now () in
 
-  let rec periodic_emit ~remaining_size =
+  let rec periodic_emit ~size ~remaining_size =
     let* () = Lwt_unix.sleep 60.0 in
     let elapsed_time = Ptime.diff (Ptime_clock.now ()) start_time in
     let* () =
       Events.download_in_progress
-        ?remaining_bytes:!remaining_size
+        ~size
+        ~remaining_size:!remaining_size
         ~elapsed_time
         url
     in
-    periodic_emit ~remaining_size
+    periodic_emit ~size ~remaining_size
   in
 
   let download_task ~stream ~remaining_size =
@@ -130,7 +131,7 @@ let rec download_file ~keep_alive ~working_dir url =
             Lwt.pick
               [
                 download_task ~stream ~remaining_size;
-                periodic_emit ~remaining_size;
+                periodic_emit ~size ~remaining_size;
               ]
           in
           Lwt_result.return target_path
