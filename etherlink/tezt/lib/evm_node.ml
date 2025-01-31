@@ -28,6 +28,8 @@
 
 type time_between_blocks = Nothing | Time_between_blocks of float
 
+type history_mode = Archive | Rolling of int
+
 type mode =
   | Observer of {
       initial_kernel : string;
@@ -107,6 +109,7 @@ module Parameters = struct
     mutable pending_blueprint_finalized :
       unit option Lwt.u list Per_level_map.t;
     mode : mode;
+    history : history_mode;
     data_dir : string;
     rpc_addr : string;
     rpc_port : int;
@@ -737,7 +740,8 @@ let mode_with_new_private_rpc (mode : mode) =
   | _ -> mode
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs endpoint =
+    ?(mode = Proxy) ?(history = Archive) ?data_dir ?rpc_addr ?rpc_port
+    ?restricted_rpcs endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -770,6 +774,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         last_finalized_level = 0;
         pending_blueprint_finalized = Per_level_map.empty;
         mode;
+        history;
         data_dir;
         rpc_addr;
         rpc_port;
@@ -948,7 +953,14 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         "restricted-rpcs"
         Fun.id
         evm_node.persistent_state.restricted_rpcs
+    @ [
+        "--history";
+        (match evm_node.persistent_state.history with
+        | Archive -> "archive"
+        | Rolling n -> sf "rolling:%d" n);
+      ]
   in
+
   let time_between_blocks_fmt = function
     | Nothing -> "none"
     | Time_between_blocks f -> Format.sprintf "%.3f" f
@@ -1209,8 +1221,6 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
 
 let endpoint = rpc_endpoint ?local:None
 
-type history_mode = Archive | Rolling of int
-
 type rpc_server = Resto | Dream
 
 let conditional_json_put ~name cond value_json json =
@@ -1280,6 +1290,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       ?name
       ?runner
       ?mode
+      ?history:history_mode
       ?data_dir
       ?rpc_addr
       ?rpc_port
@@ -1287,7 +1298,6 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
-  let* () = Config_file.update evm_node (patch_config_gc ?history_mode) in
   let* () =
     match patch_config with
     | Some patch_config -> Config_file.update evm_node patch_config

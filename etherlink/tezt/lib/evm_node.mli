@@ -121,6 +121,10 @@ type mode =
   | Proxy
   | Rpc of mode
 
+type history_mode =
+  | Archive
+  | Rolling of int  (** Rolling with retention period in days. *)
+
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
 
@@ -136,7 +140,7 @@ val preimages_dir : t -> string
 
 val supports_threshold_encryption : t -> bool
 
-(** [create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
@@ -153,6 +157,7 @@ val create :
   ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
+  ?history:history_mode ->
   ?data_dir:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
@@ -285,10 +290,6 @@ val spawn_init_config_minimal :
   ?extra_arguments:string list ->
   unit ->
   Process.t
-
-type history_mode =
-  | Archive
-  | Rolling of int  (** Rolling with retention period in days. *)
 
 type rpc_server = Resto | Dream
 
