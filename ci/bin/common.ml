@@ -400,8 +400,7 @@ let changeset_octez_docker_changes_or_master =
           "Dockerfile";
         ])
 
-let changeset_hadolint_docker_files =
-  Changeset.make ["build.Dockerfile"; "Dockerfile"]
+let changeset_docker_files = Changeset.make ["build.Dockerfile"; "Dockerfile"]
 
 let changeset_debian_packages =
   Changeset.(
