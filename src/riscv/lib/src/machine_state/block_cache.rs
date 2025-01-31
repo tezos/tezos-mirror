@@ -78,6 +78,8 @@
 //! opcode to function statically during block construction. This saves time over
 //! dispatching on every 'instruction run'. See [`ICall`] for more information.
 
+mod bcall;
+
 use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::instruction::Instruction;
 use super::main_memory::MainMemoryLayout;
@@ -97,6 +99,7 @@ use crate::{
 };
 use crate::{default::ConstDefault, state_backend::verify_backend};
 use crate::{machine_state::instruction::Args, storage::binary};
+pub use bcall::Block;
 use std::marker::PhantomData;
 use std::u64;
 
@@ -825,95 +828,6 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
         }
     }
 }
-
-/// A block fetched from the block cache, that can be executed against the machine state.
-pub struct Block<'a, ML: MainMemoryLayout, M: ManagerBase> {
-    instr: &'a mut [EnrichedCell<ICallPlaced<ML>, M>],
-}
-
-impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
-    /// The number of instructions contained in the block.
-    pub fn num_instr(&self) -> usize {
-        self.instr.len()
-    }
-
-    /// Run a block against the machine state.
-    ///
-    /// When calling this function, there must be no partial block in progress. To ensure
-    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
-    /// and running a new block.
-    ///
-    /// There _must_ also be sufficient steps remaining, to execute the block in full.
-    pub fn run_block(
-        &mut self,
-        core: &mut MachineCoreState<ML, M>,
-        mut instr_pc: Address,
-        steps: &mut usize,
-    ) -> Result<(), EnvironException>
-    where
-        M: ManagerReadWrite,
-    {
-        if let Err(e) = self.run_block_inner(core, &mut instr_pc, steps) {
-            core.handle_step_result(instr_pc, Err(e))?;
-            // If we succesfully handled an error, need to increment steps one more.
-            *steps += 1;
-        }
-
-        Ok(())
-    }
-
-    fn run_block_inner(
-        &mut self,
-        core: &mut MachineCoreState<ML, M>,
-        instr_pc: &mut Address,
-        steps: &mut usize,
-    ) -> Result<(), Exception>
-    where
-        M: ManagerReadWrite,
-    {
-        for instr in self.instr.iter() {
-            match run_instr(instr, core) {
-                Ok(ProgramCounterUpdate::Next(width)) => {
-                    *instr_pc += width as u64;
-                    core.hart.pc.write(*instr_pc);
-                    *steps += 1;
-                }
-                Ok(ProgramCounterUpdate::Set(instr_pc)) => {
-                    // Setting the instr_pc implies execution continuing
-                    // elsewhere - and no longer within the current block.
-                    core.hart.pc.write(instr_pc);
-                    *steps += 1;
-                    break;
-                }
-                Err(e) => {
-                    // Exceptions lead to a new address being set to handle it,
-                    // with no guarantee of it being the next instruction.
-                    return Err(e);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Retrieve the underlying instructions contained in the given block.
-    #[cfg(test)]
-    pub(super) fn to_vec(&self) -> Vec<Instruction>
-    where
-        M: ManagerRead,
-    {
-        self.instr.iter().map(|cell| cell.read_stored()).collect()
-    }
-}
-
-impl<'a, ML: MainMemoryLayout, M: ManagerBase> From<&'a mut [EnrichedCell<ICallPlaced<ML>, M>]>
-    for Block<'a, ML, M>
-{
-    fn from(value: &'a mut [EnrichedCell<ICallPlaced<ML>, M>]) -> Self {
-        Self { instr: value }
-    }
-}
-
 #[inline(always)]
 fn run_instr<ML: MainMemoryLayout, M: ManagerReadWrite>(
     instr: &EnrichedCell<ICallPlaced<ML>, M>,
