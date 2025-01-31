@@ -59,21 +59,6 @@ Errors
 Protocol parameters
 -------------------
 
-- Lower the number of blocks per cycle (``blocks_per_cycle``) from
-  30720 (~2.8 days) to 10800 (~1 day). (MR :gl:`!15196`)
-
-- Update the number of cycles per voting period
-  (``cycles_per_voting_period``) from 5 cycles (that is, ~14.2 days
-  with old cycle duration) to 14 cycles (~14 days with new cycle
-  duration). (MR :gl:`!15196`)
-
-- Make ``tolerated_inactivity_period`` a protocol constant, and lower it
-  from 3 cycles (~8.5 days with old cycle duration) to 2 cycles (~2
-  days with new cycle duration). (MRs :gl:`!15390`, :gl:`!16264`)
-
-- Lower the number of blocks per cycle (``blocks_per_cycle``) for
-  ghostnet to 10800 (~12 hours). (MR :gl:`!15196`)
-
 - Rename ``consensus_threshold`` to ``consensus_threshold_size``. (MR :gl:`!15979`)
 
 - Replace the ``max_slashing_period = 2`` protocol constant with two
@@ -107,6 +92,29 @@ Protocol parameters
   now be observed by calling the RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/context/constants``. (MR
   :gl:`!16296`)
+
+
+One-day cycles and related protocol periods
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Lowered the number of blocks per cycle (``blocks_per_cycle``) from
+  30720 (~2.8 days) to 10800 (~1 day) on mainnet (with 8-second
+  minimal block time). (MR :gl:`!15196`)
+
+  - On ghostnet where minimal block time is 4s, lowered
+    ``blocks_per_cycle`` from 15360 (~17 hours) to 10800 (~12
+    hours). (MR :gl:`!15196`)
+
+- In order for the duration of voting periods to stay about the same,
+  updated the number of cycles per voting period
+  (``cycles_per_voting_period``) on mainnet from 5 cycles (that is,
+  ~14.2 days with old cycle duration) to 14 cycles (~14 days with new
+  cycle duration). (MR :gl:`!15196`)
+
+- Exposed ``tolerated_inactivity_period`` as a protocol constant, and
+  lowered it from 3 cycles (~8.5 days with old cycle duration) to 2
+  cycles (~2 days with new cycle duration) on mainnet. (MRs
+  :gl:`!15390`, :gl:`!16264`)
 
 
 Feature flags
