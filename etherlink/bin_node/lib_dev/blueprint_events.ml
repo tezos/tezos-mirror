@@ -29,8 +29,15 @@ let blueprint_application =
   declare_6
     ~name:"blueprint_application"
     ~section
-    ~msg:"Head is now {level}, applied in {process_time}"
+    ~msg:"Head is now {level}, applied in {process_time}{timestamp}"
     ~level:Notice
+    ~pp2:(fun fmt timestamp ->
+      let timestamp = Time.System.of_protocol_exn timestamp in
+      if Metrics.is_bootstrapping () then
+        let now = Time.System.now () in
+        let age = Ptime.diff now timestamp in
+        Format.fprintf fmt " (%a old)" Ptime.Span.pp age
+      else ())
     ~pp6:Time.System.Span.pp_hum
     ("level", Data_encoding.n)
     ("timestamp", Time.Protocol.rfc_encoding)
