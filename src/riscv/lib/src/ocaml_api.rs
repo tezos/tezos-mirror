@@ -14,7 +14,6 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
 use pointer_apply::{ApplyReadOnly, apply_imm, apply_mut};
 use sha2::{Digest, Sha256};
-use tezos_smart_rollup_constants::core::{METADATA_LENGTH, ROLLUP_ADDRESS_LENGTH};
 
 use crate::{
     pvm::{
@@ -101,13 +100,6 @@ impl From<Status> for PvmStatus {
     }
 }
 
-#[derive(ocaml::FromValue, ocaml::ToValue)]
-#[ocaml::sig("RawData of string | Metadata of bytes * int32")]
-pub enum RevealData<'a> {
-    RawData(&'a [u8]),
-    Metadata(&'a [u8], u32),
-}
-
 /// Wrapper to convert a Rust allocated byte-array to an OCaml allocated Bytes type
 pub struct BytesWrapper(Box<[u8]>);
 
@@ -116,19 +108,23 @@ unsafe impl ocaml::ToValue for BytesWrapper {
         unsafe { ocaml::Value::bytes(&self.0) }
     }
 }
-
-#[derive(ocaml::FromValue, ocaml::ToValue)]
-#[ocaml::sig("InboxMessage of int32 * int64 * string | Reveal of reveal_data")]
+/// Input values are passed into the PVM after an input request has been made.
+#[derive(ocaml::FromValue)]
+#[ocaml::sig("InboxMessage of int32 * int64 * bytes | Reveal of bytes")]
 pub enum Input<'a> {
     InboxMessage(u32, u64, &'a [u8]),
-    Reveal(RevealData<'a>),
+    Reveal(&'a [u8]),
 }
 
-// TODO RV-336 Implement `InputRequest` type
-/// A value of this type could only be returned as part of successfully verifying
-/// a proof, which is not yet implemented. It is therefore only mocked for now.
-#[ocaml::sig]
-pub struct InputRequest;
+/// A value of this type could only be returned as part of successfully verifying a proof.
+#[derive(ocaml::ToValue)]
+#[ocaml::sig("NoInputRequired | Initial | FirstAfter of int32 * int64 | NeedsReveal of bytes")]
+pub enum InputRequest {
+    NoInputRequired,
+    Initial,
+    FirstAfter(u32, u64),
+    NeedsReveal(BytesWrapper),
+}
 
 ocaml::custom!(InputRequest);
 
@@ -441,16 +437,8 @@ fn apply_set_input<M: ManagerReadWrite>(pvm: &mut NodePvm<M>, input: Input) {
         Input::InboxMessage(level, message_counter, payload) => {
             pvm.set_input_message(level, message_counter, payload.to_vec())
         }
-        Input::Reveal(RevealData::Metadata(address, origination_level)) => {
-            let mut metadata_response_buffer = [0u8; METADATA_LENGTH];
-            metadata_response_buffer[..ROLLUP_ADDRESS_LENGTH].copy_from_slice(address);
-            metadata_response_buffer[ROLLUP_ADDRESS_LENGTH..]
-                .copy_from_slice(&origination_level.to_be_bytes());
-            pvm.set_reveal_response(&metadata_response_buffer)
-        }
-        _ => {
-            // TODO: RV-110. Support all revelations in set_input method
-            todo!()
+        Input::Reveal(reveal_data) => {
+            pvm.set_reveal_response(reveal_data);
         }
     }
 }
@@ -534,7 +522,7 @@ pub unsafe fn octez_riscv_verify_proof(
     }
 
     // TODO: RV-336: Need to construct InputRequest
-    Some(Pointer::from(InputRequest))
+    Some(todo!())
 }
 
 #[ocaml::func]

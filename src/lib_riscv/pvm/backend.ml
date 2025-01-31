@@ -18,11 +18,13 @@ type state = Api.state
 
 type status = Api.status
 
-type reveal_data = Api.reveal_data
+type input = Inbox_message of int32 * int64 * string | Reveal of string
 
-type input = Api.input
-
-type input_request = Api.input_request
+type input_request =
+  | No_input_required
+  | Initial
+  | First_after of int32 * int64
+  | Needs_reveal of string
 
 type proof = Api.proof
 
@@ -54,6 +56,22 @@ let from_api_output : Api.output -> output =
     info = from_api_output_info info;
     encoded_message = String.of_bytes encoded_message;
   }
+
+let to_api_input : input -> Api.input =
+ fun input ->
+  match input with
+  | Inbox_message (outbox_level, message_index, payload) ->
+      InboxMessage (outbox_level, message_index, Bytes.of_string payload)
+  | Reveal raw_reveal -> Reveal (Bytes.of_string raw_reveal)
+
+let from_api_input_request : Api.input_request -> input_request =
+ fun input_request ->
+  match input_request with
+  | Api.NoInputRequired -> No_input_required
+  | Api.Initial -> Initial
+  | Api.FirstAfter (outbox_level, message_index) ->
+      First_after (outbox_level, message_index)
+  | Api.NeedsReveal raw_reveal -> Needs_reveal (String.of_bytes raw_reveal)
 
 (* The kernel debug logging function (`string -> unit Lwt.t`) passed by the node
  * to [compute_step] and [compute_step_many] cannot be passed directly
@@ -101,7 +119,7 @@ module Mutable_state = struct
     riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_mut_state_hash state
 
   let set_input state input =
-    Lwt.return (Api.octez_riscv_mut_set_input state input)
+    Lwt.return (Api.octez_riscv_mut_set_input state (to_api_input input))
 
   let get_reveal_request state =
     Lwt.return (String.of_bytes @@ Api.octez_riscv_mut_get_reveal_request state)
@@ -142,7 +160,8 @@ let get_current_level state = Lwt.return (Api.octez_riscv_get_level state)
 let state_hash state =
   riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_state_hash state
 
-let set_input state input = Lwt.return (Api.octez_riscv_set_input state input)
+let set_input state input =
+  Lwt.return (Api.octez_riscv_set_input state (to_api_input input))
 
 let proof_start_state proof =
   riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_proof_start_state proof
@@ -150,9 +169,14 @@ let proof_start_state proof =
 let proof_stop_state proof =
   riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_proof_stop_state proof
 
-let verify_proof input proof = Api.octez_riscv_verify_proof input proof
+let verify_proof input proof =
+  let open Option_syntax in
+  let input = Option.map to_api_input input in
+  let* input_request = Api.octez_riscv_verify_proof input proof in
+  return @@ from_api_input_request input_request
 
-let produce_proof input state = Api.octez_riscv_produce_proof input state
+let produce_proof input state =
+  Api.octez_riscv_produce_proof (Option.map to_api_input input) state
 
 let serialise_proof proof = Api.octez_riscv_serialise_proof proof
 

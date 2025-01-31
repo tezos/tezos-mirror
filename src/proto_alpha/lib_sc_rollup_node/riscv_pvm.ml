@@ -22,17 +22,17 @@ module Ctxt_wrapper = Context_wrapper.Riscv
 let to_pvm_input (input : Sc_rollup.input) : Backend.input =
   match input with
   | Sc_rollup.Inbox_message {inbox_level; message_counter; payload} ->
-      InboxMessage
+      Inbox_message
         ( Raw_level.to_int32 inbox_level,
           Z.to_int64 message_counter,
           Sc_rollup.Inbox_message.unsafe_to_string payload )
-  | Sc_rollup.(Reveal (Metadata {address; origination_level})) ->
-      Reveal
-        (Metadata
-           ( Sc_rollup.Address.to_bytes address,
-             Raw_level.to_int32 origination_level ))
-  | Sc_rollup.(Reveal (Raw_data data)) -> Reveal (RawData data)
-  | _ -> assert false
+  | Sc_rollup.(Reveal (Metadata data)) ->
+      let bytes =
+        Data_encoding.Binary.to_string_exn Sc_rollup.Metadata.encoding data
+      in
+      Reveal bytes
+  (* TODO: RV-504 Encode remaining types of reveal *)
+  | Sc_rollup.(Reveal _) -> assert false
 
 let of_pvm_input_request (_input_request : Backend.input_request) :
     Sc_rollup.input_request =

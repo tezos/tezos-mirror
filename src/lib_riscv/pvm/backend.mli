@@ -18,11 +18,13 @@ type state = Api.state
 
 type status = Api.status
 
-type reveal_data = Api.reveal_data
+type input = Inbox_message of int32 * int64 * string | Reveal of string
 
-type input = Api.input
-
-type input_request = Api.input_request
+type input_request =
+  | No_input_required
+  | Initial
+  | First_after of int32 * int64
+  | Needs_reveal of string
 
 type proof = Api.proof
 

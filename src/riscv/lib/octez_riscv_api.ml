@@ -9,9 +9,8 @@ type state
 type mut_state
 type id
 type status = Evaluating | WaitingForInput | WaitingForReveal
-type reveal_data = RawData of string | Metadata of bytes * int32
-type input = InboxMessage of int32 * int64 * string | Reveal of reveal_data
-type input_request
+type input = InboxMessage of int32 * int64 * bytes | Reveal of bytes
+type input_request = NoInputRequired | Initial | FirstAfter of int32 * int64 | NeedsReveal of bytes
 type output_info = {message_index : int64; outbox_level : int32}
 type output = {info : output_info; encoded_message : bytes}
 type output_proof
