@@ -74,6 +74,10 @@ module Params = struct
   let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
+  let event_level =
+    Tezos_clic.parameter (fun _ value ->
+        Lwt.return_ok (Internal_event.Level.of_string_exn value))
+
   let native_execution_policy =
     Tezos_clic.parameter (fun _ policy ->
         match policy with
@@ -350,6 +354,24 @@ let print_config_arg =
     ~doc:"Print the full configuration to the standard output"
     ~short:'p'
     ~long:"print"
+    ()
+
+let level_arg =
+  Tezos_clic.default_arg
+    ~doc:
+      "Set list_events filter level to either `fatal`, `error`, `warning`, \
+       `notice` `info`, `debug`"
+    ~short:'l'
+    ~long:"level"
+    ~placeholder:"info"
+    ~default:"none"
+    Params.event_level
+
+let json_arg =
+  Tezos_clic.switch
+    ~short:'j'
+    ~long:"json"
+    ~doc:"Enables the display of json schemas"
     ()
 
 let rollup_address_arg =
@@ -2483,6 +2505,51 @@ let list_metrics_command =
       Format.printf "%s\n" metrics ;
       return_unit)
 
+let list_events_command =
+  let open Tezos_clic in
+  command
+    ~desc:"List the events emitted by the EVM node."
+    (args2 level_arg json_arg)
+    (prefixes ["list"; "events"] stop)
+    (fun (level, show_json) () ->
+      let open Lwt_result_syntax in
+      let events =
+        let filter Internal_event.Generic.(Definition (section, _, def)) =
+          let module E = (val def) in
+          match Option.map Internal_event.Section.to_string_list section with
+          | Some section when List.hd section = Some "evm_node" ->
+              Option.fold ~none:true ~some:(( >= ) E.level) level
+          | _ -> false
+        in
+        Internal_event.All_definitions.get ~filter ()
+      in
+      Format.printf
+        "%a"
+        (Format.pp_print_list
+           ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
+           (fun fmt
+                Internal_event.Generic.(Definition (section, name, definition)) ->
+             let module E = (val definition) in
+             Format.fprintf
+               fmt
+               "@[<v 2>%s:@,description: %s@,level: %s@,%a@,%a@]"
+               name
+               E.doc
+               (Internal_event.Level.to_string E.level)
+               (Format.pp_print_option (fun fmt s ->
+                    Format.fprintf fmt "section: %a" Internal_event.Section.pp s))
+               section
+               (fun fmt () ->
+                 if show_json then
+                   Format.fprintf
+                     fmt
+                     "@[<v 2>json format:@,@[<hov 2>%a@]@]@."
+                     Json_schema.pp
+                     (Data_encoding.Json.schema E.encoding))
+               ()))
+        events ;
+      return_unit)
+
 (* List of commands not ready to be used by our end-users *)
 let in_development_commands = []
 
@@ -2513,6 +2580,7 @@ let commands =
     preemptive_kernel_download_command;
     debug_print_store_schemas_command;
     list_metrics_command;
+    list_events_command;
   ]
 
 let global_options = Tezos_clic.no_options

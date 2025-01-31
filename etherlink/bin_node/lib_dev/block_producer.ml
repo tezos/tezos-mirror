@@ -68,7 +68,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = ["evm_node"; "dev"; "block"; "producer"; "worker"]
+  let base = ["evm_node_worker"; "block"; "producer"]
 
   let pp _ _ = ()
 

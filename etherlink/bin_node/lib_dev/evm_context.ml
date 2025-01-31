@@ -73,7 +73,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = Evm_context_events.section @ ["worker"]
+  let base = ["evm_node_worker"; "evm_context"]
 
   let pp _fmt () = ()
 

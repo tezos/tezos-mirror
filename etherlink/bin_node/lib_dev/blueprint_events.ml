@@ -74,7 +74,7 @@ let blueprint_injection_failure =
     ~pp2:Error_monad.pp_print_trace
     ~level:Error
     ("level", Data_encoding.n)
-    ("trace", Error_monad.trace_encoding)
+    ("trace", Events.trace_encoding)
 
 let blueprint_catchup =
   declare_2
@@ -139,7 +139,7 @@ let worker_request_failed =
     ~level:Error
     ("view", Blueprints_publisher_types.Request.encoding)
     ~pp1:Blueprints_publisher_types.Request.pp
-    ("errors", Error_monad.trace_encoding)
+    ("errors", Events.trace_encoding)
     ~pp2:Error_monad.pp_print_trace
 
 let publisher_is_ready () = emit publisher_ready ()

@@ -10,6 +10,12 @@
 (** Default section for events. *)
 val section : string list
 
+(** Error encoding specific to the EVM node that wraps the default error encoding for event.
+
+    Use it to prevent the command `list events` to show all existing octez error.
+ *)
+val trace_encoding : tztrace Data_encoding.t
+
 (** [received_upgrade payload] advertises that the sequencer received an
     upgrade of payload [payload]. *)
 val received_upgrade : string -> unit Lwt.t

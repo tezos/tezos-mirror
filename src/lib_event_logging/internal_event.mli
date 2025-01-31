@@ -180,8 +180,10 @@ end
 
 (** Access to all the event definitions registered with {!Make}. *)
 module All_definitions : sig
-  (** Get the list of all the known definitions. *)
-  val get : unit -> Generic.definition list
+  (** Get the list of all the known definitions. If [filter] is
+  defined, use it to filter the returned events. *)
+  val get :
+    ?filter:(Generic.definition -> bool) -> unit -> Generic.definition list
 
   (** Find the definition matching on the given name. *)
   val find : (string -> bool) -> Generic.definition option

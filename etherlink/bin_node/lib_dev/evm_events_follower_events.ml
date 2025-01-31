@@ -103,7 +103,7 @@ module Event = struct
       ~level:Warning
       ("view", Evm_events_follower_types.Request.encoding)
       ~pp1:Evm_events_follower_types.Request.pp
-      ("errors", Error_monad.trace_encoding)
+      ("errors", Events.trace_encoding)
       ~pp2:Error_monad.pp_print_trace
 
   let unexpected_key =

@@ -30,7 +30,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = ["evm_node"; "dev"; "events_follower"; "worker"]
+  let base = ["evm_node_worker"; "events_follower"]
 
   let pp _ _ = ()
 

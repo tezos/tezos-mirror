@@ -51,7 +51,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = Blueprint_events.section
+  let base = ["evm_node_worker"; "blueprints"; "publisher"]
 
   let pp _fmt () = ()
 

@@ -142,7 +142,7 @@ let worker_request_failed =
     ~level:Error
     ("view", Evm_context_types.Request.encoding)
     ~pp1:Evm_context_types.Request.pp
-    ("errors", Error_monad.trace_encoding)
+    ("errors", Events.trace_encoding)
     ~pp2:Error_monad.pp_print_trace
 
 let observer_potential_reorg =
@@ -203,7 +203,7 @@ let get_block_failed =
     ~pp1:Ethereum_types.pp_quantity
     ~pp2:pp_print_trace
     ("level", Ethereum_types.quantity_encoding)
-    ("trace", trace_encoding)
+    ("trace", Events.trace_encoding)
 
 let start_history_mode =
   declare_1

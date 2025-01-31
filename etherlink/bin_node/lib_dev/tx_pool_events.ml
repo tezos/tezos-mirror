@@ -78,7 +78,7 @@ module Event = struct
       ~name:"tx_pool_transaction_injection_failed"
       ~msg:"Injection of transactions failed"
       ~level:Error
-      ("trace", trace_encoding)
+      ("trace", Events.trace_encoding)
 
   let connection_lost =
     declare_0

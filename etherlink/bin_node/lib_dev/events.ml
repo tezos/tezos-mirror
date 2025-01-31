@@ -9,6 +9,15 @@ include Internal_event.Simple
 
 let section = ["evm_node"; "dev"]
 
+let trace_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (fun o -> Json.construct trace_encoding o)
+    (fun json ->
+      try Ok (Json.destruct trace_encoding json)
+      with _ -> Error "JSON is not a valid trace")
+    json
+
 let received_upgrade =
   declare_1
     ~section
@@ -350,7 +359,7 @@ let cannot_fetch_time_between_blocks =
     ~pp1:Configuration.pp_time_between_blocks
     ~pp2:Error_monad.pp_print_trace
     ("tbb", Configuration.time_between_blocks_encoding)
-    ("trace", Error_monad.trace_encoding)
+    ("trace", trace_encoding)
 
 let invalid_node_da_fees =
   Internal_event.Simple.declare_4
