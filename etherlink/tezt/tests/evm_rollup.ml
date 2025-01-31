@@ -2848,6 +2848,75 @@ let test_deposit_and_fast_withdraw =
       "Expected %R amount instead of %L after outbox message was executed" ;
   return ()
 
+let test_fast_withdraw_feature_flag_deactivated =
+  let admin = Constant.bootstrap5 in
+  let commitment_period = 5 and challenge_window = 5 in
+  register_proxy
+    ~tags:["evm"; "feature_flag"; "fast_withdraw"]
+    ~title:"Check fast withdraw tez is deactivated with feature flag"
+    ~admin
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:false
+    ~kernels:[Kernel.Latest]
+  @@ fun ~protocol:_
+             ~evm_setup:
+               {
+                 client;
+                 sc_rollup_address;
+                 l1_contracts;
+                 endpoint;
+                 produce_block;
+                 _;
+               } ->
+  let {bridge; fast_withdrawal_contract_address; _} =
+    match l1_contracts with
+    | Some x -> x
+    | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
+  in
+  let withdraw_amount = Tez.of_int 50 in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = Tez.of_int 100 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    deposit
+      ~amount_mutez:deposit_amount
+      ~sc_rollup_address
+      ~bridge
+      ~depositor:admin
+      ~receiver:receiver.address
+      ~produce_block
+      client
+  in
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  (* Perform the fast withdrawal from the rollup, transferring 50 tez to the L1 withdrawal contract. *)
+  let* err =
+    call_fast_withdraw
+      ~expect_failure:true
+      ~produce_block
+      ~value:withdraw_amount_wei
+      ~sender:receiver
+      ~receiver:withdraw_receiver
+      ~fast_withdrawal_contract_address
+      ~endpoint
+      ()
+  in
+  if not (err =~ rex "Error") then Test.fail "Test should fail with error" ;
+  unit
+
 let test_withdraw_amount =
   let admin = Constant.bootstrap5 in
   register_proxy
@@ -6567,6 +6636,7 @@ let register_evm_node ~protocols =
   test_preinitialized_evm_kernel protocols ;
   test_deposit_and_withdraw protocols ;
   test_deposit_and_fast_withdraw protocols ;
+  test_fast_withdraw_feature_flag_deactivated protocols ;
   test_withdraw_amount protocols ;
   test_withdraw_via_calls protocols ;
   test_estimate_gas protocols ;

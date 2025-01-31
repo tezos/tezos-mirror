@@ -201,7 +201,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
+    ?enable_fast_withdrawal ?(threshold_encryption = false)
+    ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
     ?history_mode protocol =
@@ -256,6 +257,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
       ~enable_dal
+      ?enable_fast_withdrawal
       ?dal_slots
       ~enable_multichain
       ?max_blueprint_lookahead_in_seconds
@@ -388,9 +390,10 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
     ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
-    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
-    ?(additional_uses = []) ?rollup_history_mode ~enable_dal
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?commitment_period ?challenge_window
+    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
+    ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ?rpc_server ?websockets ?history_mode body ~title ~tags
     protocols =
@@ -437,6 +440,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?maximum_gas_per_transaction
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
+        ?enable_fast_withdrawal
         ~threshold_encryption
         ?rollup_history_mode
         ?websockets
@@ -488,8 +492,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
-    ~enable_multichain ?rpc_server ?websockets ?history_mode ~title ~tags body
-    protocols =
+    ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?history_mode ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -519,6 +523,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?maximum_gas_per_transaction
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
+        ?enable_fast_withdrawal
         ?additional_uses
         ?rpc_server
         ?websockets
