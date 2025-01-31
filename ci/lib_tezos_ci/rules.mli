@@ -77,6 +77,20 @@ val schedule_test_release : If.t
     [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_MASTER]. *)
 val schedule_container_scanning_master : If.t
 
+(** A rule that is true for scheduled pipelines that scan
+    `tezos/tezos:octez-evm-node-vX.Y` Docker image.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_OCTEZ_RELEASES]. *)
+val schedule_container_scanning_octez_releases : If.t
+
+(** A rule that is true for scheduled pipelines that scan
+    `tezos/tezos:octez-evm-node-vX.Y` Docker image.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_EVM_NODE_RELEASES]. *)
+val schedule_container_scanning_evm_node_releases : If.t
+
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t
 

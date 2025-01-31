@@ -1,6 +1,12 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+include:
+  template: Jobs/Container-Scanning.gitlab-ci.yml
+
 stages:
-  - start
-  - octez_releases
+- start
+- scan
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -9,34 +15,26 @@ datadog_pipeline_trace:
   - gcp
   dependencies: []
   allow_failure: true
-  timeout: 3 minutes
-  interruptible: false
+  timeout: 60 minutes
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
-include:
-  - template: Jobs/Container-Scanning.gitlab-ci.yml
-
-
 container_scanning:
-  stage: octez_releases
+  stage: scan
   tags:
   - gcp
+  dependencies: []
+  timeout: 60 minutes
   script:
   - gtcs scan > scan.log
   - grep "Vulnerability DB:" -B2 -A4 scan.log
-  needs: []
-  parallel:
-    matrix:
-      - IMAGE:
-          - "tezos/tezos:latest"
+  variables:
+    GIT_STRATEGY: fetch
+    CS_IMAGE: tezos/tezos:latest
+    SECURE_LOG_LEVEL: debug
+    CS_DOCKERFILE_PATH: build.Dockerfile
   artifacts:
     paths:
-      - scan.log
-  variables:
-    CS_IMAGE: $IMAGE
-    SECURE_LOG_LEVEL: "debug"
-    CS_DOCKERFILE_PATH: "build.Dockerfile"
-    GIT_STRATEGY: fetch
+    - scan.log

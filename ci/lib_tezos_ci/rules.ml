@@ -61,6 +61,13 @@ let schedule_test_release =
 let schedule_container_scanning_master =
   scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_MASTER"
 
+let schedule_container_scanning_octez_releases =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_OCTEZ_RELEASES"
+
+let schedule_container_scanning_evm_node_releases =
+  scheduled
+  && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_EVM_NODE_RELEASES"
+
 let on_master = Predefined_vars.ci_commit_branch == str "master"
 
 let on_branch branch = Predefined_vars.ci_commit_branch == str branch
