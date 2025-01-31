@@ -109,7 +109,7 @@ module Parameters = struct
     mutable pending_blueprint_finalized :
       unit option Lwt.u list Per_level_map.t;
     mode : mode;
-    history : history_mode;
+    mutable history : history_mode;
     data_dir : string;
     rpc_addr : string;
     rpc_port : int;
@@ -1705,3 +1705,18 @@ let list_events ?hooks ?level ?(json = false) () =
   in
   let process = Process.spawn ?hooks (Uses.path Constant.octez_evm_node) cmd in
   Process.check process
+
+let switch_history_mode evm_node history =
+  let hist =
+    match history with Archive -> "archive" | Rolling n -> sf "rolling:%d" n
+  in
+  let args =
+    ["switch"; "history"; "to"; hist; "--data-dir"; data_dir evm_node]
+  in
+  let run process =
+    let* () = Process.check process in
+    evm_node.persistent_state.history <- history ;
+    unit
+  in
+  let process = spawn_command evm_node args in
+  {Runnable.value = process; run}
