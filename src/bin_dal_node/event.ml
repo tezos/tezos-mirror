@@ -54,6 +54,14 @@ open struct
       ~level:Notice
       ()
 
+  let waiting_known_plugin =
+    declare_0
+      ~section
+      ~name:"waiting_l1_node_known_plugin"
+      ~msg:"waiting for a block with a known protocol plugin"
+      ~level:Notice
+      ()
+
   let shutdown_node =
     declare_1
       ~section
@@ -847,6 +855,8 @@ let emit_starting_node () = emit starting_node ()
 let emit_waiting_l1_node_bootstrapped () = emit waiting_l1_node_bootstrapped ()
 
 let emit_l1_node_bootstrapped () = emit l1_node_bootstrapped ()
+
+let emit_waiting_known_plugin () = emit waiting_known_plugin ()
 
 let emit_shutdown_node ~exit_status = emit shutdown_node exit_status
 
