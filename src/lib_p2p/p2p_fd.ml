@@ -240,13 +240,26 @@ let close_socket fd =
     (fun () ->
       (Lwt.catch
          (fun () ->
+           (* This announces to the remote peer we won't send or
+              receive anymore messages. This is particularly useful in
+              the case of a client/server situation such as HTTP. In
+              our case, this is not that much necessary, but seems to
+              be a good practice. Any attempt to write on this socket
+              will result in a [EPIPE] error (as well as a SIGPIPE
+              signal, this file sets a ignore handler for this
+              signal). *)
            Lwt_unix.shutdown fd Unix.SHUTDOWN_ALL ;
            Lwt.return_unit)
          (function
            (* Occurs if the peer closes the connection first. *)
            | Unix.Unix_error (Unix.ENOTCONN, _, _) -> Lwt.return_unit
            | exn -> Lwt.reraise exn) [@ocaml.warning "-4"]))
-    (fun () -> Lwt_unix.close fd)
+    (fun () ->
+      (* This call can be blocking since it waits for the current
+         write buffer to be acknowledged by the remote peer. A way to
+         prevent that could be to set the [SO_LINGER] option for this
+         socket. *)
+      Lwt_unix.close fd)
 
 let close ?reason t =
   let open Lwt_syntax in

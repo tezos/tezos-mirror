@@ -652,7 +652,21 @@ let stat {read_conn; write_conn; _} =
 let add_closing_reason ~reason t = P2p_fd.add_closing_reason ~reason t.fd
 
 (* [close conn] prevents further data to be pushed to the remote peer
-   and start a cascade of effects that should close the connection. *)
+   and start a cascade of effects that should close the connection.
+
+   NOTE:
+
+   - This function may be called after the underlying socket was
+   closed or not. In case an error happens while writing to/reading
+   from the socket, likely the [P2p_fd] module will already stop data
+   to be pushed to the remote peer
+
+   - It may happen that this function is closed because we were
+   "nacked" too. Likely this function may be called twice in this
+   case: 1 for the nack, a second time by [P2p_socket] when closing.
+   Hence, it is important that this function to have some kind of
+   idempotency property.
+*)
 let close ?timeout ?reason conn =
   let open Lwt_result_syntax in
   let id = P2p_fd.id conn.fd in
