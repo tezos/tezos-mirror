@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -6,6 +6,8 @@ NATIVE_TARGET ?= $(shell rustc -vV | grep 'host:' | awk '{print $$2}')
 ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
+
+RUST_VERSION_SUPERVISED := 1.84.1
 
 INBOX_FILE ?= $(shell mktemp)
 
@@ -19,9 +21,9 @@ print-native-target:
 .PHONY: build-deps
 build-deps:
 	@exec ../scripts/install-rust-std-hermit.sh
-	@rustup toolchain install 1.82.0
+	@rustup toolchain install $(RUST_VERSION_SUPERVISED)
 	@rustup component add rustfmt clippy
-	@rustup target add --toolchain 1.82.0 riscv64gc-unknown-linux-musl
+	@rustup target add --toolchain $(RUST_VERSION_SUPERVISED) riscv64gc-unknown-linux-musl
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
@@ -43,7 +45,7 @@ build-kernel-native:
 
 .PHONY: build-kernel-linux-musl
 build-kernel-linux-musl:
-	@cargo +1.82.0 build --target=riscv64gc-unknown-linux-musl --package jstz --release
+	@cargo +$(RUST_VERSION_SUPERVISED) build --target=riscv64gc-unknown-linux-musl --package jstz --release
 
 .PHONY: test
 test:
