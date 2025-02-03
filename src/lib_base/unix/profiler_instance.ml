@@ -82,6 +82,7 @@ let register_backend :
   (* Wrapping the kind in a View to avoid internal types of the Driver
      escaping their scope *)
   let view = Profiler.View Driver.kind in
+  Profiler_kind.register_case Driver.encoding_case ;
   match List.find (fun k -> BackendMap.mem k !registered_backends) env with
   | Some k ->
       Fmt.failwith "Profiler backend already registered for value \"%s\"" k
