@@ -1212,6 +1212,11 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
         let* () =
           Store.Last_processed_level.save last_processed_level_store level
         in
+        let*! () =
+          if Int32.to_int level mod 1000 = 0 then
+            Event.emit_catching_up ~current_level:level
+          else Lwt.return_unit
+        in
         clean_up_at_level (Int32.succ level)
     in
     (* Clean up from [last_processed_level] to [last_level]. *)
@@ -1223,9 +1228,23 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
     in
     let new_head_level = header.Block_header.level in
     if new_head_level > head_level then do_clean_up last_level new_head_level
-    else return_unit
+    else
+      let*! () = Event.emit_end_catchup () in
+      return_unit
   in
-  do_clean_up last_processed_level head_level
+  let*! () =
+    let levels_to_clean_up =
+      Int32.(succ @@ sub head_level last_processed_level)
+    in
+    if levels_to_clean_up > 0l then
+      Event.emit_start_catchup
+        ~start_level:last_processed_level
+        ~end_level:head_level
+        ~levels_to_clean_up
+    else Lwt.return_unit
+  in
+  let* () = do_clean_up last_processed_level head_level in
+  return_unit
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc

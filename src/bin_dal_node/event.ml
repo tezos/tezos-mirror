@@ -885,6 +885,34 @@ open struct
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+
+  let start_catchup =
+    declare_3
+      ~section
+      ~name:"start_catchup"
+      ~msg:
+        "catching up to level {end_level}, from last processed level \
+         {start_level} (that is, {levels_to_clean_up} levels to process)"
+      ~level:Notice
+      ("start_level", Data_encoding.int32)
+      ("end_level", Data_encoding.int32)
+      ("levels_to_clean_up", Data_encoding.int32)
+
+  let catching_up =
+    declare_1
+      ~section
+      ~name:"catching_up"
+      ~msg:"caught up the store up to level {current_level}"
+      ~level:Notice
+      ("current_level", Data_encoding.int32)
+
+  let end_catchup =
+    declare_0
+      ~section
+      ~name:"end_catchup"
+      ~msg:"done catching up"
+      ~level:Notice
+      ()
 end
 
 (* DAL node event emission functions *)
@@ -1138,3 +1166,10 @@ let emit_dont_wait__register_trap ~delegate ~published_level ~slot_index
   emit__dont_wait__use_with_care
     register_trap
     (delegate, published_level, slot_index, shard_index)
+
+let emit_start_catchup ~start_level ~end_level ~levels_to_clean_up =
+  emit start_catchup (start_level, end_level, levels_to_clean_up)
+
+let emit_catching_up ~current_level = emit catching_up current_level
+
+let emit_end_catchup () = emit end_catchup ()
