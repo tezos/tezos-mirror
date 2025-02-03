@@ -96,8 +96,6 @@ let () =
 type compression = No | On_the_fly | After
 
 module Header = struct
-  type version = V0
-
   let magic_bytes = "OCTEZ_EVM_node_snapshot"
 
   let magic_bytes_encoding =
@@ -109,47 +107,56 @@ module Header = struct
         else Error "Invalid magic bytes for evm node snapshot")
       (obj1 (req "magic_bytes" (Fixed.string (String.length magic_bytes))))
 
-  type t = {
-    version : version;
-    rollup_address : Address.t;
-    current_level : Ethereum_types.quantity;
-  }
+  type t =
+    | V0_legacy of {
+        rollup_address : Address.t;
+        current_level : Ethereum_types.quantity;
+      }
+    | V1 of {
+        rollup_address : Address.t;
+        current_level : Ethereum_types.quantity;
+      }
 
-  let v0_encoding =
-    let open Data_encoding in
-    conv
-      (fun {version = V0; rollup_address; current_level} ->
-        (rollup_address, Ethereum_types.encode_u256_le current_level))
-      (fun (rollup_address, current_level) ->
-        {
-          version = V0;
-          rollup_address;
-          current_level = Ethereum_types.decode_number_le current_level;
-        })
-    @@ obj2
-         (req "rollup_address" Address.encoding)
-         (req "current_level" (Fixed.bytes 32))
+  let cur_level_encoding =
+    Data_encoding.conv
+      Ethereum_types.encode_u256_le
+      Ethereum_types.decode_number_le
+      (Data_encoding.Fixed.bytes 32)
 
   let header_encoding =
     let open Data_encoding in
     union
       [
         case
-          ~title:"evm_node.snapshot_header.v0"
+          ~title:"evm_node.snapshot_header.v0_legacy"
           (Tag 0)
-          v0_encoding
-          (fun ({version = V0; _} as h) -> Some h)
-          (fun h -> h);
+          (obj2
+             (req "rollup_address" Address.encoding)
+             (req "current_level" cur_level_encoding))
+          (function
+            | V0_legacy {rollup_address; current_level} ->
+                Some (rollup_address, current_level)
+            | _ -> None)
+          (fun (rollup_address, current_level) ->
+            V0_legacy {rollup_address; current_level});
+        case
+          ~title:"evm_node.snapshot_header.v1"
+          (Tag 1)
+          (obj2
+             (req "rollup_address" Address.encoding)
+             (req "current_level" cur_level_encoding))
+          (function
+            | V1 {rollup_address; current_level} ->
+                Some (rollup_address, current_level)
+            | _ -> None)
+          (fun (rollup_address, current_level) ->
+            V1 {rollup_address; current_level});
       ]
 
   let encoding =
     let open Data_encoding in
     conv (fun h -> ((), h)) (fun ((), h) -> h)
     @@ merge_objs magic_bytes_encoding header_encoding
-
-  let size =
-    Data_encoding.Binary.fixed_length encoding
-    |> WithExceptions.Option.get ~loc:__LOC__
 end
 
 open Snapshot_utils.Make (Header)
@@ -185,10 +192,15 @@ let export ?snapshot_file ~compression ~data_dir () =
     (* Export SQLite database *)
     Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
     let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-    let* {rollup_address; current_number = current_level} =
+    let* {rollup_address; current_number = current_level; legacy_block_storage}
+        =
       Data_dir.export_store ~data_dir ~output_db_file
     in
-    let header = Header.{version = V0; rollup_address; current_level} in
+    let header =
+      if legacy_block_storage then
+        Header.(V0_legacy {rollup_address; current_level})
+      else Header.(V1 {rollup_address; current_level})
+    in
     let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
     let writer =
       match compression with
@@ -199,12 +211,7 @@ let export ?snapshot_file ~compression ~data_dir () =
       let open Result_syntax in
       match snapshot_file with
       | Some f -> (
-          let+ f =
-            interpolate_snapshot_file
-              header.current_level
-              header.rollup_address
-              f
-          in
+          let+ f = interpolate_snapshot_file current_level rollup_address f in
           match compression with
           | No | On_the_fly -> f
           | After -> f ^ ".uncompressed")
@@ -218,9 +225,9 @@ let export ?snapshot_file ~compression ~data_dir () =
             Format.asprintf
               "evm-snapshot-%a-%a%s"
               Address.pp_short
-              header.rollup_address
+              rollup_address
               Ethereum_types.pp_quantity
-              header.current_level
+              current_level
               suffix
           in
           return filename
@@ -252,6 +259,12 @@ let check_snapshot_exists snapshot_file =
 let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     =
   let open Lwt_result_syntax in
+  let header_rollup_address, header_current_level =
+    match header with
+    | V0_legacy {rollup_address; current_level} ->
+        (rollup_address, current_level)
+    | V1 {rollup_address; current_level} -> (rollup_address, current_level)
+  in
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   Evm_store.use store @@ fun conn ->
@@ -261,8 +274,8 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     | None -> return_unit
     | Some {smart_rollup_address = r; history_mode = _} ->
         fail_unless
-          Address.(header.rollup_address = r)
-          (Incorrect_rollup (header.rollup_address, r))
+          Address.(header_rollup_address = r)
+          (Incorrect_rollup (header_rollup_address, r))
   in
   let* latest_context = Evm_store.Context_hashes.find_latest conn in
   let* () =
@@ -271,9 +284,9 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     | Some (current_number, _) ->
         fail_when
           Z.Compare.(
-            Ethereum_types.Qty.to_z header.current_level
+            Ethereum_types.Qty.to_z header_current_level
             <= Ethereum_types.Qty.to_z current_number)
-          (Outdated_snapshot (header.current_level, current_number))
+          (Outdated_snapshot (header_current_level, current_number))
   in
   return_unit
 

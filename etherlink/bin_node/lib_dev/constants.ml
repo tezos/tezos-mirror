@@ -7,6 +7,12 @@
 
 open Ethereum_types
 
+let supported_networks = Configuration.[Mainnet; Testnet]
+
+let network_name = function
+  | Configuration.Mainnet -> "Mainnet"
+  | Testnet -> "Testnet"
+
 let chain_id network =
   (match network with Configuration.Mainnet -> 0xa729 | Testnet -> 0x1f47b)
   |> Z.of_int |> quantity_of_z

@@ -33,8 +33,6 @@ module Make (Header : sig
   type t
 
   val encoding : t Data_encoding.t
-
-  val size : int
 end) : sig
   (** [create reader writer header ~files ~dest] creates a snapshot archive with
       the header [header] with the contents of [files]. Each element of [files]
