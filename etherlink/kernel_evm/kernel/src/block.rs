@@ -33,7 +33,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
-use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_smart_rollup_host::path::Path;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 use tezos_ethereum::block::BlockConstants;
@@ -427,8 +427,6 @@ fn promote_block<Host: Runtime>(
     Ok(())
 }
 
-const AT_MOST_ONE_BLOCK: RefPath = RefPath::assert_from(b"/__at_most_one_block");
-
 pub fn produce<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
@@ -462,8 +460,6 @@ pub fn produce<Host: Runtime>(
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut tick_counter = TickCounter::new(0u64);
-
-    let at_most_one_block = host.store_has(&AT_MOST_ONE_BLOCK)?.is_some();
 
     let mut safe_host = SafeStorage { host };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
@@ -545,11 +541,7 @@ pub fn produce<Host: Runtime>(
                 config,
                 included_delayed_transactions,
             )?;
-            if at_most_one_block {
-                Ok(ComputationResult::Finished)
-            } else {
-                Ok(ComputationResult::RebootNeeded)
-            }
+            Ok(ComputationResult::RebootNeeded)
         }
         Ok(BlockComputationResult::RebootNeeded) => {
             // The computation will resume at next reboot, we leave the
