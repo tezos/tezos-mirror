@@ -330,39 +330,6 @@ trigger:octez_monitoring:
   trigger:
     include: .gitlab/ci/pipelines/octez_monitoring.yml
 
-oc.docker-systemd_tests-debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: images
-  tags:
-  - $TAGS
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - ./scripts/ci/docker_initialize.sh
-  script:
-  - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-systemd-tests.Dockerfile
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DISTRIBUTION: debian
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
-  parallel:
-    matrix:
-    - RELEASE:
-      - unstable
-      - bookworm
-      TAGS:
-      - gcp
-      - gcp_arm64
-
 oc.docker-build-debian-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images

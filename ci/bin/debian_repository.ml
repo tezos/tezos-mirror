@@ -476,7 +476,6 @@ let jobs pipeline_type =
   in
   let debian_jobs =
     [
-      job_docker_systemd_test_debian_dependencies;
       job_docker_build_debian_dependencies;
       job_build_debian_package;
       job_build_debian_package_current_a;
@@ -498,13 +497,15 @@ let jobs pipeline_type =
   in
   match pipeline_type with
   | Partial ->
-      ( debian_jobs @ test_current_debian_packages_jobs,
+      ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
+        @ test_current_debian_packages_jobs,
         job_build_ubuntu_package_current_a,
         job_build_debian_package_current_a,
         job_build_ubuntu_package_current_b,
         job_build_debian_package_current_b )
   | Full ->
-      ( debian_jobs @ ubuntu_jobs @ test_current_debian_packages_jobs
+      ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
+        @ ubuntu_jobs @ test_current_debian_packages_jobs
         @ test_current_ubuntu_packages_jobs,
         job_build_ubuntu_package_current_a,
         job_build_debian_package_current_a,
