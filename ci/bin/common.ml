@@ -60,10 +60,12 @@ let cargo_home =
    optional arguments. *)
 let before_script ?(take_ownership = false) ?(source_version = false)
     ?(eval_opam = false) ?(init_python_venv = false) ?(install_js_deps = false)
-    before_script =
+    ?(datadog_job_info = false) before_script =
   let toggle t x = if t then [x] else [] in
+  (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
+  toggle datadog_job_info ". ./scripts/ci/datadog_send_job_info.sh"
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2865 *)
-  toggle take_ownership "./scripts/ci/take_ownership.sh"
+  @ toggle take_ownership "./scripts/ci/take_ownership.sh"
   @ toggle source_version ". ./scripts/version.sh"
     (* TODO: this must run in the before_script of all jobs that use the opam environment.
        how to enforce? *)
