@@ -4699,6 +4699,8 @@ oc.unified_coverage:
   allow_failure:
     exit_codes: 64
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/report_coverage.sh || exit $?
   variables:
