@@ -869,3 +869,26 @@ opam:release:
   interruptible: false
   script:
   - ./scripts/ci/opam-release.sh --dry-run
+
+publish:release-page:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: publish_release
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  allow_failure: true
+  timeout: 60 minutes
+  script:
+  - ./scripts/ci/release_page_publish.sh
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com
