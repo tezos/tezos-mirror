@@ -100,7 +100,7 @@ module Node = struct
       agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
-    | (`Mainnet | `Ghostnet | `Weeklynet _) as network -> (
+    | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _) as network -> (
         match data_dir with
         | Some data_dir ->
             let rpc_external = Cli.node_external_rpc_server in
@@ -133,8 +133,10 @@ module Node = struct
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
-            toplog "Downloading a rolling snapshot" ;
-            let* () =
+            toplog "Initializing node configuration" ;
+            let* () = Node.config_init node [] in
+            toplog "Trying to download a rolling snapshot" ;
+            let* exit_status =
               Process.spawn
                 ?runner:(runner_of_agent agent)
                 "wget"
@@ -143,29 +145,44 @@ module Node = struct
                   "snapshot_file";
                   sf "%s/rolling" (Network.snapshot_service network);
                 ]
-              |> Process.check
+              |> Process.wait
             in
-            toplog "Initializing node configuration" ;
-            let* () = Node.config_init node [] in
-            toplog "Importing the snapshot" ;
             let* () =
-              try
-                let* () =
-                  Node.snapshot_import ~no_check:true node "snapshot_file"
-                in
-                let () = toplog "Snapshot import succeeded." in
-                Lwt.return_unit
-              with _ ->
-                (* Failing to import the snapshot could happen on a
-                   very young Weeklynet, before the first snapshot is
-                   available. In this case bootstrapping from the
-                   genesis block is OK. *)
-                let () =
+              match exit_status with
+              | WEXITED 0 ->
+                  toplog "Importing the snapshot" ;
+                  let* () =
+                    try
+                      let* () =
+                        Node.snapshot_import ~no_check:true node "snapshot_file"
+                      in
+                      let () = toplog "Snapshot import succeeded." in
+                      Lwt.return_unit
+                    with _ ->
+                      (* Failing to import the snapshot could happen on a
+                                 very young Weeklynet, before the first snapshot is
+                                 available. In this case bootstrapping from the
+                                 genesis block is OK. *)
+                      let () =
+                        toplog
+                          "Snapshot import failed, the node will be \
+                           bootstrapped from genesis."
+                      in
+                      Lwt.return_unit
+                  in
+                  Lwt.return_unit
+              | WEXITED code ->
                   toplog
-                    "Snapshot import failed, the node will be bootstrapped \
-                     from genesis."
-                in
-                Lwt.return_unit
+                    "Could not download the snapshot: wget exit code: %d\n\
+                     Starting without snapshot. This could last long before \
+                     the node is bootstrapped"
+                    code ;
+                  Lwt.return_unit
+              | status -> (
+                  match Process.validate_status status with
+                  | Ok () -> Lwt.return_unit
+                  | Error (`Invalid_status reason) ->
+                      failwith @@ Format.sprintf "wget: %s" reason)
             in
             toplog "Launching the node." ;
             let* () =
@@ -2142,7 +2159,7 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : baker list) (producers : producer list)
     (observers : observer list) etherlink =
   match (agent, network) with
-  | None, (`Mainnet | `Ghostnet | `Weeklynet _) -> (
+  | None, (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _) -> (
       match (bakers, producers, observers, etherlink) with
       | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
       | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
@@ -2241,7 +2258,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           configuration
           ?etherlink_configuration
           bootstrap_agent
-    | (`Ghostnet | `Mainnet | `Weeklynet _) as network ->
+    | (`Ghostnet | `Nextnet _ | `Mainnet | `Weeklynet _) as network ->
         init_public_network
           cloud
           configuration

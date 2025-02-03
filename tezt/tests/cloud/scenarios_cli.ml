@@ -76,8 +76,13 @@ let network_typ : Network.t Clap.typ =
       | "mainnet" -> Some `Mainnet
       | "ghostnet" -> Some `Ghostnet
       | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
+          (* format:  weeklynet-2025-01-29 (with dashes) *)
           let date = String.sub s 10 10 in
           Some (`Weeklynet date)
+      | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
+          (* format: nextnet-20250203  (without dashes) *)
+          let date = String.sub s 8 8 in
+          Some (`Nextnet date)
       | "sandbox" -> Some `Sandbox
       | _ -> None)
     ~show:Network.to_string
@@ -86,7 +91,8 @@ let network =
   Clap.default
     ~section
     ~long:"network"
-    ~placeholder:"<network> (sandbox,ghostnet,weeklynet-YYYY-MM-DD,...)"
+    ~placeholder:
+      "<network> (sandbox,ghostnet,nextnet-YYYY-MM-DD,weeklynet-YYYY-MM-DD,...)"
     ~description:"Allow to specify a network to use for the scenario"
     network_typ
     `Sandbox

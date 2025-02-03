@@ -5,13 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type public = [`Mainnet | `Ghostnet | `Weeklynet of string]
+type public = [`Mainnet | `Ghostnet | `Nextnet of string | `Weeklynet of string]
 
 type t = [public | `Sandbox]
 
 let to_string = function
   | `Mainnet -> "mainnet"
   | `Ghostnet -> "ghostnet"
+  | `Nextnet _ -> "betanet"
   | `Weeklynet date -> sf "weeklynet-%s" date
   | `Sandbox -> "sandbox"
 
@@ -20,6 +21,7 @@ let default_protocol : t -> Protocol.t = function
   | `Ghostnet -> Quebec
   | `Weeklynet _ -> Alpha
   | `Sandbox -> Alpha
+  | `Nextnet _ -> Next
 
 let public_rpc_endpoint testnet =
   Endpoint.
@@ -29,6 +31,7 @@ let public_rpc_endpoint testnet =
         (match testnet with
         | `Mainnet -> "rpc.tzbeta.net"
         | `Ghostnet -> "rpc.ghostnet.teztnets.com"
+        | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
         | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date);
       port = 443;
     }
@@ -36,23 +39,27 @@ let public_rpc_endpoint testnet =
 let snapshot_service = function
   | `Mainnet -> "https://snapshots.eu.tzinit.org/mainnet"
   | `Ghostnet -> "https://snapshots.eu.tzinit.org/ghostnet"
+  | `Nextnet _ -> "https://snapshots.eu.tzinit.org/nextnet"
   | `Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
 
 (* Argument to give to the --network option of `octez-node config init`. *)
 let to_octez_network_options = function
   | `Mainnet -> "mainnet"
   | `Ghostnet -> "ghostnet"
+  | `Nextnet date -> sf "https://teztnets.com/nextnet-%s" date
   | `Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
 
 let default_bootstrap = function
   | `Mainnet -> "boot.tzinit.org"
   | `Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
+  | `Nextnet date -> sf "nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
 
 let default_dal_bootstrap = function
   | `Mainnet -> "dalboot.mainnet.tzboot.net"
   | `Ghostnet ->
       "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
+  | `Nextnet date -> sf "dal.nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
 
 let get_level endpoint =
@@ -63,7 +70,7 @@ let expected_pow = function `Sandbox -> 0. | _ -> 26.
 
 let versions network =
   match network with
-  | (`Mainnet | `Ghostnet) as public_network -> (
+  | (`Mainnet | `Nextnet _ | `Ghostnet) as public_network -> (
       let decoder json =
         json |> JSON.as_list |> List.to_seq
         |> Seq.map (fun json_account ->
@@ -145,7 +152,7 @@ let delegates ?(accounts = []) network =
           response.code
           (Printexc.to_string exn) ;
         Lwt.return_none)
-  | `Weeklynet _ ->
+  | `Weeklynet _ | `Nextnet _ ->
       (* There is no aliases for weeklynet. *)
       Lwt.return_none
   | `Sandbox ->
