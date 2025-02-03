@@ -540,7 +540,6 @@ pub enum Instr {
 /// This is either 4 bytes, in the case of an uncompressed instruction,
 /// or 2 bytes, in the case of a compressed instruction.
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Hash)]
-#[repr(u64)]
 pub enum InstrWidth {
     Compressed = 2,
     Uncompressed = 4,
