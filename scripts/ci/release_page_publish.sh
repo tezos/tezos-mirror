@@ -67,7 +67,7 @@ pandoc index.md -s --template="./docs/release_page/template.html" --metadata tit
 
 echo "Syncing files to remote s3 bucket"
 
-if aws s3 cp "./index.html" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./$Releases_list" "s3://${S3_BUCKET}/" --region "${REGION}"; then
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./$Releases_list" "s3://${S3_BUCKET}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
