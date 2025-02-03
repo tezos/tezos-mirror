@@ -1171,6 +1171,7 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
       (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
   in
   let store = Node_context.get_store ctxt in
+  let last_processed_level_store = Store.last_processed_level store in
   let supports_refutations = Handler.supports_refutations ctxt in
   (* [target_level] identifies the level wrt to head level at which we want to
      start the P2P and process blocks as usual. *)
@@ -1180,21 +1181,26 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
        the plugin. *)
     Int32.(sub level (of_int period))
   in
-  let should_store_skip_list_cells ~head_level ~level =
-    let profile_ctxt = Node_context.get_profile_ctxt ctxt in
-    let period =
-      get_storage_period
-        profile_ctxt
-        proto_parameters
-        head_level
-        first_seen_level
-      + skip_list_offset proto_parameters
-    in
-    supports_refutations
-    && level >= first_level_for_skip_list_storage period head_level
+  let should_store_skip_list_cells ~head_level =
+    if not supports_refutations then fun ~level:_ -> false
+    else
+      let profile_ctxt = Node_context.get_profile_ctxt ctxt in
+      let period =
+        get_storage_period
+          profile_ctxt
+          proto_parameters
+          head_level
+          first_seen_level
+        + skip_list_offset proto_parameters
+      in
+      let first_level = first_level_for_skip_list_storage period head_level in
+      fun ~level -> level >= first_level
   in
   let rec do_clean_up last_processed_level head_level =
     let last_level = target_level head_level in
+    let should_store_skip_list_cells =
+      should_store_skip_list_cells ~head_level
+    in
     let rec clean_up_at_level level =
       if level > last_level then return_unit
       else
@@ -1202,12 +1208,11 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
           Handler.remove_old_level_stored_data proto_parameters ctxt level
         in
         let* () =
-          if should_store_skip_list_cells ~head_level ~level then
+          if should_store_skip_list_cells ~level then
             store_skip_list_cells ~level
           else return_unit
         in
         let* () =
-          let last_processed_level_store = Store.last_processed_level store in
           Store.Last_processed_level.save last_processed_level_store level
         in
         clean_up_at_level (Int32.succ level)
