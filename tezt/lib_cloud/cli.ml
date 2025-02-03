@@ -105,6 +105,16 @@ let grafana =
     ~description:"Flag to set whether to run grafana"
     (((not localhost) || proxy) && os = Os.Cos)
 
+let grafana_legacy_source =
+  Clap.flag
+    ~section
+    ~set_long:"grafana-legacy-source"
+    ~description:
+      "Flag to indicate to use grafana legacy 'Prometheus' source name when \
+       importing a prometheus snapshot. Newer dashboards should use \
+       ${datasource} as source instead of the hardcoded 'Prometheus' name."
+    false
+
 let alert_handlers =
   Clap.list_string
     ~section

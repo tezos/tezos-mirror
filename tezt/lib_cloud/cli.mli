@@ -47,6 +47,10 @@ val os : Types.Os.t
 (** Flag which indicates whether Grafana should be run or not. *)
 val grafana : bool
 
+(** Flag which indicates whether Grafana should use legacy data source name or not.
+    Only used when importing prometheus snapshot. *)
+val grafana_legacy_source : bool
+
 (** The alert handlers to be registered by the alert manager. *)
 val alert_handlers : string list
 
