@@ -51,7 +51,7 @@ echo "# Octez Releases" >> index.md
 # Define the content of the release page
 tac "$Releases_list" | while IFS= read -r release; do
   echo "## $release" >> index.md
-  echo "## Static binaries" >> index.md
+  echo "### Static binaries" >> index.md
   for arch in x86_64 arm64; do
     echo "#### $arch" >> index.md
 
