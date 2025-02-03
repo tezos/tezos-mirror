@@ -6036,16 +6036,44 @@ mod typecheck_tests {
             ))
         );
 
-        // ID and overlay - ok case
+        // ID and overlay - forget some
         assert_eq!(
             typecheck_value(
                 &app!(Pair[0, seq!(app!(Elt[7, 8]))]),
                 &mut ctx,
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
+            Err(TcError::InvalidEltForMap(
+                "Int(8)".into(),
+                Type::BigMap((Type::Int, Type::Int).into())
+            ))
+        );
+
+        // ID and overlay - Some case
+        assert_eq!(
+            typecheck_value(
+                &app!(Pair[0, seq!(app!(Elt[7, app!(Some[8])]))]),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0),
+                id: Some(id0.clone()),
                 overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
+        );
+
+        // ID and overlay - None case
+        assert_eq!(
+            typecheck_value(
+                &app!(Pair[0, seq!(app!(Elt[7, app!(None)]))]),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: Some(id0.clone()),
+                overlay: BTreeMap::from([(TypedValue::int(7), None)]),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
