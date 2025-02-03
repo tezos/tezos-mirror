@@ -250,14 +250,6 @@ let export ?snapshot_file ~compression ~data_dir () =
   in
   return snapshot_file
 
-let data_dir_populated ~data_dir =
-  let open Lwt_syntax in
-  let store_file = Filename.concat data_dir Evm_store.sqlite_file_name in
-  let state_dir = Data_dir.store_path ~data_dir in
-  let* store_exists = Lwt_unix.file_exists store_file in
-  let* state_exists = Lwt_utils_unix.dir_exists state_dir in
-  return (store_exists || state_exists)
-
 let check_snapshot_exists snapshot_file =
   let open Lwt_result_syntax in
   let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
@@ -328,7 +320,7 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
 let import ~cancellable ~force ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let open Filename.Infix in
-  let*! populated = data_dir_populated ~data_dir in
+  let*! populated = Data_dir.populated ~data_dir in
   let*? () =
     error_when ((not force) && populated) (Data_dir_populated data_dir)
   in

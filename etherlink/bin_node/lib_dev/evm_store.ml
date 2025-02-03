@@ -887,6 +887,14 @@ module Metadata = struct
     | Some smart_rollup_address, Some history_mode ->
         return_some {smart_rollup_address; history_mode}
     | _ -> return_none
+
+  let store_history_mode store history_mode =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Metadata.insert_history_mode history_mode
+
+  let find_history_mode store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Metadata.get_history_mode ()
 end
 
 module Transactions = struct

@@ -2049,3 +2049,5 @@ let shutdown () =
   let*! () = Evm_context_events.shutdown () in
   let*! () = Worker.shutdown w in
   return_unit
+
+let check_history_mode = State.check_history_mode

@@ -158,6 +158,35 @@ module Params = struct
       ~desc:"Snapshot archive file or URL"
       string
       next
+
+  let history_param =
+    Tezos_clic.parameter @@ fun () s ->
+    let open Lwt_result_syntax in
+    match String.split_on_char ':' s with
+    | ["archive"] -> return Configuration.(Archive, retention ())
+    | ["rolling"] -> return Configuration.(Rolling, retention ())
+    | ["rolling"; n] -> (
+        match int_of_string_opt n with
+        | Some days when days >= 0 ->
+            return Configuration.(Rolling, retention ~days ())
+        | _ ->
+            failwith
+              "Invalid retention period %S for rolling history mode. Must be a \
+               positive integer number of days."
+              n)
+    | _ ->
+        failwith
+          "Invalid history mode. Must be either archive, rolling or rolling:n \
+           where n is the number of days to retain history."
+
+  let history next =
+    Tezos_clic.param
+      ~name:"history"
+      ~desc:
+        "History mode, either archive, rolling or rolling:n where n is the \
+         number of days of history to retain."
+      history_param
+      next
 end
 
 let wallet_dir_arg =
@@ -743,24 +772,7 @@ let history_arg =
       "History mode for the EVM node. rolling:n means rolling with n days of \
        history."
     ~placeholder:"archive | rolling | rolling:n"
-  @@ Tezos_clic.parameter (fun () s ->
-         let open Lwt_result_syntax in
-         match String.split_on_char ':' s with
-         | ["archive"] -> return Configuration.(Archive, retention ())
-         | ["rolling"] -> return Configuration.(Rolling, retention ())
-         | ["rolling"; n] -> (
-             match int_of_string_opt n with
-             | Some days when days >= 0 ->
-                 return Configuration.(Rolling, retention ~days ())
-             | _ ->
-                 failwith
-                   "Invalid retention period %S for rolling history mode. Must \
-                    be a positive integer number of days."
-                   n)
-         | _ ->
-             failwith
-               "Invalid history mode. Must be either archive, rolling or \
-                rolling:n where n is the number of days to retain history.")
+    Params.history_param
 
 let common_config_args =
   Tezos_clic.args19
@@ -2444,6 +2456,58 @@ let snapshot_info_command =
         () ;
       return_unit)
 
+let switch_history_mode_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Switch history mode of the node"
+    (args1 data_dir_arg)
+    (prefixes ["switch"; "history"; "to"] @@ Params.history @@ stop)
+    (fun data_dir (history_mode, garbage_collector_parameters) () ->
+      let open Lwt_result_syntax in
+      let open Evm_node_lib_dev in
+      let*! populated = Data_dir.populated ~data_dir in
+      let*? () =
+        if not populated then
+          error_with
+            "Data directory %S is empty or is not an EVM node data dir."
+            data_dir
+        else Ok ()
+      in
+      let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+      let* () =
+        Evm_store.use store @@ fun conn ->
+        let* config =
+          Cli.create_or_read_config
+            ~data_dir
+            ~history_mode
+            ~garbage_collector_parameters
+            ()
+        in
+        let*! () =
+          let open Tezos_base_unix.Internal_event_unix in
+          let config = make_with_defaults ~verbosity:Warning () in
+          init ~config ()
+        in
+        let* store_history_mode = Evm_store.Metadata.find_history_mode conn in
+
+        let* () =
+          Evm_context.check_history_mode
+            ~switch:true
+            ~store_history_mode
+            ~history_mode:config.history_mode
+            conn
+        in
+        let* () = Evm_store.Metadata.store_history_mode conn history_mode in
+        let*! config_exists =
+          Lwt_unix.file_exists (Configuration.config_filename ~data_dir)
+        in
+        when_ config_exists @@ fun () ->
+        (* Update configuration accordingly for nodes that already have one. *)
+        Configuration.save ~force:true ~data_dir config
+      in
+      let*! () = Evm_store.close store in
+      return_unit)
+
 let patch_state_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -2614,6 +2678,7 @@ let commands =
     snapshot_info_command;
     export_snapshot_command;
     import_snapshot_command;
+    switch_history_mode_command;
     chunker_command;
     make_upgrade_command;
     make_sequencer_upgrade_command;
