@@ -249,7 +249,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets
+    ?websockets ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ~title ~tags body
@@ -313,6 +313,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?additional_uses
                 ?rpc_server
                 ?websockets
+                ?history_mode
                 ~threshold_encryption
                 ?rollup_history_mode
                 ~enable_dal
@@ -812,6 +813,7 @@ let test_snapshots_import_empty =
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot in empty data dir"
     ~time_between_blocks:Nothing
+    ~history_mode:(Rolling 1)
   @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
   let* _snapshot_file_before, snapshot_file, block_number =
     snapshots_setup setup

@@ -50,6 +50,7 @@ val run_new_observer_node :
   sc_rollup_node:Sc_rollup_node.t ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
   Evm_node.t ->
   Evm_node.t Lwt.t
 
@@ -92,6 +93,7 @@ val register_test :
   enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -136,6 +138,7 @@ val register_test_for_kernels :
   enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -179,5 +182,6 @@ val setup_sequencer :
   enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
   Protocol.t ->
   sequencer_setup Lwt.t

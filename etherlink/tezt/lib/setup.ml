@@ -131,7 +131,7 @@ let run_new_rpc_endpoint evm_node =
   return rpc_node
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
-    ~sc_rollup_node ?rpc_server ?websockets evm_node =
+    ~sc_rollup_node ?rpc_server ?websockets ?history_mode evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
   let patch_config =
@@ -179,7 +179,11 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
            })
   in
   let* observer =
-    Evm_node.init ~patch_config ~mode:observer_mode (Evm_node.endpoint evm_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:observer_mode
+      ?history_mode
+      (Evm_node.endpoint evm_node)
   in
   return observer
 
@@ -199,7 +203,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
-    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets protocol =
+    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
+    ?history_mode protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -341,6 +346,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?rpc_port:sequencer_rpc_port
       ~patch_config
       ~mode:sequencer_mode
+      ?history_mode
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* observer =
@@ -349,6 +355,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ~sc_rollup_node
       ?rpc_server
       ?websockets
+      ?history_mode
       sequencer
   in
   let* proxy =
@@ -385,7 +392,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
     ?(additional_uses = []) ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
-    ~enable_multichain ?rpc_server ?websockets body ~title ~tags protocols =
+    ~enable_multichain ?rpc_server ?websockets ?history_mode body ~title ~tags
+    protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -432,6 +440,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~threshold_encryption
         ?rollup_history_mode
         ?websockets
+        ?history_mode
         ~enable_dal
         ?dal_slots
         ~enable_multichain
@@ -479,7 +488,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
-    ~enable_multichain ?rpc_server ?websockets ~title ~tags body protocols =
+    ~enable_multichain ?rpc_server ?websockets ?history_mode ~title ~tags body
+    protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -512,6 +522,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?additional_uses
         ?rpc_server
         ?websockets
+        ?history_mode
         ~threshold_encryption
         ?rollup_history_mode
         ~enable_dal
