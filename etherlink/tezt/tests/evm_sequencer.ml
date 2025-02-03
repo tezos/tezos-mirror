@@ -752,6 +752,13 @@ let test_persistent_state =
 (* Helper to setup snapshot test. This function stops the observer and sequencer
    and exports two snapshots at one block interval. *)
 let snapshots_setup {sequencer; observer; _} =
+  let*@ prev_block_number = Rpc.block_number sequencer in
+  let block_number = Int32.succ prev_block_number in
+  let observer_sync =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int block_number)
+  in
+  let*@ _ = produce_block sequencer in
+  let* () = observer_sync in
   Log.info "Test setup: Exporting snapshots for test." ;
   Log.info " - Exporting older snapshot from observer." ;
   Log.info "   - Terminate the observer." ;
