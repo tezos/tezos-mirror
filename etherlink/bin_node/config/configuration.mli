@@ -171,7 +171,7 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   garbage_collector_parameters : garbage_collector_parameters;
-  history_mode : history_mode;
+  history_mode : history_mode option;
 }
 
 val history_mode_encoding : history_mode Data_encoding.t
@@ -264,6 +264,8 @@ val make_pattern_restricted_rpcs : string -> restricted_rpcs
 (** [retention ?days ()] returns the GC parameters to retain [days] of history
     when provided or the default otherwise. *)
 val retention : ?days:int -> unit -> garbage_collector_parameters
+
+val default_history_mode : history_mode
 
 module Cli : sig
   val create :

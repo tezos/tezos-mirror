@@ -2490,7 +2490,7 @@ let switch_history_mode_command =
         in
         let* store_history_mode = Evm_store.Metadata.find_history_mode conn in
 
-        let* () =
+        let* history_mode =
           Evm_context.check_history_mode
             ~switch:true
             ~store_history_mode

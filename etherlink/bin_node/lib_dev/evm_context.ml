@@ -307,7 +307,8 @@ module State = struct
 
   let maybe_split_context ctxt conn timestamp level =
     let open Lwt_result_syntax in
-    match ctxt.configuration.history_mode with
+    let* history_mode = Evm_store.Metadata.get_history_mode conn in
+    match history_mode with
     | Archive -> return_none
     | Rolling ->
         let split =
@@ -1147,37 +1148,44 @@ module State = struct
       conn =
     let open Lwt_result_syntax in
     match store_history_mode with
-    | None -> return_unit
+    | None -> (
+        match history_mode with
+        | None -> return Configuration.default_history_mode
+        | Some h -> return h)
     | Some store_history_mode -> (
         match (store_history_mode, history_mode) with
-        | Configuration.Archive, Configuration.Archive | Rolling, Rolling ->
+        | Configuration.Archive, (None | Some Archive)
+        | Rolling, (None | Some Rolling) ->
             if switch then
               Format.printf
                 "History mode is already %a, not switching@."
                 Configuration.pp_history_mode
-                history_mode ;
-            return_unit
-        | Archive, Rolling when switch ->
+                store_history_mode ;
+            return store_history_mode
+        | Archive, Some Rolling when switch ->
             let*! () =
               Evm_context_events.switching_history_mode
                 ~from:Archive
                 ~to_:Rolling
             in
-            return_unit
-        | Rolling, Archive when switch ->
+            return Configuration.Rolling
+        | Rolling, Some Archive when switch ->
             (* Switching from rolling to archive is possible, however it does
                not necessarily mean all information are stored, it will just
                stop garbage collecting data. *)
             let* () = Evm_store.Irmin_chunks.clear conn in
             let* earliest = Evm_store.Context_hashes.find_earliest conn in
             let earliest_level = Option.map fst earliest in
-            unless (earliest_level = Some Ethereum_types.Qty.zero) (fun () ->
-                let*! () =
-                  Evm_context_events.rolling_to_archive_incomplete_history
-                    earliest_level
-                in
-                return_unit)
-        | _, _ ->
+            let* () =
+              unless (earliest_level = Some Ethereum_types.Qty.zero) (fun () ->
+                  let*! () =
+                    Evm_context_events.rolling_to_archive_incomplete_history
+                      earliest_level
+                  in
+                  return_unit)
+            in
+            return Configuration.Archive
+        | _, Some history_mode ->
             tzfail (Incorrect_history_mode {store_history_mode; history_mode}))
 
   let check_metadata ~store_metadata ~smart_rollup_address ~history_mode conn =
@@ -1191,7 +1199,7 @@ module State = struct
              store_metadata)
         ~smart_rollup_address
     in
-    let* () =
+    let* history_mode =
       check_history_mode
         ~store_history_mode:
           (Option.map
@@ -1239,7 +1247,10 @@ module State = struct
       ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url () =
     let open Lwt_result_syntax in
     let*! () =
-      Evm_context_events.start_history_mode configuration.history_mode
+      Evm_context_events.start_history_mode
+        (Option.value
+           configuration.history_mode
+           ~default:Configuration.default_history_mode)
     in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1267,7 +1278,7 @@ module State = struct
       | None -> (Ethereum_types.Qty Z.zero, None)
       | Some {finalized; l1_level; _} -> (finalized, Some l1_level)
     in
-    let* smart_rollup_address =
+    let* {smart_rollup_address; history_mode} =
       let smart_rollup_address =
         Option.map
           Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
@@ -1285,7 +1296,7 @@ module State = struct
         when_ (Option.is_none store_metadata) (fun () ->
             Evm_store.Metadata.store conn metadata)
       in
-      return metadata.smart_rollup_address
+      return metadata
     in
     let* evm_state, context =
       match kernel_path with
@@ -1313,7 +1324,7 @@ module State = struct
     in
 
     let* last_split_block =
-      match configuration.history_mode with
+      match history_mode with
       | Rolling -> Evm_store.Irmin_chunks.latest conn
       | Archive -> return_none
     in

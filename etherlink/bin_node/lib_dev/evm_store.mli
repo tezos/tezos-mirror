@@ -261,6 +261,8 @@ module Metadata : sig
 
   val find_history_mode :
     conn -> Configuration.history_mode option tzresult Lwt.t
+
+  val get_history_mode : conn -> Configuration.history_mode tzresult Lwt.t
 end
 
 (** [reset_after conn ~l2_level] clear the table that has information related to l2

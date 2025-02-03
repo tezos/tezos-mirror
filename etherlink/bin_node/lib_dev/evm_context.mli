@@ -141,12 +141,13 @@ val head_watcher : Ethereum_types.Subscription.output Lwt_watcher.input
 val receipt_watcher : Transaction_receipt.t Lwt_watcher.input
 
 (** [check_history_mode ?switch ~store_history_mode ~history_mode conn] checks
-    that the history mode are compatible, depending on its stored mode
-    [store_history_mode], the one requested by the configuration [history_mode]
-    and if it is allowed to [switch]. *)
+    that the history mode are compatible, and returns the history mode the node
+    should run in, depending on its stored mode [store_history_mode], the one
+    requested by the configuration [history_mode] and if it is allowed to
+    [switch]. *)
 val check_history_mode :
   ?switch:bool ->
   store_history_mode:Configuration.history_mode option ->
-  history_mode:Configuration.history_mode ->
+  history_mode:Configuration.history_mode option ->
   Sqlite.conn ->
-  unit tzresult Lwt.t
+  Configuration.history_mode tzresult Lwt.t

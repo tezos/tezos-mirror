@@ -134,7 +134,7 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   garbage_collector_parameters : garbage_collector_parameters;
-  history_mode : history_mode;
+  history_mode : history_mode option;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -1181,7 +1181,9 @@ let encoding ?network data_dir : t Data_encoding.t =
             public_rpc,
             private_rpc,
             finalized_view,
-            (history_mode, garbage_collector_parameters) ) ) ))
+            match history_mode with
+            | Some h -> Some (h, garbage_collector_parameters)
+            | None -> None ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1196,7 +1198,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                public_rpc,
                private_rpc,
                finalized_view,
-               (history_mode, garbage_collector_parameters) ) ) ) ->
+               history_mode_and_gc ) ) ) ->
+      let history_mode, garbage_collector_parameters =
+        match history_mode_and_gc with
+        | None -> (None, default_garbage_collector_parameters)
+        | Some (h, gc) -> (Some h, gc)
+      in
       {
         public_rpc;
         private_rpc;
@@ -1293,11 +1300,10 @@ let encoding ?network data_dir : t Data_encoding.t =
                 "finalized_view"
                 bool
                 false)
-             (dft
+             (opt
                 "history"
                 ~description:"History mode of the EVM node"
-                history_mode_and_gc_parameters_encoding
-                (default_history_mode, default_garbage_collector_parameters)))))
+                history_mode_and_gc_parameters_encoding))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1594,7 +1600,7 @@ module Cli = struct
         Option.value
           garbage_collector_parameters
           ~default:default_garbage_collector_parameters;
-      history_mode = Option.value history_mode ~default:default_history_mode;
+      history_mode;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -1899,8 +1905,7 @@ module Cli = struct
         Option.value
           garbage_collector_parameters
           ~default:configuration.garbage_collector_parameters;
-      history_mode =
-        Option.value history_mode ~default:configuration.history_mode;
+      history_mode = Option.either history_mode configuration.history_mode;
     }
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit

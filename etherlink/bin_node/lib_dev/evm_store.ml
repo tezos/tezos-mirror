@@ -895,6 +895,10 @@ module Metadata = struct
   let find_history_mode store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Metadata.get_history_mode ()
+
+  let get_history_mode store =
+    with_connection store @@ fun conn ->
+    Db.find conn Q.Metadata.get_history_mode ()
 end
 
 module Transactions = struct
