@@ -73,6 +73,12 @@ pub enum ComputationResult {
     Finished,
 }
 
+// A block in progress can either come directly from the storage (when the previous run did not have enough ticks to apply the full block) or from a blueprint
+enum BlockInProgressProvenance {
+    Storage,
+    Blueprint,
+}
+
 fn on_invalid_transaction<Host: Runtime>(
     host: &mut Host,
     transaction: &Transaction,
@@ -100,7 +106,6 @@ fn compute<Host: Runtime>(
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
-    is_first_block_of_reboot: bool,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     tracer_input: Option<TracerInput>,
@@ -125,7 +130,7 @@ fn compute<Host: Runtime>(
             data_size,
         );
 
-        let retriable = !is_first_transaction || !is_first_block_of_reboot;
+        let retriable = !is_first_transaction;
         if allocated_ticks == 0 {
             if retriable {
                 log!(
@@ -288,7 +293,6 @@ fn compute_bip<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     tick_counter: &mut TickCounter,
-    first_block_of_reboot: &mut bool,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     tracer_input: Option<TracerInput>,
@@ -311,7 +315,6 @@ fn compute_bip<Host: Runtime>(
         &constants,
         precompiles,
         evm_account_storage,
-        *first_block_of_reboot,
         sequencer_pool_address,
         limits,
         tracer_input,
@@ -345,8 +348,6 @@ fn compute_bip<Host: Runtime>(
             *current_block_parent_hash = new_block.hash;
             *previous_receipts_root = new_block.receipts_root;
             *previous_transactions_root = new_block.transactions_root;
-
-            *first_block_of_reboot = false;
         }
     }
     Ok(result)
@@ -354,7 +355,7 @@ fn compute_bip<Host: Runtime>(
 
 fn revert_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
-    block_in_progress: bool,
+    block_in_progress_provenance: &BlockInProgressProvenance,
     number: U256,
     error: anyhow::Error,
 ) -> anyhow::Result<()> {
@@ -362,7 +363,14 @@ fn revert_block<Host: Runtime>(
         safe_host,
         Error,
         "Block{} {} failed with '{:?}'. Reverting.",
-        if block_in_progress { "InProgress" } else { "" },
+        match block_in_progress_provenance {
+            BlockInProgressProvenance::Storage => {
+                "InProgress"
+            }
+            BlockInProgressProvenance::Blueprint => {
+                ""
+            }
+        },
         number,
         error
     );
@@ -385,12 +393,12 @@ fn clean_delayed_transactions(
 fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: bool,
+    block_in_progress_provenance: &BlockInProgressProvenance,
     number: U256,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
-    if block_in_progress {
+    if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
     }
     safe_host.promote()?;
@@ -454,7 +462,6 @@ pub fn produce<Host: Runtime>(
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut tick_counter = TickCounter::new(0u64);
-    let mut first_block_of_reboot = true;
 
     let at_most_one_block = host.store_has(&AT_MOST_ONE_BLOCK)?.is_some();
 
@@ -464,157 +471,119 @@ pub fn produce<Host: Runtime>(
         precompiles::precompile_set::<SafeStorage<&mut Host>>(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
-    match storage::read_block_in_progress(&safe_host)? {
-        None => (),
-        Some(block_in_progress) => {
-            let processed_blueprint = block_in_progress.number;
-            match compute_bip(
-                &mut safe_host,
-                &outbox_queue,
+    let (processed_blueprint, block_in_progress_provenance, block_in_progress) =
+        match storage::read_block_in_progress(&safe_host)? {
+            Some(block_in_progress) => (
+                block_in_progress.number,
+                BlockInProgressProvenance::Storage,
                 block_in_progress,
-                &mut current_block_number,
-                &mut current_block_parent_hash,
-                &mut previous_receipts_root,
-                &mut previous_transactions_root,
-                &precompiles,
-                &mut evm_account_storage,
-                &mut tick_counter,
-                &mut first_block_of_reboot,
-                sequencer_pool_address,
-                &config.limits,
-                tracer_input,
-                chain_id,
-                minimum_base_fee_per_gas,
-                da_fee_per_byte,
-                coinbase,
-            ) {
-                Ok(BlockComputationResult::Finished {
-                    included_delayed_transactions,
-                }) => {
-                    promote_block(
-                        &mut safe_host,
-                        &outbox_queue,
-                        true,
-                        processed_blueprint,
-                        config,
-                        included_delayed_transactions,
-                    )?;
-                    if at_most_one_block {
+            ),
+            None => {
+                // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
+                // because the sequencer pool address is located outside of `/evm/world_state`.
+                upgrade::possible_sequencer_upgrade(safe_host.host)?;
+
+                // Execute at most one of the stored blueprints
+                let block_in_progress = match next_bip_from_blueprints(
+                    safe_host.host,
+                    current_block_number,
+                    current_block_parent_hash,
+                    &tick_counter,
+                    config,
+                    &kernel_upgrade,
+                    minimum_base_fee_per_gas,
+                )? {
+                    BlueprintParsing::Next(bip) => bip,
+                    BlueprintParsing::None => {
+                        log!(
+                            safe_host,
+                            Benchmarking,
+                            "Estimated ticks: {}",
+                            tick_counter.c
+                        );
                         return Ok(ComputationResult::Finished);
-                    } else {
-                        return Ok(ComputationResult::RebootNeeded);
                     }
-                }
-                Ok(BlockComputationResult::RebootNeeded) => {
-                    // The computation still needs to reboot, we do nothing.
-                    return Ok(ComputationResult::RebootNeeded);
-                }
-                Err(err) => {
-                    revert_block(&mut safe_host, true, processed_blueprint, err)?;
-                    // The block was reverted because it failed. We don't know at
-                    // which point did it fail nor why. We cannot make assumption
-                    // on how many ticks it consumed before failing. Therefore
-                    // the safest solution is to simply reboot after a failure.
-                    return Ok(ComputationResult::RebootNeeded);
-                }
-            }
-        }
-    }
-
-    // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
-    // because the sequencer pool address is located outside of `/evm/world_state`.
-    upgrade::possible_sequencer_upgrade(safe_host.host)?;
-
-    // Execute at most one of the stored blueprints
-    {
-        let block_in_progress = match next_bip_from_blueprints(
-            safe_host.host,
-            current_block_number,
-            current_block_parent_hash,
-            &tick_counter,
-            config,
-            &kernel_upgrade,
-            minimum_base_fee_per_gas,
-        )? {
-            BlueprintParsing::Next(bip) => bip,
-            BlueprintParsing::None => {
-                log!(
-                    safe_host,
-                    Benchmarking,
-                    "Estimated ticks: {}",
-                    tick_counter.c
-                );
-                return Ok(ComputationResult::Finished);
+                };
+                // We are going to execute a new block, we copy the storage to allow
+                // to revert if the block fails.
+                safe_host.start()?;
+                (
+                    current_block_number,
+                    BlockInProgressProvenance::Blueprint,
+                    *block_in_progress,
+                )
             }
         };
-        // We are going to execute a new block, we copy the storage to allow
-        // to revert if the block fails.
-        safe_host.start()?;
 
-        let processed_blueprint = current_block_number;
-
-        match compute_bip(
-            &mut safe_host,
-            &outbox_queue,
-            *block_in_progress,
-            &mut current_block_number,
-            &mut current_block_parent_hash,
-            &mut previous_receipts_root,
-            &mut previous_transactions_root,
-            &precompiles,
-            &mut evm_account_storage,
-            &mut tick_counter,
-            &mut first_block_of_reboot,
-            sequencer_pool_address,
-            &config.limits,
-            tracer_input,
-            chain_id,
-            minimum_base_fee_per_gas,
-            da_fee_per_byte,
-            coinbase,
-        ) {
-            Ok(BlockComputationResult::Finished {
+    match compute_bip(
+        &mut safe_host,
+        &outbox_queue,
+        block_in_progress,
+        &mut current_block_number,
+        &mut current_block_parent_hash,
+        &mut previous_receipts_root,
+        &mut previous_transactions_root,
+        &precompiles,
+        &mut evm_account_storage,
+        &mut tick_counter,
+        sequencer_pool_address,
+        &config.limits,
+        tracer_input,
+        chain_id,
+        minimum_base_fee_per_gas,
+        da_fee_per_byte,
+        coinbase,
+    ) {
+        Ok(BlockComputationResult::Finished {
+            included_delayed_transactions,
+        }) => {
+            promote_block(
+                &mut safe_host,
+                &outbox_queue,
+                &block_in_progress_provenance,
+                processed_blueprint,
+                config,
                 included_delayed_transactions,
-            }) => {
-                promote_block(
-                    &mut safe_host,
-                    &outbox_queue,
-                    false,
-                    processed_blueprint,
-                    config,
-                    included_delayed_transactions,
-                )?;
-                if at_most_one_block {
-                    Ok(ComputationResult::Finished)
-                } else {
-                    Ok(ComputationResult::RebootNeeded)
-                }
+            )?;
+            if at_most_one_block {
+                Ok(ComputationResult::Finished)
+            } else {
+                Ok(ComputationResult::RebootNeeded)
             }
-            Ok(BlockComputationResult::RebootNeeded) => {
-                // The computation will resume at next reboot, we leave the
-                // storage untouched.
+        }
+        Ok(BlockComputationResult::RebootNeeded) => {
+            // The computation will resume at next reboot, we leave the
+            // storage untouched.
+            if let BlockInProgressProvenance::Blueprint = &block_in_progress_provenance {
                 log!(
                     safe_host,
                     Benchmarking,
                     "Estimated ticks: {}",
                     tick_counter.c
-                );
-                Ok(ComputationResult::RebootNeeded)
-            }
-            Err(err) => {
-                revert_block(&mut safe_host, false, processed_blueprint, err)?;
-                // The block was reverted because it failed. We don't know at
-                // which point did it fail nor why. We cannot make assumption
-                // on how many ticks it consumed before failing. Therefore
-                // the safest solution is to simply reboot after a failure.
+                )
+            };
+            Ok(ComputationResult::RebootNeeded)
+        }
+        Err(err) => {
+            revert_block(
+                &mut safe_host,
+                &block_in_progress_provenance,
+                processed_blueprint,
+                err,
+            )?;
+            // The block was reverted because it failed. We don't know at
+            // which point did it fail nor why. We cannot make assumption
+            // on how many ticks it consumed before failing. Therefore
+            // the safest solution is to simply reboot after a failure.
+            if let BlockInProgressProvenance::Blueprint = &block_in_progress_provenance {
                 log!(
                     safe_host,
                     Benchmarking,
                     "Estimated ticks: {}",
                     tick_counter.c
-                );
-                Ok(ComputationResult::RebootNeeded)
-            }
+                )
+            };
+            Ok(ComputationResult::RebootNeeded)
         }
     }
 }
@@ -1347,7 +1316,6 @@ mod tests {
             &block_constants,
             &precompiles,
             &mut evm_account_storage,
-            true,
             None,
             &limits,
             None,
