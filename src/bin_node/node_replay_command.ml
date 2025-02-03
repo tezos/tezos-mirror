@@ -608,8 +608,8 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
 
 let[@warning "-32"] may_start_profiler data_dir =
   match Tezos_base_unix.Profiler_instance.selected_backend () with
-  | Some profiler_maker -> (
-      let profiler_maker = profiler_maker ~directory:data_dir in
+  | Some {instance_maker; _} -> (
+      let profiler_maker = instance_maker ~directory:data_dir in
       Shell_profiling.activate_all ~profiler_maker ;
       match profiler_maker ~name:"context" with
       | Some instance ->

@@ -17,9 +17,13 @@ type instance_maker =
 
 type 'config driver = (module Profiler.DRIVER with type config = 'config)
 
-type backend_infos = {instance_maker : instance_maker}
+type 'instance_maker backend_infos = {
+  instance_maker : 'instance_maker;
+  view : view;
+}
 
-let registered_backends : backend_infos BackendMap.t ref = ref BackendMap.empty
+let registered_backends : instance_maker backend_infos BackendMap.t ref =
+  ref BackendMap.empty
 
 (** Get the verbosity map from the contents of the PROFILING environment
     variable. The contents are expected to be of the following form:
@@ -75,6 +79,9 @@ let register_backend :
     string list -> (config driver -> instance_maker) -> config driver -> unit =
  fun env instance_maker driver ->
   let module Driver = (val driver : DRIVER with type config = config) in
+  (* Wrapping the kind in a View to avoid internal types of the Driver
+     escaping their scope *)
+  let view = Profiler.View Driver.kind in
   match List.find (fun k -> BackendMap.mem k !registered_backends) env with
   | Some k ->
       Fmt.failwith "Profiler backend already registered for value \"%s\"" k
@@ -82,7 +89,7 @@ let register_backend :
       registered_backends :=
         List.fold_left
           (fun acc k ->
-            BackendMap.add k {instance_maker = instance_maker driver} acc)
+            BackendMap.add k {instance_maker = instance_maker driver; view} acc)
           !registered_backends
           env
 
@@ -90,6 +97,9 @@ let wrap_backend_verbosity instance_maker ~directory ~name =
   match get_profiler_verbosity ~name with
   | None -> None
   | Some verbosity -> Some (instance_maker ~verbosity ~directory ~name)
+
+type wrapped_instance_maker =
+  directory:string -> name:string -> Profiler.instance option
 
 let selected_backend () =
   let fail s =
@@ -117,7 +127,8 @@ let selected_backend () =
           |> fail)
   | Some b -> (
       match BackendMap.find b !registered_backends with
-      | Some {instance_maker; _} -> Some (wrap_backend_verbosity instance_maker)
+      | Some {instance_maker; view} ->
+          Some {instance_maker = wrap_backend_verbosity instance_maker; view}
       | None ->
           Format.sprintf "No backend registered for value \"%s\"" b |> fail)
 

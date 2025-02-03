@@ -13,6 +13,11 @@ type instance_maker =
 
 type 'config driver = (module Profiler.DRIVER with type config = 'config)
 
+type 'instance_maker backend_infos = {
+  instance_maker : 'instance_maker;
+  view : Profiler.view;
+}
+
 (** [register_backend identifiers instance_maker driver] associates one or more
     identifier(s) with a profiler instantiator.
 
@@ -36,7 +41,9 @@ type 'config driver = (module Profiler.DRIVER with type config = 'config)
 val register_backend :
   string list -> ('config driver -> instance_maker) -> 'config driver -> unit
 
+type wrapped_instance_maker =
+  directory:string -> name:string -> Profiler.instance option
+
 (** [selected_backend ()] returns the backend selected using the environment
     variable [PROFILING_BACKEND]. *)
-val selected_backend :
-  unit -> (directory:string -> name:string -> Profiler.instance option) option
+val selected_backend : unit -> wrapped_instance_maker backend_infos option
