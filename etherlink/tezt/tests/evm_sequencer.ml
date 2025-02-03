@@ -9726,23 +9726,16 @@ let test_rpc_getLogs_with_earliest_fail =
 
 let test_estimate_gas_with_block_param =
   register_all
-    ~tags:
-      [
-        "evm";
-        "eth_estimategas";
-        "simulate";
-        "estimate_gas";
-        "earliest";
-        Tag.flaky;
-      ]
+    ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
     ~title:"eth_estimateGas with block parameter"
+    ~time_between_blocks:Nothing
   @@ fun {sequencer; _} _protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* gas_consumer = Solidity_contracts.even_block_gas_consumer () in
   let* () =
     Eth_cli.add_abi ~label:gas_consumer.label ~abi:gas_consumer.abi ()
   in
-  let* address_contract, _ =
+  let* address_contract, tx =
     send_transaction_to_sequencer
       (Eth_cli.deploy
          ~source_private_key:sender.private_key
@@ -9751,24 +9744,42 @@ let test_estimate_gas_with_block_param =
          ~bin:gas_consumer.bin)
       sequencer
   in
-  let* data =
-    Eth_cli.encode_method ~abi_label:gas_consumer.label ~method_:"consume()" ()
+  let* receipt =
+    Eth_cli.get_receipt ~endpoint:(Evm_node.endpoint sequencer) ~tx ()
   in
-  let call_params =
-    [
-      ("from", `String sender.address);
-      ("to", `String address_contract);
-      ("input", `String data);
-    ]
-  in
-  let* _ = produce_block sequencer in
-  (* Estimate_gas does it's estimations on a block about to be minted so if we run it on block `N` the solidity code execute itself with block.number = `N`+ 1 *)
-  let*@ evenGasCost =
-    Rpc.estimate_gas call_params sequencer ~block:(Number 1)
-  in
-  let*@ oddGasCost = Rpc.estimate_gas call_params sequencer ~block:(Number 2) in
-  Check.((evenGasCost > oddGasCost) int64 ~error_msg:"Expected %R but got %L") ;
-  unit
+  match receipt with
+  | Some {blockNumber; _} when blockNumber = 1l ->
+      let blockNumber = Int32.to_int blockNumber in
+      let* data =
+        Eth_cli.encode_method
+          ~abi_label:gas_consumer.label
+          ~method_:"consume()"
+          ()
+      in
+      let call_params =
+        [
+          ("from", `String sender.address);
+          ("to", `String address_contract);
+          ("input", `String data);
+        ]
+      in
+      let* _ = produce_block sequencer in
+      (* Estimate_gas does its estimations on a block about to be minted so if we run it on block `N` the solidity code execute itself with block.number = `N`+ 1 *)
+      let*@ evenGasCost =
+        Rpc.estimate_gas call_params sequencer ~block:(Number blockNumber)
+      in
+      let*@ oddGasCost =
+        Rpc.estimate_gas call_params sequencer ~block:(Number (blockNumber + 1))
+      in
+      Check.(
+        (evenGasCost > oddGasCost)
+          int64
+          ~error_msg:
+            "When calling for the contract EvenBlockGasConsumer.consume(), The \
+             cost of gas should be lower in odd block numbers than in even \
+             block numbers but got even = %L and odd = %R") ;
+      unit
+  | _ -> Test.fail "Test contract deployment failed"
 
 let protocols = Protocol.all
 
