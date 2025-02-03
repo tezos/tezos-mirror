@@ -1101,7 +1101,7 @@ mod tests {
         let addiw = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Addiw,
             args: TaggedArgs {
-                rd: a1.into(),
+                rd: nz::a1.into(),
                 rs1: a1.into(),
                 imm: 257,
                 ..TaggedArgs::DEFAULT
@@ -1283,7 +1283,7 @@ mod tests {
                     Instruction::try_from(TaggedInstruction {
                         opcode: OpCode::Add,
                         args: TaggedArgs {
-                            rd: a1.into(),
+                            rd: nz::a1.into(),
                             rs1: a1.into(),
                             rs2: a2.into(),
                             ..TaggedArgs::DEFAULT

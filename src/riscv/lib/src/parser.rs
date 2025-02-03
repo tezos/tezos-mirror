@@ -179,12 +179,28 @@ macro_rules! r_instr {
             rs2: rs2($instr),
         })
     };
+
+    ($enum_variant:ident, $instr:expr, $rd:expr) => {
+        $enum_variant(instruction::NonZeroRdRTypeArgs {
+            rd: $rd,
+            rs1: rs1($instr),
+            rs2: rs2($instr),
+        })
+    };
 }
 
 macro_rules! i_instr {
     ($enum_variant:ident, $instr:expr) => {
         $enum_variant(instruction::ITypeArgs {
             rd: rd($instr),
+            rs1: rs1($instr),
+            imm: i_imm($instr),
+        })
+    };
+
+    ($enum_variant:ident, $instr:expr, $rd:expr) => {
+        $enum_variant(instruction::NonZeroRdITypeArgs {
+            rd: $rd,
             rs1: rs1($instr),
             imm: i_imm($instr),
         })
@@ -212,9 +228,9 @@ macro_rules! b_instr {
 }
 
 macro_rules! u_instr {
-    ($enum_variant:ident, $instr:expr) => {
-        $enum_variant(instruction::UJTypeArgs {
-            rd: rd($instr),
+    ($enum_variant:ident, $instr:expr, $rd:expr) => {
+        $enum_variant(instruction::NonZeroRdUJTypeArgs {
+            rd: $rd,
             imm: u_imm($instr),
         })
     };
@@ -498,55 +514,55 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         OP_ARITH => match funct3(instr) {
             F3_0 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Add, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Add, instr, rd),
                 (F7_1, _) => r_instr!(Mul, instr),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(_)) => r_instr!(Sub, instr),
+                (F7_20, NonZero(rd)) => r_instr!(Sub, instr, rd),
                 _ => Unknown { instr },
             },
             F3_4 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Xor, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Xor, instr, rd),
                 (F7_1, _) => r_instr!(Div, instr),
                 _ => Unknown { instr },
             },
             F3_6 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Or, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Or, instr, rd),
                 (F7_1, _) => r_instr!(Rem, instr),
                 _ => Unknown { instr },
             },
             F3_7 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(And, instr),
+                (F7_0, NonZero(rd)) => r_instr!(And, instr, rd),
                 (F7_1, _) => r_instr!(Remu, instr),
                 _ => Unknown { instr },
             },
             F3_1 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Sll, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Sll, instr, rd),
                 (F7_1, _) => r_instr!(Mulh, instr),
                 _ => Unknown { instr },
             },
             F3_5 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Srl, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Srl, instr, rd),
                 (F7_1, _) => r_instr!(Divu, instr),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(_)) => r_instr!(Sra, instr),
+                (F7_20, NonZero(rd)) => r_instr!(Sra, instr, rd),
                 _ => Unknown { instr },
             },
 
             F3_2 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Slt, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Slt, instr, rd),
                 (F7_1, _) => r_instr!(Mulhsu, instr),
                 _ => Unknown { instr },
             },
 
             F3_3 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Sltu, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Sltu, instr, rd),
                 (F7_1, _) => r_instr!(Mulhu, instr),
                 _ => Unknown { instr },
             },
@@ -556,15 +572,15 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         OP_ARITH_W => match funct3(instr) {
             F3_0 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Addw, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Addw, instr, rd),
                 (F7_1, _) => r_instr!(Mulw, instr),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(_)) => r_instr!(Subw, instr),
+                (F7_20, NonZero(rd)) => r_instr!(Subw, instr, rd),
                 _ => Unknown { instr },
             },
             F3_1 => match split_x0(rd(instr)) {
                 X0 => Hint { instr },
-                _ => r_instr!(Sllw, instr),
+                NonZero(rd) => r_instr!(Sllw, instr, rd),
             },
             F3_4 => match funct7(instr) {
                 F7_1 => r_instr!(Divw, instr),
@@ -572,10 +588,10 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
             },
             F3_5 => match (funct7(instr), split_x0(rd(instr))) {
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => r_instr!(Srlw, instr),
+                (F7_0, NonZero(rd)) => r_instr!(Srlw, instr, rd),
                 (F7_1, NonZero(_)) => r_instr!(Divuw, instr),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(_)) => r_instr!(Sraw, instr),
+                (F7_20, NonZero(rd)) => r_instr!(Sraw, instr, rd),
                 _ => Unknown { instr },
             },
 
@@ -593,40 +609,36 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
 
         // I-type instructions
         OP_ARITH_I => match (funct3(instr), split_x0(rd(instr))) {
-            (F3_0, X0) => match (rs1(instr), i_imm(instr)) {
-                (x0, 0) => Addi(instruction::ITypeArgs {
-                    rd: x0,
-                    rs1: x0,
-                    imm: 0,
-                }),
-                (x0, _) | (_, 0) => Hint { instr },
-                (rs1, imm) => Addi(instruction::ITypeArgs { rd: x0, rs1, imm }),
+            (F3_0, X0) => match (split_x0(rs1(instr)), i_imm(instr)) {
+                (X0, _) | (_, 0) => Hint { instr },
+                (_rs1, _imm) => i_instr!(Addi, instr),
             },
-            (F3_0, NonZero(_)) => i_instr!(Addi, instr),
+            // TODO: RV-427 Deduplicate Addi and introduce specific constructor for its cases.
+            (F3_0, _rd) => i_instr!(Addi, instr),
             (F3_4, X0) => Hint { instr },
-            (F3_4, NonZero(_)) => i_instr!(Xori, instr),
+            (F3_4, NonZero(rd)) => i_instr!(Xori, instr, rd),
             (F3_6, X0) => Hint { instr },
-            (F3_6, NonZero(_)) => i_instr!(Ori, instr),
+            (F3_6, NonZero(rd)) => i_instr!(Ori, instr, rd),
             (F3_7, X0) => Hint { instr },
-            (F3_7, NonZero(_)) => i_instr!(Andi, instr),
+            (F3_7, NonZero(rd)) => i_instr!(Andi, instr, rd),
             (F3_1, rd) => match (imm_11_6(instr), rd) {
                 // imm[0:5] -> shift amount
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => i_instr!(Slli, instr),
+                (F7_0, NonZero(rd)) => i_instr!(Slli, instr, rd),
                 _ => Unknown { instr },
             },
             (F3_5, rd) => match (imm_11_6(instr), rd) {
                 // imm[6:11] -> type of shift, imm[0:5] -> shift amount
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => i_instr!(Srli, instr),
+                (F7_0, NonZero(rd)) => i_instr!(Srli, instr, rd),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(_)) => i_instr!(Srai, instr),
+                (F7_20, NonZero(rd)) => i_instr!(Srai, instr, rd),
                 _ => Unknown { instr },
             },
             (F3_2, X0) => Hint { instr },
-            (F3_2, NonZero(_)) => i_instr!(Slti, instr),
+            (F3_2, NonZero(rd)) => i_instr!(Slti, instr, rd),
             (F3_3, X0) => Hint { instr },
-            (F3_3, NonZero(_)) => i_instr!(Sltiu, instr),
+            (F3_3, NonZero(rd)) => i_instr!(Sltiu, instr, rd),
             _ => Unknown { instr },
         },
         OP_LOAD => match funct3(instr) {
@@ -641,19 +653,19 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         },
         OP_ARITH_IW => match (funct3(instr), split_x0(rd(instr))) {
             (F3_0, X0) => Hint { instr },
-            (F3_0, NonZero(_)) => i_instr!(Addiw, instr),
+            (F3_0, NonZero(rd)) => i_instr!(Addiw, instr, rd),
             (F3_1, rd) => match (imm_11_6(instr), rd) {
                 // imm[0:4] -> shift amount
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => i_instr!(Slliw, instr),
+                (F7_0, NonZero(rd)) => i_instr!(Slliw, instr, rd),
                 _ => Unknown { instr },
             },
             (F3_5, rd) => match (imm_11_6(instr), rd) {
                 // imm[6:11] -> type of shift, imm[0:4] -> shift amount
                 (F7_0, X0) => Hint { instr },
-                (F7_0, NonZero(_)) => i_instr!(Srliw, instr),
+                (F7_0, NonZero(rd)) => i_instr!(Srliw, instr, rd),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(_)) => i_instr!(Sraiw, instr),
+                (F7_20, NonZero(rd)) => i_instr!(Sraiw, instr, rd),
                 _ => Unknown { instr },
             },
             _ => Unknown { instr },
@@ -768,11 +780,11 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         // U-type instructions
         OP_LUI => match split_x0(rd(instr)) {
             X0 => Hint { instr },
-            NonZero(_) => u_instr!(Lui, instr),
+            NonZero(rd) => u_instr!(Lui, instr, rd),
         },
         OP_AUIPC => match split_x0(rd(instr)) {
             X0 => Hint { instr },
-            NonZero(_) => u_instr!(Auipc, instr),
+            NonZero(rd) => u_instr!(Auipc, instr, rd),
         },
 
         // F/D-type instructions
@@ -1151,6 +1163,7 @@ const C_Q1_3: u16 = 0b11;
 
 /// Wrapper for splitting x0 from other XRegisters that can
 /// be represented by [`NonZeroXRegister`].
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 enum XRegisterParsed {
     X0,
     NonZero(NonZeroXRegister),
@@ -1379,7 +1392,10 @@ mod tests {
     use std::collections::HashMap;
 
     use super::{
-        instruction::{CsrArgs, ITypeArgs, Instr, InstrCacheable::*, SBTypeArgs, UJTypeArgs},
+        instruction::{
+            CsrArgs, ITypeArgs, Instr, InstrCacheable::*, NonZeroRdITypeArgs, SBTypeArgs,
+            UJTypeArgs,
+        },
         parse_block,
     };
     use crate::{
@@ -1389,7 +1405,7 @@ mod tests {
         },
         parser::{
             instruction::{CIBNZTypeArgs, CIBTypeArgs, InstrUncacheable},
-            parse_compressed_instruction, parse_compressed_instruction_inner,
+            parse_compressed_instruction, parse_compressed_instruction_inner, NonZeroRdUJTypeArgs,
         },
     };
 
@@ -1448,8 +1464,8 @@ mod tests {
                 rd_rs1: NonZeroXRegister::x8,
                 imm: 0x1 << 12,
             })),
-            Instr::Cacheable(Addiw(ITypeArgs {
-                rd: x8,
+            Instr::Cacheable(Addiw(NonZeroRdITypeArgs {
+                rd: NonZeroXRegister::x8,
                 rs1: x8,
                 imm: 564,
             })),
@@ -1457,12 +1473,12 @@ mod tests {
                 rd_rs1: NonZeroXRegister::x8,
                 imm: 4,
             })),
-            Instr::Cacheable(Lui(UJTypeArgs {
-                rd: x7,
+            Instr::Cacheable(Lui(NonZeroRdUJTypeArgs {
+                rd: NonZeroXRegister::x7,
                 imm: 0x12 << 12,
             })),
-            Instr::Cacheable(Addiw(ITypeArgs {
-                rd: x7,
+            Instr::Cacheable(Addiw(NonZeroRdITypeArgs {
+                rd: NonZeroXRegister::x7,
                 rs1: x7,
                 imm: 832,
             })),
@@ -1508,8 +1524,8 @@ mod tests {
     fn test_5() {
         let bytes: [u8; 8] = [0x13, 0x15, 0xf5, 0x01, 0x13, 0x15, 0xf5, 0x21];
         let expected = [
-            Instr::Cacheable(Slli(ITypeArgs {
-                rd: x10,
+            Instr::Cacheable(Slli(NonZeroRdITypeArgs {
+                rd: NonZeroXRegister::x10,
                 rs1: x10,
                 imm: 31,
             })),

@@ -150,7 +150,8 @@ where
     /// Computes the bitwise AND of the values in registers `rd_rs1` and `rs2`,
     /// then writes the result back to register rd `rd_rs1`.
     pub fn run_cand(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        self.run_and(rd_rs1, rs2, rd_rs1)
+        let result = self.read(rd_rs1) & self.read(rs2);
+        self.write(rd_rs1, result)
     }
 
     /// `C.XOR` CA-type compressed instruction
@@ -158,7 +159,8 @@ where
     /// Computes the bitwise XOR of the values in registers `rd_rs1` and `rs2`,
     /// then writes the result back to register rd `rd_rs1`.
     pub fn run_cxor(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        self.run_xor(rd_rs1, rs2, rd_rs1)
+        let result = self.read(rd_rs1) ^ self.read(rs2);
+        self.write(rd_rs1, result)
     }
 
     /// `C.OR` CA-type compressed instruction
@@ -166,7 +168,8 @@ where
     /// Computes the bitwise OR of the values in registers `rd_rs1` and `rs2`,
     /// then writes the result back to register rd `rd_rs1`.
     pub fn run_cor(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        self.run_or(rd_rs1, rs2, rd_rs1)
+        let result = self.read(rd_rs1) | self.read(rs2);
+        self.write(rd_rs1, result)
     }
 
     /// `C.SUB` CA-type compressed instruction
@@ -174,7 +177,11 @@ where
     /// Subtracts the value in register `rs2` from the value in register `rd_rs1`,
     /// then writes the result to register `rd_rs1`.
     pub fn run_csub(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        self.run_sub(rd_rs1, rs2, rd_rs1)
+        let lhs = self.read(rd_rs1);
+        let rhs = self.read(rs2);
+        // Wrapped subtraction in two's complement behaves the same for signed and unsigned
+        let result = lhs.wrapping_sub(rhs);
+        self.write(rd_rs1, result)
     }
 
     /// Loads the immediate `imm` into register `rd_rs1`.

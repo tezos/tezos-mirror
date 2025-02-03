@@ -23,8 +23,22 @@ pub struct RTypeArgs {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroRdRTypeArgs {
+    pub rd: NonZeroXRegister,
+    pub rs1: XRegister,
+    pub rs2: XRegister,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ITypeArgs {
     pub rd: XRegister,
+    pub rs1: XRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroRdITypeArgs {
+    pub rd: NonZeroXRegister,
     pub rs1: XRegister,
     pub imm: i64,
 }
@@ -39,6 +53,12 @@ pub struct SBTypeArgs {
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct UJTypeArgs {
     pub rd: XRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroRdUJTypeArgs {
+    pub rd: NonZeroXRegister,
     pub imm: i64,
 }
 
@@ -248,36 +268,36 @@ pub struct CSSDTypeArgs {
 )]
 pub enum InstrCacheable {
     // RV64I R-type instructions
-    Add(RTypeArgs),
-    Sub(RTypeArgs),
-    Xor(RTypeArgs),
-    Or(RTypeArgs),
-    And(RTypeArgs),
-    Sll(RTypeArgs),
-    Srl(RTypeArgs),
-    Sra(RTypeArgs),
-    Slt(RTypeArgs),
-    Sltu(RTypeArgs),
-    Addw(RTypeArgs),
-    Subw(RTypeArgs),
-    Sllw(RTypeArgs),
-    Srlw(RTypeArgs),
-    Sraw(RTypeArgs),
+    Add(NonZeroRdRTypeArgs),
+    Sub(NonZeroRdRTypeArgs),
+    Xor(NonZeroRdRTypeArgs),
+    Or(NonZeroRdRTypeArgs),
+    And(NonZeroRdRTypeArgs),
+    Sll(NonZeroRdRTypeArgs),
+    Srl(NonZeroRdRTypeArgs),
+    Sra(NonZeroRdRTypeArgs),
+    Slt(NonZeroRdRTypeArgs),
+    Sltu(NonZeroRdRTypeArgs),
+    Addw(NonZeroRdRTypeArgs),
+    Subw(NonZeroRdRTypeArgs),
+    Sllw(NonZeroRdRTypeArgs),
+    Srlw(NonZeroRdRTypeArgs),
+    Sraw(NonZeroRdRTypeArgs),
 
     // RV64I I-type instructions
     Addi(ITypeArgs),
-    Addiw(ITypeArgs),
-    Xori(ITypeArgs),
-    Ori(ITypeArgs),
-    Andi(ITypeArgs),
-    Slli(ITypeArgs),
-    Srli(ITypeArgs),
-    Srai(ITypeArgs),
-    Slliw(ITypeArgs),
-    Srliw(ITypeArgs),
-    Sraiw(ITypeArgs),
-    Slti(ITypeArgs),
-    Sltiu(ITypeArgs),
+    Addiw(NonZeroRdITypeArgs),
+    Xori(NonZeroRdITypeArgs),
+    Ori(NonZeroRdITypeArgs),
+    Andi(NonZeroRdITypeArgs),
+    Slli(NonZeroRdITypeArgs),
+    Srli(NonZeroRdITypeArgs),
+    Srai(NonZeroRdITypeArgs),
+    Slliw(NonZeroRdITypeArgs),
+    Srliw(NonZeroRdITypeArgs),
+    Sraiw(NonZeroRdITypeArgs),
+    Slti(NonZeroRdITypeArgs),
+    Sltiu(NonZeroRdITypeArgs),
     Lb(ITypeArgs),
     Lh(ITypeArgs),
     Lw(ITypeArgs),
@@ -301,8 +321,8 @@ pub enum InstrCacheable {
     Bgeu(SBTypeArgs),
 
     // RV64I U-type instructions
-    Lui(UJTypeArgs),
-    Auipc(UJTypeArgs),
+    Lui(NonZeroRdUJTypeArgs),
+    Auipc(NonZeroRdUJTypeArgs),
 
     // RV64I jump instructions
     Jal(UJTypeArgs),
@@ -991,7 +1011,7 @@ impl fmt::Display for InstrCacheable {
                 i_instr_hex!(
                     f,
                     "srai",
-                    ITypeArgs {
+                    NonZeroRdITypeArgs {
                         imm: args.imm & !(1 << 10),
                         ..*args
                     }
@@ -1003,7 +1023,7 @@ impl fmt::Display for InstrCacheable {
                 i_instr_hex!(
                     f,
                     "sraiw",
-                    ITypeArgs {
+                    NonZeroRdITypeArgs {
                         imm: args.imm & !(1 << 10),
                         ..*args
                     }
@@ -1038,7 +1058,7 @@ impl fmt::Display for InstrCacheable {
             Lui(args) => j_instr!(
                 f,
                 "lui",
-                UJTypeArgs {
+                NonZeroRdUJTypeArgs {
                     rd: args.rd,
                     imm: (args.imm >> 12) & ((0b1 << 20) - 1),
                 }
@@ -1046,7 +1066,7 @@ impl fmt::Display for InstrCacheable {
             Auipc(args) => j_instr!(
                 f,
                 "auipc",
-                UJTypeArgs {
+                NonZeroRdUJTypeArgs {
                     rd: args.rd,
                     imm: (args.imm >> 12) & ((0b1 << 20) - 1),
                 }

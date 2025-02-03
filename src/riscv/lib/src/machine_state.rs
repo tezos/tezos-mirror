@@ -682,7 +682,7 @@ mod tests {
             },
             main_memory::{self, M1M, M8K},
             mode::Mode,
-            registers::{a0, a1, a2, a5, nz, t0, t1, t2, zero},
+            registers::{a0, a1, a2, nz, t0, t1, t2, zero},
             DefaultCacheLayouts, TestCacheLayouts,
         },
         parser::{
@@ -1252,7 +1252,7 @@ mod tests {
         let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Add,
             args: TaggedArgs {
-                rd: a5.into(),
+                rd: nz::a5.into(),
                 rs1: t1.into(),
                 rs2: t0.into(),
                 ..TaggedArgs::DEFAULT
@@ -1319,7 +1319,7 @@ mod tests {
             Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::Auipc,
                 args: TaggedArgs {
-                    rd: a0.into(),
+                    rd: nz::a0.into(),
                     imm: 0,
                     ..TaggedArgs::DEFAULT
                 },
@@ -1360,7 +1360,7 @@ mod tests {
             Instruction::try_from(TaggedInstruction {
                 opcode: OpCode::Addiw,
                 args: TaggedArgs {
-                    rd: a1.into(),
+                    rd: nz::a1.into(),
                     rs1: a1.into(),
                     imm: u16::bits_subset(overwrite_bytes, 11, 0) as i64,
                     ..TaggedArgs::DEFAULT
