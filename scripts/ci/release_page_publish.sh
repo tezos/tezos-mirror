@@ -39,6 +39,10 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
     aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
+    # Upload rpm packages to S3 bucket
+    aws s3 sync "./packages/rockylinux/9.3" "s3://${S3_BUCKET}/${gitlab_release}/rpm/rockylinux:9.3/" --region "${REGION}"
+    aws s3 sync "./packages/fedora/39" "s3://${S3_BUCKET}/${gitlab_release}/rpm/fedora:39/" --region "${REGION}"
+
   fi
 else
   echo "No tag found. No asset will be added to the release page."
@@ -60,6 +64,24 @@ tac "$Releases_list" | while IFS= read -r release; do
     done
     echo -e "\n" >> index.md
   done
+
+  {
+    echo -e "### Debian Packages\n"
+    echo -e "For installation instructions, refer to the [Octez Debian Packages Guide](https://tezos.gitlab.io/introduction/howtoget.html#new-set-of-debian-packages)\n"
+  } >> index.md
+
+  echo -e "### RPM packages\n" >> index.md
+
+  for distribution in fedora:39 rockylinux:9.3; do
+
+    echo "#### $distribution" >> index.md
+
+    for package in $(aws s3 ls "s3://${S3_BUCKET}/${release}/rpm/${distribution}/" --recursive | awk '{print $NF}'); do
+      echo "- [$(basename "$package")](https://${S3_BUCKET}/${package})" >> index.md
+    done
+    echo -e "\n" >> index.md
+  done
+
 done
 
 echo "Generating html file."
