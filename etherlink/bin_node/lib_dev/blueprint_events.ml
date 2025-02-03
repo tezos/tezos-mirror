@@ -13,7 +13,7 @@ let publisher_ready =
   declare_0
     ~section
     ~name:"blueprint_publisher_is_ready"
-    ~msg:"Blueprint publisher is ready"
+    ~msg:"blueprint publisher is ready"
     ~level:Info
     ()
 
@@ -21,7 +21,7 @@ let publisher_shutdown =
   declare_0
     ~section
     ~name:"blueprint_publisher_shutdown"
-    ~msg:"Blueprint publishing is shutting down"
+    ~msg:"blueprint publishing is shutting down"
     ~level:Info
     ()
 
@@ -29,7 +29,7 @@ let blueprint_application =
   declare_6
     ~name:"blueprint_application"
     ~section
-    ~msg:"Head is now {level}, applied in {process_time}{timestamp}"
+    ~msg:"head is now {level}, applied in {process_time}{timestamp}"
     ~level:Notice
     ~pp2:(fun fmt timestamp ->
       let timestamp = Time.System.of_protocol_exn timestamp in
@@ -50,7 +50,7 @@ let blueprint_injection =
   declare_1
     ~section
     ~name:"blueprint_injection"
-    ~msg:"Injecting a blueprint for level {level}"
+    ~msg:"injecting a blueprint for level {level}"
     ~level:Info
     ("level", Data_encoding.n)
 
@@ -58,7 +58,7 @@ let blueprint_injection_on_inbox =
   declare_1
     ~section
     ~name:"blueprint_injection_on_inbox"
-    ~msg:"Injecting on the shared inbox a blueprint for level {level}"
+    ~msg:"injecting on the shared inbox a blueprint for level {level}"
     ~level:Debug
     ("level", Data_encoding.n)
 
@@ -67,7 +67,7 @@ let blueprint_injection_on_DAL =
     ~section
     ~name:"blueprint_injection_on_DAL"
     ~msg:
-      "Injecting on the DAL a blueprint for level {level} containing \
+      "injecting on the DAL a blueprint for level {level} containing \
        {nb_chunks} chunks"
     ~level:Debug
     ("level", Data_encoding.n)
@@ -77,7 +77,7 @@ let blueprint_injection_failure =
   declare_2
     ~section
     ~name:"blueprint_injection_failure"
-    ~msg:"Injecting a blueprint for level {level} failed with {trace}"
+    ~msg:"injecting a blueprint for level {level} failed with {trace}"
     ~pp2:Error_monad.pp_print_trace
     ~level:Error
     ("level", Data_encoding.n)
@@ -87,7 +87,7 @@ let blueprint_catchup =
   declare_2
     ~section
     ~name:"blueprint_catchup"
-    ~msg:"Catching-up from level {min} to {max}"
+    ~msg:"catching-up from level {min} to {max}"
     ~level:Notice
     ("min", Data_encoding.n)
     ("max", Data_encoding.n)
@@ -96,7 +96,7 @@ let blueprint_proposal =
   declare_2
     ~section
     ~name:"blueprint_proposal"
-    ~msg:"Crafted a blueprint proposal for level {level} in {process_time}"
+    ~msg:"crafted a blueprint proposal for level {level} in {process_time}"
     ~level:Debug
     ~pp2:Ptime.Span.pp
     ("level", Data_encoding.n)
@@ -106,7 +106,7 @@ let blueprint_production =
   declare_2
     ~section
     ~name:"blueprint_production"
-    ~msg:"Produced a blueprint for level {level} in {process_time}"
+    ~msg:"produced a blueprint for level {level} in {process_time}"
     ~level:Info
     ~pp2:Ptime.Span.pp
     ("level", Data_encoding.n)
@@ -116,7 +116,7 @@ let invalid_blueprint_produced =
   declare_1
     ~section
     ~name:"blueprint_invalid"
-    ~msg:"Produced an invalid blueprint at level {level}"
+    ~msg:"produced an invalid blueprint at level {level}"
     ~level:Error
     ("level", Data_encoding.n)
 
@@ -124,7 +124,7 @@ let invalid_blueprint_applied =
   declare_1
     ~section
     ~name:"blueprint_invalid_applied"
-    ~msg:"[Warning] Failed to apply received blueprint for level {level}"
+    ~msg:"failed to apply received blueprint for level {level}"
     ~level:Error
     ("level", Data_encoding.n)
 
@@ -132,7 +132,7 @@ let missing_blueprints =
   declare_3
     ~section
     ~name:"missing_blueprints"
-    ~msg:"Store is missing {count} blueprints in the range [{from}; {to_}]"
+    ~msg:"store is missing {count} blueprints in the range [{from}; {to_}]"
     ~level:Error
     ("count", Data_encoding.int31)
     ("from", Data_encoding.n)
@@ -142,7 +142,7 @@ let worker_request_failed =
   declare_2
     ~section
     ~name:"blueprints_publisher_request_failed"
-    ~msg:"[Warning]: Request {view} failed: {errors}"
+    ~msg:"request {view} failed: {errors}"
     ~level:Error
     ("view", Blueprints_publisher_types.Request.encoding)
     ~pp1:Blueprints_publisher_types.Request.pp

@@ -19,6 +19,11 @@
   ```
   (!16465)
 
+#### UX
+
+- Reworked logs to be more compacted and to respect other Octez logs
+  format. (!16265, !16508, !todo)
+
 ### Bug fixes
 
 #### RPCs

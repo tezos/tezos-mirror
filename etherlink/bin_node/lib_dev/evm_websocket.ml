@@ -161,7 +161,7 @@ module Event = struct
       ~section
       ~name:"websocket_shutdown"
       ~msg:
-        "Shutting down websocket worker for connection {conn}: {reason} \
+        "shutting down websocket worker for connection {conn}: {reason} \
          ({subscriptions} subscriptions)"
       ~level:Notice
       ("conn", Data_encoding.string)
@@ -174,7 +174,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"websocket_starting"
-      ~msg:"Starting worker for websocket connection {conn}"
+      ~msg:"starting worker for websocket connection {conn}"
       ~level:Notice
       ("conn", Data_encoding.string)
       ~pp1:Format.pp_print_string
@@ -183,7 +183,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"websocket_missing_worker"
-      ~msg:"No worker for websocket connection {conn}"
+      ~msg:"no worker for websocket connection {conn}"
       ~level:Error
       ("conn", Data_encoding.string)
       ~pp1:Format.pp_print_string
@@ -192,7 +192,7 @@ module Event = struct
     declare_3
       ~section
       ~name:"request_failed"
-      ~msg:"[Warning]: Request {view} failed ({worker_status}): {errors}"
+      ~msg:"request {view} failed ({worker_status}): {errors}"
       ~level:Warning
       ("view", Request.encoding)
       ~pp1:Request.pp
@@ -216,7 +216,7 @@ module Event = struct
     declare_3
       ~section
       ~name:"websocket_unsubscribe"
-      ~msg:"Unsubscribe {id} for connection {conn}: {reason}"
+      ~msg:"unsubscribe {id} for connection {conn}: {reason}"
       ~level:Info
       ("conn", Data_encoding.string)
       ("id", Ethereum_types.Subscription.id_encoding)
@@ -230,7 +230,7 @@ module Event = struct
     declare_2
       ~section
       ~name:"websocket_monitoring_exception"
-      ~msg:"Monitoring for websocket {conn} raised exception {exception}"
+      ~msg:"monitoring for websocket {conn} raised exception {exception}"
       ~level:Warning
       ("conn", Data_encoding.string)
       ("exception", Data_encoding.string)

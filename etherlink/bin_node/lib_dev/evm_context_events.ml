@@ -13,7 +13,7 @@ let ready =
   declare_0
     ~section
     ~name:"evm_context_is_ready"
-    ~msg:"EVM Context worker is ready"
+    ~msg:"EVM context worker is ready"
     ~level:Info
     ()
 
@@ -21,7 +21,7 @@ let shutdown =
   declare_0
     ~section
     ~name:"evm_context_shutdown"
-    ~msg:"EVM Context worker is shutting down"
+    ~msg:"EVM context worker is shutting down"
     ~level:Info
     ()
 
@@ -29,7 +29,7 @@ let reconstruct_replace_mainnet_kernel =
   declare_0
     ~section
     ~name:"reconstruct_replace_mainnet_kernel"
-    ~msg:"Replacing initial mainnet kernel"
+    ~msg:"replacing initial mainnet kernel"
     ~level:Info
     ()
 
@@ -37,7 +37,7 @@ let gc_split =
   declare_2
     ~section
     ~name:"evm_context_gc_split"
-    ~msg:"Splitting Irmin context at level {level} ({timestamp})"
+    ~msg:"splitting Irmin context at level {level} ({timestamp})"
     ~level:Info
     ~pp1:Ethereum_types.pp_quantity
     ~pp2:Time.Protocol.pp_hum
@@ -49,7 +49,7 @@ let gc_started =
     ~section
     ~name:"evm_context_gc_started"
     ~msg:
-      "Garbage collection started for level {gc_level} at head level \
+      "garbage collection started for level {gc_level} at head level \
        {head_level}"
     ~level:Info
     ~pp1:Ethereum_types.pp_quantity
@@ -62,7 +62,7 @@ let gc_finished =
     ~section
     ~name:"evm_context_gc_finished"
     ~msg:
-      "Garbage collection finished for level {gc_level} at head level \
+      "garbage collection finished for level {gc_level} at head level \
        {head_level} (took {duration})"
     ~level:Info
     ~pp1:Ethereum_types.pp_quantity
@@ -83,7 +83,7 @@ let gc_waiter_failed =
     ~section
     ~name:"evm_context_gc_waiter_failed"
     ~level:Warning
-    ~msg:"Garbage collector waiter failed with an exception:"
+    ~msg:"garbage collector waiter failed with an exception:"
     ("exn", Data_encoding.string)
 
 let unexpected_l1_block =
@@ -92,8 +92,8 @@ let unexpected_l1_block =
     ~name:"evm_context_unexpected_l1_block"
     ~level:Warning
     ~msg:
-      "Received L1 block of level {provided_level} to process, but was \
-       expected level {expected_level}."
+      "received L1 block of level {provided_level} to process, but was \
+       expected level {expected_level}"
     ("expected_level", Data_encoding.int32)
     ("provided_level", Data_encoding.int32)
 
@@ -103,8 +103,8 @@ let processed_l1_level =
     ~name:"evm_context_processed_l1_level"
     ~level:Info
     ~msg:
-      "Processed L1 level {level}. Last finalized blueprint is: \
-       {finalized_blueprint}."
+      "processed L1 level {level}. Last finalized blueprint is: \
+       {finalized_blueprint}"
     ("level", Data_encoding.int32)
     ("finalized_blueprint", Data_encoding.n)
 
@@ -113,7 +113,7 @@ let reset_impossible_missing_finalized_state =
     ~section
     ~name:"evm_context_reset_impossible_missing_finalized_state"
     ~level:Warning
-    ~msg:"Cannot found finalized state we must exit on divergence"
+    ~msg:"cannot found finalized state we must exit on divergence"
     ()
 
 let missing_state =
@@ -121,7 +121,7 @@ let missing_state =
     ~section
     ~name:"evm_context_missing_state"
     ~level:Warning
-    ~msg:"Cannot find state at level {level}"
+    ~msg:"cannot find state at level {level}"
     ~pp1:Ethereum_types.pp_quantity
     ("level", Ethereum_types.quantity_encoding)
 
@@ -130,7 +130,7 @@ let reset_at_level =
     ~section
     ~name:"evm_context_reset_at_level"
     ~level:Notice
-    ~msg:"Resetting to finalized block {level}"
+    ~msg:"resetting to finalized block {level}"
     ~pp1:Ethereum_types.pp_quantity
     ("level", Ethereum_types.quantity_encoding)
 
@@ -138,7 +138,7 @@ let worker_request_failed =
   declare_2
     ~section
     ~name:"evm_context_request_failed"
-    ~msg:"Request {view} failed: {errors}"
+    ~msg:"request {view} failed: {errors}"
     ~level:Error
     ("view", Evm_context_types.Request.encoding)
     ~pp1:Evm_context_types.Request.pp
@@ -150,7 +150,7 @@ let observer_potential_reorg =
     ~section
     ~name:"evm_context_observer_potential_reorg"
     ~level:Warning
-    ~msg:"Potential reorganization happening at level {level}"
+    ~msg:"potential reorganization happening at level {level}"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
@@ -159,7 +159,7 @@ let observer_reorg_old_blueprint =
     ~section
     ~name:"evm_context_observer_reorg_old_blueprint"
     ~level:Warning
-    ~msg:"EVM Endpoint provided an old known blueprint (level {level})"
+    ~msg:"EVM endpoint provided an old known blueprint (level {level})"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
@@ -168,7 +168,7 @@ let observer_reorg_cannot_decode_blueprint =
     ~section
     ~name:"evm_context_observer_reorg_cannot_decode_blueprint"
     ~level:Warning
-    ~msg:"EVM Endpoint provided a blueprint (level {level}) we cannot decode"
+    ~msg:"EVM endpoint provided a blueprint (level {level}) we cannot decode"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
@@ -178,7 +178,7 @@ let observer_reorg_cannot_find_divergence =
     ~name:"evm_context_observer_reorg_cannot_find_divergence"
     ~level:Warning
     ~msg:
-      "Potential blueprint of reorg is at level {level1}, cannot find block \
+      "potential blueprint of reorg is at level {level1}, cannot find block \
        {level2} locally"
     ~pp1:Z.pp_print
     ~pp2:Z.pp_print
@@ -190,7 +190,7 @@ let observer_reorg_cannot_find_state =
     ~section
     ~name:"evm_context_observer_reorg_cannot_find_state"
     ~level:Warning
-    ~msg:"Reorganization needs state at level {level} but checkpoint is missing"
+    ~msg:"reorganization needs state at level {level} but checkpoint is missing"
     ~pp1:Z.pp_print
     ("level", Data_encoding.n)
 
@@ -199,7 +199,7 @@ let get_block_failed =
     ~section
     ~name:"evm_context_get_block_failed"
     ~level:Error
-    ~msg:"Get block by number failed for level {level}{trace}."
+    ~msg:"get block by number failed for level {level}{trace}"
     ~pp1:Ethereum_types.pp_quantity
     ~pp2:pp_print_trace
     ("level", Ethereum_types.quantity_encoding)
@@ -210,7 +210,7 @@ let start_history_mode =
     ~section
     ~name:"evm_context_start_history_mode"
     ~level:Notice
-    ~msg:"Running with history mode {mode}"
+    ~msg:"running with history mode {mode}"
     ("mode", Configuration.history_mode_encoding)
 
 let rolling_to_archive_incomplete_history =
@@ -219,7 +219,7 @@ let rolling_to_archive_incomplete_history =
     ~name:"evm_context_rolling_to_archive_incomplete_history"
     ~level:Warning
     ~msg:
-      "Switching history mode from Rolling to Archive, but be aware that \
+      "switching history mode from Rolling to Archive, but be aware that \
        history is incomplete, earliest level is {earliest_level}"
     ~pp1:
       ((Format.pp_print_option ~none:(fun fmt () ->
@@ -232,7 +232,7 @@ let switching_history_mode =
     ~section
     ~name:"evm_context_switch_history_mode"
     ~level:Warning
-    ~msg:"Switching history mode from {from} to {to_}."
+    ~msg:"switching history mode from {from} to {to_}"
     ("from", Configuration.history_mode_encoding)
     ("to_", Configuration.history_mode_encoding)
 

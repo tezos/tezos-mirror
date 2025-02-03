@@ -13,7 +13,7 @@ let publisher_ready =
   declare_0
     ~section
     ~name:"signal_publisher_is_ready"
-    ~msg:"Signal publisher is ready"
+    ~msg:"signal publisher is ready"
     ~level:Info
     ()
 
@@ -21,7 +21,7 @@ let publisher_shutdown =
   declare_0
     ~section
     ~name:"signal_publisher_shutting_down"
-    ~msg:"Stopping the signals publisher worker"
+    ~msg:"stopping the signals publisher worker"
     ~level:Info
     ()
 
@@ -30,8 +30,8 @@ let untracking =
     ~section
     ~name:"signal_publisher_untracking"
     ~msg:
-      "The injection id {injector_op_hash} is not longer tracked by the signal \
-       publisher."
+      "the injection id {injector_op_hash} is not longer tracked by the signal \
+       publisher"
     ~level:Debug
     ("injector_op_hash", Tezos_crypto.Hashed.Injector_operations_hash.encoding)
 
@@ -40,9 +40,9 @@ let commited_or_included_injection_id =
     ~section
     ~name:"signal_publisher_commited_or_included_injector_id"
     ~msg:
-      "The injection id {injector_op_hash} has been reported commited or \
+      "the injection id {injector_op_hash} has been reported commited or \
        included, and finalized, by the rollup node and published at L1 level \
-       {publish_level}."
+       {publish_level}"
     ~level:Debug
     ("injector_op_hash", Tezos_crypto.Hashed.Injector_operations_hash.encoding)
     ("publish_level", Data_encoding.int32)
@@ -52,8 +52,8 @@ let signal_signed =
     ~section
     ~name:"signal_publisher_signal_signed"
     ~msg:
-      "Signed the following signals: {signals} (slot_index, published_level) \
-       for smart rollup address {smart_rollup_address}."
+      "signed the following signals: {signals} (slot_index, published_level) \
+       for smart rollup address {smart_rollup_address}"
     ~level:Info
     ( "signals",
       Data_encoding.(

@@ -14,7 +14,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"rollup_node_follower_disabled"
-      ~msg:"Rollup node follower is disabled"
+      ~msg:"rollup node follower is disabled"
       ~level:Notice
       ()
 
@@ -22,7 +22,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"rollup_node_follower_started"
-      ~msg:"Rollup node follower has been started"
+      ~msg:"rollup node follower has been started"
       ~level:Notice
       ()
 
@@ -30,7 +30,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"rollup_node_follower_new_block"
-      ~msg:"Rollup node follower detected a new block (level: {block})"
+      ~msg:"rollup node follower detected a new block (level {block})"
       ~level:Info
       ("block", Data_encoding.int32)
 
@@ -38,7 +38,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"shutting_down_rollup_node_follower"
-      ~msg:"Stopping the rollup node follower"
+      ~msg:"stopping the rollup node follower"
       ~level:Notice
       ()
 
@@ -46,7 +46,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"rollup_node_follower_connection_acquired"
-      ~msg:"Rollup node follower connected to the rollup node"
+      ~msg:"rollup node follower connected to the rollup node"
       ~level:Info
       ()
 
@@ -54,7 +54,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"rollup_node_follower_connection_lost"
-      ~msg:"Connection with the rollup node has been lost"
+      ~msg:"connection with the rollup node has been lost"
       ~level:Error
       ()
 
@@ -63,7 +63,8 @@ module Event = struct
       ~section
       ~name:"rollup_node_follower_trying_reconnection"
       ~msg:
-        "Waiting {duration} sec before trying to reconnect to the rollup node"
+        "waiting {duration} seconds before trying to reconnect to the rollup \
+         node"
       ~level:Info
       ("duration", Data_encoding.float)
 
@@ -71,7 +72,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"rollup_node_follower_connection_failed"
-      ~msg:"Connection with the rollup node failed with {trace}"
+      ~msg:"connection with the rollup node failed with {trace}"
       ~level:Error
       ~pp1:Error_monad.pp_print_trace
       ("trace", Events.trace_encoding)
@@ -80,7 +81,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"rollup_node_follower_stream_failed"
-      ~msg:"Stream from the rollup node failed with {trace}"
+      ~msg:"stream from the rollup node failed with {trace}"
       ~level:Error
       ~pp1:Error_monad.pp_print_trace
       ("trace", Events.trace_encoding)
