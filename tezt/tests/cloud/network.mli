@@ -8,14 +8,19 @@
 type public =
   [ `Mainnet
   | `Ghostnet
+  | `Nextnet of
+    string
+    (* date of the genesis block of the current weeklynet;
+       format is YYYYMMDD *)
   | `Weeklynet of
     string
     (* date of the genesis block of the current weeklynet;
-       typically it is last wednesday. *) ]
+       typically it is last wednesday.
+       format is YYYY-MM-DD *) ]
 
 type t = [public | `Sandbox]
 
-(** ["mainnet" | "ghostnet" | "weeklynet-%s" | "sandbox"] *)
+(** ["mainnet" | "ghostnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
 val to_string : t -> string
 
 (** Known protocol used by the network *)
@@ -43,7 +48,7 @@ val get_level : Endpoint.t -> int Lwt.t
 val expected_pow : t -> float
 
 (** Associate delegate aliases with octez version used (according to tzkt).
-    Only works for mainnet and ghostnet. Return empty table for other networks. 
+    Only works for mainnet and ghostnet. Return empty table for other networks.
 
     Returns [None] when [Tzkt] did not respond or respond with an unexpected
     output.
@@ -53,7 +58,7 @@ val versions : t -> (string, string) Hashtbl.t option Lwt.t
 (** List of delegates as [(alias, public key hash, public key)] known
     by tzkt for a given network. [?accounts] is only used for
     [`Sandbox] network (and the only source of data for this kind of
-    network). 
+    network).
 
     Returns [None] when [Tzkt] did not respond or respond with an unexpected
     output. *)

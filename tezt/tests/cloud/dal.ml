@@ -100,7 +100,7 @@ module Node = struct
       agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
-    | (`Mainnet | `Ghostnet | `Weeklynet _) as network -> (
+    | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _) as network -> (
         match data_dir with
         | Some data_dir ->
             let rpc_external = Cli.node_external_rpc_server in
@@ -2142,7 +2142,7 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : baker list) (producers : producer list)
     (observers : observer list) etherlink =
   match (agent, network) with
-  | None, (`Mainnet | `Ghostnet | `Weeklynet _) -> (
+  | None, (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _) -> (
       match (bakers, producers, observers, etherlink) with
       | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
       | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
@@ -2241,7 +2241,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           configuration
           ?etherlink_configuration
           bootstrap_agent
-    | (`Ghostnet | `Mainnet | `Weeklynet _) as network ->
+    | (`Ghostnet | `Nextnet _ | `Mainnet | `Weeklynet _) as network ->
         init_public_network
           cloud
           configuration
