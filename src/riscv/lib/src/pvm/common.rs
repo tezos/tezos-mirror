@@ -13,7 +13,7 @@ use crate::{
     state_backend::{
         self,
         proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
-        AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, Ref,
+        Atom, Cell,
     },
     traps::EnvironException,
 };
@@ -115,49 +115,6 @@ impl fmt::Display for PvmStatus {
             PvmStatus::WaitingForReveal => "Waiting for reveal",
         };
         f.write_str(status)
-    }
-}
-
-impl<M: ManagerClone> Clone for RevealRequest<M> {
-    fn clone(&self) -> Self {
-        Self {
-            bytes: self.bytes.clone(),
-            size: self.size.clone(),
-        }
-    }
-}
-
-impl<M: ManagerBase> RevealRequest<M> {
-    /// Bind the reveal request to the given allocated region.
-    pub fn bind(space: AllocatedOf<RevealRequestLayout, M>) -> Self {
-        Self {
-            bytes: space.0,
-            size: space.1,
-        }
-    }
-
-    /// Given a manager morphism `f : &M -> N`, return the reveal request layout's
-    /// allocated structure containing the constituents of `N` that were produced
-    /// from the constituents of `&M`.
-    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
-        &'a self,
-    ) -> AllocatedOf<RevealRequestLayout, F::Output> {
-        (self.bytes.struct_ref::<F>(), self.size.struct_ref::<F>())
-    }
-
-    /// Return the content of a reveal request as a vector
-    #[cfg(test)]
-    pub fn to_vec(&self) -> Vec<u8>
-    where
-        M: state_backend::ManagerRead,
-    {
-        use std::cmp::min;
-        use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
-
-        let size = self.size.read() as usize;
-        let mut buffer = vec![0u8; min(size, REVEAL_REQUEST_MAX_SIZE)];
-        self.bytes.read_all(0, &mut buffer);
-        buffer
     }
 }
 
