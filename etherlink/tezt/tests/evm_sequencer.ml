@@ -247,7 +247,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
     ?websockets
     ?(use_threshold_encryption = default_threshold_encryption_registration)
@@ -314,7 +314,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?rpc_server
                 ?websockets
                 ~threshold_encryption
-                ?history_mode
+                ?rollup_history_mode
                 ~enable_dal
                 ~enable_multichain
                 ~title
@@ -2216,7 +2216,7 @@ let test_init_from_rollup_node_data_dir =
          Evm_node.init_from_rollup_node_data_dir until this issue is
          fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
-    ~history_mode:Archive
+    ~rollup_history_mode:Archive
   @@ fun {sc_rollup_node; sequencer; observer; proxy; client; _} _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =

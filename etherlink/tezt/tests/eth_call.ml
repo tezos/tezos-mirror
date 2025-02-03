@@ -21,7 +21,7 @@ open Setup
 open Helpers
 
 let register ?genesis_timestamp ?bootstrap_accounts ?(kernels = Kernel.all)
-    ?preimages_dir ?maximum_allowed_ticks ?enable_fa_bridge ?history_mode
+    ?preimages_dir ?maximum_allowed_ticks ?enable_fa_bridge ?rollup_history_mode
     ?additional_uses ~title ~tags body protocols =
   register_test_for_kernels
     ~__FILE__
@@ -33,7 +33,7 @@ let register ?genesis_timestamp ?bootstrap_accounts ?(kernels = Kernel.all)
     ?maximum_allowed_ticks
     ?enable_fa_bridge
     ?additional_uses
-    ?history_mode
+    ?rollup_history_mode
     ~enable_dal:false
     ~enable_multichain:false
     ~threshold_encryption:false

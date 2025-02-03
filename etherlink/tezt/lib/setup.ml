@@ -198,8 +198,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
-    ?(blueprints_publisher_order_enabled = true) ?history_mode ~enable_dal
-    ?dal_slots ~enable_multichain ?rpc_server ?websockets protocol =
+    ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
+    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -226,7 +226,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       node
       ~base_dir:(Client.base_dir client)
       ?dal_node
-      ?history_mode
+      ?history_mode:rollup_history_mode
   in
   let preimages_dir =
     Option.value
@@ -383,7 +383,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
     ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
-    ?(additional_uses = []) ?history_mode ~enable_dal
+    ?(additional_uses = []) ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ?rpc_server ?websockets body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
@@ -430,7 +430,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
         ~threshold_encryption
-        ?history_mode
+        ?rollup_history_mode
         ?websockets
         ~enable_dal
         ?dal_slots
@@ -477,7 +477,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ~title ~tags body protocols =
   List.iter
@@ -513,7 +513,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?rpc_server
         ?websockets
         ~threshold_encryption
-        ?history_mode
+        ?rollup_history_mode
         ~enable_dal
         ?dal_slots
         ~enable_multichain
