@@ -54,13 +54,14 @@ Depends:
  ${misc:Depends}, ${shlibs:Depends},
  octez-node (= ${source:Version}),
  curl, systemd
-Recommends: octez-signer (= ${source:Version}),
+Recommends: octez-signer (= ${source:Version}), octez-dal-node (= ${source:Version})
 Description: Octez baking software for the Tezos blockchain.
  The Octez baker includes the necessary tools and functionalities for
  participating in the baking process, such as block creation, attestations, and
  protocol-specific consensus mechanisms.
  .
- This package installs the baker, the accuser and the Octez node. For key
+ This package installs the baker, the accuser and the Octez node. By default this
+ package also installs the octez-signer and octez-dal-node in observer mode. For key
  management it is recommended to install a remote signer of a different host.
 
 Package: octez-signer
@@ -108,7 +109,6 @@ Description: Smart Rollup node for the Tezos blockchain.
 Package: octez-dal-node
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends},
- octez-zcash-dal-params,
  systemd
 Suggests: octez-baker (= ${source:Version})
 Description: Octez distribution Availability Layer (DAL) node
