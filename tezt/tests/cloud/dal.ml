@@ -1795,7 +1795,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
         dal_slots
         |> Lwt_list.map_p (fun slot_index ->
                let name =
-                 Format.asprintf "etherlink-dal-observer-%d" slot_index
+                 Format.asprintf "etherlink-dal-operator-%d" slot_index
                in
                let* agent = next_agent ~name in
                let* node =
@@ -1809,7 +1809,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
                let* () =
                  Dal_node.init_config
                    ~expected_pow:(Network.expected_pow network)
-                   ~observer_profiles:[slot_index]
+                   ~producer_profiles:[slot_index]
                    ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
                    dal_node
                in
