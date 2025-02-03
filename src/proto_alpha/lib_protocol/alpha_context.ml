@@ -189,6 +189,21 @@ module Entrypoint = Entrypoint_repr
 module Manager_counter = Manager_counter_repr
 include Operation_repr
 
+module Constants = struct
+  include Constants_repr
+  include Constants_storage
+
+  module Parametric = struct
+    include Constants_parametric_repr
+
+    module Internal_for_tests = struct
+      include Internal_for_tests
+
+      let update_sc_rollup_parameter = update_sc_rollup_parameter
+    end
+  end
+end
+
 module Operation = struct
   type 'kind t = 'kind operation = {
     shell : Operation.shell_header;
@@ -203,7 +218,17 @@ module Operation = struct
 
   include Operation_repr
 
-  let check_signature _ctxt = check_signature unsigned_encoding
+  let check_signature (type kind) ctxt (key : Signature.Public_key.t) chain_id
+      (op : kind operation) =
+    let encoding =
+      if Constants.aggregate_attestation ctxt then
+        (* attestations signed by BLS keys uses a dedicated serialization encoding *)
+        match (op.protocol_data.contents, key) with
+        | Single (Attestation _), Bls _ -> bls_mode_unsigned_encoding
+        | _ -> unsigned_encoding
+      else unsigned_encoding
+    in
+    check_signature encoding key chain_id op
 
   module Internal_for_tests = struct
     let serialize_unsigned_operation _ctxt branch contents =
@@ -267,21 +292,6 @@ type public_key = Signature.Public_key.t
 type public_key_hash = Signature.Public_key_hash.t
 
 type signature = Signature.t
-
-module Constants = struct
-  include Constants_repr
-  include Constants_storage
-
-  module Parametric = struct
-    include Constants_parametric_repr
-
-    module Internal_for_tests = struct
-      include Internal_for_tests
-
-      let update_sc_rollup_parameter = update_sc_rollup_parameter
-    end
-  end
-end
 
 module Voting_period = struct
   include Voting_period_repr
