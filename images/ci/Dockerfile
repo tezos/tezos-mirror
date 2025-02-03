@@ -346,17 +346,21 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 RUN apk update \
  && apk add --no-cache curl npm git file make jq websocat \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
- procps-ng \
+    procps-ng \
+ ## Add npm from 3.21 main repository instead of 3.20 to get a newer version of nodejs.
+ ## Should solve related hanging problems  cf. https://github.com/npm/cli/issues/4028
+ ## Notes: npm is in community, node in main. npm version is currently identical in 3.20 and 3.21
+ && apk add npm --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main \
  # We need datadog-ci to send JUnit files to Datadog in tezt
  # jobs. Cf. [scripts/ci/tezt.sh].
  # Version number should be kept in sync with the one of the
  # datadog/ci image used for the [datadog_ci] image
  # (cf. ci/bin/common.ml)
- && npm install -g "@datadog/datadog-ci@2.44.0" \
+ && npm --ddd install -g "@datadog/datadog-ci@2.44.0" \
  # We need eth since e2e tests. This requires git as well.
- && npm install -g eth-cli@2.0.2 \
+ && npm --ddd install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
- && npm install -g solc@0.8.26 \
+ && npm --ddd install -g solc@0.8.26 \
  && PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
