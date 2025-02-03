@@ -1067,8 +1067,13 @@ module Tezt = struct
   let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
-      ?(before_script = before_script ~source_version:true ~eval_opam:false [])
-      ?timeout ?job_select_tezts ~dependencies ?allow_failure () : tezos_job =
+      ?(before_script =
+        before_script
+          ~source_version:true
+          ~eval_opam:false
+          ~datadog_job_info:true
+          []) ?timeout ?job_select_tezts ~dependencies ?allow_failure () :
+      tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");
