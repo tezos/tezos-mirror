@@ -278,6 +278,26 @@ contain a white-list update. This message can only be executed for a
 rollup that is private since its origination (see
 :ref:`private_rollups_alpha`).
 
+.. _bonds:
+
+Bonds
+^^^^^
+
+The committer's bond of 10,000 tez is frozen automatically when the committer makes their first commitment.
+The bond remains frozen until the committer is no longer staking on any uncemented commitment.
+
+Because nodes have all the refutation period to challenge another node's commitment, the bond stays locked until the end of the refutation period for the last commitment that the node posted.
+Recovering the bond safely takes a few steps; in general, node operators follow these steps:
+
+#. Switch the rollup node to ``bailout`` mode, which defends existing commitments but does not post new commitments.
+
+#. Wait until the last commitment is cemented.
+   If operators shut down the node before the last commitment is cemented, they risk losing their bond if another node challenges their commitments.
+
+#. Recover the bond by running the ``recover bond`` operation, which unlocks their tez.
+   Nodes running in ``bailout`` mode attempt to run this command automatically when the last commitment is cemented.
+   For more information, see :ref:`deploying_a_rollup_node`.
+
 Refutation
 ^^^^^^^^^^
 
