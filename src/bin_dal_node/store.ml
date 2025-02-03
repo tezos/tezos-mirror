@@ -359,7 +359,7 @@ module Traps = struct
   let create ~capacity = Level_map.create capacity
 
   let add_slot_index t ~slot_index ~shard_index ~delegate ~share ~shard_proof =
-    let shard_index_map_opt = Slot_index_map.find_opt shard_index t in
+    let shard_index_map_opt = Slot_index_map.find_opt slot_index t in
     let shard_index_map =
       Option.value ~default:Shard_index_map.empty shard_index_map_opt
     in
