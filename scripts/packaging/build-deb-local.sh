@@ -35,11 +35,6 @@ zcash() {
     ln -s "$OPAM_SWITCH_PREFIX/share/zcash-params" scripts/packaging/octez-data/
   fi
 
-  if [ ! -e scripts/packaging/octez-data/dal-trusted-setup ]; then
-    scripts/install_dal_trusted_setup.sh
-    ln -s "$OPAM_SWITCH_PREFIX/share/dal-trusted-setup" scripts/packaging/octez-data/
-  fi
-
   cd scripts/packaging/octez-data
   DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -tc -b --no-sign -sa
   cd -
