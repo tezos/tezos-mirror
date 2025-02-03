@@ -24,7 +24,7 @@ export recommended_node_version=18.18.2
 
 ## opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export opam_repository_tag=e566c29b12a9c284b68b3f6cbe7fbd4e8452406f
+export opam_repository_tag=aa131f3eda80ed7121debe7582faaf50448bc105
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
