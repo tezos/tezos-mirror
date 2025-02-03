@@ -335,6 +335,7 @@ let jobs pipeline_type =
             ~__POS__
             ~image:Images.datadog_ci
             ~stage:Stages.start
+            ~before_script:(before_script ~datadog_job_info:true [])
             ~rules:
               [
                 job_rule

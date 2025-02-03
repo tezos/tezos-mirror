@@ -127,6 +127,8 @@ trigger:
   - when: always
   dependencies: []
   timeout: 10 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - echo 'Trigger pipeline!'
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}

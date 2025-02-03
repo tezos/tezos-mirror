@@ -1011,6 +1011,7 @@ let job_datadog_pipeline_trace : tezos_job =
     ~allow_failure:Yes
     ~name:"datadog_pipeline_trace"
     ~image:Images.datadog_ci
+    ~before_script:(before_script ~datadog_job_info:true [])
     ~stage:Stages.start
     [
       "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
