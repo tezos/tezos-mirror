@@ -765,6 +765,13 @@ let snapshots_setup {sequencer; observer; _} =
   let* () = Evm_node.terminate observer in
   Log.info "   - Export observer snapshot." ;
   let*! snapshot_file_before = Evm_node.export_snapshot observer in
+  let*! snapshot_info_before =
+    Evm_node.snapshot_info ~snapshot_file:snapshot_file_before
+  in
+  Check.(snapshot_info_before =~ rex "First level:\\s*0")
+    ~error_msg:"Snapshot info should have %R, got %L" ;
+  Check.(snapshot_info_before =~ rex (sf "Current level:\\s*%ld" block_number))
+    ~error_msg:"Snapshot info should have %R, got %L" ;
   Log.info " - Exporting current snapshot from sequencer." ;
   Log.info "   - Force the sequencer to produce a block." ;
   let*@ _ = produce_block sequencer in
@@ -778,6 +785,11 @@ let snapshots_setup {sequencer; observer; _} =
   let* () = Evm_node.terminate sequencer in
   Log.info "   - Export snapshot for block %ld." block_number ;
   let*! snapshot_file = Evm_node.export_snapshot sequencer in
+  let*! snapshot_info_after = Evm_node.snapshot_info ~snapshot_file in
+  Check.(snapshot_info_after =~ rex "First level:\\s*0")
+    ~error_msg:"Snapshot info should have %R, got %L" ;
+  Check.(snapshot_info_after =~ rex (sf "Current level:\\s*%ld" block_number))
+    ~error_msg:"Snapshot info should have %R, got %L" ;
   return (snapshot_file_before, snapshot_file, block_number)
 
 let test_snapshots_lock =
