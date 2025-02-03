@@ -409,7 +409,7 @@ let jobs pipeline_type =
     in
     let job_docker_hadolint =
       job
-        ~rules:(make_rules ~changes:changeset_hadolint_docker_files ())
+        ~rules:(make_rules ~changes:changeset_docker_files ())
         ~__POS__
         ~name:"docker:hadolint"
         ~dependencies
@@ -1925,7 +1925,7 @@ let jobs pipeline_type =
             ~__POS__
             ~arch:Amd64
             ~dependencies:(Dependent [])
-            ~rules:(make_rules ~manual:Yes ())
+            ~rules:(make_rules ~changes:changeset_docker_files ~manual:Yes ())
             Test_manual
         in
         let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
@@ -1933,7 +1933,7 @@ let jobs pipeline_type =
             ~__POS__
             ~arch:Arm64
             ~dependencies:(Dependent [])
-            ~rules:(make_rules ~manual:Yes ())
+            ~rules:(make_rules ~changes:changeset_docker_files ~manual:Yes ())
             Test_manual
         in
         let job_build_rpm_amd64_manual =

@@ -5139,6 +5139,10 @@ oc.docker:amd64:
   tags:
   - gcp
   rules:
+  - changes:
+    - Dockerfile
+    - build.Dockerfile
+    when: on_success
   - when: manual
     allow_failure: true
   needs:
@@ -5167,6 +5171,10 @@ oc.docker:arm64:
   tags:
   - gcp_arm64
   rules:
+  - changes:
+    - Dockerfile
+    - build.Dockerfile
+    when: on_success
   - when: manual
     allow_failure: true
   needs:
