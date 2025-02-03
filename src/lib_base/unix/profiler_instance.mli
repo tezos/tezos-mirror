@@ -18,6 +18,10 @@ type 'instance_maker backend_infos = {
   view : Profiler.view;
 }
 
+module BackendMap : Map.S with type key = string
+
+val registered_backends : instance_maker backend_infos BackendMap.t ref
+
 (** [register_backend identifiers instance_maker driver] associates one or more
     identifier(s) with a profiler instantiator.
 
