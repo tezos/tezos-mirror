@@ -3175,6 +3175,14 @@ module Forge = struct
         ~output:(bytes Hex)
         RPC_path.(path / "operations")
 
+    let signed_operations =
+      RPC_service.post_service
+        ~description:"Forge a signed operation"
+        ~query:RPC_query.empty
+        ~input:Operation.encoding
+        ~output:(bytes Hex)
+        RPC_path.(path / "signed_operations")
+
     let empty_proof_of_work_nonce =
       Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
 
@@ -3223,6 +3231,14 @@ module Forge = struct
           (Data_encoding.Binary.to_bytes_exn
              Operation.unsigned_encoding
              operation)) ;
+    Registration.register0_noctxt
+      ~chunked:true
+      S.signed_operations
+      (fun () signed_operation ->
+        return
+          (Data_encoding.Binary.to_bytes_exn
+             Operation.encoding
+             signed_operation)) ;
     Registration.register0_noctxt
       ~chunked:true
       S.consensus_operations
