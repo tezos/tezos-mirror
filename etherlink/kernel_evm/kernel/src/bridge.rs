@@ -55,6 +55,31 @@ pub struct Deposit {
 }
 
 impl Deposit {
+    const RECEIVER_LENGTH: usize = std::mem::size_of::<H160>();
+
+    const RECEIVER_AND_CHAIN_ID_LENGTH: usize =
+        Self::RECEIVER_LENGTH + std::mem::size_of::<U256>();
+
+    fn parse_receiver(
+        input: MichelsonBytes,
+    ) -> Result<(H160, Option<U256>), BridgeError> {
+        let input_bytes = input.0;
+        let input_length = input_bytes.len();
+        if input_length == Self::RECEIVER_LENGTH {
+            // Legacy format, input is exactly the receiver EVM address
+            let receiver = H160::from_slice(&input_bytes);
+            Ok((receiver, None))
+        } else if input_length == Self::RECEIVER_AND_CHAIN_ID_LENGTH {
+            // input is receiver followed by chain id
+            let receiver = H160::from_slice(&input_bytes[..Self::RECEIVER_LENGTH]);
+            let chain_id =
+                U256::from_little_endian(&input_bytes[Self::RECEIVER_LENGTH..]);
+            Ok((receiver, Some(chain_id)))
+        } else {
+            Err(BridgeError::InvalidDepositReceiver(input_bytes))
+        }
+    }
+
     /// Parses a deposit from a ticket transfer (internal inbox message).
     /// The "entrypoint" type is pair of ticket (FA2.1) and bytes (receiver address).
     #[cfg_attr(feature = "benchmark", inline(never))]
@@ -63,7 +88,7 @@ impl Deposit {
         receiver: MichelsonBytes,
         inbox_level: u32,
         inbox_msg_id: u32,
-    ) -> Result<Self, BridgeError> {
+    ) -> Result<(Self, Option<U256>), BridgeError> {
         // Amount
         let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
         // We use the `U256::from_little_endian` as it takes arbitrary long
@@ -73,19 +98,19 @@ impl Deposit {
         let amount_mutez: u64 = U256::from_little_endian(&amount_bytes).as_u64();
         let amount: U256 = eth_from_mutez(amount_mutez);
 
-        // EVM address
-        let receiver_bytes = receiver.0;
-        if receiver_bytes.len() != std::mem::size_of::<H160>() {
-            return Err(BridgeError::InvalidDepositReceiver(receiver_bytes));
-        }
-        let receiver = H160::from_slice(&receiver_bytes);
+        // EVM address of the receiver and chain id both come from the
+        // Michelson byte parameter.
+        let (receiver, chain_id) = Self::parse_receiver(receiver)?;
 
-        Ok(Self {
-            amount,
-            receiver,
-            inbox_level,
-            inbox_msg_id,
-        })
+        Ok((
+            Self {
+                amount,
+                receiver,
+                inbox_level,
+                inbox_msg_id,
+            },
+            chain_id,
+        ))
     }
 
     /// Returns log structure for an implicit deposit event.
@@ -221,9 +246,11 @@ pub fn execute_deposit<Host: Runtime>(
 mod tests {
     use alloy_sol_types::SolEvent;
     use evm_execution::account_storage::init_account_storage;
+    use evm_execution::fa_bridge::test_utils::create_fa_ticket;
     use primitive_types::{H160, U256};
     use rlp::Decodable;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
     use crate::{bridge::DEPOSIT_EVENT_TOPIC, CONFIG};
 
@@ -252,6 +279,48 @@ mod tests {
     #[test]
     fn deposit_event_topic() {
         assert_eq!(events::Deposit::SIGNATURE_HASH.0, DEPOSIT_EVENT_TOPIC);
+    }
+
+    #[test]
+    fn deposit_parsing_no_chain_id() {
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let receiver = MichelsonBytes(vec![1u8; 20]);
+        let (deposit, chain_id) =
+            Deposit::try_parse(ticket, receiver, 0, 0).expect("Failed to parse");
+        pretty_assertions::assert_eq!(
+            deposit,
+            Deposit {
+                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                receiver: H160([1u8; 20]),
+                inbox_level: 0,
+                inbox_msg_id: 0,
+            }
+        );
+        pretty_assertions::assert_eq!(chain_id, None)
+    }
+
+    #[test]
+    fn deposit_parsing_chain_id() {
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let mut receiver_and_chain_id = vec![];
+        receiver_and_chain_id.extend(vec![1u8; 20]);
+        receiver_and_chain_id.extend(vec![1u8]);
+        receiver_and_chain_id.extend(vec![0u8; 31]);
+        let receiver_and_chain_id = MichelsonBytes(receiver_and_chain_id);
+        let (deposit, chain_id) = Deposit::try_parse(ticket, receiver_and_chain_id, 0, 0)
+            .expect("Failed to parse");
+        pretty_assertions::assert_eq!(
+            deposit,
+            Deposit {
+                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                receiver: H160([1u8; 20]),
+                inbox_level: 0,
+                inbox_msg_id: 0,
+            }
+        );
+        pretty_assertions::assert_eq!(chain_id, Some(U256::one()))
     }
 
     #[test]

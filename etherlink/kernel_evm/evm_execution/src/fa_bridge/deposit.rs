@@ -78,19 +78,22 @@ impl FaDeposit {
         routing_info: MichelsonBytes,
         inbox_level: u32,
         inbox_msg_id: u32,
-    ) -> Result<Self, FaBridgeError> {
+    ) -> Result<(Self, Option<U256>), FaBridgeError> {
         let amount = bigint_to_u256(ticket.amount())?;
-        let (receiver, proxy) = parse_l2_routing_info(routing_info)?;
+        let (receiver, proxy, chain_id) = parse_l2_routing_info(routing_info)?;
         let ticket_hash = ticket_hash(&ticket)?;
 
-        Ok(FaDeposit {
-            amount,
-            receiver,
-            proxy,
-            ticket_hash,
-            inbox_level,
-            inbox_msg_id,
-        })
+        Ok((
+            FaDeposit {
+                amount,
+                receiver,
+                proxy,
+                ticket_hash,
+                inbox_level,
+                inbox_msg_id,
+            },
+            chain_id,
+        ))
     }
 
     /// Returns calldata for the proxy (ERC wrapper) contract.
@@ -171,16 +174,35 @@ impl FaDeposit {
     }
 }
 
-/// Split routing info (raw bytes passed along with the ticket) into receiver and optional proxy addresses.
+const RECEIVER_LENGTH: usize = std::mem::size_of::<H160>();
+
+const RECEIVER_AND_PROXY_LENGTH: usize = RECEIVER_LENGTH + std::mem::size_of::<H160>();
+
+const RECEIVER_PROXY_AND_CHAIN_ID_LENGTH: usize =
+    RECEIVER_AND_PROXY_LENGTH + std::mem::size_of::<U256>();
+
+/// Split routing info (raw bytes passed along with the ticket) into receiver and optional proxy address and chain id.
 fn parse_l2_routing_info(
     routing_info: MichelsonBytes,
-) -> Result<(H160, Option<H160>), FaBridgeError> {
-    if routing_info.0.len() == 20 {
-        Ok((H160::from_slice(&routing_info.0), None))
-    } else if routing_info.0.len() == 40 {
+) -> Result<(H160, Option<H160>, Option<U256>), FaBridgeError> {
+    let routing_info_len = routing_info.0.len();
+    if routing_info_len == RECEIVER_LENGTH {
+        Ok((H160::from_slice(&routing_info.0), None, None))
+    } else if routing_info_len == RECEIVER_AND_PROXY_LENGTH {
         Ok((
-            H160::from_slice(&routing_info.0[..20]),
-            Some(H160::from_slice(&routing_info.0[20..])),
+            H160::from_slice(&routing_info.0[..RECEIVER_LENGTH]),
+            Some(H160::from_slice(&routing_info.0[RECEIVER_LENGTH..])),
+            None,
+        ))
+    } else if routing_info_len == RECEIVER_PROXY_AND_CHAIN_ID_LENGTH {
+        Ok((
+            H160::from_slice(&routing_info.0[..RECEIVER_LENGTH]),
+            Some(H160::from_slice(
+                &routing_info.0[RECEIVER_LENGTH..RECEIVER_AND_PROXY_LENGTH],
+            )),
+            Some(U256::from_little_endian(
+                &routing_info.0[RECEIVER_AND_PROXY_LENGTH..],
+            )),
         ))
     } else {
         Err(FaBridgeError::InvalidRoutingInfo("invalid length"))
@@ -205,37 +227,18 @@ pub fn ticket_hash(ticket: &FA2_1Ticket) -> Result<H256, FaBridgeError> {
 mod tests {
     use std::str::FromStr;
 
+    use crate::fa_bridge::test_utils::create_fa_ticket;
     use num_bigint::BigInt;
     use sha3::{Digest, Keccak256};
-    use tezos_crypto_rs::hash::ContractKt1Hash;
-    use tezos_smart_rollup_encoding::{
-        contract::Contract,
-        michelson::{MichelsonNat, MichelsonOption, MichelsonPair},
-    };
 
     use super::*;
 
-    fn create_fa_ticket(
-        ticketer: &str,
-        token_id: u64,
-        metadata: &[u8],
-        amount: BigInt,
-    ) -> FA2_1Ticket {
-        let creator =
-            Contract::Originated(ContractKt1Hash::from_base58_check(ticketer).unwrap());
-        let contents = MichelsonPair(
-            MichelsonNat::new(BigInt::from(token_id).into()).unwrap(),
-            MichelsonOption(Some(MichelsonBytes(metadata.to_vec()))),
-        );
-        FA2_1Ticket::new(creator, contents, amount).unwrap()
-    }
-
     #[test]
-    fn fa_deposit_parsing_success() {
+    fn fa_deposit_parsing_success_no_chain_id() {
         let ticket =
             create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 1, &[0u8], 2.into());
         let routing_info = MichelsonBytes([[1u8; 20], [0u8; 20]].concat().to_vec());
-        let deposit =
+        let (deposit, chain_id) =
             FaDeposit::try_parse(ticket, routing_info, 1, 0).expect("Failed to parse");
 
         pretty_assertions::assert_eq!(
@@ -251,7 +254,38 @@ mod tests {
                 )
                 .unwrap(),
             }
-        )
+        );
+        pretty_assertions::assert_eq!(chain_id, None)
+    }
+
+    #[test]
+    fn fa_deposit_parsing_success() {
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 1, &[0u8], 2.into());
+        let mut routing_info = vec![];
+        routing_info.extend([1u8; 20]);
+        routing_info.extend([0u8; 20]);
+        routing_info.extend([1u8]);
+        routing_info.extend([0u8; 31]);
+        let routing_info = MichelsonBytes(routing_info);
+        let (deposit, chain_id) =
+            FaDeposit::try_parse(ticket, routing_info, 1, 0).expect("Failed to parse");
+
+        pretty_assertions::assert_eq!(
+            deposit,
+            FaDeposit {
+                amount: 2.into(),
+                proxy: Some(H160([0u8; 20])),
+                receiver: H160([1u8; 20]),
+                inbox_level: 1,
+                inbox_msg_id: 0,
+                ticket_hash: H256::from_str(
+                    "e0027297584c9e4162c872e072f1cc75b527023f9c0eda44ad4c732762b0b897",
+                )
+                .unwrap(),
+            }
+        );
+        pretty_assertions::assert_eq!(chain_id, Some(U256::one()))
     }
 
     #[test]
@@ -292,7 +326,7 @@ mod tests {
             create_fa_ticket("KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5", 1, &[0u8], 1.into());
         let routing_info = MichelsonBytes([0u8; 20].to_vec());
 
-        let res = FaDeposit::try_parse(ticket, routing_info, 1, 0).unwrap();
+        let (res, _chain_id) = FaDeposit::try_parse(ticket, routing_info, 1, 0).unwrap();
         assert_eq!(res.receiver, H160::zero());
         assert!(res.proxy.is_none());
     }

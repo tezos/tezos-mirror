@@ -239,12 +239,14 @@ where
     fn handle_deposit<Host: Runtime>(
         host: &mut Host,
         deposit: Deposit,
+        chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>;
 
     fn handle_fa_deposit<Host: Runtime>(
         host: &mut Host,
         fa_deposit: FaDeposit,
+        chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>;
 }
@@ -285,6 +287,7 @@ impl InputHandler for ProxyInput {
     fn handle_deposit<Host: Runtime>(
         host: &mut Host,
         deposit: Deposit,
+        _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
         inbox_content
@@ -297,6 +300,7 @@ impl InputHandler for ProxyInput {
     fn handle_fa_deposit<Host: Runtime>(
         host: &mut Host,
         fa_deposit: FaDeposit,
+        _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
         inbox_content
@@ -401,6 +405,7 @@ impl InputHandler for SequencerInput {
     fn handle_deposit<Host: Runtime>(
         host: &mut Host,
         deposit: Deposit,
+        _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
@@ -413,6 +418,7 @@ impl InputHandler for SequencerInput {
     fn handle_fa_deposit<Host: Runtime>(
         host: &mut Host,
         fa_deposit: FaDeposit,
+        _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
@@ -539,9 +545,11 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
             store_l1_level(host, info.level)?
         }
-        Input::Deposit(deposit) => Mode::handle_deposit(host, deposit, inbox_content)?,
-        Input::FaDeposit(fa_deposit) => {
-            Mode::handle_fa_deposit(host, fa_deposit, inbox_content)?
+        Input::Deposit((deposit, chain_id)) => {
+            Mode::handle_deposit(host, deposit, chain_id, inbox_content)?
+        }
+        Input::FaDeposit((fa_deposit, chain_id)) => {
+            Mode::handle_fa_deposit(host, fa_deposit, chain_id, inbox_content)?
         }
         Input::ForceKernelUpgrade => force_kernel_upgrade(host)?,
     }

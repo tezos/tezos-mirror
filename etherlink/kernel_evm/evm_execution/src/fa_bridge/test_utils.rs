@@ -7,6 +7,7 @@ pub use alloy_sol_types::SolCall;
 use alloy_sol_types::{sol, SolConstructor};
 use crypto::hash::ContractKt1Hash;
 use evm::Config;
+use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::{
@@ -17,7 +18,9 @@ use tezos_evm_runtime::runtime::MockKernelHost;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::{
     contract::Contract,
-    michelson::{ticket::FA2_1Ticket, MichelsonOption, MichelsonPair},
+    michelson::{
+        ticket::FA2_1Ticket, MichelsonBytes, MichelsonNat, MichelsonOption, MichelsonPair,
+    },
 };
 use tezos_storage::read_u256_le_default;
 
@@ -419,4 +422,19 @@ pub fn fa_bridge_precompile_call_withdraw(
     };
 
     handler.end_initial_transaction(execution_result).unwrap()
+}
+
+pub fn create_fa_ticket(
+    ticketer: &str,
+    token_id: u64,
+    metadata: &[u8],
+    amount: BigInt,
+) -> FA2_1Ticket {
+    let creator =
+        Contract::Originated(ContractKt1Hash::from_base58_check(ticketer).unwrap());
+    let contents = MichelsonPair(
+        MichelsonNat::new(BigInt::from(token_id).into()).unwrap(),
+        MichelsonOption(Some(MichelsonBytes(metadata.to_vec()))),
+    );
+    FA2_1Ticket::new(creator, contents, amount).unwrap()
 }
