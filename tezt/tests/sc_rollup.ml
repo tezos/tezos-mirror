@@ -3925,6 +3925,91 @@ let test_interrupt_rollup_node =
   let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
   unit
 
+let test_remote_signer =
+  let default_operator = Constant.bootstrap2 in
+  let operators =
+    [
+      (Sc_rollup_node.Operating, Constant.bootstrap3);
+      (Cementing, Constant.bootstrap4);
+      (Batching, Constant.bootstrap5);
+    ]
+  in
+  test_full_scenario
+    {
+      tags = ["remote"; "signer"];
+      variant = None;
+      description = "rollup node can sign operations with remote signer";
+    }
+    ~uses:(fun _ -> [Constant.octez_signer])
+    ~commitment_period:3
+    ~challenge_window:5
+    ~mode:Operator
+    ~operator:default_operator.public_key_hash
+    ~operators:
+      (List.map (fun (p, k) -> (p, k.Account.public_key_hash)) operators)
+  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  let keys = default_operator :: List.map snd operators in
+  Log.info "Starting remote signer" ;
+  let* signer = Signer.init ~keys () in
+  Log.info "Registering keys as remote in client" ;
+  let import (k : Account.key) =
+    Client.import_signer_key
+      client
+      ~force:true
+      ~public_key_hash:k.public_key_hash
+      ~alias:k.alias
+      (Signer.uri signer)
+  in
+  let* () = Lwt_list.iter_s import keys in
+  let sks =
+    JSON.parse_file (Filename.concat (Client.base_dir client) "secret_keys")
+    |> JSON.as_list
+  in
+  Log.info "Check configuration uses remote signer" ;
+  let check_config_key (k : Account.key) =
+    let open JSON in
+    let entry = List.find (fun e -> e |-> "name" |> as_string = k.alias) sks in
+    let sk = entry |-> "value" |> as_string in
+    if not @@ String.starts_with ~prefix:"http://" sk then
+      Test.fail ~__LOC__ "Key %s not using remote signer" k.alias
+  in
+  List.iter check_config_key keys ;
+  Log.info "Create wallet just for baking" ;
+  let baking_client =
+    Client.create ~name:"baking_client" ~endpoint:(Node node) ()
+  in
+  let* () =
+    Client.import_secret_key
+      baking_client
+      Constant.bootstrap1.secret_key
+      ~alias:Constant.bootstrap1.alias
+  in
+  Log.info "Starting rollup node" ;
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
+  let signer_has_signed =
+    Lwt.pick
+      [
+        Signer.wait_for signer "signing_data.v0" (fun _ ->
+            Log.info ~color:Log.Color.BG.green "Remote signer signed!" ;
+            Some ());
+        (let* () = Lwt_unix.sleep 120. in
+         Test.fail "Remote signer did not sign");
+      ]
+  in
+  Log.info "Progressing until rollup node publishes and cements" ;
+  let* _ =
+    bake_until_lcc_updated
+      ~at_least:5
+      ~timeout:120.
+      ~level:3
+      baking_client
+      sc_rollup_node
+  in
+  let* () = signer_has_signed in
+  unit
+
 let test_refutation_reward_and_punishment ~kind =
   let timeout_period = 3 in
   let commitment_period = 2 in
@@ -7073,4 +7158,5 @@ let register_protocol_independent () =
   bailout_mode_not_publish ~kind protocols ;
   bailout_mode_fail_to_start_without_operator ~kind protocols ;
   bailout_mode_fail_operator_no_stake ~kind protocols ;
-  bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols
+  bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
+  test_remote_signer ~kind protocols

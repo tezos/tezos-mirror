@@ -792,6 +792,9 @@ let as_rpc_endpoint (t : t) =
   let scheme = "http" in
   Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
 
+let operators t =
+  (t.persistent_state.default_operator, t.persistent_state.operators)
+
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
