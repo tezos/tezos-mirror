@@ -2769,6 +2769,8 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 (self.stack_depth() + 1).try_into().unwrap_or_default(),
                             );
 
+                            // for DELEGATECALL the transaction_context is the same as the parent
+                            // call. In the trace, we should use to=code_address and from=address
                             call_trace.add_to(Some(address));
                             call_trace.add_gas(target_gas);
                             call_trace.add_output(Some(output.to_owned()));

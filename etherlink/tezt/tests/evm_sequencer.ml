@@ -7150,6 +7150,84 @@ let test_trace_transaction_calltracer_failed_create =
       ~error_msg:"Trace should report an error. Expected %R but got %L") ;
   unit
 
+let test_trace_delegate_call =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "delegate_call"]
+    ~title:"calltracer correctly display delegate call infos"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* delegated = Solidity_contracts.delegatecall_delegated () in
+  let* delegator = Solidity_contracts.delegatecall_delegator () in
+  let* () = Eth_cli.add_abi ~label:delegated.label ~abi:delegated.abi () in
+  let* () = Eth_cli.add_abi ~label:delegator.label ~abi:delegator.abi () in
+  let* delegated_address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:delegated.label
+         ~bin:delegated.bin)
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let* delegator_address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:delegator.label
+         ~bin:delegator.bin)
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let* tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:delegator.label
+         ~address:delegator_address
+         ~method_call:(Format.sprintf "setVars(\"%s\",%d)" delegated_address 42))
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@ top_call =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:tx_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  Check.(
+    JSON.(
+      top_call |-> "to" |> as_string = String.lowercase_ascii delegator_address)
+      string
+      ~error_msg:"Top call should have been traced as coming from %R but was %L") ;
+  Check.(
+    JSON.(top_call |-> "calls" |> as_list <> [])
+      (list json)
+      ~error_msg:"Top call should have some subcalls") ;
+  let delegatecall = JSON.(top_call |-> "calls" |> as_list |> List.hd) in
+  Check.(
+    JSON.(
+      delegatecall |-> "from" |> as_string
+      = String.lowercase_ascii delegator_address)
+      string
+      ~error_msg:"Delegate call should be traced as coming from %R but was %L") ;
+  Check.(
+    JSON.(
+      delegatecall |-> "to" |> as_string
+      = String.lowercase_ascii delegated_address)
+      string
+      ~error_msg:
+        "Delegate call should be traced as going to delegated contract %R but \
+         was %L") ;
+  unit
+
 let test_trace_transaction_calltracer_all_types =
   register_all
     ~kernels:[Latest]
@@ -10033,6 +10111,7 @@ let () =
   test_trace_transaction_call_trace protocols ;
   test_relay_restricted_rpcs protocols ;
   test_batch_limit_size_rpc protocols ;
+  test_trace_delegate_call protocols ;
   test_trace_transaction_calltracer_all_types protocols ;
   test_trace_transaction_call_tracer_with_logs protocols ;
   test_trace_transaction_call_revert protocols ;
