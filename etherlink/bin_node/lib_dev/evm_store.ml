@@ -161,7 +161,7 @@ module Q = struct
 
   let history_mode =
     custom
-      ~encode:(fun mode -> Ok (Configuration.string_of_history_mode mode))
+      ~encode:(fun mode -> Ok (Configuration.string_of_history_mode_debug mode))
       ~decode:(fun str ->
         Option.to_result
           ~none:(Format.sprintf "Cannot decode %S" str)
@@ -1244,15 +1244,22 @@ let reset_after store ~l2_level =
   let* () = Irmin_chunks.clear_after store l2_level in
   return_unit
 
-let reset_before store ~l2_level =
+let reset_before store ~l2_level ~history_mode =
   let open Lwt_result_syntax in
-  let* () = Blueprints.clear_before store l2_level in
   let* () = Context_hashes.clear_before store l2_level in
   let* () = L1_l2_levels_relationships.clear_before store l2_level in
-  let* () = Kernel_upgrades.clear_before store l2_level in
-  let* () = Delayed_transactions.clear_before store l2_level in
-  let* () = Blocks.clear_before store l2_level in
-  let* () = Transactions.clear_before store l2_level in
+  let* () =
+    match history_mode with
+    | Configuration.Rolling _ ->
+        let* () = Blueprints.clear_before store l2_level in
+        let* () = Blocks.clear_before store l2_level in
+        let* () = Transactions.clear_before store l2_level in
+        let* () = Kernel_upgrades.clear_before store l2_level in
+        let* () = Delayed_transactions.clear_before store l2_level in
+        return_unit
+    | _ -> return_unit
+  in
+
   (* {!reset_before} is called when garbage collector is trigerred.
      Garbage collector is trigerred when the maximum number of splits
      is reached, [l2_level] was the pointer to the oldest split.

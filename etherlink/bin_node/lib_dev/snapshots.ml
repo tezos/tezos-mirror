@@ -284,9 +284,9 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
       when header_hist <> history_mode ->
         failwith
           "Cannot import %a snapshot into %a EVM node."
-          Configuration.pp_history_mode
+          Configuration.pp_history_mode_debug
           header_hist
-          Configuration.pp_history_mode
+          Configuration.pp_history_mode_debug
           history_mode
     | _ -> (* Same history mode *) return_unit
   in

@@ -515,20 +515,6 @@ evm_context_switch_history_mode:
          retention period */
       "archive" | "rolling:n"
 
-evm_context_rolling_to_archive_incomplete_history:
-  description: switching history mode from Rolling to Archive, but be aware that history is incomplete, earliest level is {earliest_level}
-  level: warning
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_rolling_to_archive_incomplete_history version 0 */
-      "evm_context_rolling_to_archive_incomplete_history.v0":
-        $unistring /* Some */ || null /* None */ }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
 evm_context_start_history_mode:
   description: running with history mode {mode}
   level: notice

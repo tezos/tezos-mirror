@@ -4,6 +4,9 @@
 
 ### Features
 
+- Adds `full` history mode, where the EVM node keeps all the blocks and transactions,
+  but still prunes state data. (!16584)
+
 ### Bug Fixes
 
 - Advertises the correct history mode on start-up when it is not explicitely

@@ -166,15 +166,15 @@ module Params = struct
     | Some mode -> return mode
     | None ->
         failwith
-          "Invalid history mode. Must be either archive, or rolling:n where n \
-           is the number of days to retain history."
+          "Invalid history mode. Must be either archive, rolling:n or full:n \
+           where n is the number of days to retain history."
 
   let history next =
     Tezos_clic.param
       ~name:"history"
       ~desc:
-        "History mode, either archive, or rolling:n where n is the number of \
-         days of history to retain."
+        "History mode, either archive, rolling:n or full:n where n is the \
+         number of days of history to retain."
       history_param
       next
 end
@@ -758,10 +758,8 @@ let num_download_retries =
 let history_arg =
   Tezos_clic.arg
     ~long:"history"
-    ~doc:
-      "History mode for the EVM node. rolling:n means rolling with n days of \
-       history."
-    ~placeholder:"archive | rolling | rolling:n"
+    ~doc:"History mode for the EVM node. ':n' means n days of history."
+    ~placeholder:"archive | rolling:n | full:n"
     Params.history_param
 
 let common_config_args =
@@ -2418,13 +2416,15 @@ let snapshot_info_command =
               "@,History mode:    %s@,First level:     %a"
               (match history_mode with
               | Archive -> "Archive"
-              | Rolling gc ->
+              | Rolling gc | Full gc ->
                   let hist_span =
                     Ptime.Span.of_int_s
                       (gc.split_frequency_in_seconds * gc.number_of_chunks)
                   in
                   Format.asprintf
-                    "Rolling (with %a history)"
+                    "%a (with %a history)"
+                    Configuration.pp_history_mode_info
+                    history_mode
                     Ptime.Span.pp
                     hist_span)
               Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
