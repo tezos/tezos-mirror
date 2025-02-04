@@ -2,7 +2,7 @@
 
 # Install depedendencies for the rpm_repo job
 
-dnf update
+dnf -y update
 
 tee -a /etc/yum.repos.d/google-cloud-sdk.repo << EOM
 [google-cloud-cli]

@@ -4,6 +4,8 @@ set -eu
 # Mandatory variables
 DISTRIBUTION=${DISTRIBUTION:?You must specify a distribution}
 RELEASE=${RELEASE:?You must specify a release}
+TESTFILE=${1:?You must specify a test file to run}
+DOCKERFILE=${2:?You must specify a dockerfile}
 
 # CI variables with defaults from the local git repository
 CI_COMMIT_SHORT_SHA=${CI_COMMIT_SHORT_SHA:-$(git rev-parse --short HEAD)}
@@ -23,20 +25,19 @@ if [ ! -z ${DEP_IMAGE+x} ]; then
 else
   # for local execution, we assume the image name is "systemd"
   IMAGE="systemd"
-  if [ -z "$(docker images -q "$IMAGE")" ]; then
-    echo "Image $IMAGE does not exist locally."
-    echo "Building or updating the local image for you"
-    docker build -f images/packages/debian-systemd-tests.Dockerfile . -t systemd
-  fi
-
+  docker rm -f $IMAGE || true
+  docker rmi $IMAGE || true
+  echo "Image $IMAGE does not exist locally."
+  echo "Building or updating the local image for you"
+  docker build -f "$DOCKERFILE" . -t systemd
 fi
 
 # Trap signals (EXIT, INT, TERM) and perform cleanup
 trap 'echo "Stopping and removing container systemd" && \
-      docker rm -f systemd' INT TERM
+  (docker rm -f systemd || true) && (docker rmi systemd || true)' INT TERM EXIT
 
 # Run the container in the background and capture the PID of the background process
-screen -d -m /bin/sh -c "docker run -i --rm --privileged --name systemd $IMAGE"
+screen -d -m /bin/sh -c "docker run -i --rm --privileged --name systemd -v $PWD/$TESTFILE:/$TESTFILE $IMAGE"
 
 timeout=30
 elapsed=0
@@ -61,7 +62,7 @@ docker exec \
   -e "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA" \
   -e "GCP_LINUX_PACKAGES_BUCKET=$GCP_LINUX_PACKAGES_BUCKET" \
   -i systemd \
-  /bin/sh -c "docs/introduction/install-bin-deb.sh debian bookworm"
+  /bin/sh -c "$TESTFILE $DISTRIBUTION $RELEASE"
 
 # Capture exit status
 EXIT=$?

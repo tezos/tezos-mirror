@@ -48,16 +48,40 @@ let fedora_package_release_matrix = function
    the list of all jobs, the second is the job building fedora packages artifats
    and the third rockylinux packages artifacts *)
 let jobs pipeline_type =
-  let variables add =
-    ( "DEP_IMAGE",
-      "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION-$RELEASE"
-    )
-    (* this second variable is for a read only registry and we want it to be
-       tezos/tezos *)
+  let variables ?(kind = "build") add =
+    ("FLAVOUR", kind)
+    :: ( "DEP_IMAGE",
+         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+       )
+       (* This second variable is for a read only registry and we want it to be
+          tezos/tezos *)
     :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION-$RELEASE" )
+         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+       )
     :: add
   in
+  let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution =
+    job_docker_authenticated
+      ~__POS__
+      ~name
+      ~stage:Stages.images
+      ~variables:
+        (variables ~kind:"systemd-tests" [("DISTRIBUTION", distribution)])
+      ~parallel:(Matrix matrix)
+      ~tag:Dynamic
+      [
+        "./scripts/ci/build-packages-dependencies.sh \
+         images/packages/rpm-systemd-tests.Dockerfile";
+      ]
+  in
+  let job_docker_systemd_test_rpm_dependencies : tezos_job =
+    make_job_docker_systemd_tests
+      ~__POS__
+      ~name:"oc.docker-systemd_tests-rpm"
+      ~distribution:"rockylinux"
+      ~matrix:(rockylinux_package_release_matrix pipeline_type)
+  in
+
   let make_job_docker_build_dependencies ~__POS__ ~name ~matrix ~distribution =
     job_docker_authenticated
       ~__POS__
@@ -198,6 +222,17 @@ let jobs pipeline_type =
       ~stage:Stages.publishing_tests
       script
   in
+  let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
+      ?allow_failure script =
+    job_docker_authenticated
+      ?allow_failure
+      ~__POS__
+      ~name
+      ~dependencies
+      ~variables
+      ~stage:Stages.publishing_tests
+      script
+  in
   let test_fedora_packages_jobs =
     [
       job_install_bin
@@ -228,11 +263,34 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [Job job_rpm_repo_rockylinux])
         ~image:Images.rockylinux_93
         ["./docs/introduction/install-bin-rpm.sh rockylinux 9.3"];
+      job_install_systemd_bin
+        ~__POS__
+        ~name:"oc.install_bin_rockylinux_93_systemd"
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_rpm_dependencies;
+               Job job_rpm_repo_rockylinux;
+             ])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [
+               ("PREFIX", "next");
+               ("DISTRIBUTION", "rockylinux");
+               ("RELEASE", "9.3");
+             ])
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           docs/introduction/install-bin-rpm.sh \
+           images/packages/rpm-systemd-tests.Dockerfile";
+        ];
     ]
   in
   let rockylinux_jobs =
     [
       job_docker_build_rockylinux_dependencies;
+      job_docker_systemd_test_rpm_dependencies;
       job_build_rockylinux_package;
       job_build_rockylinux_package_data;
       job_rpm_repo_rockylinux;
