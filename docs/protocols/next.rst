@@ -30,8 +30,9 @@ Adaptive Issuance
 Gas improvements
 ----------------
 
-- Increase gas cost for transfers to implicit accounts by 2000 gas
-  units. (MR :gl:`!15993`)
+- Fixed the gas cost for transfers to user accounts. This results in
+  an increase of around 2000 gas units per such transfer. (MR
+  :gl:`!15993`)
 
 
 RPC Changes
