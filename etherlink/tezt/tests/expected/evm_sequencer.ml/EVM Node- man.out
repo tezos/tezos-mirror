@@ -343,8 +343,9 @@ Miscellaneous commands:
       [--maximum-blueprints-catch-up <CATCH_UP>]
       [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
       [--bundler-node-endpoint <url>] [--sequencer-sidecar-endpoint <url>]
-      [--dont-track-rollup-node] [-d --wallet-dir <path>] [-f --force]
-      [--dal-slots <slot indices>] [--network <network>]
+      [--history <archive | rolling | rolling:n>] [--dont-track-rollup-node]
+      [-d --wallet-dir <path>] [-f --force] [--dal-slots <slot indices>]
+      [--network <network>]
     Create an initial config with default value.
     --data-dir <data-dir>: The path to the EVM node data directory
     --rpc-addr <ADDR>: The EVM node server rpc address.
@@ -379,6 +380,7 @@ Miscellaneous commands:
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
     --bundler-node-endpoint <url>: The address of a service which encrypts incoming transactions for the rollup.
     --sequencer-sidecar-endpoint <url>: The address of The sequencer sidecar to connect to.
+    --history <archive | rolling | rolling:n>: History mode for the EVM node. rolling:n means rolling with n days of history.
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
     -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
     -f --force: Overwrites the configuration file when it exists.
