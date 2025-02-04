@@ -278,22 +278,6 @@ DAL node
 - A warning is emitted when registering a public key hash (as an attester
   profile) that does not correspond to that of a delegate. (MR :gl:`!16336`)
 
-Protocol
-~~~~~~~~
-
-- The DAL incentives feature flag was turned on. (MR :gl:`!15614`)
-
-- **Change** The output of the RPC ``context/issuance/expected_issuance`` has a
-  new field ``"dal_attesting_reward_per_shard"`` (MR :gl:`!15614`)
-
-- A new RPC ``/chains/main/blocks/head/context/delegates/<pkh>/dal_participation``
-  similar to Tenderbake's ``/participation`` RPC to track bakers' DAL activity
-  (MR :gl:`!16168`)
-
-- A new anonymous operation "DAL entrapment evidence" was added. This operation
-  is not valid when the feature flag for DAL incentives is turned off. (MRs
-  :gl:`!15677`, :gl:`!15832`, :gl:`!15836`)
-
 - Set the message validation function at node startup, fixing
   https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
 
@@ -307,16 +291,21 @@ Protocol
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
 
-- A warning has been introduced in case it is observed that the DAL node lags
-  behind the L1 node. (MR :gl:`!15756`)
-
-- Set the message validation function at node startup, fixing
-  https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
-
 Protocol
 ~~~~~~~~
 
 - The DAL incentives feature flag was turned on. (MR :gl:`!15614`)
+
+- **Change** The output of the RPC ``context/issuance/expected_issuance`` has a
+  new field ``"dal_attesting_reward_per_shard"`` (MR :gl:`!15614`)
+
+- A new RPC ``/chains/main/blocks/head/context/delegates/<pkh>/dal_participation``
+  similar to Tenderbake's ``/participation`` RPC to track bakers' DAL activity
+  (MR :gl:`!16168`)
+
+- A new anonymous operation "DAL entrapment evidence" was added. Bakers that do
+  not detect traps lose the corresponding DAL rewards. (MRs :gl:`!15677`,
+  :gl:`!15832`, :gl:`!15836`, :gl:`!16253`, :gl:`!16224`, :gl:`!16322`)
 
 - New protocol parameters were added: ``DAL.REWARDS_RATIO``,
   ``DAL_REWARDS_WEIGHT``, ``MINIMAL_PARTICIPATION_RATIO``,
@@ -324,10 +313,6 @@ Protocol
 
 - DAL rewards are distributed at the end of a cycle for bakers who meet the
   minimal participation ratio. (MRs :gl:`!15559`, :gl:`!16407`, :gl:`!16408`)
-
-- A new anonymous operation "DAL entrapment evidence" was added. Bakers that do
-  not detect traps lose the corresponding DAL rewards. (MRs :gl:`!15677`,
-  :gl:`!15832`, :gl:`!15836`, :gl:`!16253`, :gl:`!16224`, :gl:`!16322`)
 
 Miscellaneous
 -------------
