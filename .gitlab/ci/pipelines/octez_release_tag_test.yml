@@ -849,10 +849,12 @@ publish:release-page:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
+  - oc.build:rpm:amd64
   dependencies:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
+  - oc.build:rpm:amd64
   allow_failure: true
   timeout: 60 minutes
   script:

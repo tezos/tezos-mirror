@@ -211,6 +211,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
            [
              Artifacts job_static_x86_64_release;
              Artifacts job_static_arm64_release;
+             Artifacts job_build_rpm_amd64;
            ])
       ~variables:[("S3_BUCKET", "release-page-test.nomadic-labs.com")]
       ["./scripts/ci/release_page_publish.sh"]
