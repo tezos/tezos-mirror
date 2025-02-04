@@ -10,6 +10,7 @@
 use super::{CACHE_INSTR, ICallLayout, ICallPlaced, run_instr};
 use crate::{
     default::ConstDefault,
+    jit::{JCall, JIT, state_access::JitStateAccess},
     machine_state::{
         MachineCoreState, ProgramCounterUpdate,
         instruction::Instruction,
@@ -255,6 +256,145 @@ impl<ML: MainMemoryLayout, M: ManagerClone> Clone for Interpreted<ML, M> {
         Self {
             len_instr: self.len_instr.clone(),
             instr: self.instr.clone(),
+        }
+    }
+}
+
+/// Blocks that are compiled to native code for execution, when possible.
+///
+/// Not all instructions are currently supported, when a block contains
+/// unsupported instructions, a fallback to [`Interpreted`] mode occurs.
+///
+/// Blocks are compiled upon calling [`Block::complete_block`], in a *stop the world* fashion.
+pub struct InlineJit<ML: MainMemoryLayout, M: JitStateAccess> {
+    fallback: Interpreted<ML, M>,
+    jit_fn: Option<JCall<ML, M>>,
+}
+
+impl<ML: MainMemoryLayout, M: JitStateAccess> Block<ML, M> for InlineJit<ML, M> {
+    type BlockBuilder = JIT<ML, M>;
+
+    fn start_block(&mut self)
+    where
+        M: ManagerWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.start_block()
+    }
+
+    fn invalidate(&mut self)
+    where
+        M: ManagerWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.invalidate()
+    }
+
+    fn reset(&mut self)
+    where
+        M: ManagerReadWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.reset()
+    }
+
+    fn push_instr(&mut self, instr: Instruction)
+    where
+        M: ManagerReadWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.push_instr(instr)
+    }
+
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<ML>, M>]
+    where
+        M: ManagerRead,
+    {
+        self.fallback.instr()
+    }
+
+    /// Bind
+    fn bind(allocated: AllocatedOf<BlockLayout<ML>, M>) -> Self {
+        Self {
+            fallback: Interpreted::bind(allocated),
+            jit_fn: None,
+        }
+    }
+
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<BlockLayout<ML>, F::Output> {
+        self.fallback.struct_ref::<F>()
+    }
+
+    fn complete_block(&mut self, jit: &mut Self::BlockBuilder) {
+        if <Self as Block<ML, M>>::num_instr(self) > 0 {
+            self.fallback.complete_block(&mut InterpretedBlockBuilder);
+
+            let instr = self
+                .fallback
+                .instr
+                .iter()
+                .take(<Self as Block<ML, M>>::num_instr(self))
+                .map(|i| i.read_ref_stored());
+
+            let jitfn = jit.compile(instr);
+
+            self.jit_fn = jitfn;
+        }
+    }
+
+    /// Get a callable block from an entry. The entry must have passed the address and fence
+    /// checks.
+    fn callable(&mut self) -> Option<&mut (impl BCall<ML, M> + ?Sized)>
+    where
+        M: ManagerRead,
+    {
+        if self.fallback.callable().is_some() {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    /// The number of instructions contained in the block.
+    fn num_instr(&self) -> usize
+    where
+        M: ManagerRead,
+    {
+        self.fallback.num_instr()
+    }
+}
+
+impl<ML: MainMemoryLayout, M: JitStateAccess> BCall<ML, M> for InlineJit<ML, M> {
+    /// The number of instructions contained in the block.
+    fn num_instr(&self) -> usize
+    where
+        M: ManagerRead,
+    {
+        self.fallback.num_instr()
+    }
+
+    /// Run a block against the machine state.
+    ///
+    /// When calling this function, there must be no partial block in progress. To ensure
+    /// this, you must always run [`InterpretedCache::complete_current_block`] prior to fetching
+    /// and running a new block.
+    ///
+    /// There _must_ also be sufficient steps remaining, to execute the block in full.
+    fn run_block(
+        &self,
+        core: &mut MachineCoreState<ML, M>,
+        instr_pc: Address,
+        steps: &mut usize,
+    ) -> Result<(), EnvironException>
+    where
+        M: ManagerReadWrite,
+    {
+        match &self.jit_fn {
+            // # SAFETY: JIT is alive
+            Some(jcall) => unsafe { jcall.call(core, instr_pc, steps) },
+            None => self.fallback.instr().run_block(core, instr_pc, steps),
         }
     }
 }

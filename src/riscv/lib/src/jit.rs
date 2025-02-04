@@ -244,6 +244,15 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     }
 }
 
+// TODO: https://linear.app/tezos/issue/RV-496
+//       `Block::BlockBuilder` should not require Default, as it
+//         does not allow for potential fallilibility
+impl<ML: MainMemoryLayout, M: JitStateAccess> Default for JIT<ML, M> {
+    fn default() -> Self {
+        Self::new().expect("JIT is supported on all octez-riscv supported platforms")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
