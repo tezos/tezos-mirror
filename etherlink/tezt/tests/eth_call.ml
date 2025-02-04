@@ -301,7 +301,7 @@ let test_call_state_override_state_diff =
         );
       ]
   in
-  let override = [`O [(contract, `O [("state_diff", state_diff)])]] in
+  let override = [`O [(contract, `O [("stateDiff", state_diff)])]] in
   let* call_result = make_call ~override "getCount()" in
   check_value
     call_result
@@ -327,7 +327,7 @@ let test_call_state_override_state_diff =
         );
       ]
   in
-  let override = [`O [(contract, `O [("state_diff", invalid)])]] in
+  let override = [`O [(contract, `O [("stateDiff", invalid)])]] in
   let* call_result = make_call ~override "getCount()" in
   Check.(
     (Evm_node.extract_error_message call_result
