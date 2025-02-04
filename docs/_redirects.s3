@@ -4,6 +4,7 @@
 /releases/latest.html /releases/version-21.html 301
 # These are inherited from the past, don't change:
 /007/cli-commands.html /shell/cli-commands.html 301
+/007/* /alpha/:splat 301
 /009/glossary.html /active/glossary.html 301
 /009/michelson.html /active/michelson.html 301
 /009/proof_of_stake.html /active/proof_of_stake.html 301
