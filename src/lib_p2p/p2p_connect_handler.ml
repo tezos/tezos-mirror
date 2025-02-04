@@ -393,7 +393,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                   | Tezos_base.Data_encoding_wrapper.Encoding_error _
                   | Tezos_base.Data_encoding_wrapper
                     .Unexpected_size_of_encoded_value
-                  | P2p_errors.Decoding_error _
+                  | Tezos_base.Data_encoding_wrapper.Decoding_error _
                   | P2p_errors.Invalid_chunks_size _ ->
                       P2p_pool.greylist_addr t.pool (fst point)
                   | _ -> ())
