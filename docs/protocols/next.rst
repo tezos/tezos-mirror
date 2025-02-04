@@ -19,8 +19,6 @@ It requires protocol environment V14, compared to V13 for Quebec.
 Smart Rollups
 -------------
 
-
-
 Data Availability Layer
 -----------------------
 
@@ -57,13 +55,13 @@ Operations
 Errors
 ------
 
-
 Protocol parameters
 -------------------
 
-- Rename ``consensus_threshold`` to ``consensus_threshold_size``. (MR :gl:`!15979`)
+- Renamed ``consensus_threshold`` to ``consensus_threshold_size``. (MR
+  :gl:`!15979`)
 
-- Replace the ``max_slashing_period = 2`` protocol constant with two
+- Replaced the ``max_slashing_period = 2`` protocol constant with two
   constants ``denunciation_period = 1`` and ``slashing_delay =
   1``. The behavior of denunciations and slashing is unaffected by
   this change. Indeed, ``denunciation_period`` represents how many
