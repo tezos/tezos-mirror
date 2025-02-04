@@ -1555,6 +1555,11 @@ let import_snapshot ?(force = false) evm_node ~snapshot_file =
   let process = spawn_command evm_node args in
   Runnable.{value = process; run = Process.check}
 
+let snapshot_info ~snapshot_file =
+  let cmd = ["snapshot"; "info"; snapshot_file] in
+  let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
+  Runnable.{value = process; run = Process.check_and_read_stdout}
+
 let wait_termination (evm_node : t) =
   match evm_node.status with
   | Not_running -> unit

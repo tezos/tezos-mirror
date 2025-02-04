@@ -11,7 +11,7 @@ type error +=
   | Data_dir_populated of string
   | File_not_found of string
   | Incorrect_rollup of Address.t * Address.t
-  | Outdated_snapshot of Ethereum_types.quantity * Ethereum_types.quantity
+  | Outdated_snapshot of Z.t * Z.t
   | Invalid_snapshot_file of string
 
 let () =
@@ -67,14 +67,11 @@ let () =
         ppf
         "The snapshot is outdated (for level %a) while the \n\
         \ existing EVM node is already at %a@."
-        Ethereum_types.pp_quantity
+        Z.pp_print
         snap_level
-        Ethereum_types.pp_quantity
+        Z.pp_print
         exp_level)
-    Data_encoding.(
-      obj2
-        (req "evm_node_level" Ethereum_types.quantity_encoding)
-        (req "snapshot_level" Ethereum_types.quantity_encoding))
+    Data_encoding.(obj2 (req "evm_node_level" z) (req "snapshot_level" z))
     (function Outdated_snapshot (a1, a2) -> Some (a1, a2) | _ -> None)
     (fun (a1, a2) -> Outdated_snapshot (a1, a2)) ;
   register_error_kind
@@ -115,6 +112,8 @@ module Header = struct
     | V1 of {
         rollup_address : Address.t;
         current_level : Ethereum_types.quantity;
+        history_mode : Configuration.history_mode;
+        first_level : Ethereum_types.quantity;
       }
 
   let cur_level_encoding =
@@ -142,15 +141,17 @@ module Header = struct
         case
           ~title:"evm_node.snapshot_header.v1"
           (Tag 1)
-          (obj2
+          (obj4
              (req "rollup_address" Address.encoding)
-             (req "current_level" cur_level_encoding))
+             (req "current_level" cur_level_encoding)
+             (req "history_mode" Configuration.history_mode_encoding)
+             (req "first_level" cur_level_encoding))
           (function
-            | V1 {rollup_address; current_level} ->
-                Some (rollup_address, current_level)
+            | V1 {rollup_address; current_level; history_mode; first_level} ->
+                Some (rollup_address, current_level, history_mode, first_level)
             | _ -> None)
-          (fun (rollup_address, current_level) ->
-            V1 {rollup_address; current_level});
+          (fun (rollup_address, current_level, history_mode, first_level) ->
+            V1 {rollup_address; current_level; history_mode; first_level});
       ]
 
   let encoding =
@@ -192,14 +193,20 @@ let export ?snapshot_file ~compression ~data_dir () =
     (* Export SQLite database *)
     Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
     let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-    let* {rollup_address; current_number = current_level; legacy_block_storage}
-        =
+    let* {
+           rollup_address;
+           current_number = current_level;
+           legacy_block_storage;
+           history_mode;
+           first_number = first_level;
+         } =
       Data_dir.export_store ~data_dir ~output_db_file
     in
     let header =
       if legacy_block_storage then
         Header.(V0_legacy {rollup_address; current_level})
-      else Header.(V1 {rollup_address; current_level})
+      else
+        Header.(V1 {rollup_address; current_level; history_mode; first_level})
     in
     let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
     let writer =
@@ -256,14 +263,20 @@ let check_snapshot_exists snapshot_file =
   let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
   fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
 
+let pp_history_mode fmt h =
+  Format.pp_print_string
+    fmt
+    (match h with Configuration.Archive -> "archive" | Rolling -> "rolling")
+
 let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     =
   let open Lwt_result_syntax in
-  let header_rollup_address, header_current_level =
+  let header_rollup_address, Qty header_current_level, header_history =
     match header with
     | V0_legacy {rollup_address; current_level} ->
-        (rollup_address, current_level)
-    | V1 {rollup_address; current_level} -> (rollup_address, current_level)
+        (rollup_address, current_level, None)
+    | V1 {rollup_address; current_level; history_mode; first_level} ->
+        (rollup_address, current_level, Some (history_mode, first_level))
   in
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
@@ -277,15 +290,42 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
           Address.(header_rollup_address = r)
           (Incorrect_rollup (header_rollup_address, r))
   in
+  let* () =
+    match (header_history, metadata) with
+    | None, _ | _, None -> return_unit
+    | Some (header_hist, _), Some {history_mode; _}
+      when header_hist <> history_mode ->
+        failwith
+          "Cannot import %a snapshot into %a EVM node."
+          pp_history_mode
+          header_hist
+          pp_history_mode
+          history_mode
+    | _ -> (* Same history mode *) return_unit
+  in
+  let* first_context = Evm_store.Context_hashes.find_earliest conn in
+  let* () =
+    match (first_context, header_history) with
+    | None, _ | _, None -> return_unit
+    | Some (Qty first_number, _), Some (Archive, Qty header_first_level)
+      when Z.Compare.(header_first_level > first_number) ->
+        failwith
+          "Snapshot history starts at %a but the archive node has history from \
+           %a locally. Backup configuration and start from an empty data dir \
+           if you want to proceed."
+          Z.pp_print
+          header_first_level
+          Z.pp_print
+          first_number
+    | _ -> return_unit
+  in
   let* latest_context = Evm_store.Context_hashes.find_latest conn in
   let* () =
     match latest_context with
     | None -> return_unit
-    | Some (current_number, _) ->
+    | Some (Qty current_number, _) ->
         fail_when
-          Z.Compare.(
-            Ethereum_types.Qty.to_z header_current_level
-            <= Ethereum_types.Qty.to_z current_number)
+          Z.Compare.(header_current_level <= current_number)
           (Outdated_snapshot (header_current_level, current_number))
   in
   return_unit

@@ -686,6 +686,13 @@ module Context_hashes = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Context_hashes.get_earliest ()
 
+  let get_earliest store =
+    let open Lwt_result_syntax in
+    let* candidate = find_earliest store in
+    match candidate with
+    | Some c -> return c
+    | None -> failwith "Could not fetch earliest context hash from store"
+
   let find_finalized store =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->

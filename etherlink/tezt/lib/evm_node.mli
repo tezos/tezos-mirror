@@ -542,6 +542,10 @@ val export_snapshot :
 val import_snapshot :
   ?force:bool -> t -> snapshot_file:string -> (Process.t, unit) runnable
 
+(** Run [snapshot info] command and return output containing information about
+    the snapshot file. *)
+val snapshot_info : snapshot_file:string -> (Process.t, string) runnable
+
 val wait_termination : t -> unit Lwt.t
 
 (** [make_kernel_installer_config ~output ()] create the config needed for the

@@ -247,9 +247,9 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?history_mode
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets
+    ?websockets ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ~title ~tags body
@@ -313,8 +313,9 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?additional_uses
                 ?rpc_server
                 ?websockets
-                ~threshold_encryption
                 ?history_mode
+                ~threshold_encryption
+                ?rollup_history_mode
                 ~enable_dal
                 ~enable_multichain
                 ~title
@@ -752,12 +753,26 @@ let test_persistent_state =
 (* Helper to setup snapshot test. This function stops the observer and sequencer
    and exports two snapshots at one block interval. *)
 let snapshots_setup {sequencer; observer; _} =
+  let*@ prev_block_number = Rpc.block_number sequencer in
+  let block_number = Int32.succ prev_block_number in
+  let observer_sync =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int block_number)
+  in
+  let*@ _ = produce_block sequencer in
+  let* () = observer_sync in
   Log.info "Test setup: Exporting snapshots for test." ;
   Log.info " - Exporting older snapshot from observer." ;
   Log.info "   - Terminate the observer." ;
   let* () = Evm_node.terminate observer in
   Log.info "   - Export observer snapshot." ;
   let*! snapshot_file_before = Evm_node.export_snapshot observer in
+  let*! snapshot_info_before =
+    Evm_node.snapshot_info ~snapshot_file:snapshot_file_before
+  in
+  Check.(snapshot_info_before =~ rex "First level:\\s*0")
+    ~error_msg:"Snapshot info should have %R, got %L" ;
+  Check.(snapshot_info_before =~ rex (sf "Current level:\\s*%ld" block_number))
+    ~error_msg:"Snapshot info should have %R, got %L" ;
   Log.info " - Exporting current snapshot from sequencer." ;
   Log.info "   - Force the sequencer to produce a block." ;
   let*@ _ = produce_block sequencer in
@@ -771,6 +786,11 @@ let snapshots_setup {sequencer; observer; _} =
   let* () = Evm_node.terminate sequencer in
   Log.info "   - Export snapshot for block %ld." block_number ;
   let*! snapshot_file = Evm_node.export_snapshot sequencer in
+  let*! snapshot_info_after = Evm_node.snapshot_info ~snapshot_file in
+  Check.(snapshot_info_after =~ rex "First level:\\s*0")
+    ~error_msg:"Snapshot info should have %R, got %L" ;
+  Check.(snapshot_info_after =~ rex (sf "Current level:\\s*%ld" block_number))
+    ~error_msg:"Snapshot info should have %R, got %L" ;
   return (snapshot_file_before, snapshot_file, block_number)
 
 let test_snapshots_lock =
@@ -793,6 +813,7 @@ let test_snapshots_import_empty =
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot in empty data dir"
     ~time_between_blocks:Nothing
+    ~history_mode:(Rolling 1)
   @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
   let* _snapshot_file_before, snapshot_file, block_number =
     snapshots_setup setup
@@ -2197,7 +2218,7 @@ let test_init_from_rollup_node_data_dir =
          Evm_node.init_from_rollup_node_data_dir until this issue is
          fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
-    ~history_mode:Archive
+    ~rollup_history_mode:Archive
   @@ fun {sc_rollup_node; sequencer; observer; proxy; client; _} _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
