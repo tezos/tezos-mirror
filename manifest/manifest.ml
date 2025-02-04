@@ -2560,16 +2560,6 @@ let write_raw filename f =
       close_out outch ;
       x
 
-(* Write a file relatively to the root directory of the repository. *)
-let write filename f =
-  if !checks_done then
-    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
-  if String_set.mem filename !generated_files then
-    failwith
-      (filename ^ " is generated twice; did you declare the same library twice?") ;
-  generated_files := String_set.add filename !generated_files ;
-  write_raw filename f
-
 (* Copied from [tezt/lib_wrapper/tezt_wrapper.ml] and adapted to remove ".." as well. *)
 let canonicalize_path path =
   let rec simplify_parents acc = function
@@ -2586,6 +2576,16 @@ let canonicalize_path path =
   String.split_on_char '/' path
   |> List.filter (function "" | "." -> false | _ -> true)
   |> simplify_parents [] |> String.concat "/"
+
+(* Write a file relatively to the root directory of the repository. *)
+let write filename f =
+  if !checks_done then
+    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
+  if String_set.mem filename !generated_files then
+    failwith
+      (filename ^ " is generated twice; did you declare the same library twice?") ;
+  generated_files := String_set.add filename !generated_files ;
+  write_raw filename f
 
 let generate_content_input ~product ~source =
   let filename = Format.sprintf "script-inputs/%s-source-content" product in
