@@ -1246,38 +1246,6 @@ let init_public_network cloud (configuration : configuration)
       (List.length configuration.dal_node_producers)
       bootstrap.client
   in
-  let () = toplog "Funding the producer accounts" in
-  let fundraiser_key =
-    match configuration.fundraiser with
-    | None ->
-        Test.fail
-          "No fundraiser key was specified. Please use either `--fundraiser` \
-           or the variable environment `TEZT_CLOUD_FUNDRAISER` to specified an \
-           unencrypted secret key of an account having funds to run the \
-           scenario"
-    | Some key -> key
-  in
-  let* () =
-    Client.import_secret_key
-      bootstrap.client
-      (Unencrypted fundraiser_key)
-      ~alias:"fundraiser"
-  in
-  let () = toplog "Revealing the fundraiser public key" in
-  let* () =
-    let*? process = Client.reveal ~src:"fundraiser" bootstrap.client in
-    let* _ = Process.wait process in
-    Lwt.return_unit
-  in
-  let* fundraiser = Client.show_address ~alias:"fundraiser" bootstrap.client in
-  let () = toplog "Fetching fundraiser's counter" in
-  let* counter =
-    Operation.get_next_counter ~source:fundraiser bootstrap.client
-  in
-  let () = toplog "Fetching fundraiser's balance" in
-  let* _balance =
-    Client.get_balance_for ~account:"fundraiser" bootstrap.client
-  in
   let* etherlink_rollup_operator_key =
     if etherlink_configuration <> None then
       let () = toplog "Generating a key pair for Etherlink operator" in
@@ -1309,6 +1277,40 @@ let init_public_network cloud (configuration : configuration)
   in
   let* () =
     if List.length accounts_to_fund > 0 then
+      let () = toplog "Funding the producer accounts" in
+      let fundraiser_key =
+        match configuration.fundraiser with
+        | None ->
+            Test.fail
+              "No fundraiser key was specified. Please use either \
+               `--fundraiser` or the variable environment \
+               `TEZT_CLOUD_FUNDRAISER` to specified an unencrypted secret key \
+               of an account having funds to run the scenario"
+        | Some key -> key
+      in
+      let* () =
+        Client.import_secret_key
+          bootstrap.client
+          (Unencrypted fundraiser_key)
+          ~alias:"fundraiser"
+      in
+      let () = toplog "Revealing the fundraiser public key" in
+      let* () =
+        let*? process = Client.reveal ~src:"fundraiser" bootstrap.client in
+        let* _ = Process.wait process in
+        Lwt.return_unit
+      in
+      let* fundraiser =
+        Client.show_address ~alias:"fundraiser" bootstrap.client
+      in
+      let () = toplog "Fetching fundraiser's counter" in
+      let* counter =
+        Operation.get_next_counter ~source:fundraiser bootstrap.client
+      in
+      let () = toplog "Fetching fundraiser's balance" in
+      let* _balance =
+        Client.get_balance_for ~account:"fundraiser" bootstrap.client
+      in
       let () = toplog "Injecting the batch" in
       let* _op_hash =
         accounts_to_fund
