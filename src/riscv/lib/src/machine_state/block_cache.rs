@@ -290,15 +290,6 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Cached<ML, M> {
         self.fence_counter.write(fence_counter);
     }
 
-    fn block(&mut self) -> Block<ML, M>
-    where
-        M: ManagerRead,
-    {
-        Block {
-            instr: &mut self.instr[..self.len_instr.read() as usize],
-        }
-    }
-
     fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
         &'a self,
     ) -> AllocatedOf<CachedLayout<ML>, F::Output> {
@@ -684,7 +675,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
     ///
     /// *NB* before running any block, you must ensure no partial block
     /// is in progress with [`BlockCache::complete_current_block`].
-    pub fn get_block(&mut self, phys_addr: Address) -> Option<impl BCall<ML, M> + '_>
+    pub fn get_block(&mut self, phys_addr: Address) -> Option<impl BCall<ML, M>>
     where
         M: ManagerRead,
     {
@@ -699,7 +690,7 @@ impl<BCL: BlockCacheLayout<MainMemoryLayout = ML>, ML: MainMemoryLayout, M: Mana
             && self.fence_counter.read() == entry.fence_counter.read()
             && entry.len_instr.read() > 0
         {
-            Some(entry.block())
+            Some(Block::callable(entry))
         } else {
             None
         }

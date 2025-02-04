@@ -7,7 +7,7 @@
 //!
 //! Currently just for interperation only, but will expand to cover JIT.
 
-use super::{run_instr, ICallPlaced};
+use super::{run_instr, Cached, ICallPlaced};
 use crate::{
     machine_state::{
         main_memory::{Address, MainMemoryLayout},
@@ -20,9 +20,14 @@ use crate::{
 /// Functionality required to execute blocks.
 ///
 /// In future, will also cover 'construction' of blocks.
-pub trait BCall<ML: MainMemoryLayout, M: ManagerBase> {
+pub trait BCall<'a, ML: MainMemoryLayout, M: ManagerBase> {
     /// The number of instructions contained in the block.
     fn num_instr(&self) -> usize;
+
+    /// Get a callable block from an entry. The entry must contain a valid block.
+    fn callable(entry: &'a mut Cached<ML, M>) -> Self
+    where
+        M: ManagerRead;
 
     /// Run a block against the machine state.
     ///
@@ -82,9 +87,18 @@ impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
     }
 }
 
-impl<'a, ML: MainMemoryLayout, M: ManagerBase> BCall<ML, M> for Block<'a, ML, M> {
+impl<'a, ML: MainMemoryLayout, M: ManagerBase> BCall<'a, ML, M> for Block<'a, ML, M> {
     fn num_instr(&self) -> usize {
         self.instr.len()
+    }
+
+    fn callable(entry: &'a mut Cached<ML, M>) -> Self
+    where
+        M: ManagerRead,
+    {
+        Block {
+            instr: &mut entry.instr[..entry.len_instr.read() as usize],
+        }
     }
 
     fn run_block(
