@@ -147,14 +147,15 @@ module Floodgate = struct
   include Tezt_etherlink.Floodgate
 
   module Agent = struct
-    let run ?(path = "floodgate") ~rpc_endpoint ~controller ?relay_endpoint
-        ?max_active_eoa ?spawn_interval ?tick_interval ?base_fee_factor
-        ?initial_balance agent =
+    let run ?(path = "floodgate") ?scenario ~rpc_endpoint ~controller
+        ?relay_endpoint ?max_active_eoa ?spawn_interval ?tick_interval
+        ?base_fee_factor ?initial_balance agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       run
         ?runner
         ~path
+        ?scenario
         ~rpc_endpoint
         ~controller
         ?relay_endpoint
