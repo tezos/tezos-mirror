@@ -24,7 +24,7 @@ use super::{
 use crate::{
     default::ConstDefault,
     instruction_context::{IcbLoweringFn, ICB},
-    interpreter::c,
+    interpreter::{c, i},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -339,7 +339,6 @@ pub enum OpCode {
     CAddi16sp,
     CAddi4spn,
     CSlli,
-    CAdd,
     CAnd,
     COr,
     CXor,
@@ -549,7 +548,6 @@ impl OpCode {
             Self::CAddi4spn => Args::run_caddi4spn,
             Self::CSlli => Args::run_cslli,
             Self::Mv => Args::run_mv,
-            Self::CAdd => Args::run_cadd,
             Self::CAnd => Args::run_cand,
             Self::COr => Args::run_cor,
             Self::CXor => Args::run_cxor,
@@ -587,7 +585,7 @@ impl OpCode {
         match self {
             Self::Mv => Some(Args::run_mv),
             Self::Nop => Some(Args::run_nop),
-            Self::CAdd => Some(Args::run_cadd),
+            Self::Add => Some(Args::run_add),
             _ => None,
         }
     }
@@ -696,6 +694,15 @@ macro_rules! impl_r_type {
                 .xregisters
                 .$fn(self.rs1.x, self.rs2.x, self.rd.nzx);
             Ok(Next(self.width))
+        }
+    };
+
+    ($impl: path, $fn: ident, non_zero) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+            $impl(icb, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
+            icb.ok(Next(self.width))
         }
     };
 }
@@ -1063,7 +1070,7 @@ macro_rules! impl_f_r_type {
 
 impl Args {
     // RV64I R-type instructions
-    impl_r_type!(run_add, non_zero_rd);
+    impl_r_type!(i::run_add, run_add, non_zero);
     impl_r_type!(run_sub, non_zero_rd);
     impl_r_type!(run_xor, non_zero_rd);
     impl_r_type!(run_or, non_zero_rd);
@@ -1271,7 +1278,6 @@ impl Args {
     impl_csr_imm_type!(run_csrrci);
 
     // RV32C compressed instructions
-    impl_cr_nz_type!(c::run_cadd, run_cadd);
     impl_cr_nz_type!(c::run_mv, run_mv);
     impl_load_type!(run_clw);
     impl_cload_sp_type!(run_clwsp);
@@ -1357,10 +1363,7 @@ impl From<&InstrCacheable> for Instruction {
     fn from(value: &InstrCacheable) -> Self {
         match value {
             // RV64I R-type instructions
-            InstrCacheable::Add(args) => Instruction {
-                opcode: OpCode::Add,
-                args: args.into(),
-            },
+            InstrCacheable::Add(args) => Instruction::from_ic_add(args),
             InstrCacheable::Sub(args) => Instruction {
                 opcode: OpCode::Sub,
                 args: args.into(),
@@ -2061,7 +2064,7 @@ impl From<&InstrCacheable> for Instruction {
                 Instruction::new_mv(args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
             InstrCacheable::CAdd(args) => {
-                Instruction::new_cadd(args.rd_rs1, args.rs2, InstrWidth::Compressed)
+                Instruction::new_add(args.rd_rs1, args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
             InstrCacheable::CAnd(args) => Instruction {
                 opcode: OpCode::CAnd,

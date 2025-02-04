@@ -415,7 +415,7 @@ mod tests {
         }
     });
 
-    backend_test!(test_cadd, F, {
+    backend_test!(test_add, F, {
         use crate::machine_state::registers::NonZeroXRegister::*;
         use Instruction as I;
 
@@ -423,10 +423,10 @@ mod tests {
 
         // calculate fibonacci(4) == 5
         let scenario: &[I] = &[
-            I::new_cadd(x2, x1, Compressed),
-            I::new_cadd(x1, x2, Uncompressed),
-            I::new_cadd(x2, x1, Uncompressed),
-            I::new_cadd(x1, x2, Compressed),
+            I::new_add(x2, x2, x1, Compressed),
+            I::new_add(x1, x1, x2, Uncompressed),
+            I::new_add(x2, x2, x1, Uncompressed),
+            I::new_add(x1, x1, x2, Compressed),
         ];
 
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
@@ -456,7 +456,7 @@ mod tests {
         let interpreted_res = block.run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
         let jitted_res = unsafe {
             // # Safety - the jit is not dropped until after we
-            //            exit the for loop
+            //            exit the block.
             fun.call(&mut jitted, initial_pc, &mut jitted_steps)
         };
 

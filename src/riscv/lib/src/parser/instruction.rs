@@ -22,6 +22,7 @@ pub struct RTypeArgs {
     pub rs2: XRegister,
 }
 
+/// Intermediate representation of Args for R-type instructions with guaranteed `rd` != `x0`.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NonZeroRdRTypeArgs {
     pub rd: NonZeroXRegister,
@@ -36,6 +37,7 @@ pub struct ITypeArgs {
     pub imm: i64,
 }
 
+/// Intermediate representation of Args for I-type instructions with guaranteed `rd` != `x0`.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NonZeroRdITypeArgs {
     pub rd: NonZeroXRegister,
@@ -268,6 +270,7 @@ pub struct CSSDTypeArgs {
 )]
 pub enum InstrCacheable {
     // RV64I R-type instructions
+    /// `ADD` - Perform val(rs1) + val(rs2) and store the result in `rd`
     Add(NonZeroRdRTypeArgs),
     Sub(NonZeroRdRTypeArgs),
     Xor(NonZeroRdRTypeArgs),
@@ -463,6 +466,8 @@ pub enum InstrCacheable {
     CAndi(CIBTypeArgs),
     /// `C.MV` - Copies the value in register `rs2` into register `rd_rs1`.
     CMv(CNZRTypeArgs),
+    /// `C.ADD` - Adds the values in registers `rd_rs1` and `rs2` and writes the result
+    /// back to register `rd_rs1`.
     CAdd(CNZRTypeArgs),
     CAnd(CRTypeArgs),
     COr(CRTypeArgs),
