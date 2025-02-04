@@ -32,6 +32,8 @@
 - `eth_getLogs` now properly supports the [EIP-234](https://eips.ethereum.org/EIPS/eip-234)
   introducing the `blockHash` parameter. (!16460)
 - `eth_getLogs` now returns an empty array instead of an error when `fromBlock` is greater than `toBlock`.
+- Improve reliability of `debug_traceTransaction` when dealing with non
+  standard revert reasons. (!16415)
 
 ### Internal
 
