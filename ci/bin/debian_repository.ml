@@ -471,7 +471,11 @@ let jobs pipeline_type =
                ("DISTRIBUTION", "debian");
                ("RELEASE", "bookworm");
              ])
-        ["./scripts/ci/systemd-debian-test.sh"];
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           docs/introduction/install-bin-deb.sh \
+           images/packages/debian-systemd-tests.Dockerfile";
+        ];
     ]
   in
   let debian_jobs =
