@@ -8,17 +8,6 @@
 
 use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister};
 
-/// `C.ADD` CR-type compressed instruction
-///
-/// Adds the values in registers `rd_rs1` and `rs2` and writes the result
-/// back to register `rd_rs1`.
-pub fn run_cadd(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
-    let lhs = icb.xregister_read(rd_rs1);
-    let rhs = icb.xregister_read(rs2);
-    let result = icb.xvalue_wrapping_add(lhs, rhs);
-    icb.xregister_write(rd_rs1, result)
-}
-
 /// Copies the value in register `rs2` into register `rd_rs1`.
 ///
 /// Relevant RISC-V opcodes:
@@ -40,6 +29,7 @@ mod tests {
     use crate::machine_state::MachineCoreState;
     use crate::{
         backend_test, create_state,
+        interpreter::i::run_add,
         machine_state::{main_memory::tests::T1K, registers::nz, MachineCoreStateLayout},
     };
 
@@ -59,7 +49,7 @@ mod tests {
             state.hart.xregisters.write_nz(nz::a3, rs1);
             state.hart.xregisters.write_nz(nz::a4, imm as u64);
 
-            run_cadd(&mut state, nz::a3, nz::a4);
+            run_add(&mut state, nz::a3, nz::a4, nz::a3);
             assert_eq!(state.hart.xregisters.read_nz(nz::a3), res);
             run_mv(&mut state, nz::a4, nz::a3);
             assert_eq!(state.hart.xregisters.read_nz(nz::a4), res);

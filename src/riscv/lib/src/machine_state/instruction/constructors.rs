@@ -48,25 +48,6 @@ impl Instruction {
         }
     }
 
-    pub(crate) fn new_cadd(
-        rd_rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
-        width: InstrWidth,
-    ) -> Self {
-        Self {
-            opcode: OpCode::CAdd,
-            args: Args {
-                rd: rd_rs1.into(),
-                // We are adding a default value for rs1 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs1: NonZeroXRegister::x1.into(),
-                rs2: rs2.into(),
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
     /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Li` [`OpCode`].
     pub(crate) fn new_li(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
         Self {

@@ -351,8 +351,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        Add | Mv | CAdd | CJr | CJalr | CAddi | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp
-        | Nop => ArgsShape::NZXSrcNZXDest,
+        Add | Mv | CJr | CJalr | CAddi | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp | Nop => {
+            ArgsShape::NZXSrcNZXDest
+        }
 
         Andi | Ori | Xori | Addiw | Sub | And | Or | Xor | Sll | Srl | Sra | Addw | Subw | Sllw
         | Srlw | Sraw | Slti | Sltiu | Slli | Srli | Srai | Slliw | Srliw | Sraiw | Slt | Sltu

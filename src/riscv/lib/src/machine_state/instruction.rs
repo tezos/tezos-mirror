@@ -339,7 +339,6 @@ pub enum OpCode {
     CAddi16sp,
     CAddi4spn,
     CSlli,
-    CAdd,
     CAnd,
     COr,
     CXor,
@@ -549,7 +548,6 @@ impl OpCode {
             Self::CAddi4spn => Args::run_caddi4spn,
             Self::CSlli => Args::run_cslli,
             Self::Mv => Args::run_mv,
-            Self::CAdd => Args::run_cadd,
             Self::CAnd => Args::run_cand,
             Self::COr => Args::run_cor,
             Self::CXor => Args::run_cxor,
@@ -587,7 +585,6 @@ impl OpCode {
         match self {
             Self::Mv => Some(Args::run_mv),
             Self::Nop => Some(Args::run_nop),
-            Self::CAdd => Some(Args::run_cadd),
             Self::Add => Some(Args::run_add),
             _ => None,
         }
@@ -1281,7 +1278,6 @@ impl Args {
     impl_csr_imm_type!(run_csrrci);
 
     // RV32C compressed instructions
-    impl_cr_nz_type!(c::run_cadd, run_cadd);
     impl_cr_nz_type!(c::run_mv, run_mv);
     impl_load_type!(run_clw);
     impl_cload_sp_type!(run_clwsp);
@@ -2068,7 +2064,7 @@ impl From<&InstrCacheable> for Instruction {
                 Instruction::new_mv(args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
             InstrCacheable::CAdd(args) => {
-                Instruction::new_cadd(args.rd_rs1, args.rs2, InstrWidth::Compressed)
+                Instruction::new_add(args.rd_rs1, args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
             InstrCacheable::CAnd(args) => Instruction {
                 opcode: OpCode::CAnd,

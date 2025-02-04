@@ -466,6 +466,8 @@ pub enum InstrCacheable {
     CAndi(CIBTypeArgs),
     /// `C.MV` - Copies the value in register `rs2` into register `rd_rs1`.
     CMv(CNZRTypeArgs),
+    /// `C.ADD` - Adds the values in registers `rd_rs1` and `rs2` and writes the result
+    /// back to register `rd_rs1`.
     CAdd(CNZRTypeArgs),
     CAnd(CRTypeArgs),
     COr(CRTypeArgs),
