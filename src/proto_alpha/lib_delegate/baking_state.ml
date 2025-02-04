@@ -251,6 +251,11 @@ module Delegate_slots = struct
 
   let own_slot_owner slots ~slot = SlotMap.find slot slots.own_delegate_slots
 
+  let find_first_slot_from slots ~slot =
+    SlotMap.find_first (fun s -> Slot.(s >= slot)) slots.own_delegate_slots
+
+  let min_slot slots = SlotMap.min_binding slots.own_delegate_slots
+
   let voting_power slots ~slot =
     SlotMap.find slot slots.all_delegate_voting_power
 end
