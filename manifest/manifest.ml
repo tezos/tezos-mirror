@@ -32,13 +32,14 @@ let ( // ) = Filename.concat
 
 let has_error = ref false
 
-let info fmt = Format.eprintf fmt
+let info fmt = Format.ksprintf prerr_endline fmt
 
 let error fmt =
   Format.ksprintf
     (fun s ->
       has_error := true ;
-      Format.eprintf "Error: %s" s)
+      prerr_string "Error: " ;
+      prerr_endline s)
     fmt
 
 let pp_do_not_edit ~comment_start fmt () =
@@ -1599,7 +1600,7 @@ module Target = struct
                 | first :: _ ->
                     if first <> opam then
                       error
-                        "Mismatch between public_name %S and opam package %S\n"
+                        "Mismatch between public_name %S and opam package %S"
                         public_name
                         opam)
             | _ -> ()) ;
@@ -2954,7 +2955,7 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
             error
               "In %s, %S has release status %s, and in %s, %S has release \
                status %s; those two targets cannot be in the same opam package \
-               %S.\n"
+               %S."
               a.path
               (Target.kind_name_for_errors a.kind)
               (Target.show_release_status a.release_status)
@@ -3053,7 +3054,7 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
                 Printf.eprintf "Package %S is not released\n" dependency_name ;
                 output_reason dependency_node.release_status ;
                 error
-                  "Released package %S cannot depend on unreleased package %S.\n"
+                  "Released package %S cannot depend on unreleased package %S."
                   parent_name
                   dependency_name ;
                 exit 1
@@ -3346,7 +3347,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     | [value] -> Some value
     | value :: _ :: _ as list ->
         error
-          "Package %s was declared with multiple different values for %s: %s\n"
+          "Package %s was declared with multiple different values for %s: %s"
           for_package
           name
           (String.concat ", " (List.map (Format.sprintf "%S") list)) ;
@@ -3360,13 +3361,13 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     | [] -> (
         match default with
         | None ->
-            error "No %s declared for package %s\n" name for_package ;
+            error "No %s declared for package %s" name for_package ;
             ""
         | Some value -> value)
     | [value] -> value
     | value :: _ :: _ as list ->
         error
-          "Package %s was declared with multiple different values for %s: %s\n"
+          "Package %s was declared with multiple different values for %s: %s"
           for_package
           name
           (String.concat ", " (List.map (Format.sprintf "%S") list)) ;
@@ -3660,7 +3661,7 @@ let check_for_non_generated_files ~remove_extra_files
     String_set.filter exclude !generated_files
   in
   String_set.iter
-    (error "%s: generated but is excluded\n%!")
+    (error "%s: generated but is excluded")
     error_generated_and_excluded ;
   let error_not_generated =
     String_set.diff all_non_excluded_files !generated_files
@@ -3668,9 +3669,9 @@ let check_for_non_generated_files ~remove_extra_files
   String_set.iter
     (fun file ->
       if remove_extra_files then (
-        info "%s: exists but was not generated, removing it.\n%!" file ;
+        info "%s: exists but was not generated, removing it." file ;
         Sys.remove file)
-      else error "%s: exists but was not generated\n%!" file)
+      else error "%s: exists but was not generated" file)
     error_not_generated ;
   if
     not
@@ -3699,9 +3700,9 @@ let check_circular_opam_deps () =
   let error_header = ref true in
   let report_circular_dep pkg (paths : Target.internal list) =
     if !error_header then (
-      error "Circular opam dependency for %s:\n" this_package ;
+      error "Circular opam dependency for %s:" this_package ;
       error_header := false) ;
-    info "- %s\n" (String.concat " -> " (List.map name (pkg :: paths)))
+    info "- %s" (String.concat " -> " (List.map name (pkg :: paths)))
   in
   list_iter internals @@ fun internal_from_this_package ->
   let to_visit : Target.internal Queue.t = Queue.create () in
@@ -3760,7 +3761,7 @@ let check_opam_with_test_consistency () =
       | Some bad ->
           error
             "Opam package %s contains targets with different values for \
-             ~opam_with_test: %s and %s.\n"
+             ~opam_with_test: %s and %s."
             this_package
             (show_with_test expected)
             (show_with_test bad))
