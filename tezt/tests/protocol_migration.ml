@@ -1009,9 +1009,345 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   in
   check_blocks ~level_from ~level_to
 
+module Local_helpers = struct
+  let get_current_level client =
+    let* current_level =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
+    Log.info
+      ~color:Log.Color.FG.blue
+      "Current level = %d and cycle = %d."
+      current_level.level
+      current_level.cycle ;
+    return current_level
+
+  let check_current_level_and_cycle ~level ~cycle client =
+    let* current_level = get_current_level client in
+    Check.((current_level.cycle = cycle) ~__LOC__ int)
+      ~error_msg:"Expected cycle=%R, got %L" ;
+    Check.((current_level.level = level) ~__LOC__ int)
+      ~error_msg:"Expected level=%R, got %L" ;
+    unit
+
+  let multiple_transfers ~baker ~giver ~(receivers : (string * Tez.t) list)
+      client =
+    let transfers =
+      List.map
+        (fun (alias, amount) ->
+          `O
+            [
+              ("destination", `String alias);
+              ("amount", `String (Tez.to_string amount));
+            ])
+        receivers
+    in
+    let json_batch = `A transfers |> JSON.encode_u in
+    let*! () =
+      Client.multiple_transfers ~burn_cap:Tez.one ~giver ~json_batch client
+    in
+    let* () = Client.bake_for_and_wait ~keys:[baker] client in
+    unit
+
+  let create_delegates_and_stake ~baker ~giver
+      ~(delegates : (string * Tez.t) list) client =
+    let* accounts =
+      Lwt_list.map_s
+        (fun (alias, amount) ->
+          let* account = Client.gen_and_show_keys ~alias client in
+          Log.info
+            ~color:Log.Color.FG.green
+            "Create an account for %s with pkh = %s and spendable balance = %s \
+             tez."
+            alias
+            account.public_key_hash
+            (Tez.to_string amount) ;
+          return account)
+        delegates
+    in
+    let* () = multiple_transfers ~baker ~giver ~receivers:delegates client in
+
+    let* () =
+      Lwt_list.iter_s
+        (fun (alias, _amount) ->
+          Log.info ~color:Log.Color.FG.green "Register %s as a delegate." alias ;
+          let* _ = Client.register_delegate ~delegate:alias client in
+          unit)
+        delegates
+    in
+    let* () = Client.bake_for_and_wait ~keys:[baker] client in
+
+    let* () =
+      Lwt_list.iter_s
+        (fun (alias, amount) ->
+          let amount = Tez.(amount /! 2L) in
+          Log.info
+            ~color:Log.Color.FG.green
+            "Delegate %s stakes %s tez."
+            alias
+            (Tez.to_string amount) ;
+          Client.stake amount ~staker:alias client)
+        delegates
+    in
+    let* () = Client.bake_for_and_wait ~keys:[baker] client in
+    return accounts
+
+  (* 1. Bake until [target_cycle] with the list of [bakers].
+     2. For the last block of the [target_cycle - 1] cycle,
+     the following is checked:
+        - migration block consistency if it is a migration block
+        - [check] is valid
+     3. The first block of [target_cycle] is baked with [delegate],
+        which is supposed to be its last activity in the cycle. *)
+  let bake_until_cycle_with_and_check ~migration_level ~migrate_from ~migrate_to
+      ~blocks_per_cycle ~bakers ~target_cycle ~delegate ~check client =
+    let* () = Client.bake_until_cycle ~keys:bakers ~target_cycle client in
+    let level = target_cycle * blocks_per_cycle in
+    let* () =
+      check_current_level_and_cycle ~level ~cycle:(target_cycle - 1) client
+    in
+    let* () =
+      if level = migration_level then (
+        Log.info
+          ~color:Log.Color.FG.green
+          "Checking migration block consistency." ;
+        block_check
+          ~expected_block_type:`Migration
+          client
+          ~migrate_from
+          ~migrate_to)
+      else unit
+    in
+    let* () = check () in
+    Log.info
+      ~color:Log.Color.FG.red
+      "Bake a block with %s [last activity is at cycle %s]."
+      delegate
+      (Int.to_string target_cycle) ;
+    let* () = Client.bake_for_and_wait ~keys:[delegate] client in
+    let* () =
+      check_current_level_and_cycle
+        ~level:(level + 1)
+        ~cycle:target_cycle
+        client
+    in
+    if level = migration_level then (
+      Log.info
+        ~color:Log.Color.FG.green
+        "Checking post-migration block consistency (first block of new \
+         protocol %s)."
+        (Protocol.name migrate_to) ;
+      block_check
+        ~expected_block_type:`Non_migration
+        client
+        ~migrate_from
+        ~migrate_to)
+    else unit
+
+  let print_parameters ~parameter_file ~migration_level =
+    let parameters = JSON.parse_file parameter_file in
+    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+    let consensus_rights_delay =
+      JSON.(get "consensus_rights_delay" parameters |> as_int)
+    in
+    Log.info
+      ~color:Log.Color.FG.green
+      "blocks_per_cycle = %d, consensus_rights_delay = %d, migration_level = %d"
+      blocks_per_cycle
+      consensus_rights_delay
+      migration_level
+
+  let activate_protocol ~parameter_file ~migrate_from ~migrate_to
+      ~migration_level =
+    Log.info ~color:Log.Color.FG.green "Start node and client." ;
+    let* client, node =
+      user_migratable_node_init ~migration_level ~migrate_to ()
+    in
+    Log.info
+      ~color:Log.Color.FG.green
+      "Activate protocol %s."
+      (Protocol.name migrate_from) ;
+    let* () =
+      Client.activate_protocol ~parameter_file ~protocol:migrate_from client
+    in
+    return (client, node)
+
+  let check_deactivated (delegate : Account.key) ~expected client =
+    let pkh = delegate.public_key_hash in
+    let* deactivated =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegate_deactivated pkh
+    in
+    let* grace_period =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegate_grace_period pkh
+    in
+    Log.debug
+      ~color:Log.Color.FG.gray
+      "Check if %s is deactivated = %s; grace_period = %s"
+      delegate.alias
+      (JSON.encode deactivated)
+      (JSON.encode grace_period) ;
+    Check.((JSON.as_bool deactivated = expected) ~__LOC__ bool)
+      ~error_msg:"Expected for deactivated=%R, got %L" ;
+    unit
+end
+
+let test_tolerated_inactivity_period () =
+  (* In proto R, the [tolerated_inactivity_period] protocol constant
+     was lowered from 3 to 2 cycles. Given that [grace_period] for the
+     current scenarion is equal to 5 cycles, we check a protocol
+     migration near that cycle. *)
+  let migrate_from = Protocol.Quebec in
+  let migrate_to = Protocol.Next in
+
+  for migration_cycle = 5 to 7 do
+    Test.register
+      ~__FILE__
+      ~title:
+        (Printf.sprintf
+           "protocol migration for tolerated_inactivity_period at the end of \
+            cycle %d"
+           (migration_cycle - 1))
+      ~tags:[team; "protocol"; "migration"; "tolerated_inactivity_period"]
+    @@ fun () ->
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~base:(Left (Protocol.parameter_file migrate_from))
+        [(["adaptive_issuance_force_activation"], `Bool true)]
+    in
+    let parameters = JSON.parse_file parameter_file in
+    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+    let migration_level = migration_cycle * blocks_per_cycle in
+    let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+
+    let* client, _node =
+      Local_helpers.activate_protocol
+        ~parameter_file
+        ~migrate_from
+        ~migrate_to
+        ~migration_level
+    in
+    let bake_until_cycle_with_and_check =
+      Local_helpers.bake_until_cycle_with_and_check
+        ~migration_level
+        ~migrate_from
+        ~migrate_to
+        ~blocks_per_cycle
+    in
+    (* [default_baker] never gets deactivated *)
+    let default_baker = Constant.bootstrap1.alias in
+    (* [funder] is used to fund all new accounts *)
+    let funder = Constant.bootstrap2.alias in
+
+    (* [delegate_i] stops participating in cycle (i + 1) *)
+    let* delegates =
+      Local_helpers.create_delegates_and_stake
+        ~baker:default_baker
+        ~giver:funder
+        ~delegates:
+          (List.init 8 (fun i ->
+               ("delegate_" ^ Int.to_string i, Tez.of_int 300_000)))
+        client
+    in
+    let delegates_array = Array.of_list delegates in
+    let all_activated = List.init 8 (fun _i -> false) in
+    let all_deactivated = List.init 8 (fun _i -> true) in
+
+    let check_deactivated_list expected_status_for_delegates =
+      Lwt_list.iteri_s
+        (fun i expected ->
+          let* () =
+            Local_helpers.check_deactivated delegates_array.(i) ~expected client
+          in
+          unit)
+        expected_status_for_delegates
+    in
+
+    let* () =
+      Local_helpers.check_current_level_and_cycle ~level:4 ~cycle:0 client
+    in
+    (* grace_period = tolerated_inactivity_period + consensus_rights_delay = 3 + 2 = 5 *)
+    (* all delegates are marked as active with [grace_period] = 5 *)
+    let* () = check_deactivated_list all_activated in
+
+    let* () =
+      Lwt_list.iter_s
+        (fun target_cycle ->
+          let delegates_i_and_higher i =
+            List.init (8 - i) (fun x -> delegates_array.(x + i).alias)
+          in
+          (* [delegate_i] can't bake during cycle_{0,1,2} as they have
+             no baking rights, so we wait for cycle 3 to start baking
+             with new delegates; delegate_{0,1,2} never bake in this
+             testing scenario *)
+          let bakers, delegate =
+            if 3 <= target_cycle && target_cycle <= 7 then
+              ( delegates_i_and_higher target_cycle,
+                delegates_array.(target_cycle).alias )
+            else ([], default_baker)
+          in
+          let expected_list =
+            match target_cycle with
+            | 3 | 4 | 5 -> all_activated
+            | 6 -> List.init 8 (fun i -> if i <= 2 then true else false)
+            | 7 -> List.init 8 (fun i -> if i <= 3 then true else false)
+            | 8 ->
+                (* [delegate_5] bakes for the last time in cycle 5. At
+                   this point, the cycle at the end of which it should
+                   get deactivated if no further participation is
+                   witnessed is set to [current_cycle +
+                   tolerated_inactivity_period], which is either cycle
+                   8 if Quebec is still active during cycle 5, or
+                   cycle 7 if proto R is already active during cycle
+                   5.
+
+                   So [delegate_5] gets deactivated at the end of
+                   cycle 7 IFF the migration_cycle is 5 or lower. *)
+                let is_deactivated i =
+                  if i <= 4 then true
+                  else if i = 5 then migration_cycle <= 5
+                  else false
+                in
+                List.init 8 is_deactivated
+            | 9 ->
+                (* As above, [delegate_6] status depends on whether
+                   proto R was already active during cycle 6. Note
+                   that [delegate_5] has now been deactivated in any
+                   case. *)
+                let is_deactivated i =
+                  if i <= 5 then true
+                  else if i = 6 then migration_cycle <= 6
+                  else false
+                in
+                List.init 8 is_deactivated
+            | 10 ->
+                (* When migrating at the end of cycle 6, [delegate_7] is
+                   deactivated by 1 cycle earlier *)
+                all_deactivated
+            | 11 -> all_deactivated
+            | _ -> failwith "unexpected input"
+          in
+          (* [default_baker] must be always active *)
+          let bakers = default_baker :: bakers in
+          let* () =
+            bake_until_cycle_with_and_check
+              ~bakers
+              ~target_cycle
+              ~delegate
+              ~check:(fun () -> check_deactivated_list expected_list)
+              client
+          in
+          unit)
+        (* From cycle 3 to 11 *)
+        (List.init 9 (fun i -> i + 3))
+    in
+    unit
+  done
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
-  test_migration_with_snapshots ~migrate_from ~migrate_to
+  test_migration_with_snapshots ~migrate_from ~migrate_to ;
+  test_tolerated_inactivity_period ()
