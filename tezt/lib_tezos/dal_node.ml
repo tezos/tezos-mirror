@@ -451,3 +451,97 @@ let debug_print_store_schemas ?(path = Uses.path Constant.octez_dal_node) ?hooks
   let args = ["debug"; "print"; "store"; "schemas"] in
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
+
+module Proxy = struct
+  type answer = [`Response of string]
+
+  type route = {
+    path : Re.Str.regexp;
+    callback :
+      path:string ->
+      fetch_answer:(unit -> Ezjsonm.t Lwt.t) ->
+      answer option Lwt.t;
+  }
+
+  type proxy = {
+    name : string;
+    routes : route list;
+    shutdown : unit Lwt.t;
+    trigger_shutdown : unit Lwt.u;
+  }
+
+  let make ~name ~routes =
+    let shutdown, trigger_shutdown = Lwt.task () in
+    {name; routes; shutdown; trigger_shutdown}
+
+  let route ~path ~callback = {path; callback}
+
+  let find_mocked_action t ~path =
+    List.find_opt (fun act -> Re.Str.string_match act.path path 0) t.routes
+
+  let run t ~honest_dal_node ~faulty_dal_node =
+    let dal_uri uri =
+      Uri.make
+        ~scheme:"http"
+        ~host:(rpc_host honest_dal_node)
+        ~port:(rpc_port honest_dal_node)
+        ~path:(Uri.path uri)
+        ~query:(Uri.query uri)
+        ()
+    in
+    let callback _conn req body =
+      let uri = Cohttp.Request.uri req in
+      let uri_str = Uri.to_string uri in
+      let method_ = Cohttp.Request.meth req in
+      let path = Uri.path uri in
+      match find_mocked_action t ~path with
+      | Some action -> (
+          Log.info "[%s] mocking data for request: '%s'" t.name uri_str ;
+          let* res =
+            action.callback ~path ~fetch_answer:(fun () ->
+                let headers = Cohttp.Request.headers req in
+                let* _resp, body =
+                  Cohttp_lwt_unix.Client.call
+                    ~headers
+                    ~body
+                    method_
+                    (dal_uri uri)
+                in
+                let* body_str = Cohttp_lwt.Body.to_string body in
+                return (Ezjsonm.from_string body_str))
+          in
+          match res with
+          | None -> Cohttp_lwt_unix.Server.respond_not_found ()
+          | Some (`Response body) ->
+              Log.info "[%s] mocking with custom answer '%s'" t.name body ;
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+      | None ->
+          Log.info
+            "[%s] forwarding the following request to the honest dal node: '%s'"
+            t.name
+            uri_str ;
+          let headers = Cohttp.Request.headers req in
+          let* resp, body =
+            Cohttp_lwt_unix.Client.call ~headers ~body method_ (dal_uri uri)
+          in
+          let* body_str = Cohttp_lwt.Body.to_string body in
+          Log.info
+            "[%s] mocking with honest dal node answer: '%s'"
+            t.name
+            body_str ;
+          Cohttp_lwt_unix.Server.respond_string
+            ~status:(Cohttp.Response.status resp)
+            ~headers:(Cohttp.Response.headers resp)
+            ~body:body_str
+            ()
+    in
+    let start () =
+      Cohttp_lwt_unix.Server.create
+        ~mode:(`TCP (`Port (rpc_port faulty_dal_node)))
+        ~stop:t.shutdown
+        (Cohttp_lwt_unix.Server.make ~callback ())
+    in
+    Lwt.async start
+
+  let stop t = Lwt.wakeup t.trigger_shutdown ()
+end
