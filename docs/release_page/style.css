@@ -9,9 +9,25 @@ body {
 }
 
 /* Header Styles */
+h1 {
+    color: #1D2227;
+}
+
 h2 {
-    color: #4CAF50;
+    color: #0F61FF;
     border-bottom: 2px solid #ddd;
+    padding-bottom: 5px;
+    margin-top: 20px;
+}
+
+h3 {
+    color: #9F329F;
+    padding-bottom: 5px;
+    margin-top: 20px;
+}
+
+h4 {
+    color: #1D2227;
     padding-bottom: 5px;
     margin-top: 20px;
 }
