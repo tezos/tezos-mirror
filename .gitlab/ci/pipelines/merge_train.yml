@@ -4091,7 +4091,6 @@ tezt:
   timeout: 40 minutes
   before_script:
   - . ./scripts/version.sh
-  - eval $(opam env)
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -4180,7 +4179,6 @@ tezt-memory-3k:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - eval $(opam env)
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -4269,7 +4267,6 @@ tezt-memory-4k:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - eval $(opam env)
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -4358,7 +4355,6 @@ tezt-time-sensitive:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - eval $(opam env)
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -4447,7 +4443,6 @@ tezt-slow:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - eval $(opam env)
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -4534,7 +4529,6 @@ tezt-flaky:
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
-  - eval $(opam env)
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
