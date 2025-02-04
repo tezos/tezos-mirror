@@ -170,9 +170,9 @@ a.k.a. **unfinalizable**.
 
 After ``UNSTAKE_FINALIZATION_DELAY + 1`` cycles (more precisely, after
 the cycle in which the unstake was requested has ended and then
-another :ref:`UNSTAKE_FINALIZATION_DELAY<cs_constants>` full cycles
-have passed), unstaked frozen tokens are no longer considered at stake
-nor slashable. They are said then to be both **unstaked** and
+another :ref:`UNSTAKE_FINALIZATION_DELAY<cs_constants_next>` full
+cycles have passed), unstaked frozen tokens are no longer considered
+at stake nor slashable. They are said then to be both **unstaked** and
 **finalizable**.
 
 A staker can retrieve all unstaked and finalizable tokens at any time,
