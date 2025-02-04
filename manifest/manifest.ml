@@ -2584,7 +2584,8 @@ let write filename f =
   if String_set.mem filename !generated_files then
     failwith
       (filename ^ " is generated twice; did you declare the same library twice?") ;
-  generated_files := String_set.add filename !generated_files ;
+  generated_files :=
+    String_set.add (canonicalize_path filename) !generated_files ;
   write_raw filename f
 
 let generate_content_input ~product ~source =
@@ -3636,7 +3637,7 @@ let find_opam_and_dune_files =
         || Filename.extension filename = ".opam"
         || filename = "dune-project"
         || filename = "dune-workspace"
-      then String_set.add full_filename acc
+      then String_set.add (canonicalize_path full_filename) acc
       else if filename.[0] = '.' || filename.[0] = '_' then acc
       else if
         try Sys.is_directory (root // dir // filename)
