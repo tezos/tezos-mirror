@@ -159,3 +159,7 @@ Internal
 
 - Added a stub RISC-V module for the protocol environment 
   and used it in the protocol implementation for the RISC-V PVM. (MRs :gl:`!15921`)
+
+- Removed dead code related to autostaking, old slashing, and Adaptive
+  Issuance activation. (MRs :gl:`!15215`, :gl:`!15391`, :gl:`!15223`,
+  :gl:`!15211`, :gl:`!16129`)
