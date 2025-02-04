@@ -19,8 +19,6 @@ It requires protocol environment V14, compared to V13 for Quebec.
 Smart Rollups
 -------------
 
-
-
 Data Availability Layer
 -----------------------
 
@@ -30,15 +28,10 @@ Adaptive Issuance
 Gas improvements
 ----------------
 
-- Increase gas cost for transfers to implicit accounts by 2000 gas
-  units. (MR :gl:`!15993`)
+- Fixed the gas cost for transfers to user accounts. This results in
+  an increase of around 2000 gas units per such transfer. (MR
+  :gl:`!15993`)
 
-Breaking Changes
-----------------
-
-- ``Update_consensus_key`` operation now has an optional ``proof`` parameter.
-  This parameter is needed to update to a tz4 (BLS) consensus key. (MR
-  :gl:`!15670`)
 
 RPC Changes
 -----------
@@ -48,38 +41,27 @@ RPC Changes
   which returns the number of blocks consecutively baked at round
   zero. (MR :gl:`!15945`)
 
-Operation receipts
-------------------
+
+Operations
+----------
+
+- Added an optional ``proof`` parameter to the
+  ``Update_consensus_key`` operation. This parameter is unused in the
+  Next protocol; it will be needed to update to a BLS consensus key
+  when the ``allow_tz4_delegate_enable`` feature flag is enabled in a
+  future protocol. (MR :gl:`!15670`)
 
 
 Errors
 ------
 
-- tz4 (BLS) addresses are allowed to be registered as delegate and or as
-  consensus keys if the ``allow_tz4_delegate_enable`` feature flag is set. (MR
-  :gl:`!15302`)
-
 Protocol parameters
 -------------------
 
-- Lower the number of blocks per cycle (``blocks_per_cycle``) from
-  30720 (~2.8 days) to 10800 (~1 day). (MR :gl:`!15196`)
+- Renamed ``consensus_threshold`` to ``consensus_threshold_size``. (MR
+  :gl:`!15979`)
 
-- Update the number of cycles per voting period
-  (``cycles_per_voting_period``) from 5 cycles (that is, ~14.2 days
-  with old cycle duration) to 14 cycles (~14 days with new cycle
-  duration). (MR :gl:`!15196`)
-
-- Make ``tolerated_inactivity_period`` a protocol constant, and lower it
-  from 3 cycles (~8.5 days with old cycle duration) to 2 cycles (~2
-  days with new cycle duration). (MRs :gl:`!15390`, :gl:`!16264`)
-
-- Lower the number of blocks per cycle (``blocks_per_cycle``) for
-  ghostnet to 10800 (~12 hours). (MR :gl:`!15196`)
-
-- Rename ``consensus_threshold`` to ``consensus_threshold_size``. (MR :gl:`!15979`)
-
-- Replace the ``max_slashing_period = 2`` protocol constant with two
+- Replaced the ``max_slashing_period = 2`` protocol constant with two
   constants ``denunciation_period = 1`` and ``slashing_delay =
   1``. The behavior of denunciations and slashing is unaffected by
   this change. Indeed, ``denunciation_period`` represents how many
@@ -111,10 +93,60 @@ Protocol parameters
   /chains/<chain_id>/blocks/<block_id>/context/constants``. (MR
   :gl:`!16296`)
 
+- Changed the type of the protocol constant ``max_slashing_threshold``
+  from an integer (number of slots) to a ratio (portion of the
+  committee). This does not affect slashing semantics. (MR
+  :gl:`!15765`)
+
+
+One-day cycles and related protocol periods
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Lowered the number of blocks per cycle (``blocks_per_cycle``) from
+  30720 (~2.8 days) to 10800 (~1 day) on mainnet (with 8-second
+  minimal block time). (MR :gl:`!15196`)
+
+  - On ghostnet where minimal block time is 4s, lowered
+    ``blocks_per_cycle`` from 15360 (~17 hours) to 10800 (~12
+    hours). (MR :gl:`!15196`)
+
+- In order for the duration of voting periods to stay about the same,
+  updated the number of cycles per voting period
+  (``cycles_per_voting_period``) on mainnet from 5 cycles (that is,
+  ~14.2 days with old cycle duration) to 14 cycles (~14 days with new
+  cycle duration). (MR :gl:`!15196`)
+
+- Exposed ``tolerated_inactivity_period`` as a protocol constant, and
+  lowered it from 3 cycles (~8.5 days with old cycle duration) to 2
+  cycles (~2 days with new cycle duration) on mainnet. (MRs
+  :gl:`!15390`, :gl:`!16264`)
+
+
+Feature flags
+^^^^^^^^^^^^^
+
+- Added a feature flag ``aggregate_attestation`` to enable the
+  aggregation of block attestation lists into a single aggregate
+  operation. (MR :gl:`!15283`) (This feature is not active yet in the
+  Next protocol.)
+
+- Added a feature flag ``allow_tz4_delegate_enable`` to allow tz4
+  (BLS) addresses as delegates and/or as consensus keys. (MRs
+  :gl:`!15311`, :gl:`!15302`) (This feature is not active yet in the
+  Next protocol.)
+
+- Added a feature-controlling parameter
+  ``all_bakers_attest_activation_level``. It is set to ``null`` in the
+  Next protocol, which means that the all-bakers-attest feature will
+  not be active at all in this protocol. (MRs :gl:`!15584`,
+  :gl:`!15764`, :gl:`!16380`)
+
 - Removed obsolete feature flags ``autostaking_enable``,
-  ``ns_enable``, ``activation_vote_enable``,
-  ``adaptive_issuance.launch_ema_threshold``, and ``force_activation``
-  (MRs :gl:`!15215`, :gl:`!15223`, :gl:`!15211`)
+  ``ns_enable``, ``activation_vote_enable``, and ``force_activation``,
+  and related parameter
+  ``adaptive_issuance.launch_ema_threshold``. (MRs :gl:`!15215`,
+  :gl:`!15223`, :gl:`!15211`)
+
 
 Bug Fixes
 ---------
@@ -122,23 +154,12 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Added a feature flag to enable the aggregation of block attestation lists into
-  a single aggregate operation. (MR :gl:`!15283`)
-
-- Added a feature flag which would allow tz4 (BLS) addresses as delegate and or
-  as consensus keys. (MR :gl:`!15311`)
-
-- Added a feature-controlling parameter
-  ``all_bakers_attest_activation_level``. It is currently set to
-  ``null``, which means that the all-bakers-attest feature will not be
-  active at all in the current protocol. (MRs :gl:`!15584`,
-  :gl:`!15764`, :gl:`!16380`)
-
-- Changed the type of the protocol constant ``max_slashing_threshold`` from
-  ``int`` to ``Ratio.t``. (MR :gl:`!15765`)
-
 Internal
 --------
 
 - Added a stub RISC-V module for the protocol environment 
   and used it in the protocol implementation for the RISC-V PVM. (MRs :gl:`!15921`)
+
+- Removed dead code related to autostaking, old slashing, and Adaptive
+  Issuance activation. (MRs :gl:`!15215`, :gl:`!15391`, :gl:`!15223`,
+  :gl:`!15211`, :gl:`!16129`)
