@@ -65,18 +65,45 @@ mentioned above, staked tez are weighted higher than non-staked tez
 when computing the baking power.
 
 
+.. _consensus_key_next:
+
 Consensus key
 ^^^^^^^^^^^^^
 
 The key used by a delegate to sign blocks and consensus operations is called the
 *consensus key*. By default, this is the delegate's private key, called its
 *manager key*. However, a delegate may specify another, dedicated key for this
-role. See :ref:`this page<consensus_key>` for further important details. In particular,
-both the delegate key and the consensus key give total control over the
-delegate's funds: indeed, the consensus key may sign a *drain* operation to
-transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant RPCs<../api/openapi>`,
-like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
-manager and consensus keys are listed.
+role.
+
+Setting a new consensus key is accomplished via the
+``Update_consensus_key`` operation. There is delay of
+``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles before the new key
+actually becomes the *active consensus key* that must be used to sign
+blocks and consensus operations; until then, it is called a *pending
+consensus key*. More precisely, the key becomes active after the cycle
+containing the ``Update_consensus_key`` operation is over and then
+another :ref:`CONSENSUS_KEY_ACTIVATION_DELAY<cs_constants_next>` full
+cycles have passed: if the update happens during cycle ``n``, then the
+key becomes active at the beginning of cycle ``n +
+CONSENSUS_KEY_ACTIVATION_DELAY + 1``.
+
+There may be multiple pending consensus keys, set to activate in
+different future cycles, and each one will replace the previously
+active consensus key in turn. If multiple ``Update_consensus_key``
+operations are performed within the same cycle ``n``, the last one
+takes precedence for determining which key to activate at the start of
+cycle ``n + CONSENSUS_KEY_ACTIVATION_DELAY + 1``.
+
+Note that both the manager key and the consensus key give total
+control over the delegate's spendable balance: indeed, the consensus
+key may sign a ``Drain_delegate`` operation to transfer the delegate's
+spendable balance to an arbitrary account. In :doc:`relevant
+RPCs<../api/openapi>` like
+``/chains/main/blocks/head/helpers/baking_rights``, both the
+delegate's manager and consensus keys are listed.
+
+See :ref:`this page<consensus_key>` for further important details,
+notably client commands that are helpful for handling consensus keys.
 
 
 Active and passive delegates

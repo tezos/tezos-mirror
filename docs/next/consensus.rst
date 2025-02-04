@@ -401,8 +401,23 @@ Consensus related protocol parameters
      - 5%
    * - ``SLASHING_DELAY``
      - 1 cycle
+   * - ``CONSENSUS_KEY_ACTIVATION_DELAY`` [#derived_cs]_
+     - 2 cycles
+   * - ``ISSUANCE_MODIFICATION_DELAY`` [#derived_cs]_
+     - 2 cycles
+   * - ``UNSTAKE_FINALIZATION_DELAY`` [#derived_cs+sd]_
+     - 3 cycles
 
 The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_next>`.
+
+.. [#derived_cs] These :ref:`derived constants
+                 <protocol_constants_next>` are automatically set to
+                 the same value as ``CONSENSUS_RIGHTS_DELAY``.
+
+.. [#derived_cs+sd] This :ref:`derived constant
+                    <protocol_constants_next>` is automatically set
+                    to ``CONSENSUS_RIGHTS_DELAY + SLASHING_DELAY``.
+
 
 Further External Resources
 --------------------------

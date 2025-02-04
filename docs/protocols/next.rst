@@ -103,6 +103,14 @@ Protocol parameters
   which is no longer used since the activation of Adaptive Slashing in
   the Paris protocol. (MR :gl:`!15223`)
 
+- Exposed :ref:`derived constants<protocol_constants_next>`
+  ``issuance_modification_delay``, ``consensus_key_activation_delay``,
+  and ``unstake_finalization_delay`` (which are automatically computed
+  from the ``consensus_rights_delay`` parametric constant): they can
+  now be observed by calling the RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/constants``. (MR
+  :gl:`!16296`)
+
 - Removed obsolete feature flags ``autostaking_enable``,
   ``ns_enable``, ``activation_vote_enable``,
   ``adaptive_issuance.launch_ema_threshold``, and ``force_activation``

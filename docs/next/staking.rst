@@ -58,7 +58,8 @@ Freezing and unfreezing of staked funds is controlled directly by delegates and
 stakers.
 This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
-4 cycles (cf. :ref:`Staked funds management <staked_funds_management_next>`).
+``UNSTAKE_FINALIZATION_DELAY`` cycles (cf. :ref:`Staked funds
+management <staked_funds_management_next>`).
 
 .. _pseudo_operations_next:
 
@@ -166,8 +167,12 @@ or more conveniently::
 
 The requested amount will be **unstaked** but will remain **frozen**,
 a.k.a. **unfinalizable**.
-After 4 cycles, unstaked frozen tokens are no longer considered at stake
-nor slashable. They are said then to be both **unstaked** and
+
+After ``UNSTAKE_FINALIZATION_DELAY + 1`` cycles (more precisely, after
+the cycle in which the unstake was requested has ended and then
+another :ref:`UNSTAKE_FINALIZATION_DELAY<cs_constants_next>` full
+cycles have passed), unstaked frozen tokens are no longer considered
+at stake nor slashable. They are said then to be both **unstaked** and
 **finalizable**.
 
 A staker can retrieve all unstaked and finalizable tokens at any time,
