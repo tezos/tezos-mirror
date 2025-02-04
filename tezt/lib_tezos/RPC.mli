@@ -1151,6 +1151,13 @@ val get_chain_block_context_delegate_min_delegated_in_current_cycle :
 val get_chain_block_context_delegate_participation :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/dal_participation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_dal_participation :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/balance]
 
     [chain] defaults to ["main"].
