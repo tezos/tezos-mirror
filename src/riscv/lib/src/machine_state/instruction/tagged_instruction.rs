@@ -351,12 +351,12 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        Mv | CAdd | CJr | CJalr | CAddi | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp | Nop => {
-            ArgsShape::NZXSrcNZXDest
-        }
-        Andi | Ori | Xori | Addiw | Add | Sub | And | Or | Xor | Sll | Srl | Sra | Addw | Subw
-        | Sllw | Srlw | Sraw | Slti | Sltiu | Slli | Srli | Srai | Slliw | Srliw | Sraiw | Slt
-        | Sltu | Lui | Auipc => ArgsShape::XSrcNZXDest,
+        Add | Mv | CAdd | CJr | CJalr | CAddi | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp
+        | Nop => ArgsShape::NZXSrcNZXDest,
+
+        Andi | Ori | Xori | Addiw | Sub | And | Or | Xor | Sll | Srl | Sra | Addw | Subw | Sllw
+        | Srlw | Sraw | Slti | Sltiu | Slli | Srli | Srai | Slliw | Srliw | Sraiw | Slt | Sltu
+        | Lui | Auipc => ArgsShape::XSrcNZXDest,
     }
 }
 
@@ -377,8 +377,8 @@ mod tests {
             opcode: OpCode::Add,
             args: Args {
                 rd: NonZeroXRegister::x1.into(),
-                rs1: XRegister::x0.into(),
-                rs2: XRegister::x0.into(),
+                rs1: NonZeroXRegister::x2.into(),
+                rs2: NonZeroXRegister::x2.into(),
                 ..Args::DEFAULT
             },
         };

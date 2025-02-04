@@ -941,7 +941,7 @@ mod tests {
             },
             main_memory::{self, tests::T1K},
             mode::Mode,
-            registers::{a1, a2, nz, t0, t1},
+            registers::{a1, nz, t0, t1},
             MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
             TestCacheLayouts,
         },
@@ -1284,8 +1284,8 @@ mod tests {
                         opcode: OpCode::Add,
                         args: TaggedArgs {
                             rd: nz::a1.into(),
-                            rs1: a1.into(),
-                            rs2: a2.into(),
+                            rs1: nz::a1.into(),
+                            rs2: nz::a2.into(),
                             ..TaggedArgs::DEFAULT
                         },
                     })

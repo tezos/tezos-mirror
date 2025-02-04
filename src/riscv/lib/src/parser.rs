@@ -16,6 +16,7 @@ use crate::machine_state::{
 use arbitrary_int::{u3, u5};
 use core::ops::Range;
 use instruction::*;
+use std::fmt::{self, Display, Formatter};
 
 /// Given an instruction encoded as a little-endian `u32`, extract `n` bits
 /// starting at `pos`.
@@ -1164,16 +1165,25 @@ const C_Q1_3: u16 = 0b11;
 /// Wrapper for splitting x0 from other XRegisters that can
 /// be represented by [`NonZeroXRegister`].
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
-enum XRegisterParsed {
+pub(crate) enum XRegisterParsed {
     X0,
     NonZero(NonZeroXRegister),
 }
 
 /// Convert [`XRegister`] to [`NonZeroXRegister`] when `r != x0`.
-const fn split_x0(r: XRegister) -> XRegisterParsed {
+pub(crate) const fn split_x0(r: XRegister) -> XRegisterParsed {
     match r {
         x0 => XRegisterParsed::X0,
         r => XRegisterParsed::NonZero(NonZeroXRegister::assert_from(r)),
+    }
+}
+
+impl Display for XRegisterParsed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            XRegisterParsed::X0 => write!(f, "zero"),
+            XRegisterParsed::NonZero(r) => write!(f, "{}", r),
+        }
     }
 }
 

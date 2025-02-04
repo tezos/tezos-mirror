@@ -1253,8 +1253,8 @@ mod tests {
             opcode: OpCode::Add,
             args: TaggedArgs {
                 rd: nz::a5.into(),
-                rs1: t1.into(),
-                rs2: t0.into(),
+                rs1: nz::t1.into(),
+                rs2: nz::t0.into(),
                 ..TaggedArgs::DEFAULT
             },
         })

@@ -478,4 +478,68 @@ mod tests {
             &jitted.struct_ref::<FnManagerIdent>(),
         );
     });
+
+    backend_test!(test_add, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+        use Instruction as I;
+
+        // Arrange
+
+        // calculate fibonacci(4) == 5
+        let scenario: &[I] = &[
+            I::new_add(x2, x2, x1, Compressed),
+            I::new_add(x1, x1, x2, Uncompressed),
+            I::new_add(x2, x2, x1, Uncompressed),
+            I::new_add(x1, x1, x2, Compressed),
+        ];
+
+        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+
+        let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+
+        block.construct(scenario);
+
+        let mut interpreted_steps = 0;
+        let mut jitted_steps = 0;
+
+        let initial_pc = 0;
+        interpreted.hart.pc.write(initial_pc);
+        jitted.hart.pc.write(initial_pc);
+
+        interpreted.hart.xregisters.write_nz(x1, 1);
+        jitted.hart.xregisters.write_nz(x1, 1);
+
+        // Act
+        let fun = jit
+            .compile(block.as_slice())
+            .expect("Compilation of Mv should succeed");
+        let mut block = block.interpreted_block();
+
+        let interpreted_res = block.run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+        let jitted_res = unsafe {
+            // # Safety - the jit is not dropped until after we
+            //            exit the block.
+            fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+        };
+
+        // Assert
+        assert_eq!(jitted_res, interpreted_res);
+        assert_eq!(
+            interpreted_steps, jitted_steps,
+            "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+        );
+
+        assert_eq!(interpreted_steps, scenario.len());
+
+        // have got to the fibonacci number 5
+        assert_eq!(interpreted.hart.xregisters.read_nz(x1), 5);
+        assert_eq!(jitted.hart.xregisters.read_nz(x1), 5);
+
+        assert_eq_struct(
+            &interpreted.struct_ref::<FnManagerIdent>(),
+            &jitted.struct_ref::<FnManagerIdent>(),
+        );
+    });
 }

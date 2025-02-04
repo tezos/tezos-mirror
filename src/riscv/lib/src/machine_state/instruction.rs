@@ -24,7 +24,7 @@ use super::{
 use crate::{
     default::ConstDefault,
     instruction_context::{IcbLoweringFn, ICB},
-    interpreter::c,
+    interpreter::{c, i},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -588,6 +588,7 @@ impl OpCode {
             Self::Mv => Some(Args::run_mv),
             Self::Nop => Some(Args::run_nop),
             Self::CAdd => Some(Args::run_cadd),
+            Self::Add => Some(Args::run_add),
             _ => None,
         }
     }
@@ -696,6 +697,15 @@ macro_rules! impl_r_type {
                 .xregisters
                 .$fn(self.rs1.x, self.rs2.x, self.rd.nzx);
             Ok(Next(self.width))
+        }
+    };
+
+    ($impl: path, $fn: ident, non_zero) => {
+        // SAFETY: This function must only be called on an `Args` belonging
+        // to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+            $impl(icb, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
+            icb.ok(Next(self.width))
         }
     };
 }
@@ -1063,7 +1073,7 @@ macro_rules! impl_f_r_type {
 
 impl Args {
     // RV64I R-type instructions
-    impl_r_type!(run_add, non_zero_rd);
+    impl_r_type!(i::run_add, run_add, non_zero);
     impl_r_type!(run_sub, non_zero_rd);
     impl_r_type!(run_xor, non_zero_rd);
     impl_r_type!(run_or, non_zero_rd);
@@ -1357,10 +1367,7 @@ impl From<&InstrCacheable> for Instruction {
     fn from(value: &InstrCacheable) -> Self {
         match value {
             // RV64I R-type instructions
-            InstrCacheable::Add(args) => Instruction {
-                opcode: OpCode::Add,
-                args: args.into(),
-            },
+            InstrCacheable::Add(args) => Instruction::from_ic_add(args),
             InstrCacheable::Sub(args) => Instruction {
                 opcode: OpCode::Sub,
                 args: args.into(),
