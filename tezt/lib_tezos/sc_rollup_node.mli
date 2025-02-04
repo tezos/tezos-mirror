@@ -393,4 +393,8 @@ val list_metrics :
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
 
+(** [operators node] returns a pair with the default operator and all other
+    operators with their purpose. *)
+val operators : t -> string option * (purpose * string) list
+
 module RPC : RPC_core.CALLERS with type uri_provider := t
