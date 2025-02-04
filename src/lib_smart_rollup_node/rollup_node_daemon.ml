@@ -264,7 +264,16 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
            the predecessor. In this case, we don't update the head or notify the
            block. *)
         return_unit
-      else Node_context.set_l2_head node_ctxt l2_block
+      else
+        (* Reorg (reproposal) of a block already handled *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7731
+           This just overwrites the outbox messages with the correct ones for
+           the level but we need to properly handle reorgs in the storage. *)
+        let* ctxt = Node_context.checkout_context node_ctxt head.hash in
+        let* () =
+          register_outbox_messages state.plugin node_ctxt ctxt head.level
+        in
+        Node_context.set_l2_head node_ctxt l2_block
   | `New l2_block ->
       let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
