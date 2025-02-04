@@ -85,6 +85,9 @@ let teztale_archiver =
 let teztale_server =
   Uses.make ~tag:"teztale_server" ~path:"./octez-teztale-server" ()
 
+let _teztale_snitch =
+  Uses.make ~tag:"teztale_snitch" ~path:"./octez-teztale-snitch" ()
+
 let yes_wallet =
   Uses.make
     ~tag:"yes_wallet"
