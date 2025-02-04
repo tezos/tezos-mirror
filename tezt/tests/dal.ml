@@ -9135,6 +9135,233 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
   in
   unit
 
+(**  [test_e2e_trap_faulty_dal_node] verifies a scenario where a
+     [faulty_delegate] misbehaves. Specifically, it:
+
+     - Creates a DAL node [proxy] whose role is to mimick the honest
+     [dal_node] by forwarding to the honest DAL node each RPC call
+     except for [/profiles/<tz>/attested_levels/<n>/attestable_slots],
+     where [<tz>] is the [faulty_delegate] and [<n>] is the level [2 *
+     blocks_per_cycle + 1]. For this RPC path, it will declare for the
+     [faulty_delegate] each slot attestable by replacing the honest
+     DAL node answer field ['attestable_slots_set'] to an array of
+     ['true'] values.
+
+     The test proceeds as follows:
+
+     1. Bakes [blocks_per_cycle] blocks to avoid the period in which
+     the DAL node is not able to inject an accusation because of the
+     accusation delay introduced by the migration.
+
+     2. Bakes [blocks_per_cycle] blocks while publishing on slot index
+     [0] and checks that [faulty_delegate] is not denounced at the end.
+
+     3. Bakes again [blocks_per_cycle] blocks to finally reach [3 *
+     blocks_per_cycle] blocks.
+
+     - Finally, the test
+
+        - a) retrieves the balance updates for the last block of
+             the third cycle and verifies that:
+           - Multiple DAL attesting rewards were minted
+           - Exactly one delegate (the [faulty_delegate]) lost DAL
+             attesting rewards
+
+        - b) retrieves the [faulty_delegate] DAL participation at the
+             end of the third cycle, minus one block (i.e "head~1")
+             because DAL participation are reset at the end of a block
+             preceding a new cycle, and checks that:
+
+             - it has a sufficient DAL participation to get rewards,
+             - it is denounced,
+             - its expected DAL rewards are [0].
+*)
+let test_e2e_trap_faulty_dal_node _protocol dal_parameters _cryptobox node
+    client dal_node =
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  (* This constraint makes the test simpler; it could be lifted. *)
+  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
+  let target_attested_level = (2 * blocks_per_cycle) + 1 in
+  let faulty_delegate = Constant.bootstrap1.Account.public_key_hash in
+  let proxy =
+    let routes =
+      [
+        (let path =
+           Re.Str.regexp
+           @@ Format.sprintf
+                "/profiles/%s/attested_levels/%d/attestable_slots"
+                faulty_delegate
+                target_attested_level
+         in
+         Dal_node.Proxy.route ~path ~callback:(fun ~path:_ ~fetch_answer ->
+             let open Ezjsonm in
+             let* dal_node_answer = fetch_answer () in
+             let v = value dal_node_answer in
+             let kind = find v ["kind"] |> get_string in
+             let new_v =
+               if String.equal kind "attestable_slots_set" then
+                 let attestable_slots_set =
+                   (* Declare each slot attestable. *)
+                   find v ["attestable_slots_set"]
+                   |> get_list get_bool
+                   |> List.map (fun _ -> true)
+                   |> list bool
+                 in
+                 update v ["attestable_slots_set"] (Some attestable_slots_set)
+               else v
+             in
+             return (Some (`Response (value_to_string new_v)))));
+      ]
+    in
+    Dal_node.Proxy.make ~name:"proxy-dal-node" ~routes
+  in
+  let faulty_dal_node =
+    Dal_node.create
+      ~name:"faulty-dal-node"
+      ~listen_addr:(Dal_node.listen_addr dal_node)
+      ~node
+      ()
+  in
+  let () =
+    Dal_node.Proxy.run ~honest_dal_node:dal_node ~faulty_dal_node proxy
+  in
+  let dal_node_endpoint =
+    Dal_node.as_rpc_endpoint faulty_dal_node |> Endpoint.as_string
+  in
+  let* level =
+    let* first_level = Node.get_level node in
+    let block = string_of_int first_level in
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ~block ()
+  in
+  let* () =
+    bake_for
+      ~count:(blocks_per_cycle - 1 - level.cycle_position)
+      ~dal_node_endpoint
+      client
+  in
+  let* _ = Node.wait_for_level node blocks_per_cycle in
+  let* () =
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    repeat blocks_per_cycle (fun () ->
+        let wait_slot ~published_level ~slot_index:_ =
+          wait_for_layer1_final_block dal_node (published_level - 2)
+        in
+        let* _res =
+          publish_store_and_wait_slot
+            node
+            client
+            dal_node
+            Constant.bootstrap2
+            ~index:0
+            ~wait_slot
+            ~number_of_extra_blocks_to_bake:0
+          @@ Helpers.make_slot ~slot_size "content"
+        in
+        unit)
+  in
+  let level = ref (2 * blocks_per_cycle) in
+  let* _ = Node.wait_for_level node !level in
+  let* faulty_delegate_dal_participation =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_delegate_dal_participation
+         ~block:"head~1"
+         faulty_delegate
+  in
+  let is_denounced =
+    JSON.(faulty_delegate_dal_participation |-> "denounced" |> as_bool)
+  in
+  Check.is_false
+    is_denounced
+    ~__LOC__
+    ~error_msg:"Expected the faulty delegate to not be denounced" ;
+  let wait_for_trap_injection =
+    Dal_node.wait_for dal_node "trap_injection.v0" (fun e ->
+        let open JSON in
+        let delegate = e |-> "delegate" |> as_string in
+        let attested_level = e |-> "attested_level" |> as_int in
+        if delegate = faulty_delegate && attested_level = target_attested_level
+        then Some ()
+        else None)
+  in
+  let* () =
+    repeat blocks_per_cycle (fun () ->
+        let wait = wait_for_layer1_final_block dal_node (!level - 1) in
+        let* () = bake_for ~dal_node_endpoint client in
+        incr level ;
+        let* () = wait in
+        unit)
+  in
+  let* () = wait_for_trap_injection in
+  let* _ = Node.wait_for_level node (3 * blocks_per_cycle) in
+  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata_raw () in
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  let dal_rewards =
+    List.filter
+      (fun json ->
+        JSON.(json |-> "kind" |> as_string) |> String.equal "minted"
+        && JSON.(json |-> "category" |> as_string)
+           |> String.equal "DAL attesting rewards")
+      balance_updates
+  in
+  Check.(List.length dal_rewards > 1)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R minted DAL-related balance updates, got %L" ;
+  let lost_dal_rewards =
+    List.filter
+      (fun json ->
+        JSON.(json |-> "kind" |> as_string) |> String.equal "burned"
+        && JSON.(json |-> "category" |> as_string)
+           |> String.equal "lost DAL attesting rewards")
+      balance_updates
+  in
+  Check.(List.length lost_dal_rewards = 1)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R lost DAL reward, got %L" ;
+  let json = List.hd lost_dal_rewards in
+  let losing_delegate = JSON.(json |-> "delegate" |> as_string) in
+  Check.(faulty_delegate = losing_delegate)
+    ~__LOC__
+    Check.string
+    ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
+  let* faulty_delegate_dal_participation =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_delegate_dal_participation
+         ~block:"head~1"
+         faulty_delegate
+  in
+  let is_denounced =
+    JSON.(faulty_delegate_dal_participation |-> "denounced" |> as_bool)
+  in
+  Check.is_true
+    is_denounced
+    ~__LOC__
+    ~error_msg:"Expected the faulty delegate to be denounced" ;
+  let sufficient_dal_participation =
+    JSON.(
+      faulty_delegate_dal_participation |-> "sufficient_dal_participation"
+      |> as_bool)
+  in
+  Check.is_true
+    sufficient_dal_participation
+    ~__LOC__
+    ~error_msg:"Expected sufficiant participation for the faulty delegate" ;
+  let expected_dal_rewards =
+    JSON.(
+      faulty_delegate_dal_participation |-> "expected_dal_rewards" |> as_int)
+  in
+  Check.(expected_dal_rewards = 0)
+    ~__LOC__
+    Check.int
+    ~error_msg:
+      "Expected DAL rewards for for the faulty delegate expected to be %R, but \
+       got %L" ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -9190,6 +9417,13 @@ let register ~protocols =
     test_denunciation_next_cycle
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   (* Tests with layer1 and dal nodes *)
+  scenario_with_layer1_and_dal_nodes
+    ~number_of_slots:1
+    ~producer_profiles:[0]
+    ~traps_fraction:Q.one
+    "faulty DAL node entrapment"
+    test_e2e_trap_faulty_dal_node
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   test_dal_node_startup protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]
