@@ -33,12 +33,6 @@ Gas improvements
 - Increase gas cost for transfers to implicit accounts by 2000 gas
   units. (MR :gl:`!15993`)
 
-Breaking Changes
-----------------
-
-- ``Update_consensus_key`` operation now has an optional ``proof`` parameter.
-  This parameter is needed to update to a tz4 (BLS) consensus key. (MR
-  :gl:`!15670`)
 
 RPC Changes
 -----------
@@ -48,8 +42,15 @@ RPC Changes
   which returns the number of blocks consecutively baked at round
   zero. (MR :gl:`!15945`)
 
-Operation receipts
-------------------
+
+Operations
+----------
+
+- Added an optional ``proof`` parameter to the
+  ``Update_consensus_key`` operation. This parameter is unused in the
+  Next protocol; it will be needed to update to a BLS consensus key
+  when the ``allow_tz4_delegate_enable`` feature flag is enabled in a
+  future protocol. (MR :gl:`!15670`)
 
 
 Errors
