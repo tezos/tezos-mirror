@@ -635,6 +635,54 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node sc_rollup node client =
        Test.fail "Refutation loop did not process after reconnection");
     ]
 
+let setup_double_reorg node client =
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* node2, client2 = Client.init_with_node ~nodes_args `Client ()
+  and* node3, client3 = Client.init_with_node ~nodes_args `Client () in
+  let* () = Client.Admin.trust_address client ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node
+  and* () = Client.Admin.trust_address client ~peer:node3
+  and* () = Client.Admin.trust_address client3 ~peer:node
+  and* () = Client.Admin.trust_address client2 ~peer:node3
+  and* () = Client.Admin.trust_address client3 ~peer:node2 in
+  let* () = Client.Admin.connect_address client ~peer:node2
+  and* () = Client.Admin.connect_address client ~peer:node3
+  and* () = Client.Admin.connect_address client2 ~peer:node3 in
+  let divergence ~branch1 ~branch2 =
+    let* identity2 = Node.wait_for_identity node2
+    and* identity3 = Node.wait_for_identity node3 in
+    let* () = Client.Admin.kick_peer client ~peer:identity2
+    and* () = Client.Admin.kick_peer client2 ~peer:identity3 in
+    let* () = branch1 client in
+    let* level = Node.get_level node in
+    let* _ = Node.wait_for_level node3 level in
+    Log.info "Nodes 1 and 3 have branch1." ;
+    let* () = Client.Admin.kick_peer client ~peer:identity3 in
+    let* () = branch2 client2 in
+    (* One extra block in branch2 *)
+    let* () = Client.bake_for_and_wait client2 in
+    Log.info "Nodes 1 and 2 are following distinct branches." ;
+    (* Two extra blocks in node3 *)
+    let* () = Client.bake_for_and_wait client3 in
+    let* () = Client.bake_for_and_wait client3 in
+    Log.info "Nodes 1 and 2 and 3 are following distinct branches." ;
+    unit
+  in
+  let trigger_reorg () =
+    let* level2 = Node.get_level node2 in
+    let* level3 = Node.get_level node3 in
+    let* () = Client.Admin.connect_address client ~peer:node2 in
+    let* _ = Node.wait_for_level node level2 in
+    Log.info "Node 1 has switched to second branch." ;
+    let* () = Client.Admin.connect_address client ~peer:node3 in
+    let* _ = Node.wait_for_level node level3 in
+    Log.info "Node 1 has switched back to its first branch (with extra blocks)." ;
+    unit
+  in
+  return (divergence, trigger_reorg)
+
 let sc_rollup_node_handles_chain_reorg sc_rollup_node sc_rollup node client =
   let num_messages = 1 in
   let nodes_args =
@@ -4223,8 +4271,8 @@ let test_refutation_reward_and_punishment ~kind =
 *)
 let test_outbox_message_generic ?supports ?regression ?expected_error
     ?expected_l1_error ~earliness ?entrypoint ~init_storage ~storage_ty
-    ?outbox_parameters_ty ?boot_sector ~input_message ~expected_storage ~kind
-    ~message_kind ~auto_execute_outbox =
+    ?outbox_parameters_ty ?boot_sector ?(reorg = false) ~input_message
+    ~expected_storage ~kind ~message_kind ~auto_execute_outbox () =
   let commitment_period = 2 and challenge_window = 5 in
   let _outbox_level = 5 in
   let message_index = 0 in
@@ -4236,6 +4284,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     Option.value ~default:"no_parameters_ty" outbox_parameters_ty
   in
   let auto_s = if auto_execute_outbox then ", auto_execute_outbox" else "" in
+  let reorg_s = if reorg then ", reorg" else "" in
   test_full_scenario
     ?supports
     ?regression
@@ -4246,21 +4295,30 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     ~commitment_period
     ~challenge_window
     {
-      tags = ["outbox"; message_kind_s; entrypoint_s; outbox_parameters_ty_s];
+      tags =
+        (["outbox"; message_kind_s; entrypoint_s; outbox_parameters_ty_s]
+        @ if reorg then ["reorg"] else []);
       variant =
         Some
           (Format.sprintf
-             "%s, entrypoint: %%%s, eager: %d, %s, %s%s"
+             "%s, entrypoint: %%%s, eager: %d, %s, %s%s%s"
              init_storage
              entrypoint_s
              earliness
              message_kind_s
              outbox_parameters_ty_s
-             auto_s);
+             auto_s
+             reorg_s);
       description = "output exec";
     }
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol rollup_node sc_rollup node client ->
+  let* reorg =
+    if reorg then
+      let* actions = setup_double_reorg node client in
+      return (Some actions)
+    else return None
+  in
   let src = Constant.bootstrap1.public_key_hash in
   let src2 = Constant.bootstrap2.public_key_hash in
   let* () =
@@ -4333,7 +4391,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            string
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
-  let check_outbox_execution outbox_level status =
+  let check_outbox_execution outbox_level indexes status =
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let* executable_outboxes =
       Sc_rollup_node.RPC.call rollup_node
@@ -4343,58 +4401,87 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       Sc_rollup_node.RPC.call rollup_node
       @@ Sc_rollup_rpc.get_local_outbox_pending_unexecutable ()
     in
-    let get_nb l =
+    let get_indexes l =
       match List.assoc_opt outbox_level l with
-      | None -> 0
-      | Some l -> List.length l
+      | None -> []
+      | Some l -> List.map (fun x -> x.Sc_rollup_rpc.message_index) l
     in
-    let executable = get_nb executable_outboxes in
-    let unexecutable = get_nb unexecutable_outboxes in
+    let executable = get_indexes executable_outboxes in
+    let unexecutable = get_indexes unexecutable_outboxes in
     match (status, executable, unexecutable) with
-    | `Executable, 1, 0 -> unit
-    | `Unexecutable, 0, 1 -> unit
+    | `Executable, e, [] when e = indexes -> unit
+    | `Unexecutable, [], e when e = indexes -> unit
     | _ ->
         Test.fail
-          "Outbox level should be %s but there is %d executable, %d \
+          "Outbox level should be [%a] %s but there is [%a] executable, [%a] \
            unexecutable."
+          (Format.pp_print_list Format.pp_print_int)
+          indexes
           (match status with
           | `Executable -> "executable"
           | `Unexecutable -> "unexecutable")
+          (Format.pp_print_list Format.pp_print_int)
           executable
+          (Format.pp_print_list Format.pp_print_int)
           unexecutable
   in
   let perform_rollup_execution_and_cement source_address target_address =
     Log.info "Perform rollup execution and cement" ;
-    let* payload = input_message protocol target_address in
+    let trigger_output_message ?(extra_empty_messages = 0) client =
+      let* payload = input_message protocol target_address in
+      let* () =
+        match payload with
+        | `External payload ->
+            let extra = List.init extra_empty_messages (fun _ -> "") in
+            send_text_messages ~hooks ~format:`Hex client (extra @ [payload])
+        | `Internal payload ->
+            let payload = "0x" ^ payload in
+            let* () =
+              Client.transfer
+                ~amount:Tez.(of_int 100)
+                ~burn_cap:Tez.(of_int 100)
+                ~storage_limit:100000
+                ~giver:Constant.bootstrap1.alias
+                ~receiver:source_address
+                ~arg:(sf "Pair %s %S" payload sc_rollup)
+                client
+            in
+            Client.bake_for_and_wait client
+      in
+      let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+      unit
+    in
     let* () =
-      match payload with
-      | `External payload ->
-          send_text_messages ~hooks ~format:`Hex client [payload]
-      | `Internal payload ->
-          let payload = "0x" ^ payload in
-          let* () =
-            Client.transfer
-              ~amount:Tez.(of_int 100)
-              ~burn_cap:Tez.(of_int 100)
-              ~storage_limit:100000
-              ~giver:Constant.bootstrap1.alias
-              ~receiver:source_address
-              ~arg:(sf "Pair %s %S" payload sc_rollup)
-              client
-          in
-          Client.bake_for_and_wait client
+      match reorg with
+      | None -> trigger_output_message client
+      | Some (divergence, _) ->
+          divergence
+            ~branch1:trigger_output_message
+            ~branch2:(trigger_output_message ~extra_empty_messages:2)
     in
     let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let* () =
+      match reorg with
+      | None -> unit
+      | Some (_, trigger_reorg) ->
+          let* () = trigger_reorg () in
+          let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+          unit
+    in
     let* {outbox; _} =
       Sc_rollup_node.RPC.call rollup_node
-      @@ Sc_rollup_rpc.get_global_block ~outbox:true ()
+      @@ Sc_rollup_rpc.get_global_block
+           ~block:(string_of_int outbox_level)
+           ~outbox:true
+           ()
     in
     let nb_outbox_transactions_in_block =
-      outbox |> List.map @@ fun (Sc_rollup_rpc.Transactions j) -> List.length j
+      outbox
+      |> List.map @@ fun (Sc_rollup_rpc.Transactions trs) -> List.length trs
     in
     Check.((nb_outbox_transactions_in_block = [1]) (list int))
       ~error_msg:"Block has %L outbox transactions but expected %R" ;
-    let* () = check_outbox_execution outbox_level `Unexecutable in
+    let* () = check_outbox_execution outbox_level [0] `Unexecutable in
     let* _ =
       bake_until_lcc_updated
         ~timeout:100.
@@ -4460,7 +4547,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     in
     if Option.is_some expected_error then unit
     else
-      let* () = check_outbox_execution outbox_level `Executable in
+      let* () = check_outbox_execution outbox_level [0] `Executable in
       if auto_execute_outbox then
         bake_until_execute_outbox_message
           ~at_least:1
@@ -4474,7 +4561,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
         | Some {commitment_hash; proof} -> (
             match expected_l1_error with
             | None ->
-                let* () = check_outbox_execution outbox_level `Executable in
+                let* () = check_outbox_execution outbox_level [0] `Executable in
                 let*! () =
                   Client.Sc_rollup.execute_outbox_message
                     ~hooks
@@ -4548,7 +4635,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
 
 let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ~earliness ?entrypoint ?(init_storage = "0") ?(storage_ty = "int")
-    ?(outbox_parameters = "37") ?outbox_parameters_ty ~kind ~message_kind
+    ?(outbox_parameters = "37") ?outbox_parameters_ty ?reorg ~kind ~message_kind
     ~auto_execute_outbox =
   let wrap payload =
     match message_kind with
@@ -4612,6 +4699,7 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ?entrypoint
     ?outbox_parameters_ty
     ?boot_sector
+    ?reorg
     ~init_storage
     ~storage_ty
     ~input_message
@@ -4619,6 +4707,16 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ~message_kind
     ~kind
     ~auto_execute_outbox
+    ()
+
+let test_outbox_message_reorg protocols ~kind =
+  test_outbox_message
+    ~earliness:0
+    ~message_kind:`External
+    ~kind
+    ~auto_execute_outbox:true
+    ~reorg:true
+    protocols
 
 let test_outbox_message protocols ~kind =
   let test
@@ -7150,6 +7248,7 @@ let register_protocol_independent () =
     sc_rollup_node_batcher
     protocols ;
   test_rollup_node_inbox ~kind ~variant:"basic" basic_scenario protocols ;
+  test_outbox_message_reorg ~kind protocols ;
   test_gc
     "many_gc"
     ~kind
