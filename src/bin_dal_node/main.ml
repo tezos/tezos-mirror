@@ -103,15 +103,15 @@ let run subcommand cli_options =
           cli_options.Cli.data_dir
       in
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Lwt_main.run @@ wrap_with_error
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
       @@ Daemon.run ~data_dir ~configuration_override:(merge cli_options)
   | Config_init ->
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Lwt_main.run @@ wrap_with_error
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
   | Config_update ->
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Lwt_main.run @@ wrap_with_error
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
       @@
       let open Lwt_result_syntax in
       let data_dir =
@@ -123,7 +123,7 @@ let run subcommand cli_options =
       Configuration_file.save (merge cli_options configuration)
   | Debug_print_store_schemas ->
       let open Lwt_result_syntax in
-      Lwt_main.run @@ wrap_with_error
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
       @@ Lwt_utils_unix.with_tempdir "store"
       @@ fun data_dir ->
       let* schemas = Store.Skip_list_cells.schemas data_dir in

@@ -172,7 +172,7 @@ module Node_metrics_command = struct
     Format.printf "@]@." ;
     return_unit
 
-  let dump_metrics () = Lwt_main.run (dump_metrics ())
+  let dump_metrics () = Tezos_base_unix.Event_loop.main_run (dump_metrics ())
 
   module Term = struct
     let process _ = `Ok (dump_metrics ())
