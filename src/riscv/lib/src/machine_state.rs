@@ -34,7 +34,10 @@ use address_translation::{
     translation_cache::{TranslationCache, TranslationCacheLayout},
     PAGE_SIZE,
 };
-use block_cache::{BCall, BlockCache};
+use block_cache::{
+    bcall::{BCall, Block},
+    BlockCache,
+};
 pub use cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
 use csregisters::CSRegister;
 use csregisters::{values::CSRValue, CSRRepr};
@@ -84,13 +87,18 @@ pub struct MachineState<
     ML: main_memory::MainMemoryLayout,
     CL: CacheLayouts,
     M: backend::ManagerBase,
+    B: Block<ML, M> = block_cache::bcall::Interpreted<ML, M>,
 > {
     pub core: MachineCoreState<ML, M>,
-    pub block_cache: BlockCache<CL::BlockCacheLayout<ML>, ML, M>,
+    pub block_cache: BlockCache<CL::BlockCacheLayout<ML>, B, ML, M>,
 }
 
-impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerClone> Clone
-    for MachineState<ML, CL, M>
+impl<
+        ML: main_memory::MainMemoryLayout,
+        CL: CacheLayouts,
+        B: Block<ML, M> + Clone,
+        M: backend::ManagerClone,
+    > Clone for MachineState<ML, CL, M, B>
 {
     fn clone(&self) -> Self {
         Self {
@@ -478,58 +486,24 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
 
             let res = match self.translate_instr_address(current_mode, satp, instr_pc) {
                 Err(e) => Err(e),
-                Ok(phys_addr) => {
-                    /// Possible scenarios for being unable to execute a block
-                    enum BlockUnexecutable {
-                        /// We have found a block to run, but not enough steps remain to
-                        /// run it, so we run it partially. This is done immediately after
-                        /// the match statement.
-                        NotEnoughSteps,
-                        /// There is no block to run. Therefore we have to do the
-                        /// fetch-run-parse cycle of `run_instr_at`. This may result in a
-                        /// new instruction being pushed to the block cache, so we need to
-                        /// exit the match statement first to run this.
-                        NoBlockFound,
+                Ok(phys_addr) => match self.block_cache.get_block(phys_addr) {
+                    Some(block) if block.num_instr() <= max_steps - *steps => {
+                        block.run_block(&mut self.core, instr_pc, steps)?;
+
+                        continue 'run;
                     }
+                    Some(_) => {
+                        self.block_cache.run_block_partial(
+                            &mut self.core,
+                            phys_addr,
+                            steps,
+                            max_steps,
+                        )?;
 
-                    // Unfornately `block_cache.get_block()` mutable captures the block_cache
-                    // for the lifetime of this match statement - even though internally we
-                    // don't. Rustc cannot see this though, as it's hidden behind a trait.
-                    //
-                    // Therefore, we make use of enum return values to run various options
-                    // depending on whether
-                    // - the block exists
-                    // - we have enough steps to run the block
-                    let run_result = match self.block_cache.get_block(phys_addr) {
-                        Some(mut block) if block.num_instr() <= max_steps - *steps => {
-                            block.run_block(&mut self.core, instr_pc, steps)?;
-
-                            continue 'run;
-                        }
-                        Some(_) => BlockUnexecutable::NotEnoughSteps,
-                        None => BlockUnexecutable::NoBlockFound,
-                    };
-
-                    match run_result {
-                        BlockUnexecutable::NotEnoughSteps => {
-                            // We now run the block partially. Because we're outside the match
-                            // statement, we have access to `self.block_cache` again.
-                            self.block_cache.run_block_partial(
-                                &mut self.core,
-                                phys_addr,
-                                steps,
-                                max_steps,
-                            )?;
-
-                            continue 'run;
-                        }
-                        BlockUnexecutable::NoBlockFound => {
-                            // We did not find a block. Therefore we can now run a single instruction. If
-                            // we had found block, execution would immediately continue at the top-level.
-                            self.run_instr_at(current_mode, satp, instr_pc, phys_addr)
-                        }
+                        continue 'run;
                     }
-                }
+                    None => self.run_instr_at(current_mode, satp, instr_pc, phys_addr),
+                },
             };
 
             self.core.handle_step_result(instr_pc, res)?;
