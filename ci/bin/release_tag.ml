@@ -214,7 +214,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
              Artifacts job_build_rpm_amd64;
            ])
       ~variables:[("S3_BUCKET", "release-page-test.nomadic-labs.com")]
-      ["./scripts/ci/release_page_publish.sh"]
+      ["./scripts/releases/publish_release_page.sh"]
   in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
     job
