@@ -176,7 +176,7 @@ pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> anyhow::Result<
 }
 
 // Used to store a blueprint made out of forced delayed transactions.
-pub fn store_immediate_blueprint<Host: Runtime>(
+pub fn store_forced_blueprint<Host: Runtime>(
     host: &mut Host,
     blueprint: Blueprint,
     number: U256,

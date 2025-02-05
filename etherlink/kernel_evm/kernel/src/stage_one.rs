@@ -4,7 +4,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::blueprint_storage::{store_immediate_blueprint, store_inbox_blueprint};
+use crate::blueprint_storage::{
+    clear_all_blueprints, store_forced_blueprint, store_inbox_blueprint,
+};
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
 };
@@ -93,13 +95,25 @@ fn fetch_delayed_transactions<Host: Runtime>(
             level,
         }
         .store(host)?;
+
+        // Clean existing blueprints
+        if offset == 0 {
+            log!(
+                host,
+                Info,
+                "Deleting all blueprints following flush at {}",
+                level
+            );
+            clear_all_blueprints(host)?;
+        }
+
         // Create a new blueprint with the timed out transactions
         let blueprint = Blueprint {
             transactions: timed_out,
             timestamp,
         };
         // Store the blueprint.
-        store_immediate_blueprint(host, blueprint, level)?;
+        store_forced_blueprint(host, blueprint, level)?;
         offset += 1;
     }
 

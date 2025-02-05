@@ -52,6 +52,7 @@
   Tezos level, which was added in version
   ec7c3b349624896b269e179384d0a45cf39e1145, has been removed. (!16302)
 - Deposits can now specify a chain id, but it is currently ignored. (!16153)
+- All blueprints in storage are deleted after a flush event. (!15673)
 
 ### Bug fixes
 

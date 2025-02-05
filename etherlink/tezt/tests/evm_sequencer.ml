@@ -2985,7 +2985,9 @@ let test_self_upgrade_kernel =
     check_head_consistency
       ~left:sequencer
       ~right:proxy
-      ~error_msg:"The head should be the same before the upgrade"
+      ~error_msg:
+        "The head should be the same before the upgrade: sequencer is %%L \
+         while proxy is %%R"
       ()
   in
 
@@ -3003,7 +3005,9 @@ let test_self_upgrade_kernel =
     check_head_consistency
       ~left:sequencer
       ~right:proxy
-      ~error_msg:"The head should be the same after the upgrade"
+      ~error_msg:
+        "The head should be the same after the upgrade: sequencer is %%L while \
+         proxy is %%R"
       ()
   in
 
@@ -3145,7 +3149,9 @@ let test_upgrade_kernel_auto_sync =
     check_head_consistency
       ~left:sequencer
       ~right:proxy
-      ~error_msg:"The head should be the same before the upgrade"
+      ~error_msg:
+        "The head should be the same before the upgrade: sequencer is %%L \
+         while proxy is %%R"
       ()
   in
 
@@ -3163,7 +3169,9 @@ let test_upgrade_kernel_auto_sync =
     check_head_consistency
       ~left:sequencer
       ~right:proxy
-      ~error_msg:"The head should be the same after the upgrade"
+      ~error_msg:
+        "The head should be the same after the upgrade: sequencer is %%L while \
+         proxy is %%R"
       ()
   in
 
@@ -3187,7 +3195,9 @@ let test_upgrade_kernel_auto_sync =
     check_head_consistency
       ~left:sequencer
       ~right:observer
-      ~error_msg:"The head should be the same after the upgrade"
+      ~error_msg:
+        "The head should be the same after the upgrade: sequencer is %%L while \
+         observer is %%R"
       ()
   in
 
@@ -3301,6 +3311,105 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
   unit
 
+(* Tests that _all_ blueprint chunks are cleared during a flush, including
+   blueprint chunk not yet processed: they will be invalidated by the flush
+   anyway.*)
+let test_clean_bps =
+  let sequencer_account = Constant.bootstrap1 in
+  register_all
+    ~sequencer:sequencer_account
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~title:"All blueprints are cleared on flush"
+    ~tags:["evm"; "flush"; "clean"]
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~kernels:[Latest]
+  @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocols
+    ->
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1). *)
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* we send a blueprint in the (far) future, to ensure the kernel don't
+     execute it after the flush *)
+  let* chunks =
+    Evm_node.chunk_data
+      ~rollup_address:sc_rollup_address
+      ~sequencer_key:sequencer_account.alias
+      ~client
+      ~number:42
+      [raw_transfer]
+  in
+  let send_chunks chunks src =
+    let messages =
+      `A (List.map (fun c -> `String c) chunks)
+      |> JSON.annotate ~origin:"send_message"
+      |> JSON.encode
+    in
+    Client.Sc_rollup.send_message
+      ?wait:None
+      ~msg:("hex:" ^ messages)
+      ~src
+      client
+  in
+  let* () = send_chunks chunks sequencer_account.alias in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* check the bp is in storage *)
+  let* subkeys =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:"/evm/blueprints/42"
+         ()
+  in
+  Check.(
+    (subkeys <> [])
+      (list string)
+      ~error_msg:
+        "There should be a list of chunks, otherwise the blueprint was never \
+         stored") ;
+  (* flush *)
+  (* Add a transaction to the delayed inbox. *)
+  let* _hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  (* Bake a new L1 block to force the flush. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* check not in storage anymore*)
+  let* subkeys =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:"/evm/blueprints/42"
+         ()
+  in
+  Check.(
+    (subkeys = [])
+      (list string)
+      ~error_msg:"The blueprint should have been cleared, but we found %L") ;
+  unit
+
 let test_delayed_inbox_flushing_event =
   register_all
     ~time_between_blocks:Nothing
@@ -3364,13 +3473,7 @@ let test_delayed_inbox_flushing_event =
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
   let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   unit
 
@@ -3473,13 +3576,7 @@ let test_flushed_blueprint_reorg =
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
   let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -3619,13 +3716,7 @@ let test_multiple_flushed_blueprints =
   and* _ = wait_for_second_flush
   and* _ = wait_for_processed_l1_level in
 
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   let*@ proxy_head_after_flush = Rpc.block_number proxy in
   Check.(
@@ -3749,13 +3840,7 @@ let test_observer_reorg_on_blueprint_stream =
   and* _ = wait_for_processed_l1_level
   and* () = wait_for_observer_reset in
 
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   (* Sequencer resumes block production. *)
   let* () =
@@ -3869,13 +3954,7 @@ let test_observer_reorg_on_blueprint_catchup =
      should be in sync. *)
   let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
 
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   (* Sequencer resumes block production. *)
   let* () =
@@ -3990,13 +4069,7 @@ let test_flushed_blueprint_reorg_late =
       ~level:flushed_delayed_inbox_level
       sequencer
   and* _ = Evm_node.wait_for_flush_delayed_inbox sequencer in
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -4020,13 +4093,7 @@ let test_flushed_blueprint_reorg_late =
   let* () =
     Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
   in
-  let* () =
-    check_head_consistency
-      ~left:observer
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:observer ~right:sequencer () in
 
   unit
 
@@ -4140,13 +4207,7 @@ let test_flushed_blueprint_reorg_done_late =
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -4170,13 +4231,7 @@ let test_flushed_blueprint_reorg_done_late =
   let* () =
     Evm_node.wait_for_blueprint_applied observer (Int32.to_int sequencer_head)
   in
-  let* () =
-    check_head_consistency
-      ~left:observer
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:observer ~right:sequencer () in
 
   unit
 
@@ -4304,13 +4359,7 @@ let test_upgrade_injected_before_flush_level =
 
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
-  let* () =
-    check_head_consistency
-      ~left:observer
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:observer ~right:sequencer () in
   unit
 
 let test_upgrade_activated_after_flush_level =
@@ -4442,13 +4491,7 @@ let test_upgrade_activated_after_flush_level =
 
   let* _ = Evm_node.wait_for_processed_l1_level ~level:flush_l1_level sequencer
   and* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   let* _ =
     repeat 2 (fun () ->
@@ -4466,13 +4509,7 @@ let test_upgrade_activated_after_flush_level =
   Check.((lvl_seq = lvl_obs) int)
     ~error_msg:"Level of upgrade should be the same" ;
 
-  let* () =
-    check_head_consistency
-      ~left:observer
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:observer ~right:sequencer () in
   unit
 
 let test_upgrade_injected_after_flush_level =
@@ -4613,13 +4650,7 @@ let test_upgrade_injected_after_flush_level =
   Check.((rh_seq = rh_obs) string) ~error_msg:"Root hash should be the same" ;
   Check.((lvl_seq = lvl_obs) int)
     ~error_msg:"Level of upgrade should be the same" ;
-  let* () =
-    check_head_consistency
-      ~left:observer
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:observer ~right:sequencer () in
   unit
 
 (* test of reorg: the sequencer sees the "upgrade to do" event at the same
@@ -4744,13 +4775,7 @@ let test_flushed_blueprint_reorg_upgrade =
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   and* _ = next_rollup_node_level ~sc_rollup_node ~client in
 
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -4779,13 +4804,7 @@ let test_flushed_blueprint_reorg_upgrade =
   Check.((lvl_seq = lvl_obs) int)
     ~error_msg:"Level of upgrade should be the same" ;
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
-  let* () =
-    check_head_consistency
-      ~left:observer
-      ~right:sequencer
-      ~error_msg:"The head should be the same after flush"
-      ()
-  in
+  let* () = check_head_consistency ~left:observer ~right:sequencer () in
   unit
 
 let test_delayed_transfer_timeout =
@@ -5535,7 +5554,9 @@ let test_sequencer_upgrade =
     check_head_consistency
       ~left:proxy
       ~right:sequencer
-      ~error_msg:"The head should be the same before the upgrade"
+      ~error_msg:
+        "The head should be the same before the upgrade: sequencer is %%L \
+         while proxy is %%R"
       ()
   in
   let*@ previous_proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
@@ -5566,7 +5587,9 @@ let test_sequencer_upgrade =
     check_head_consistency
       ~left:proxy
       ~right:sequencer
-      ~error_msg:"The head should be the same after the upgrade"
+      ~error_msg:
+        "The head should be the same after the upgrade: sequencer is %%L while \
+         proxy is %%R"
       ()
   in
   let nb_block = 4l in
@@ -5602,7 +5625,7 @@ let test_sequencer_upgrade =
       ~right:sequencer
       ~error_msg:
         "The head should be the same after the sequencer tried to produce \
-         blocks, they are are disregarded."
+         blocks, they are are disregarded: sequencer is %%R while proxy is %%L"
       ()
   in
   Log.info
@@ -5654,7 +5677,7 @@ let test_sequencer_upgrade =
         ~right:new_sequencer
         ~error_msg:
           "The head should be the same after blocks produced by the new \
-           sequencer"
+           sequencer: sequencer is %%R while proxy is %%L"
         ()
     in
     let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
@@ -8300,13 +8323,7 @@ let test_finalized_block_param =
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.((sequencer_head.number = 4l) int32)
     ~error_msg:"Sequencer head should be %R, but is %L instead" ;
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"Sequencer and proxy should have the same head"
-      ()
-  in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   (* While the blocks were posted onchain, they are not final wrt. the
      consensus algorithm, so the finalized proxy does not have a head yet.
 
@@ -8335,20 +8352,9 @@ let test_finalized_block_param =
   Check.((sequencer_finalized_head.number = 4l) int32)
     ~error_msg:"Sequencer finalized head should be %R, but is %L instead" ;
 
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
-      ~error_msg:"Sequencer and proxy should have the same head"
-      ()
-  in
-  let* () =
-    check_block_consistency
-      ~block:`Finalized
-      ~left:rpc
-      ~right:sequencer
-      ~error_msg:"Sequencer and rpc should have the same last finalized"
-      ()
+    check_block_consistency ~block:`Finalized ~left:rpc ~right:sequencer ()
   in
 
   (* Terminate the sequencer. *)
@@ -9920,6 +9926,7 @@ let () =
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
   test_overwrite_simulation_tick_limit protocols ;
+  test_clean_bps protocols ;
   test_produce_block_with_no_delayed_transactions protocols ;
   test_observer_reset [Protocol.Alpha] ;
   test_websocket_rpcs [Protocol.Alpha] ;
