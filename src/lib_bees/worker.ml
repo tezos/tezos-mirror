@@ -394,11 +394,24 @@ struct
     | Some resolver -> Eio.Promise.resolve resolver res
     | None -> ()
 
-  let take_nonblocking (type a) (t : a t) =
+  let take (type a) (t : a t) =
     match t.buffer with
-    | Queue_buffer q -> Eio.Stream.take_nonblocking q
-    | Bounded_buffer q -> Eio.Stream.take_nonblocking q
-    | Dropbox_buffer q -> Eio.Stream.take_nonblocking q
+    | Queue_buffer q -> Eio.Stream.take q
+    | Bounded_buffer q -> Eio.Stream.take q
+    | Dropbox_buffer q -> Eio.Stream.take q
+
+  let take t =
+    match t.timeout with
+    | None -> Some (take t)
+    | Some timeout -> (
+        match
+          Eio.Time.with_timeout
+            (Tezos_base_unix.Event_loop.env_exn ())#clock
+            (Ptime.Span.to_float_s timeout)
+            (fun () -> Ok (take t))
+        with
+        | Error `Timeout -> None
+        | Ok m -> Some m)
 
   let add (type a) (t : a t) (m : message) =
     match t.buffer with
@@ -569,8 +582,7 @@ struct
           add worker Shutdown ;
           `Stop_daemon
       | Running _ -> (
-          (* TODO: it should block and take the timeout into account *)
-          let popped = take_nonblocking worker in
+          let popped = take worker in
           match popped with
           | None ->
               Handlers.on_no_request worker ;
@@ -639,139 +651,100 @@ struct
   let create_table buffer_kind =
     {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
+  let init (type kind launch_error) (table : kind table) ?timeout name
+      parameters =
+    let buffer : kind buffer =
+      match table.buffer_kind with
+      | Queue -> Queue_buffer (Eio.Stream.create max_int)
+      | Bounded {size} -> Bounded_buffer (Eio.Stream.create size)
+      | Dropbox _ -> Dropbox_buffer (Eio.Stream.create 1)
+    in
+    let name_s = Format.asprintf "%a" Name.pp name in
+    let full_name =
+      if name_s = "" then base_name
+      else Format.asprintf "%s_%s" base_name name_s
+    in
+    if Nametbl.mem table.instances name then
+      invalid_arg
+        (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
+    else
+      let id =
+        table.last_id <- table.last_id + 1 ;
+        table.last_id
+      in
+      let id_name =
+        if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id
+      in
+      ( {
+          mutex = Eio.Mutex.create ();
+          timeout;
+          name;
+          parameters;
+          buffer;
+          canceler = Lwt_canceler.create ();
+          stream_explorer = [];
+          current_request = None;
+          state = None;
+          status = Launching (Time.System.now ());
+          table;
+        },
+        id_name )
+
+  let start (type kind launch_error) worker ?(domains = 1) ~name ~id_name
+      parameters
+      (module Handlers : EIO_HANDLERS
+        with type self = kind t
+         and type launch_error = launch_error) =
+    let state = Handlers.on_launch worker name parameters in
+    if id_name = base_name then
+      Worker_events.(emit__dont_wait__use_with_care started) ()
+    else
+      Worker_events.(emit__dont_wait__use_with_care started_for)
+        (Format.asprintf "%a" Name.pp name) ;
+    match state with
+    | Ok state ->
+        worker.state <- Some state ;
+        worker.status <- Worker_types.Running (Time.System.now ()) ;
+        Hive.launch_worker
+          worker
+          ~bee_name:(Format.asprintf "%a" Name.pp name)
+          ~domains
+          (worker_loop (module Handlers)) ;
+        Ok worker
+    | Error e -> Error e
+
   (** [launch table name parameters handlers] creates a single worker
       instance, using exclusively Lwt handlers. As such, it won't start multiple
       domains. *)
-  let launch (type kind launch_error) (table : kind table) ?timeout
-      ?(domains = 1) name parameters handlers :
+  let launch (type kind launch_error) (table : kind table) ?timeout ?domains
+      name parameters
+      (module Lwt_handlers : HANDLERS
+        with type self = kind t
+         and type launch_error = launch_error) :
       (kind t, launch_error) result Lwt.t =
-    let (module Lwt_handlers : HANDLERS
-          with type self = kind t
-           and type launch_error = launch_error) =
-      handlers
-    in
-    ignore timeout ;
-    let module Handlers :
-      EIO_HANDLERS with type self = kind t and type launch_error = launch_error =
-      MakeEIO (Lwt_handlers) in
-    let buffer : kind buffer =
-      match table.buffer_kind with
-      | Queue -> Queue_buffer (Eio.Stream.create max_int)
-      | Bounded {size} -> Bounded_buffer (Eio.Stream.create size)
-      | Dropbox _ -> Dropbox_buffer (Eio.Stream.create 1)
-    in
-    let name_s = Format.asprintf "%a" Name.pp name in
-    let full_name =
-      if name_s = "" then base_name
-      else Format.asprintf "%s_%s" base_name name_s
-    in
-    if Nametbl.mem table.instances name then
-      invalid_arg
-        (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
-    else
-      let id =
-        table.last_id <- table.last_id + 1 ;
-        table.last_id
-      in
-      let id_name =
-        if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id
-      in
-      let worker =
-        {
-          mutex = Eio.Mutex.create ();
-          timeout = None;
-          name;
-          parameters;
-          buffer;
-          canceler = Lwt_canceler.create ();
-          stream_explorer = [];
-          current_request = None;
-          state = None;
-          status = Launching (Time.System.now ());
-          table;
-        }
-      in
-      Lwt_eio.run_eio @@ fun () ->
-      let state = Handlers.on_launch worker name parameters in
-      if id_name = base_name then
-        Worker_events.(emit__dont_wait__use_with_care started) ()
-      else
-        Worker_events.(emit__dont_wait__use_with_care started_for)
-          (Format.asprintf "%a" Name.pp name) ;
-      match state with
-      | Ok state ->
-          worker.state <- Some state ;
-          worker.status <- Worker_types.Running (Time.System.now ()) ;
-          Hive.launch_worker
-            worker
-            ~bee_name:(Format.asprintf "%a" Name.pp name)
-            ~domains
-            (worker_loop (module Handlers)) ;
-          Ok worker
-      | Error e -> Error e
+    let module Handlers = MakeEIO (Lwt_handlers) in
+    let worker, id_name = init table ?timeout name parameters in
+    Lwt_eio.run_eio @@ fun () ->
+    start
+      worker
+      ?domains
+      ~name
+      ~id_name
+      parameters
+      (module Handlers : EIO_HANDLERS
+        with type self = kind t
+         and type launch_error = launch_error)
 
-  let launch_eio (type kind launch_error) (table : kind table) ?timeout
-      ?(domains = 1) ~name parameters handlers : (kind t, launch_error) result =
-    let (module Handlers : EIO_HANDLERS
-          with type self = kind t
-           and type launch_error = launch_error) =
-      handlers
-    in
-    ignore timeout ;
-    let buffer : kind buffer =
-      match table.buffer_kind with
-      | Queue -> Queue_buffer (Eio.Stream.create max_int)
-      | Bounded {size} -> Bounded_buffer (Eio.Stream.create size)
-      | Dropbox _ -> Dropbox_buffer (Eio.Stream.create 1)
-    in
-    let name_s = Format.asprintf "%a" Name.pp name in
-    let full_name =
-      if name_s = "" then base_name
-      else Format.asprintf "%s_%s" base_name name_s
-    in
-    if Nametbl.mem table.instances name then
-      invalid_arg
-        (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
-    else
-      let id =
-        table.last_id <- table.last_id + 1 ;
-        table.last_id
-      in
-      let id_name =
-        if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id
-      in
-      let worker =
-        {
-          mutex = Eio.Mutex.create ();
-          timeout = None;
-          name;
-          parameters;
-          stream_explorer = [];
-          canceler = Lwt_canceler.create ();
-          state = None;
-          status = Launching (Time.System.now ());
-          current_request = None;
-          table;
-          buffer;
-        }
-      in
-      let state = Handlers.on_launch worker name parameters in
-      if id_name = base_name then
-        Worker_events.(emit__dont_wait__use_with_care started) ()
-      else
-        Worker_events.(emit__dont_wait__use_with_care started_for)
-          (Format.asprintf "%a" Name.pp name) ;
-      match state with
-      | Ok state ->
-          worker.state <- Some state ;
-          worker.status <- Worker_types.Running (Time.System.now ()) ;
-          Hive.launch_worker
-            worker
-            ~bee_name:(Format.asprintf "%a" Name.pp name)
-            ~domains
-            (worker_loop (module Handlers)) ;
-          Ok worker
-      | Error e -> Error e
+  (** [launch table name parameters handlers] creates a swarm of bees
+      (workers), each running on a separate domain. By default only a single
+      domain (then worker) is used to handle the requests. *)
+  let launch_eio (type kind launch_error) (table : kind table) ?timeout ?domains
+      ~name parameters
+      (module Handlers : EIO_HANDLERS
+        with type self = kind t
+         and type launch_error = launch_error) : (kind t, launch_error) result =
+    let worker, id_name = init table ?timeout name parameters in
+    start worker ?domains ~name ~id_name parameters (module Handlers)
 
   let pp_worker_status ppf =
     let open Worker_types in
@@ -842,7 +815,7 @@ struct
     | Running _ ->
         w.status <- Closing (Time.System.now (), Time.System.now ()) ;
         while not @@ is_empty w do
-          ignore @@ take_nonblocking w
+          ignore @@ take w
         done ;
         w.stream_explorer <- [] ;
         add w Shutdown ;
