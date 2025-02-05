@@ -649,6 +649,11 @@ struct
                   (* Add [Shutdown] again to the worker queue to make sure that
                      other bees see the shutdown request *)
                   add worker Shutdown ;
+                  (* TODO: check whether the canceler is used with the legacy
+                     workers except when shutdowning the worker, as it
+                     introduces a dependency to Lwt's event loop. *)
+                  ( Lwt_eio.run_lwt @@ fun () ->
+                    Error_monad.cancel_with_exceptions worker.canceler ) ;
                   `Stop_daemon))
     in
     loop ()
@@ -803,7 +808,6 @@ struct
     | Launching _ | Closing _ | Closed _ ->
         Eio.Promise.create_resolved (Error (Closed None))
 
-  (* TODO: link it to the canceler? *)
   let shutdown_eio w =
     match w.status with
     | Launching _ | Closed _ | Closing _ ->
