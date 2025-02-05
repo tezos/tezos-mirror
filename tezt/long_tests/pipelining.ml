@@ -595,7 +595,7 @@ let operation_and_block_validation protocol manager_kind tag =
         "for";
         "--minimal-timestamp";
         "--context";
-        data_dir // "context";
+        data_dir;
       ]
   in
   let io = Process.stdout p in
