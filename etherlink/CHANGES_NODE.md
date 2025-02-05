@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug Fixes
+
+### Internals
+
 ## Version 0.16 (2025-01-06)
 
 This release notably stabilizes the new storage for blocks (which
