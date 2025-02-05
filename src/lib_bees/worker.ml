@@ -381,6 +381,11 @@ struct
     instances : 'kind t Nametbl.t;
   }
 
+  let extract_status_errors w =
+    match w.status with
+    | Worker_types.Launching _ | Running _ | Closing _ -> None
+    | Closed (_, _, errs) -> errs
+
   let resolve_error : ('a, 'b) result Eio.Promise.u option -> 'b -> unit =
    fun resolver error ->
     match resolver with
@@ -746,14 +751,6 @@ struct
     let worker, id_name = init table ?timeout name parameters in
     start worker ?domains ~name ~id_name parameters (module Handlers)
 
-  let pp_worker_status ppf =
-    let open Worker_types in
-    function
-    | Running _ -> Format.fprintf ppf "Shutdown"
-    | Launching _ -> Format.fprintf ppf "Launching"
-    | Closing _ -> Format.fprintf ppf "Closing"
-    | Closed _ -> Format.fprintf ppf "Closed"
-
   let drop_request ?(_priority = 0) worker merge message_box request metadata =
     match worker.status with
     | Running _ -> (
@@ -905,17 +902,7 @@ struct
   module Queue = struct
     let push_request ?(_priority = 0) worker request metadata =
       match worker.status with
-      | Closing _ | Closed _ | Launching _ ->
-          let reset = Pretty_printing.add_ansi_marking Format.err_formatter in
-          Format.eprintf
-            "@{<fg_yellow>Worker %a state (%a) does not allow it to handle \
-             requests@}@."
-            Name.pp
-            worker.name
-            pp_worker_status
-            worker.status ;
-          reset () ;
-          false
+      | Closing _ | Closed _ | Launching _ -> false
       | Running _ ->
           let timestamp = Time.System.now () in
           let message =
@@ -926,29 +913,22 @@ struct
             (timestamp, Request.view request) :: worker.stream_explorer ;
           true
 
-    (* TODO: check the worker status and don't push if closed *)
     let push_request_now ?(_priority = 0) (worker : infinite queue t) request
         metadata =
-      let (Queue_buffer message_queue) = worker.buffer in
-      let timestamp = Time.System.now () in
-      let message = Message {request; metadata; timestamp; resolver = None} in
-      Eio.Stream.add message_queue message ;
-      worker.stream_explorer <-
-        (timestamp, Request.view request) :: worker.stream_explorer
+      match worker.status with
+      | Closing _ | Closed _ | Launching _ -> ()
+      | Running _ ->
+          let (Queue_buffer message_queue) = worker.buffer in
+          let timestamp = Time.System.now () in
+          let message =
+            Message {request; metadata; timestamp; resolver = None}
+          in
+          Eio.Stream.add message_queue message ;
+          worker.stream_explorer <-
+            (timestamp, Request.view request) :: worker.stream_explorer
 
     let push_request_and_wait ?(_priority = 0) worker request metadata =
       match worker.status with
-      | Closing _ | Closed _ | Launching _ ->
-          let reset = Pretty_printing.add_ansi_marking Format.err_formatter in
-          Format.eprintf
-            "@{<fg_yellow>Worker %a state (%a) does not allow it to handle \
-             requests@}@."
-            Name.pp
-            worker.name
-            pp_worker_status
-            worker.status ;
-          reset () ;
-          Eio.Promise.create_resolved (Error (Closed None))
       | Running _ ->
           let promise, resolver =
             Eio.Promise.create (* should we use ~label?*) ()
@@ -961,6 +941,9 @@ struct
           worker.stream_explorer <-
             (timestamp, Request.view request) :: worker.stream_explorer ;
           promise
+      | _ ->
+          Eio.Promise.create_resolved
+            (Error (Closed (extract_status_errors worker)))
 
     let push_request_eio worker request =
       let metadata = make_metadata () in
