@@ -24,7 +24,6 @@ fn run_test(file: &str) -> Result<(), String> {
     let tzt_test = parser
         .parse_tzt_test(&contents)
         .map_err(|e| e.to_string())?;
-
     let arena = Arena::new();
     run_tzt_test(tzt_test, &arena).map_err(|e| format!("{}", e))
 }

@@ -10,6 +10,7 @@
 mod expectation;
 
 use num_bigint::BigInt;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
 use typed_arena::Arena;
@@ -17,6 +18,7 @@ use typed_arena::Arena;
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
+use crate::ast::big_map::{BigMapId,InMemoryLazyStorage, MapInfo};
 use crate::context::*;
 use crate::interpreter::*;
 use crate::gas;
@@ -27,6 +29,7 @@ use crate::stack::*;
 use crate::syntax::tztTestEntitiesParser;
 use crate::typechecker::*;
 use crate::tzt::expectation::*;
+use crate::lexer::Prim;
 
 /// Test's input stack represented as a [Vec] of pairs of type and typechecked
 /// value. The top of the stack is the _leftmost_ element.
@@ -98,6 +101,9 @@ pub struct TztTest<'a> {
     pub self_addr: Option<AddressHash>,
     /// Other known contracts, as defined by `other_contracts` field.
     pub other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
+    /// mapping between integers representing big_map indices and descriptions of big maps
+    /// as defined by the `big_maps` field.
+    pub big_maps: Option<InMemoryLazyStorage<'a>>,
     /// Initial value for "now" in the context.
     pub now: Option<BigInt>,
     /// Address that directly or indirectly initiated the current transaction
@@ -135,9 +141,11 @@ fn typecheck_stack<'a>(
     stk: Vec<(Micheline<'a>, Micheline<'a>)>,
     self_param: Option<(AddressHash, Option<Entrypoints>)>,
     m_other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
+    m_big_maps: Option<InMemoryLazyStorage<'a>>,
 ) -> Result<Vec<(Type, TypedValue<'a>)>, TcError> {
     let mut ctx = Ctx::default();
     populate_ctx_with_known_contracts(&mut ctx, self_param, m_other_contracts);
+    ctx.set_big_map_storage(m_big_maps.unwrap_or_default());
 
     stk.into_iter()
         .map(|(t, v)| {
@@ -183,6 +191,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_parameter: Option<Micheline> = None;
         let mut m_self: Option<Micheline> = None;
         let mut m_other_contracts: Option<Vec<(Micheline, Micheline)>> = None;
+        let mut m_big_maps: Option<Vec<(Micheline, Micheline, Micheline, Micheline)>> = None;
         let mut m_now : Option<BigInt> = None;
         let mut m_source : Option<Micheline> = None;
         let mut m_sender : Option<Micheline> = None;
@@ -215,6 +224,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 Now(n) => set_tzt_field("now", &mut m_now, n.into())?,
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
+                BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
             }
         }
 
@@ -281,6 +291,49 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
+        let big_maps  = match m_big_maps {
+            Some(bm) => {
+                let mut a = BTreeMap::new();
+                for (idx, key_ty, val_ty, elts) in bm {
+                    let idx = BigMapId(irrefutable_match!(
+                        typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
+                        TypedValue::Int)
+                    .clone());
+                    let key_ty = parse_ty(&mut Ctx::default(), &key_ty)?;
+                    let val_ty = parse_ty(&mut Ctx::default(), &val_ty)?;
+                    let elts = match elts {
+                        Micheline::Seq(elts) => elts,
+                        _ => return Err("Big map elements must be a sequence".into()),
+                    };
+                    let descr: BTreeMap<TypedValue<'a>, TypedValue<'a>> = elts
+                        .into_iter()
+                        .map(|elt| {
+                            match elt {
+                                // If Micheline::App stores its arguments in a Vec,
+                                // pattern match with a condition to ensure length is 2
+                                Micheline::App(Prim::Elt, ref kv, _) if kv.len() == 2 => {
+                                    let (k_raw, v_raw) = (&kv[0], &kv[1]);
+                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty).unwrap();
+                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty).unwrap();
+                                    Ok((k, v))
+                                }
+                                _ => { return Err("Each big map element must be of the form `Elt <key> <value>`."); }
+                            }
+                        })
+                        .collect::<Result<BTreeMap<_, _>, _>>()?;
+
+                    a.insert(idx, MapInfo::new(
+                        descr,
+                        key_ty,
+                        val_ty,
+                    ));
+                }
+                let storage = InMemoryLazyStorage::with_big_maps(a);
+                Some(storage)
+            }
+            None => None,
+        };
+
         // Once we have self_addr and parameter, we typecheck the output stack
         // after populating the context's known_contracts with the self address.
         // Later we may add the Tzt specs `other_contracts` fields. At that point
@@ -291,6 +344,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     stk,
                     self_addr.clone().map(|x| (x, parameter.clone())),
                     other_contracts.clone(),
+                    big_maps.clone(),
                 )?)),
                 TztError(error_exp) => Some(ExpectError(error_exp)),
             },
@@ -305,6 +359,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         stk,
                         self_addr.clone().map(|x| (x, parameter.clone())),
                         other_contracts.clone(),
+                        big_maps.clone(),
                     )?)
                 },
                 None => None,
@@ -327,6 +382,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             parameter,
             self_addr,
             other_contracts,
+            big_maps,
             now: m_now,
             source,
             sender,
@@ -426,6 +482,7 @@ pub(crate) enum TztEntity<'a> {
     Now(i64),
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
+    BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test. This is a
@@ -498,6 +555,8 @@ pub fn run_tzt_test<'a>(
         test.self_addr.clone().map(|x| (x, test.parameter.clone())),
         test.other_contracts.clone(),
     );
+
+    ctx.set_big_map_storage(test.big_maps.unwrap_or_default());
 
     ctx.now = test.now.clone().unwrap_or(Ctx::default().now);
 

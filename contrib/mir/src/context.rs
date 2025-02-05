@@ -83,7 +83,7 @@ pub struct Ctx<'a> {
     operation_counter: u128,
 }
 
-impl Ctx<'_> {
+impl<'a> Ctx<'a> {
     /// Increment the internal operation counter and return it. Used as a nonce
     /// for operations.
     pub fn operation_counter(&mut self) -> u128 {
@@ -101,6 +101,12 @@ impl Ctx<'_> {
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
         let map = v.into();
         self.lookup_contract = Box::new(move |ah| map.get(ah).cloned());
+    }
+
+    /// Set a resonable implementation for [Self::big_map_storage] by providing
+    /// something that implements the [LazyStorage] trait.
+    pub fn set_big_map_storage(&mut self, v: impl LazyStorage<'a> + 'a) {
+        self.big_map_storage = Box::new(v);
     }
 
     /// Set a reasonable implementation for [Self::voting_powers] and a

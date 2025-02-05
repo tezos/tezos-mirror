@@ -150,6 +150,8 @@ defprim! {
     now,
     source,
     sender,
+    big_maps,
+    Big_map,
 }
 
 /// Either a Micheline primitive, TZT primitive, or a macro lexeme.

@@ -45,6 +45,8 @@ extern {
         "balance" => Tok::Noun(TztPrim(TzP::balance)),
         "self" => Tok::Noun(TztPrim(TzP::self_)),
         "other_contracts" => Tok::Noun(TztPrim(TzP::other_contracts)),
+        "big_map" => Tok::Noun(TztPrim(TzP::Big_map)),
+        "big_maps" => Tok::Noun(TztPrim(TzP::big_maps)),
         "now" => Tok::Noun(TztPrim(TzP::now)),
         "source" => Tok::Noun(TztPrim(TzP::source)),
         "sender" => Tok::Noun(TztPrim(TzP::sender)),
@@ -148,6 +150,14 @@ otherContracts : Vec<(Micheline<'a>, Micheline<'a>)> = {
   "{" <s:otherContractsSeq> "}" => s
 }
 
+bigMapsIndexed : (Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>) = {
+  "big_map" <i:Micheline> <kty:Micheline> <vty:Micheline> <elts:Micheline>  => (i, kty, vty, elts)
+}
+
+bigMaps : Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)> = {
+  "{" <s:semicolonSepSeq<bigMapsIndexed>> "}" => s
+}
+
 tztStackEltSeq = semicolonSepSeq<tztStackElt>;
 
 tztStack : Vec<(Micheline<'a>, Micheline<'a>)> = {
@@ -175,6 +185,7 @@ timestamp : i64 = {
 
 use ErrorExpectation::*;
 use InterpreterErrorExpectation::*;
+
 tztEntity : TztEntity<'a> = {
   "code" <Micheline> => Code(<>),
   "input" <s:tztStack> => Input(s),
@@ -195,6 +206,7 @@ tztEntity : TztEntity<'a> = {
   "now" <t:timestamp> => TztEntity::Now(t),
   "source" <Micheline> => TztEntity::Source(<>),
   "sender" <Micheline> => TztEntity::SenderAddr(<>),
+  "big_maps" <bigMaps> => TztEntity::BigMaps(<>),
 }
 
 pub(crate) tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;
