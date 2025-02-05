@@ -121,6 +121,8 @@ Protocol Compiler And Environment
 
 - Added a new version of the protocol environment (V14). (MR :gl:`!15345`)
 
+- Added a new version of the protocol environment (V15). (MR :gl:`!16599`)
+
 Codec
 -----
 
