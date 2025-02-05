@@ -176,6 +176,8 @@ type t = {
 
 val history_mode_encoding : history_mode Data_encoding.t
 
+val pp_history_mode : Format.formatter -> history_mode -> unit
+
 val native_execution_policy_encoding : native_execution_policy Data_encoding.t
 
 (** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir].

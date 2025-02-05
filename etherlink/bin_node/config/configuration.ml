@@ -739,6 +739,10 @@ let history_mode_encoding =
   let open Data_encoding in
   string_enum [("archive", Archive); ("rolling", Rolling)]
 
+let pp_history_mode fmt h =
+  Format.pp_print_string fmt
+  @@ match h with Archive -> "archive" | Rolling -> "rolling"
+
 let history_mode_and_gc_parameters_encoding =
   let open Data_encoding in
   union

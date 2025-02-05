@@ -263,11 +263,6 @@ let check_snapshot_exists snapshot_file =
   let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
   fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
 
-let pp_history_mode fmt h =
-  Format.pp_print_string
-    fmt
-    (match h with Configuration.Archive -> "archive" | Rolling -> "rolling")
-
 let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     =
   let open Lwt_result_syntax in
@@ -297,9 +292,9 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
       when header_hist <> history_mode ->
         failwith
           "Cannot import %a snapshot into %a EVM node."
-          pp_history_mode
+          Configuration.pp_history_mode
           header_hist
-          pp_history_mode
+          Configuration.pp_history_mode
           history_mode
     | _ -> (* Same history mode *) return_unit
   in
