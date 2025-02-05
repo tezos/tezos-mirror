@@ -341,7 +341,7 @@ let start ~alerts agents =
         "/dev/null";
         "-w";
         "%{http_code}";
-        sf "http://localhost:%d/-/ready" Env.prometheus_port;
+        sf "http://localhost:%d/-/ready" port;
       ]
   in
   let* _ = Env.wait_process ~is_ready ~run () in
