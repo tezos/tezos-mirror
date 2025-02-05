@@ -11,10 +11,10 @@ use crate::blueprint_storage::{
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
-use crate::storage::DELAYED_BRIDGE;
-use crate::storage::ENABLE_FA_BRIDGE;
 use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, StorageVersion,
+    DELAYED_BRIDGE, ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
+    SEQUENCER_GOVERNANCE,
 };
 use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
@@ -216,6 +216,27 @@ fn migrate_to<Host: Runtime>(
                 RefPath::assert_from(b"/evm/world_state/fees/base_fee_per_gas");
             host.store_delete(&EVM_BASE_FEE_PER_GAS)?;
             Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V25 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                const REGULAR_GOVERNANCE_KT: &[u8] =
+                    b"KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK";
+                const SECURITY_GOVERNANCE_KT: &[u8] =
+                    b"KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+                const SEQUENCER_GOVERNANCE_KT: &[u8] =
+                    b"KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U";
+
+                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(
+                    &KERNEL_SECURITY_GOVERNANCE,
+                    SECURITY_GOVERNANCE_KT,
+                )?;
+                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
         }
     }
 }

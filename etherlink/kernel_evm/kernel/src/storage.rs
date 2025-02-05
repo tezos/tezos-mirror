@@ -57,6 +57,7 @@ pub enum StorageVersion {
     V22,
     V23,
     V24,
+    V25,
 }
 
 impl From<StorageVersion> for u64 {
@@ -71,7 +72,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V24;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V25;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 

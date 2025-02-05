@@ -15,6 +15,15 @@
 - The kernel uses events to make the sequencer aware of delayed transaction
   flush. This significantly reduces the risk of sequencer downtime due to
   unforseen flush event. (!15621 !15841)
+- Updates the Layer 1 governance contracts to take into account Quebec new time
+  between blocks. (!16592)
+    - [`KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK` for the regular upgrade governance][kgov]
+    - [`KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2` for the security upgrade governance][sgov]
+    - [`KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U` for the sequencer governance][sqgov]
+
+[kgov]: https://better-call.dev/mainnet/KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK/operations
+[sgov]: https://better-call.dev/mainnet/KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2/operations
+[sqgov]: https://better-call.dev/mainnet/KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U/operations
 
 ### Internal
 
