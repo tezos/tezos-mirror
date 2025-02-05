@@ -405,15 +405,19 @@ fn handle_tezos_reveal<S, ML, CL, M>(
 
     let mut buffer = vec![0u8; min(request_size as usize, REVEAL_REQUEST_MAX_SIZE)];
 
+    let Ok(phys_dest_addr) = machine.core.translate(request_address, AccessType::Store) else {
+        return sbi_return_error(machine, SbiError::NoSharedMemory);
+    };
     if machine
         .core
         .main_memory
-        .read_all(request_address, &mut buffer)
+        .read_all(phys_dest_addr, &mut buffer)
         .is_err()
     {
         return sbi_return_error(machine, SbiError::InvalidAddress);
     }
 
+    // TODO: RV-425 Cross-page memory accesses are not translated correctly
     reveal_request.bytes.write_all(0, &buffer);
     reveal_request.size.write(request_size);
     status.write(PvmStatus::WaitingForReveal);
