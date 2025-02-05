@@ -182,5 +182,8 @@ echo "All packages are available in ./scripts/packaging"
 # On the CI we have a specific job for it
 if [ -z "${CI:-}" ] && [ ${DEVEL} != "1" ]; then
   echo "Running lintian scripts/packaging/octez-*.deb"
-  lintian scripts/packaging/octez-*.deb --tag-display-limit 0 --verbose --fail-on warning
+  for p in scripts/packaging/octez-*.deb; do
+    lintian "$p" --tag-display-limit 0 --verbose --fail-on warning &
+  done
+  wait
 fi

@@ -43,6 +43,20 @@ install | upgrade)
           #shellcheck disable=SC2154
           db_set octez-baker/baker-key "$baking_key"
         fi
+
+        echo "set dalurl=$dalurl"
+        if [ -n "${dalurl:-}" ]; then
+          if [ "$dalurl" = "" ]; then
+            #shellcheck disable=SC2154
+            db_set octez-baker/dal-node false
+          else
+            db_set octez-baker/dal-node true
+            db_set octez-baker/dal-node-url "$dalurl"
+          fi
+        else
+          db_set octez-baker/dal-node true
+        fi
+
         #shellcheck disable=SC2119
         db_go
       fi

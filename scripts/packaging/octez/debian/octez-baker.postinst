@@ -56,6 +56,22 @@ configure)
     else
       echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
     fi
+
+    db_get octez-baker/dal-node
+    DAL=${RET}
+    case "$DAL" in
+    true)
+      db_get octez-baker/dal-node-url
+      DALURL=${RET}
+      echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-next
+      echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-active
+      ;;
+    false)
+      echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
+      echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-active
+      ;;
+    esac
+
     mkdir -p /var/tezos/.tezos-client
     chown tezos:tezos /var/tezos/.tezos-client
   else
@@ -77,6 +93,21 @@ configure)
       db_get octez-baker/baker-key
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
+
+      db_get octez-baker/dal-node
+      DAL=${RET}
+      case "$DAL" in
+      true)
+        db_get octez-baker/dal-node-url
+        DALURL=${RET}
+        echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-next
+        echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-active
+        ;;
+      false)
+        echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
+        echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-active
+        ;;
+      esac
 
       db_input high octez-baker/upgrade_note_current || true
       #shellcheck disable=SC2119
