@@ -43,8 +43,11 @@ val prometheus_export : bool
 (** Equivalent to [Cli.prometheus_port]. *)
 val prometheus_port : int
 
-(** Equivalent to [Cli.prometheus_snapshot_filename]. *)
-val prometheus_snapshot_filename : string option
+(** Equivalent to [Cli.prometheus_export_path]. *)
+val prometheus_export_path : string option
+
+(** Equivalent to [Cli.prometheus_snapshots]. *)
+val prometheus_snapshots : (string * int option) list
 
 (** Equivalent to [Cli.prometheus_scrape_interval]. *)
 val prometheus_scrape_interval : int

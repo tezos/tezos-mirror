@@ -128,19 +128,50 @@ let prometheus_export =
     ~description:"Export a Prometheus snapshot at the end of the scenario"
     true
 
+let default_prometheus_port = 9090
+
 let prometheus_port =
   Clap.default_int
     ~section
     ~long:"prometheus-port"
     ~description:
-      "Set the port on which the prometheus instance will run (default: 9090)."
-    9090
+      (sf
+         "Set the port on which the prometheus instance will run (default: %d)."
+         default_prometheus_port)
+    default_prometheus_port
 
-let prometheus_snapshot_filename =
+let prometheus_export_path =
   Clap.optional_string
     ~section
-    ~long:"prometheus-snapshot-filename"
-    ~description:"Name of the prometheus snapshot file"
+    ~long:"prometheus-export-path"
+    ~description:"Path of the prometheus snapshot"
+    ()
+
+let prometheus_snapshots =
+  let parse str =
+    match String.split_on_char ':' str with
+    | [file; port] -> Some (file, Some (int_of_string port))
+    | [file] -> Some (file, None)
+    | _ -> None
+  in
+  let show = function
+    | filename, Some port -> sf "%s:%d" filename port
+    | filename, None -> filename
+  in
+  let typ =
+    Clap.typ ~name:"prometheus-snapshot-imported" ~dummy:("", None) ~parse ~show
+  in
+  Clap.list
+    typ
+    ~section
+    ~long:"prometheus-snapshots"
+    ~placeholder:"/path/to/snapshot[:port]"
+    ~description:
+      (sf
+         "Path to the snapshot to load in a prometheus docker container. If no \
+          port is specified, a port will be automatically assigned starting \
+          with the value of --prometheus-port (default: %d)"
+         default_prometheus_port)
     ()
 
 let prometheus_scrape_interval =

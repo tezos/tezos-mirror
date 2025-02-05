@@ -42,10 +42,10 @@ val shutdown : t -> unit Lwt.t
 (** [export_snapshot prometheus] exports a prometheus snapshot. *)
 val export_snapshot : t -> unit Lwt.t
 
-(** [run_wtih_snapshot ()] allows to run the prometheus with the given
+(** [run_with_snapshot port snapshot_path] allows to run the prometheus with the given
     snapshot. The snapshot must have been exported by running a tezt-cloud
     scenario beforehand. *)
-val run_with_snapshot : unit -> t Lwt.t
+val run_with_snapshot : int -> string -> t Lwt.t
 
 (** [reload prometheus] reloads the prometheus configuration. This can be used
   to take into account a change such a different agent name or a new source. *)
