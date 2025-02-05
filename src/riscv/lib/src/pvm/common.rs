@@ -334,6 +334,14 @@ impl<
     {
         self.status.read()
     }
+
+    /// Get the reveal request in the machine state
+    pub fn reveal_request(&self) -> Vec<u8>
+    where
+        M: state_backend::ManagerRead,
+    {
+        self.reveal_request.to_vec()
+    }
 }
 
 impl<

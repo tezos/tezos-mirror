@@ -406,7 +406,7 @@ fn handle_tezos_reveal<S, ML, CL, M>(
     let mut buffer = vec![0u8; min(request_size as usize, REVEAL_REQUEST_MAX_SIZE)];
 
     let Ok(phys_dest_addr) = machine.core.translate(request_address, AccessType::Store) else {
-        return sbi_return_error(machine, SbiError::NoSharedMemory);
+        return sbi_return_error(machine, SbiError::InvalidAddress);
     };
     if machine
         .core

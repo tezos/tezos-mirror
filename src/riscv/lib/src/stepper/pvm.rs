@@ -24,7 +24,9 @@ use crate::{
     storage::binary,
 };
 use serde::{de::DeserializeOwned, Serialize};
+use std::collections::HashMap;
 use std::ops::Bound;
+use std::sync::Arc;
 use tezos_smart_rollup_utils::inbox::Inbox;
 
 /// Error during PVM stepping
@@ -36,6 +38,8 @@ pub enum PvmStepperError {
     /// Errors arising from loading the kernel
     KernelError(kernel_loader::Error),
 }
+
+type ResponseFn = Arc<dyn Fn() -> Result<Box<[u8]>, std::io::Error>>;
 
 /// Wrapper over a PVM that lets you step through it
 pub struct PvmStepper<
@@ -49,6 +53,7 @@ pub struct PvmStepper<
     inbox: Inbox,
     rollup_address: [u8; 20],
     origination_level: u32,
+    reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn>,
 }
 
 impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, Owned> {
@@ -81,12 +86,20 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
             )?;
         }
 
+        // TODO RV-458: Sandbox can load pre-images and provide them when it receives reveal request
+        // Currently, one sample record with dummy data is added to the map for testing purpose
+        let mut reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn> = HashMap::new();
+
+        reveal_request_response_map
+            .insert(Box::new([1u8; 100]), Arc::new(|| Ok(Box::new([2u8; 100]))));
+
         Ok(Self {
             pvm,
             hooks,
             inbox,
             rollup_address,
             origination_level,
+            reveal_request_response_map,
         })
     }
 
@@ -172,8 +185,50 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
                     }
                 }
             }
-            // TODO: RV-412: PVM handles reveal result from rollup node
-            PvmStatus::WaitingForReveal => todo!(),
+
+            PvmStatus::WaitingForReveal => {
+                let reveal_request = self.pvm.reveal_request();
+
+                let Some(reveal_response_getter) = self
+                    .reveal_request_response_map
+                    .get(reveal_request.as_slice())
+                else {
+                    return StepperStatus::Errored {
+                        steps: 0,
+                        cause: "PVM was waiting for reveal response".to_owned(),
+                        message: format!(
+                            "Unable to handle reveal request {:02X?}",
+                            reveal_request.as_slice()
+                        ),
+                    };
+                };
+
+                let reveal_response = match reveal_response_getter() {
+                    Ok(response) => response,
+                    Err(error) => {
+                        return StepperStatus::Errored {
+                            steps: 0,
+                            cause: "PVM was waiting for reveal response".to_owned(),
+                            message: format!(
+                                "Retrieving reveal response did not succeed with {:?}",
+                                error
+                            )
+                            .to_owned(),
+                        };
+                    }
+                };
+
+                let success = self.pvm.provide_reveal_response(&reveal_response);
+                if success {
+                    StepperStatus::Running { steps: 1 }
+                } else {
+                    StepperStatus::Errored {
+                        steps: 0,
+                        cause: "PVM was waiting for reveal response".to_owned(),
+                        message: "Providing reveal response did not succeed".to_owned(),
+                    }
+                }
+            }
         }
     }
 
@@ -192,6 +247,9 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
             // We don't want to re-use the same hooks to avoid polluting logs with refutation game
             // output. Instead we use hooks that don't do anything.
             hooks: PvmHooks::none(),
+
+            // TODO: RV-462 Pvm stepper uses response map less expensive to clone
+            reveal_request_response_map: self.reveal_request_response_map.clone(),
         }
     }
 
@@ -218,6 +276,9 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
             // We don't want to re-use the same hooks to avoid polluting logs with refutation game
             // output. Instead we use hooks that don't do anything.
             hooks: PvmHooks::none(),
+
+            // TODO: RV-462 Pvm stepper uses response map less expensive to clone
+            reveal_request_response_map: self.reveal_request_response_map.clone(),
         };
 
         match stepper.step_max_once(Bound::Included(1)) {

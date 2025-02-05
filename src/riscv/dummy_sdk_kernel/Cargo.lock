@@ -1012,6 +1012,7 @@ name = "riscv-dummy-sdk"
 version = "0.0.0"
 dependencies = [
  "tezos-smart-rollup",
+ "tezos-smart-rollup-constants",
 ]
 
 [[package]]
