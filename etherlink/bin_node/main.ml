@@ -1116,7 +1116,6 @@ let rpc_command =
           ?restricted_rpcs
           ~rpc_port
           ?rpc_addr
-          ~dal_slots:None
           read_write_config
           ~finalized_view
       in
@@ -1422,14 +1421,7 @@ let init_from_rollup_node_command =
     @@ rollup_node_data_dir_param @@ stop)
     (fun (data_dir, omit_delayed_tx_events) rollup_node_data_dir () ->
       let open Lwt_result_syntax in
-      let* configuration =
-        Cli.create_or_read_config
-          ~data_dir
-          ~keep_alive:false
-          ~verbose:false
-          ~finalized_view:false
-          ()
-      in
+      let* configuration = Cli.create_or_read_config ~data_dir () in
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
         ~configuration
         ~omit_delayed_tx_events
@@ -1549,13 +1541,10 @@ let replay_command =
       in
       let* configuration =
         Cli.create_or_read_config
-          ~keep_alive:false
           ~data_dir
-          ~verbose:false
           ?preimages
           ?preimages_endpoint
           ?native_execution_policy
-          ~finalized_view:false
           ()
       in
       Evm_node_lib_dev.Replay.main
@@ -1594,14 +1583,7 @@ let patch_kernel_command =
         let config = make_with_defaults ~verbosity:Warning () in
         init ~config ()
       in
-      let* configuration =
-        Cli.create_or_read_config
-          ~data_dir
-          ~keep_alive:false
-          ~verbose:false
-          ~finalized_view:false
-          ()
-      in
+      let* configuration = Cli.create_or_read_config ~data_dir () in
       (* We remove the [observer] configuration. This [patch] should not need
          to interact with an upstream EVM node. *)
       let configuration = {configuration with observer = None} in
@@ -2489,14 +2471,7 @@ let patch_state_command =
         let config = make_with_defaults ~verbosity:Warning () in
         init ~config ()
       in
-      let* configuration =
-        Cli.create_or_read_config
-          ~data_dir
-          ~keep_alive:false
-          ~verbose:false
-          ~finalized_view:false
-          ()
-      in
+      let* configuration = Cli.create_or_read_config ~data_dir () in
       if force then
         (* We remove the [observer] configuration. This [patch] should not need
            to interact with an upstream EVM node. *)
@@ -2532,14 +2507,7 @@ let preemptive_kernel_download_command =
          () ->
       let open Lwt_result_syntax in
       let* configuration =
-        Cli.create_or_read_config
-          ~data_dir
-          ~keep_alive:false
-          ~verbose:false
-          ?preimages
-          ?preimages_endpoint
-          ~finalized_view:false
-          ()
+        Cli.create_or_read_config ~data_dir ?preimages ?preimages_endpoint ()
       in
       let kernel_execution_config = configuration.kernel_execution in
       let*? preimages_endpoint =

@@ -276,10 +276,10 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -298,7 +298,7 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
@@ -316,10 +316,10 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -338,11 +338,11 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?history_mode:history_mode ->
     ?garbage_collector_parameters:garbage_collector_parameters ->
-    dal_slots:int trace option ->
+    ?dal_slots:int list ->
     t ->
     t
 
@@ -356,10 +356,10 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -378,7 +378,7 @@ module Cli : sig
     ?log_filter_chunk_size:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->

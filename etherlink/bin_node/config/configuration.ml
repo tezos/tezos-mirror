@@ -184,6 +184,10 @@ let default_sequencer_sidecar_endpoint = Uri.of_string "127.0.0.1:5303"
 
 let default_keep_alive = false
 
+let default_finalized_view = false
+
+let default_verbose = false
+
 let default_rollup_node_endpoint = Uri.of_string "http://localhost:8932"
 
 let default_rollup_node_tracking = true
@@ -1468,14 +1472,14 @@ let preimages_endpoint_resolved network preimages_endpoint =
 module Cli = struct
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
+      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
       ?proxy_ignore_block_param ?dal_slots ?network ?history_mode
       ?garbage_collector_parameters () =
     let public_rpc =
@@ -1577,12 +1581,15 @@ module Cli = struct
         Option.value
           ~default:default_tx_pool_tx_per_addr_limit
           tx_pool_tx_per_addr_limit;
-      keep_alive;
+      keep_alive = Option.value ~default:default_keep_alive keep_alive;
       rollup_node_endpoint;
-      verbose = (if verbose then Debug else Internal_event.Notice);
+      verbose =
+        (if Option.value verbose ~default:default_verbose then Debug
+         else Internal_event.Notice);
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
-      finalized_view;
+      finalized_view =
+        Option.value ~default:default_finalized_view finalized_view;
       garbage_collector_parameters =
         Option.value
           garbage_collector_parameters
@@ -1621,16 +1628,16 @@ module Cli = struct
 
   let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
+      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
       ?proxy_ignore_block_param ?history_mode ?garbage_collector_parameters
-      ~dal_slots configuration =
+      ?dal_slots configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1645,6 +1652,17 @@ module Cli = struct
       Option.map
         (patch_rpc ?rpc_port:private_rpc_port)
         configuration.private_rpc
+    in
+    let keep_alive =
+      Option.value keep_alive ~default:configuration.keep_alive
+    in
+    let finalized_view =
+      Option.value finalized_view ~default:configuration.finalized_view
+    in
+    let verbose =
+      match verbose with
+      | Some true -> Internal_event.Debug
+      | _ -> configuration.verbose
     in
     let sequencer =
       let sequencer_config = configuration.sequencer in
@@ -1873,7 +1891,7 @@ module Cli = struct
           tx_pool_tx_per_addr_limit;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
-      verbose = (if verbose then Debug else configuration.verbose);
+      verbose;
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
       finalized_view = finalized_view || configuration.finalized_view;
@@ -1887,14 +1905,14 @@ module Cli = struct
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ~verbose ?preimages ?preimages_endpoint
+      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ~finalized_view
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
       ?proxy_ignore_block_param ?dal_slots ?network ?history_mode
       ?garbage_collector_parameters () =
     let open Lwt_result_syntax in
@@ -1924,7 +1942,7 @@ module Cli = struct
           ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
-          ~keep_alive
+          ?keep_alive
           ?sequencer_key
           ?evm_node_endpoint
           ?threshold_encryption_bundler_endpoint
@@ -1943,17 +1961,17 @@ module Cli = struct
           ?tx_pool_tx_per_addr_limit
           ?rollup_node_endpoint
           ?dont_track_rollup_node
-          ~verbose
+          ?verbose
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
-          ~finalized_view
+          ?finalized_view
           ?proxy_ignore_block_param
           ?history_mode
           ?garbage_collector_parameters
-          ~dal_slots
+          ?dal_slots
           configuration
       in
       return configuration
@@ -1966,7 +1984,7 @@ module Cli = struct
           ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
-          ~keep_alive
+          ?keep_alive
           ?sequencer_key
           ?evm_node_endpoint
           ?threshold_encryption_bundler_endpoint
@@ -1985,13 +2003,13 @@ module Cli = struct
           ?tx_pool_tx_per_addr_limit
           ?rollup_node_endpoint
           ?dont_track_rollup_node
-          ~verbose
+          ?verbose
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ?sequencer_sidecar_endpoint
           ?restricted_rpcs
-          ~finalized_view
+          ?finalized_view
           ?proxy_ignore_block_param
           ?dal_slots
           ?network
