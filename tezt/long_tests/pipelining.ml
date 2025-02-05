@@ -45,7 +45,10 @@ let manager_kind_to_string = function
    unit in a block without exceeding the `hard_gas_limit_per_block` from the
    protocol (1.73M gas unit since P). *)
 let number_of_operation_from_manager_kind = function
-  | `Transfer -> 1333 (* x1040 gas units *)
+  | `Transfer -> 456
+  (* Gas cost for transfers has been increased by 2000 units.
+     It was previously 1040 and it's now 3040.
+     Since 1333 * (1040/3040) = 456, the number of expected operations is 456 *)
   | `Origination -> 13 (* x100_000 gas units *)
   | `Call -> 2 (* x650_000 gas units *)
 
@@ -595,7 +598,7 @@ let operation_and_block_validation protocol manager_kind tag =
         "for";
         "--minimal-timestamp";
         "--context";
-        data_dir // "context";
+        data_dir;
       ]
   in
   let io = Process.stdout p in
