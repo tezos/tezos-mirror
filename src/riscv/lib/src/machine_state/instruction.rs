@@ -2032,10 +2032,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Srai,
                 args: args.into(),
             },
-            InstrCacheable::CAndi(args) => Instruction {
-                opcode: OpCode::Andi,
-                args: args.into(),
-            },
+            InstrCacheable::CAndi(args) => Instruction::from_ic_candi(args),
             InstrCacheable::CMv(args) => {
                 Instruction::new_mv(args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }

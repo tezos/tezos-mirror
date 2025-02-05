@@ -177,4 +177,15 @@ impl Instruction {
             }
         }
     }
+
+    /// Convert [`InstrCacheable::CAndi`] according to whether register is non-zero.
+    pub(super) fn from_ic_candi(args: &CIBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_andi(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
+            }
+        }
+    }
 }

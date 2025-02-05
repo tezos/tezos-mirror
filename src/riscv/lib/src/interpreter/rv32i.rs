@@ -62,6 +62,7 @@ where
     ///
     /// Relevant RISC-V opcodes:
     /// - `ANDI`
+    /// - `C.ANDI`
     pub fn run_andi(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         let result = self.read_nz(rs1) & (imm as u64);
         self.write_nz(rd, result)
