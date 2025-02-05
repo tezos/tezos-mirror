@@ -677,8 +677,7 @@ module Term = struct
 
   let external_rpc_listen_addrs =
     let doc =
-      "The URL at which this external RPC server instance can be reached. \
-       Warning: this feature is unstable -- use it with care."
+      "The URL at which this external RPC server instance can be reached."
     in
     Arg.(
       value & opt_all string []
