@@ -57,9 +57,32 @@ let jobs pipeline_type : tezos_job list =
       ]
     |> enable_networked_cargo
   in
+
+  let job_build_homebrew_formula_macosx : tezos_job =
+    job
+      ~__POS__
+      ~name:"oc.install-homebrew-macosx"
+      ~image:Images.macosx_14
+      ~variables:[("TAGS", "saas-macos-medium-m1")]
+      ~dependencies:(Dependent [Job job_create_homebrew_formula])
+      ~stage
+      ~description:"Run the homebrew installation on gitlab MacOSX runners"
+      ~tag:Dynamic
+      [
+        "./scripts/packaging/homebrew_install.sh";
+        "eval $(/opt/homebrew/bin/brew shellenv)";
+        "./scripts/packaging/test_homebrew_install.sh";
+      ]
+  in
+
   match pipeline_type with
   | Release -> [job_create_homebrew_formula]
-  | Full -> [job_build_homebrew_formula; job_create_homebrew_formula]
+  | Full ->
+      [
+        job_build_homebrew_formula;
+        job_create_homebrew_formula;
+        job_build_homebrew_formula_macosx;
+      ]
 
 let jobs pipeline_type = job_datadog_pipeline_trace :: jobs pipeline_type
 
