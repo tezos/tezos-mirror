@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023, 2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023-2024 PK Lab <contact@pklab.io>
@@ -11,7 +11,8 @@ use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::{execute_fa_deposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
 use evm_execution::handler::{
-    ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult, RouterInterface,
+    ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult, FastWithdrawalInterface,
+    RouterInterface,
 };
 use evm_execution::precompiles::{self, PrecompileBTreeMap};
 use evm_execution::run_transaction;
@@ -552,9 +553,18 @@ pub fn handle_transaction_result<Host: Runtime>(
         log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
         log!(host, Benchmarking, "reason: {:?}", outcome.result);
         for message in outcome.withdrawals.drain(..) {
-            let outbox_message: OutboxMessage<RouterInterface> = message;
-            let len = outbox_queue.queue_message(host, outbox_message)?;
-            log!(host, Debug, "Length of the outbox queue: {}", len);
+            match message {
+                evm_execution::handler::Withdrawal::Standard(message) => {
+                    let outbox_message: OutboxMessage<RouterInterface> = message;
+                    let len = outbox_queue.queue_message(host, outbox_message)?;
+                    log!(host, Debug, "Length of the outbox queue: {}", len);
+                }
+                evm_execution::handler::Withdrawal::Fast(message) => {
+                    let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
+                    let len = outbox_queue.queue_message(host, outbox_message)?;
+                    log!(host, Debug, "Length of the outbox queue: {}", len);
+                }
+            }
         }
     }
 

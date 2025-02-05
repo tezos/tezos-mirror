@@ -55,6 +55,7 @@ type l1_contracts = {
   kernel_governance : string;
   kernel_security_governance : string;
   sequencer_governance : string option;
+  fast_withdrawal_contract_address : string;
 }
 
 type full_evm_setup = {
@@ -277,6 +278,16 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
         return (Some sequencer_admin)
     | None -> return None
   in
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
   return
     {
       exchanger;
@@ -285,6 +296,7 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
       kernel_governance;
       sequencer_governance;
       kernel_security_governance;
+      fast_withdrawal_contract_address;
     }
 
 type setup_mode =
@@ -310,7 +322,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?restricted_rpcs ?(enable_dal = false) ?dal_slots
-    ?(enable_multichain = false) ?websockets protocol =
+    ?(enable_multichain = false) ?websockets ?(enable_fast_withdrawal = false)
+    protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -384,6 +397,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ~output:output_config
         ~enable_dal
         ~enable_multichain
+        ~enable_fast_withdrawal
         ?dal_slots
         ()
     in
@@ -522,7 +536,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs ~setup_mode
     ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None)
-    ~enable_multichain ?websockets f protocols =
+    ~enable_multichain ?websockets ?enable_fast_withdrawal f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -577,6 +591,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ?dal_slots
               ~enable_multichain
               ?websockets
+              ?enable_fast_withdrawal
               protocol
           in
           f ~protocol ~evm_setup)
@@ -586,7 +601,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
 let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
-    ?maximum_allowed_ticks ?restricted_rpcs ?websockets f protocols =
+    ?maximum_allowed_ticks ?restricted_rpcs ?websockets ?enable_fast_withdrawal
+    f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -605,6 +621,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       ?maximum_allowed_ticks
       ?restricted_rpcs
       ?websockets
+      ?enable_fast_withdrawal
       f
       protocols
       ~enable_dal
@@ -2423,6 +2440,34 @@ let call_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
   in
   wait_for_application ~produce_block call_withdraw
 
+let call_fast_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
+    ~receiver ~fast_withdrawal_contract_address () =
+  let* () =
+    Eth_cli.add_abi
+      ~label:"fast_withdraw_base58"
+      ~abi:(fast_withdrawal_abi_path ())
+      ()
+  in
+  let call_fast_withdraw =
+    Eth_cli.contract_send
+      ?expect_failure
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi_label:"fast_withdraw_base58"
+      ~address:"0xff00000000000000000000000000000000000001"
+        (* NB: the third parameter is unused for now, could be used later for
+           maximum fees to pay, whitelist of service providers etc. *)
+      ~method_call:
+        (sf
+           {|fast_withdraw_base58("%s","%s","%s")|}
+           receiver
+           fast_withdrawal_contract_address
+           "0x0000000000000000000000000000000000000000000000000000000000000001")
+      ~value
+      ~gas:16_000_000
+  in
+  wait_for_application ~produce_block call_fast_withdraw
+
 let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
     ~produce_block ~evm_node ~sc_rollup_node ~sc_rollup_address ~client
     ~endpoint =
@@ -2435,6 +2480,34 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
       ~endpoint
       ~value:amount_wei
       ~receiver
+      ()
+  in
+  let* _ =
+    find_and_execute_withdrawal
+      ~withdrawal_level
+      ~commitment_period
+      ~challenge_window
+      ~evm_node
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~client
+      ()
+  in
+  unit
+
+let fast_withdraw ~commitment_period ~challenge_window ~amount_wei ~sender
+    ~receiver ~fast_withdrawal_contract_address ~produce_block ~evm_node
+    ~sc_rollup_node ~sc_rollup_address ~client ~endpoint =
+  let* withdrawal_level = Client.level client in
+  (* Call the withdrawal precompiled contract. *)
+  let* _tx =
+    call_fast_withdraw
+      ~produce_block
+      ~sender
+      ~endpoint
+      ~value:amount_wei
+      ~receiver
+      ~fast_withdrawal_contract_address
       ()
   in
   let* _ =
@@ -2485,6 +2558,7 @@ let test_deposit_and_withdraw =
     exchanger = _;
     sequencer_governance = _;
     kernel_security_governance = _;
+    _;
   } =
     match l1_contracts with
     | Some x -> x
@@ -2538,6 +2612,310 @@ let test_deposit_and_withdraw =
   Check.((balance = expected_balance) Tez.typ)
     ~error_msg:(sf "Expected %%R amount instead of %%L after withdrawal") ;
   return ()
+
+let test_deposit_and_fast_withdraw =
+  let admin = Constant.bootstrap5 in
+  let commitment_period = 5 and challenge_window = 5 in
+  register_proxy
+    ~tags:["evm"; "deposit"; "fast_withdraw"]
+    ~title:"Deposit and fast withdraw tez"
+    ~admin
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:true
+    ~kernels:[Kernel.Latest]
+  @@ fun ~protocol:_
+             ~evm_setup:
+               {
+                 client;
+                 sc_rollup_address;
+                 l1_contracts;
+                 sc_rollup_node;
+                 endpoint;
+                 evm_node;
+                 produce_block;
+                 _;
+               } ->
+  let {
+    bridge;
+    admin = _;
+    kernel_governance = _;
+    exchanger;
+    sequencer_governance = _;
+    kernel_security_governance = _;
+    fast_withdrawal_contract_address;
+  } =
+    match l1_contracts with
+    | Some x -> x
+    | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
+  in
+  let* service_provider =
+    Client.originate_contract
+      ~alias:"service_provider"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:
+        "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
+         \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0x00"
+      ~prg:(service_provider_path ())
+      ~burn_cap:(Tez.of_int 890)
+      client
+  in
+  let withdraw_amount = Tez.of_int 50 in
+  (* Define the service provider's Tezos public key hash (PKH). This address will act as the service provider in the test. *)
+  let service_provider_pkh = "tz1TGKSrZrBpND3PELJ43nVdyadoeiM1WMzb" in
+  let* initial_service_provider_balance =
+    Client.get_balance_for ~account:service_provider_pkh client
+  in
+
+  let fast_withdrawal_event_signature =
+    "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes)"
+  in
+  (* Define the fast withdrawal event log topic, which will be searched for in the EVM logs.
+     This topic is a hashed identifier that corresponds to the fast withdrawal transaction event. *)
+  let fast_withdrawal_event_topic =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest
+      (Bytes.of_string fast_withdrawal_event_signature)
+    |> Hex.of_bytes |> Hex.show |> add_0x
+  in
+
+  (* Function to extract the event data from the EVM logs based on the provided topic.
+     This searches the transaction logs for the specified topic and returns the corresponding data. *)
+  let extract_data_by_topic ~topic (logs : Transaction.tx_log list) =
+    List.find_opt
+      (fun tx ->
+        match tx.Transaction.topics with
+        | [x] when String.equal x topic -> true
+        | _ -> false)
+      logs
+    |> Option.map (fun tx_log -> tx_log.Transaction.data)
+  in
+
+  (* Function to execute the payout by invoking the `payout_proxy` entrypoint on the L1 contract.
+     The payout transfers funds to the service provider based on the withdrawal details. *)
+  let execute_payout ~withdrawal_id ~fast_withdrawal_contract_address ~target
+      ~timestamp ~service_provider_proxy ~payload =
+    Client.transfer
+      ~force:true
+      ~wait:"1"
+      ~fee:(Tez.of_int 1) (* Small fee for the transaction *)
+      ~fee_cap:(Tez.of_int 1)
+      ~gas_limit:100_000_000
+      ~storage_limit:Int.max_int
+      ~burn_cap:(Tez.of_int 100)
+      ~amount:withdraw_amount
+        (* Transfer 50 tez as part of the payout to the service provider *)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:service_provider_proxy
+      ~entrypoint:"payout_proxy"
+      ~arg:
+        (Printf.sprintf
+           "(Pair %S %S %s %S %s %S %s)"
+           fast_withdrawal_contract_address
+           exchanger
+           withdrawal_id
+           target
+           timestamp
+           service_provider_pkh
+           payload)
+      client
+  in
+
+  (* Function to handle the payout after detecting the fast withdrawal event.
+     It continuously checks the EVM logs for the fast withdrawal event and executes the payout once it's found. *)
+  let payout_service_provider ~withdraw_receiver =
+    let rec loop_until_event_detected () =
+      let*@ all_logs = Rpc.get_logs ~from_block:(Number 0) evm_node in
+      let data =
+        extract_data_by_topic ~topic:fast_withdrawal_event_topic all_logs
+        |> Option.map (fun s -> String.sub s 2 (String.length s - 2))
+      in
+      let* () = Lwt_unix.sleep 1. in
+      match data with
+      | Some data -> return data
+      | None -> loop_until_event_detected ()
+    in
+    let* data = loop_until_event_detected () in
+    (* Decode the fast withdrawal event to extract the withdrawal details, including target address, withdrawal ID, and timestamp. *)
+    let* res =
+      Eth_cli.decode_method
+        ~abi_label:fast_withdrawal_event_signature
+        ~method_:(String.sub fast_withdrawal_event_topic 2 8 ^ data)
+        ()
+    in
+    let open Ezjsonm in
+    let _target, withdrawal_id, amount, timestamp, payload =
+      let json = from_string res in
+      match json with
+      | `A
+          [
+            `String target;
+            `String withdrawal_id;
+            `String amount;
+            `String timestamp;
+            `String payload;
+          ] ->
+          (target, withdrawal_id, amount, timestamp, payload)
+      | _ -> assert false
+    in
+    assert (Wei.of_tez withdraw_amount = Wei.of_string amount) ;
+
+    (* Execute the payout to the service provider using the withdrawal details extracted from the event. *)
+    let* () =
+      execute_payout
+        ~service_provider_proxy:service_provider
+        ~withdrawal_id
+        ~fast_withdrawal_contract_address
+        ~target:withdraw_receiver
+        ~timestamp
+        ~payload
+    in
+    Lwt.return_unit
+  in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = Tez.of_int 100 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Check the initial balance of the L1 withdraw receiver. It should be 0 before the fast withdrawal occurs. *)
+  let* balance_withdraw_receiver =
+    Client.get_balance_for ~account:withdraw_receiver client
+  in
+  Check.((balance_withdraw_receiver = Tez.of_int 0) Tez.typ)
+    ~error_msg:"Expected %R as initial balance instead of %L" ;
+
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    deposit
+      ~amount_mutez:deposit_amount
+      ~sc_rollup_address
+      ~bridge
+      ~depositor:admin
+      ~receiver:receiver.address
+      ~produce_block
+      client
+  in
+
+  (* Check that the receiver's balance in the rollup matches the deposited amount. *)
+  let* () = check_balance ~receiver:receiver.address ~endpoint deposit_amount in
+
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  (* Perform the fast withdrawal from the rollup, transferring 50 tez to the L1 withdrawal contract. *)
+  let* _tx =
+    fast_withdraw
+      ~produce_block
+      ~evm_node
+      ~sc_rollup_address
+      ~commitment_period
+      ~challenge_window
+      ~amount_wei:withdraw_amount_wei
+      ~sender:receiver
+      ~receiver:withdraw_receiver
+      ~fast_withdrawal_contract_address
+      ~sc_rollup_node
+      ~client
+      ~endpoint
+  and* () = payout_service_provider ~withdraw_receiver in
+
+  let* balance = Client.get_balance_for ~account:withdraw_receiver client in
+  let* final_withdraw_receiver_balance =
+    Client.get_balance_for ~account:service_provider_pkh client
+  in
+
+  (* Check that the L1 withdrawal contract now has a balance of 50 tez after the fast withdrawal is complete. *)
+  Check.((balance = withdraw_amount) Tez.typ)
+    ~error_msg:"Expected %R amount instead of %L after withdrawal" ;
+
+  (* Verify that the service provider's balance increased by 50 tez after the fast withdrawal payout. *)
+  Check.(
+    (Tez.(initial_service_provider_balance + withdraw_amount)
+    = final_withdraw_receiver_balance)
+      Tez.typ)
+    ~error_msg:
+      "Expected %R amount instead of %L after outbox message was executed" ;
+  return ()
+
+let test_fast_withdraw_feature_flag_deactivated =
+  let admin = Constant.bootstrap5 in
+  let commitment_period = 5 and challenge_window = 5 in
+  register_proxy
+    ~tags:["evm"; "feature_flag"; "fast_withdraw"]
+    ~title:"Check fast withdraw tez is deactivated with feature flag"
+    ~admin
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:false
+    ~kernels:[Kernel.Latest]
+  @@ fun ~protocol:_
+             ~evm_setup:
+               {
+                 client;
+                 sc_rollup_address;
+                 l1_contracts;
+                 endpoint;
+                 produce_block;
+                 _;
+               } ->
+  let {bridge; fast_withdrawal_contract_address; _} =
+    match l1_contracts with
+    | Some x -> x
+    | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
+  in
+  let withdraw_amount = Tez.of_int 50 in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = Tez.of_int 100 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    deposit
+      ~amount_mutez:deposit_amount
+      ~sc_rollup_address
+      ~bridge
+      ~depositor:admin
+      ~receiver:receiver.address
+      ~produce_block
+      client
+  in
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  (* Perform the fast withdrawal from the rollup, transferring 50 tez to the L1 withdrawal contract. *)
+  let* err =
+    call_fast_withdraw
+      ~expect_failure:true
+      ~produce_block
+      ~value:withdraw_amount_wei
+      ~sender:receiver
+      ~receiver:withdraw_receiver
+      ~fast_withdrawal_contract_address
+      ~endpoint
+      ()
+  in
+  if not (err =~ rex "Error") then Test.fail "Test should fail with error" ;
+  unit
 
 let test_withdraw_amount =
   let admin = Constant.bootstrap5 in
@@ -6257,6 +6635,8 @@ let register_evm_node ~protocols =
   test_eth_call_input protocols ;
   test_preinitialized_evm_kernel protocols ;
   test_deposit_and_withdraw protocols ;
+  test_deposit_and_fast_withdraw protocols ;
+  test_fast_withdraw_feature_flag_deactivated protocols ;
   test_withdraw_amount protocols ;
   test_withdraw_via_calls protocols ;
   test_estimate_gas protocols ;

@@ -82,6 +82,7 @@ val register_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  ?enable_fast_withdrawal:bool ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?threshold_encryption:bool ->
@@ -138,6 +139,7 @@ val register_test_for_kernels :
   enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
+  ?enable_fast_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
   title:string ->
   tags:string list ->
@@ -173,6 +175,7 @@ val setup_sequencer :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  ?enable_fast_withdrawal:bool ->
   ?threshold_encryption:bool ->
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->

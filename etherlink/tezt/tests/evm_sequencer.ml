@@ -249,7 +249,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?history_mode
+    ?websockets ?enable_fast_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ~title ~tags body
@@ -310,6 +310,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?maximum_gas_per_transaction
                 ?max_blueprint_lookahead_in_seconds
                 ?enable_fa_bridge
+                ?enable_fast_withdrawal
                 ?additional_uses
                 ?rpc_server
                 ?websockets
@@ -7925,6 +7926,24 @@ let test_multichain_feature_flag =
       "Multichain feature flag in the durable storage is %L, expected %R" ;
   unit
 
+let test_fast_withdrawal_feature_flag =
+  register_all
+    ~tags:["fast_withdrawal"; "feature_flag"]
+    ~title:"Fast withdrawal feature is set in storage"
+    ~enable_fast_withdrawal:true
+  @@ fun {sequencer; _} _protocol ->
+  (* We simply check that the flag is set in the storage. *)
+  let*@ flag =
+    Rpc.state_value sequencer Durable_storage_path.enable_fast_withdrawal
+  in
+  Check.is_true
+    (Option.is_some flag)
+    ~error_msg:
+      (sf
+         "Expected to have a value at %s"
+         Durable_storage_path.enable_fast_withdrawal) ;
+  unit
+
 let test_trace_call =
   register_all
     ~kernels:[Latest]
@@ -9889,6 +9908,7 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_multichain_feature_flag protocols ;
+  test_fast_withdrawal_feature_flag protocols ;
   test_trace_call protocols ;
   test_trace_empty_block protocols ;
   test_trace_block protocols ;

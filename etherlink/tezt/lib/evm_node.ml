@@ -1589,7 +1589,8 @@ let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
     ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_dal = false)
-    ?dal_slots ?(enable_multichain = false) ~output () =
+    ?dal_slots ?(enable_fast_withdrawal = false) ?(enable_multichain = false)
+    ~output () =
   let set_account_code =
     List.flatten
     @@ List.map
@@ -1650,6 +1651,7 @@ let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
     @ Cli_arg.optional_switch "enable-fa-bridge" enable_fa_bridge
     @ Cli_arg.optional_switch "enable-multichain" enable_multichain
     @ Cli_arg.optional_switch "enable-dal" enable_dal
+    @ Cli_arg.optional_switch "enable-fast-withdrawal" enable_fast_withdrawal
     @ Cli_arg.optional_arg
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))

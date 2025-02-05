@@ -16,8 +16,17 @@ let admin_path () = Base.(project_root // "etherlink/tezos_contracts/admin.tz")
 let withdrawal_abi_path () =
   Base.(project_root // "etherlink/tezos_contracts/withdrawal.abi")
 
+let fast_withdrawal_path () =
+  Base.(project_root // "etherlink/tezos_contracts/fast_withdrawal_mockup.tz")
+
+let fast_withdrawal_abi_path () =
+  Base.(project_root // "etherlink/tezos_contracts/fast_withdrawal.abi")
+
 let fa_withdrawal_abi_path () =
   Base.(project_root // "etherlink/tezos_contracts/fa_withdrawal.abi")
+
+let service_provider_path () =
+  Base.(project_root // "etherlink/tezos_contracts/service_provider.tz")
 
 let delayed_path ~kernel =
   (* The path to the delayed transaction bridge depends on the version

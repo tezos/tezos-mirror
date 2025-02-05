@@ -24,6 +24,8 @@
 [kgov]: https://better-call.dev/mainnet/KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK/operations
 [sgov]: https://better-call.dev/mainnet/KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2/operations
 [sqgov]: https://better-call.dev/mainnet/KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U/operations
+- A fast withdrawal entrypoint was added to the withdrawal precompiled contract
+  under a feature flag. (!16417)
 
 ### Internal
 
