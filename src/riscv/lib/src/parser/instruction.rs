@@ -301,6 +301,7 @@ pub enum InstrCacheable {
     Addiw(NonZeroRdITypeArgs),
     Xori(NonZeroRdITypeArgs),
     Ori(NonZeroRdITypeArgs),
+    /// `ANDI` - Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
     Andi(NonZeroRdITypeArgs),
     Slli(NonZeroRdITypeArgs),
     Srli(NonZeroRdITypeArgs),

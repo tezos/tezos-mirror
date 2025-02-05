@@ -7,7 +7,9 @@ use crate::{
     default::ConstDefault,
     machine_state::registers::{nz, NonZeroXRegister},
     parser::{
-        instruction::{CIBTypeArgs, InstrWidth, NonZeroRdRTypeArgs, SplitITypeArgs},
+        instruction::{
+            CIBTypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs, SplitITypeArgs,
+        },
         split_x0, XRegisterParsed,
     },
 };
@@ -102,6 +104,28 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Andi` [`OpCode`].
+    pub(crate) fn new_andi(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Andi,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                // We are adding a default value for rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -138,6 +162,18 @@ impl Instruction {
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
             X::NonZero(rd_rs1) => {
                 Instruction::new_addi(rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Andi`] according to whether register is non-zero.
+    pub(super) fn from_ic_andi(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // Bitwise AND with zero is zero: `x & 0 == 0`
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            X::NonZero(rs1) => {
+                Instruction::new_andi(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
         }
     }
