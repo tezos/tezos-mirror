@@ -126,6 +126,28 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Ori` [`OpCode`].
+    pub(crate) fn new_ori(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Ori,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                // We are adding a default value for rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -185,6 +207,18 @@ impl Instruction {
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
             X::NonZero(rd_rs1) => {
                 Instruction::new_andi(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Ori`] according to whether register is non-zero.
+    pub(super) fn from_ic_ori(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // Bitwise OR with zero is identity: `x | 0 == x`
+            X::X0 => Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed),
+            X::NonZero(rs1) => {
+                Instruction::new_ori(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
         }
     }

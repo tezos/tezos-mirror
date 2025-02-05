@@ -68,11 +68,12 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `ORI` I-type instruction
-    ///
     /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
-    pub fn run_ori(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
-        let result = self.read(rs1) | (imm as u64);
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - `ORI`
+    pub fn run_ori(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
+        let result = self.read_nz(rs1) | (imm as u64);
         self.write_nz(rd, result)
     }
 
@@ -602,11 +603,11 @@ mod tests {
             prop_assert_eq!(state.read(a2), val & positive_imm);
 
             state.write(a0, val);
-            state.run_ori(negative_imm as i64, a0, nz::a0);
+            state.run_ori(negative_imm as i64, nz::a0, nz::a0);
             prop_assert_eq!(state.read(a0), val | negative_imm);
 
             state.write(a0, val);
-            state.run_ori(positive_imm as i64, a0, nz::a1);
+            state.run_ori(positive_imm as i64, nz::a0, nz::a1);
             prop_assert_eq!(state.read(a1), val | positive_imm);
 
             state.write(t2, val);
