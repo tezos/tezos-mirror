@@ -191,13 +191,11 @@ let write_rules_file t =
 
 (* Prometheus can reload its configuration by first sending the POST RPC and
    then the signal SIGHUP. *)
-let reload _t =
+let reload t =
   let* () =
-    Process.run
-      "curl"
-      ["-XPOST"; sf "http://localhost:%d/-/reload" Env.prometheus_port]
+    Process.run "curl" ["-XPOST"; sf "http://localhost:%d/-/reload" t.port]
   in
-  Process.run "docker" ["kill"; "--signal"; "SIGHUP"; "prometheus"]
+  Process.run "docker" ["kill"; "--signal"; "SIGHUP"; t.name]
 
 let add_job t ?(metrics_path = "/metrics") ~name targets =
   let source = {name; metrics_path; targets} in
