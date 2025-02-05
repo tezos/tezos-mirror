@@ -122,7 +122,11 @@ where
     /// encoded in the instruction (see U:C-16.5).
     pub fn run_caddi16sp(&mut self, imm: i64) {
         debug_assert!(imm != 0 && imm % 16 == 0);
-        self.run_addi(imm, sp, sp)
+        // Return the lower XLEN (64 bits in our case) bits of the addition
+        // Irrespective of sign, the result is the same, casting to u64 for addition
+        let rval = self.read(sp);
+        let result = rval.wrapping_add(imm as u64);
+        self.write(sp, result)
     }
 
     /// `C.ADDI4SPN` CIW-type compressed instruction
@@ -133,7 +137,11 @@ where
     /// encoded in the instruction (see U:C-16.5).
     pub fn run_caddi4spn(&mut self, imm: i64, rd: XRegister) {
         debug_assert!(imm > 0 && imm % 4 == 0);
-        self.run_addi(imm, sp, rd)
+        // Return the lower XLEN (64 bits in our case) bits of the addition
+        // Irrespective of sign, the result is the same, casting to u64 for addition
+        let rval = self.read(sp);
+        let result = rval.wrapping_add(imm as u64);
+        self.write(rd, result)
     }
 
     /// `C.SLLI` CI-type compressed instruction

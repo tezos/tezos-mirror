@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::XRegisterParsed;
 use crate::{
     default::ConstDefault,
     interpreter::float::RoundingMode,
@@ -37,6 +38,13 @@ pub struct ITypeArgs {
     pub imm: i64,
 }
 
+/// Intermediate representation of Args for I-type instructions with parsed split of registers.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct SplitITypeArgs {
+    pub(crate) rd: XRegisterParsed,
+    pub(crate) rs1: XRegisterParsed,
+    pub imm: i64,
+}
 /// Intermediate representation of Args for I-type instructions with guaranteed `rd` != `x0`.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NonZeroRdITypeArgs {
@@ -288,7 +296,7 @@ pub enum InstrCacheable {
     Sraw(NonZeroRdRTypeArgs),
 
     // RV64I I-type instructions
-    Addi(ITypeArgs),
+    Addi(SplitITypeArgs),
     Addiw(NonZeroRdITypeArgs),
     Xori(NonZeroRdITypeArgs),
     Ori(NonZeroRdITypeArgs),

@@ -26,12 +26,12 @@ where
     /// `ADDI` I-type instruction
     ///
     /// Add `imm` to val(rs1) and store the result in `rd`
-    pub fn run_addi(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_addi(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // Return the lower XLEN (64 bits in our case) bits of the addition
         // Irrespective of sign, the result is the same, casting to u64 for addition
-        let rval = self.read(rs1);
+        let rval = self.read_nz(rs1);
         let result = rval.wrapping_add(imm as u64);
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `SUB` R-type instruction
@@ -396,7 +396,7 @@ mod tests {
             main_memory::{tests::T1K, Address},
             mode::Mode,
             registers::{
-                a0, a1, a2, a3, a4, fa0, nz, t0, t1, t2, t3, t4, XRegisters, XRegistersLayout,
+                a0, a1, a2, a3, a4, fa0, nz, t0, t1, t2, t3, XRegisters, XRegistersLayout,
             },
             MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
         },
@@ -410,20 +410,20 @@ mod tests {
 
     backend_test!(test_add_sub, F, {
         let imm_rs1_rd_res = [
-            (0_i64, 0_u64, t3, 0_u64),
-            (0, 0xFFF0_0420, t2, 0xFFF0_0420),
-            (-1, 0, t4, 0xFFFF_FFFF_FFFF_FFFF),
+            (0_i64, 0_u64, nz::t3, 0_u64),
+            (0, 0xFFF0_0420, nz::t2, 0xFFF0_0420),
+            (-1, 0, nz::t4, 0xFFFF_FFFF_FFFF_FFFF),
             (
                 1_000_000,
                 -123_000_987_i64 as u64,
-                a2,
+                nz::a2,
                 -122_000_987_i64 as u64,
             ),
-            (1_000_000, 123_000_987, a2, 124_000_987),
+            (1_000_000, 123_000_987, nz::a2, 124_000_987),
             (
                 -1,
                 -321_000_000_000_i64 as u64,
-                a1,
+                nz::a1,
                 -321_000_000_001_i64 as u64,
             ),
         ];
@@ -433,8 +433,8 @@ mod tests {
 
             state.hart.xregisters.write(a0, rs1);
             state.hart.xregisters.write(t0, imm as u64);
-            state.hart.xregisters.run_addi(imm, a0, rd);
-            assert_eq!(state.hart.xregisters.read(rd), res);
+            state.hart.xregisters.run_addi(imm, nz::a0, rd);
+            assert_eq!(state.hart.xregisters.read_nz(rd), res);
             run_add(&mut state, nz::a0, nz::t0, nz::a0);
             assert_eq!(state.hart.xregisters.read(a0), res);
             // test sub with: res - imm = rs1 and res - rs1 = imm

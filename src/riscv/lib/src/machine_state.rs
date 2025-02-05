@@ -722,9 +722,10 @@ mod tests {
         },
         parser::{
             instruction::{
-                CIBNZTypeArgs, ITypeArgs, Instr, InstrCacheable, InstrWidth, SBTypeArgs,
+                CIBNZTypeArgs, Instr, InstrCacheable, InstrWidth, SBTypeArgs, SplitITypeArgs,
             },
             parse_block,
+            XRegisterParsed::*,
         },
         state_backend::{
             test_helpers::{assert_eq_struct, copy_via_serde, TestBackendFactory},
@@ -919,9 +920,9 @@ mod tests {
         const I_LOAD_6_INTO_T2: u32 = 0b11000000000001110010011;
         assert_eq!(
             parse_block(&I_LOAD_6_INTO_T2.to_le_bytes()),
-            [Instr::Cacheable(InstrCacheable::Addi(ITypeArgs {
-                rd: t2,
-                rs1: zero,
+            [Instr::Cacheable(InstrCacheable::Addi(SplitITypeArgs {
+                rd: NonZero(nz::t2),
+                rs1: X0,
                 imm: 6,
             }))]
         );
@@ -930,9 +931,9 @@ mod tests {
         const I_LOAD_5_INTO_T2: u32 = 0b10100000000001110010011;
         assert_eq!(
             parse_block(&I_LOAD_5_INTO_T2.to_le_bytes()),
-            [Instr::Cacheable(InstrCacheable::Addi(ITypeArgs {
-                rd: t2,
-                rs1: zero,
+            [Instr::Cacheable(InstrCacheable::Addi(SplitITypeArgs {
+                rd: NonZero(nz::t2),
+                rs1: X0,
                 imm: 5,
             }))]
         );
