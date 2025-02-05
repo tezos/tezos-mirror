@@ -296,6 +296,7 @@ pub enum InstrCacheable {
     Sraw(NonZeroRdRTypeArgs),
 
     // RV64I I-type instructions
+    /// `ADDI` - Add `imm` to val(rs1) and store the result in `rd`.
     Addi(SplitITypeArgs),
     Addiw(NonZeroRdITypeArgs),
     Xori(NonZeroRdITypeArgs),
@@ -465,6 +466,8 @@ pub enum InstrCacheable {
     /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
     CLi(CIBNZTypeArgs),
     CLui(CIBNZTypeArgs),
+    /// `C.ADDI` - Adds the non-zero sign-extended 6-bit `imm`
+    /// to the value in `rd_rs1` then writes the result to `rd_rs1`.
     CAddi(CIBNZTypeArgs),
     CAddi16sp(CJTypeArgs),
     CAddi4spn(CIBTypeArgs),

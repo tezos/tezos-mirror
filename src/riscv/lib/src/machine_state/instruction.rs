@@ -335,7 +335,6 @@ pub enum OpCode {
     CJr,
     CJalr,
     CLui,
-    CAddi,
     CAddi16sp,
     CAddi4spn,
     CSlli,
@@ -543,7 +542,6 @@ impl OpCode {
             Self::Bnez => Args::run_bnez,
             Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
-            Self::CAddi => Args::run_caddi,
             Self::CAddi16sp => Args::run_caddi16spn,
             Self::CAddi4spn => Args::run_caddi4spn,
             Self::CSlli => Args::run_cslli,
@@ -1288,7 +1286,6 @@ impl Args {
     impl_cb_type!(run_bnez);
     impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
-    impl_ci_type!(run_caddi, non_zero);
     impl_ci_type!(run_caddi4spn);
     impl_ci_type!(run_cslli, non_zero);
     impl_cr_type!(run_cand);
@@ -2031,10 +2028,9 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CLui,
                 args: args.into(),
             },
-            InstrCacheable::CAddi(args) => Instruction {
-                opcode: OpCode::CAddi,
-                args: args.into(),
-            },
+            InstrCacheable::CAddi(args) => {
+                Instruction::new_addi(args.rd_rs1, args.rd_rs1, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CAddi16sp(args) => Instruction {
                 opcode: OpCode::CAddi16sp,
                 args: args.into(),

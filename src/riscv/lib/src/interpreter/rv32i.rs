@@ -23,9 +23,11 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `ADDI` I-type instruction
-    ///
     /// Add `imm` to val(rs1) and store the result in `rd`
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - `ADDI`
+    /// - `C.ADDI`
     pub fn run_addi(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // Return the lower XLEN (64 bits in our case) bits of the addition
         // Irrespective of sign, the result is the same, casting to u64 for addition
