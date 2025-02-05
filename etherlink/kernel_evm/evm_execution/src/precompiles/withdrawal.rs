@@ -302,7 +302,7 @@ fn event_log(
     debug_assert!(data.len() % 32 == 0);
 
     Log {
-        address: H160::zero(),
+        address: WITHDRAWAL_ADDRESS,
         topics: vec![H256(WITHDRAWAL_EVENT_TOPIC)],
         data,
     }
@@ -460,7 +460,7 @@ mod tests {
     + 15_000_000; // cost of calling withdrawal precompiled contract (hard cap because of low gas price)
 
         let expected_log = Log {
-            address: H160::zero(),
+            address: WITHDRAWAL_ADDRESS,
             topics: vec![H256(WITHDRAWAL_EVENT_TOPIC)],
             data: [
                 [
@@ -538,7 +538,7 @@ mod tests {
     + 15_000_000; // cost of calling withdrawal precompiled contract (hard cap because of low gas price)
 
         let expected_log = Log {
-            address: H160::zero(),
+            address: WITHDRAWAL_ADDRESS,
             topics: vec![H256(WITHDRAWAL_EVENT_TOPIC)],
             data: [
                 [
