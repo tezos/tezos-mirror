@@ -47,7 +47,7 @@ struct
     | Tezos_crypto.Signature.Ed25519 -> "ed25519"
     | Tezos_crypto.Signature.Secp256k1 -> "secp256k1"
     | Tezos_crypto.Signature.P256 -> "p256"
-    | Tezos_crypto.Signature.Bls -> "bls"
+    | Tezos_crypto.Signature.Bls_aug -> "bls"
 
   module Sampler = Crypto_samplers.Make_finite_key_pool (struct
     let size = 256
@@ -221,7 +221,7 @@ module P256 = Make_elliptic_curve_encoding_benchmarks (struct
 end)
 
 module Bls = Make_elliptic_curve_encoding_benchmarks (struct
-  let algo = Tezos_crypto.Signature.Bls
+  let algo = Tezos_crypto.Signature.Bls_aug
 end)
 
 let chain_id_encoding =

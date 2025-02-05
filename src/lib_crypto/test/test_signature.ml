@@ -61,7 +61,7 @@ let test_size () =
   in
   assert (Compare.Int.(expected = length)) ;
   let length =
-    let _pkh, pk, _sk = generate_key ~algo:Bls () in
+    let _pkh, pk, _sk = generate_key ~algo:Bls_aug () in
     Public_key.size pk
   in
   let expected =
@@ -81,7 +81,7 @@ let test_of_bytes_without_validation () =
       in
       let pk2 = Signature.Public_key.of_bytes_without_validation bytes in
       assert (Some pk = pk2))
-    [Ed25519; Secp256k1; P256; Bls]
+    [Ed25519; Secp256k1; P256; Bls_aug]
 
 let secp256k1_sig_to_hex signature =
   Hex.show @@ Hex.of_string

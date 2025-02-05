@@ -810,7 +810,7 @@ let fake_sign_from_pk pk msg =
   Bytes.blit msg 0 tmp half (all_or_half msg) ;
   of_bytes_exn tmp
 
-type algo = Ed25519 | Secp256k1 | P256 | Bls
+type algo = Ed25519 | Secp256k1 | P256 | Bls_aug
 
 let fake_sign ?watermark:_ secret_key msg =
   let pk = Secret_key.to_public_key secret_key in
@@ -827,7 +827,7 @@ let hardcoded_sk algo : secret_key =
   | P256 ->
       Secret_key.of_b58check_exn
         "p2sk2k6YAkNJ8CySZCS3vGA5Ht6Lj6LXG3yb8UrHvMKZy7Ab8JUtWh"
-  | Bls ->
+  | Bls_aug ->
       Secret_key.of_b58check_exn
         "BLsk1hfuv6V8JJRaLDBJgPTRGLKusTZnTmWGrvSKYzUaMuzvPLmeGG"
 
@@ -837,9 +837,9 @@ let hardcoded_pk =
     ( Secret_key.to_public_key (hardcoded_sk Ed25519),
       Secret_key.to_public_key (hardcoded_sk Secp256k1),
       Secret_key.to_public_key (hardcoded_sk P256),
-      Secret_key.to_public_key (hardcoded_sk Bls) )
+      Secret_key.to_public_key (hardcoded_sk Bls_aug) )
   in
-  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
+  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls_aug -> bls
 
 let hardcoded_msg = Bytes.of_string "Cheers"
 
@@ -849,16 +849,16 @@ let hardcoded_sig =
     ( sign (hardcoded_sk Ed25519) hardcoded_msg,
       sign (hardcoded_sk Secp256k1) hardcoded_msg,
       sign (hardcoded_sk P256) hardcoded_msg,
-      sign (hardcoded_sk Bls) hardcoded_msg )
+      sign (hardcoded_sk Bls_aug) hardcoded_msg )
   in
-  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
+  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls_aug -> bls
 
 let algo_of_pk (pk : Public_key.t) =
   match pk with
   | Ed25519 _ -> Ed25519
   | Secp256k1 _ -> Secp256k1
   | P256 _ -> P256
-  | Bls_aug _ -> Bls
+  | Bls_aug _ -> Bls_aug
 
 let fast_fake_sign ?watermark:_ sk _msg =
   let pk = Secret_key.to_public_key sk in
@@ -937,7 +937,7 @@ let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
 
 let concat msg signature = Bytes.cat msg (to_bytes signature)
 
-let algos = [Ed25519; Secp256k1; P256; Bls]
+let algos = [Ed25519; Secp256k1; P256; Bls_aug]
 
 let fake_generate_key (pkh, pk, _) =
   let sk_of_pk (pk : public_key) : secret_key =
@@ -962,7 +962,7 @@ let generate_key ?(algo = Ed25519) ?seed () =
   | P256 ->
       let pkh, pk, sk = P256.generate_key ?seed () in
       (Public_key_hash.P256 pkh, Public_key.P256 pk, Secret_key.P256 sk)
-  | Bls ->
+  | Bls_aug ->
       let pkh, pk, sk = Bls_aug.generate_key ?seed () in
       (Public_key_hash.Bls_aug pkh, Public_key.Bls_aug pk, Secret_key.Bls_aug sk)
 

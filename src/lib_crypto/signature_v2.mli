@@ -82,7 +82,7 @@ val of_p256 : P256.t -> t
 val of_bls : Bls_aug.t -> t
 
 (** The type of signing algorithms. *)
-type algo = Ed25519 | Secp256k1 | P256 | Bls
+type algo = Ed25519 | Secp256k1 | P256 | Bls_aug
 
 (** The list of signing algorithm supported, i.e. all constructors of type
     {!algo}. *)
