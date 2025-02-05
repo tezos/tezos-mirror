@@ -84,7 +84,9 @@ module Raw = struct
             Signature.P256.Secret_key.encoding
             sk
       | Decrypted_sk (Bls_aug sk) ->
-          Data_encoding.Binary.to_bytes_exn Signature.Bls.Secret_key.encoding sk
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Bls_aug.Secret_key.encoding
+            sk
     in
     Bytes.cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)
 
@@ -138,7 +140,7 @@ module Raw = struct
     | Some bytes, Encrypted_sk Signature.Bls_aug -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Signature.Bls.Secret_key.encoding
+            Signature.Bls_aug.Secret_key.encoding
             bytes
         with
         | Some sk ->

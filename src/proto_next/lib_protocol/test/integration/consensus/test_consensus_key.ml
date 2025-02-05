@@ -295,7 +295,7 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
           Environment.Ecoproto_error
             (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
         ]
-        when Signature.Bls.Public_key.(pk = tz4_pk) ->
+        when Signature.Bls_aug.Public_key.(pk = tz4_pk) ->
           return_unit
       | err ->
           failwith

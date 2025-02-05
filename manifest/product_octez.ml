@@ -6440,7 +6440,7 @@ let hash = Protocol.hash
             S "%{targets}";
             S
               (sf
-                 {|  module Bls = Tezos_crypto.Signature.Bls
+                 {|  module Bls_aug = Tezos_crypto.Signature.Bls_aug
   module Ed25519 = Tezos_crypto.Signature.Ed25519
   module P256 = Tezos_crypto.Signature.P256
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1

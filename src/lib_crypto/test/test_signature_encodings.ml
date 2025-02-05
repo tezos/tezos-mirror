@@ -173,7 +173,7 @@ module Test_P256 =
 
 module Test_Bls =
   Make_tests
-    (Signature.Bls)
+    (Signature.Bls_aug)
     (struct
       let name = "bls12_381"
 

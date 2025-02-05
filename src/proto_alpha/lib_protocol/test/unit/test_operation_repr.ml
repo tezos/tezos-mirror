@@ -96,7 +96,7 @@ module Test_operation_repr = struct
     | Error _ -> return_unit
 
   let zero_bls =
-    match Signature.(split_signature (Bls Signature.Bls.zero)) with
+    match Signature.(split_signature (Bls Signature.Bls_aug.zero)) with
     | {prefix = None; _} -> assert false
     | {prefix = Some prefix; suffix} ->
         let prefix =
