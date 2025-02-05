@@ -9,7 +9,6 @@
   lwt-watcher
   lwt-canceler
   octez-libs.prometheus
-  octez-libs.octez-profiler-backend
   octez-libs.base
   octez-libs.base.unix
   octez-libs.rpc
@@ -21,6 +20,8 @@
   octez-libs.stdlib-unix
   octez-shell-libs.shell-services
   octez-libs.tezos-p2p-services
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.complex_backends
   octez-protocol-compiler.alternative-hashes
   octez-shell-libs.protocol-updater
   octez-shell-libs.requester
@@ -39,7 +40,6 @@
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
-  -open Tezos_profiler_backend
   -open Tezos_base.TzPervasives
   -open Tezos_base
   -open Tezos_base_unix
@@ -51,6 +51,8 @@
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_p2p_services
+  -open Tezos_profiler
+  -open Tezos_profiler_complex_backends
   -open Tezos_protocol_updater
   -open Tezos_requester
   -open Tezos_workers

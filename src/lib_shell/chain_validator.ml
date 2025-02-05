@@ -329,7 +329,7 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
         new_protocol_hash
     in
     let instances =
-      Tezos_base.Profiler.plugged Shell_profiling.mempool_profiler
+      Tezos_profiler.Profiler.plugged Shell_profiling.mempool_profiler
     in
     List.iter
       Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
@@ -481,7 +481,7 @@ let[@warning "-32"] reset_profilers =
   let reset_sections =
     let to_string b = Block_hash.to_b58check (Store.Block.hash b) in
     List.map
-      (Tezos_base.Profiler.section_maker Store.Block.equal to_string)
+      (Tezos_profiler.Profiler.section_maker Store.Block.equal to_string)
       profilers
   in
   fun block ->

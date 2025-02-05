@@ -356,7 +356,7 @@ module Headless = struct
   let kind = Headless
 
   let encoding_case =
-    Data_encoding.case
+    case
       Json_only
       ~title:"headless"
       ~description:"Headless driver"
@@ -476,3 +476,40 @@ let make_driver ~file_format =
 let auto_write_as_txt_to_file = make_driver ~file_format:Plain_text
 
 let auto_write_as_json_to_file = make_driver ~file_format:Json
+
+(** Default profilers. *)
+
+let profiler ?(suffix = "")
+    (backend : (module DRIVER with type config = string * verbosity)) ~verbosity
+    ~directory ~name =
+  let output_dir =
+    (* If [PROFILING_OUTPUT_DIR] environment variable is set, it overwrites the
+       directory provided by the application *)
+    let output_dir =
+      Sys.getenv_opt "PROFILING_OUTPUT_DIR" |> Option.value ~default:directory
+    in
+    match Sys.is_directory output_dir with
+    | true -> output_dir
+    | false ->
+        Fmt.failwith
+          "Error: Profiling output directory '%s' is not a directory."
+          output_dir
+    | exception Sys_error _ ->
+        Tezos_stdlib_unix.Utils.create_dir ~perm:0o777 output_dir ;
+        output_dir
+  in
+  Profiler.instance
+    backend
+    Filename.Infix.(output_dir // (name ^ "_profiling" ^ suffix), verbosity)
+
+let () =
+  Profiler_instance.register_backend
+    ["json"]
+    (profiler ~suffix:".json")
+    auto_write_as_json_to_file
+
+let () =
+  Profiler_instance.register_backend
+    ["text"; "txt"]
+    (profiler ~suffix:".txt")
+    auto_write_as_txt_to_file

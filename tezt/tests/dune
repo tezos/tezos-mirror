@@ -17,6 +17,8 @@
   octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.backends
   octez-libs.stdlib-unix
   tezos-protocol-alpha.protocol
   tezt_self_tests_tezt_lib
@@ -88,6 +90,7 @@
   src_lib_proxy_test_tezt_lib
   src_lib_protocol_environment_test_shell_context_tezt_lib
   src_lib_protocol_environment_test_tezt_lib
+  src_lib_profiler_backends_test_tezt_lib
   src_lib_polynomial_test_tezt_lib
   src_lib_p2p_tezt_tezt_lib
   src_lib_mockup_test_tezt_lib

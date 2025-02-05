@@ -29,7 +29,7 @@ open Block_validator_errors
 open Validation_errors
 
 module Profiler = struct
-  include (val Profiler.wrap Tezos_base.Profiler.main)
+  include (val Profiler.wrap Tezos_profiler.Profiler.main)
 end
 
 module Event = struct

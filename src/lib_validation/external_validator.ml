@@ -52,8 +52,8 @@ module Processing = struct
     cache : Context_ops.Environment_context.block_cache option;
     cached_result :
       (Block_validation.apply_result * Context_ops.Environment_context.t) option;
-    headless : Tezos_base.Profiler.instance;
-    profiler_headless : Tezos_base.Profiler.instance;
+    headless : Tezos_profiler.Profiler.instance;
+    profiler_headless : Tezos_profiler.Profiler.instance;
   }
 
   let load_protocol proto protocol_root =
@@ -110,17 +110,17 @@ module Processing = struct
         context_root_dir
     in
     let headless =
-      Tezos_base.Profiler.instance
-        Tezos_base_unix.Simple_profiler.headless
+      Tezos_profiler.Profiler.instance
+        Tezos_profiler_backends.Simple_profiler.headless
         Profiler.Info
     in
     let profiler_headless =
-      Tezos_base.Profiler.instance
-        Tezos_base_unix.Simple_profiler.headless
+      Tezos_profiler.Profiler.instance
+        Tezos_profiler_backends.Simple_profiler.headless
         Profiler.Info
     in
 
-    Tezos_base.Profiler.(plug main) headless ;
+    Tezos_profiler.Profiler.(plug main) headless ;
     Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
       headless ;
     Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
@@ -141,8 +141,8 @@ module Processing = struct
       a External_validation.request ->
       [ `Continue of
         (a
-        * (Tezos_base.Profiler.report option
-          * Tezos_base.Profiler.report option)
+        * (Tezos_profiler.Profiler.report option
+          * Tezos_profiler.Profiler.report option)
           option)
         tzresult
         * state
@@ -254,8 +254,10 @@ module Processing = struct
                   } )
         in
         () [@profiler.stop] ;
-        let report = Tezos_base.Profiler.report headless in
-        let profiler_report = Tezos_base.Profiler.report profiler_headless in
+        let report = Tezos_profiler.Profiler.report headless in
+        let profiler_report =
+          Tezos_profiler.Profiler.report profiler_headless
+        in
         continue
           block_application_result
           cache
@@ -329,8 +331,10 @@ module Processing = struct
           | Error _ as err -> Lwt.return (err, None)
         in
         () [@profiler.stop] ;
-        let report = Tezos_base.Profiler.report headless in
-        let profiler_report = Tezos_base.Profiler.report profiler_headless in
+        let report = Tezos_profiler.Profiler.report headless in
+        let profiler_report =
+          Tezos_profiler.Profiler.report profiler_headless
+        in
         continue res cache cachable_result (Some (report, profiler_report))
     | External_validation.Validate
         {
@@ -380,8 +384,10 @@ module Processing = struct
                 operations)
         in
         () [@profiler.stop] ;
-        let report = Tezos_base.Profiler.report headless in
-        let profiler_report = Tezos_base.Profiler.report profiler_headless in
+        let report = Tezos_profiler.Profiler.report headless in
+        let profiler_report =
+          Tezos_profiler.Profiler.report profiler_headless
+        in
         continue
           block_validate_result
           cache

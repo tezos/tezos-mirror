@@ -26,7 +26,7 @@
 (** Profiler for RPC client.
     Here, we want every [call_service] to be profiled. *)
 module Profiler =
-  (val Tezos_base.Profiler.wrap RPC_profiler.rpc_client_profiler)
+  (val Tezos_profiler.Profiler.wrap RPC_profiler.rpc_client_profiler)
 
 module type S = sig
   module type LOGGER = sig

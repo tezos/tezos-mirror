@@ -12,6 +12,7 @@
   octez-libs.version
   octez-libs.context.sigs
   octez-libs.tezos-context.merkle_proof_encoding
+  octez-libs.octez-profiler
   octez-libs.crypto-dal.dal-config)
  (library_flags (:standard -linkall))
  (flags
@@ -20,4 +21,5 @@
   -open Tezos_base
   -open Tezos_p2p_services
   -open Tezos_version
+  -open Tezos_profiler
   -open Tezos_crypto_dal_octez_dal_config))

@@ -396,7 +396,7 @@ let build_rpc_directory ~node_version node =
        node.store) ;
   merge (Version_directory.rpc_directory node_version) ;
   merge (Health_directory.build_rpc_directory ()) ;
-  merge (Profiler_directory.build_rpc_directory ()) ;
+  merge (Tezos_profiler_unix.Profiler_directory.build_rpc_directory ()) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

@@ -8,7 +8,7 @@
 (* Testing
    -------
    Component:    Base, Unix
-   Invocation:   dune exec src/lib_base/unix/test/main.exe -- --file test_simple_profiler.ml
+   Invocation:   dune exec src/lib_profiler/backends/test/main.exe -- --file test_simple_profiler.ml
                  Use --verbose flag for detailed logs.
    Subject:      Testing simple profiler
 *)
@@ -236,7 +236,7 @@ let get_profiler file_name =
     instance
       (* The default driver is a text driver writing to a file
          without suffixing it *)
-      Tezos_base_unix.Simple_profiler.auto_write_as_txt_to_file
+      Tezos_profiler_backends.Simple_profiler.auto_write_as_txt_to_file
       (file_name, Info)
   in
   plug profiler test_profiler_instance ;

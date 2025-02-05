@@ -36,7 +36,7 @@ module Profiler = struct
        whole lifetime of the profiler and will be used to test if the
        section should be closed and re-opened or not. *)
     let section =
-      Tezos_base.Profiler.section_maker
+      Tezos_profiler.Profiler.section_maker
         ~verbosity:Notice
         ( = )
         Block_hash.to_b58check
