@@ -96,8 +96,7 @@ packages() {
 zcash() {
   # Build data packages
 
-  cp -a "$OPAM_SWITCH_PREFIX/share/zcash-params/" \
-    "$OPAM_SWITCH_PREFIX/share/dal-trusted-setup/" "$SPECS_DIR/"
+  cp -a "$OPAM_SWITCH_PREFIX/share/zcash-params/" "$SPECS_DIR/"
 
   grep "Package:" "$packaging_dir/scripts/packaging/octez-data/debian/control" | cut -d' ' -f2 |
     while read -r pkg; do
