@@ -34,7 +34,7 @@ container_scanning:
   - grep "Vulnerability DB:" -B2 -A4 scan.log
   variables:
     GIT_STRATEGY: fetch
-    CS_IMAGE: tezos/tezos:octez-evm-node-v0.15
+    CS_IMAGE: tezos/tezos:octez-evm-node-v0.16
     SECURE_LOG_LEVEL: debug
     CS_DOCKERFILE_PATH: build.Dockerfile
   artifacts:
