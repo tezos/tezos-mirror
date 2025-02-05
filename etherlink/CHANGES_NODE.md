@@ -23,6 +23,8 @@
 
 - Reworked logs to be more compacted and to respect other Octez logs
   format. (!16265, !16508, !todo)
+- New command `switch history to` which is now the only way to change history
+  mode for and already populated EVM node. (!16533)
 
 ### Bug fixes
 
