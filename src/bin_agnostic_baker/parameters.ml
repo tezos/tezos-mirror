@@ -94,7 +94,7 @@ let protocol_info = function
     | "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg" ) as full_hash ->
       (String.sub full_hash 0 8, Active)
   | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
-  | _ -> (*We assume that unmatched protocols are beta ones*) ("beta", Active)
+  | _ -> (*We assume that unmatched protocols are next ones*) ("next", Active)
 
 let protocol_short_hash h = fst (protocol_info (Protocol_hash.to_b58check h))
 

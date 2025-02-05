@@ -44,6 +44,7 @@ let alpha_can_stitch_from_its_predecessor = false
 (* Tests that are protocol-independent.
    They do not take a protocol as a parameter and thus need to be registered only once. *)
 let register_protocol_independent_tests () =
+  Agnostic_baker_test.register_protocol_independent () ;
   Binaries.register_protocol_independent () ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
@@ -68,6 +69,7 @@ let register_protocol_independent_tests () =
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
+  Agnostic_baker_test.register ~migrate_from ~migrate_to ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Weeklynet.register () ;
@@ -100,6 +102,7 @@ let register_old_protocol_migration_tests () =
       | _, Alpha -> () (* Already in register_protocol_migration_tests *)
       | None, _ -> ()
       | Some migrate_from, migrate_to ->
+          Agnostic_baker_test.register ~migrate_from ~migrate_to ;
           Sc_rollup_migration.register ~migrate_from ~migrate_to)
     Protocol.all
 
@@ -114,7 +117,6 @@ let register_old_protocol_migration_tests () =
 let register_protocol_tests_that_use_supports_correctly () =
   let protocols = Protocol.all in
   Adaptive_issuance.register ~protocols ;
-  Agnostic_baker_test.register ~protocols ;
   Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;
