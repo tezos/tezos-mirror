@@ -1106,20 +1106,34 @@ let state_encoding =
 
 let state_account_override_encoding =
   let open Data_encoding in
-  conv
+  let state_diff_encoding =
+    StorageMap.associative_array_encoding hex_encoding
+  in
+  conv_with_guard
     (fun {balance; nonce; code; state; state_diff} ->
-      (balance, nonce, code, state, state_diff))
-    (fun (balance, nonce, code, state, state_diff) ->
+      (balance, nonce, code, state, Some state_diff, None))
+    (fun (balance, nonce, code, state, state_diff, state_diff') ->
+      let open Result_syntax in
+      let+ state_diff =
+        match (state_diff, state_diff') with
+        | Some state_diff, None | None, Some state_diff -> Ok state_diff
+        | None, None -> Ok StorageMap.empty
+        | Some _, Some _ -> Error "Cannot provide both state_diff and stateDiff"
+      in
       {balance; nonce; code; state; state_diff})
-    (obj5
+    (obj6
        (opt "balance" quantity_encoding)
        (opt "nonce" quantity_encoding)
        (opt "code" hex_encoding)
        (dft "state" state_encoding None)
-       (dft
+       (opt "stateDiff" state_diff_encoding)
+       (opt
+          ~description:
+            "DEPRECATED. The expected name for this field is stateDiff. We \
+             keep supporting state_diff for now for avoiding potential \
+             breaking changes."
           "state_diff"
-          (StorageMap.associative_array_encoding hex_encoding)
-          StorageMap.empty))
+          state_diff_encoding))
 
 let state_override_empty = AddressMap.empty
 

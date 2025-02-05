@@ -34,6 +34,8 @@
 - `eth_getLogs` now returns an empty array instead of an error when `fromBlock` is greater than `toBlock`.
 - Improve reliability of `debug_traceTransaction` when dealing with non
   standard revert reasons. (!16415)
+- Fixes the encoding of state overrides for `eth_call` to correctly parse
+  `stateDiff`. Keeps the support for `state_diff` for now. (!16581)
 
 ### Internal
 
