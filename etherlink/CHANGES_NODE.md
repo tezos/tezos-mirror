@@ -1,45 +1,62 @@
 # Changelog
 
-## Unreleased
+## Version 0.16 (2025-01-06)
+
+This release notably stabilizes the new storage for blocks (which
+significantly reduces the size of data directories), and the `rolling` history
+mode (which enables deployment where only the most recent states are kept).
+
+The node now uses this block storage by default for new deployments. Data
+directories created before this release will keep using the deprecated, legacy
+block storage. Migrating to the new block storage requires importing a
+snapshot. To give an example, Etherlink Mainnet archive nodes using the legacy
+storage require more than 250GBytes of disk, while the new block storage
+requires around 180GBytes.
+
+The `rolling` history mode can be enabled on new data directories by running
+`octez-evm-node config init --history-mode rolling:N`, where `N` is the number
+of days to keep, _before_ starting the node for the first time. For existing
+data directories, it is required to run the command `octez-evm-node switch
+history to rolling:N` when the node is stopped. At the time of releasing this
+version, a data directory of a node configured to use the `rolling:14` history
+mode requires around 13GBytes.
+
+The node will apply two migrations to its internal store (version 18), meaning
+it is not possible to downgrade to the previous version.
 
 ### Features
 
 - Defaults to the new block storage, which significantly reduces the size of
-  data directories For instance, Mainnet archive nodes using the now legacy
-  storage requires more than 250GBytes of disk, while the new block storage
-  requires around 180GBytes. (!16412)
-- CLI command `list events`, allows listing events relative to the EVM node. (!16446)
-- The garbage collector is now stabilized. Configuration parameters
-  `experimental_features.history_mode` and
-  `experimental_features.garbage_collector_parameters` are moved at top level
-  and the corresponding experimental features are deprecated. The number of days
-  to keep can now also be provided simply as days, with e.g.
-  ```json
-  "history": { "mode": "rolling", "retention": 14 }
-  ```
-  (!16465)
-- Addition of `elapsed_time` to performance metrics, which exposes in seconds the time since the node
-  started. (!16551)
-
-#### UX
-
-- Reworked logs to be more compacted and to respect other Octez logs
-  format. (!16265, !16508, !todo)
 - New command `switch history to` which is now the only way to change history
   mode for and already populated EVM node. (!16533)
+- CLI command `list events`, allows listing events relative to the EVM node. (!16446)
+- Reworks logs to be more compact and to respect other Octez logs format.
+  (!16265 !16508 !16518 !16521)
+- Added `elapsed_time` to the performance metrics, which exposes in seconds the
+  time since the node started. (!16551)
 
 ### Bug fixes
 
 #### RPCs
 
 - `eth_estimateGas` now correctly interprets the block parameter. (!16423)
-- `eth_getLogs` now properly supports the [EIP-234](https://eips.ethereum.org/EIPS/eip-234)
+- `eth_getLogs` now properly supports the [EIP-234]
   introducing the `blockHash` parameter. (!16460)
-- `eth_getLogs` now returns an empty array instead of an error when `fromBlock` is greater than `toBlock`.
-- Improve reliability of `debug_traceTransaction` when dealing with non
+- `eth_getLogs` now returns an empty array instead of an error when `fromBlock`
+  is greater than `toBlock`.
+- Improves reliability of `debug_traceTransaction` when dealing with non
   standard revert reasons. (!16415)
 - Fixes the encoding of state overrides for `eth_call` to correctly parse
   `stateDiff`. Keeps the support for `state_diff` for now. (!16581)
+
+[EIP-234]: https://eips.ethereum.org/EIPS/eip-234
+
+#### UX
+
+- Disables the performance metrics if `ps` does not support the necessary CLI
+  arguments (typically, `ps` from BusyBox does not). (!16474)
+- Hides the logs of `du` on failure (typically when a directory does not
+  exist). (!16609)
 
 ### Internal
 
