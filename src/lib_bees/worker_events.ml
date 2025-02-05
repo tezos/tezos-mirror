@@ -46,6 +46,8 @@ module type S = sig
   val started_for : string Internal_event.Simple.t
 
   val emit : 'a Internal_event.Simple.t -> 'a -> unit Lwt.t
+
+  val emit__dont_wait__use_with_care : 'a Internal_event.Simple.t -> 'a -> unit
 end
 
 module type CRITICAL_ERROR = sig
@@ -74,7 +76,7 @@ struct
   let request_error =
     declare_3
       ~section
-      ~name:("request_" ^ base_name)
+      ~name:("bees_request_" ^ base_name)
       ~msg:"{view} {request_status} {errors}"
       ~level:Debug
       ~pp1:R.pp
@@ -87,7 +89,7 @@ struct
   let request_no_errors =
     declare_2
       ~section
-      ~name:("request_no_errors_" ^ base_name)
+      ~name:("bees_request_no_errors_" ^ base_name)
       ~msg:"{view} {request_status}"
       ~level:Debug
       ~pp1:R.pp
@@ -98,7 +100,7 @@ struct
   let terminated =
     declare_0
       ~section
-      ~name:("terminate_" ^ base_name)
+      ~name:("bees_terminate_" ^ base_name)
       ~msg:(Format.asprintf "worker terminated [%s]" base_name)
       ~level:Info
       ()
@@ -106,7 +108,7 @@ struct
   let triggering_shutdown =
     declare_0
       ~section
-      ~name:("triggering_" ^ base_name)
+      ~name:("bees_triggering_" ^ base_name)
       ~msg:"triggering shutting down"
       ~level:Debug
       ()
@@ -114,7 +116,7 @@ struct
   let crashed =
     declare_1
       ~section
-      ~name:("crashed_" ^ base_name)
+      ~name:("bees_crashed_" ^ base_name)
       ~msg:(Format.asprintf "worker crashed [%s]: {error}" base_name)
       ~level:Error
       ~pp1:C.pp
@@ -123,16 +125,16 @@ struct
   let started =
     declare_0
       ~section
-      ~name:("started_" ^ base_name)
-      ~msg:"worker started"
+      ~name:("bees_started_" ^ base_name)
+      ~msg:"worker bee started"
       ~level:Info
       ()
 
   let started_for =
     declare_1
       ~section
-      ~name:("started_for_" ^ base_name)
-      ~msg:"worker started for {name}"
+      ~name:("bees_started_for_" ^ base_name)
+      ~msg:"worker bee started for {name}"
       ~level:Info
       ("name", Data_encoding.string)
 end
