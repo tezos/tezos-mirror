@@ -18,9 +18,16 @@ sudo apk add pandoc
 
 echo "# Octez Releases" >> index.md
 
+mapfile -t releases < <(tac "$Releases_list")
+latest=${releases[0]}
+
 # Define the content of the release page
-tac "$Releases_list" | while IFS= read -r release; do
-  echo "## $release" >> index.md
+for release in "${releases[@]}"; do
+  if [[ "$release" == "$latest" ]]; then
+    echo "## $release (latest)" >> index.md
+  else
+    echo "## $release" >> index.md
+  fi
   echo "### Static binaries" >> index.md
   for arch in x86_64 arm64; do
     echo "#### $arch" >> index.md
