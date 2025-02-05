@@ -6,16 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Workers, their types and signatures, and a functor to make them. *)
+(** Implementation of workers, with an interface compatible with
+    {!Octez_workers}. To parallelize efficiently, the handlers must use
+    exclusively [Eio] for their IOs and any asynchronous operation. As such, the
+    worker can be started either with Lwt-compatible handlers or Eio handlers,
+    and [push_requests] requests are duplicated to either return an Lwt promise
+    or an Eio promise. *)
 
-(** {2 Worker group maker} *)
-
-type worker_name = {base : string; name : string}
-
-(** Functor to build a group of workers.
-    At that point, all the types are fixed and introspectable,
-    but the actual parameters and event handlers can be tweaked
-    for each individual worker. *)
 module type T = sig
   module Name : Worker_intf.NAME
 
@@ -120,11 +117,12 @@ module type T = sig
       unit Lwt.t
   end
 
-  (** Creates a new worker instance.
-      Parameter [queue_size] not passed means unlimited queue. *)
+  (** [launch table name parameters handlers] creates an instance of the
+      worker, of the given queue kind. *)
   val launch :
     'kind table ->
     ?timeout:Time.System.Span.t ->
+    ?domains:int ->
     Name.t ->
     Types.parameters ->
     (module HANDLERS
@@ -136,6 +134,8 @@ module type T = sig
       Cannot be called from within the handlers.  *)
   val shutdown : _ t -> unit Lwt.t
 
+  val shutdown_eio : _ t -> unit
+
   (** The following interface are common elements of multiple modules below.
       They are used to minimize repetition. *)
   module type BOX = sig
@@ -146,6 +146,8 @@ module type T = sig
         [worker] dropbox is closed, then it is a no-op. *)
     val put_request : t -> ('a, 'request_error) Request.t -> unit
 
+    val put_request_eio : t -> ('a, 'request_error) Request.t -> unit
+
     (** [put_request_and_wait worker request] sends the [request] to the
         [worker] and waits for its completion. If the worker dropbox is closed,
         then it returns [Error Closed]. *)
@@ -153,6 +155,11 @@ module type T = sig
       t ->
       ('a, 'request_error) Request.t ->
       ('a, 'request_error message_error) result Lwt.t
+
+    val put_request_and_wait_eio :
+      t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Eio.Promise.t
   end
 
   module type QUEUE = sig
@@ -168,11 +175,18 @@ module type T = sig
       ('a, 'request_error) Request.t ->
       ('a, 'request_error message_error) result Lwt.t
 
+    val push_request_and_wait_eio :
+      'q t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Eio.Promise.t
+
     (** [push_request worker request] sends the [request] to the [worker]. The
         promise returned is [true] if the request was pushed successfuly or
         [false] if the worker queue is closed. If the buffer is a bounded queue
         and the underlying queue is full, the call is blocking. *)
     val push_request : 'q t -> ('a, 'request_error) Request.t -> bool Lwt.t
+
+    val push_request_eio : 'q t -> ('a, 'request_error) Request.t -> bool
 
     val pending_requests : 'a t -> (Time.System.t * Request.view) list
 
@@ -188,6 +202,9 @@ module type T = sig
 
     (** Adds a message to the queue immediately. *)
     val push_request_now :
+      infinite queue t -> ('a, 'request_error) Request.t -> unit
+
+    val push_request_now_eio :
       infinite queue t -> ('a, 'request_error) Request.t -> unit
   end
 
@@ -209,6 +226,11 @@ module type T = sig
     (Types.state -> (unit, 'request_error) result Lwt.t) ->
     (unit, 'request_error) result Lwt.t
 
+  val with_state_eio :
+    _ t ->
+    (Types.state -> (unit, 'request_error) result) ->
+    (unit, 'request_error) result
+
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list
 
@@ -229,17 +251,74 @@ module type T = sig
   (** [find_opt table n] is [Some worker] if the [worker] is in the [table] and
       has name [n]. *)
   val find_opt : 'a table -> Name.t -> 'a t option
+
+  (** [EIO_HANDLERS] is {!HANDLERS} within the Eio event loop. *)
+  module type EIO_HANDLERS = sig
+    type self
+
+    type launch_error
+
+    val on_launch :
+      self -> Name.t -> Types.parameters -> (Types.state, launch_error) result
+
+    val on_request :
+      self -> ('a, 'request_error) Request.t -> ('a, 'request_error) result
+
+    val on_no_request : self -> unit
+
+    val on_close : self -> unit
+
+    val on_error :
+      self ->
+      Worker_types.request_status ->
+      ('a, 'request_error) Request.t ->
+      'request_error ->
+      unit tzresult
+
+    val on_completion :
+      self ->
+      ('a, 'request_error) Request.t ->
+      'a ->
+      Worker_types.request_status ->
+      unit
+  end
+
+  module MakeEIO (H : HANDLERS) :
+    EIO_HANDLERS with type self = H.self and type launch_error = H.launch_error
+
+  (** [launch table name parameters handlers] creates a swarm of bees
+      (workers), each running on a separate domain. By default only a single
+      domain (then worker) is used to handle the requests. *)
+  val launch_eio :
+    'kind table ->
+    ?timeout:Time.System.Span.t ->
+    ?domains:int ->
+    name:Name.t ->
+    Types.parameters ->
+    (module EIO_HANDLERS
+       with type self = 'kind t
+        and type launch_error = 'launch_error) ->
+    ('kind t, 'launch_error) result
 end
 
-(** [module WG = MakeGroup (Name) (Request)] defines a {e worker group} all
-    using the same [Name], [Event], etc. To instantiate a worker from a group,
-    you must give the [Types] parameter: [WG.MakeWorker(Types)]. This defines a
-    [Worker] module of type [T]. This last instantiation can be safely used as
-    first class module.
+module Make_internal
+    (Name : Worker_intf.NAME)
+    (Request : Worker_intf.REQUEST)
+    (Types : Worker_intf.TYPES)
+    (Worker_events : Worker_events.S
+                       with type view = Request.view
+                        and type critical_error = tztrace) : sig
+  include
+    T
+      with module Name = Name
+       and module Request = Request
+       and module Types = Types
 
-    The delayed application is there to prevent multiple side-effect executions
-    in case of multiple instantiation. (Inner events trigger side effects.)
-*)
+  val is_empty : 'a t -> bool
+
+  type exn += Request_exn
+end
+
 module MakeGroup (Name : Worker_intf.NAME) (Request : Worker_intf.REQUEST) : sig
   module MakeWorker (Types : Worker_intf.TYPES) :
     T
@@ -248,10 +327,6 @@ module MakeGroup (Name : Worker_intf.NAME) (Request : Worker_intf.REQUEST) : sig
        and module Types = Types
 end
 
-(** [MakeSingle (Name) (Request) (Types)] is the same as using
-    [MakeGroup] and then [MakeWorker]. It's a special case which you can
-    use if you only ever need a single instantiation.
-*)
 module MakeSingle
     (Name : Worker_intf.NAME)
     (Request : Worker_intf.REQUEST)

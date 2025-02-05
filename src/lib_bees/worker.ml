@@ -6,10 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** An error returned when trying to communicate with a worker that
-    has been closed.*)
-type worker_name = {base : string; name : string}
-
 module Eio = struct
   include Eio
 
@@ -84,6 +80,7 @@ module type T = sig
         provided by the type of buffer chosen at {!launch}.*)
     type self
 
+    (** The type of errors happening when launching an instance of a worker.  *)
     type launch_error
 
     (** Builds the initial internal state of a worker at launch.
@@ -108,12 +105,10 @@ module type T = sig
     (** A function called when terminating a worker. *)
     val on_close : self -> unit Lwt.t
 
-    (** A function called at the end of the worker loop in case of an
-        abnormal error. This function can handle the error by
-        returning [Ok ()], or leave the default unexpected error
-        behaviour by returning its parameter. A possibility is to
-        handle the error for ad-hoc logging, and still use
-        {!trigger_shutdown} to kill the worker. *)
+    (** A function called at the end of the worker loop in case of an error. One
+        can first log the incoming error. Then, the error can be filtered out by
+        returning [return_unit] and the worker execution continues, or the error
+        can be propagated through a [tzresult], making the worker crash. *)
     val on_error :
       self ->
       Worker_types.request_status ->
@@ -131,11 +126,11 @@ module type T = sig
       unit Lwt.t
   end
 
-  (** Creates a new worker instance.
-      Parameter [queue_size] not passed means unlimited queue. *)
+  (** Creates a new worker instance. *)
   val launch :
     'kind table ->
     ?timeout:Time.System.Span.t ->
+    ?domains:int ->
     Name.t ->
     Types.parameters ->
     (module HANDLERS
@@ -147,15 +142,24 @@ module type T = sig
       Cannot be called from within the handlers.  *)
   val shutdown : _ t -> unit Lwt.t
 
+  val shutdown_eio : _ t -> unit
+
   module type BOX = sig
     type t
 
     val put_request : t -> ('a, 'request_error) Request.t -> unit
 
+    val put_request_eio : t -> ('a, 'request_error) Request.t -> unit
+
     val put_request_and_wait :
       t ->
       ('a, 'request_error) Request.t ->
       ('a, 'request_error message_error) result Lwt.t
+
+    val put_request_and_wait_eio :
+      t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Eio.Promise.t
   end
 
   module type QUEUE = sig
@@ -166,7 +170,14 @@ module type T = sig
       ('a, 'request_error) Request.t ->
       ('a, 'request_error message_error) result Lwt.t
 
+    val push_request_and_wait_eio :
+      'q t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Eio.Promise.t
+
     val push_request : 'q t -> ('a, 'request_error) Request.t -> bool Lwt.t
+
+    val push_request_eio : 'q t -> ('a, 'request_error) Request.t -> bool
 
     val pending_requests : 'a t -> (Time.System.t * Request.view) list
 
@@ -183,10 +194,13 @@ module type T = sig
     (** Adds a message to the queue immediately. *)
     val push_request_now :
       infinite queue t -> ('a, 'request_error) Request.t -> unit
+
+    val push_request_now_eio :
+      infinite queue t -> ('a, 'request_error) Request.t -> unit
   end
 
   (** Exports the canceler to allow cancellation of other tasks when this
-      worker is shut down or when it dies. *)
+      worker is shutdown or when it dies. *)
   val canceler : _ t -> Lwt_canceler.t
 
   (** Triggers a worker termination. *)
@@ -196,7 +210,14 @@ module type T = sig
   val state : _ t -> Types.state
 
   val with_state :
-    _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t
+    _ t ->
+    (Types.state -> (unit, 'request_error) result Lwt.t) ->
+    (unit, 'request_error) result Lwt.t
+
+  val with_state_eio :
+    _ t ->
+    (Types.state -> (unit, 'request_error) result) ->
+    (unit, 'request_error) result
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list
@@ -218,6 +239,50 @@ module type T = sig
   (** [find_opt table n] is [Some worker] if the [worker] is in the [table] and
       has name [n]. *)
   val find_opt : 'a table -> Name.t -> 'a t option
+
+  module type EIO_HANDLERS = sig
+    type self
+
+    type launch_error
+
+    val on_launch :
+      self -> Name.t -> Types.parameters -> (Types.state, launch_error) result
+
+    val on_request :
+      self -> ('a, 'request_error) Request.t -> ('a, 'request_error) result
+
+    val on_no_request : self -> unit
+
+    val on_close : self -> unit
+
+    val on_error :
+      self ->
+      Worker_types.request_status ->
+      ('a, 'request_error) Request.t ->
+      'request_error ->
+      unit tzresult
+
+    val on_completion :
+      self ->
+      ('a, 'request_error) Request.t ->
+      'a ->
+      Worker_types.request_status ->
+      unit
+  end
+
+  module MakeEIO (H : HANDLERS) :
+    EIO_HANDLERS with type self = H.self and type launch_error = H.launch_error
+
+  val launch_eio :
+    'kind table ->
+    ?timeout:Time.System.Span.t ->
+    ?domains:int ->
+    name:Name.t ->
+    Types.parameters ->
+    (module EIO_HANDLERS
+       with type self = 'kind t
+        and type launch_error = 'launch_error) ->
+    ('kind t, 'launch_error) result
 end
 
 module Make_internal
@@ -249,7 +314,7 @@ struct
 
   let base_name = String.concat "-" Name.base
 
-  type scope = Opentelemetry.Scope.t
+  type scope
 
   type metadata = {scope : scope option}
 
@@ -259,11 +324,15 @@ struct
     | Any of exn
 
   type message =
-    | Message :
-        ('a, 'b) Request.t
-        * metadata
-        * ('a, 'b message_error) result Lwt.u option
+    | Message : {
+        request : ('a, 'request_error) Request.t;
+        resolver :
+          ('a, 'request_error message_error) Result.t Eio.Promise.u option;
+        metadata : metadata;
+        timestamp : Time.System.t;
+      }
         -> message
+    | Shutdown : message
 
   type 'a queue
 
@@ -272,6 +341,8 @@ struct
   and infinite
 
   type dropbox
+
+  type any_request = Any_request : _ Request.t * metadata -> any_request
 
   type _ buffer_kind =
     | Queue : infinite queue buffer_kind
@@ -282,29 +353,25 @@ struct
       }
         -> dropbox buffer_kind
 
-  and any_request = Any_request : _ Request.t * metadata -> any_request
-
   and _ buffer =
-    | Queue_buffer :
-        (Time.System.t * message) Lwt_pipe.Unbounded.t
-        -> infinite queue buffer
-    | Bounded_buffer :
-        (Time.System.t * message) Lwt_pipe.Bounded.t
-        -> bounded queue buffer
-    | Dropbox_buffer : (Time.System.t * message) Lwt_dropbox.t -> dropbox buffer
+    | Queue_buffer : message Eio.Stream.t -> infinite queue buffer
+    | Bounded_buffer : message Eio.Stream.t -> bounded queue buffer
+    | Dropbox_buffer : message Eio.Stream.t -> dropbox buffer
 
   and 'kind t = {
+    mutex : Eio.Mutex.t;
     timeout : Time.System.Span.t option;
     parameters : Types.parameters;
-    mutable (* only for init *) worker : unit Lwt.t;
-    mutable (* only for init *) state : Types.state option;
     buffer : 'kind buffer;
-    canceler : Lwt_canceler.t;
-    name : Name.t;
-    id : int;
+    mutable stream_explorer : (Ptime.t * Request.view) list;
+    (* Gives an approximate view of the requests in the buffer. Use with
+       care. *)
+    mutable state : Types.state option;
     mutable status : Worker_types.worker_status;
     mutable current_request :
       (Time.System.t * Time.System.t * Request.view) option;
+    canceler : Lwt_canceler.t; (* Used for compatibility with Lwt. *)
+    name : Name.t;
     table : 'kind table;
   }
 
@@ -314,238 +381,92 @@ struct
     instances : 'kind t Nametbl.t;
   }
 
-  let extract_status_errors w =
-    match w.status with
-    | Worker_types.Launching _ | Running _ | Closing _ -> None
-    | Closed (_, _, errs) -> errs
+  let resolve_error : ('a, 'b) result Eio.Promise.u option -> 'b -> unit =
+   fun resolver error ->
+    match resolver with
+    | Some resolver -> Eio.Promise.resolve_error resolver error
+    | None -> ()
 
-  let queue_item ~metadata ?u r = (Time.System.now (), Message (r, metadata, u))
+  let resolve : ('a, 'b) result Eio.Promise.u option -> ('a, 'b) result -> unit
+      =
+   fun resolver res ->
+    match resolver with
+    | Some resolver -> Eio.Promise.resolve resolver res
+    | None -> ()
 
-  let drop_request w merge message_box request metadata =
-    try
-      match
-        match Lwt_dropbox.peek message_box with
-        | None -> merge w (Any_request (request, metadata)) None
-        | Some (_, Message (old, old_metadata, _)) ->
-            Lwt.ignore_result (Lwt_dropbox.take message_box) ;
-            merge
-              w
-              (Any_request (request, metadata))
-              (Some (Any_request (old, old_metadata)))
-      with
-      | None -> ()
-      | Some (Any_request (neu, neu_metadata)) ->
-          Lwt_dropbox.put
-            message_box
-            (Time.System.now (), Message (neu, neu_metadata, None))
-    with Lwt_dropbox.Closed -> ()
+  let take_nonblocking (type a) (t : a t) =
+    match t.buffer with
+    | Queue_buffer q -> Eio.Stream.take_nonblocking q
+    | Bounded_buffer q -> Eio.Stream.take_nonblocking q
+    | Dropbox_buffer q -> Eio.Stream.take_nonblocking q
 
-  let drop_request_and_wait w message_box request metadata =
-    let t, u = Lwt.wait () in
-    Lwt.catch
-      (fun () ->
-        Lwt_dropbox.put message_box (queue_item ~metadata ~u request) ;
-        t)
-      (function
-        | Lwt_dropbox.Closed ->
-            Lwt.return_error (Closed (extract_status_errors w))
-        | exn ->
-            (* [Lwt_dropbox.put] can only raise [Closed] which is caught above. *)
-            Lwt.return_error (Any exn))
+  let add (type a) (t : a t) (m : message) =
+    match t.buffer with
+    | Queue_buffer q -> Eio.Stream.add q m
+    | Bounded_buffer q -> Eio.Stream.add q m
+    | Dropbox_buffer q -> Eio.Stream.add q m
 
-  module type BOX = sig
-    type t
+  let is_empty (type a) (t : a t) =
+    match t.buffer with
+    | Queue_buffer q -> Eio.Stream.is_empty q
+    | Bounded_buffer q -> Eio.Stream.is_empty q
+    | Dropbox_buffer q -> Eio.Stream.is_empty q
 
-    val put_request : t -> ('a, 'request_error) Request.t -> unit
+  type exn += Request_exn
 
-    val put_request_and_wait :
-      t ->
-      ('a, 'request_error) Request.t ->
-      ('a, 'request_error message_error) result Lwt.t
-  end
+  let state w =
+    match (w.state, w.status) with
+    | None, Launching _ ->
+        invalid_arg
+          (Format.asprintf
+             "Worker.state ([%a]): state called before worker was initialized"
+             Name.pp
+             w.name)
+    | None, (Closing _ | Closed _) ->
+        invalid_arg
+          (Format.asprintf
+             "Worker.state ([%a]): state called after worker was terminated"
+             Name.pp
+             w.name)
+    | None, _ -> assert false
+    | Some state, _ -> state
 
-  module type QUEUE = sig
-    type 'a t
+  let with_state :
+      type a.
+      a t ->
+      (Types.state -> (unit, 'request_error) result Lwt.t) ->
+      (unit, 'request_error) result Lwt.t =
+   fun w f ->
+    match w.state with None -> Lwt.return (Ok ()) | Some state -> f state
 
-    val push_request_and_wait :
-      'q t ->
-      ('a, 'request_error) Request.t ->
-      ('a, 'request_error message_error) result Lwt.t
+  let with_state_eio :
+      type a.
+      a t ->
+      (Types.state -> (unit, 'request_error) result) ->
+      (unit, 'request_error) result =
+   fun w f -> match w.state with None -> Ok () | Some state -> f state
 
-    val push_request : 'q t -> ('a, 'request_error) Request.t -> bool Lwt.t
+  let pending_requests w = w.stream_explorer
 
-    val pending_requests : 'a t -> (Time.System.t * Request.view) list
+  let status w = w.status
 
-    val pending_requests_length : 'a t -> int
-  end
+  let current_request w = w.current_request
 
-  let make_metadata () =
-    (* This pattern is equivalent to:
-       ```
-       let scope =
-         if "ppx is enabled" then
-           Opentelemetry.Scope.get_ambient_scope ()
-         else
-           None
-       ```
-    *)
-    let scope =
-      (None
-      [@profiler.overwrite
-        {driver_ids = [Opentelemetry]}
-          (Opentelemetry.Scope.get_ambient_scope ())])
-    in
-    {scope}
+  let information (type a) (w : a t) =
+    {
+      Worker_types.instances_number = Nametbl.length w.table.instances;
+      wstatus = w.status;
+      queue_length =
+        (match w.buffer with
+        | Queue_buffer q -> Eio.Stream.length q
+        | Bounded_buffer q -> Eio.Stream.length q
+        | Dropbox_buffer q -> Eio.Stream.length q);
+    }
 
-  module Dropbox = struct
-    let put_request (w : dropbox t) request =
-      let (Dropbox {merge}) = w.table.buffer_kind in
-      let (Dropbox_buffer message_box) = w.buffer in
-      let metadata = make_metadata () in
-      drop_request w merge message_box request metadata
+  let list {instances; _} =
+    Nametbl.fold (fun k v acc -> (k, v) :: acc) instances []
 
-    let put_request_and_wait (w : dropbox t) request =
-      let (Dropbox_buffer message_box) = w.buffer in
-      let metadata = make_metadata () in
-      drop_request_and_wait w message_box request metadata
-  end
-
-  module Queue = struct
-    let push_request (type a) (w : a queue t) request =
-      let metadata = make_metadata () in
-      match w.buffer with
-      | Queue_buffer message_queue ->
-          if Lwt_pipe.Unbounded.is_closed message_queue then Lwt.return_false
-          else (
-            Lwt_pipe.Unbounded.push message_queue (queue_item ~metadata request) ;
-            (* because pushing on an unbounded pipe is immediate, we return within
-               Lwt explicitly for compatibility with the other case *)
-            Lwt.return_true)
-      | Bounded_buffer message_queue ->
-          if Lwt_pipe.Bounded.is_closed message_queue then Lwt.return_false
-          else
-            let open Lwt_syntax in
-            let* () =
-              Lwt_pipe.Bounded.push message_queue (queue_item ~metadata request)
-            in
-            Lwt.return_true
-
-    let push_request_now (w : infinite queue t) request =
-      let metadata = make_metadata () in
-      let (Queue_buffer message_queue) = w.buffer in
-      if Lwt_pipe.Unbounded.is_closed message_queue then ()
-      else Lwt_pipe.Unbounded.push message_queue (queue_item ~metadata request)
-
-    let push_request_and_wait (type a) (w : a queue t) request =
-      let metadata = make_metadata () in
-      match w.buffer with
-      | Queue_buffer message_queue -> (
-          try
-            let t, u = Lwt.wait () in
-            Lwt_pipe.Unbounded.push
-              message_queue
-              (queue_item ~metadata ~u request) ;
-            t
-          with Lwt_pipe.Closed ->
-            Lwt.return_error (Closed (extract_status_errors w)))
-      | Bounded_buffer message_queue ->
-          let t, u = Lwt.wait () in
-          Lwt.try_bind
-            (fun () ->
-              Lwt_pipe.Bounded.push
-                message_queue
-                (queue_item ~metadata ~u request))
-            (fun () -> t)
-            (function
-              | Lwt_pipe.Closed ->
-                  Lwt.return_error (Closed (extract_status_errors w))
-              | exn -> Lwt.return_error (Any exn))
-
-    let pending_requests (type a) (w : a queue t) =
-      let peeked =
-        try
-          match w.buffer with
-          | Queue_buffer message_queue ->
-              Lwt_pipe.Unbounded.peek_all_now message_queue
-          | Bounded_buffer message_queue ->
-              Lwt_pipe.Bounded.peek_all_now message_queue
-        with Lwt_pipe.Closed -> []
-      in
-      List.map
-        (function t, Message (req, _, _) -> (t, Request.view req))
-        peeked
-
-    let pending_requests_length (type a) (w : a queue t) =
-      let pipe_length (type a) (q : a buffer) =
-        match q with
-        | Queue_buffer queue -> Lwt_pipe.Unbounded.length queue
-        | Bounded_buffer queue -> Lwt_pipe.Bounded.length queue
-        | Dropbox_buffer _ -> 1
-      in
-      pipe_length w.buffer
-  end
-
-  let close (type a) (w : a t) =
-    let wakeup = function
-      | _, Message (_, _, Some u) ->
-          Lwt.wakeup_later u (Error (Closed (extract_status_errors w)))
-      | _, Message (_, _, None) -> ()
-    in
-    let close_queue message_queue =
-      let messages = Lwt_pipe.Bounded.pop_all_now message_queue in
-      List.iter wakeup messages ;
-      Lwt_pipe.Bounded.close message_queue
-    in
-    let close_unbounded_queue message_queue =
-      let messages = Lwt_pipe.Unbounded.pop_all_now message_queue in
-      List.iter wakeup messages ;
-      Lwt_pipe.Unbounded.close message_queue
-    in
-    match w.buffer with
-    | Queue_buffer message_queue -> close_unbounded_queue message_queue
-    | Bounded_buffer message_queue -> close_queue message_queue
-    | Dropbox_buffer message_box ->
-        (try Option.iter wakeup (Lwt_dropbox.peek message_box)
-         with Lwt_dropbox.Closed -> ()) ;
-        Lwt_dropbox.close message_box
-
-  let pop (type a) (w : a t) =
-    let open Lwt_syntax in
-    let pop_queue message_queue =
-      match w.timeout with
-      | None ->
-          let* m = Lwt_pipe.Bounded.pop message_queue in
-          return_some m
-      | Some timeout ->
-          Lwt_pipe.Bounded.pop_with_timeout
-            (Systime_os.sleep timeout)
-            message_queue
-    in
-    let pop_unbounded_queue message_queue =
-      match w.timeout with
-      | None ->
-          let* m = Lwt_pipe.Unbounded.pop message_queue in
-          return_some m
-      | Some timeout ->
-          Lwt_pipe.Unbounded.pop_with_timeout
-            (Systime_os.sleep timeout)
-            message_queue
-    in
-    match w.buffer with
-    | Queue_buffer message_queue -> pop_unbounded_queue message_queue
-    | Bounded_buffer message_queue -> pop_queue message_queue
-    | Dropbox_buffer message_box -> (
-        match w.timeout with
-        | None ->
-            let* m = Lwt_dropbox.take message_box in
-            return_some m
-        | Some timeout ->
-            Lwt_dropbox.take_with_timeout (Systime_os.sleep timeout) message_box
-        )
-
-  let trigger_shutdown w = Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
-
-  let canceler {canceler; _} = canceler
+  let find_opt {instances; _} name = Nametbl.find_opt instances name
 
   module type HANDLERS = sig
     type self
@@ -582,140 +503,163 @@ struct
       unit Lwt.t
   end
 
+  module type EIO_HANDLERS = sig
+    type self
+
+    type launch_error
+
+    val on_launch :
+      self -> Name.t -> Types.parameters -> (Types.state, launch_error) result
+
+    val on_request :
+      self -> ('a, 'request_error) Request.t -> ('a, 'request_error) result
+
+    val on_no_request : self -> unit
+
+    val on_close : self -> unit
+
+    val on_error :
+      self ->
+      Worker_types.request_status ->
+      ('a, 'request_error) Request.t ->
+      'request_error ->
+      unit tzresult
+
+    val on_completion :
+      self ->
+      ('a, 'request_error) Request.t ->
+      'a ->
+      Worker_types.request_status ->
+      unit
+  end
+
+  module MakeEIO (H : HANDLERS) :
+    EIO_HANDLERS with type self = H.self and type launch_error = H.launch_error =
+  struct
+    type self = H.self
+
+    type launch_error = H.launch_error
+
+    let on_launch self name params =
+      Lwt_eio.Promise.await_lwt @@ H.on_launch self name params
+
+    let on_close self = Lwt_eio.run_lwt_in_main @@ fun () -> H.on_close self
+
+    let on_request self request =
+      Lwt_eio.run_lwt_in_main @@ fun () -> H.on_request self request
+
+    let on_no_request self =
+      Lwt_eio.run_lwt_in_main @@ fun () -> H.on_no_request self
+
+    let on_error self status request error =
+      Lwt_eio.run_lwt_in_main @@ fun () -> H.on_error self status request error
+
+    let on_completion self request params status =
+      Lwt_eio.run_lwt_in_main @@ fun () ->
+      H.on_completion self request params status
+  end
+
+  let worker_loop (type kind) handlers _domain (worker : kind t) : [`Stop_daemon]
+      =
+    let (module Handlers : EIO_HANDLERS with type self = kind t) = handlers in
+    let rec loop () : [`Stop_daemon] =
+      match worker.status with
+      | Launching _ -> assert false
+      | Closing _ | Closed _ ->
+          add worker Shutdown ;
+          `Stop_daemon
+      | Running _ -> (
+          (* TODO: it should block and take the timeout into account *)
+          let popped = take_nonblocking worker in
+          match popped with
+          | None ->
+              Handlers.on_no_request worker ;
+              (* TODO: To check *)
+              Eio.Fiber.yield () ;
+              loop ()
+          | Some (Message {request; metadata = _; resolver; timestamp = pushed})
+            -> (
+              worker.stream_explorer <-
+                List.tl worker.stream_explorer
+                |> Stdlib.Option.value ~default:[] ;
+              let treated = Time.System.now () in
+              (* Retrieves the last possible error from the hive and returns it.
+                 See `Eio.Executor_pool`. *)
+              Option.iter
+                (fun x -> resolve_error resolver (Any x))
+                (Hive.get_error (Format.asprintf "%a" Name.pp worker.name)) ;
+
+              match Handlers.on_request worker request with
+              | Ok v ->
+                  let completed = Time.System.now () in
+                  resolve resolver (Ok v) ;
+                  let status = Worker_types.{pushed; treated; completed} in
+                  Handlers.on_completion worker request v status ;
+                  ( Lwt_eio.run_lwt_in_main @@ fun () ->
+                    Worker_events.(emit request_no_errors)
+                      (Request.view request, status) ) ;
+                  loop ()
+              | Error e -> (
+                  resolve resolver (Error (Request_error e)) ;
+                  let r =
+                    let status =
+                      Worker_types.
+                        {pushed; treated; completed = Time.System.now ()}
+                    in
+                    Handlers.on_error worker status request e
+                  in
+                  match r with
+                  | Ok () -> loop ()
+                  | Error errs ->
+                      add worker Shutdown ;
+                      ( Lwt_eio.run_lwt_in_main @@ fun () ->
+                        Worker_events.(emit crashed) errs ) ;
+                      `Stop_daemon)
+              | exception e ->
+                  resolve resolver (Error (Any e)) ;
+                  raise e)
+          | Some Shutdown -> (
+              match worker.status with
+              | Closing _ | Closed _ ->
+                  add worker Shutdown ;
+                  `Stop_daemon
+              | Launching _ -> assert false
+              | Running birth ->
+                  worker.status <- Closing (birth, Time.System.now ()) ;
+                  Handlers.on_close worker ;
+                  (Lwt_eio.run_lwt_in_main @@ Worker_events.(emit terminated)) ;
+                  worker.status <- Closed (birth, Time.System.now (), None) ;
+                  (* Add [Shutdown] again to the worker queue to make sure that
+                     other bees see the shutdown request *)
+                  add worker Shutdown ;
+                  `Stop_daemon))
+    in
+    loop ()
+
   let create_table buffer_kind =
     {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
-  let close (type kind) handlers (w : kind t) errs =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3264
-              close should be called only once in a worker lifetime *)
-    let (module Handlers : HANDLERS with type self = kind t) = handlers in
-    let open Lwt_syntax in
-    match w.status with
-    (* Launching is not accessible from here, as the only occurrence
-       in form [launch] and happens before the call to [worker_loop] *)
-    | Closed _ | Closing _ | Launching _ -> Lwt.return_unit
-    | Running t0 ->
-        w.status <- Closing (t0, Time.System.now ()) ;
-        close w ;
-        let* () = Error_monad.cancel_with_exceptions w.canceler in
-        w.status <- Closed (t0, Time.System.now (), errs) ;
-        let* () = Handlers.on_close w in
-        Nametbl.remove w.table.instances w.name ;
-        w.state <- None ;
-        return_unit
-
-  let worker_loop (type kind) handlers (w : kind t) =
-    let (module Handlers : HANDLERS with type self = kind t) = handlers in
-    let open Lwt_syntax in
-    let rec loop () =
-      (* The call to [protect] here allows the call to [pop] (responsible
-         for fetching the next request) to be canceled by the use of the
-         [canceler].
-
-         These cancellations cannot affect the processing of ongoing requests.
-         This is due to the limited scope of the argument of [protect]. As a
-         result, ongoing requests are never canceled by this mechanism.
-
-         In the case when the [canceler] is canceled whilst a request is being
-         processed, the processing eventually resolves, at which point a
-         recursive call to this [loop] at which point this call to [protect]
-         fails immediately with [Canceled]. *)
-      let* popped = protect_result (fun () -> pop w) in
-      match popped with
-      | Error exn -> raise exn
-      | Ok None ->
-          let* () = Handlers.on_no_request w in
-          loop ()
-      | Ok (Some (pushed, Message (request, {scope = _scope}, u))) -> (
-          (let current_request = Request.view request in
-           let treated = Time.System.now () in
-           w.current_request <- Some (pushed, treated, current_request) ;
-           let* r =
-             match u with
-             | None -> (
-                 let open Lwt_result_syntax in
-                 let*! res = Handlers.on_request w request in
-                 match res with
-                 | Error err -> Lwt.return_error err
-                 | Ok res ->
-                     let completed = Time.System.now () in
-                     w.current_request <- None ;
-                     let status = Worker_types.{pushed; treated; completed} in
-                     let*! () = Handlers.on_completion w request res status in
-                     let*! () =
-                       Worker_events.(emit request_no_errors)
-                         (current_request, status)
-                     in
-                     return_unit)
-             | Some u -> (
-                 (* [res] is a result. But the side effect [wakeup]
-                    needs to happen regardless of success (Ok) or failure
-                    (Error). To that end, we treat it locally like a regular
-                    promise (which happens to carry a [result]) within the Lwt
-                    monad. *)
-                 let* res = Handlers.on_request w request in
-                 match res with
-                 | Error err ->
-                     Lwt.wakeup_later u (Error (Request_error err)) ;
-                     Lwt.return (Error err)
-                 | Ok res ->
-                     Lwt.wakeup_later u (Ok res) ;
-                     let completed = Time.System.now () in
-                     let status = Worker_types.{pushed; treated; completed} in
-                     w.current_request <- None ;
-                     let* () = Handlers.on_completion w request res status in
-                     let* () =
-                       Worker_events.(emit request_no_errors)
-                         (current_request, status)
-                     in
-                     return (Ok ()))
-           in
-           match r with
-           | Ok () -> loop ()
-           | Error err -> (
-               let* r =
-                 match w.current_request with
-                 | Some (pushed, treated, _request_view) ->
-                     let completed = Time.System.now () in
-                     w.current_request <- None ;
-                     Handlers.on_error
-                       w
-                       Worker_types.{pushed; treated; completed}
-                       request
-                       err
-                 | None -> assert false
-               in
-               match r with
-               | Ok () -> loop ()
-               | Error errs ->
-                   let* () = Worker_events.(emit crashed) errs in
-                   close handlers w (Some errs)))
-          [@profiler.custom_f
-            {driver_ids = [Opentelemetry]}
-              (Tezos_profiler_backend.Opentelemetry_profiler.update_scope
-                 _scope)])
-    in
-    let* r = protect_result ~canceler:w.canceler (fun () -> loop ()) in
-    match r with
-    | Ok () -> Lwt.return_unit
-    | Error Lwt.Canceled | Error Lwt_pipe.Closed | Error Lwt_dropbox.Closed ->
-        let* () = Worker_events.(emit terminated) () in
-        close handlers w None
-    | Error exn ->
-        let* () = Worker_events.(emit crashed) [Exn exn] in
-        raise exn
-
-  let launch :
-      type kind launch_error.
-      kind table ->
-      ?timeout:Time.System.Span.t ->
-      Name.t ->
-      Types.parameters ->
-      (module HANDLERS
-         with type self = kind t
-          and type launch_error = launch_error) ->
+  (** [launch table name parameters handlers] creates a single worker
+      instance, using exclusively Lwt handlers. As such, it won't start multiple
+      domains. *)
+  let launch (type kind launch_error) (table : kind table) ?timeout
+      ?(domains = 1) name parameters handlers :
       (kind t, launch_error) result Lwt.t =
-   fun table ?timeout name parameters (module Handlers) ->
+    let (module Lwt_handlers : HANDLERS
+          with type self = kind t
+           and type launch_error = launch_error) =
+      handlers
+    in
+    ignore timeout ;
+    let module Handlers :
+      EIO_HANDLERS with type self = kind t and type launch_error = launch_error =
+      MakeEIO (Lwt_handlers) in
+    let buffer : kind buffer =
+      match table.buffer_kind with
+      | Queue -> Queue_buffer (Eio.Stream.create max_int)
+      | Bounded {size} -> Bounded_buffer (Eio.Stream.create size)
+      | Dropbox _ -> Dropbox_buffer (Eio.Stream.create 1)
+    in
     let name_s = Format.asprintf "%a" Name.pp name in
     let full_name =
       if name_s = "" then base_name
@@ -732,112 +676,352 @@ struct
       let id_name =
         if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id
       in
-      let canceler = Lwt_canceler.create () in
-      let buffer : kind buffer =
-        match table.buffer_kind with
-        | Queue -> Queue_buffer (Lwt_pipe.Unbounded.create ())
-        | Bounded {size} ->
-            Bounded_buffer
-              (Lwt_pipe.Bounded.create
-                 ~max_size:size
-                 ~compute_size:(fun _ -> 1)
-                 ())
-        | Dropbox _ -> Dropbox_buffer (Lwt_dropbox.create ())
-      in
-      let w =
+      let worker =
         {
-          parameters;
+          mutex = Eio.Mutex.create ();
+          timeout = None;
           name;
-          canceler;
-          table;
+          parameters;
           buffer;
-          state = None;
-          id;
-          worker = Lwt.return_unit;
-          timeout;
+          canceler = Lwt_canceler.create ();
+          stream_explorer = [];
           current_request = None;
+          state = None;
           status = Launching (Time.System.now ());
+          table;
         }
       in
-      Nametbl.add table.instances name w ;
-      let open Lwt_result_syntax in
-      let*! () =
-        if id_name = base_name then Worker_events.(emit started) ()
-        else Worker_events.(emit started_for) name_s
+      Lwt_eio.run_eio @@ fun () ->
+      let state = Handlers.on_launch worker name parameters in
+      if id_name = base_name then
+        Worker_events.(emit__dont_wait__use_with_care started) ()
+      else
+        Worker_events.(emit__dont_wait__use_with_care started_for)
+          (Format.asprintf "%a" Name.pp name) ;
+      match state with
+      | Ok state ->
+          worker.state <- Some state ;
+          worker.status <- Worker_types.Running (Time.System.now ()) ;
+          Hive.launch_worker
+            worker
+            ~bee_name:(Format.asprintf "%a" Name.pp name)
+            ~domains
+            (worker_loop (module Handlers)) ;
+          Ok worker
+      | Error e -> Error e
+
+  let launch_eio (type kind launch_error) (table : kind table) ?timeout
+      ?(domains = 1) ~name parameters handlers : (kind t, launch_error) result =
+    let (module Handlers : EIO_HANDLERS
+          with type self = kind t
+           and type launch_error = launch_error) =
+      handlers
+    in
+    ignore timeout ;
+    let buffer : kind buffer =
+      match table.buffer_kind with
+      | Queue -> Queue_buffer (Eio.Stream.create max_int)
+      | Bounded {size} -> Bounded_buffer (Eio.Stream.create size)
+      | Dropbox _ -> Dropbox_buffer (Eio.Stream.create 1)
+    in
+    let name_s = Format.asprintf "%a" Name.pp name in
+    let full_name =
+      if name_s = "" then base_name
+      else Format.asprintf "%s_%s" base_name name_s
+    in
+    if Nametbl.mem table.instances name then
+      invalid_arg
+        (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
+    else
+      let id =
+        table.last_id <- table.last_id + 1 ;
+        table.last_id
       in
-      let* state = Handlers.on_launch w name parameters in
-      w.status <- Running (Time.System.now ()) ;
-      w.state <- Some state ;
-      w.worker <-
-        Lwt_utils.worker
-          full_name
-          ~on_event:Internal_event.Lwt_worker_logger.on_event
-          ~run:(fun () -> worker_loop (module Handlers) w)
-          ~cancel:(fun () -> Error_monad.cancel_with_exceptions w.canceler) ;
-      return w
+      let id_name =
+        if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id
+      in
+      let worker =
+        {
+          mutex = Eio.Mutex.create ();
+          timeout = None;
+          name;
+          parameters;
+          stream_explorer = [];
+          canceler = Lwt_canceler.create ();
+          state = None;
+          status = Launching (Time.System.now ());
+          current_request = None;
+          table;
+          buffer;
+        }
+      in
+      let state = Handlers.on_launch worker name parameters in
+      if id_name = base_name then
+        Worker_events.(emit__dont_wait__use_with_care started) ()
+      else
+        Worker_events.(emit__dont_wait__use_with_care started_for)
+          (Format.asprintf "%a" Name.pp name) ;
+      match state with
+      | Ok state ->
+          worker.state <- Some state ;
+          worker.status <- Worker_types.Running (Time.System.now ()) ;
+          Hive.launch_worker
+            worker
+            ~bee_name:(Format.asprintf "%a" Name.pp name)
+            ~domains
+            (worker_loop (module Handlers)) ;
+          Ok worker
+      | Error e -> Error e
 
-  let shutdown w =
-    (* The actual cancellation ([Lwt_canceler.cancel w.canceler]) resolves
-       immediately because no hooks are registered on the canceler. However, the
-       worker ([w.worker]) resolves only once the ongoing request has resolved
-       (if any) and some clean-up operations have completed. *)
-    let open Lwt_syntax in
-    let* () = Worker_events.(emit triggering_shutdown) () in
-    let* () = Error_monad.cancel_with_exceptions w.canceler in
-    w.worker
+  let pp_worker_status ppf =
+    let open Worker_types in
+    function
+    | Running _ -> Format.fprintf ppf "Shutdown"
+    | Launching _ -> Format.fprintf ppf "Launching"
+    | Closing _ -> Format.fprintf ppf "Closing"
+    | Closed _ -> Format.fprintf ppf "Closed"
 
-  let state w =
-    match (w.state, w.status) with
-    | None, Launching _ ->
-        invalid_arg
-          (Format.asprintf
-             "Worker.state (%s[%a]): state called before worker was initialized"
-             base_name
-             Name.pp
-             w.name)
-    | None, (Closing _ | Closed _) ->
-        invalid_arg
-          (Format.asprintf
-             "Worker.state (%s[%a]): state called after worker was terminated"
-             base_name
-             Name.pp
-             w.name)
-    | None, _ -> assert false
-    | Some state, _ -> state
+  let drop_request ?(_priority = 0) worker merge message_box request metadata =
+    match worker.status with
+    | Running _ -> (
+        Eio.Mutex.with_lock_rw ~protect:true worker.mutex @@ fun () ->
+        let merge_res =
+          match Eio.Stream.take_nonblocking message_box with
+          | None -> merge worker (Any_request (request, metadata)) None
+          | Some (Message {request = old; metadata = old_metadata; _}) ->
+              merge
+                worker
+                (Any_request (request, metadata))
+                (Some (Any_request (old, old_metadata)))
+          | Some Shutdown ->
+              Eio.Stream.add message_box Shutdown ;
+              None
+        in
+        match merge_res with
+        | None -> ()
+        | Some (Any_request (request, metadata)) ->
+            Eio.Stream.add
+              message_box
+              (Message
+                 {
+                   request;
+                   metadata;
+                   timestamp = Time.System.now ();
+                   resolver = None;
+                 }))
+    | Launching _ | Closing _ | Closed _ -> ()
 
-  let with_state :
-      _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t
+  let drop_request_and_wait ?(_priority = 0) worker message_box request metadata
       =
-   fun w f ->
-    match w.state with
-    | Some state -> f state
-    | None -> Lwt_result_syntax.return_unit
+    match worker.status with
+    | Running _ ->
+        let promise, resolver =
+          Eio.Promise.create (* should we use label? *) ()
+        in
+        Eio.Mutex.with_lock_rw ~protect:true worker.mutex @@ fun () ->
+        ignore @@ Eio.Stream.take_nonblocking message_box ;
+        Eio.Stream.add
+          message_box
+          (Message
+             {
+               request;
+               metadata;
+               timestamp = Time.System.now ();
+               resolver = Some resolver;
+             }) ;
+        promise
+    | Launching _ | Closing _ | Closed _ ->
+        Eio.Promise.create_resolved (Error (Closed None))
 
-  let pending_requests q = Queue.pending_requests q
+  (* TODO: link it to the canceler? *)
+  let shutdown_eio w =
+    match w.status with
+    | Launching _ | Closed _ | Closing _ ->
+        add w Shutdown ;
+        Eio.Fiber.yield ()
+    | Running _ ->
+        w.status <- Closing (Time.System.now (), Time.System.now ()) ;
+        while not @@ is_empty w do
+          ignore @@ take_nonblocking w
+        done ;
+        w.stream_explorer <- [] ;
+        add w Shutdown ;
+        Eio.Fiber.yield ()
 
-  let status {status; _} = status
+  let shutdown w = Lwt_eio.run_eio @@ fun () -> shutdown_eio w
 
-  let current_request {current_request; _} = current_request
+  module type BOX = sig
+    type t
 
-  let information (type a) (w : a t) =
-    {
-      Worker_types.instances_number = Nametbl.length w.table.instances;
-      wstatus = w.status;
-      queue_length =
-        (match w.buffer with
-        | Queue_buffer pipe -> Lwt_pipe.Unbounded.length pipe
-        | Bounded_buffer pipe -> Lwt_pipe.Bounded.length pipe
-        | Dropbox_buffer _ -> 1);
-    }
+    val put_request : t -> ('a, 'request_error) Request.t -> unit
 
-  let list {instances; _} =
-    Nametbl.fold (fun n w acc -> (n, w) :: acc) instances []
+    val put_request_eio : t -> ('a, 'request_error) Request.t -> unit
 
-  let find_opt {instances; _} = Nametbl.find instances
+    val put_request_and_wait :
+      t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
 
-  let () =
-    Internal_event.register_section
-      (Internal_event.Section.make_sanitized Name.base)
+    val put_request_and_wait_eio :
+      t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Eio.Promise.t
+  end
+
+  module type QUEUE = sig
+    type 'a t
+
+    val push_request_and_wait :
+      'q t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
+
+    val push_request_and_wait_eio :
+      'q t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Eio.Promise.t
+
+    val push_request : 'q t -> ('a, 'request_error) Request.t -> bool Lwt.t
+
+    val push_request_eio : 'q t -> ('a, 'request_error) Request.t -> bool
+
+    val pending_requests : 'a t -> (Time.System.t * Request.view) list
+
+    val pending_requests_length : 'a t -> int
+  end
+
+  let make_metadata () =
+    (* This pattern is equivalent to:
+       ```
+       let scope =
+         if "ppx is enabled" then
+           Opentelemetry.Scope.get_ambient_scope ()
+         else
+           None
+       ```
+    *)
+    let scope =
+      (None
+      [@profiler.overwrite
+        {driver_ids = [Opentelemetry]}
+          (Opentelemetry.Scope.get_ambient_scope ())])
+    in
+    {scope}
+
+  module Dropbox = struct
+    let put_request_eio worker request =
+      let (Dropbox {merge}) = worker.table.buffer_kind in
+      let (Dropbox_buffer message_box) = worker.buffer in
+      let metadata = make_metadata () in
+      drop_request worker merge message_box request metadata
+
+    let put_request worker request = put_request_eio worker request
+
+    let put_request_and_wait_eio worker request =
+      let (Dropbox_buffer message_box) = worker.buffer in
+      let metadata = make_metadata () in
+      drop_request_and_wait worker message_box request metadata
+
+    let put_request_and_wait worker request =
+      let (Dropbox_buffer message_box) = worker.buffer in
+      let metadata = make_metadata () in
+      Lwt_eio.Promise.await_eio
+      @@ drop_request_and_wait worker message_box request metadata
+  end
+
+  module Queue = struct
+    let push_request ?(_priority = 0) worker request metadata =
+      match worker.status with
+      | Closing _ | Closed _ | Launching _ ->
+          let reset = Pretty_printing.add_ansi_marking Format.err_formatter in
+          Format.eprintf
+            "@{<fg_yellow>Worker %a state (%a) does not allow it to handle \
+             requests@}@."
+            Name.pp
+            worker.name
+            pp_worker_status
+            worker.status ;
+          reset () ;
+          false
+      | Running _ ->
+          let timestamp = Time.System.now () in
+          let message =
+            Message {request; metadata; resolver = None; timestamp}
+          in
+          add worker message ;
+          worker.stream_explorer <-
+            (timestamp, Request.view request) :: worker.stream_explorer ;
+          true
+
+    (* TODO: check the worker status and don't push if closed *)
+    let push_request_now ?(_priority = 0) (worker : infinite queue t) request
+        metadata =
+      let (Queue_buffer message_queue) = worker.buffer in
+      let timestamp = Time.System.now () in
+      let message = Message {request; metadata; timestamp; resolver = None} in
+      Eio.Stream.add message_queue message ;
+      worker.stream_explorer <-
+        (timestamp, Request.view request) :: worker.stream_explorer
+
+    let push_request_and_wait ?(_priority = 0) worker request metadata =
+      match worker.status with
+      | Closing _ | Closed _ | Launching _ ->
+          let reset = Pretty_printing.add_ansi_marking Format.err_formatter in
+          Format.eprintf
+            "@{<fg_yellow>Worker %a state (%a) does not allow it to handle \
+             requests@}@."
+            Name.pp
+            worker.name
+            pp_worker_status
+            worker.status ;
+          reset () ;
+          Eio.Promise.create_resolved (Error (Closed None))
+      | Running _ ->
+          let promise, resolver =
+            Eio.Promise.create (* should we use ~label?*) ()
+          in
+          let timestamp = Time.System.now () in
+          let message =
+            Message {request; metadata; resolver = Some resolver; timestamp}
+          in
+          add worker message ;
+          worker.stream_explorer <-
+            (timestamp, Request.view request) :: worker.stream_explorer ;
+          promise
+
+    let push_request_eio worker request =
+      let metadata = make_metadata () in
+      push_request worker request metadata
+
+    let push_request worker request =
+      let metadata = make_metadata () in
+      Lwt_eio.run_eio @@ fun () -> push_request worker request metadata
+
+    let push_request_and_wait_eio worker request =
+      let metadata = make_metadata () in
+      push_request_and_wait worker request metadata
+
+    let push_request_and_wait worker request =
+      let metadata = make_metadata () in
+      Lwt_eio.Promise.await_eio @@ push_request_and_wait worker request metadata
+
+    let push_request_now_eio worker request =
+      let metadata = make_metadata () in
+      push_request_now worker request metadata
+
+    let push_request_now worker request =
+      let metadata = make_metadata () in
+      push_request_now worker request metadata
+
+    let pending_requests (type a) (worker : a queue t) = worker.stream_explorer
+
+    let pending_requests_length (type a) (worker : a queue t) =
+      List.length worker.stream_explorer
+  end
+
+  let trigger_shutdown (type a) (w : a t) = shutdown_eio w
+
+  let canceler {canceler; _} = canceler
 end
 
 module MakeGroup (Name : Worker_intf.NAME) (Request : Worker_intf.REQUEST) =
