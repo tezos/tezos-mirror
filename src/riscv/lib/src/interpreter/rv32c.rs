@@ -103,20 +103,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `C.ADDI16SP` CI-type compressed instruction
-    ///
-    /// Adds the non-zero immediate to the value in the stack pointer.
-    /// The immediate is obtained by sign-extending and scaling by 16 the value
-    /// encoded in the instruction (see U:C-16.5).
-    pub fn run_caddi16sp(&mut self, imm: i64) {
-        debug_assert!(imm != 0 && imm % 16 == 0);
-        // Return the lower XLEN (64 bits in our case) bits of the addition
-        // Irrespective of sign, the result is the same, casting to u64 for addition
-        let rval = self.read(sp);
-        let result = rval.wrapping_add(imm as u64);
-        self.write(sp, result)
-    }
-
     /// `C.SLLI` CI-type compressed instruction
     ///
     /// Performs a logical left shift of the value in register `rd_rs1`

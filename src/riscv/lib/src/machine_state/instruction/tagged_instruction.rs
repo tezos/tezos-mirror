@@ -334,8 +334,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord
         | Amoandd | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw
         | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw
-        | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CAddi16sp | CAnd | COr
-        | CXor | CSub | CAddw | CSubw | CLd | CSd | CSdsp | Unknown | Beqz | Bnez | J => {
+        | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CAnd | COr | CXor
+        | CSub | CAddw | CSubw | CLd | CSd | CSdsp | Unknown | Beqz | Bnez | J => {
             ArgsShape::XSrcXDest
         }
 

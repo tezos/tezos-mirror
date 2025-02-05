@@ -469,6 +469,9 @@ pub enum InstrCacheable {
     /// `C.ADDI` - Adds the non-zero sign-extended 6-bit `imm`
     /// to the value in `rd_rs1` then writes the result to `rd_rs1`.
     CAddi(CIBNZTypeArgs),
+    /// `C.ADDI16SP` - Adds the non-zero immediate to the value in the stack pointer.
+    /// The immediate is obtained by sign-extending and scaling by 16 the value
+    /// encoded in the instruction (see U:C-16.5).
     CAddi16sp(CJTypeArgs),
     /// `C.ADDI4SPN`- Adds the non-zero immediate to the stack pointer and writes the result
     /// to `rd`. The immediate is obtained by zero-extending and scaling by 4 the value

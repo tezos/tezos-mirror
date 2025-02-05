@@ -29,6 +29,7 @@ where
     /// - `ADDI`
     /// - `C.ADDI`
     /// - `C.ADDI4SPN`
+    /// - `C.ADDI16SP`
     pub fn run_addi(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // Return the lower XLEN (64 bits in our case) bits of the addition
         // Irrespective of sign, the result is the same, casting to u64 for addition

@@ -335,7 +335,6 @@ pub enum OpCode {
     CJr,
     CJalr,
     CLui,
-    CAddi16sp,
     CSlli,
     CAnd,
     COr,
@@ -541,7 +540,6 @@ impl OpCode {
             Self::Bnez => Args::run_bnez,
             Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
-            Self::CAddi16sp => Args::run_caddi16spn,
             Self::CSlli => Args::run_cslli,
             Self::Mv => Args::run_mv,
             Self::CAnd => Args::run_cand,
@@ -1291,16 +1289,6 @@ impl Args {
     impl_cr_type!(run_csub);
     impl_css_type!(run_cswsp);
 
-    // SAFETY: This function must only be called on an `Args` belonging
-    // to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_caddi16spn<ML: MainMemoryLayout, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<ML, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
-        core.hart.xregisters.run_caddi16sp(self.imm);
-        Ok(Next(self.width))
-    }
-
     fn run_j<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
@@ -2028,10 +2016,12 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::CAddi(args) => {
                 Instruction::new_addi(args.rd_rs1, args.rd_rs1, args.imm, InstrWidth::Compressed)
             }
-            InstrCacheable::CAddi16sp(args) => Instruction {
-                opcode: OpCode::CAddi16sp,
-                args: args.into(),
-            },
+            InstrCacheable::CAddi16sp(args) => Instruction::new_addi(
+                NonZeroXRegister::x2,
+                NonZeroXRegister::x2,
+                args.imm,
+                InstrWidth::Compressed,
+            ),
             InstrCacheable::CAddi4spn(args) => Instruction::from_ic_caddi4spn(args),
             InstrCacheable::CSlli(args) => Instruction {
                 opcode: OpCode::CSlli,
