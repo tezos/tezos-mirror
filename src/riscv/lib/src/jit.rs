@@ -237,6 +237,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
 mod tests {
     use super::*;
     use crate::default::ConstDefault;
+    use crate::machine_state::block_cache::BCall;
     use crate::machine_state::block_cache::{Block, ICallLayout, ICallPlaced, CACHE_INSTR};
     use crate::machine_state::main_memory::tests::T1K;
     use crate::machine_state::{MachineCoreState, MachineCoreStateLayout};
