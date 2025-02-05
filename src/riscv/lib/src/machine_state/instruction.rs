@@ -666,8 +666,8 @@ impl ConstDefault for Args {
 
 macro_rules! impl_r_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -678,8 +678,8 @@ macro_rules! impl_r_type {
     };
 
     ($fn: ident, non_zero_rd) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -692,8 +692,8 @@ macro_rules! impl_r_type {
     };
 
     ($impl: path, $fn: ident, non_zero) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
             $impl(icb, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
             icb.ok(Next(self.width))
@@ -703,8 +703,8 @@ macro_rules! impl_r_type {
 
 macro_rules! impl_i_type {
     ($fn: ident, non_zero) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -717,8 +717,8 @@ macro_rules! impl_i_type {
     };
 
     ($fn: ident, non_zero_rd) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -731,8 +731,8 @@ macro_rules! impl_i_type {
 
 macro_rules! impl_fload_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -744,8 +744,8 @@ macro_rules! impl_fload_type {
 }
 macro_rules! impl_load_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -757,8 +757,8 @@ macro_rules! impl_load_type {
 }
 macro_rules! impl_cload_sp_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -769,8 +769,8 @@ macro_rules! impl_cload_sp_type {
 }
 macro_rules! impl_cfload_sp_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -782,8 +782,8 @@ macro_rules! impl_cfload_sp_type {
 
 macro_rules! impl_store_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -795,8 +795,8 @@ macro_rules! impl_store_type {
 }
 macro_rules! impl_fstore_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -809,8 +809,8 @@ macro_rules! impl_fstore_type {
 
 macro_rules! impl_b_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -822,8 +822,8 @@ macro_rules! impl_b_type {
 
 macro_rules! impl_amo_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -836,8 +836,8 @@ macro_rules! impl_amo_type {
 
 macro_rules! impl_ci_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -848,8 +848,8 @@ macro_rules! impl_ci_type {
     };
 
     ($fn: ident, non_zero) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -862,8 +862,8 @@ macro_rules! impl_ci_type {
 
 macro_rules! impl_cr_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -876,8 +876,8 @@ macro_rules! impl_cr_type {
 
 macro_rules! impl_cr_nz_type {
     ($impl: path, $fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
             $impl(icb, self.rd.nzx, self.rs2.nzx);
             icb.ok(Next(self.width))
@@ -887,8 +887,8 @@ macro_rules! impl_cr_nz_type {
 
 macro_rules! impl_cb_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -900,8 +900,8 @@ macro_rules! impl_cb_type {
 
 macro_rules! impl_css_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -913,8 +913,8 @@ macro_rules! impl_css_type {
 
 macro_rules! impl_fcss_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -926,8 +926,8 @@ macro_rules! impl_fcss_type {
 
 macro_rules! impl_csr_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -941,8 +941,8 @@ macro_rules! impl_csr_type {
 
 macro_rules! impl_csr_imm_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -956,8 +956,8 @@ macro_rules! impl_csr_imm_type {
 
 macro_rules! impl_f_x_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -969,8 +969,8 @@ macro_rules! impl_f_x_type {
     };
 
     ($fn:ident, rm) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -984,8 +984,8 @@ macro_rules! impl_f_x_type {
 
 macro_rules! impl_x_f_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -997,8 +997,8 @@ macro_rules! impl_x_f_type {
     };
 
     ($fn:ident, rm) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -1012,8 +1012,8 @@ macro_rules! impl_x_f_type {
 
 macro_rules! impl_f_r_type {
     ($fn: ident) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -1025,8 +1025,8 @@ macro_rules! impl_f_r_type {
     };
 
     ($fn: ident, (rd, x)) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -1038,8 +1038,8 @@ macro_rules! impl_f_r_type {
     };
 
     ($fn: ident, rm) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -1051,8 +1051,8 @@ macro_rules! impl_f_r_type {
     };
 
     ($fn: ident, (rs2, f), $($field: ident),+) => {
-        // SAFETY: This function must only be called on an `Args` belonging
-        // to the same OpCode as the OpCode used to derive this function.
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<ML, M>,
@@ -1120,8 +1120,8 @@ impl Args {
 
     // RV64I U-type instructions
     //
-    // SAFETY: This function must only be called on an `Args` belonging
-    // to the same OpCode as the OpCode used to derive this function.
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_lui<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
@@ -1130,8 +1130,8 @@ impl Args {
         Ok(Next(self.width))
     }
 
-    // SAFETY: This function must only be called on an `Args` belonging
-    // to the same OpCode as the OpCode used to derive this function.
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_auipc<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
@@ -1142,8 +1142,8 @@ impl Args {
 
     // RV64I jump instructions
     //
-    // SAFETY: This function must only be called on an `Args` belonging
-    // to the same OpCode as the OpCode used to derive this function.
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jal<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
@@ -1151,8 +1151,8 @@ impl Args {
         Ok(Set(core.hart.run_jal(self.imm, self.rd.x)))
     }
 
-    // SAFETY: This function must only be called on an `Args` belonging
-    // to the same OpCode as the OpCode used to derive this function.
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
@@ -1296,8 +1296,8 @@ impl Args {
         Ok(Set(core.hart.run_j(self.imm)))
     }
 
-    // SAFETY: This function must only be called on an `Args` belonging
-    // to the same OpCode as the OpCode used to derive this function.
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_cjr<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
@@ -1305,8 +1305,8 @@ impl Args {
         Ok(Set(core.hart.run_cjr(self.rs1.nzx)))
     }
 
-    // SAFETY: This function must only be called on an `Args` belonging
-    // to the same OpCode as the OpCode used to derive this function.
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_cjalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<ML, M>,
