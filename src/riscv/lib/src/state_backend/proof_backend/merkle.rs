@@ -256,55 +256,11 @@ pub trait AccessInfoAggregatable {
     fn aggregate_access_info(&self) -> AccessInfo;
 }
 
-impl<T: AccessInfoAggregatable> AccessInfoAggregatable for [T] {
-    fn aggregate_access_info(&self) -> AccessInfo {
-        let mut acc = AccessInfo::NoAccess;
-        for e in self.iter() {
-            acc = acc.merge(e.aggregate_access_info());
-            if let AccessInfo::ReadWrite = acc {
-                break;
-            }
-        }
-        acc
-    }
-}
-
-impl<T: AccessInfoAggregatable> AccessInfoAggregatable for Vec<T> {
-    fn aggregate_access_info(&self) -> AccessInfo {
-        self.as_slice().aggregate_access_info()
-    }
-}
-
-impl<T: AccessInfoAggregatable, const N: usize> AccessInfoAggregatable for [T; N] {
-    fn aggregate_access_info(&self) -> AccessInfo {
-        self.as_slice().aggregate_access_info()
-    }
-}
-
 impl AccessInfoAggregatable for () {
     fn aggregate_access_info(&self) -> AccessInfo {
         AccessInfo::NoAccess
     }
 }
-
-macro_rules! impl_aggregatable_for_tuple {
-    ($($name:ident),*) => {
-        impl<$($name: AccessInfoAggregatable),*> AccessInfoAggregatable for ($($name,)*) {
-            fn aggregate_access_info(&self) -> AccessInfo {
-                #[allow(non_snake_case)]
-                let ($($name,)*) = self;
-                let children = [$($name.aggregate_access_info(),)*];
-                AccessInfo::fold(&children)
-            }
-        }
-    }
-}
-
-impl_aggregatable_for_tuple!(A, B);
-impl_aggregatable_for_tuple!(A, B, C);
-impl_aggregatable_for_tuple!(A, B, C, D);
-impl_aggregatable_for_tuple!(A, B, C, D, E);
-impl_aggregatable_for_tuple!(A, B, C, D, E, F);
 
 /// Helper function which allows iterating over chunks of a dynamic array
 /// and writing them to a writer. The last chunk may be smaller than the
