@@ -66,7 +66,7 @@ type garbage_collector_parameters = {
 
 type history_mode =
   | Archive  (** Keeps all blocks, operations and states. *)
-  | Rolling
+  | Rolling of garbage_collector_parameters
       (** Keep blocks, operations and states for a period defined by
           {!type-garbage_collector_parameters}. *)
 
@@ -170,7 +170,6 @@ type t = {
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
-  garbage_collector_parameters : garbage_collector_parameters;
   history_mode : history_mode option;
 }
 
@@ -261,9 +260,13 @@ val observer_config_dft :
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
-(** [retention ?days ()] returns the GC parameters to retain [days] of history
+val string_of_history_mode : history_mode -> string
+
+val history_mode_of_string_opt : string -> history_mode option
+
+(** [retention ~days] returns the GC parameters to retain [days] of history
     when provided or the default otherwise. *)
-val retention : ?days:int -> unit -> garbage_collector_parameters
+val gc_param_from_retention_period : days:int -> garbage_collector_parameters
 
 val default_history_mode : history_mode
 
@@ -305,7 +308,6 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
-    ?garbage_collector_parameters:garbage_collector_parameters ->
     unit ->
     t
 
@@ -343,7 +345,6 @@ module Cli : sig
     ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?history_mode:history_mode ->
-    ?garbage_collector_parameters:garbage_collector_parameters ->
     ?dal_slots:int list ->
     t ->
     t
@@ -385,7 +386,6 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
-    ?garbage_collector_parameters:garbage_collector_parameters ->
     unit ->
     t tzresult Lwt.t
 end

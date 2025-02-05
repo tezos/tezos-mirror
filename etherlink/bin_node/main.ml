@@ -162,29 +162,19 @@ module Params = struct
   let history_param =
     Tezos_clic.parameter @@ fun () s ->
     let open Lwt_result_syntax in
-    match String.split_on_char ':' s with
-    | ["archive"] -> return Configuration.(Archive, retention ())
-    | ["rolling"] -> return Configuration.(Rolling, retention ())
-    | ["rolling"; n] -> (
-        match int_of_string_opt n with
-        | Some days when days >= 0 ->
-            return Configuration.(Rolling, retention ~days ())
-        | _ ->
-            failwith
-              "Invalid retention period %S for rolling history mode. Must be a \
-               positive integer number of days."
-              n)
-    | _ ->
+    match Configuration.history_mode_of_string_opt s with
+    | Some mode -> return mode
+    | None ->
         failwith
-          "Invalid history mode. Must be either archive, rolling or rolling:n \
-           where n is the number of days to retain history."
+          "Invalid history mode. Must be either archive, or rolling:n where n \
+           is the number of days to retain history."
 
   let history next =
     Tezos_clic.param
       ~name:"history"
       ~desc:
-        "History mode, either archive, rolling or rolling:n where n is the \
-         number of days of history to retain."
+        "History mode, either archive, or rolling:n where n is the number of \
+         days of history to retain."
       history_param
       next
 end
@@ -1701,7 +1691,7 @@ mode.|}
              evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
              sequencer_sidecar_endpoint,
-             history,
+             history_mode,
              dont_track_rollup_node,
              wallet_dir,
              force,
@@ -1718,11 +1708,6 @@ mode.|}
             let wallet_ctxt = register_wallet ~wallet_dir () in
             Client_keys.Secret_key.parse_source_string wallet_ctxt str)
           sequencer_str
-      in
-      let history_mode, garbage_collector_parameters =
-        match history with
-        | Some (hist_mode, gc_params) -> (Some hist_mode, Some gc_params)
-        | None -> (None, None)
       in
       let* config =
         Cli.create_or_read_config
@@ -1765,7 +1750,6 @@ mode.|}
           ~finalized_view
           ?network
           ?history_mode
-          ?garbage_collector_parameters
           ()
       in
       let*! () =
@@ -2434,7 +2418,15 @@ let snapshot_info_command =
               "@,History mode:    %s@,First level:     %a"
               (match history_mode with
               | Archive -> "Archive"
-              | Rolling -> "Rolling")
+              | Rolling gc ->
+                  let hist_span =
+                    Ptime.Span.of_int_s
+                      (gc.split_frequency_in_seconds * gc.number_of_chunks)
+                  in
+                  Format.asprintf
+                    "Rolling (with %a history)"
+                    Ptime.Span.pp
+                    hist_span)
               Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
               first_level
       in
@@ -2462,7 +2454,7 @@ let switch_history_mode_command =
     ~desc:"Switch history mode of the node"
     (args1 data_dir_arg)
     (prefixes ["switch"; "history"; "to"] @@ Params.history @@ stop)
-    (fun data_dir (history_mode, garbage_collector_parameters) () ->
+    (fun data_dir history_mode () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
       let*! populated = Data_dir.populated ~data_dir in
@@ -2476,13 +2468,7 @@ let switch_history_mode_command =
       let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
       let* () =
         Evm_store.use store @@ fun conn ->
-        let* config =
-          Cli.create_or_read_config
-            ~data_dir
-            ~history_mode
-            ~garbage_collector_parameters
-            ()
-        in
+        let* config = Cli.create_or_read_config ~data_dir ~history_mode () in
         let*! () =
           let open Tezos_base_unix.Internal_event_unix in
           let config = make_with_defaults ~verbosity:Warning () in
@@ -2495,7 +2481,7 @@ let switch_history_mode_command =
             ~switch:true
             ~store_history_mode
             ~history_mode:config.history_mode
-            conn
+            ()
         in
         let* () = Evm_store.Metadata.store_history_mode conn history_mode in
         let*! config_exists =

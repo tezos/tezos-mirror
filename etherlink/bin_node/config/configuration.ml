@@ -44,7 +44,7 @@ type garbage_collector_parameters = {
   number_of_chunks : int;
 }
 
-type history_mode = Archive | Rolling
+type history_mode = Archive | Rolling of garbage_collector_parameters
 
 type rpc_server = Resto | Dream
 
@@ -133,7 +133,6 @@ type t = {
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
-  garbage_collector_parameters : garbage_collector_parameters;
   history_mode : history_mode option;
 }
 
@@ -148,10 +147,25 @@ let default_enable_send_raw_transaction = true
 
 let default_history_mode = Archive
 
-let retention ?(days = 14) () =
+let gc_param_from_retention_period ~days =
   {split_frequency_in_seconds = 86_400; number_of_chunks = days}
 
-let default_garbage_collector_parameters = retention ()
+let history_mode_of_string_opt str =
+  let open Option_syntax in
+  match String.split_on_char ':' str with
+  | ["archive"] -> return Archive
+  | ["rolling"; days] ->
+      let* days = int_of_string_opt days in
+      if days > 0 then return (Rolling (gc_param_from_retention_period ~days))
+      else None
+  | _ -> None
+
+let string_of_history_mode = function
+  | Archive -> "archive"
+  | Rolling gc -> Format.sprintf "rolling:%d" gc.number_of_chunks
+
+let pp_history_mode fmt h =
+  Format.pp_print_string fmt @@ string_of_history_mode h
 
 (* This should be enough for messages we expect to receive in the ethereum
    JSONRPC protocol. *)
@@ -717,68 +731,30 @@ let observer_encoding ?network () =
           bool
           default_rollup_node_tracking))
 
-let garbage_collector_parameters_encoding =
-  let open Data_encoding in
-  let int_days =
-    def
-      "days"
-      ~title:"number_of_days"
-      ~description:"Number of days of history to retain"
-      (ranged_int 0 ((1 lsl 30) - 1))
-  in
-  conv
-    (function
-      | {split_frequency_in_seconds = 86_400; number_of_chunks} ->
-          number_of_chunks
-      | _ -> Stdlib.failwith "GC split frequency must one day")
-    (fun number_of_chunks ->
-      {split_frequency_in_seconds = 86_400; number_of_chunks})
-    int_days
-
 let rpc_server_encoding =
   let open Data_encoding in
   string_enum [("resto", Resto); ("dream", Dream)]
 
+let history_mode_schema =
+  Data_encoding.(
+    Json.schema @@ string_enum [("archive", ()); ("rolling:n", ())])
+
 let history_mode_encoding =
   let open Data_encoding in
-  string_enum [("archive", Archive); ("rolling", Rolling)]
-
-let pp_history_mode fmt h =
-  Format.pp_print_string fmt
-  @@ match h with Archive -> "archive" | Rolling -> "rolling"
-
-let history_mode_and_gc_parameters_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"archive"
-        (Tag 0)
-        (constant "archive")
-        (function Archive, _ -> Some () | _ -> None)
-        (fun () -> (Archive, default_garbage_collector_parameters));
-      case
-        ~title:"rolling_default_gc"
-        (Tag 1)
-        (constant "rolling")
-        (function
-          | _ ->
-              (* This is a shortcut for rolling with default GC parameters,
-                 never output it. *)
-              None)
-        (fun () -> (Rolling, default_garbage_collector_parameters));
-      case
-        ~title:"rolling"
-        (Tag 2)
-        (obj2
-           (req "mode" (constant "rolling"))
-           (req
-              "retention"
-              ~description:"How much history is retained for rolling nodes."
-              garbage_collector_parameters_encoding))
-        (function Rolling, gc -> Some ((), gc) | _ -> None)
-        (fun ((), gc) -> (Rolling, gc));
-    ]
+  def
+    "history_mode"
+    ~description:
+      "Compact notation for the history mode. Can either be `archive` and \
+       `rolling:N` with `N` being the number of days to use as the retention \
+       period"
+  @@ conv_with_guard
+       ~schema:history_mode_schema
+       string_of_history_mode
+       (fun str ->
+         match history_mode_of_string_opt str with
+         | None -> Error (Format.sprintf "%s is not a valid history mode" str)
+         | Some m -> Ok m)
+       string
 
 let monitor_websocket_heartbeat_encoding =
   let open Data_encoding in
@@ -1165,7 +1141,6 @@ let encoding ?network data_dir : t Data_encoding.t =
            kernel_execution;
            finalized_view;
            history_mode;
-           garbage_collector_parameters;
          } ->
       ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
@@ -1181,9 +1156,7 @@ let encoding ?network data_dir : t Data_encoding.t =
             public_rpc,
             private_rpc,
             finalized_view,
-            match history_mode with
-            | Some h -> Some (h, garbage_collector_parameters)
-            | None -> None ) ) ))
+            history_mode ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1198,12 +1171,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                public_rpc,
                private_rpc,
                finalized_view,
-               history_mode_and_gc ) ) ) ->
-      let history_mode, garbage_collector_parameters =
-        match history_mode_and_gc with
-        | None -> (None, default_garbage_collector_parameters)
-        | Some (h, gc) -> (Some h, gc)
-      in
+               history_mode ) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -1223,7 +1191,6 @@ let encoding ?network data_dir : t Data_encoding.t =
         kernel_execution;
         finalized_view;
         history_mode;
-        garbage_collector_parameters;
       })
     (merge_objs
        (obj4
@@ -1303,7 +1270,7 @@ let encoding ?network data_dir : t Data_encoding.t =
              (opt
                 "history"
                 ~description:"History mode of the EVM node"
-                history_mode_and_gc_parameters_encoding))))
+                history_mode_encoding))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1486,8 +1453,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode
-      ?garbage_collector_parameters () =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
     let public_rpc =
       default_rpc
         ?rpc_port
@@ -1596,10 +1562,6 @@ module Cli = struct
       fee_history = default_fee_history;
       finalized_view =
         Option.value ~default:default_finalized_view finalized_view;
-      garbage_collector_parameters =
-        Option.value
-          garbage_collector_parameters
-          ~default:default_garbage_collector_parameters;
       history_mode;
     }
 
@@ -1642,8 +1604,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?history_mode ?garbage_collector_parameters
-      ?dal_slots configuration =
+      ?proxy_ignore_block_param ?history_mode ?dal_slots configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1901,10 +1862,6 @@ module Cli = struct
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
       finalized_view = finalized_view || configuration.finalized_view;
-      garbage_collector_parameters =
-        Option.value
-          garbage_collector_parameters
-          ~default:configuration.garbage_collector_parameters;
       history_mode = Option.either history_mode configuration.history_mode;
     }
 
@@ -1918,8 +1875,7 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode
-      ?garbage_collector_parameters () =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1975,7 +1931,6 @@ module Cli = struct
           ?finalized_view
           ?proxy_ignore_block_param
           ?history_mode
-          ?garbage_collector_parameters
           ?dal_slots
           configuration
       in
@@ -2019,7 +1974,6 @@ module Cli = struct
           ?dal_slots
           ?network
           ?history_mode
-          ?garbage_collector_parameters
           ()
       in
       return config

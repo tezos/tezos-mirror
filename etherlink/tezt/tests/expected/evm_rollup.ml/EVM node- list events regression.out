@@ -507,8 +507,13 @@ evm_context_switch_history_mode:
   json format:
     { /* evm_context_switch_history_mode version 0 */
       "evm_context_switch_history_mode.v0":
-        { "from": "rolling" | "archive",
-          "to_": "rolling" | "archive" } }
+        { "from": $history_mode,
+          "to_": $history_mode } }
+    $history_mode:
+      /* Compact notation for the history mode. Can either be `archive` and
+         `rolling:N` with `N` being the number of days to use as the
+         retention period */
+      "archive" | "rolling:n"
 
 evm_context_rolling_to_archive_incomplete_history:
   description: switching history mode from Rolling to Archive, but be aware that history is incomplete, earliest level is {earliest_level}
@@ -530,7 +535,12 @@ evm_context_start_history_mode:
   section: evm_node.dev.evm_context
   json format:
     { /* evm_context_start_history_mode version 0 */
-      "evm_context_start_history_mode.v0": "rolling" | "archive" }
+      "evm_context_start_history_mode.v0": $history_mode }
+    $history_mode:
+      /* Compact notation for the history mode. Can either be `archive` and
+         `rolling:N` with `N` being the number of days to use as the
+         retention period */
+      "archive" | "rolling:n"
 
 evm_context_get_block_failed:
   description: get block by number failed for level {level}{trace}

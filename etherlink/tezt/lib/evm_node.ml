@@ -1275,12 +1275,7 @@ let patch_config_gc ?history_mode json =
   json
   |> optional_json_put ~name:"history" history_mode (function
          | Archive -> `String "archive"
-         | Rolling retention ->
-             `O
-               [
-                 ("mode", `String "rolling");
-                 ("retention", `Float (float_of_int retention));
-               ])
+         | Rolling retention -> `String (Format.sprintf "rolling:%d" retention))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     ?restricted_rpcs ?history_mode rollup_node =
