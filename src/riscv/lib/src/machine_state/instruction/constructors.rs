@@ -5,9 +5,9 @@
 use super::{Args, Instruction, OpCode};
 use crate::{
     default::ConstDefault,
-    machine_state::registers::NonZeroXRegister,
+    machine_state::registers::{nz, NonZeroXRegister},
     parser::{
-        instruction::{InstrWidth, NonZeroRdRTypeArgs, SplitITypeArgs},
+        instruction::{CIBTypeArgs, InstrWidth, NonZeroRdRTypeArgs, SplitITypeArgs},
         split_x0, XRegisterParsed,
     },
 };
@@ -127,6 +127,17 @@ impl Instruction {
             (X::NonZero(rd), X::X0) => Instruction::new_li(rd, args.imm, InstrWidth::Uncompressed),
             (X::NonZero(rd), X::NonZero(rs1)) => {
                 Instruction::new_addi(rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CAddi4spn`] according to whether register is non-zero.
+    pub(super) fn from_ic_caddi4spn(args: &CIBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_addi(rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
             }
         }
     }

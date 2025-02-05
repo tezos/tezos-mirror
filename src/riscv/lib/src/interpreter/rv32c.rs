@@ -117,21 +117,6 @@ where
         self.write(sp, result)
     }
 
-    /// `C.ADDI4SPN` CIW-type compressed instruction
-    ///
-    /// Adds the non-zero immediate to the stack pointer and writes the result
-    /// to `rd`.
-    /// The immediate is obtained by zero-extending and scaling by 4 the value
-    /// encoded in the instruction (see U:C-16.5).
-    pub fn run_caddi4spn(&mut self, imm: i64, rd: XRegister) {
-        debug_assert!(imm > 0 && imm % 4 == 0);
-        // Return the lower XLEN (64 bits in our case) bits of the addition
-        // Irrespective of sign, the result is the same, casting to u64 for addition
-        let rval = self.read(sp);
-        let result = rval.wrapping_add(imm as u64);
-        self.write(rd, result)
-    }
-
     /// `C.SLLI` CI-type compressed instruction
     ///
     /// Performs a logical left shift of the value in register `rd_rs1`

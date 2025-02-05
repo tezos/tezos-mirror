@@ -333,7 +333,6 @@ impl NonZeroXRegister {
 }
 
 /// ABI register names for NonZeroXRegister types used in backend tests.
-#[cfg(test)]
 pub mod nz {
     use super::NonZeroXRegister;
 
