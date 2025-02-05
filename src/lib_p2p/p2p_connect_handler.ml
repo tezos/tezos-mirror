@@ -264,8 +264,25 @@ let is_acceptable t connection_point_info peer_info incoming version =
           match P2p_point_state.get connection_point_info with
           | Accepted _ | Running _ ->
               P2p_rejection.(rejecting Already_connected)
-          | Requested _ when incoming ->
-              P2p_rejection.(rejecting Already_connected)
+          | Requested {cancel} when incoming ->
+              (* Prioritise incoming connections. *)
+              Lwt.dont_wait
+                (fun () ->
+                  Lwt.bind (Lwt_canceler.cancel cancel) (fun result ->
+                      match result with
+                      | Error err ->
+                          let tztrace = List.map Error_monad.error_of_exn err in
+                          Format.eprintf
+                            "Unexpected error while cancelling: %a@."
+                            Error_monad.pp_print_trace
+                            tztrace ;
+                          Lwt.return_unit
+                      | Ok () -> Lwt.return_unit))
+                (fun exn ->
+                  Format.eprintf
+                    "Unexpected exn while cancelling: %s@."
+                    (Printexc.to_string exn)) ;
+              return version
           | Requested _ | Disconnected -> return version)
     in
     (* Point is acceptable, checking if peer is. *)
