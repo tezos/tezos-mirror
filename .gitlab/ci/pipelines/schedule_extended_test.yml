@@ -121,6 +121,8 @@ datadog_pipeline_trace:
   allow_failure: true
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -2794,6 +2796,7 @@ tezt:
   timeout: 40 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
@@ -2855,6 +2858,7 @@ tezt-memory-3k:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
@@ -2916,6 +2920,7 @@ tezt-memory-4k:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
@@ -2977,6 +2982,7 @@ tezt-time-sensitive:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
@@ -3037,6 +3043,7 @@ tezt-slow:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
@@ -3095,6 +3102,7 @@ tezt-flaky:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
