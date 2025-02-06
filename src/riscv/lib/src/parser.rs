@@ -508,7 +508,6 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     // RV64I (Chapter 5.4) and RV64C (Chapter 16.7) describe the code points associated
     // with HINT instructions. We do not implement any HINT logic, but decode all these
     // as `Hint` or `HintCompresssed` opcodes, which we translate to NOPs in `machine_state`.
-    // TODO: RV-422: Pass known NonZero `rd` values to Args constructors.
     use XRegisterParsed::*;
     let i = match opcode(instr) {
         // R-type instructions
@@ -612,10 +611,13 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         OP_ARITH_I => match (funct3(instr), split_x0(rd(instr))) {
             (F3_0, X0) => match (split_x0(rs1(instr)), i_imm(instr)) {
                 (X0, _) | (_, 0) => Hint { instr },
-                (_rs1, _imm) => i_instr!(Addi, instr),
+                (rs1, imm) => Addi(instruction::SplitITypeArgs { rd: X0, rs1, imm }),
             },
-            // TODO: RV-427 Deduplicate Addi and introduce specific constructor for its cases.
-            (F3_0, _rd) => i_instr!(Addi, instr),
+            (F3_0, rd) => Addi(instruction::SplitITypeArgs {
+                rd,
+                rs1: split_x0(rs1(instr)),
+                imm: i_imm(instr),
+            }),
             (F3_4, X0) => Hint { instr },
             (F3_4, NonZero(rd)) => i_instr!(Xori, instr, rd),
             (F3_6, X0) => Hint { instr },
@@ -1403,10 +1405,10 @@ mod tests {
 
     use super::{
         instruction::{
-            CsrArgs, ITypeArgs, Instr, InstrCacheable::*, NonZeroRdITypeArgs, SBTypeArgs,
-            UJTypeArgs,
+            CsrArgs, Instr, InstrCacheable::*, NonZeroRdITypeArgs, SBTypeArgs, UJTypeArgs,
         },
         parse_block,
+        XRegisterParsed::*,
     };
     use crate::{
         machine_state::{
@@ -1416,6 +1418,7 @@ mod tests {
         parser::{
             instruction::{CIBNZTypeArgs, CIBTypeArgs, InstrUncacheable},
             parse_compressed_instruction, parse_compressed_instruction_inner, NonZeroRdUJTypeArgs,
+            SplitITypeArgs,
         },
     };
 
@@ -1439,9 +1442,9 @@ mod tests {
                 rs1: x0,
                 csr: mcause,
             })),
-            Instr::Cacheable(Addi(ITypeArgs {
-                rd: x31,
-                rs1: x0,
+            Instr::Cacheable(Addi(SplitITypeArgs {
+                rd: NonZero(NonZeroXRegister::x31),
+                rs1: X0,
                 imm: 0x8,
             })),
         ];
@@ -1465,9 +1468,9 @@ mod tests {
             0x0, 0x9b, 0x83, 0x3, 0x34, 0x63, 0x10, 0x74, 0x12,
         ];
         let expected = [
-            Instr::Cacheable(Addi(ITypeArgs {
-                rd: x3,
-                rs1: x0,
+            Instr::Cacheable(Addi(SplitITypeArgs {
+                rd: NonZero(NonZeroXRegister::x3),
+                rs1: X0,
                 imm: 21,
             })),
             Instr::Cacheable(CLui(CIBNZTypeArgs {

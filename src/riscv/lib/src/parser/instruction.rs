@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::XRegisterParsed;
 use crate::{
     default::ConstDefault,
     interpreter::float::RoundingMode,
@@ -37,6 +38,13 @@ pub struct ITypeArgs {
     pub imm: i64,
 }
 
+/// Intermediate representation of Args for I-type instructions with parsed split of registers.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct SplitITypeArgs {
+    pub(crate) rd: XRegisterParsed,
+    pub(crate) rs1: XRegisterParsed,
+    pub imm: i64,
+}
 /// Intermediate representation of Args for I-type instructions with guaranteed `rd` != `x0`.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NonZeroRdITypeArgs {
@@ -288,7 +296,8 @@ pub enum InstrCacheable {
     Sraw(NonZeroRdRTypeArgs),
 
     // RV64I I-type instructions
-    Addi(ITypeArgs),
+    /// `ADDI` - Add `imm` to val(rs1) and store the result in `rd`.
+    Addi(SplitITypeArgs),
     Addiw(NonZeroRdITypeArgs),
     Xori(NonZeroRdITypeArgs),
     Ori(NonZeroRdITypeArgs),
@@ -457,8 +466,16 @@ pub enum InstrCacheable {
     /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
     CLi(CIBNZTypeArgs),
     CLui(CIBNZTypeArgs),
+    /// `C.ADDI` - Adds the non-zero sign-extended 6-bit `imm`
+    /// to the value in `rd_rs1` then writes the result to `rd_rs1`.
     CAddi(CIBNZTypeArgs),
+    /// `C.ADDI16SP` - Adds the non-zero immediate to the value in the stack pointer.
+    /// The immediate is obtained by sign-extending and scaling by 16 the value
+    /// encoded in the instruction (see U:C-16.5).
     CAddi16sp(CJTypeArgs),
+    /// `C.ADDI4SPN`- Adds the non-zero immediate to the stack pointer and writes the result
+    /// to `rd`. The immediate is obtained by zero-extending and scaling by 4 the value
+    /// encoded in the instruction (see U:C-16.5).
     CAddi4spn(CIBTypeArgs),
     CSlli(CIBNZTypeArgs),
     CSrli(CIBTypeArgs),

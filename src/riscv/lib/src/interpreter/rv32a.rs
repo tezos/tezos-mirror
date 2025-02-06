@@ -234,6 +234,7 @@ mod test {
     macro_rules! test_lrsc {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
+                use $crate::machine_state::registers::nz;
                 let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
                 let state_cell = std::cell::RefCell::new(state);
 
@@ -256,7 +257,7 @@ mod test {
                     // Correct sequence of LR.x / SC.y instructions
                     // SC.x succeeds and stores the expected value
                     state.$lr(a0, a1, a2, false, false)?;
-                    state.hart.xregisters.run_addi(imm, a2, a1);
+                    state.hart.xregisters.run_addi(imm, nz::a2, nz::a1);
                     state.$sc(a0, a1, a2, false, false)?;
                     let res = state.hart.xregisters.read(a2);
                     let val: $t = state.read_from_address(r1_addr)?;

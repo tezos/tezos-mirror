@@ -103,39 +103,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `C.ADDI` CI-type compressed instruction
-    ///
-    /// Adds the non-zero sign-extended 6-bit `imm` to the value in `rd_rs1` then
-    /// writes the result to `rd_rs1`.
-    pub fn run_caddi(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
-        // Return the lower XLEN (64 bits in our case) bits of the addition
-        // Irrespective of sign, the result is the same, casting to u64 for addition
-        let rval = self.read_nz(rd_rs1);
-        let result = rval.wrapping_add(imm as u64);
-        self.write_nz(rd_rs1, result)
-    }
-
-    /// `C.ADDI16SP` CI-type compressed instruction
-    ///
-    /// Adds the non-zero immediate to the value in the stack pointer.
-    /// The immediate is obtained by sign-extending and scaling by 16 the value
-    /// encoded in the instruction (see U:C-16.5).
-    pub fn run_caddi16sp(&mut self, imm: i64) {
-        debug_assert!(imm != 0 && imm % 16 == 0);
-        self.run_addi(imm, sp, sp)
-    }
-
-    /// `C.ADDI4SPN` CIW-type compressed instruction
-    ///
-    /// Adds the non-zero immediate to the stack pointer and writes the result
-    /// to `rd`.
-    /// The immediate is obtained by zero-extending and scaling by 4 the value
-    /// encoded in the instruction (see U:C-16.5).
-    pub fn run_caddi4spn(&mut self, imm: i64, rd: XRegister) {
-        debug_assert!(imm > 0 && imm % 4 == 0);
-        self.run_addi(imm, sp, rd)
-    }
-
     /// `C.SLLI` CI-type compressed instruction
     ///
     /// Performs a logical left shift of the value in register `rd_rs1`
@@ -328,24 +295,6 @@ mod tests {
             assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
         }
-    });
-
-    backend_test!(run_caddi, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let state_cell = std::cell::RefCell::new(state);
-
-        proptest!(|(
-            rd_val in any::<u64>(),
-            imm in any::<i64>(),
-        )| {
-            let mut state = state_cell.borrow_mut();
-            state.reset();
-
-            state.hart.xregisters.write_nz(nz::a1, rd_val);
-            state.hart.xregisters.run_caddi(imm, nz::a1);
-            let res = state.hart.xregisters.read_nz(nz::a1);
-            prop_assert_eq!(res, rd_val.wrapping_add(imm as u64));
-        });
     });
 
     backend_test!(test_run_cli, F, {

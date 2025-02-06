@@ -329,14 +329,15 @@ pub enum ArgsShape {
 pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
     use OpCode::*;
     match opcode {
-        Addi | Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Beq | Bne | Blt | Bge
-        | Bltu | Bgeu | Jal | Jalr | Lrw | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw
-        | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd
-        | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu
-        | Remw | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw
-        | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CAddi16sp | CAddi4spn
-        | CAnd | COr | CXor | CSub | CAddw | CSubw | CLd | CSd | CSdsp | Unknown | Beqz | Bnez
-        | J => ArgsShape::XSrcXDest,
+        Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Beq | Bne | Blt | Bge | Bltu
+        | Bgeu | Jal | Jalr | Lrw | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw
+        | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord
+        | Amoandd | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw
+        | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw
+        | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CAnd | COr | CXor
+        | CSub | CAddw | CSubw | CLd | CSd | CSdsp | Unknown | Beqz | Bnez | J => {
+            ArgsShape::XSrcXDest
+        }
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -351,7 +352,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        Add | Mv | CJr | CJalr | CAddi | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp | Nop => {
+        Addi | Add | Mv | CJr | CJalr | CAddiw | Li | CLui | CSlli | CLdsp | CLwsp | Nop => {
             ArgsShape::NZXSrcNZXDest
         }
 
