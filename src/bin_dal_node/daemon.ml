@@ -395,7 +395,7 @@ module Handler = struct
     in
     Profile_manager.on_new_head
       (Node_context.get_profile_ctxt ctxt)
-      proto_parameters
+      ~number_of_slots:proto_parameters.number_of_slots
       (Node_context.get_gs_worker ctxt)
       committee
 
@@ -1067,7 +1067,10 @@ let update_and_register_profiles ctxt =
   let gs_worker = Node_context.get_gs_worker ctxt in
   let proto_parameters = Node_context.get_proto_parameters ctxt in
   let profile_ctxt =
-    Profile_manager.register_profile profile_ctxt proto_parameters gs_worker
+    Profile_manager.register_profile
+      profile_ctxt
+      ~number_of_slots:proto_parameters.number_of_slots
+      gs_worker
   in
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
@@ -1355,7 +1358,7 @@ let run ~data_dir ~configuration_override =
     let+ profile_ctxt = build_profile_context config in
     Profile_manager.resolve_random_observer_profile
       profile_ctxt
-      proto_parameters
+      ~number_of_slots:proto_parameters.number_of_slots
   in
   let*? () =
     Profile_manager.validate_slot_indexes

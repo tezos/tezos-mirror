@@ -281,10 +281,11 @@ module Profile_handlers = struct
           |> lwt_map_error (fun e -> `Other e)
         in
         let proto_parameters = Node_context.get_proto_parameters ctxt in
+        let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
         match
           Profile_manager.add_and_register_operator_profile
             (Node_context.get_profile_ctxt ctxt)
-            proto_parameters
+            ~number_of_slots
             gs_worker
             operator_profiles
         with
