@@ -158,18 +158,15 @@ let test_switch_history_mode () =
       sequencer
       (Evm_node.patch_config_gc ~history_mode:Archive)
   in
+  let process = Evm_node.spawn_run sequencer in
+  let* () =
+    Process.check_error ~msg:(rex "cannot be run with history mode") process
+  in
+  let*! () = Evm_node.switch_history_mode sequencer Archive in
   let wait_for_archive =
     Evm_node.wait_for_start_history_mode ~history_mode:"archive" sequencer
   in
-  let wait_for_incomplete_history =
-    Evm_node.wait_for_event
-      sequencer
-      ~event:"evm_context_rolling_to_archive_incomplete_history.v0"
-      (fun _json -> Some ())
-  in
-  let* () = Evm_node.run sequencer
-  and* () = wait_for_incomplete_history
-  and* _ = wait_for_archive in
+  let* () = Evm_node.run sequencer and* _ = wait_for_archive in
   unit
 
 let () =

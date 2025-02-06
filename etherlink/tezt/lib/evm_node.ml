@@ -109,7 +109,7 @@ module Parameters = struct
     mutable pending_blueprint_finalized :
       unit option Lwt.u list Per_level_map.t;
     mode : mode;
-    history : history_mode;
+    mutable history : history_mode option;
     data_dir : string;
     rpc_addr : string;
     rpc_port : int;
@@ -598,7 +598,8 @@ let wait_for_start_history_mode ?history_mode evm_node =
   let event_history_mode = JSON.as_string json in
   match history_mode with
   | Some history_mode ->
-      if history_mode = event_history_mode then Some history_mode else None
+      if history_mode = event_history_mode then Some history_mode
+      else Test.fail "Started with wrong history mode"
   | None -> Some event_history_mode
 
 let wait_for_blueprint_catchup ?timeout evm_node =
@@ -740,8 +741,8 @@ let mode_with_new_private_rpc (mode : mode) =
   | _ -> mode
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?(history = Archive) ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs endpoint =
+    ?(mode = Proxy) ?history ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs
+    endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -953,12 +954,10 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         "restricted-rpcs"
         Fun.id
         evm_node.persistent_state.restricted_rpcs
-    @ [
-        "--history";
-        (match evm_node.persistent_state.history with
-        | Archive -> "archive"
-        | Rolling n -> sf "rolling:%d" n);
-      ]
+    @ Cli_arg.optional_arg
+        "history"
+        (function Archive -> "archive" | Rolling n -> sf "rolling:%d" n)
+        evm_node.persistent_state.history
   in
 
   let time_between_blocks_fmt = function
@@ -1705,3 +1704,18 @@ let list_events ?hooks ?level ?(json = false) () =
   in
   let process = Process.spawn ?hooks (Uses.path Constant.octez_evm_node) cmd in
   Process.check process
+
+let switch_history_mode evm_node history =
+  let hist =
+    match history with Archive -> "archive" | Rolling n -> sf "rolling:%d" n
+  in
+  let args =
+    ["switch"; "history"; "to"; hist; "--data-dir"; data_dir evm_node]
+  in
+  let run process =
+    let* () = Process.check process in
+    evm_node.persistent_state.history <- Some history ;
+    unit
+  in
+  let process = spawn_command evm_node args in
+  {Runnable.value = process; run}

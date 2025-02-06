@@ -171,10 +171,12 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   garbage_collector_parameters : garbage_collector_parameters;
-  history_mode : history_mode;
+  history_mode : history_mode option;
 }
 
 val history_mode_encoding : history_mode Data_encoding.t
+
+val pp_history_mode : Format.formatter -> history_mode -> unit
 
 val native_execution_policy_encoding : native_execution_policy Data_encoding.t
 
@@ -263,6 +265,8 @@ val make_pattern_restricted_rpcs : string -> restricted_rpcs
     when provided or the default otherwise. *)
 val retention : ?days:int -> unit -> garbage_collector_parameters
 
+val default_history_mode : history_mode
+
 module Cli : sig
   val create :
     data_dir:string ->
@@ -274,10 +278,10 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -296,7 +300,7 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
@@ -314,10 +318,10 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -336,11 +340,11 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?history_mode:history_mode ->
     ?garbage_collector_parameters:garbage_collector_parameters ->
-    dal_slots:int trace option ->
+    ?dal_slots:int list ->
     t ->
     t
 
@@ -354,10 +358,10 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -376,7 +380,7 @@ module Cli : sig
     ?log_filter_chunk_size:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->

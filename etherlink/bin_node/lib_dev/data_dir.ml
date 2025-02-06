@@ -87,3 +87,11 @@ let use ~data_dir k =
       let*! () = on_failure () in
       fail err)
     k
+
+let populated ~data_dir =
+  let open Lwt_syntax in
+  let store_file = Filename.concat data_dir Evm_store.sqlite_file_name in
+  let state_dir = store_path ~data_dir in
+  let* store_exists = Lwt_unix.file_exists store_file in
+  let* state_exists = Lwt_utils_unix.dir_exists state_dir in
+  return (store_exists || state_exists)

@@ -258,6 +258,11 @@ Miscellaneous commands:
     Display information about an EVM node snapshot file.
     <snapshot_file>: Snapshot archive file
   
+  switch history to <history> [--data-dir <data-dir>]
+    Switch history mode of the node
+    <history>: History mode, either archive, rolling or rolling:n where n is the number of days of history to retain.
+    --data-dir <data-dir>: The path to the EVM node data directory
+  
   chunk data [<data or file>...] [--rollup-address <sr1...>] [--as-blueprint]
       [--timestamp <[TIMESTAMP]>] [--number <0>]
       [--parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>]

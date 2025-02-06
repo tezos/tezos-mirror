@@ -42,8 +42,7 @@
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
   },
-  "finalized_view": false,
-  "history": "archive"
+  "finalized_view": false
 }
 {
   "log_filter": {
@@ -100,8 +99,7 @@
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
   },
-  "finalized_view": false,
-  "history": "archive"
+  "finalized_view": false
 }
 {
   "log_filter": {
@@ -152,6 +150,5 @@
     "restricted_rpcs": "unrestricted",
     "max_active_connections": "unlimited"
   },
-  "finalized_view": false,
-  "history": "archive"
+  "finalized_view": false
 }

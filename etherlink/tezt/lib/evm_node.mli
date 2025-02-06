@@ -601,3 +601,6 @@ val list_metrics : ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 (** A description of the events exported by the node. *)
 val list_events :
   ?hooks:Process_hooks.t -> ?level:string -> ?json:bool -> unit -> unit Lwt.t
+
+(** Switch history mode of an EVM node with command switch history. *)
+val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable

@@ -250,23 +250,10 @@ let export ?snapshot_file ~compression ~data_dir () =
   in
   return snapshot_file
 
-let data_dir_populated ~data_dir =
-  let open Lwt_syntax in
-  let store_file = Filename.concat data_dir Evm_store.sqlite_file_name in
-  let state_dir = Data_dir.store_path ~data_dir in
-  let* store_exists = Lwt_unix.file_exists store_file in
-  let* state_exists = Lwt_utils_unix.dir_exists state_dir in
-  return (store_exists || state_exists)
-
 let check_snapshot_exists snapshot_file =
   let open Lwt_result_syntax in
   let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
   fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
-
-let pp_history_mode fmt h =
-  Format.pp_print_string
-    fmt
-    (match h with Configuration.Archive -> "archive" | Rolling -> "rolling")
 
 let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
     =
@@ -297,9 +284,9 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
       when header_hist <> history_mode ->
         failwith
           "Cannot import %a snapshot into %a EVM node."
-          pp_history_mode
+          Configuration.pp_history_mode
           header_hist
-          pp_history_mode
+          Configuration.pp_history_mode
           history_mode
     | _ -> (* Same history mode *) return_unit
   in
@@ -333,7 +320,7 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
 let import ~cancellable ~force ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let open Filename.Infix in
-  let*! populated = data_dir_populated ~data_dir in
+  let*! populated = Data_dir.populated ~data_dir in
   let*? () =
     error_when ((not force) && populated) (Data_dir_populated data_dir)
   in
