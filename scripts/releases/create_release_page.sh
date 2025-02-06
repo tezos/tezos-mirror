@@ -25,8 +25,17 @@ tac "$Releases_list" | while IFS= read -r release; do
   for arch in x86_64 arm64; do
     echo "#### $arch" >> index.md
 
+    aws s3 cp "s3://${S3_BUCKET}/${release}/binaries/${arch}/sha256sums.txt" "./sha256sums.txt"
+
     for binary in $(aws s3 ls "s3://${S3_BUCKET}/${release}/binaries/${arch}/" --recursive | awk '{print $NF}'); do
-      echo "- [$(basename "$binary")](https://${S3_BUCKET}/${binary})" >> index.md
+      binary_name=$(basename "$binary")
+      # Write sha256sum only if it's an actual binary (and not a checksums file)
+      if [[ "$binary_name" != "sha256sums.txt" ]]; then
+        checksum=$(grep " ${binary_name}$" sha256sums.txt | awk '{print $1}')
+        echo "- [${binary_name}](https://${S3_BUCKET}/${binary}) <span class=\"sha256\">(**sha256:** \`$checksum\`)</span>" >> index.md
+      else
+        echo "- [${binary_name}](https://${S3_BUCKET}/${binary})" >> index.md
+      fi
     done
     echo -e "\n" >> index.md
   done
