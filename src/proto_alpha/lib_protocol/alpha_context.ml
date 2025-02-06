@@ -200,6 +200,16 @@ module Operation = struct
   let unsigned_encoding = unsigned_operation_encoding
 
   include Operation_repr
+
+  let check_signature _ctxt = check_signature unsigned_encoding
+
+  module Internal_for_tests = struct
+    let serialize_unsigned_operation _ctxt branch contents =
+      let op : _ operation =
+        {shell = {branch}; protocol_data = {contents; signature = None}}
+      in
+      serialize_unsigned_operation unsigned_encoding op
+  end
 end
 
 module Block_header = Block_header_repr
