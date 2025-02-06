@@ -96,13 +96,61 @@ let register_prometheus_import ~tags =
       (fun (path, port) -> Prometheus.run_with_snapshot port path)
       conf
   in
+  let* g =
+    if Env.grafana then
+      let sources =
+        if Env.grafana_legacy_source then
+          match prometheus with
+          | [p] ->
+              (* For legacy support of the existing grafana dashboards, when
+                 using only one snapshot, we want to use the default
+                 'Prometheus' source name. *)
+              let port = Prometheus.get_port p in
+              [
+                sf
+                  {|
+- name: Prometheus
+  type: prometheus
+  access: proxy
+  url: http://localhost:%d
+  isDefault: true
+|}
+                  port;
+              ]
+          | _ ->
+              Test.fail
+                "You need to provide one and only one snapshot when using the \
+                 legacy dashboard source name"
+        else
+          (* When using multiple snapshots we assume that they are used
+             with a dashboard that do not hard code the datasource
+             name. *)
+          List.map
+            (fun p ->
+              let name = Prometheus.get_name p in
+              let port = Prometheus.get_port p in
+              sf
+                {|
+- name: %s
+  type: prometheus
+  access: proxy
+  url: http://localhost:%d
+|}
+                name
+                port)
+            prometheus
+      in
+      Grafana.run ~sources () |> Lwt.map Option.some
+    else Lwt.return_none
+  in
   Log.info
     "Prometheus instances are now running. Write 'stop' in order to stop and \
      remove docker containers." ;
   while read_line () <> "stop" do
     ()
   done ;
-  Lwt_list.iter_s Prometheus.shutdown prometheus
+  let* () = Lwt_list.iter_s Prometheus.shutdown prometheus in
+  Option.map Grafana.shutdown g |> Option.value ~default:Lwt.return_unit
 
 let register_clean_up_vms ~tags =
   Cloud.register

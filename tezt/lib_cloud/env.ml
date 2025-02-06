@@ -40,6 +40,8 @@ let prometheus_scrape_interval = Cli.prometheus_scrape_interval
 
 let grafana = Cli.grafana
 
+let grafana_legacy_source = Cli.grafana_legacy_source
+
 let website = Cli.website
 
 let website_port = Cli.website_port

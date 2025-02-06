@@ -7,6 +7,12 @@
 
 type t
 
+(** Get the docker container name *)
+val get_name : t -> string
+
+(** Get the port used on localhost used for port [9090] of the docker machine *)
+val get_port : t -> int
+
 type target = {address : string; port : int; app_name : string}
 
 type alert

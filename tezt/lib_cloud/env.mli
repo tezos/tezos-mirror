@@ -55,6 +55,9 @@ val prometheus_scrape_interval : int
 (** Equivalent to [Cli.grafana]. *)
 val grafana : bool
 
+(** Equivalent to [Cli.grafana_legacy_source]. *)
+val grafana_legacy_source : bool
+
 (** Equivalent to [Cli.website]. *)
 val website : bool
 

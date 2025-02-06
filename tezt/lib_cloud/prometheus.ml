@@ -63,6 +63,10 @@ type t = {
   groups : groups;
 }
 
+let get_name (t : t) = t.name
+
+let get_port (t : t) = t.port
+
 let netdata_source_of_agents agents =
   let name = "netdata" in
   let metrics_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
