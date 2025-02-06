@@ -34,7 +34,7 @@ pub fn prepend_cell(first_cell: Cell, mut rest_of_cells: Vec<Cell>) -> Vec<Cell>
 /// Type holding `(Name of benchmark, Option<Named Single instruction stats>)`
 pub type NamedBenchInstrStats<'a, 'b> = (&'a str, Option<&'b NamedStats>);
 
-/// Return an array r[i][j] = the stats for the i-th instruction and j-th benchmark & benchmark_name
+/// Return an array `r[i][j]` = the stats for the i-th instruction and j-th benchmark & benchmark_name
 pub fn tableify_bench_stats<'a, 'b>(
     data: &[(&'a BenchStats, &'b String)],
 ) -> Vec<Vec<NamedBenchInstrStats<'b, 'a>>> {

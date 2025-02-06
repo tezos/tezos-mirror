@@ -268,7 +268,7 @@ where
     status.write(PvmStatus::WaitingForInput);
 }
 
-/// Handle a [SBI_TEZOS_META] call.
+/// Handle a [SBI_TEZOS_METADATA_REVEAL] call.
 #[inline]
 fn handle_tezos_metadata_reveal<S>(status: &mut S)
 where

@@ -92,6 +92,7 @@ check:
 	@cargo update --workspace --locked
 	@cargo check --workspace --all-targets $(CHECK_FEATURES)
 	@cargo clippy --workspace --all-targets $(CHECK_FEATURES) -- --deny warnings
+	@cargo doc --document-private-items --no-deps $(CHECK_FEATURES)
 	@taplo format --check $(shell git ls-files '**/Cargo.toml')
 	@make -C dummy_kernel check
 	@make -C supervised_dummy_kernel check

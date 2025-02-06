@@ -3,6 +3,9 @@ name = "octez-riscv"
 version = "0.0.0"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [dependencies]
 arbitrary-int.workspace = true
 bincode.workspace = true

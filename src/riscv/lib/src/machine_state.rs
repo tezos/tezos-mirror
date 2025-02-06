@@ -3,8 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![deny(rustdoc::broken_intra_doc_links)]
-
 pub mod address_translation;
 pub mod block_cache;
 mod cache_layouts;
@@ -111,7 +109,7 @@ pub enum ProgramCounterUpdate {
     Next(InstrWidth),
 }
 
-/// Result type when running multiple steps at a time with [`MachineState::step_many`]
+/// Result type when running multiple steps at a time with [`MachineState::step_max`]
 #[derive(Debug)]
 pub struct StepManyResult<E> {
     pub steps: usize,

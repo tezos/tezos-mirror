@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 //! Additional resources on device trees:
-//!   - https://elinux.org/Device_Tree_Usage
-//!   - https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.4
+//!   - <https://elinux.org/Device_Tree_Usage>
+//!   - <https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.4>
 
 use crate::machine_state::main_memory;
 use vm_fdt::FdtWriter;

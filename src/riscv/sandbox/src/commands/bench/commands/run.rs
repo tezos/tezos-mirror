@@ -28,7 +28,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
+/// Helper function to look in the [`Stepper`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.
 fn get_current_instr<S: Stepper>(stepper: &S) -> Result<Instr, InstrGetError>
 where
@@ -50,8 +50,8 @@ where
     parse(first, second)
 }
 
-/// Composes "in time" two [`InterpreterResult`] one after another,
-/// to obtain the equivalent final [`InterpreterResult`]
+/// Composes "in time" two [`StepperStatus`] one after another,
+/// to obtain the equivalent final [`StepperStatus`]
 fn compose(current_state: StepperStatus, following_result: StepperStatus) -> StepperStatus {
     use StepperStatus::*;
     match current_state {

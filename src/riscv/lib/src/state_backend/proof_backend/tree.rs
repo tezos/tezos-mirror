@@ -61,7 +61,7 @@ impl<A> Tree<A> {
 
     /// Perform a shape-preserving map operation over a [`Tree`].
     ///
-    /// Note: The traversal order should correspond with the one in [`Tree::modify_shape`] and [`tree_iterator`]
+    /// Note: The traversal order should correspond with the one in [`Tree::modify_shape`] and [`Tree::subtree_iterator`].
     pub fn map<B, E, F: FnMut(A) -> Result<B, E>>(self, map: &mut F) -> Result<Tree<B>, E> {
         // modify & collect are "default"
         impl_modify_map_collect(

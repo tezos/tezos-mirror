@@ -57,7 +57,7 @@ where
     }
 }
 
-/// Layout for a fixed number of bytes, readable as types implementing [`Elem`].
+/// Layout for a fixed number of bytes, readable as types implementing [`super::elems::Elem`].
 pub struct DynArray<const LEN: usize> {}
 
 impl<const LEN: usize> Layout for DynArray<LEN> {

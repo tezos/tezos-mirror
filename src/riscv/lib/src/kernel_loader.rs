@@ -102,8 +102,8 @@ pub fn mem_size(phs: &[ProgramHeader]) -> usize {
     min.and_then(|min| max.map(|max| max - min)).unwrap_or(0) as usize
 }
 
-/// Load a relocatable ELF file at the given [start] address. [elf] is the partially parsed
-/// ELF file, while [contents] is the raw ELF file.
+/// Load a relocatable ELF file at the given `start` address. `elf` is the partially parsed
+/// ELF file, while `contents` is the raw ELF file.
 pub fn load_elf_reloc<'a>(
     mem: &mut impl Memory,
     start: u64,
@@ -158,8 +158,8 @@ pub fn load_elf_reloc<'a>(
     })
 }
 
-/// Loads an ELF file. If the file is relocatable, loads it at the given [start] address in the memory of the VM.
-/// If it is not relocatable, [start] is ignored.
+/// Loads an ELF file. If the file is relocatable, loads it at the given `start` address in the memory of the VM.
+/// If it is not relocatable, `start` is ignored.
 pub fn load_elf<'a>(
     mem: &mut impl Memory,
     start: u64,

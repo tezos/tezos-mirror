@@ -122,6 +122,8 @@ impl TryFrom<TaggedInstruction> for Instruction {
 /// An intermediate object for creating and deserialising Instructions.
 /// This is necessary because we can't directly create or deserialise into
 /// an [Instruction] due to the [Register] Union.
+///
+/// [Register]: super::Register
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaggedInstruction {
     pub opcode: OpCode,
@@ -274,7 +276,7 @@ impl TaggedRegister {
 
 /// Intermediate object for instantiating [Instruction] objects and
 /// serialising [Args]. This is necessary because we can't
-/// directly serialise Args due to the [Register] Union.
+/// directly serialise Args due to the [super::Register] Union.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaggedArgs {
     pub rd: TaggedRegister,

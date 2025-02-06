@@ -289,7 +289,7 @@ where
 
     /// `FCVT.S.W` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_w(
         &mut self,
         rs1: XRegister,
@@ -303,7 +303,7 @@ where
 
     /// `FCVT.S.WU` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_wu(
         &mut self,
         rs1: XRegister,
@@ -317,7 +317,7 @@ where
 
     /// `FCVT.S.W` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_l(
         &mut self,
         rs1: XRegister,
@@ -331,7 +331,7 @@ where
 
     /// `FCVT.S.WU` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_lu(
         &mut self,
         rs1: XRegister,
