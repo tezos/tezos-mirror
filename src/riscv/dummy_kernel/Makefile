@@ -22,6 +22,7 @@ check:
 	@cargo check --workspace --locked
 	@cargo fmt --check
 	@cargo clippy -- --deny warnings
+	@cargo doc --all-features --document-private-items --no-deps
 
 .PHONY: clean
 clean:

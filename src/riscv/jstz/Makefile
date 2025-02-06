@@ -62,6 +62,7 @@ run:
 check:
 	@INBOX_FILE=$(INBOX_FILE) cargo check --all-features --workspace --locked
 	@INBOX_FILE=$(INBOX_FILE) cargo clippy --all-features -- --deny warnings
+	@INBOX_FILE=$(INBOX_FILE) cargo doc --all-features --document-private-items --no-deps
 
 .PHONY: inbox-bench
 inbox-bench:
