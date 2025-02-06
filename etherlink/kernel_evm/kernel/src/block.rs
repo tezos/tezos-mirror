@@ -9,7 +9,7 @@ use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::block_storage;
-use crate::blueprint_storage::{drop_blueprint, read_next_blueprint};
+use crate::blueprint_storage::{drop_blueprint, read_blueprint};
 use crate::configuration::ConfigurationMode;
 use crate::configuration::Limits;
 use crate::delayed_inbox::DelayedInbox;
@@ -254,7 +254,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     kernel_upgrade: &Option<KernelUpgrade>,
     minimum_base_fee_per_gas: U256,
 ) -> Result<BlueprintParsing, anyhow::Error> {
-    let (blueprint, size) = read_next_blueprint(host, config)?;
+    let (blueprint, size) = read_blueprint(host, config, current_block_number)?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
@@ -593,6 +593,7 @@ mod tests {
     use super::*;
     use crate::block_storage;
     use crate::blueprint::Blueprint;
+    use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::fees::DA_FEE_PER_BYTE;

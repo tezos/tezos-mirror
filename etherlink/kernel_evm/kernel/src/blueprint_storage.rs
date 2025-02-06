@@ -423,7 +423,7 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     }
 }
 
-fn read_blueprint<Host: Runtime>(
+pub fn read_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
     number: U256,
@@ -468,6 +468,7 @@ fn read_blueprint<Host: Runtime>(
     }
 }
 
+#[cfg(test)]
 pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
