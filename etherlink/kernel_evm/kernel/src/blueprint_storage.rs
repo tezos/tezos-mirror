@@ -423,11 +423,11 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     }
 }
 
-pub fn read_next_blueprint<Host: Runtime>(
+fn read_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
+    number: U256,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
-    let number = read_next_blueprint_number(host)?;
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
     if exists {
@@ -466,6 +466,14 @@ pub fn read_next_blueprint<Host: Runtime>(
         );
         Ok((None, 0))
     }
+}
+
+pub fn read_next_blueprint<Host: Runtime>(
+    host: &mut Host,
+    config: &mut Configuration,
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
+    let number = read_next_blueprint_number(host)?;
+    read_blueprint(host, config, number)
 }
 
 pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
