@@ -288,6 +288,10 @@ module Counter = struct
   let inc t v =
     assert (v >= 0.0) ;
     t := !t +. v
+
+  let set t v =
+    assert (v >= !t) ;
+    t := v
 end
 
 module Gauge = struct

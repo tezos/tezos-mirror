@@ -53,6 +53,10 @@ let supports_performance_metrics () =
 module Make (R : REGISTRY) = struct
   include R
 
+  let start_time = Time.System.now ()
+
+  let v_counter = Counter.v ~registry ~namespace ~subsystem
+
   let v_gauge = Gauge.v ~registry ~namespace ~subsystem
 
   let virtual_ = v_gauge ~help:"Size Memory Stats" "performance_virtual"
@@ -62,6 +66,11 @@ module Make (R : REGISTRY) = struct
   let memp = v_gauge ~help:"Memory Percentage" "performance_mem_percentage"
 
   let cpu = v_gauge ~help:"CPU Percentage" "performance_cpu_percentage"
+
+  let elapsed_time =
+    v_counter
+      ~help:"Number of seconds since the node is running"
+      "performance_elapsed_time"
 
   let get_ps pid =
     Lwt.catch
@@ -224,8 +233,15 @@ module Make (R : REGISTRY) = struct
         Gauge.set connections @@ Float.of_int conn)
       r
 
+  let set_elapsed_time () =
+    let new_elapsed_time =
+      Ptime.Span.to_float_s @@ Ptime.diff (Time.System.now ()) start_time
+    in
+    Counter.set elapsed_time new_elapsed_time
+
   let set_stats ~data_dir =
     let open Lwt_syntax in
+    set_elapsed_time () ;
     let* () = set_memory_cpu_stats ()
     and* () = set_disk_usage_stats ~data_dir
     and* () = set_file_descriptors () in

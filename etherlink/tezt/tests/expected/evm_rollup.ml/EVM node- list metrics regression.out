@@ -32,6 +32,8 @@
 #TYPE octez_evm_node_performance_data gauge
 #HELP octez_evm_node_performance_disk_percentage Disk Usage Percentage
 #TYPE octez_evm_node_performance_disk_percentage gauge
+#HELP octez_evm_node_performance_elapsed_time Number of seconds since the node is running
+#TYPE octez_evm_node_performance_elapsed_time counter
 #HELP octez_evm_node_performance_file_descriptors Open file descriptors
 #TYPE octez_evm_node_performance_file_descriptors gauge
 #HELP octez_evm_node_performance_logs Disk usage: daily_logs
