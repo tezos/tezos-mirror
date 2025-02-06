@@ -65,13 +65,17 @@ pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 /// * timestamp
 /// * withdrawer's address
 /// * generic payload
+/// * l2 caller's address
 pub type FastWithdrawalInterface = MichelsonPair<
     MichelsonNat,
     MichelsonPair<
         FA2_1Ticket,
         MichelsonPair<
             MichelsonTimestamp,
-            MichelsonPair<MichelsonContract, MichelsonBytes>,
+            MichelsonPair<
+                MichelsonContract,
+                MichelsonPair<MichelsonBytes, MichelsonBytes>,
+            >,
         >,
     >,
 >;

@@ -4,28 +4,31 @@
            (ticket %ticket (pair nat (option bytes)))
            (timestamp %timestamp)
            (address %base_withdrawer)
-           (bytes %payload))
+           (bytes %payload)
+           (bytes %l2_caller))
         (pair %payout_withdrawal
            (nat %withdrawal_id)
            (ticket %ticket (pair nat (option bytes)))
            (address %target)
            (timestamp %timestamp)
            (address %service_provider)
-           (bytes %payload))) ;
+           (bytes %payload)
+           (bytes %l2_caller))) ;
   storage
     (pair (address %exchanger)
-          (big_map %withdrawals nat (pair nat timestamp address bytes))) ;
+          (big_map %withdrawals nat (pair nat timestamp address bytes bytes))) ;
   code { UNPAIR ;
          IF_LEFT
-           { UNPAIR 5 ;
-             DUP 6 ;
+           { UNPAIR 6 ;
+             DUP 7 ;
              CDR ;
              DUP 2 ;
              GET ;
              IF_NONE
                { DIG 2 ;
                  DIG 4 ;
-                 DROP 3 ;
+                 DIG 5 ;
+                 DROP 4 ;
                  DUP 3 ;
                  CAR ;
                  CONTRACT %burn (pair address (ticket (pair nat (option bytes)))) ;
@@ -43,29 +46,34 @@
                      PAIR } }
                { DIG 4 ;
                  DROP ;
-                 UNPAIR 4 ;
-                 DIG 5 ;
+                 UNPAIR 5 ;
+                 DIG 6 ;
                  READ_TICKET ;
                  CDR ;
                  CDR ;
-                 DIG 8 ;
-                 DIG 6 ;
+                 DIG 10 ;
+                 DIG 7 ;
                  COMPARE ;
                  EQ ;
-                 SWAP ;
-                 DIG 3 ;
+                 DIG 9 ;
+                 DIG 7 ;
                  COMPARE ;
                  EQ ;
-                 DIG 6 ;
+                 DIG 2 ;
                  DIG 4 ;
                  COMPARE ;
                  EQ ;
+                 DIG 7 ;
+                 DIG 5 ;
+                 COMPARE ;
+                 EQ ;
+                 AND ;
                  AND ;
                  AND ;
                  IF { DUP 4 ;
                       DIG 4 ;
                       CDR ;
-                      NONE (pair nat timestamp address bytes) ;
+                      NONE (pair nat timestamp address bytes bytes) ;
                       DIG 5 ;
                       UPDATE ;
                       UPDATE 2 ;
@@ -85,8 +93,8 @@
                           CONS ;
                           PAIR } }
                     { DROP 4 ; PUSH string "Unexpected behavior" ; FAILWITH } } }
-           { UNPAIR 6 ;
-             DUP 7 ;
+           { UNPAIR 7 ;
+             DUP 8 ;
              CDR ;
              DUP 2 ;
              GET ;
@@ -96,14 +104,15 @@
                   READ_TICKET ;
                   CDR ;
                   CDR ;
-                  DUP 8 ;
-                  DIG 8 ;
+                  DUP 9 ;
+                  DIG 9 ;
                   CDR ;
-                  DIG 8 ;
-                  DIG 8 ;
-                  DIG 8 ;
-                  DIG 5 ;
-                  PAIR 4 ;
+                  DIG 9 ;
+                  DIG 9 ;
+                  DIG 9 ;
+                  DIG 9 ;
+                  DIG 6 ;
+                  PAIR 5 ;
                   SOME ;
                   DIG 4 ;
                   UPDATE ;
@@ -123,5 +132,5 @@
                       TRANSFER_TOKENS ;
                       CONS ;
                       PAIR } }
-                { DROP 7 ; PUSH string "The fast withdrawal was already payed" ; FAILWITH } } } }
+                { DROP 8 ; PUSH string "The fast withdrawal was already payed" ; FAILWITH } } } }
 
