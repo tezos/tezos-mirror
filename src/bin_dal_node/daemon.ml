@@ -1540,14 +1540,15 @@ let run ~data_dir ~configuration_override =
     wait_for_block_with_plugin cctxt
   in
   let head_level = header.Block_header.shell.level in
+  let* proto_parameters =
+    Plugin.get_constants `Main (`Level head_level) cctxt
+  in
   let proto_plugins =
     Proto_plugins.singleton
       ~first_level:head_level
       ~proto_level:header.shell.proto_level
       (module Plugin)
-  in
-  let* proto_parameters =
-    Plugin.get_constants `Main (`Level head_level) cctxt
+      proto_parameters
   in
   (* Set proto number of slots hook. *)
   Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;

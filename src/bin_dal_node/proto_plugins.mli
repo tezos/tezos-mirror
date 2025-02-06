@@ -16,7 +16,11 @@ type t
 (** It builds a value of type [t] containing a single plugin, given as
     parameter. *)
 val singleton :
-  first_level:int32 -> proto_level:int -> (module Dal_plugin.T) -> t
+  first_level:int32 ->
+  proto_level:int ->
+  (module Dal_plugin.T) ->
+  Types.proto_parameters ->
+  t
 
 val to_list : t -> (module Dal_plugin.T) list
 
