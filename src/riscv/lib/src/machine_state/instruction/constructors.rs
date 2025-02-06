@@ -170,6 +170,28 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Slli` [`OpCode`].
+    pub(crate) fn new_slli(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Slli,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                // We are adding a default value for rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -253,6 +275,18 @@ impl Instruction {
             X::X0 => Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed),
             X::NonZero(rs1) => {
                 Instruction::new_xori(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Slli`] according to whether register is non-zero.
+    pub(super) fn from_ic_slli(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // Shifting 0 by any amount is 0.
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            X::NonZero(rs1) => {
+                Instruction::new_slli(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
         }
     }
