@@ -211,34 +211,22 @@ let version {config; _} =
   let network_name = config.Configuration_file.network_name in
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7706
-   This level argument would not be needed if we had the head level in the context. *)
-let warn_if_attesters_not_delegates ctxt ?level operator_profiles =
+let warn_if_attesters_not_delegates ctxt operator_profiles =
   let open Lwt_result_syntax in
   let pkh_set = Operator_profile.attesters operator_profiles in
   if Signature.Public_key_hash.Set.is_empty pkh_set then return_unit
   else
-    let* level_opt =
-      match level with
-      | Some _ -> return level
-      | None ->
-          let store = get_store ctxt in
-          let lpl_store = Store.last_processed_level store in
-          Store.Last_processed_level.load lpl_store
-    in
-    Option.iter_es
-      (fun level ->
-        let cctxt = get_tezos_node_cctxt ctxt in
-        let*? (module Plugin) = get_plugin_for_level ctxt ~level in
-        Signature.Public_key_hash.Set.iter_es
-          (fun pkh ->
-            let* is_delegate = Plugin.is_delegate cctxt ~pkh in
-            if not is_delegate then
-              let*! () = Event.emit_registered_pkh_not_a_delegate ~pkh in
-              return_unit
-            else return_unit)
-          pkh_set)
-      level_opt
+    let level = get_last_finalized_level ctxt in
+    let cctxt = get_tezos_node_cctxt ctxt in
+    let*? (module Plugin) = get_plugin_for_level ctxt ~level in
+    Signature.Public_key_hash.Set.iter_es
+      (fun pkh ->
+        let* is_delegate = Plugin.is_delegate cctxt ~pkh in
+        if not is_delegate then
+          let*! () = Event.emit_registered_pkh_not_a_delegate ~pkh in
+          return_unit
+        else return_unit)
+      pkh_set
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

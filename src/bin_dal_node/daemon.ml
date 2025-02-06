@@ -1411,10 +1411,7 @@ let run ~data_dir ~configuration_override =
   let* () =
     match Profile_manager.get_profiles profile_ctxt with
     | Operator profile ->
-        Node_context.warn_if_attesters_not_delegates
-          ctxt
-          ~level:head_level
-          profile
+        Node_context.warn_if_attesters_not_delegates ctxt profile
     | _ -> return_unit
   in
   Gossipsub.Worker.Validate_message_hook.set
