@@ -5047,6 +5047,7 @@ documentation:build_all:
   - . $HOME/.venv/bin/activate
   script:
   - make -C docs -j sphinx
+  - make -C docs -j _build/octezdoc.txt
   artifacts:
     expire_in: 1 week
     paths:

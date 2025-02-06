@@ -1399,7 +1399,7 @@ module Documentation = struct
            ~expire_in:(Duration (Weeks 1))
            (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
            ["docs/_build/"])
-      ["make -C docs -j sphinx"]
+      ["make -C docs -j sphinx"; "make -C docs -j _build/octezdoc.txt"]
 
   (** Create a [documentation:linkcheck] job. *)
   let job_linkcheck ~job_manuals ~job_docgen ~job_build_all ?dependencies ?rules
