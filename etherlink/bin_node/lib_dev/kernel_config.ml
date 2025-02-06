@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -21,6 +22,11 @@ let encode_hexa hexa =
 let parse_z_to_padded_32_le_int_bytes s =
   let z = Z.of_string s in
   padded_32_le_int_bytes z
+
+let le_int64_bytes i =
+  let b = Bytes.make 8 '\000' in
+  Bytes.set_int64_le b 0 (Int64.of_string i) ;
+  String.of_bytes b
 
 let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     ?chain_id ?sequencer ?delayed_bridge ?ticketer ?admin ?sequencer_governance
@@ -55,11 +61,6 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
               (Some (address ^ "/code", code)))
           set_account_codes
         |> List.flatten
-  in
-  let le_int64_bytes i =
-    let b = Bytes.make 8 '\000' in
-    Bytes.set_int64_le b 0 (Int64.of_string i) ;
-    String.of_bytes b
   in
   (* Convert a comma-separated list of decimal values in the [0; 255]
      range into a sequence of bytes (of type string). *)
