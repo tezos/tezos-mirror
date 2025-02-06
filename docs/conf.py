@@ -134,6 +134,7 @@ html_theme_options = {
     'use_issues_button': True,
     'use_download_button': False,
     'use_fullscreen_button': True,
+    'use_source_button': True,
 }
 
 html_theme_options["analytics"] = {
