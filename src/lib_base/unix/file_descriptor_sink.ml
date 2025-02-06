@@ -98,6 +98,10 @@ module Color = struct
 
     let magenta = "\027[35m"
   end
+
+  module Inverse = struct
+    let red = "\027[7;31m"
+  end
 end
 
 let wrapped_encoding ~advertise_levels event_encoding =
@@ -160,7 +164,8 @@ let make_with_pp_rfc5424 ~advertise_levels ~level pp wrapped_event name =
 
 type color_setting = Enabled of string option | Disabled
 
-let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
+let make_with_pp_short ?cols ~color ~tag_color ~advertise_levels ~level pp
+    wrapped_event =
   let string_of_level = function
     | Internal_event.Fatal -> "FATAL"
     | Debug -> "DEBUG"
@@ -169,8 +174,19 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
     | Warning -> "WARN"
     | Error -> "ERROR"
   in
-  let pp_date fmt time =
-    let time = Ptime.to_float_s time in
+  let level_string, visible_level_size =
+    if advertise_levels then
+      let color, reset =
+        match tag_color with Some c -> (c, Color.reset) | None -> ("", "")
+      in
+      let l_str = string_of_level level in
+      let level_width = 8 (* NOTICE + 2 spaces *) in
+      let tab = String.make (level_width - String.length l_str - 1) ' ' in
+      (String.concat "" [tab; color; l_str; reset; " "], level_width)
+    else ("", 0)
+  in
+  let timestamp =
+    let time = Ptime.to_float_s wrapped_event.time_stamp in
     let tm = Unix.localtime time in
     let month_string =
       match tm.Unix.tm_mon with
@@ -189,40 +205,31 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
       | _ -> assert false
       (* `tm` is built locally, so it should contain invalid month code *)
     in
-    let level_string =
-      if advertise_levels then
-        Format.asprintf
-          "%a"
-          Pretty_printing.(pp_right_aligned 7) (* NOTICE + 1 space *)
-          (string_of_level level)
-      else ""
-    in
     let ms = mod_float (time *. 1000.) 1000. in
-    Format.fprintf
-      fmt
-      "%s %02d %02d:%02d:%02d.%03.0f%s"
+    Format.sprintf
+      "%s %02d %02d:%02d:%02d.%03.0f"
       month_string
       tm.Unix.tm_mday
       tm.Unix.tm_hour
       tm.Unix.tm_min
       tm.Unix.tm_sec
       ms
-      level_string
-  in
-  let timestamp =
-    if advertise_levels then
-      Format.asprintf "%a │ " pp_date wrapped_event.time_stamp
-    else Format.asprintf "%a: " pp_date wrapped_event.time_stamp
   in
   let timestamp_size = String.length timestamp in
-  let line_size = Option.map (fun cols -> max 1 (cols - timestamp_size)) cols in
+  let separator = if advertise_levels then "│ " else ": " in
+  let prefix = String.concat "" [timestamp; level_string; separator] in
+  let visible_prefix_size = timestamp_size + visible_level_size + 2 in
+  let prefix_size = String.length prefix in
+  let available_cols =
+    Option.map (fun cols -> max 1 (cols - visible_prefix_size)) cols
+  in
   let lines =
     String.split_on_char
       '\n'
       (Format.asprintf
          "%a"
          (fun ppf ->
-           Option.iter (Format.pp_set_margin ppf) line_size ;
+           Option.iter (Format.pp_set_margin ppf) available_cols ;
            pp ~all_fields:false ~block:true ppf)
          wrapped_event.event)
   in
@@ -243,7 +250,7 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
     List.fold_left_i
       (fun i acc s ->
         (* computing the total length of a line *)
-        acc + timestamp_size + String.length s + 1 + color_total_size
+        acc + prefix_size + String.length s + 1 + color_total_size
         + bold_total_size i)
       0
       lines
@@ -265,7 +272,7 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
         let bold_first_header = enable_color && i = 0 in
         let s_len = String.length s in
         if bold_first_header then blit Color.bold Color.bold_len ;
-        blit timestamp timestamp_size ;
+        blit prefix prefix_size ;
         if bold_first_header then blit Color.reset Color.reset_len ;
         Option.iter (fun tag -> blit tag Color.color_len) color_tag_opt ;
         blit s s_len ;
@@ -293,6 +300,7 @@ let%expect_test _ =
   print_endline
     (make_with_pp_short
        ~color:Disabled
+       ~tag_color:None
        ~advertise_levels:false
        ~level:Debug
        pp_string
@@ -305,6 +313,7 @@ let%expect_test _ =
     (String.escaped
     @@ make_with_pp_short
          ~color:(Enabled None)
+         ~tag_color:None
          ~advertise_levels:false
          ~level:Debug
          pp_string
@@ -316,6 +325,7 @@ let%expect_test _ =
     (String.escaped
     @@ make_with_pp_short
          ~color:(Enabled None)
+         ~tag_color:None
          ~advertise_levels:false
          ~level:Debug
          pp_string
@@ -325,6 +335,7 @@ let%expect_test _ =
     (String.escaped
     @@ make_with_pp_short
          ~color:(Enabled (Some Color.FG.red))
+         ~tag_color:None
          ~advertise_levels:false
          ~level:Debug
          pp_string
@@ -723,6 +734,14 @@ end) : Internal_event.SINK with type t = t = struct
     | Error | Fatal -> Some Color.FG.red
     | Info | Notice | Debug -> None
 
+  let level_tag_color = function
+    | Internal_event.Warning -> Color.FG.yellow
+    | Error -> Color.FG.red
+    | Fatal -> Color.Inverse.red
+    | Info -> Color.FG.cyan
+    | Notice -> Color.FG.blue
+    | Debug -> Color.FG.magenta
+
   let output_color_compatible out =
     let open Lwt_syntax in
     match out with
@@ -741,11 +760,11 @@ end) : Internal_event.SINK with type t = t = struct
 
   let handle (type a) {output; format; colors; advertise_levels; _} m
       ?(section = Internal_event.Section.empty) (event : a) =
-    let open Lwt_result_syntax in
+    let open Lwt_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Ptime_clock.now () in
     let wrapped_event = wrap now section event in
-    let*! to_write =
+    let* to_write =
       if is_syslog output then Lwt.return @@ make_for_syslog M.pp wrapped_event
       else
         let json () =
@@ -755,7 +774,7 @@ end) : Internal_event.SINK with type t = t = struct
         in
         match format with
         | `Pp_RFC5424 ->
-            Lwt.return
+            return
             @@ make_with_pp_rfc5424
                  ~advertise_levels
                  ~level:M.level
@@ -763,39 +782,42 @@ end) : Internal_event.SINK with type t = t = struct
                  wrapped_event
                  M.name
         | `Pp_short ->
-            let*! color =
+            let* color, tag_color =
               if colors then
-                let*! color_compatible = output_color_compatible output in
+                let+ color_compatible = output_color_compatible output in
                 if color_compatible then
-                  match M.alternative_color with
-                  | None -> Lwt.return (Enabled (level_color M.level))
-                  | Some c -> Lwt.return (Enabled (color c))
-                else Lwt.return Disabled
-              else Lwt.return Disabled
+                  let color =
+                    match M.alternative_color with
+                    | None -> Enabled (level_color M.level)
+                    | Some c -> Enabled (color c)
+                  in
+                  (color, Some (level_tag_color M.level))
+                else (Disabled, None)
+              else return (Disabled, None)
             in
-            let*! cols = output_columns output in
-            Lwt.return
-            @@ make_with_pp_short
-                 ?cols
-                 ~color
-                 ~advertise_levels
-                 ~level:M.level
-                 M.pp
-                 wrapped_event
+            let+ cols = output_columns output in
+            make_with_pp_short
+              ?cols
+              ~color
+              ~tag_color
+              ~advertise_levels
+              ~level:M.level
+              M.pp
+              wrapped_event
         | `One_per_line ->
-            Lwt.return @@ Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
+            return @@ Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
         | `Netstring ->
             let str = Ezjsonm.value_to_string ~minify:true (json ()) in
-            Lwt.return @@ Printf.sprintf "%d:%s," (String.length str) str
+            return @@ Printf.sprintf "%d:%s," (String.length str) str
     in
-    let*! r = output_one now output section M.level to_write in
+    let* r = output_one now output section M.level to_write in
     match r with
     | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
         (* The file descriptor was closed before the event arrived,
            ignore it. *)
-        return_unit
-    | Error _ as err -> Lwt.return err
-    | Ok () -> return_unit
+        return_ok_unit
+    | Error _ as err -> return err
+    | Ok () -> return_ok_unit
 
   let close {output; _} =
     let open Lwt_result_syntax in
