@@ -13,18 +13,24 @@ module Plugins = struct
     let compare a b = compare b a
   end)
 
-  type proto_plugin = {proto_level : int; plugin : (module Dal_plugin.T)}
+  type proto_plugin = {
+    proto_level : int;
+    plugin : (module Dal_plugin.T);
+    proto_parameters : Types.proto_parameters;
+  }
 
   type t = proto_plugin LevelMap.t
 
   let empty = LevelMap.empty
 
-  let add t ~first_level ~proto_level plugin =
-    LevelMap.add first_level {proto_level; plugin} t
+  let add t ~first_level ~proto_level plugin proto_parameters =
+    LevelMap.add first_level {proto_level; plugin; proto_parameters} t
 
   let to_list t =
     LevelMap.bindings t
-    |> List.map (fun (_block_level, {proto_level = _; plugin}) -> plugin)
+    |> List.map
+         (fun (_block_level, {proto_level = _; plugin; proto_parameters = _}) ->
+           plugin)
 end
 
 let singleton = Plugins.add Plugins.empty
@@ -78,11 +84,12 @@ let add_plugin_for_level cctxt plugins
     (protocols : Chain_services.Blocks.protocols) ~level =
   let open Lwt_result_syntax in
   let* plugin = resolve_plugin_by_hash protocols.next_protocol in
-  let+ header =
-    Shell_services.Blocks.Header.shell_header cctxt ~block:(`Level level) ()
-  in
+  let block = `Level level in
+  let* header = Shell_services.Blocks.Header.shell_header cctxt ~block () in
   let proto_level = header.proto_level in
-  Plugins.add plugins ~first_level:level ~proto_level plugin
+  let (module Plugin) = plugin in
+  let+ proto_parameters = Plugin.get_constants `Main block cctxt in
+  Plugins.add plugins ~first_level:level ~proto_level plugin proto_parameters
 
 (* This function performs a (kind of) binary search to search for all values
    that satisfy the given condition [cond] on values. There is bijection between
@@ -177,15 +184,20 @@ let initial_plugins cctxt ~first_level ~last_level =
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
+  let add first_level =
+    let* plugin = resolve_plugin_for_level cctxt ~level:first_level in
+    let (module Plugin) = plugin in
+    let+ proto_parameters =
+      Plugin.get_constants `Main (`Level first_level) cctxt
+    in
+    Plugins.add plugins ~proto_level ~first_level plugin proto_parameters
+  in
   let plugin_opt = Plugins.LevelMap.min_binding_opt plugins in
   match plugin_opt with
-  | None ->
-      let* plugin = resolve_plugin_for_level cctxt ~level:first_level in
-      Plugins.add plugins ~proto_level ~first_level plugin |> return
+  | None -> add first_level
   | Some (_, Plugins.{proto_level = prev_proto_level; _})
     when prev_proto_level < proto_level ->
-      let* plugin = resolve_plugin_for_level cctxt ~level:first_level in
-      Plugins.add plugins ~proto_level ~first_level plugin |> return
+      add first_level
   | _ -> return plugins
 
 type error += No_plugin_for_level of {level : int32}
@@ -213,6 +225,8 @@ let get_plugin_for_level plugins ~level =
   in
   match plugin_opt with
   | None -> tzfail @@ No_plugin_for_level {level}
-  | Some (_first_level, Plugins.{plugin; proto_level = _}) -> return plugin
+  | Some (_first_level, Plugins.{plugin; proto_level = _; proto_parameters = _})
+    ->
+      return plugin
 
 include Plugins
