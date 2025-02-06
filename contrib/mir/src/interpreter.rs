@@ -10,6 +10,7 @@
 
 use checked::Checked;
 use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
+use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
@@ -20,13 +21,15 @@ use tezos_crypto_rs::blake2b::digest as blake2bdigest;
 use typed_arena::Arena;
 
 use crate::ast::big_map::{BigMap, LazyStorageError};
+use crate::ast::michelson_address::entrypoint::Direction;
 use crate::ast::*;
 use crate::bls;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
+use crate::lexer::Prim;
 use crate::stack::*;
-use crate::typechecker::{typecheck_contract_address, typecheck_value};
+use crate::typechecker::{typecheck_contract_address, typecheck_value, TcError};
 
 /// Errors possible during interpretation.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -78,12 +81,13 @@ impl<'a> ContractScript<'a> {
         ctx: &mut Ctx<'a>,
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
+        annotation: Option<FieldAnnotation<'a>>,
         storage: Micheline<'a>,
     ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
     {
-        let parameter = typecheck_value(&parameter, ctx, &self.parameter)?;
+        let wrapped_parameter = self.wrap_parameter(arena, parameter, annotation, ctx)?;
         let storage = typecheck_value(&storage, ctx, &self.storage)?;
-        let tc_val = TypedValue::new_pair(parameter, storage);
+        let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, arena, &mut stack)?;
         use TypedValue as V;
@@ -97,6 +101,48 @@ impl<'a> ContractScript<'a> {
                 (v, _) => panic!("expected `list operation`, got {:?}", v),
             },
             v => panic!("expected `pair 'a 'b`, got {:?}", v),
+        }
+    }
+
+    /// Wrap the input in the entrypoint with the given name.
+    pub fn wrap_parameter(
+        &self,
+        arena: &'a Arena<Micheline<'a>>,
+        parameter: Micheline<'a>,
+        annotation: Option<FieldAnnotation<'a>>,
+        ctx: &mut Ctx<'a>,
+    ) -> Result<TypedValue<'a>, TcError> {
+        let parsed_annotation = match annotation {
+            None => {
+                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME)
+            }
+            Some(ann) => {
+                ann
+            }
+        };
+        if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
+            typecheck_value(&parameter, ctx, annotation_type)?;
+            Entrypoint::try_from(parsed_annotation)?;
+            let mut result = parameter;
+            for direction in annotation_path.into_iter().rev() {
+                match direction {
+                    Direction::Left => {
+                        result = Micheline::prim1(arena, Prim::Left, result);
+                    }
+                    Direction::Right => {
+                        result = Micheline::prim1(arena, Prim::Right, result);
+                    }
+                }
+            }
+            Ok(typecheck_value(
+                &result,
+                ctx,
+                &self.parameter,
+            )?)
+        } else {
+            Err(TcError::NoSuchEntrypoint(Entrypoint::try_from(
+                parsed_annotation,
+            )?))
         }
     }
 }
@@ -1765,6 +1811,7 @@ mod interpreter_tests {
     use crate::bls;
     use crate::gas::Gas;
     use chrono::DateTime;
+    use entrypoint::DEFAULT_EP_NAME;
     use num_bigint::BigUint;
     use Instruction::*;
     use Option::None;
@@ -6491,6 +6538,507 @@ mod interpreter_tests {
             start_milligas - ctx.gas.milligas(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn three_layered_balanced_entrypoints() {
+        use crate::parser::test_helpers::parse;
+
+        let code = r#"{parameter (or (or (or (address %A) (bool %B)) (or (string %C) (key %D))) (or (or (nat %E) (signature %F)) (or (timestamp %G) (unit %H))));
+        storage unit ;
+        code {
+            CDR ;
+            NIL operation ;
+            PAIR }}"#;
+
+        let cs_mich = parse(code).unwrap();
+        let mut ctx = Ctx::default();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+
+        let expected_entrypoints = HashMap::from([
+            (
+                FieldAnnotation::from_str_unchecked("A"),
+                (
+                    vec![Direction::Left, Direction::Left, Direction::Left],
+                    Type::Address,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("B"),
+                (
+                    vec![Direction::Left, Direction::Left, Direction::Right],
+                    Type::Bool,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("C"),
+                (
+                    vec![Direction::Left, Direction::Right, Direction::Left],
+                    Type::String,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("D"),
+                (
+                    vec![Direction::Left, Direction::Right, Direction::Right],
+                    Type::Key,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("E"),
+                (
+                    vec![Direction::Right, Direction::Left, Direction::Left],
+                    Type::Nat,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("F"),
+                (
+                    vec![Direction::Right, Direction::Left, Direction::Right],
+                    Type::Signature,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("G"),
+                (
+                    vec![Direction::Right, Direction::Right, Direction::Left],
+                    Type::Timestamp,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("H"),
+                (
+                    vec![Direction::Right, Direction::Right, Direction::Right],
+                    Type::Unit,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                (
+                    Vec::new(),
+                    Type::new_or(
+                        Type::new_or(
+                            Type::new_or(Type::Address, Type::Bool),
+                            Type::new_or(Type::String, Type::Key),
+                        ),
+                        Type::new_or(
+                            Type::new_or(Type::Nat, Type::Signature),
+                            Type::new_or(Type::Timestamp, Type::Unit),
+                        ),
+                    ),
+                ),
+            ),
+        ]);
+
+        // Check that each entrypoint is parsed correctly
+        for (entrypoint, (path, ty)) in expected_entrypoints {
+            match cs.annotations.get(&entrypoint) {
+                Some((parsed_path, parsed_ty)) => {
+                    assert_eq!(
+                        parsed_path, &path,
+                        "Incorrect path for entrypoint: {:?}",
+                        entrypoint
+                    );
+                    assert_eq!(
+                        parsed_ty, &ty,
+                        "Incorrect type for entrypoint: {:?}",
+                        entrypoint
+                    );
+                }
+                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+            }
+        }
+    }
+
+    #[test]
+    fn seven_layered_left_pivoted_entrypoint() {
+        use crate::parser::test_helpers::parse;
+
+        let code = r#"{parameter (or (address %A) (or (bool %B) (or (string %C) (or (key %D) (or (nat %E) (or (signature %F) (or (timestamp %G) (unit %H))))))));
+        storage unit ;
+        code {
+            CDR ;
+            NIL operation ;
+            PAIR }}"#;
+
+        let cs_mich = parse(code).unwrap();
+        let mut ctx = Ctx::default();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+
+        let parsed_entrypoints = cs.annotations;
+        let expected_entrypoints = HashMap::from([
+            (
+                FieldAnnotation::from_str_unchecked("A"),
+                (vec![Direction::Left], Type::Address),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("B"),
+                (vec![Direction::Right, Direction::Left], Type::Bool),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("C"),
+                (
+                    vec![Direction::Right, Direction::Right, Direction::Left],
+                    Type::String,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("D"),
+                (
+                    vec![
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Left,
+                    ],
+                    Type::Key,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("E"),
+                (
+                    vec![
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Left,
+                    ],
+                    Type::Nat,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("F"),
+                (
+                    vec![
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Left,
+                    ],
+                    Type::Signature,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("G"),
+                (
+                    vec![
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Left,
+                    ],
+                    Type::Timestamp,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("H"),
+                (
+                    vec![
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                        Direction::Right,
+                    ],
+                    Type::Unit,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                (
+                    Vec::new(),
+                    Type::new_or(
+                        Type::Address,
+                        Type::new_or(
+                            Type::Bool,
+                            Type::new_or(
+                                Type::String,
+                                Type::new_or(
+                                    Type::Key,
+                                    Type::new_or(
+                                        Type::Nat,
+                                        Type::new_or(
+                                            Type::Signature,
+                                            Type::new_or(Type::Timestamp, Type::Unit),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ]);
+
+        // Check that each entrypoint is parsed correctly
+        for (entrypoint, (path, ty)) in expected_entrypoints {
+            match parsed_entrypoints.get(&entrypoint) {
+                Some((parsed_path, parsed_ty)) => {
+                    assert_eq!(
+                        parsed_path, &path,
+                        "Incorrect path for entrypoint: {:?}",
+                        entrypoint
+                    );
+                    assert_eq!(
+                        parsed_ty, &ty,
+                        "Incorrect type for entrypoint: {:?}",
+                        entrypoint
+                    );
+                }
+                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+            }
+        }
+    }
+
+    #[test]
+    fn seven_layered_right_pivoted_entrypoint() {
+        use crate::parser::test_helpers::parse;
+
+        let code = r#"{parameter (or (or (or (or (or (or (or (timestamp %G) (unit %H)) (signature %F)) (nat %E)) (key %D)) (string %C)) (bool %B)) (address %A));
+        storage unit ;
+        code {
+            CDR ;
+            NIL operation ;
+            PAIR }}"#;
+
+        let cs_mich = parse(code).unwrap();
+        let mut ctx = Ctx::default();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+
+        let parsed_entrypoints = cs.annotations;
+        let expected_entrypoints = HashMap::from([
+            (
+                FieldAnnotation::from_str_unchecked("A"),
+                (vec![Direction::Right], Type::Address),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("B"),
+                (vec![Direction::Left, Direction::Right], Type::Bool),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("C"),
+                (
+                    vec![Direction::Left, Direction::Left, Direction::Right],
+                    Type::String,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("D"),
+                (
+                    vec![
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Right,
+                    ],
+                    Type::Key,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("E"),
+                (
+                    vec![
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Right,
+                    ],
+                    Type::Nat,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("F"),
+                (
+                    vec![
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Right,
+                    ],
+                    Type::Signature,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("G"),
+                (
+                    vec![
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                    ],
+                    Type::Timestamp,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("H"),
+                (
+                    vec![
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Left,
+                        Direction::Right,
+                    ],
+                    Type::Unit,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                (
+                    Vec::new(),
+                    Type::new_or(
+                        Type::new_or(
+                            Type::new_or(
+                                Type::new_or(
+                                    Type::new_or(
+                                        Type::new_or(
+                                            Type::new_or(Type::Timestamp, Type::Unit),
+                                            Type::Signature,
+                                        ),
+                                        Type::Nat,
+                                    ),
+                                    Type::Key,
+                                ),
+                                Type::String,
+                            ),
+                            Type::Bool,
+                        ),
+                        Type::Address,
+                    ),
+                ),
+            ),
+        ]);
+
+        // Check that each entrypoint is parsed correctly
+        for (entrypoint, (path, ty)) in expected_entrypoints {
+            match parsed_entrypoints.get(&entrypoint) {
+                Some((parsed_path, parsed_ty)) => {
+                    assert_eq!(
+                        parsed_path, &path,
+                        "Incorrect path for entrypoint: {:?}",
+                        entrypoint
+                    );
+                    assert_eq!(
+                        parsed_ty, &ty,
+                        "Incorrect type for entrypoint: {:?}",
+                        entrypoint
+                    );
+                }
+                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+            }
+        }
+    }
+
+    #[test]
+    fn explicit_default_entrypoint() {
+        use crate::parser::test_helpers::parse;
+
+        let code = r#"{parameter (or (or (or (address %A) (bool %B)) (or (string %C) (key %D))) (or (or (nat %default) (signature %F)) (or (timestamp %G) (unit %H))));
+        storage unit ;
+        code {
+            CDR ;
+            NIL operation ;
+            PAIR }}"#;
+
+        let cs_mich = parse(code).unwrap();
+        let mut ctx = Ctx::default();
+        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+
+        let parsed_entrypoints = cs.annotations;
+        let expected_entrypoints = HashMap::from([
+            (
+                FieldAnnotation::from_str_unchecked("A"),
+                (
+                    vec![Direction::Left, Direction::Left, Direction::Left],
+                    Type::Address,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("B"),
+                (
+                    vec![Direction::Left, Direction::Left, Direction::Right],
+                    Type::Bool,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("C"),
+                (
+                    vec![Direction::Left, Direction::Right, Direction::Left],
+                    Type::String,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("D"),
+                (
+                    vec![Direction::Left, Direction::Right, Direction::Right],
+                    Type::Key,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                (
+                    vec![Direction::Right, Direction::Left, Direction::Left],
+                    Type::Nat,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("F"),
+                (
+                    vec![Direction::Right, Direction::Left, Direction::Right],
+                    Type::Signature,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("G"),
+                (
+                    vec![Direction::Right, Direction::Right, Direction::Left],
+                    Type::Timestamp,
+                ),
+            ),
+            (
+                FieldAnnotation::from_str_unchecked("H"),
+                (
+                    vec![Direction::Right, Direction::Right, Direction::Right],
+                    Type::Unit,
+                ),
+            ),
+        ]);
+
+        // Check that each entrypoint is parsed correctly
+        for (entrypoint, (path, ty)) in expected_entrypoints {
+            match parsed_entrypoints.get(&entrypoint) {
+                Some((parsed_path, parsed_ty)) => {
+                    assert_eq!(
+                        parsed_path, &path,
+                        "Incorrect path for entrypoint: {:?}",
+                        entrypoint
+                    );
+                    assert_eq!(
+                        parsed_ty, &ty,
+                        "Incorrect type for entrypoint: {:?}",
+                        entrypoint
+                    );
+                }
+                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+            }
+        }
     }
 
     #[test]

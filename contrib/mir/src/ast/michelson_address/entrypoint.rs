@@ -21,6 +21,15 @@ use super::ByteReprError;
 #[derive(Debug, Clone, Eq, PartialOrd, Ord, PartialEq, Hash)]
 pub struct Entrypoint(String);
 
+/// Enum representing each layer to achieve a given entrypoint
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Direction {
+    /// Left
+    Left,
+    /// Right
+    Right,
+}
+
 /// A structure mapping from entrypoints to their types. This is simply an alias
 /// for a [HashMap].
 pub type Entrypoints = HashMap<Entrypoint, Type>;
@@ -31,9 +40,9 @@ impl std::fmt::Display for Entrypoint {
     }
 }
 
-// NB: default entrypoint is represented as literal "default", because it
-// affects comparison for addresses.
-const DEFAULT_EP_NAME: &str = "default";
+/// NB: default entrypoint is represented as literal "default", because it
+/// affects comparison for addresses.
+pub const DEFAULT_EP_NAME: &str = "default";
 const MAX_EP_LEN: usize = 31;
 
 impl Default for Entrypoint {

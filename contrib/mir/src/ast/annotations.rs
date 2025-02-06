@@ -81,7 +81,7 @@ impl std::fmt::Debug for Annotations<'_> {
 /// A newtype wrapping a field annotation, like `%foo`. This newtype is used to
 /// enforce some invariants on the type level. It's impossible to construct
 /// manually, except in tests.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FieldAnnotation<'a>(Cow<'a, str>);
 
 impl<'a> FieldAnnotation<'a> {
@@ -96,7 +96,7 @@ impl<'a> FieldAnnotation<'a> {
         self.0
     }
 
-    #[cfg(test)]
+    /// Get the field annotation from a string slice.
     pub fn from_str_unchecked(s: &'a str) -> Self {
         FieldAnnotation(Cow::Borrowed(s))
     }
