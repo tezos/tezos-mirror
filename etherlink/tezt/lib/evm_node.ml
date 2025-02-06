@@ -883,7 +883,9 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
     | None ->
         Some
           String_map.(
-            singleton "RUST_LOG" "octez_evm_node_wasm_runtime::write_debug=info")
+            singleton
+              "RUST_LOG"
+              "octez_evm_node_wasm_runtime::write_debug=trace")
   in
   let* () =
     run
