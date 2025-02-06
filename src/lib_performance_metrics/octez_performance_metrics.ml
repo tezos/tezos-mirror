@@ -109,7 +109,7 @@ module Make (R : REGISTRY) = struct
       (fun () ->
         let open Lwt_syntax in
         let+ s =
-          Lwt_process.with_process_in
+          Lwt_process.with_process_full
             ~env:[|"LC_ALL=C"|]
             ("du", [|"du"; "-sk"; path|])
             (fun pc -> Lwt_io.read_line pc#stdout)
