@@ -273,19 +273,12 @@
     boolean
     /* When enabled, the node only expose blocks that are finalized, i.e.,
        the `latest` block parameter becomes a synonym for `finalized`. */,
-  "history"?:
-    /* History mode of the EVM node */
-    "archive"
-    || "rolling"
-    || { /* rolling */
-         "mode": "rolling",
-         "retention":
-           $days
-           /* How much history is retained for rolling nodes. */ } }
-$days:
-  /* number_of_days
-     Number of days of history to retain */
-  integer ∈ [0, 2^30]
+  "history"?: $history_mode /* History mode of the EVM node */ }
+$history_mode:
+  /* Compact notation for the history mode. Can either be `archive` and
+     `rolling:N` with `N` being the number of days to use as the retention
+     period */
+  "archive" | "rolling:n"
 $int64:
   /* 64 bit integers
      Decimal representation of 64 bit integers */

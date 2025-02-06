@@ -161,12 +161,11 @@ module Q = struct
 
   let history_mode =
     custom
-      ~encode:(function
-        | Configuration.Archive -> Ok "archive" | Rolling -> Ok "rolling")
-      ~decode:(function
-        | "archive" -> Ok Archive
-        | "rolling" -> Ok Rolling
-        | s -> Error (Format.sprintf "Cannot decode %S" s))
+      ~encode:(fun mode -> Ok (Configuration.string_of_history_mode mode))
+      ~decode:(fun str ->
+        Option.to_result
+          ~none:(Format.sprintf "Cannot decode %S" str)
+          Configuration.(history_mode_of_string_opt str))
       string
 
   let levels =
@@ -235,7 +234,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 17
+    let version = 18
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version

@@ -20,7 +20,8 @@
 
 open Rpc.Syntax
 
-let register ?genesis_timestamp ?(retention_period = 5) ~title ~tags f =
+let register ?genesis_timestamp ?(history_mode = Evm_node.Rolling 5) ~title
+    ~tags f =
   Test.register
     ~__FILE__
     ~title
@@ -39,7 +40,7 @@ let register ?genesis_timestamp ?(retention_period = 5) ~title ~tags f =
   let* sequencer =
     Helpers.init_sequencer_sandbox
       ?genesis_timestamp
-      ~history_mode:(Rolling retention_period)
+      ~history_mode
       ~patch_config
       ()
   in
@@ -52,7 +53,7 @@ let test_gc_boundaries () =
   let genesis_timestamp = Client.At genesis_time in
   register
     ~genesis_timestamp
-    ~retention_period:3
+    ~history_mode:(Rolling 3)
     ~title:"GC boundaries"
     ~tags:["boundaries"; "earliest"]
   @@ fun sequencer ->
@@ -124,49 +125,58 @@ let test_gc_boundaries () =
 let test_switch_history_mode () =
   let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
   let genesis_timestamp = Client.At genesis_time in
+  let retention_period = 2 in
+  let get_timestamp i =
+    (* Move one day every block *)
+    Ptime.add_span genesis_time (days (i + 1))
+    |> Option.get |> Client.Time.to_notation
+  in
+  let blocks_before_switch = 3 in
   register
     ~genesis_timestamp
-    ~retention_period:2
-    ~title:"Switch history mode (rolling -> archive)"
+    ~title:"Switch history mode (archive -> rolling)"
+    ~history_mode:Archive
     ~tags:["history_mode"]
   @@ fun sequencer ->
   let* () = Evm_node.terminate sequencer in
-  let wait_for_rolling =
-    Evm_node.wait_for_start_history_mode ~history_mode:"rolling" sequencer
+  let wait_for_archive =
+    Evm_node.wait_for_start_history_mode ~history_mode:"archive" sequencer
   in
-  let* () = Evm_node.run sequencer and* _ = wait_for_rolling in
-  (* We want the evm-node to trigger at least one garbage collector to
-     have only partial history. *)
-  let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
+  let* () = Evm_node.run sequencer and* _ = wait_for_archive in
   let* _ =
-    fold 3 () (fun i () ->
-        let timestamp =
-          (* Move one day every block *)
-          Ptime.add_span genesis_time (days (i + 1))
-          |> Option.get |> Client.Time.to_notation
-        in
+    fold blocks_before_switch () (fun i () ->
+        let timestamp = get_timestamp i in
         let* _ = Rpc.produce_block ~timestamp sequencer in
         unit)
-  and* _ = wait_for_gc in
-  let*@ earliest_block = Rpc.get_block_by_number ~block:"earliest" sequencer in
-  Check.((earliest_block.number > 0l) int32)
-    ~error_msg:"Garbage collector should have removed genesis block" ;
+  in
   (* Restart the node in archive mode. *)
   let* () = Evm_node.terminate sequencer in
   let* () =
     Evm_node.Config_file.update
       sequencer
-      (Evm_node.patch_config_gc ~history_mode:Archive)
+      (Evm_node.patch_config_gc ~history_mode:(Rolling retention_period))
   in
   let process = Evm_node.spawn_run sequencer in
   let* () =
     Process.check_error ~msg:(rex "cannot be run with history mode") process
   in
-  let*! () = Evm_node.switch_history_mode sequencer Archive in
-  let wait_for_archive =
-    Evm_node.wait_for_start_history_mode ~history_mode:"archive" sequencer
+  let*! () =
+    Evm_node.switch_history_mode sequencer (Rolling retention_period)
   in
-  let* () = Evm_node.run sequencer and* _ = wait_for_archive in
+  let wait_for_rolling =
+    Evm_node.wait_for_start_history_mode
+      ~history_mode:(Format.sprintf "rolling:%d" retention_period)
+      sequencer
+  in
+  let* () = Evm_node.run sequencer and* _ = wait_for_rolling in
+  (* show that we indeed gc *)
+  let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
+  let* _ =
+    fold (retention_period + 1) () (fun i () ->
+        let timestamp = get_timestamp (blocks_before_switch + i + 1) in
+        let* _ = Rpc.produce_block ~timestamp sequencer in
+        unit)
+  and* _ = wait_for_gc in
   unit
 
 let () =
