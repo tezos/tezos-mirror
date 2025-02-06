@@ -169,8 +169,16 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
     | Warning -> "WARN"
     | Error -> "ERROR"
   in
-  let pp_date fmt time =
-    let time = Ptime.to_float_s time in
+  let level_string =
+    if advertise_levels then
+      let l_str = string_of_level level in
+      let level_width = 8 (* NOTICE + 2 spaces *) in
+      let tab = String.make (level_width - String.length l_str - 1) ' ' in
+      String.concat "" [tab; l_str; " "]
+    else ""
+  in
+  let timestamp =
+    let time = Ptime.to_float_s wrapped_event.time_stamp in
     let tm = Unix.localtime time in
     let month_string =
       match tm.Unix.tm_mon with
@@ -189,40 +197,32 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
       | _ -> assert false
       (* `tm` is built locally, so it should contain invalid month code *)
     in
-    let level_string =
-      if advertise_levels then
-        Format.asprintf
-          "%a"
-          Pretty_printing.(pp_right_aligned 7) (* NOTICE + 1 space *)
-          (string_of_level level)
-      else ""
-    in
     let ms = mod_float (time *. 1000.) 1000. in
-    Format.fprintf
-      fmt
-      "%s %02d %02d:%02d:%02d.%03.0f%s"
+    Format.sprintf
+      "%s %02d %02d:%02d:%02d.%03.0f"
       month_string
       tm.Unix.tm_mday
       tm.Unix.tm_hour
       tm.Unix.tm_min
       tm.Unix.tm_sec
       ms
-      level_string
-  in
-  let timestamp =
-    if advertise_levels then
-      Format.asprintf "%a │ " pp_date wrapped_event.time_stamp
-    else Format.asprintf "%a: " pp_date wrapped_event.time_stamp
   in
   let timestamp_size = String.length timestamp in
-  let line_size = Option.map (fun cols -> max 1 (cols - timestamp_size)) cols in
+  let level_size = String.length level_string in
+  let separator = if advertise_levels then "│ " else ": " in
+  let prefix = String.concat "" [timestamp; level_string; separator] in
+  let visible_prefix_size = timestamp_size + level_size + 2 in
+  let prefix_size = String.length prefix in
+  let available_cols =
+    Option.map (fun cols -> max 1 (cols - visible_prefix_size)) cols
+  in
   let lines =
     String.split_on_char
       '\n'
       (Format.asprintf
          "%a"
          (fun ppf ->
-           Option.iter (Format.pp_set_margin ppf) line_size ;
+           Option.iter (Format.pp_set_margin ppf) available_cols ;
            pp ~all_fields:false ~block:true ppf)
          wrapped_event.event)
   in
@@ -243,7 +243,7 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
     List.fold_left_i
       (fun i acc s ->
         (* computing the total length of a line *)
-        acc + timestamp_size + String.length s + 1 + color_total_size
+        acc + prefix_size + String.length s + 1 + color_total_size
         + bold_total_size i)
       0
       lines
@@ -265,7 +265,7 @@ let make_with_pp_short ?cols ~color ~advertise_levels ~level pp wrapped_event =
         let bold_first_header = enable_color && i = 0 in
         let s_len = String.length s in
         if bold_first_header then blit Color.bold Color.bold_len ;
-        blit timestamp timestamp_size ;
+        blit prefix prefix_size ;
         if bold_first_header then blit Color.reset Color.reset_len ;
         Option.iter (fun tag -> blit tag Color.color_len) color_tag_opt ;
         blit s s_len ;
