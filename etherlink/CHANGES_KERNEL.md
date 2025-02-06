@@ -58,6 +58,9 @@
 
 ### Bug fixes
 
+- Standard withdrawals from the withdrawal precompiled contract now emit events
+  from the appropriate address. (!16417)
+
 ## Version 7386d0bc63f3589525bdfbd3cc0544076231b813
 
 This kernel has been activated on Etherlink Testnet on block
