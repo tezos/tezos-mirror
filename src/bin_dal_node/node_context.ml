@@ -40,10 +40,14 @@ type t = {
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
+  mutable last_finalized_level : int32;
+      (* the highest finalized level the DAL node is aware of (except at start-up, where
+         it is the highest level the node is aware of) *)
 }
 
 let init config profile_ctxt cryptobox shards_proofs_precomputation
-    proto_parameters proto_plugins store gs_worker transport_layer cctxt =
+    proto_parameters proto_plugins store gs_worker transport_layer cctxt
+    ~last_finalized_level =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -69,6 +73,7 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     gs_worker;
     transport_layer;
     profile_ctxt;
+    last_finalized_level;
   }
 
 let may_reconstruct ~reconstruct slot_id t =
@@ -155,6 +160,10 @@ let get_config ctxt = ctxt.config
 let get_cryptobox ctxt = ctxt.cryptobox
 
 let get_proto_parameters ctxt = ctxt.proto_parameters
+
+let set_last_finalized_level ctxt level = ctxt.last_finalized_level <- level
+
+let get_last_finalized_level ctxt = ctxt.last_finalized_level
 
 let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
 

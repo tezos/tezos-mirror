@@ -40,6 +40,7 @@ val init :
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
+  last_finalized_level:int32 ->
   t
 
 (** Returns all the registered plugins *)
@@ -100,6 +101,13 @@ val get_cryptobox : t -> Cryptobox.t
 
 (** [get_proto_parameters ctxt] returns the DAL node's current protocol parameters. *)
 val get_proto_parameters : t -> Dal_plugin.proto_parameters
+
+(** Update the node's last finalized level. *)
+val set_last_finalized_level : t -> int32 -> unit
+
+(** Get the node's last finalized level. This level may be equal or higher than
+    the node's last processed level. *)
+val get_last_finalized_level : t -> int32
 
 (** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
 val get_shards_proofs_precomputation :
