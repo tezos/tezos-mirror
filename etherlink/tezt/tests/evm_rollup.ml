@@ -2658,7 +2658,7 @@ let test_deposit_and_fast_withdraw =
         "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
          \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
          \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0 \
-         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0x00"
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0x00 0x00"
       ~prg:(service_provider_path ())
       ~burn_cap:(Tez.of_int 890)
       client
@@ -2671,7 +2671,7 @@ let test_deposit_and_fast_withdraw =
   in
 
   let fast_withdrawal_event_signature =
-    "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes)"
+    "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,bytes20)"
   in
   (* Define the fast withdrawal event log topic, which will be searched for in the EVM logs.
      This topic is a hashed identifier that corresponds to the fast withdrawal transaction event. *)
@@ -2696,9 +2696,8 @@ let test_deposit_and_fast_withdraw =
   (* Function to execute the payout by invoking the `payout_proxy` entrypoint on the L1 contract.
      The payout transfers funds to the service provider based on the withdrawal details. *)
   let execute_payout ~withdrawal_id ~fast_withdrawal_contract_address ~target
-      ~timestamp ~service_provider_proxy ~payload =
+      ~timestamp ~service_provider_proxy ~payload ~l2_caller =
     Client.transfer
-      ~force:true
       ~wait:"1"
       ~fee:(Tez.of_int 1) (* Small fee for the transaction *)
       ~fee_cap:(Tez.of_int 1)
@@ -2712,14 +2711,15 @@ let test_deposit_and_fast_withdraw =
       ~entrypoint:"payout_proxy"
       ~arg:
         (Printf.sprintf
-           "(Pair %S %S %s %S %s %S %s)"
+           "(Pair %S %S %s %S %s %S %s %s)"
            fast_withdrawal_contract_address
            exchanger
            withdrawal_id
            target
            timestamp
            service_provider_pkh
-           payload)
+           payload
+           l2_caller)
       client
   in
 
@@ -2746,7 +2746,7 @@ let test_deposit_and_fast_withdraw =
         ()
     in
     let open Ezjsonm in
-    let _target, withdrawal_id, amount, timestamp, payload =
+    let _target, withdrawal_id, amount, timestamp, payload, l2_caller =
       let json = from_string res in
       match json with
       | `A
@@ -2756,8 +2756,9 @@ let test_deposit_and_fast_withdraw =
             `String amount;
             `String timestamp;
             `String payload;
+            `String l2_caller;
           ] ->
-          (target, withdrawal_id, amount, timestamp, payload)
+          (target, withdrawal_id, amount, timestamp, payload, l2_caller)
       | _ -> assert false
     in
     assert (Wei.of_tez withdraw_amount = Wei.of_string amount) ;
@@ -2771,6 +2772,7 @@ let test_deposit_and_fast_withdraw =
         ~target:withdraw_receiver
         ~timestamp
         ~payload
+        ~l2_caller
     in
     Lwt.return_unit
   in
