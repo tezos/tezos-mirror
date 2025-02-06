@@ -130,6 +130,22 @@ module Cloud : sig
   val add_service : t -> name:string -> url:string -> unit Lwt.t
 
   val open_telemetry_endpoint : t -> string option
+
+  (** [register_binary t ?agents ?group name] register a binary for individual
+    process monitoring via prometheus process exporter.
+    [group] will allow to put process in process groups, is currently not used.
+    defaults to "tezt-cloud" if not specified
+    [name] is the filename of the executable to monitor.
+    [agents] when specified, is the list of agents on which to enable monitoring
+    when not specified, all container agents will run a prometheus process
+    exporter *)
+  val register_binary :
+    t ->
+    ?agents:Agent.t list ->
+    ?group:string ->
+    name:string ->
+    unit ->
+    unit Lwt.t
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

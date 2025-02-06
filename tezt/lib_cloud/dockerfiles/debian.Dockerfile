@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y \
     docker.io docker-cli screen file \
     # iproute2 installs traffic control tooling
     iproute2 \
+    # Can be used to monitor process individually
+    prometheus-process-exporter \
     # emacs can be useful for debugging
     emacs \
     # wget can be used to import snapshots
@@ -49,8 +51,8 @@ COPY $ZCASH_PARAMS_PATH /usr/local/share/zcash-params
 ARG DAL_TRUSTED_SETUP_PATH
 COPY $DAL_TRUSTED_SETUP_PATH /usr/local/share/dal-trusted-setup
 # In order to use libfaketime with ssh calls, we need to set few things
-RUN sed -i 's/#PermitUserEnvironment no/PermitUserEnvironment yes/' /etc/ssh/sshd_config
-RUN echo 'LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1' >> /root/.ssh/environment
+RUN sed -i 's/#PermitUserEnvironment no/PermitUserEnvironment yes/' /etc/ssh/sshd_config && \
+    echo 'LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1' >> /root/.ssh/environment
 # We run the ssh server but not as a daemon on the port 30000
 CMD ["-D", "-p", "30000", "-e"]
 ENTRYPOINT ["/usr/sbin/sshd"]

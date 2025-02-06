@@ -100,6 +100,11 @@ module Remote = struct
         if Env.monitoring then Monitoring.run ~cmd_wrapper ()
         else Lwt.return_unit
       in
+      let process_monitor =
+        if Env.process_monitoring then
+          Some (Process_monitor.init ~listening_port:(next_available_port ()))
+        else None
+      in
       Agent.make
         ~ssh_id:ssh_private_key_filename
         ~zone
@@ -107,6 +112,7 @@ module Remote = struct
         ~configuration
         ~next_available_port
         ~name:configuration.name
+        ~process_monitor
         ()
       |> Lwt.return
     in
@@ -381,12 +387,18 @@ module Localhost = struct
       configurations
       |> List.mapi (fun i configuration ->
              let point = get_point i in
+             let process_monitor =
+               if Env.process_monitoring then
+                 Some (Process_monitor.init ~listening_port:(next_port point))
+               else None
+             in
              Agent.make
                ~ssh_id
                ~point
                ~configuration
                ~next_available_port:(fun () -> next_port point)
                ~name:configuration.Agent.Configuration.name
+               ~process_monitor
                ())
     in
     Lwt.return {number_of_vms; processes; base_port; ports_per_vm; agents}

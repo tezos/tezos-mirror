@@ -35,7 +35,7 @@ module Configuration : sig
     Default value for [machine_type] is [n1-standard-2].
 
     Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
-    is the value provided by the environement variable [$TEZT_CLOUD].
+    is the value provided by the environment variable [$TEZT_CLOUD].
     *)
   val make :
     ?os:Types.Os.t ->
@@ -60,6 +60,7 @@ val make :
   configuration:Configuration.t ->
   next_available_port:(unit -> int) ->
   name:string ->
+  process_monitor:Process_monitor.t option ->
   unit ->
   t
 
@@ -88,6 +89,9 @@ val cmd_wrapper : t -> Gcloud.cmd_wrapper option
 
 (** Run a command on the host machine of the VM. *)
 val host_run_command : t -> string -> string list -> Process.t
+
+(** Returns the process monitor if any *)
+val process_monitor : t -> Process_monitor.t option
 
 (** Run a command on the docker image run by the agent.
 

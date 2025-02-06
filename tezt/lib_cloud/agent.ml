@@ -57,6 +57,7 @@ type t = {
   runner : Runner.t option;
   next_available_port : unit -> int;
   configuration : Configuration.t;
+  process_monitor : Process_monitor.t option;
 }
 
 let ssh_id () = Env.ssh_private_key_filename ()
@@ -66,9 +67,17 @@ let ssh_id () = Env.ssh_private_key_filename ()
 let encoding =
   let open Data_encoding in
   conv
-    (fun {name; zone; point; runner = _; next_available_port; configuration} ->
-      (name, zone, point, next_available_port (), configuration))
-    (fun (name, zone, point, next_available_port, configuration) ->
+    (fun {
+           name;
+           zone;
+           point;
+           runner = _;
+           next_available_port;
+           configuration;
+           process_monitor;
+         } ->
+      (name, zone, point, next_available_port (), configuration, process_monitor))
+    (fun (name, zone, point, next_available_port, configuration, process_monitor) ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -83,13 +92,22 @@ let encoding =
             Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
             |> Option.some
       in
-      {name; zone; point; runner; next_available_port; configuration})
-    (obj5
+      {
+        name;
+        zone;
+        point;
+        runner;
+        next_available_port;
+        configuration;
+        process_monitor;
+      })
+    (obj6
        (req "name" string)
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
-       (req "configuration" Configuration.encoding))
+       (req "configuration" Configuration.encoding)
+       (opt "process_monitor" Process_monitor.encoding))
 
 (* Getters *)
 
@@ -103,7 +121,8 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
-let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
+let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name
+    ~process_monitor () =
   let ssh_user = "root" in
   let runner =
     match (point, ssh_id) with
@@ -113,7 +132,15 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
     | Some (address, ssh_port), Some ssh_id ->
         Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () |> Option.some
   in
-  {point; runner; name; next_available_port; configuration; zone}
+  {
+    point;
+    runner;
+    name;
+    next_available_port;
+    configuration;
+    zone;
+    process_monitor;
+  }
 
 let cmd_wrapper {zone; name; _} =
   match zone with
@@ -127,6 +154,8 @@ let cmd_wrapper {zone; name; _} =
       Some (Gcloud.cmd_wrapper ~zone ~vm_name:name ~ssh_private_key_filename)
 
 let path_of agent binary = agent.configuration.vm.binaries_path // binary
+
+let process_monitor agent = agent.process_monitor
 
 let host_run_command agent cmd args =
   match cmd_wrapper agent with

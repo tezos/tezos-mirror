@@ -90,6 +90,8 @@ let faketime = Cli.faketime
 
 let binaries_path = Cli.binaries_path
 
+let process_monitoring = Cli.process_monitoring
+
 let init () =
   if tezt_cloud = "" then
     Test.fail
