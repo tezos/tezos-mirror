@@ -148,6 +148,28 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Xori` [`OpCode`].
+    pub(crate) fn new_xori(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Xori,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                // We are adding a default value for rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -219,6 +241,18 @@ impl Instruction {
             X::X0 => Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed),
             X::NonZero(rs1) => {
                 Instruction::new_ori(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Xori`] according to whether register is non-zero.
+    pub(super) fn from_ic_xori(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // Bitwise XOR with zero is identity: `x ^ 0 == x`
+            X::X0 => Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed),
+            X::NonZero(rs1) => {
+                Instruction::new_xori(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
         }
     }

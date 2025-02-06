@@ -77,11 +77,12 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `XORI` I-type instruction
-    ///
     /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
-    pub fn run_xori(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
-        let result = self.read(rs1) ^ (imm as u64);
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - `XORI`
+    pub fn run_xori(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
+        let result = self.read_nz(rs1) ^ (imm as u64);
         self.write_nz(rd, result)
     }
 
@@ -611,11 +612,11 @@ mod tests {
             prop_assert_eq!(state.read(a1), val | positive_imm);
 
             state.write(t2, val);
-            state.run_xori(negative_imm as i64, t2, nz::t2);
+            state.run_xori(negative_imm as i64, nz::t2, nz::t2);
             prop_assert_eq!(state.read(t2), val ^ negative_imm);
 
             state.write(t2, val);
-            state.run_xori(positive_imm as i64, t2, nz::t1);
+            state.run_xori(positive_imm as i64, nz::t2, nz::t1);
             prop_assert_eq!(state.read(t1), val ^ positive_imm);
         })
     });
