@@ -448,26 +448,37 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
       baking_votes;
     }
 
-let only_if_dal_feature_enabled =
-  let no_dal_node_warning_counter = ref 0 in
-  fun state ~default_value f ->
-    let open Lwt_syntax in
-    let open Constants in
-    let Parametric.{dal = {feature_enable; _}; _} =
-      state.global_state.constants.parametric
-    in
-    if feature_enable then
-      match state.global_state.dal_node_rpc_ctxt with
-      | None ->
-          incr no_dal_node_warning_counter ;
-          let* () =
-            if !no_dal_node_warning_counter mod 10 = 1 then
-              Events.(emit no_dal_node_running ())
-            else return_unit
-          in
-          return default_value
-      | Some ctxt -> f ctxt
-    else return default_value
+let dal_checks_and_warnings state =
+  let open Lwt_syntax in
+  (* We print warning about DAL state only every 10 levels. *)
+  let current_level = state.level_state.current_level in
+  let level_with_warning = Int32.rem current_level 10l = 1l in
+  if level_with_warning then
+    match state.global_state.dal_node_rpc_ctxt with
+    | None -> Events.(emit no_dal_node_running ())
+    | Some ctxt -> (
+        let* health = Node_rpc.get_dal_health ctxt in
+        match health with
+        | Ok health -> (
+            match health.status with
+            | Tezos_dal_node_services.Types.Health.Up -> return_unit
+            | _ -> Events.(emit unhealthy_dal_node) (ctxt#base, health))
+        | Error _ -> Events.(emit unreachable_dal_node) ctxt#base)
+  else return_unit
+
+let only_if_dal_feature_enabled state ~default_value f =
+  let open Lwt_syntax in
+  let open Constants in
+  let Parametric.{dal = {feature_enable; _}; _} =
+    state.global_state.constants.parametric
+  in
+  if feature_enable then
+    let* () = dal_checks_and_warnings state in
+    Option.fold
+      ~none:(return default_value)
+      ~some:f
+      state.global_state.dal_node_rpc_ctxt
+  else return default_value
 
 let process_dal_rpc_result state delegate level round =
   let open Lwt_result_syntax in

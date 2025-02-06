@@ -1133,6 +1133,10 @@ module Actions = struct
       ("level", Data_encoding.int32)
 
   let no_dal_node_running = Commands.no_dal_node_running
+
+  let unhealthy_dal_node = Commands.unhealthy_dal_node
+
+  let unreachable_dal_node = Commands.unreachable_dal_node
 end
 
 module VDF = struct
