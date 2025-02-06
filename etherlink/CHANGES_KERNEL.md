@@ -26,6 +26,7 @@
 [sqgov]: https://better-call.dev/mainnet/KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U/operations
 - A fast withdrawal entrypoint was added to the withdrawal precompiled contract
   under a feature flag. (!16417)
+- Fast withdrawal entrypoint activation. (!16617)
 
 ### Internal
 

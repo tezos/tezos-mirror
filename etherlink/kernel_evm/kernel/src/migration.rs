@@ -20,7 +20,7 @@ use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::precompiles::SYSTEM_ACCOUNT_ADDRESS;
 use evm_execution::precompiles::WITHDRAWAL_ADDRESS;
-use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
+use evm_execution::{ENABLE_FAST_WITHDRAWAL, NATIVE_TOKEN_TICKETER_PATH};
 use primitive_types::U256;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -237,6 +237,10 @@ fn migrate_to<Host: Runtime>(
             } else {
                 Ok(MigrationStatus::None)
             }
+        }
+        StorageVersion::V26 => {
+            host.store_write_all(&ENABLE_FAST_WITHDRAWAL, &[1_u8])?;
+            Ok(MigrationStatus::Done)
         }
     }
 }
