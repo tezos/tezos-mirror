@@ -1943,12 +1943,27 @@ let octez_base_test_helpers =
     ~bisect_ppx:No
     ~release_status:Released
 
+let ppx_profiler =
+  octez_lib
+    "ppx_profiler"
+    ~path:"src/lib_ppx_profiler"
+    ~deps:[ppxlib]
+    ~ppx_kind:Ppx_rewriter
+    ~ppx_runtime_libraries:[logs]
+    ~preprocess:(pps ppxlib_metaquot)
+
+let ppx_profiler =
+  make_ppx ~env_var:"TEZOS_PPX_PROFILER" ~preprocess:ppx_profiler
+
 let octez_profiler_unix =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib
     "octez-profiler.unix"
     ~internal_name:"tezos_profiler_unix"
     ~path:"src/lib_profiler/unix"
     ~synopsis:"The Octez Profiler"
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
@@ -2061,18 +2076,6 @@ let _octez_crypto_dal_tests =
         octez_bls12_381_polynomial;
         octez_test_helpers;
       ]
-
-let ppx_profiler =
-  octez_lib
-    "ppx_profiler"
-    ~path:"src/lib_ppx_profiler"
-    ~deps:[ppxlib]
-    ~ppx_kind:Ppx_rewriter
-    ~ppx_runtime_libraries:[logs]
-    ~preprocess:(pps ppxlib_metaquot)
-
-let ppx_profiler =
-  make_ppx ~env_var:"TEZOS_PPX_PROFILER" ~preprocess:ppx_profiler
 
 let ppx_brassaia =
   octez_lib

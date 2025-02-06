@@ -132,3 +132,13 @@ let selected_backend () =
           Some {instance_maker = wrap_backend_verbosity instance_maker; view}
       | None ->
           Format.sprintf "No backend registered for value \"%s\"" b |> fail)
+
+let () =
+  if
+    (true [@profiler.custom false])
+    && Sys.getenv_opt "PROFILING_BACKEND" <> None
+  then
+    Fmt.failwith
+      "The profiling has been enabled with PROFILING_BACKEND='...' but the \
+       program hasn't been compiled with TEZOS_PPX_PROFILER='...'"
+  else ()
