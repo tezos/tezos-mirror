@@ -18,6 +18,8 @@
   "history": { "mode": "rolling", "retention": 14 }
   ```
   (!16465)
+- Addition of `elapsed_time` to performance metrics, which exposes in seconds the time since the node
+  started. (!16551)
 
 #### UX
 

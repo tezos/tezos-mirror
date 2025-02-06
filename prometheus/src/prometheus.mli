@@ -166,6 +166,9 @@ module Counter : sig
 
   (** [inc t v] increases [t] by [v], which must be non-negative. *)
   val inc : t -> float -> unit
+
+  (** [set t v] sets the current value of the counter to [v]. *)
+  val set : t -> float -> unit
 end
 
 (** A gauge is a metric that represents a single numerical value that can arbitrarily go up and down. *)

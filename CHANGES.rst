@@ -178,6 +178,9 @@ Smart Rollup node
   enabled with the flag ``--enable-performance-metrics`` (requires
   ``lsof``). (MR :gl:`!12290`)
 
+- Addition of ``elapsed_time`` to performance metrics,
+  which exposes in seconds the time since the node started. (MR :gl:`!16551`)
+
 - Rotate multiple batcher keys in injector so that they are used evenly. (MR
   :gl:`!14194`)
 
