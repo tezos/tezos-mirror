@@ -52,6 +52,24 @@ let string_vm_command agent =
   | Some cmd_wrapper ->
       String.concat " " (cmd_wrapper.Gcloud.cmd :: cmd_wrapper.args)
 
+let monitored_binaries agent =
+  match Agent.process_monitor agent with
+  | None -> []
+  | Some process_monitor ->
+      let binaries = Process_monitor.get_binaries process_monitor in
+      let binaries =
+        List.sort (fun (g1, _) (g2, _) -> String.compare g1 g2) binaries
+      in
+      let binaries =
+        let open Jingoo.Jg_types in
+        List.fold_left
+          (fun res (group, name) ->
+            Tobj [("group", Tstr group); ("name", Tstr name)] :: res)
+          []
+          binaries
+      in
+      binaries
+
 let agent_jingo_template agent =
   let open Jingoo.Jg_types in
   let Agent.Configuration.
@@ -76,6 +94,7 @@ let agent_jingo_template agent =
       ("os", Tstr (Os.to_string os));
       ("vm_command", Tstr (string_vm_command agent));
       ("docker_command", Tstr (string_docker_command agent));
+      ("monitored_binaries", Tlist (monitored_binaries agent));
     ]
 
 let monitoring_jingo_template agents agent =
@@ -140,6 +159,7 @@ let write t ~agents =
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
   let website_style = Path.website_style in
+  Log.info "Website: write" ;
   Process.run "cp" [website_style; dir // "style.css"]
 
 let add_service t ~agents service =

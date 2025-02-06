@@ -717,7 +717,8 @@ let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
                 | Some prometheus ->
                     Prometheus.add_job prometheus ~name:app_name [target]
               in
-              Lwt.return_unit
+              (* Reload the website *)
+              write_website cloud
             else Lwt.return_unit)
       agents
   else Lwt.return_unit
