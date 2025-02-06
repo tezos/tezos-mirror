@@ -73,12 +73,12 @@ pub const WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
     102, 53, 63, 221, 233, 204, 248, 19, 244, 91, 132, 250, 130,
 ];
 
-/// Keccak256 of FastWithdrawal(bytes22,uint256,uint256,uint256,bytes)
+/// Keccak256 of FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,bytes20)
 /// Arguments in this order: l1 target address, withdrawal_id, amount, timestamp
 pub const FAST_WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
-    0xc3, 0x7b, 0x6b, 0x21, 0x84, 0x92, 0x3c, 0x72, 0xcb, 0xef, 0xf8, 0x85, 0x3f, 0x31,
-    0x82, 0x14, 0xa8, 0xa1, 0x6d, 0xc1, 0xbe, 0xaa, 0x34, 0x82, 0x46, 0x41, 0xfe, 0x04,
-    0xde, 0xa1, 0x69, 0x75,
+    0xdf, 0x5e, 0xd9, 0xdc, 0x3d, 0x4e, 0x5e, 0x96, 0x98, 0x61, 0x60, 0xb2, 0x0d, 0xdc,
+    0xb4, 0xde, 0x3b, 0x48, 0x9a, 0x63, 0xd0, 0x0d, 0x5b, 0xef, 0x21, 0x05, 0x11, 0xb7,
+    0xc7, 0xb0, 0x70, 0xe0,
 ];
 
 /// Calculate precompile gas cost given the estimated amount of ticks and gas price.
@@ -440,6 +440,8 @@ pub fn withdrawal_precompile<Host: Runtime>(
 
             let bytes_payload = MichelsonBytes(payload);
 
+            let caller = MichelsonBytes(context.caller.to_fixed_bytes().to_vec());
+
             let timestamp: MichelsonTimestamp =
                 MichelsonTimestamp(Zarith(u256_to_bigint(timestamp_u256)));
             let contract_address = MichelsonContract(target.clone());
@@ -450,7 +452,10 @@ pub fn withdrawal_precompile<Host: Runtime>(
                     ticket,
                     MichelsonPair(
                         timestamp,
-                        MichelsonPair(contract_address, bytes_payload),
+                        MichelsonPair(
+                            contract_address,
+                            MichelsonPair(bytes_payload, caller),
+                        ),
                     ),
                 ),
             );
@@ -475,6 +480,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 &timestamp_u256,
                 &target,
                 &mut payload_event,
+                &context.caller,
             );
 
             emit_log_and_return(handler, message, estimated_ticks, withdrawal_event)
@@ -532,12 +538,14 @@ fn event_log(
 /// * `timestamp` - timestamp in milliseconds since Epoch
 /// * `receiver` - account on L1 that initiated the fast withdrawal
 /// * `payload` - generic payload
+/// * `caller` - L2 caller's address
 fn event_log_fast_withdrawal(
     withdrawal_id: &U256,
     amount: &U256,
     timestamp: &U256,
     receiver: &Contract,
     payload: &mut Vec<u8>,
+    caller: &H160,
 ) -> Log {
     let mut data = vec![];
 
@@ -555,17 +563,25 @@ fn event_log_fast_withdrawal(
     data.extend_from_slice(&Into::<[u8; 32]>::into(*timestamp));
     debug_assert!(data.len() % 32 == 0);
 
-    //   4*32 bytes of arguments (receiver, withdrawal_id, amount, timestamp)
+    //   5*32 bytes of arguments (receiver, withdrawal_id, amount, timestamp, caller)
     // + 1*32 bytes its position
-    let payload_position = U256::from(32 * 5);
+    let payload_position = U256::from(32 * 6);
     data.extend_from_slice(&Into::<[u8; 32]>::into(payload_position));
     debug_assert!(data.len() % 32 == 0);
+
+    let mut caller = caller.to_fixed_bytes().to_vec();
+    caller.resize(32, 0);
+    data.extend_from_slice(&caller);
+    debug_assert!(data.len() % 32 == 0);
+
     let payload_size = payload.len();
     data.extend_from_slice(&Into::<[u8; 32]>::into(U256::from(payload_size)));
     debug_assert!(data.len() % 32 == 0);
+
     let payload_padding = payload_size % 32;
     payload.resize(payload_size + payload_padding, 0);
     data.extend_from_slice(payload);
+    debug_assert!(data.len() % 32 == 0);
 
     Log {
         address: WITHDRAWAL_ADDRESS,
@@ -641,8 +657,10 @@ mod tests {
     fn fast_withdrawal_event_signature() {
         assert_eq!(
             FAST_WITHDRAWAL_EVENT_TOPIC.to_vec(),
-            Keccak256::digest(b"FastWithdrawal(bytes22,uint256,uint256,uint256,bytes)")
-                .to_vec()
+            Keccak256::digest(
+                b"FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,bytes20)"
+            )
+            .to_vec()
         );
     }
 
