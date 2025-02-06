@@ -28,6 +28,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::ops::Bound;
 use std::sync::Arc;
+use tezos_smart_rollup_constants::core::{METADATA_LENGTH, ROLLUP_ADDRESS_LENGTH};
 use tezos_smart_rollup_utils::inbox::Inbox;
 
 /// Error during PVM stepping
@@ -91,12 +92,8 @@ impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
             )?;
         }
 
-        // TODO RV-458: Sandbox can load pre-images and provide them when it receives reveal request
-        // Currently, one sample record with dummy data is added to the map for testing purpose
-        let mut reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn> = HashMap::new();
-
-        reveal_request_response_map
-            .insert(Box::new([1u8; 100]), Arc::new(|| Ok(Box::new([2u8; 100]))));
+        let reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn> =
+            construct_reveal_request_response_map(rollup_address, origination_level);
 
         Ok(Self {
             pvm,
@@ -414,4 +411,28 @@ impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts> Steppe
             }
         }
     }
+}
+
+// TODO RV-458: Sandbox can load pre-images and provide them when it receives reveal request
+// Currently, one sample record with dummy data is added to the map for testing purpose
+fn construct_reveal_request_response_map(
+    rollup_address: [u8; 20],
+    origination_level: u32,
+) -> HashMap<Box<[u8]>, ResponseFn> {
+    let mut reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn> = HashMap::new();
+
+    // Entry for returning dummy data to generic reveal request
+    reveal_request_response_map.insert(Box::new([1u8; 100]), Arc::new(|| Ok(Box::new([2u8; 100]))));
+
+    // Entry for responding to reveal_metadata request
+    let mut metadata_response_buffer = [0u8; METADATA_LENGTH];
+    metadata_response_buffer[..ROLLUP_ADDRESS_LENGTH].copy_from_slice(&rollup_address);
+    metadata_response_buffer[ROLLUP_ADDRESS_LENGTH..]
+        .copy_from_slice(&origination_level.to_be_bytes());
+    reveal_request_response_map.insert(
+        Box::new([1u8]),
+        Arc::new(move || Ok(Box::from(metadata_response_buffer))),
+    );
+
+    reveal_request_response_map
 }

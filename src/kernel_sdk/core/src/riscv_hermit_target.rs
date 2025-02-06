@@ -25,13 +25,8 @@ use std::{
     slice::from_raw_parts,
 };
 use tezos_smart_rollup_constants::{
-    core::{
-        GENERIC_INVALID_ACCESS, MEMORY_INVALID_ACCESS, METADATA_LENGTH,
-        ORIGINATION_LEVEL_LENGTH, ROLLUP_ADDRESS_LENGTH,
-    },
-    riscv::{
-        SbiError, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL,
-    },
+    core::{GENERIC_INVALID_ACCESS, MEMORY_INVALID_ACCESS},
+    riscv::{SbiError, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_REVEAL},
 };
 
 /// Check the SBI return value for errors.
@@ -167,12 +162,31 @@ pub(super) unsafe fn reveal_preimage(
 
 #[inline]
 pub(super) unsafe fn reveal(
-    _payload_addr: *const u8,
-    _payload_len: usize,
-    _destination_addr: *mut u8,
-    _max_bytes: usize,
+    request_addr: *const u8,
+    request_len: usize,
+    response_addr: *mut u8,
+    response_max_bytes: usize,
 ) -> i32 {
-    unimplemented!()
+    let result: isize;
+
+    // SBI call
+    //   extension = SBI_FIRMWARE_TEZOS
+    //   function = SBI_TEZOS_REVEAL
+    core::arch::asm!(
+        "ecall",
+        in("a0") request_addr,
+        in("a1") request_len,
+        in("a2") response_addr,
+        in("a3") response_max_bytes,
+        in("a6") SBI_TEZOS_REVEAL,
+        in("a7") SBI_FIRMWARE_TEZOS,
+        lateout("a0") result,
+    );
+
+    match check_sbi_result(result) {
+        Err(err) => return err,
+        Ok(result) => result as i32,
+    }
 }
 
 #[inline]
@@ -182,47 +196,12 @@ pub(super) unsafe fn store_value_size(_path: *const u8, _path_len: usize) -> i32
 
 #[inline]
 pub(super) unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
-    let mut sbi_buffer = [0u8; METADATA_LENGTH];
-    let origin_level = {
-        let result: isize;
+    let mut request_payload = [1u8]; // reveal request tag
 
-        // SBI call
-        //   extension = SBI_FIRMWARE_TEZOS
-        //   function = SBI_TEZOS_METADATA_REVEAL
-        core::arch::asm!(
-            "ecall",
-            in("a0") sbi_buffer.as_mut_ptr(),
-            in("a6") SBI_TEZOS_METADATA_REVEAL,
-            in("a7") SBI_FIRMWARE_TEZOS,
-            lateout("a0") result,
-        );
-
-        match check_sbi_result(result) {
-            Err(err) => return err,
-            Ok(result) => result,
-        }
-    };
-
-    match ORIGINATION_LEVEL_LENGTH {
-        4 => {
-            sbi_buffer[ROLLUP_ADDRESS_LENGTH
-                ..(ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH)]
-                .copy_from_slice(&(origin_level as i32).to_be_bytes());
-        }
-
-        8 => {
-            sbi_buffer[ROLLUP_ADDRESS_LENGTH
-                ..(ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH)]
-                .copy_from_slice(&(origin_level as i64).to_be_bytes());
-        }
-
-        _ => {
-            panic!("Unknown origination level type length {ORIGINATION_LEVEL_LENGTH}")
-        }
-    }
-
-    let written = max_bytes.min(sbi_buffer.len());
-    buffer.copy_from(sbi_buffer.as_mut_ptr(), written);
-
-    written as i32
+    reveal(
+        request_payload.as_mut_ptr(),
+        std::mem::size_of_val(&request_payload),
+        buffer,
+        max_bytes,
+    )
 }
