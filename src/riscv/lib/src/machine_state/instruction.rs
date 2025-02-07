@@ -1096,7 +1096,7 @@ impl Args {
     impl_i_type!(run_andi, non_zero);
     impl_i_type!(run_slli, non_zero);
     impl_i_type!(run_srli, non_zero);
-    impl_i_type!(run_srai, non_zero_rd);
+    impl_i_type!(run_srai, non_zero);
     impl_i_type!(run_slliw, non_zero_rd);
     impl_i_type!(run_srliw, non_zero_rd);
     impl_i_type!(run_sraiw, non_zero_rd);
@@ -1409,10 +1409,7 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Andi(args) => Instruction::from_ic_andi(args),
             InstrCacheable::Slli(args) => Instruction::from_ic_slli(args),
             InstrCacheable::Srli(args) => Instruction::from_ic_srli(args),
-            InstrCacheable::Srai(args) => Instruction {
-                opcode: OpCode::Srai,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Srai(args) => Instruction::from_ic_srai(args),
             InstrCacheable::Slliw(args) => Instruction {
                 opcode: OpCode::Slliw,
                 args: args.to_args(InstrWidth::Uncompressed),
@@ -2005,10 +2002,7 @@ impl From<&InstrCacheable> for Instruction {
                 Instruction::new_slli(args.rd_rs1, args.rd_rs1, args.imm, InstrWidth::Compressed)
             }
             InstrCacheable::CSrli(args) => Instruction::from_ic_csrli(args),
-            InstrCacheable::CSrai(args) => Instruction {
-                opcode: OpCode::Srai,
-                args: args.into(),
-            },
+            InstrCacheable::CSrai(args) => Instruction::from_ic_csrai(args),
             InstrCacheable::CAndi(args) => Instruction::from_ic_candi(args),
             InstrCacheable::CMv(args) => {
                 Instruction::new_mv(args.rd_rs1, args.rs2, InstrWidth::Compressed)

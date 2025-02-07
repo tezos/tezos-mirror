@@ -352,11 +352,11 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        Addi | Andi | Ori | Xori | Slli | Srli | Add | Mv | And | Or | Xor | CJr | CJalr
+        Addi | Andi | Ori | Xori | Slli | Srli | Srai | Add | Mv | And | Or | Xor | CJr | CJalr
         | CAddiw | Li | CLui | CLdsp | CLwsp | Nop => ArgsShape::NZXSrcNZXDest,
 
-        Addiw | Sub | Sll | Srl | Sra | Addw | Subw | Sllw | Srlw | Sraw | Slti | Sltiu | Srai
-        | Slliw | Srliw | Sraiw | Slt | Sltu | Lui | Auipc => ArgsShape::XSrcNZXDest,
+        Addiw | Sub | Sll | Srl | Sra | Addw | Subw | Sllw | Srlw | Sraw | Slti | Sltiu | Slliw
+        | Srliw | Sraiw | Slt | Sltu | Lui | Auipc => ArgsShape::XSrcNZXDest,
     }
 }
 

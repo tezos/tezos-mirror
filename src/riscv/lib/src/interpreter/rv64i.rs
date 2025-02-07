@@ -84,18 +84,19 @@ where
         self.write_nz(rd, self.read_nz(rs1) >> imm)
     }
 
-    /// `SRAI` I-type instruction
-    ///
     /// Shift right arithmetically
     /// (sign-bits are shifted in the upper bits)
     ///
-    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRAI
-    pub fn run_srai(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+    /// Relevant RISC-V opcodes:
+    /// - `SRAI`
+    /// - `C.SRAI`
+    pub fn run_srai(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // SRAI encoding has bit imm[10] set, so need to mask the shift amount
+        // TODO: RV-459: Move bit-masking of shamt to the parser
         let sh_amt = imm & 0b11_1111;
 
         // Right shift on i64 is an arithmetic shift
-        let result = (self.read(rs1) as i64) >> sh_amt;
+        let result = (self.read_nz(rs1) as i64) >> sh_amt;
         // i64 as u64 is a no-op
         self.write_nz(rd, result as u64)
     }
@@ -534,7 +535,8 @@ mod tests {
             a0,
             0xFFFF_DEAD_1234_ABEF,
             a1,
-            0xFFFF_DEAD_1234_ABEF
+            0xFFFF_DEAD_1234_ABEF,
+            non_zero
         );
 
         // small imm (< 32))
@@ -583,7 +585,8 @@ mod tests {
             a0,
             0xFFFF_F0FF_FFF0_FF00,
             a0,
-            0xFFFF_FFFC_3FFF_FC3F
+            0xFFFF_FFFC_3FFF_FC3F,
+            non_zero
         );
 
         // big imm (>= 32))
@@ -620,7 +623,8 @@ mod tests {
             a0,
             0x8000_FAFF_1234_ABEF,
             a1,
-            0xFFFF_FFFF_FF80_00FA
+            0xFFFF_FFFF_FF80_00FA,
+            non_zero
         );
 
         // Use same register for shift and source

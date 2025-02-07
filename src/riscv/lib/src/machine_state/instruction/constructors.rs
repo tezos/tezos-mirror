@@ -194,7 +194,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Srli`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srli`].
     pub(crate) fn new_srli(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -203,6 +203,28 @@ impl Instruction {
     ) -> Self {
         Self {
             opcode: OpCode::Srli,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                // We are adding a default value for rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srai`].
+    pub(crate) fn new_srai(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Srai,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -410,6 +432,33 @@ impl Instruction {
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
             X::NonZero(rd_rs1) => {
                 Instruction::new_srli(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Srai`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Srai`]: crate::parser::instruction::InstrCacheable::Srai
+    pub(super) fn from_ic_srai(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // shifting 0 by any amount is 0.
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            X::NonZero(rs1) => {
+                Instruction::new_srai(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CSrai`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::CSrai`]: crate::parser::instruction::InstrCacheable::CSrai
+    pub(super) fn from_ic_csrai(args: &CIBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_srai(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
             }
         }
     }
