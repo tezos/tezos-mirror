@@ -100,6 +100,7 @@ where
     ///
     /// Relevant RISC-V opcodes:
     /// - `OR`
+    /// - `C.OR`
     pub fn run_or(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         let result = self.read_nz(rs1) | self.read_nz(rs2);
         self.write_nz(rd, result)

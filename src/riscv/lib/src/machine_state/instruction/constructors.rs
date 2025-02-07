@@ -368,4 +368,17 @@ impl Instruction {
             }
         }
     }
+
+    /// Convert [`InstrCacheable::Cor`] according to whether registers are non-zero.
+    pub(super) fn from_ic_cor(args: &CRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd_rs1), split_x0(args.rs2)) {
+            // if rd is 0, then the instruction is a NOP.
+            // if rs2 is 0, it is the same as moving rs1 to rd, which are the same register.
+            (X::X0, _) | (_, X::X0) => Instruction::new_nop(InstrWidth::Compressed),
+            (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
+                Instruction::new_or(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
+            }
+        }
+    }
 }
