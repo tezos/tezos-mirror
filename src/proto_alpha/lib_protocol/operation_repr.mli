@@ -572,6 +572,12 @@ val protocol_data_encoding : packed_protocol_data Data_encoding.t
 val unsigned_operation_encoding :
   (Operation.shell_header * packed_contents_list) Data_encoding.t
 
+(* Encoding to sign and verify attestations signatures with BLS keys. In this
+   encoding, the signed payload is omitting slots to enable BLS proof of
+   possession aggregation. *)
+val bls_mode_unsigned_operation_encoding :
+  (Operation.shell_header * packed_contents_list) Data_encoding.t
+
 val raw : _ operation -> raw
 
 val hash_raw : raw -> Operation_hash.t
@@ -681,6 +687,10 @@ type error += Invalid_signature (* `Permanent *)
     This is useful to define a gas model for the check of the
     signature. *)
 val unsigned_operation_length : _ operation -> int
+
+(** Measuring the length of an operation in bls_mode, ignoring its
+    signature. *)
+val bls_mode_unsigned_operation_length : _ operation -> int
 
 (** Check the signature of an operation. This function serializes the operation
     using the provided encoding before calling the [Signature.check] function

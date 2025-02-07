@@ -125,18 +125,18 @@ types:
     - id: alpha__operation__alpha__contents_tag
       type: u1
       enum: alpha__operation__alpha__contents_tag
-    - id: preattestation
-      type: preattestation
-      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::preattestation)
     - id: attestation
       type: attestation
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestation)
-    - id: attestations_aggregate
-      type: attestations_aggregate
-      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestations_aggregate)
     - id: attestation_with_dal
       type: attestation_with_dal
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestation_with_dal)
+    - id: preattestation
+      type: preattestation
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::preattestation)
+    - id: attestations_aggregate
+      type: attestations_aggregate
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestations_aggregate)
     - id: double_preattestation_evidence
       type: double_preattestation_evidence
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::double_preattestation_evidence)

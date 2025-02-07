@@ -824,6 +824,147 @@ let test_dal_attestation_threshold () =
   in
   return_unit
 
+(* The BLS mode encoding differs from the regular attestation encoding
+   in that slots are omitted. This test verifies that an attestation's signature
+   check remains valid even after replacing its slot with a different one. *)
+let slot_substitution_do_not_affect_signature_check () =
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* b = Block.bake genesis in
+  let* delegate, _slots = Context.get_attester (B b) in
+  let* signer = Account.find delegate in
+  let watermark = Operation.to_watermark (Attestation Chain_id.zero) in
+  let slot_swap_and_check_signature slot
+      ({shell = {branch}; protocol_data = {contents; _}} :
+        Kind.attestation operation) =
+    match contents with
+    | Single (Attestation {consensus_content; dal_content}) ->
+        let bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Operation.bls_mode_unsigned_encoding
+            ({branch}, Contents_list contents)
+        in
+        let signature = Signature.sign ~watermark signer.sk bytes in
+        let contents =
+          Single
+            (Attestation
+               {consensus_content = {consensus_content with slot}; dal_content})
+        in
+        let bytes_with_different_slot =
+          Data_encoding.Binary.to_bytes_exn
+            Operation.bls_mode_unsigned_encoding
+            ({branch}, Contents_list contents)
+        in
+        if
+          Signature.check
+            ~watermark:(Operation.to_watermark (Attestation Chain_id.zero))
+            signer.pk
+            signature
+            bytes_with_different_slot
+        then return_unit
+        else Test.fail "Unexpected signature check failure"
+  in
+  let* attestation_without_dal =
+    Op.raw_attestation ~delegate ~slot:Slot.zero b
+  in
+  let* () =
+    slot_swap_and_check_signature
+      (Slot.Internal_for_tests.of_int_unsafe_only_use_for_tests 1)
+      attestation_without_dal
+  in
+  let* attestation_with_dal =
+    (* attestation with dal signed with slot zero *)
+    Op.raw_attestation
+      ~dal_content:{attestation = Dal.Attestation.empty}
+      ~delegate
+      ~slot:Slot.zero
+      b
+  in
+  let* () =
+    slot_swap_and_check_signature
+      (Slot.Internal_for_tests.of_int_unsafe_only_use_for_tests 1)
+      attestation_with_dal
+  in
+  return_unit
+
+(* The BLS mode encoding differs from the regular attestation encoding in that
+   slots are omitted. This test ensures that an attestation's signature cannot
+   be mismatched between signing and verification. *)
+let encoding_incompatibility () =
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* b = Block.bake genesis in
+  let* delegate, _slots = Context.get_attester (B b) in
+  let* signer = Account.find delegate in
+  let check_encodings_incompatibily
+      ({shell = {branch}; protocol_data = {contents; signature = _}} :
+        Kind.attestation operation) =
+    let bytes_without_slot =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.bls_mode_unsigned_encoding
+        ({branch}, Contents_list contents)
+    in
+    let bytes_with_slot =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding
+        ({branch}, Contents_list contents)
+    in
+    let watermark = Operation.to_watermark (Attestation Chain_id.zero) in
+    let signature_without_slot =
+      Signature.sign ~watermark signer.sk bytes_without_slot
+    in
+    let signature_with_slot =
+      Signature.sign ~watermark signer.sk bytes_with_slot
+    in
+    (* Sanity checks *)
+    let* () =
+      if
+        Signature.check
+          ~watermark
+          signer.pk
+          signature_without_slot
+          bytes_without_slot
+      then return_unit
+      else
+        Test.fail "Unexpected signature check failure (signature_without_slot)"
+    in
+    let* () =
+      if
+        Signature.check ~watermark signer.pk signature_with_slot bytes_with_slot
+      then return_unit
+      else Test.fail "Unexpected signature check failure (signature_with_slot)"
+    in
+    (* Encodings incompatibility checks *)
+    let* () =
+      if
+        Signature.check
+          ~watermark
+          signer.pk
+          signature_without_slot
+          bytes_with_slot
+      then Test.fail "Unexpected signature check success (bytes_with_slot)"
+      else return_unit
+    in
+    if
+      Signature.check
+        ~watermark
+        signer.pk
+        signature_with_slot
+        bytes_without_slot
+    then Test.fail "Unexpected signature check success (bytes_without_slot)"
+    else return_unit
+  in
+  let* raw_attestation_without_dal = Op.raw_attestation ~delegate b in
+  let* () = check_encodings_incompatibily raw_attestation_without_dal in
+  let* raw_attestation_with_dal =
+    Op.raw_attestation
+      ~dal_content:{attestation = Dal.Attestation.empty}
+      ~delegate
+      b
+  in
+  let* () = check_encodings_incompatibily raw_attestation_with_dal in
+  return_unit
+
 let tests =
   [
     (* Positive tests *)
@@ -887,6 +1028,13 @@ let tests =
       "DAL attestation_threshold"
       `Quick
       test_dal_attestation_threshold;
+    (* slots are not part of the signed payload *)
+    Tztest.tztest
+      "slot substitution do not affect signature check"
+      `Quick
+      slot_substitution_do_not_affect_signature_check;
+    (* bls_mode_unsigned_encoding cannot be mismatched with unsigned_encoding *)
+    Tztest.tztest "encoding incompatitiblity" `Quick encoding_incompatibility;
   ]
 
 let () =

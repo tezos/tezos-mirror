@@ -1528,12 +1528,10 @@ module Encoding = struct
 
   type packed_case = PCase : 'b case -> packed_case
 
-  let contents_cases =
+  let contents_cases_common =
     [
       PCase preattestation_case;
-      PCase attestation_case;
       PCase attestations_aggregate_case;
-      PCase attestation_with_dal_case;
       PCase double_preattestation_evidence_case;
       PCase double_attestation_evidence_case;
       PCase seed_nonce_revelation_case;
@@ -1567,6 +1565,10 @@ module Encoding = struct
       PCase zk_rollup_publish_case;
       PCase zk_rollup_update_case;
     ]
+
+  let contents_cases =
+    PCase attestation_case :: PCase attestation_with_dal_case
+    :: contents_cases_common
 
   let contents_encoding =
     let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
@@ -1751,6 +1753,71 @@ module Encoding = struct
     @@ merge_objs
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
+
+  (* Encoding to sign and verify attestations and preattestations signatures
+     with BLS keys. In this encoding, the signed payload is omitting slots to
+     enable BLS proof of possession aggregation. *)
+  module Bls_mode = struct
+    let attestation_case =
+      Case
+        {
+          tag = 41;
+          name = "bls_mode_attestation";
+          encoding =
+            merge_objs
+              consensus_aggregate_content_encoding
+              (obj1 (opt "dal" dal_content_encoding));
+          select =
+            (function Contents (Attestation _ as op) -> Some op | _ -> None);
+          proj =
+            (fun (Attestation {consensus_content; dal_content}) ->
+              ( {
+                  level = consensus_content.level;
+                  round = consensus_content.round;
+                  block_payload_hash = consensus_content.block_payload_hash;
+                },
+                Option.map
+                  (fun dal_content -> dal_content.attestation)
+                  dal_content ));
+          inj =
+            (fun ({level; round; block_payload_hash}, dal_content) ->
+              Attestation
+                {
+                  consensus_content =
+                    {slot = Slot_repr.zero; level; round; block_payload_hash};
+                  dal_content =
+                    Option.map (fun attestation -> {attestation}) dal_content;
+                });
+        }
+
+    let contents_cases =
+      (* attestations without slots *)
+      PCase attestation_case :: contents_cases_common
+
+    let contents_encoding =
+      let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
+        assert (not @@ reserved_tag tag) ;
+        case
+          (Tag tag)
+          name
+          encoding
+          (fun o ->
+            match select o with None -> None | Some o -> Some (proj o))
+          (fun x -> Contents (inj x))
+      in
+      def "operation.alpha.bls_mode_contents"
+      @@ union (List.map make contents_cases)
+
+    let contents_list_encoding =
+      conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
+
+    let encoding =
+      let open Data_encoding in
+      def "operation.alpha.bls_mode_unsigned_operation"
+      @@ merge_objs
+           Operation.shell_header_encoding
+           (obj1 (req "contents" contents_list_encoding))
+  end
 end
 
 let encoding = Encoding.operation_encoding
@@ -1762,6 +1829,8 @@ let contents_list_encoding = Encoding.contents_list_encoding
 let protocol_data_encoding = Encoding.protocol_data_encoding
 
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
+
+let bls_mode_unsigned_operation_encoding = Encoding.Bls_mode.encoding
 
 let raw ({shell; protocol_data} : _ operation) =
   let proto =
@@ -1866,6 +1935,12 @@ let unsigned_operation_length (type kind)
     ({shell; protocol_data} : kind operation) : int =
   Data_encoding.Binary.length
     unsigned_operation_encoding
+    (shell, Contents_list protocol_data.contents)
+
+let bls_mode_unsigned_operation_length (type kind)
+    ({shell; protocol_data} : kind operation) : int =
+  Data_encoding.Binary.length
+    bls_mode_unsigned_operation_encoding
     (shell, Contents_list protocol_data.contents)
 
 let check_signature (type kind) encoding key chain_id (op : kind operation) =
