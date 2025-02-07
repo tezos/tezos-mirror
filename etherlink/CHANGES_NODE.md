@@ -6,6 +6,9 @@
 
 ### Bug Fixes
 
+- Advertises the correct history mode on start-up when it is not explicitely
+  set in the configuration file. (!16633)
+
 ### Internals
 
 ## Version 0.16 (2025-01-06)
