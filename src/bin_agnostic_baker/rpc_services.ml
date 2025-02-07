@@ -19,6 +19,9 @@ let request_uri ~node_addr ~uri =
           tzfail (Cannot_connect_to_node node_addr)
       | e -> raise e)
 
+(** [call_and_wrap_rpc ~node_addr ~uri ~f] makes the RPC call given
+    by the [~uri] against [~node_addr], and in case of a well-formed
+    response, it applies [~f] to it. *)
 let call_and_wrap_rpc ~node_addr ~uri ~f =
   let open Lwt_result_syntax in
   let* resp, body = request_uri ~node_addr ~uri in

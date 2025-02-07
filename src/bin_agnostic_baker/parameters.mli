@@ -12,9 +12,9 @@ val default_node_endpoint : string
 val log_config : base_dir:string option -> Tezos_base.Internal_event_config.t
 
 (** Status of a protocol, based on Manifest/Product_octez/Protocol. A
-    protocol is considered as Active while it is running on a network,
+    protocol is considered as [Active] while it is running on a network,
     and thus, have dedicated binaries. Otherwise, the protocol is
-    Frozen as not running anymore and no associated binaries.
+    [Frozen] as not running anymore and no associated binaries.
 
     Warning, it is needed to update status for each new protocol added.
 *)
