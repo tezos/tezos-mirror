@@ -158,6 +158,31 @@ This PPX library provides a special construct, which basically acts as a
 This construct will be preprocessed as ``expr_if_ppx_not_used`` if you are
 not using the PPX, or ``expr_if_ppx_used`` if you are.
 
+If you want to write a custom function that will use the intial value instead
+of simply removing it from the code, there are two functions that allow you
+to use a wrapper.
+
+Both ``profiler.custom_f`` and ``profiler.custom_s`` (the ``Lwt.t`` variant)
+allow you to wrap a delayed version of the initial value (using
+``fun () -> ...``) with a custom function.
+
+This will rewrite
+
+.. code-block:: OCaml
+
+   let wrapper expr = do_something (); expr ()
+   let _ = expr [@profiler.custom_f wrapper]
+   ...
+
+into
+
+.. code-block:: OCaml
+
+   let wrapper expr = do_something (); expr ()
+   let _ = wrapper (fun () -> expr)
+   ...
+
+
 Structure of an attribute
 -------------------------
 
