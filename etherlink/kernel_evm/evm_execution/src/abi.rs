@@ -47,41 +47,6 @@ pub fn string_parameter(input_data: &[u8], parameter_number: usize) -> Option<&s
     core::str::from_utf8(bytes_parameter(input_data, parameter_number)?).ok()
 }
 
-pub fn fast_withdrawal_parameters(input_data: &[u8]) -> Option<(&str, &str, Vec<u8>)> {
-    // Disclaimer: The following implementation is REALLY hack-ish. But it's the most straighforward
-    // decoding function until we find a better crate to handle these encodings.
-    // We ignore the first three slices of 32 bytes, they are the position of the parameters.
-    // In our case, since it's a hack-ish implementation, we can directly infer them.
-    const U256_SIZE: usize = 32;
-
-    let first_arg_size: usize = U256::from(input_data.get(3 * U256_SIZE..4 * U256_SIZE)?)
-        .try_into()
-        .ok()?;
-    let number_of_slice = first_arg_size.div_ceil(U256_SIZE);
-    let read_to = first_arg_size + 4 * U256_SIZE;
-    let arg_1 = &input_data.get(4 * U256_SIZE..read_to)?;
-    let arg_1 = core::str::from_utf8(arg_1).ok()?;
-
-    let from = U256_SIZE * number_of_slice + 4 * U256_SIZE;
-    let second_args_size: usize = U256::from(input_data.get(from..(from + U256_SIZE))?)
-        .try_into()
-        .ok()?;
-    let number_of_slice = second_args_size.div_ceil(U256_SIZE);
-    let read_to = (from + U256_SIZE) + second_args_size;
-    let arg_2 = &input_data.get((from + U256_SIZE)..read_to)?;
-    let arg_2 = core::str::from_utf8(arg_2).ok()?;
-
-    let from = U256_SIZE * number_of_slice + (from + U256_SIZE);
-    let third_args_size: usize = U256::from(input_data.get(from..(from + U256_SIZE))?)
-        .try_into()
-        .ok()?;
-    let read_to = third_args_size + (from + U256_SIZE);
-    let arg_3 = &input_data.get((from + U256_SIZE)..read_to)?;
-    let arg_3 = arg_3.to_vec();
-
-    Some((arg_1, arg_2, arg_3))
-}
-
 /// Get an address parameter from the input data buffer
 pub fn h160_parameter(input_data: &[u8], parameter_number: usize) -> Option<H160> {
     let location = parameter_number * 32;
@@ -122,19 +87,5 @@ pub fn fixed_bytes_parameter<const N: usize>(
         }
     } else {
         None
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::fast_withdrawal_parameters;
-
-    #[test]
-    fn test_fast_withdrawal_parameters() {
-        let test_case = hex::decode("000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a7158000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a7158000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
-        let (arg_1, arg_2, arg_3) = fast_withdrawal_parameters(&test_case).unwrap();
-        assert_eq!("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX", arg_1);
-        assert_eq!("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX", arg_2);
-        assert_eq!(Vec::<u8>::new(), arg_3)
     }
 }

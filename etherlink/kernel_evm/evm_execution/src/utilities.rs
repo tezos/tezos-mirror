@@ -77,3 +77,24 @@ pub fn u256_to_bigint(value: U256) -> BigInt {
     value.to_big_endian(&mut bytes);
     BigInt::from_bytes_be(Sign::Plus, &bytes)
 }
+
+pub fn u256_to_le_bytes(value: U256) -> Vec<u8> {
+    let mut bytes = vec![0u8; 32];
+    value.to_little_endian(&mut bytes);
+    bytes
+}
+
+pub mod alloy {
+    use super::*;
+    use alloy_primitives;
+
+    pub fn u256_to_alloy(value: &U256) -> Option<alloy_primitives::U256> {
+        Some(alloy_primitives::U256::from_le_bytes::<32>(
+            u256_to_le_bytes(*value).try_into().ok()?,
+        ))
+    }
+
+    pub fn h160_to_alloy(value: &H160) -> alloy_primitives::Address {
+        alloy_primitives::Address::from_slice(&value.to_fixed_bytes())
+    }
+}
