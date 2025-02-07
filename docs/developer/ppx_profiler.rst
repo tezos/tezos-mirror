@@ -153,7 +153,7 @@ with
 This PPX library provides a special construct, which basically acts as a
 ``#ifndef TEZOS_PPX_PROFILER`` / ``#else``:
 
-- ``expr_if_ppx_not_used [@profiler.custom expr_if_ppx_used]``
+- ``expr_if_ppx_not_used [@profiler.overwrite expr_if_ppx_used]``
 
 This construct will be preprocessed as ``expr_if_ppx_not_used`` if you are
 not using the PPX, or ``expr_if_ppx_used`` if you are.

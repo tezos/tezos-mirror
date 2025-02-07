@@ -123,7 +123,7 @@ let rewrite rewriters t =
             loc
             rewriter.key
           (* Custom functions *)
-      | Rewriter.Custom -> replace_expr_with loc rewriter.key
+      | Rewriter.Overwrite -> replace_expr_with loc rewriter.key
       | Rewriter.Custom_f | Rewriter.Custom_s ->
           add_wrapping_custom_function expr loc rewriter.key)
     t

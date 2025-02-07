@@ -396,7 +396,7 @@ struct
     *)
     let scope =
       (None
-      [@profiler.custom
+      [@profiler.overwrite
         {driver_ids = [Opentelemetry]}
           (Opentelemetry.Scope.get_ambient_scope ())])
     in

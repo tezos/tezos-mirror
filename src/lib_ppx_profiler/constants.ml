@@ -23,9 +23,6 @@ let aggregate_f_constant = create_constant "aggregate_f"
 (** Constant representing [@profiler.aggregate_s] *)
 let aggregate_s_constant = create_constant "aggregate_s"
 
-(** Constant representing [@profiler.custom] *)
-let custom_constant = create_constant "custom"
-
 (** Constant representing [@profiler.custom_f] *)
 let custom_f_constant = create_constant "custom_f"
 
@@ -34,6 +31,9 @@ let custom_s_constant = create_constant "custom_s"
 
 (** Constant representing [@profiler.mark] *)
 let mark_constant = create_constant "mark"
+
+(** Constant representing [@profiler.overwrite] *)
+let overwrite_constant = create_constant "overwrite"
 
 (** Constant representing [@profiler.record] *)
 let record_constant = create_constant "record"
@@ -73,10 +73,10 @@ let constants =
     aggregate_constant;
     aggregate_f_constant;
     aggregate_s_constant;
-    custom_constant;
     custom_f_constant;
     custom_s_constant;
     mark_constant;
+    overwrite_constant;
     record_constant;
     record_f_constant;
     record_s_constant;

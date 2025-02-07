@@ -421,7 +421,7 @@ module Internal_validator_process = struct
         operations
     in
     validator.preapply_result <- Some apply_result ;
-    let () = (() [@profiler.custom headless_reports validator]) in
+    let () = (() [@profiler.overwrite headless_reports validator]) in
     return result
 
   let validate_block validator chain_store ~predecessor header _hash operations
@@ -464,7 +464,7 @@ module Internal_validator_process = struct
         header
         operations
     in
-    let () = (() [@profiler.custom headless_reports validator]) in
+    let () = (() [@profiler.overwrite headless_reports validator]) in
     return res
 
   let context_garbage_collection _validator context_index context_hash
@@ -532,7 +532,7 @@ module External_validator_process = struct
         }
     in
     let* res = send_request validator request in
-    let () = (() [@profiler.custom handle_reports (snd res)]) in
+    let () = (() [@profiler.overwrite handle_reports (snd res)]) in
     return (fst res)
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -559,7 +559,7 @@ module External_validator_process = struct
         }
     in
     let* res = send_request validator request in
-    let () = (() [@profiler.custom handle_reports (snd res)]) in
+    let () = (() [@profiler.overwrite handle_reports (snd res)]) in
     return (fst res)
 
   let validate_block validator chain_store ~predecessor header hash operations =
@@ -583,7 +583,7 @@ module External_validator_process = struct
         }
     in
     let* res = send_request validator request in
-    let () = (() [@profiler.custom handle_reports (snd res)]) in
+    let () = (() [@profiler.overwrite handle_reports (snd res)]) in
     return (fst res)
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path

@@ -9,10 +9,10 @@ type action =
   | Aggregate
   | Aggregate_f
   | Aggregate_s
-  | Custom
   | Custom_f
   | Custom_s
   | Mark
+  | Overwrite
   | Record
   | Record_f
   | Record_s
@@ -40,8 +40,6 @@ let aggregate_s key location =
   | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s
   | _ -> Error.error location (Error.Invalid_aggregate key)
 
-let custom _key _location = Custom
-
 let custom_f key location =
   match Key.content key with
   | Key.Apply _ | Key.Ident _ -> Custom_f
@@ -56,6 +54,8 @@ let mark key location =
   match Key.content key with
   | Key.Apply _ | Key.Ident _ | Key.List _ -> Mark
   | _ -> Error.error location (Error.Invalid_mark key)
+
+let overwrite _key _location = Overwrite
 
 let record key location =
   match Key.content key with
@@ -109,10 +109,10 @@ let to_constant {action; _} =
   | Aggregate -> Constants.aggregate_constant
   | Aggregate_f -> Constants.aggregate_f_constant
   | Aggregate_s -> Constants.aggregate_s_constant
-  | Custom -> Constants.custom_constant
   | Custom_f -> Constants.custom_f_constant
   | Custom_s -> Constants.custom_s_constant
   | Mark -> Constants.mark_constant
+  | Overwrite -> Constants.overwrite_constant
   | Record -> Constants.record_constant
   | Record_f -> Constants.record_f_constant
   | Record_s -> Constants.record_s_constant
@@ -133,10 +133,10 @@ let association_constant_action_maker =
     (Constants.aggregate_constant, aggregate);
     (Constants.aggregate_f_constant, aggregate_f);
     (Constants.aggregate_s_constant, aggregate_s);
-    (Constants.custom_constant, custom);
     (Constants.custom_f_constant, custom_f);
     (Constants.custom_s_constant, custom_s);
     (Constants.mark_constant, mark);
+    (Constants.overwrite_constant, overwrite);
     (Constants.record_constant, record);
     (Constants.record_f_constant, record_f);
     (Constants.record_s_constant, record_s);
@@ -183,9 +183,10 @@ let to_fully_qualified_lident_expr t loc =
         | Span_s -> "span_s"
         | Stamp -> "stamp"
         | Stop -> "stop"
-        | Custom | Custom_f | Custom_s ->
+        | Overwrite | Custom_f | Custom_s ->
             Stdlib.failwith
-              "A custom function shouldn't be called with a leading module" )
+              "An overwrite or custom section shouldn't be called with a \
+               leading module" )
   in
   Ppxlib.Ast_helper.Exp.ident {txt = lident; loc}
 

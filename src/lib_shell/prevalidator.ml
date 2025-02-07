@@ -719,7 +719,7 @@ module Make_s
         match Parser.parse oph op with
         | Error _ ->
             ()
-            [@profiler.custom
+            [@profiler.overwrite
               Opentelemetry_profiler.add_event "parse_operation failed"] ;
             let* () = Events.(emit unparsable_operation) oph in
             Prevalidator_classification.add_unparsable
@@ -728,7 +728,7 @@ module Make_s
             return_ok_unit
         | Ok parsed_op -> (
             ()
-            [@profiler.custom
+            [@profiler.overwrite
               Opentelemetry_profiler.add_event "parse_operation succeeded"] ;
             let* v =
               pre_filter
@@ -775,7 +775,7 @@ module Make_s
         match Parser.parse oph op with
         | Error err ->
             ()
-            [@profiler.custom
+            [@profiler.overwrite
               {driver_ids = [Opentelemetry]}
                 (Opentelemetry_profiler.add_event "parse_operation failed")] ;
             failwith
@@ -786,7 +786,7 @@ module Make_s
               err
         | Ok parsed_op -> (
             ()
-            [@profiler.custom
+            [@profiler.overwrite
               {driver_ids = [Opentelemetry]}
                 (Opentelemetry_profiler.add_event "parse_operation succeeded")] ;
             if force then (
@@ -837,7 +837,7 @@ module Make_s
               match op_status with
               | Some (_h, `Validated) ->
                   ()
-                  [@profiler.custom
+                  [@profiler.overwrite
                     {driver_ids = [Opentelemetry]}
                       (Opentelemetry_profiler.add_event "operation validated")] ;
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
@@ -874,7 +874,7 @@ module Make_s
                     | `Refused e
                     | `Outdated e ) ) ->
                   ()
-                  [@profiler.custom
+                  [@profiler.overwrite
                     {driver_ids = [Opentelemetry]}
                       (Opentelemetry_profiler.add_event "operation rejected")] ;
                   Lwt.return

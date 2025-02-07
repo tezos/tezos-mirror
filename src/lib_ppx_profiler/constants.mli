@@ -47,9 +47,6 @@ val aggregate_f_constant : t
 (** Constant representing [@profiler.aggregate_s] *)
 val aggregate_s_constant : t
 
-(** Constant representing [@profiler.custom] *)
-val custom_constant : t
-
 (** Constant representing [@profiler.custom_f] *)
 val custom_f_constant : t
 
@@ -58,6 +55,9 @@ val custom_s_constant : t
 
 (** Constant representing [@profiler.mark] *)
 val mark_constant : t
+
+(** Constant representing [@profiler.overwrite] *)
+val overwrite_constant : t
 
 (** Constant representing [@profiler.record] *)
 val record_constant : t

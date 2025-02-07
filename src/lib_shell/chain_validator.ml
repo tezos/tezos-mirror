@@ -507,7 +507,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   if not accepted_head then return Ignored_head
   else
     let* previous = Store.Chain.set_head chain_store block in
-    () [@profiler.custom reset_profilers (block, [])] ;
+    () [@profiler.overwrite reset_profilers (block, [])] ;
     let () =
       if is_bootstrapped nv then
         Distributed_db.Advertise.current_head nv.chain_db block

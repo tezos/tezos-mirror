@@ -85,7 +85,7 @@ let error loc err =
     | Invalid_custom key ->
         ( "Invalid custom.",
           Format.asprintf
-            "@[<v 2>A [@profiler.custom] attribute must be a function \
+            "@[<v 2>A [@profiler.overwrite] attribute must be a function \
              application.@,\
              Found: @[<v 0>%a@]@."
             Key.pp

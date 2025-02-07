@@ -17,10 +17,10 @@ type action =
   | Aggregate
   | Aggregate_f
   | Aggregate_s
-  | Custom
   | Custom_f
   | Custom_s
   | Mark
+  | Overwrite
   | Record
   | Record_f
   | Record_s
