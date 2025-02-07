@@ -10,7 +10,7 @@ Octez consists of :ref:`several binaries <tezos_binaries>` (i.e., executable fil
 
 There are several options for getting the binaries, depending on how you plan to use Octez:
 
-- :ref:`installing binaries <installing_binaries>`.
+- :ref:`installing packages <installing_packages>`.
   This is the easiest way to install native binaries for the latest stable release, together with their dependencies, using a package manager.
 - :ref:`using docker images <using_docker_images>`.
   This is the easiest way to run the latest stable release of the binaries in
@@ -50,31 +50,16 @@ All our installation scenarios are tested daily, including by automated means, t
 These tests are performed by applying scenarios in several standard environments, from scratch.
 However, if you encounter problems when performing one of the installation scenarios in your own environment, you may want to take a look at :doc:`get_troubleshooting`.
 
-.. _getting_static_binaries:
-
-Getting static binaries
------------------------
-
-You can get static Linux binaries of the latest release from the
-`Octez package registry <https://gitlab.com/tezos/tezos/-/packages/>`__.
-
-This repository provides static binaries for x86_64 and arm64 architectures. Since these binaries
-are static, they can be used on any Linux distribution without any additional prerequisites.
-However, note that, by embedding all dependencies, static binary executables are typically much larger than dynamically-linked executables.
-
-For upgrading to a newer release, you just have to download and run the new
-versions of the binaries.
-
 .. _installing_packages:
 
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu or Debian, you can install the same packages as in the release page
-using ``apt`` directly from our APT repository, instead of going to the Octez
-release page as explained above.
+If you're using Ubuntu or Debian, you can install the packages
+using ``apt`` directly from our APT repository.
 
 We support the following distribution/releases:
+
 - ``debian/bookworm``
 - ``ubuntu/noble``
 - ``ubuntu/jammy``
@@ -99,12 +84,14 @@ We also maintain a separate repository for release candidates. To install
 the last release candidate simply prepend ``RC/`` to the distribution name
 as in ``export distribution=RC/debian``
 
-Then, to install the binaries, run the following commands:
+Then, to install the binaries, run the following command to install the octez-baker and all its dependencies:
 
-.. literalinclude:: install-bin-deb.sh
-   :language: shell
-   :start-after: [install tezos]
-   :end-before: [install octez additional packages]
+::
+
+  sudo apt install octez-baker
+
+Once the Octez binary packages are installed, they can be set up as services
+as explained in :doc:`./services`.
 
 To remove the Octez packages you can simply run the following command.
 
@@ -112,45 +99,6 @@ To remove the Octez packages you can simply run the following command.
    :language: shell
    :start-after: [test autopurge]
    :end-before: [check autopurge]
-
-Also there are some experimental packages:
-
-- ``octez-experimental`` - binaries that are considered experimental including
-  the Alpha baker
-- ``octez-evm-node`` - the EVM endpoint node for Etherlink
-
-The packages are set up to run under a dedicated user. The ``octez-node``,
-``octez-baker`` and ``octez-smartrollup`` packages use a user and group called
-tezos. The ``octez-signer`` package uses a user and group called tzsigner. It’s
-possible to configure the software to use a different user (even root).
-
-The documentation for these packages, originally developed by Chris Pinnock,
-can be found here: https://chrispinnock.com/tezos/packages/
-
-.. _new_packages:
-
-New set of Debian packages
-""""""""""""""""""""""""""
-
-
-We are developing a new set of Octez Debian packages. They are distributed with latest Octez releases for testing purposes only, and should be considered experimental.
-
-You can use them to test new packaging features, compatibility and integration with other software and :doc:`share your feedback with us <../developer/contributing>`.
-
-These will eventually replace the Debian packages mentioned above.
-
-The new set of packages can be installed by adding the following apt repository::
-
-  export distribution=next/debian
-  export release=bookworm
-
-.. literalinclude:: install-bin-deb.sh
-   :language: shell
-   :start-after: [add repository]
-   :end-before: [end add repository]
-
-Once the Octez binary packages are installed, they can be set up as services
-as explained in :doc:`./services`.
 
 If migrating from Serokell packages you can check out migration documentation
 :doc:`./serokell`.
@@ -171,6 +119,21 @@ packages and repeat the installation.
 For example using ``yum``::
 
     yum install ./octez-client-19.1-1.x86_64.rpm
+
+.. _getting_static_binaries:
+
+Getting static binaries
+-----------------------
+
+You can get static Linux binaries of the latest release from the
+`Octez package registry <https://gitlab.com/tezos/tezos/-/packages/>`__.
+
+This repository provides static binaries for x86_64 and arm64 architectures. Since these binaries
+are static, they can be used on any Linux distribution without any additional prerequisites.
+However, note that, by embedding all dependencies, static binary executables are typically much larger than dynamically-linked executables.
+
+For upgrading to a newer release, you just have to download and run the new
+versions of the binaries.
 
 .. _using_docker_images:
 
