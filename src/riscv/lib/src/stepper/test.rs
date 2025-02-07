@@ -85,7 +85,7 @@ pub struct TestStepper<
     posix_state: PosixState<Owned>,
 }
 
-impl<ML: MainMemoryLayout> TestStepper<ML> {
+impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts, B> {
     /// Initialise an interpreter with a given `program`, starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]

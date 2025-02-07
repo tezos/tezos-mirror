@@ -6,6 +6,7 @@ use super::Pvm;
 use crate::{
     machine_state::{
         CacheLayouts, MachineCoreState, MachineError, MachineState,
+        block_cache::bcall::Block,
         main_memory::{Address, MainMemoryLayout},
         mode::Mode,
         registers,
@@ -90,7 +91,9 @@ enum AuxVectorKey {
     ProgramHeadersPtr = 3,
 }
 
-impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL, M> {
+impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase>
+    MachineState<ML, CL, B, M>
+{
     /// Add data to the stack, returning the updated stack pointer.
     fn push_stack(&mut self, align: u64, data: impl AsRef<[u8]>) -> Result<Address, MachineError>
     where
