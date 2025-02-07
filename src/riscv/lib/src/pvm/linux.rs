@@ -54,6 +54,15 @@ const RLIMIT_NOFILE: u64 = 512;
 enum AuxVectorKey {
     /// [AT_PAGESZ](https://github.com/torvalds/linux/blob/bb066fe812d6fb3a9d01c073d9f1e2fd5a63403b/include/uapi/linux/auxvec.h#L15)
     PageSize = 6,
+
+    /// [AT_PHNUM](https://github.com/torvalds/linux/blob/bb066fe812d6fb3a9d01c073d9f1e2fd5a63403b/include/uapi/linux/auxvec.h#L14)
+    NumProgramHeaders = 5,
+
+    /// [AT_PHENT](https://github.com/torvalds/linux/blob/bb066fe812d6fb3a9d01c073d9f1e2fd5a63403b/include/uapi/linux/auxvec.h#L13)
+    ProgramHeaderSize = 4,
+
+    /// [AT_PHDR](https://github.com/torvalds/linux/blob/bb066fe812d6fb3a9d01c073d9f1e2fd5a63403b/include/uapi/linux/auxvec.h#L12)
+    ProgramHeadersPtr = 3,
 }
 
 impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL, M> {
@@ -171,6 +180,17 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL
 
         // Auxiliary values vector
         let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE)];
+
+        // If program headers are available, then we should inform the supervised process of them
+        if let Some(prog_headers) = &program.program_headers {
+            // Program headers are an array of a C struct. The struct for 64-bit ELF requires 8
+            // byte alignment.
+            let prog_headers_ptr = self.push_stack(8, prog_headers.contents)?;
+
+            auxv.push((AuxVectorKey::NumProgramHeaders, prog_headers.num_entries));
+            auxv.push((AuxVectorKey::ProgramHeaderSize, prog_headers.entry_size));
+            auxv.push((AuxVectorKey::ProgramHeadersPtr, prog_headers_ptr));
+        }
 
         self.init_linux_stack(&[c"tezos-smart-rollup"], &[], &auxv)?;
 
