@@ -1548,7 +1548,6 @@ let run ~data_dir ~configuration_override =
       profile_ctxt
       cryptobox
       shards_proofs_precomputation
-      proto_parameters
       proto_plugins
       store
       gs_worker
