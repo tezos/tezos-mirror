@@ -16,7 +16,7 @@ use crate::{
 };
 
 impl Instruction {
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Add` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Add`].
     pub(crate) fn new_add(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -35,7 +35,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Mv` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Mv`].
     pub(crate) fn new_mv(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Mv,
@@ -51,7 +51,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Li` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Li`].
     pub(crate) fn new_li(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Li,
@@ -68,7 +68,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Nop` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for  [`OpCode::Nop`].
     pub(crate) fn new_nop(width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Nop,
@@ -84,7 +84,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Addi` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Addi`].
     pub(crate) fn new_addi(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -106,7 +106,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Andi` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Andi`].
     pub(crate) fn new_andi(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -128,7 +128,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Ori` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ori`].
     pub(crate) fn new_ori(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -150,7 +150,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Xori` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Xori`].
     pub(crate) fn new_xori(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -172,7 +172,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the  [`OpCode::Slli`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Slli`].
     pub(crate) fn new_slli(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -194,7 +194,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for  [`OpCode::And`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::And`].
     pub(crate) fn new_and(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -213,7 +213,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Or`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Or`].
     pub(crate) fn new_or(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -232,7 +232,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Xor`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Xor`].
     pub(crate) fn new_xor(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
