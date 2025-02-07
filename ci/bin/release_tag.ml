@@ -175,6 +175,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
         job_build_debian_package_current_b ) =
     Debian_repository.jobs Release
   in
+  let jobs_dnf_repository = Rpm_repository.jobs Release in
   let job_gitlab_release_or_publish =
     let dependencies =
       Dependent
@@ -260,7 +261,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_gitlab_release_or_publish;
     job_trigger_monitoring;
   ]
-  @ jobs_debian_repository
+  @ jobs_debian_repository @ jobs_dnf_repository
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
