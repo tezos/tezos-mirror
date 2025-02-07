@@ -675,6 +675,20 @@ macro_rules! impl_r_type {
         }
     };
 
+    ($fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart
+                .xregisters
+                .$fn(self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
+            Ok(Next(self.width))
+        }
+    };
+
     ($fn: ident, non_zero_rd) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
@@ -1068,7 +1082,7 @@ impl Args {
     impl_r_type!(run_sub, non_zero_rd);
     impl_r_type!(run_xor, non_zero_rd);
     impl_r_type!(run_or, non_zero_rd);
-    impl_r_type!(run_and, non_zero_rd);
+    impl_r_type!(run_and, non_zero);
     impl_r_type!(run_sll, non_zero_rd);
     impl_r_type!(run_srl, non_zero_rd);
     impl_r_type!(run_sra, non_zero_rd);
@@ -1357,10 +1371,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Or,
                 args: args.into(),
             },
-            InstrCacheable::And(args) => Instruction {
-                opcode: OpCode::And,
-                args: args.into(),
-            },
+            InstrCacheable::And(args) => Instruction::from_ic_and(args),
             InstrCacheable::Sll(args) => Instruction {
                 opcode: OpCode::Sll,
                 args: args.into(),

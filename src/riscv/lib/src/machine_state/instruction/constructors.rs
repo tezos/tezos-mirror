@@ -15,7 +15,7 @@ use crate::{
 };
 
 impl Instruction {
-    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Add` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the [`OpCode::Add`].
     pub(crate) fn new_add(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -34,7 +34,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Mv` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the [`OpCode::Mv`].
     pub(crate) fn new_mv(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Mv,
@@ -50,7 +50,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Li` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the  [`OpCode::Li`].
     pub(crate) fn new_li(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Li,
@@ -67,7 +67,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Nop` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the  [`OpCode::Nop`].
     pub(crate) fn new_nop(width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Nop,
@@ -171,7 +171,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the `Slli` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the  [`OpCode::Slli`].
     pub(crate) fn new_slli(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -187,6 +187,25 @@ impl Instruction {
                 // to be explicit that it is of NonZeroXRegister type.
                 rs2: NonZeroXRegister::x1.into(),
                 imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for  [`OpCode::And`].
+    pub(crate) fn new_and(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::And,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
                 width,
                 ..Args::DEFAULT
             },
@@ -287,6 +306,18 @@ impl Instruction {
             X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
             X::NonZero(rs1) => {
                 Instruction::new_slli(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::And`] according to whether register is non-zero.
+    pub(super) fn from_ic_and(args: &NonZeroRdRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // Bitwise AND with zero is zero: `x & 0 == 0`
+            (X::X0, _) | (_, X::X0) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_and(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }

@@ -86,11 +86,12 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `AND` R-type instruction
+    /// Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
     ///
-    /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
-    pub fn run_and(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        let result = self.read(rs1) & self.read(rs2);
+    /// Relevant RISC-V opcodes:
+    /// - `AND`
+    pub fn run_and(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
+        let result = self.read_nz(rs1) & self.read_nz(rs2);
         self.write_nz(rd, result)
     }
 
@@ -627,7 +628,7 @@ mod tests {
 
             state.write(a0, v1);
             state.write(t3, v2);
-            state.run_and(t3, a0, nz::a1);
+            state.run_and(nz::t3, nz::a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1 & v2);
 
             state.write(a0, v1);
@@ -642,7 +643,7 @@ mod tests {
 
             // Same register
             state.write(a0, v1);
-            state.run_and(a0, a0, nz::a1);
+            state.run_and(nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1);
             state.run_or(a0, a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1);
