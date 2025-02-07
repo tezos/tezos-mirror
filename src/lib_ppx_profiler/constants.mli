@@ -47,12 +47,6 @@ val aggregate_f_constant : t
 (** Constant representing [@profiler.aggregate_s] *)
 val aggregate_s_constant : t
 
-(** Constant representing [@profiler.custom_f] *)
-val custom_f_constant : t
-
-(** Constant representing [@profiler.custom_s] *)
-val custom_s_constant : t
-
 (** Constant representing [@profiler.mark] *)
 val mark_constant : t
 
@@ -85,3 +79,9 @@ val stamp_constant : t
 
 (** Constant representing [@profiler.stop] *)
 val stop_constant : t
+
+(** Constant representing [@profiler.wrap_f] *)
+val wrap_f_constant : t
+
+(** Constant representing [@profiler.wrap_s] *)
+val wrap_s_constant : t

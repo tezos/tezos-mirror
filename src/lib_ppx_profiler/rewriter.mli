@@ -17,8 +17,6 @@ type action =
   | Aggregate
   | Aggregate_f
   | Aggregate_s
-  | Custom_f
-  | Custom_s
   | Mark
   | Overwrite
   | Record
@@ -30,6 +28,8 @@ type action =
   | Span_s
   | Stamp
   | Stop
+  | Wrap_f
+  | Wrap_s
 
 type t = {key : Key.t; action : action; location : Ppxlib.location}
 

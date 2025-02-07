@@ -124,7 +124,7 @@ let rewrite rewriters t =
             rewriter.key
           (* Custom functions *)
       | Rewriter.Overwrite -> replace_expr_with loc rewriter.key
-      | Rewriter.Custom_f | Rewriter.Custom_s ->
+      | Rewriter.Wrap_f | Rewriter.Wrap_s ->
           add_wrapping_custom_function expr loc rewriter.key)
     t
     rewriters

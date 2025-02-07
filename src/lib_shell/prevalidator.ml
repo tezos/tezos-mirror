@@ -590,7 +590,7 @@ module Make_s
           pv_shell
           advertisable_mempool
         [@profiler.aggregate_f {verbosity = Debug} "advertise mempool"]
-        [@profiler.custom_f
+        [@profiler.wrap_f
           {driver_ids = [Opentelemetry]}
             (Opentelemetry_profiler.trace "advertise mempool")] ;
       if Mempool.is_empty validated_mempool then Lwt.return_unit
@@ -1524,7 +1524,7 @@ module Make
             pv
             ~force
             op
-          [@profiler.custom_f
+          [@profiler.wrap_f
             {driver_ids = [Opentelemetry]}
               (Opentelemetry_profiler.trace_operation
                  (`Operation op)
@@ -1538,7 +1538,7 @@ module Make
             op
           [@profiler.aggregate_s
             {verbosity = Notice; metadata = [("prometheus", "")]} "on_arrived"]
-          [@profiler.custom_s
+          [@profiler.wrap_s
             Opentelemetry_profiler.trace_operation (`Hash oph) "on_arrived"]
       | Request.Advertise ->
           Requests.on_advertise

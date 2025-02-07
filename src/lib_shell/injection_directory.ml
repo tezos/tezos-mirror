@@ -57,7 +57,7 @@ let inject_operation validator ~force ?chain bytes =
            ~force
            ?chain_id
            op
-         [@profiler.custom_f
+         [@profiler.wrap_f
            {driver_ids = [Opentelemetry]}
              (Opentelemetry_profiler.trace_operation
                 (`Operation op)

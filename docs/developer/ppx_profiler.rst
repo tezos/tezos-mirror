@@ -162,7 +162,7 @@ If you want to write a custom function that will use the intial value instead
 of simply removing it from the code, there are two functions that allow you
 to use a wrapper.
 
-Both ``profiler.custom_f`` and ``profiler.custom_s`` (the ``Lwt.t`` variant)
+Both ``profiler.wrap_f`` and ``profiler.wrap_s`` (the ``Lwt.t`` variant)
 allow you to wrap a delayed version of the initial value (using
 ``fun () -> ...``) with a custom function.
 
@@ -171,7 +171,7 @@ This will rewrite
 .. code-block:: OCaml
 
    let wrapper expr = do_something (); expr ()
-   let _ = expr [@profiler.custom_f wrapper]
+   let _ = expr [@profiler.wrap_f wrapper]
    ...
 
 into

@@ -704,7 +704,7 @@ struct
                | Error errs ->
                    let* () = Worker_events.(emit crashed) errs in
                    close handlers w (Some errs)))
-          [@profiler.custom_f
+          [@profiler.wrap_f
             {driver_ids = [Opentelemetry]}
               (Tezos_profiler_backend.Opentelemetry_profiler.update_scope
                  _scope)])
