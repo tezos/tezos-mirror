@@ -1,5 +1,13 @@
 # Changelog
 
+## Version NEXT
+
+### Features
+
+### Bug fixes
+
+### Internal
+
 ## Next proposal
 
 This is a release candidate for a kernel upgrade proposal.
