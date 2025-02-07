@@ -335,7 +335,6 @@ pub enum OpCode {
     CJr,
     CJalr,
     CLui,
-    CAnd,
     COr,
     CXor,
     CSub,
@@ -540,7 +539,6 @@ impl OpCode {
             Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
             Self::Mv => Args::run_mv,
-            Self::CAnd => Args::run_cand,
             Self::COr => Args::run_cor,
             Self::CXor => Args::run_cxor,
             Self::CSub => Args::run_csub,
@@ -1294,7 +1292,6 @@ impl Args {
     impl_cb_type!(run_bnez);
     impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
-    impl_cr_type!(run_cand);
     impl_cr_type!(run_cxor);
     impl_cr_type!(run_cor);
     impl_cr_type!(run_csub);
@@ -2037,10 +2034,7 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::CAdd(args) => {
                 Instruction::new_add(args.rd_rs1, args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
-            InstrCacheable::CAnd(args) => Instruction {
-                opcode: OpCode::CAnd,
-                args: args.into(),
-            },
+            InstrCacheable::CAnd(args) => Instruction::from_ic_cand(args),
             InstrCacheable::CXor(args) => Instruction {
                 opcode: OpCode::CXor,
                 args: args.into(),

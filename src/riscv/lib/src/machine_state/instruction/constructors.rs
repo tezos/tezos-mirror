@@ -8,7 +8,8 @@ use crate::{
     machine_state::registers::{nz, NonZeroXRegister},
     parser::{
         instruction::{
-            CIBTypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs, SplitITypeArgs,
+            CIBTypeArgs, CRTypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
+            SplitITypeArgs,
         },
         split_x0, XRegisterParsed,
     },
@@ -318,6 +319,19 @@ impl Instruction {
             (X::X0, _) | (_, X::X0) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
             (X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_and(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CAnd`] according to whether register is non-zero.
+    pub(super) fn from_ic_cand(args: &CRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd_rs1), split_x0(args.rs2)) {
+            (X::X0, _) => Instruction::new_nop(InstrWidth::Compressed),
+            // Bitwise AND with zero is zero: `x & 0 == 0`
+            (X::NonZero(rd_rs1), X::X0) => Instruction::new_li(rd_rs1, 0, InstrWidth::Compressed),
+            (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
+                Instruction::new_and(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
             }
         }
     }

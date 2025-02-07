@@ -90,6 +90,7 @@ where
     ///
     /// Relevant RISC-V opcodes:
     /// - `AND`
+    /// - `C.AND`
     pub fn run_and(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         let result = self.read_nz(rs1) & self.read_nz(rs2);
         self.write_nz(rd, result)
