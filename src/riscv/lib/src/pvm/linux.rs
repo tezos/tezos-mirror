@@ -14,7 +14,7 @@ use crate::{
         ManagerReadWrite, ManagerWrite, Ref,
     },
 };
-use std::ffi::CStr;
+use std::{ffi::CStr, num::NonZeroU64};
 
 /// Size of a memory page in bytes
 pub const PAGE_SIZE: u64 = 4096;
@@ -39,6 +39,9 @@ const PPOLL: u64 = 73;
 
 /// System call number for `set_tid_address` on RISC-V
 const SET_TID_ADDRESS: u64 = 96;
+
+/// System call number for `rt_sigaction` on RISC-V
+const RT_SIGACTION: u64 = 134;
 
 /// Hard limit on the number of file descriptors that a system call can work with
 ///
@@ -202,6 +205,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         match system_call_no {
             PPOLL => return self.handle_ppoll(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
+            RT_SIGACTION => return self.handle_rt_sigaction(core),
             _ => {}
         }
 
@@ -224,7 +228,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
     /// Handle `set_tid_address` system call.
     ///
-    /// See: https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html
+    /// See: <https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html>
     fn handle_set_tid_address(
         &mut self,
         core: &mut MachineCoreState<impl MainMemoryLayout, M>,
@@ -251,7 +255,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// standard library's initialisation code. It supports only very basic functionality. For
     /// example, the `timeout` parameter is ignored entirely.
     ///
-    /// See: https://man7.org/linux/man-pages/man2/poll.2.html
+    /// See: <https://man7.org/linux/man-pages/man2/poll.2.html>
     fn handle_ppoll(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
     where
         M: ManagerRead + ManagerWrite,
@@ -321,6 +325,44 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         true
     }
+
+    /// Handle `rt_sigaction` system call. This does nothing effectively. It does not support
+    /// retrieving the previous handler for a signal - it just zeroes out the memory.
+    ///
+    /// See: <https://www.man7.org/linux/man-pages/man2/rt_sigaction.2.html>
+    fn handle_rt_sigaction(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    where
+        M: ManagerRead + ManagerWrite,
+    {
+        let old_action = core.hart.xregisters.read(registers::a2);
+        let sigset_t_size = core.hart.xregisters.read(registers::a3);
+
+        // As we're implementing a 64-bit system, the size of `sigset_t` must be 8 bytes.
+        // This is an assumption which is used in the remainder of the function body.
+        if sigset_t_size != 8 {
+            core.hart.xregisters.write(registers::a0, -ENOSYS as u64);
+            return true;
+        }
+
+        /// `sizeof(struct sigaction)` on the Kernel side
+        const SIZE_SIGACTION: usize = 32;
+
+        if let Some(old_action) = NonZeroU64::new(old_action) {
+            // As we don't store the previous signal handler, we just zero out the memory
+            let Ok(()) = core
+                .main_memory
+                .write(old_action.get(), [0u8; SIZE_SIGACTION])
+            else {
+                core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+                return true;
+            };
+        }
+
+        // Return 0 as an indicator of success
+        core.hart.xregisters.write(registers::a0, 0);
+
+        true
+    }
 }
 
 impl<M: ManagerClone> Clone for SupervisorState<M> {
@@ -338,6 +380,7 @@ mod tests {
         backend_test, create_state, machine_state::MachineCoreStateLayout, state_backend::DynArray,
     };
     use rand::Rng;
+    use std::array;
 
     // Check that the `set_tid_address` system call is working correctly.
     backend_test!(set_tid_address, F, {
@@ -417,5 +460,52 @@ mod tests {
                 .unwrap();
             assert_eq!(revents, 0);
         }
+    });
+
+    // Check that the `rt_sigaction` system call is working correctly for a basic case.
+    backend_test!(rt_sigaction_no_handler, F, {
+        const MEM_BYTES: usize = 1024;
+        type MemLayout = DynArray<MEM_BYTES>;
+
+        let mut machine_state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<MemLayout>,
+            F,
+            MemLayout
+        );
+        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+
+        // System call number
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a7, RT_SIGACTION);
+
+        // Signal is SIGPIPE
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a0, 13i32 as u64);
+
+        // New handler is located at this address
+        machine_state.hart.xregisters.write(registers::a1, 0x20);
+
+        // Old handler will be written to this address
+        machine_state.hart.xregisters.write(registers::a2, 0x40);
+        machine_state
+            .main_memory
+            .write(0x40, array::from_fn::<u8, 32, _>(|i| i as u8))
+            .unwrap();
+
+        // Size of sigset_t
+        machine_state.hart.xregisters.write(registers::a3, 8);
+
+        // Perform the system call
+        let result = supervisor_state.handle_system_call(&mut machine_state);
+        assert!(result);
+
+        // Check if the location where the old handler was is now zeroed out
+        let old_action = machine_state.main_memory.read::<[u8; 32]>(0x40).unwrap();
+        assert_eq!(old_action, [0u8; 32]);
     });
 }
