@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -208,6 +209,59 @@ let prepare_installer_kernel_with_arbitrary_file ?output
       | `Filename -> output);
     root_hash;
   }
+
+(* This function takes a path and retrieve the name of the file without
+   all the dir and the extension *)
+let name_of_file path = Filename.(remove_extension (basename path))
+
+let merge_setup_files ?smart_rollup_installer_path ?runner ?output configs =
+  let open Tezt.Base in
+  let open Lwt.Syntax in
+  let output =
+    match output with
+    | None ->
+        Temp.file (String.concat "_" (List.map name_of_file configs) ^ ".yaml")
+    | Some output -> output
+  in
+  let* process =
+    let smart_rollup_installer_path =
+      match smart_rollup_installer_path with
+      | None -> project_root // Uses.path Constant.smart_rollup_installer
+      | Some path -> path
+    in
+    Process.spawn
+      ?runner
+      ~name:output
+      smart_rollup_installer_path
+      (["merge-setup-files"; "--output"; output; "--setup-files"] @ configs)
+    |> Lwt.return
+  in
+  let+ () = Runnable.run @@ Runnable.{value = process; run = Process.check} in
+  output
+
+let prepare_installer_kernel_with_multiple_setup_file ?output
+    ?smart_rollup_installer_path ?runner ?boot_sector ~preimages_dir ?configs
+    installee =
+  let open Tezt.Base in
+  let open Lwt.Syntax in
+  let* config =
+    match configs with
+    | None -> return None
+    | Some [config] -> return (Some (`Path config))
+    | Some configs ->
+        let+ output =
+          merge_setup_files ?smart_rollup_installer_path ?runner configs
+        in
+        Some (`Path output)
+  in
+  prepare_installer_kernel_with_arbitrary_file
+    ?output
+    ?smart_rollup_installer_path
+    ?runner
+    ?boot_sector
+    ~preimages_dir
+    ?config
+    installee
 
 let prepare_installer_kernel ?output ?runner ~preimages_dir ?config installee =
   prepare_installer_kernel_with_arbitrary_file
