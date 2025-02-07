@@ -22,6 +22,7 @@ use gdbstub::target::ext::breakpoints::{
 use gdbstub::target::ext::exec_file::ExecFile;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
+use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::stepper::pvm::PvmStepper;
 use octez_riscv::stepper::{StepResult, Stepper, StepperStatus};
@@ -57,6 +58,7 @@ pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {
         PvmHooks::default(),
         [0; 20],
         0,
+        InterpretedBlockBuilder,
     )?;
 
     // loop

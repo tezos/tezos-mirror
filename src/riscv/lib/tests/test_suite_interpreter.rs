@@ -6,6 +6,7 @@
 use goldenfile::Mint;
 use octez_riscv::{
     machine_state::{
+        block_cache::bcall::InterpretedBlockBuilder,
         main_memory::M1M,
         mode::Mode,
         registers::{XRegister, XValue, gp},
@@ -46,8 +47,11 @@ fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegis
     let mut golden = mint.new_goldenfile(format!("{path}.out")).unwrap();
 
     let contents = fs::read(format!("{TESTS_DIR}/{path}")).expect("Failed to read binary");
+
+    let block_builder = InterpretedBlockBuilder;
+
     let mut interpreter: TestStepper<M1M> =
-        TestStepper::new(&contents, None, exit_mode).expect("Boot failed");
+        TestStepper::new(&contents, None, exit_mode, block_builder).expect("Boot failed");
 
     let res = interpreter.step_max(Bound::Included(MAX_STEPS));
     // Record the result to compare to the expected result

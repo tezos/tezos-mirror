@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
-    machine_state::{DefaultCacheLayouts, main_memory::M64M},
+    machine_state::{
+        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, main_memory::M64M,
+    },
     pvm::PvmHooks,
     stepper::pvm::PvmStepper,
 };
@@ -28,6 +30,8 @@ pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultC
 
     move || {
         let hooks = PvmHooks::none();
+        let block_builder = InterpretedBlockBuilder;
+
         PvmStepper::<'_, M64M, _>::new(
             &boot_program,
             Some(&main_program),
@@ -35,6 +39,7 @@ pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultC
             hooks,
             address,
             1,
+            block_builder,
         )
         .unwrap()
     }

@@ -74,9 +74,10 @@
 //!
 //! # Dispatch
 //!
-//! The block cache uses the [`EnrichedCell`] mechanism, in order to dispatch
-//! opcode to function statically during block construction. This saves time over
-//! dispatching on every 'instruction run'. See [`ICall`] for more information.
+//! The method of dispatch for Blocks can be one of several mechanisms, the current
+//! default being [`Interpreted`].
+//!
+//! [`Interpreted`]: bcall::Interpreted
 
 pub mod bcall;
 
@@ -390,6 +391,7 @@ pub trait BlockCacheLayout: state_backend::CommitmentLayout + state_backend::Pro
 
     fn bind<B: Block<Self::MainMemoryLayout, M>, M: state_backend::ManagerBase>(
         space: state_backend::AllocatedOf<Self, M>,
+        block_builder: B::BlockBuilder,
     ) -> BlockCache<Self, B, Self::MainMemoryLayout, M>
     where
         Self: Sized;
@@ -445,6 +447,7 @@ impl<ML: MainMemoryLayout, const BITS: usize, const SIZE: usize> BlockCacheLayou
 
     fn bind<B: Block<Self::MainMemoryLayout, M>, M: ManagerBase>(
         space: AllocatedOf<Self, M>,
+        block_builder: B::BlockBuilder,
     ) -> BlockCache<Self, B, Self::MainMemoryLayout, M> {
         BlockCache {
             current_block_addr: space.0,
@@ -454,11 +457,12 @@ impl<ML: MainMemoryLayout, const BITS: usize, const SIZE: usize> BlockCacheLayou
             entries: space
                 .4
                 .into_iter()
-                .map(Cached::bind)
+                .map(|c| Cached::bind(c))
                 .collect::<Vec<_>>()
                 .try_into()
                 .map_err(|_| "mismatching vector lengths for instruction cache")
                 .unwrap(),
+            block_builder,
         }
     }
 
@@ -528,6 +532,7 @@ pub struct BlockCache<
     fence_counter: Cell<FenceCounter, M>,
     partial_block: PartialBlock<M>,
     entries: BCL::Entries<B, M>,
+    block_builder: B::BlockBuilder,
 }
 
 impl<
@@ -537,9 +542,11 @@ impl<
     M: ManagerBase,
 > BlockCache<BCL, B, ML, M>
 {
-    /// Bind the block cache to the given allocated state.
-    pub fn bind(space: AllocatedOf<BCL, M>) -> Self {
-        BCL::bind(space)
+    /// Bind the block cache to the given allocated state and the given [block builder].
+    ///
+    /// [block builder]: Block::BlockBuilder
+    pub fn bind(space: AllocatedOf<BCL, M>, block_builder: B::BlockBuilder) -> Self {
+        BCL::bind(space, block_builder)
     }
 
     /// Invalidate all entries in the block cache.
@@ -587,7 +594,7 @@ impl<
         // as we cannot allow blocks to cross page boundaries.
         if phys_addr & PAGE_OFFSET_MASK as u64 == 0 || phys_addr != next_addr {
             let previous = BCL::entry_mut(&mut self.entries, self.current_block_addr.read());
-            previous.block.complete_block();
+            previous.block.complete_block(&mut self.block_builder);
 
             self.reset_to(phys_addr);
         }
@@ -618,7 +625,7 @@ impl<
         // as we cannot allow blocks to cross page boundaries.
         if phys_addr & PAGE_OFFSET_MASK as u64 == 0 || phys_addr != next_addr {
             let previous = BCL::entry_mut(&mut self.entries, self.current_block_addr.read());
-            previous.block.complete_block();
+            previous.block.complete_block(&mut self.block_builder);
 
             self.reset_to(phys_addr);
         }
@@ -660,7 +667,7 @@ impl<
             len_instr = 0;
         } else if len_instr == CACHE_INSTR {
             // complete previous block
-            entry.block.complete_block();
+            entry.block.complete_block(&mut self.block_builder);
 
             // The current block is full, start a new one
             self.reset_to(phys_addr);
@@ -700,7 +707,7 @@ impl<
             self.current_block_addr.write(!0);
 
             let current_entry = BCL::entry_mut(&mut self.entries, block_addr);
-            current_entry.block.complete_block();
+            current_entry.block.complete_block(&mut self.block_builder);
         }
     }
 
@@ -870,6 +877,7 @@ impl<
             next_instr_addr: self.next_instr_addr.clone(),
             partial_block: self.partial_block.clone(),
             entries: BCL::clone_entries(&self.entries),
+            block_builder: Default::default(),
         }
     }
 }
@@ -897,7 +905,7 @@ mod tests {
             MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
             TestCacheLayouts,
             address_translation::PAGE_SIZE,
-            block_cache::bcall::Interpreted,
+            block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
             instruction::{
                 Instruction, OpCode,
                 tagged_instruction::{TaggedArgs, TaggedInstruction, TaggedRegister},
@@ -913,7 +921,7 @@ mod tests {
 
     // writing CACHE_INSTR to the block cache creates new block
     backend_test!(test_writing_full_block_fetchable_uncompressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
@@ -939,7 +947,7 @@ mod tests {
     });
 
     backend_test!(test_writing_full_block_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -967,7 +975,7 @@ mod tests {
 
     // writing instructions immediately creates block
     backend_test!(test_writing_half_block_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -994,7 +1002,7 @@ mod tests {
     });
 
     backend_test!(test_writing_two_blocks_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -1026,7 +1034,7 @@ mod tests {
 
     // writing across pages offset two blocks next to each other
     backend_test!(test_crossing_page_exactly_creates_new_block, F, {
-        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -1058,7 +1066,7 @@ mod tests {
 
     backend_test!(test_partial_block_executes, F, {
         let mut core_state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let mut block_state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut block_state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let addiw = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Addiw,
@@ -1130,7 +1138,7 @@ mod tests {
     });
 
     backend_test!(test_concat_blocks_suitable, F, {
-        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
@@ -1168,7 +1176,7 @@ mod tests {
     });
 
     backend_test!(test_concat_blocks_too_big, F, {
-        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K);
+        let mut state = create_state!(BlockCache, TestLayout<T1K>, F, TestLayout<T1K>, Interpreted<T1K, F::Manager>, T1K, || InterpretedBlockBuilder);
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
@@ -1260,7 +1268,7 @@ mod tests {
         };
 
         let mut block: BlockCache<Layout, Interpreted<T1K, Owned>, T1K, Owned> =
-            BlockCache::bind(Owned::allocate::<Layout>());
+            BlockCache::bind(Owned::allocate::<Layout>(), InterpretedBlockBuilder);
 
         // The initial block cache should not return any blocks.
         check_block(&mut block);
@@ -1289,7 +1297,7 @@ mod tests {
         type StateLayout = MachineStateLayout<T1K, TestCacheLayouts>;
 
         let mut state: MachineState<T1K, TestCacheLayouts, Interpreted<T1K, Owned>, Owned> =
-            MachineState::bind(Owned::allocate::<StateLayout>());
+            MachineState::bind(Owned::allocate::<StateLayout>(), InterpretedBlockBuilder);
 
         // Encoding of ECALL instruction
         const ECALL: u32 = 0b1110011;

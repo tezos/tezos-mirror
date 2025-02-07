@@ -5,7 +5,10 @@
 
 use crate::{
     machine_state::{
-        TestCacheLayouts, block_cache::bcall::Interpreted, main_memory::M64M, mode::Mode,
+        TestCacheLayouts,
+        block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
+        main_memory::M64M,
+        mode::Mode,
     },
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
@@ -41,7 +44,7 @@ pub struct State<M: state_backend::ManagerBase> {
 impl<M: state_backend::ManagerBase> State<M> {
     pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
         Self {
-            pvm: Pvm::<M64M, _, _, M>::bind(space.0),
+            pvm: Pvm::<M64M, _, _, M>::bind(space.0, InterpretedBlockBuilder),
             level_is_set: space.1,
             level: space.2,
             message_counter: space.3,

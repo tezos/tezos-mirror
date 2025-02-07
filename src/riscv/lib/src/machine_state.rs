@@ -238,11 +238,16 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
 impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: backend::ManagerBase>
     MachineState<ML, CL, B, M>
 {
-    /// Bind the machine state to the given allocated space.
-    pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML, CL>, M>) -> Self {
+    /// Bind the block cache to the given allocated state and the given [block builder].
+    ///
+    /// [block builder]: Block::BlockBuilder
+    pub fn bind(
+        space: backend::AllocatedOf<MachineStateLayout<ML, CL>, M>,
+        block_builder: B::BlockBuilder,
+    ) -> Self {
         Self {
             core: MachineCoreState::bind(space.0),
-            block_cache: BlockCache::bind(space.1),
+            block_cache: BlockCache::bind(space.1, block_builder),
         }
     }
 
@@ -661,7 +666,7 @@ pub enum MachineError {
 mod tests {
     use super::{
         MachineState, MachineStateLayout,
-        block_cache::bcall::Interpreted,
+        block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
         instruction::{
             Instruction, OpCode,
             tagged_instruction::{TaggedArgs, TaggedInstruction, TaggedRegister},
@@ -713,7 +718,7 @@ mod tests {
             F, 
             T1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>);
+            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -767,7 +772,7 @@ mod tests {
             F, 
             T1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>);
+            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -810,7 +815,7 @@ mod tests {
             F, 
             T1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>);
+            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -860,7 +865,7 @@ mod tests {
             F, 
             T1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>);
+            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -947,7 +952,8 @@ mod tests {
                 F,
                 M1K,
                 TestCacheLayouts,
-                BlockRunner<F>
+                BlockRunner<F>,
+                || InterpretedBlockBuilder
             );
             state.reset();
 
@@ -983,9 +989,10 @@ mod tests {
 
         // Perform 2 steps consecutively in one backend.
         let state = {
-            let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
-                &base_state.struct_ref::<FnManagerIdent>(),
-            ));
+            let mut state = LocalMachineState::<F>::bind(
+                copy_via_serde::<LocalLayout, _, _>(&base_state.struct_ref::<FnManagerIdent>()),
+                InterpretedBlockBuilder,
+            );
 
             state.step().unwrap();
             state.step().unwrap();
@@ -996,17 +1003,19 @@ mod tests {
         // Perform 2 steps separately in another backend by re-binding the state between steps.
         let alt_state = {
             let alt_state = {
-                let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
-                    &base_state.struct_ref::<FnManagerIdent>(),
-                ));
+                let mut state = LocalMachineState::<F>::bind(
+                    copy_via_serde::<LocalLayout, _, _>(&base_state.struct_ref::<FnManagerIdent>()),
+                    InterpretedBlockBuilder,
+                );
                 state.step().unwrap();
                 state
             };
 
             {
-                let mut state = LocalMachineState::<F>::bind(copy_via_serde::<LocalLayout, _, _>(
-                    &alt_state.struct_ref::<FnManagerIdent>(),
-                ));
+                let mut state = LocalMachineState::<F>::bind(
+                    copy_via_serde::<LocalLayout, _, _>(&alt_state.struct_ref::<FnManagerIdent>()),
+                    InterpretedBlockBuilder,
+                );
                 state.step().unwrap();
                 state
             }
@@ -1193,7 +1202,8 @@ mod tests {
                 F,
                 M1M,
                 TestCacheLayouts,
-                BlockRunner<F>
+                BlockRunner<F>,
+                || InterpretedBlockBuilder
             );
             state.reset();
 
@@ -1230,10 +1240,10 @@ mod tests {
 
         // Run 2 steps consecutively against one backend.
         let state = {
-            let mut state: LocalMachineState<F> =
-                MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
-                    &base_state.struct_ref::<FnManagerIdent>(),
-                ));
+            let mut state: LocalMachineState<F> = MachineState::bind(
+                copy_via_serde::<LocalLayout, _, _>(&base_state.struct_ref::<FnManagerIdent>()),
+                InterpretedBlockBuilder,
+            );
 
             state.step().unwrap();
             state.step().unwrap();
@@ -1244,18 +1254,18 @@ mod tests {
         // Perform 2 steps separately in another backend by re-binding the state between steps.
         let alt_state = {
             let alt_state = {
-                let mut state: LocalMachineState<F> =
-                    MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
-                        &base_state.struct_ref::<FnManagerIdent>(),
-                    ));
+                let mut state: LocalMachineState<F> = MachineState::bind(
+                    copy_via_serde::<LocalLayout, _, _>(&base_state.struct_ref::<FnManagerIdent>()),
+                    InterpretedBlockBuilder,
+                );
                 state.step().unwrap();
                 state
             };
             {
-                let mut state: LocalMachineState<F> =
-                    MachineState::bind(copy_via_serde::<LocalLayout, _, _>(
-                        &alt_state.struct_ref::<FnManagerIdent>(),
-                    ));
+                let mut state: LocalMachineState<F> = MachineState::bind(
+                    copy_via_serde::<LocalLayout, _, _>(&alt_state.struct_ref::<FnManagerIdent>()),
+                    InterpretedBlockBuilder,
+                );
                 state.step().unwrap();
                 state
             }
@@ -1281,7 +1291,7 @@ mod tests {
             F, 
             M1M, 
             DefaultCacheLayouts, 
-            Interpreted<M1M, F::Manager>);
+            Interpreted<M1M, F::Manager>, || InterpretedBlockBuilder);
 
         let second = state.clone();
 
@@ -1298,7 +1308,7 @@ mod tests {
             F, 
             M8K, 
             DefaultCacheLayouts, 
-            Interpreted<M8K, F::Manager>);
+            Interpreted<M8K, F::Manager>, || InterpretedBlockBuilder);
 
         let uncompressed_bytes = 0x5307b3;
 
@@ -1462,7 +1472,7 @@ mod tests {
             F, 
             M8K, 
             DefaultCacheLayouts, 
-            Interpreted<M8K, F::Manager>);
+            Interpreted<M8K, F::Manager>, || InterpretedBlockBuilder);
 
         // Write the instructions to the beginning of the main memory and point the program
         // counter at the first instruction.

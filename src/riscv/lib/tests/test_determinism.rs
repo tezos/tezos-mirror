@@ -6,7 +6,9 @@ mod common;
 
 use common::*;
 use octez_riscv::{
-    machine_state::{DefaultCacheLayouts, main_memory::M64M},
+    machine_state::{
+        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, main_memory::M64M,
+    },
     pvm::PvmLayout,
     state_backend::{RefOwnedAlloc, hash},
     stepper::{Stepper, StepperStatus, pvm::PvmStepper},
@@ -77,7 +79,8 @@ fn run_steps_ladder<F>(
         );
         assert_eq_struct(&stepper_lhs.struct_ref(), &stepper_rhs.struct_ref());
 
-        stepper_lhs.rebind_via_serde();
+        let block_builder = InterpretedBlockBuilder;
+        stepper_lhs.rebind_via_serde(block_builder);
     }
 
     assert_eq_struct_wrapper(stepper_lhs.struct_ref(), expected_refs);

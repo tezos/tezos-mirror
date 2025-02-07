@@ -153,11 +153,16 @@ impl<
     M: state_backend::ManagerBase,
 > Pvm<ML, CL, B, M>
 {
-    /// Bind the PVM to the given allocated region.
-    pub fn bind(space: state_backend::AllocatedOf<PvmLayout<ML, CL>, M>) -> Self {
+    /// Bind the block cache to the given allocated state and the given [block builder].
+    ///
+    /// [block builder]: bcall::Block::BlockBuilder
+    pub fn bind(
+        space: state_backend::AllocatedOf<PvmLayout<ML, CL>, M>,
+        block_builder: B::BlockBuilder,
+    ) -> Self {
         Self {
             version: space.0,
-            machine_state: machine_state::MachineState::bind(space.1),
+            machine_state: machine_state::MachineState::bind(space.1, block_builder),
             status: space.2,
             reveal_request: RevealRequest::bind(space.3),
             #[cfg(feature = "supervisor")]
@@ -206,7 +211,10 @@ impl<
             }
         }
 
-        Pvm::bind(self.struct_ref::<ProofWrapper>())
+        Pvm::bind(
+            self.struct_ref::<ProofWrapper>(),
+            bcall::InterpretedBlockBuilder,
+        )
     }
 
     /// Reset the PVM state.
@@ -383,6 +391,7 @@ mod tests {
         backend_test, create_state,
         machine_state::{
             TestCacheLayouts,
+            block_cache::bcall::InterpretedBlockBuilder,
             main_memory::M1M,
             registers::{a0, a1, a2, a3, a6, a7},
         },
@@ -403,7 +412,7 @@ mod tests {
 
         // Setup PVM
         let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space);
+        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
         pvm.reset();
 
         let level_addr = main_memory::FIRST_ADDRESS;
@@ -507,7 +516,7 @@ mod tests {
 
         // Setup PVM
         let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space);
+        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
         pvm.reset();
 
         // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
@@ -546,7 +555,9 @@ mod tests {
         type B<F> = bcall::Interpreted<ML, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>);
+        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>, || {
+            InterpretedBlockBuilder
+        });
         pvm.reset();
 
         let input_address = main_memory::FIRST_ADDRESS;
@@ -617,7 +628,9 @@ mod tests {
         type B<F> = bcall::Interpreted<ML, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>);
+        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>, || {
+            InterpretedBlockBuilder
+        });
         pvm.reset();
 
         const OUTPUT_BUFFER_SIZE: usize = 10;
