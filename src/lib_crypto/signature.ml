@@ -52,6 +52,21 @@ module type CONV_OPT = sig
   val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t option
 
   val signature : V_from.t -> V_to.t option
+
+  val get_public_key :
+    V_from.Public_key.t -> V_to.Public_key.t Error_monad.tzresult
+
+  val get_public_key_exn : V_from.Public_key.t -> V_to.Public_key.t
+
+  val get_public_key_hash :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t Error_monad.tzresult
+
+  val get_public_key_hash_exn :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t
+
+  val get_signature : V_from.t -> V_to.t Error_monad.tzresult
+
+  val get_signature_exn : V_from.t -> V_to.t
 end
 
 module V_latest = Signature_v2
@@ -87,6 +102,54 @@ module V0 = struct
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Unknown k -> Some (Unknown k)
       | V_latest.Bls _ -> None
+
+    let get_public_key pk =
+      match public_key pk with
+      | Some pk -> Ok pk
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key from latest signature version to V0 \
+             impossible."
+
+    let get_public_key_exn pk =
+      match public_key pk with
+      | Some pk -> pk
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V0 \
+             impossible."
+
+    let get_public_key_hash pkh =
+      match public_key_hash pkh with
+      | Some pkh -> Ok pkh
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key hash from latest signature version to V0 \
+             impossible."
+
+    let get_public_key_hash_exn pkh =
+      match public_key_hash pkh with
+      | Some pkh -> pkh
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V0 \
+             impossible."
+
+    let get_signature s =
+      match signature s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of signature from latest signature version to V0 \
+             impossible."
+
+    let get_signature_exn s =
+      match signature s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of signature from latest signature version to V0 \
+             impossible."
   end
 end
 
@@ -121,6 +184,54 @@ module V1 = struct
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Unknown k -> Some (Unknown k)
       | V_latest.Bls k -> Some (Bls k)
+
+    let get_public_key pk =
+      match public_key pk with
+      | Some pk -> Ok pk
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key from latest signature version to V1 \
+             impossible."
+
+    let get_public_key_exn pk =
+      match public_key pk with
+      | Some pk -> pk
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V1 \
+             impossible."
+
+    let get_public_key_hash pkh =
+      match public_key_hash pkh with
+      | Some pkh -> Ok pkh
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key hash from latest signature version to V1 \
+             impossible."
+
+    let get_public_key_hash_exn pkh =
+      match public_key_hash pkh with
+      | Some pkh -> pkh
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V1 \
+             impossible."
+
+    let get_signature s =
+      match signature s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of signature from latest signature version to V1 \
+             impossible."
+
+    let get_signature_exn s =
+      match signature s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of signature from latest signature version to V1 \
+             impossible."
   end
 end
 
@@ -137,6 +248,54 @@ module V2 = struct
     let secret_key = Option.some
 
     let signature = Option.some
+
+    let get_public_key pk =
+      match public_key pk with
+      | Some pk -> Ok pk
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key from latest signature version to V2 \
+             impossible."
+
+    let get_public_key_exn pk =
+      match public_key pk with
+      | Some pk -> pk
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V2 \
+             impossible."
+
+    let get_public_key_hash pkh =
+      match public_key_hash pkh with
+      | Some pkh -> Ok pkh
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key hash from latest signature version to V2 \
+             impossible."
+
+    let get_public_key_hash_exn pkh =
+      match public_key_hash pkh with
+      | Some pkh -> pkh
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V2 \
+             impossible."
+
+    let get_signature s =
+      match signature s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of signature from latest signature version to V2 \
+             impossible."
+
+    let get_signature_exn s =
+      match signature s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of signature from latest signature version to V2 \
+             impossible."
   end
 end
 

@@ -57,6 +57,21 @@ module type CONV_OPT = sig
   val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t option
 
   val signature : V_from.t -> V_to.t option
+
+  val get_public_key :
+    V_from.Public_key.t -> V_to.Public_key.t Error_monad.tzresult
+
+  val get_public_key_exn : V_from.Public_key.t -> V_to.Public_key.t
+
+  val get_public_key_hash :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t Error_monad.tzresult
+
+  val get_public_key_hash_exn :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t
+
+  val get_signature : V_from.t -> V_to.t Error_monad.tzresult
+
+  val get_signature_exn : V_from.t -> V_to.t
 end
 
 (** The module [V_latest] is to be used by the shell and points to the latest
