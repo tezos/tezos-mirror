@@ -506,6 +506,8 @@ pub enum InstrCacheable {
     /// `C.OR` - Computes the bitwise OR of the values in registers `rd_rs1` and `rs2`,
     /// then writes the result back to register `rd_rs1`.
     COr(CRTypeArgs),
+    /// `C.XOR` - Computes the bitwise XOR of the values in registers `rd_rs1` and `rs2`,
+    /// then writes the result back to register rd `rd_rs1`.
     CXor(CRTypeArgs),
     CSub(CRTypeArgs),
     CAddw(CRTypeArgs),

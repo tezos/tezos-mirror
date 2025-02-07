@@ -110,6 +110,7 @@ where
     ///
     /// Relevant RISC-V opcodes:
     /// - `XOR`
+    /// - `C.XOR`
     pub fn run_xor(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         let result = self.read_nz(rs1) ^ self.read_nz(rs2);
         self.write_nz(rd, result)
