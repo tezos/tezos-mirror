@@ -35,9 +35,8 @@ let reached_at (threshold : float)
           Signature.Public_key_hash.Map.find delegate attestingPower
           |> Option.value ~default:0
         in
-        let acc' = acc + p in
-        if threshold >= acc && threshold <= acc then Some reception
-        else loop acc' tl
+        let acc = acc + p in
+        if acc >= threshold then Some reception else loop acc tl
   in
   loop 0 delegates
 
