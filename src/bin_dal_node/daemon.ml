@@ -804,12 +804,11 @@ let update_timing_shard_received node_ctxt shards_timing_table slot_id
   in
   timing
 
-let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
-    amplificator =
+let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
+    node_store node_ctxt amplificator =
   let open Gossipsub in
-  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
   let timing_table_size =
-    2 * proto_parameters.attestation_lag
+    2 * proto_parameters.Dal_plugin.attestation_lag
     * proto_parameters.cryptobox_parameters.number_of_shards
     * proto_parameters.number_of_slots
   in
@@ -1502,6 +1501,7 @@ let run ~data_dir ~configuration_override =
   (* Activate the p2p instance. *)
   let shards_store = Store.shards store in
   connect_gossipsub_with_p2p
+    proto_parameters
     gs_worker
     transport_layer
     shards_store
