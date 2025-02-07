@@ -118,6 +118,10 @@ val string_of_history_mode : history_mode -> string
     GC, and the [gc_frequency] is [1] by default to make it runs on
     every occasion during tests.
 
+    [remote_signer] makes the rollup node use a remote signer at the provided
+    URL to sign messages for keys that were registered with the ["remote:"]
+    scheme.
+
 *)
 val create :
   ?runner:Runner.t ->

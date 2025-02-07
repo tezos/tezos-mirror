@@ -3958,7 +3958,7 @@ let test_remote_signer =
       ~force:true
       ~public_key_hash:k.public_key_hash
       ~alias:k.alias
-      (Signer.uri signer)
+      ~signer:(Signer.uri signer)
   in
   let* () = Lwt_list.iter_s import keys in
   let sks =

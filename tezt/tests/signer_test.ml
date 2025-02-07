@@ -57,7 +57,7 @@ let signer_test protocol ~keys =
     Lwt_list.iter_s
       (fun account ->
         let Account.{alias; public_key_hash; _} = account in
-        Client.import_signer_key client ~alias ~public_key_hash uri)
+        Client.import_signer_key client ~alias ~public_key_hash ~signer:uri)
       keys
   in
   let level_2_promise = Node.wait_for_level node 2 in
@@ -93,9 +93,12 @@ let signer_magic_bytes_test =
     Signer.init ~keys:[Constant.tz4_account] ~magic_byte:"0x03" ()
   in
   let* () =
-    let uri = Signer.uri signer in
     let Account.{alias; public_key_hash; _} = Constant.tz4_account in
-    Client.import_signer_key client ~alias ~public_key_hash uri
+    Client.import_signer_key
+      client
+      ~alias
+      ~public_key_hash
+      ~signer:(Signer.uri signer)
   in
   (* Check allowed magic byte. *)
   let* _ =
@@ -121,9 +124,12 @@ let signer_bls_test =
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   let* signer = Signer.init ~keys:[Constant.tz4_account] () in
   let* () =
-    let uri = Signer.uri signer in
     let Account.{alias; public_key_hash; _} = Constant.tz4_account in
-    Client.import_signer_key client ~alias ~public_key_hash uri
+    Client.import_signer_key
+      client
+      ~alias
+      ~public_key_hash
+      ~signer:(Signer.uri signer)
   in
   let* () =
     Client.transfer

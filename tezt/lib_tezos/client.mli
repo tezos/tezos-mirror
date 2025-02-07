@@ -133,6 +133,7 @@ val create :
   ?endpoint:endpoint ->
   ?media_type:media_type ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   unit ->
   t
 
@@ -145,6 +146,7 @@ val create_with_mode :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   mode ->
   t
 
@@ -466,10 +468,10 @@ val import_secret_key :
 val import_signer_key :
   ?endpoint:endpoint ->
   ?force:bool ->
-  t ->
+  ?signer:Uri.t ->
   public_key_hash:string ->
   alias:string ->
-  Uri.t ->
+  t ->
   unit Lwt.t
 
 (** Same as [import_secret_key] for signer, but do not wait for the
@@ -477,10 +479,10 @@ val import_signer_key :
 val spawn_import_signer_key :
   ?endpoint:endpoint ->
   ?force:bool ->
-  t ->
+  ?signer:Uri.t ->
   public_key_hash:string ->
   alias:string ->
-  Uri.t ->
+  t ->
   Process.t
 
 (** Same as [import_secret_key], but do not wait for the process to exit. *)
@@ -2482,6 +2484,7 @@ val init :
   ?endpoint:endpoint ->
   ?keys:Account.key list ->
   ?media_type:media_type ->
+  ?remote_signer:Uri.t ->
   unit ->
   t Lwt.t
 
@@ -2506,6 +2509,7 @@ val init_with_node :
   ?keys:Account.key list ->
   ?rpc_external:bool ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   [`Client | `Light | `Proxy] ->
   unit ->
   (Node.t * t) Lwt.t
@@ -2542,6 +2546,7 @@ val init_with_protocol :
   ?keys:Account.key list ->
   ?rpc_external:bool ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
@@ -2583,6 +2588,7 @@ val init_light :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   unit ->
   (t * Node.t * Node.t) Lwt.t
 

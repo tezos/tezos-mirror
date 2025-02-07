@@ -60,6 +60,7 @@ type t = {
   mutable mode : mode;
   runner : Runner.t option;
   dal_node : Dal_node.t option;
+  remote_signer : Uri.t option;
 }
 
 type stresstest_gas_estimation = {
@@ -139,7 +140,7 @@ let address ?(hostname = false) ?from peer =
 
 let create_with_mode ?runner ?(path = Uses.path Constant.octez_client)
     ?(admin_path = Uses.path Constant.octez_admin_client) ?name
-    ?(color = Log.Color.FG.blue) ?base_dir ?dal_node mode =
+    ?(color = Log.Color.FG.blue) ?base_dir ?dal_node ?remote_signer mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -155,10 +156,11 @@ let create_with_mode ?runner ?(path = Uses.path Constant.octez_client)
     mode;
     runner;
     dal_node;
+    remote_signer;
   }
 
 let create ?runner ?path ?admin_path ?name ?color ?base_dir ?endpoint
-    ?media_type ?dal_node () =
+    ?media_type ?dal_node ?remote_signer () =
   create_with_mode
     ?runner
     ?path
@@ -167,6 +169,7 @@ let create ?runner ?path ?admin_path ?name ?color ?base_dir ?endpoint
     ?color
     ?base_dir
     ?dal_node
+    ?remote_signer
     (Client (endpoint, media_type))
 
 let base_dir_arg client = ["--base-dir"; client.base_dir]
@@ -215,6 +218,11 @@ let mode_arg client =
   | Light _ -> ["--mode"; "light"; "--sources"; sources_file client]
   | Proxy _ -> ["--mode"; "proxy"]
 
+let remote_signer_arg client =
+  match client.remote_signer with
+  | None -> []
+  | Some uri -> ["--remote-signer"; Uri.to_string uri]
+
 let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
     ?config_file ?(no_base_dir_warnings = false) ?block client command =
@@ -243,8 +251,8 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
-  @ base_dir_arg client @ config_file_arg @ no_base_dir_warnings_arg @ block_arg
-  @ command
+  @ base_dir_arg client @ config_file_arg @ remote_signer_arg client
+  @ no_base_dir_warnings_arg @ block_arg @ command
 
 let spawn_command_with_stdin ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
@@ -268,7 +276,7 @@ let spawn_command_with_stdin ?log_command ?log_status_on_exit ?log_output
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
-  @ base_dir_arg client @ command
+  @ base_dir_arg client @ remote_signer_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -609,24 +617,27 @@ let spawn_import_secret_key ?(force = false) ?endpoint client
     client
     (["import"; "secret"; "key"; alias; sk_uri] @ force)
 
-let spawn_import_signer_key ?endpoint ?(force = false) client ~public_key_hash
-    ~alias signer_uri =
-  let uri = Uri.with_path signer_uri public_key_hash in
+let spawn_import_signer_key ?endpoint ?(force = false) ?signer ~public_key_hash
+    ~alias client =
+  let key =
+    match signer with
+    | Some signer_uri ->
+        Uri.with_path signer_uri public_key_hash |> Uri.to_string
+    | None -> "remote:" ^ public_key_hash
+  in
   spawn_command
     ?endpoint
     client
-    (["import"; "secret"; "key"; alias; Uri.to_string uri]
-    @ if force then ["--force"] else [])
+    (["import"; "secret"; "key"; alias; key] @ if force then ["--force"] else [])
 
-let import_signer_key ?endpoint ?force client ~public_key_hash ~alias signer_uri
-    =
+let import_signer_key ?endpoint ?force ?signer ~public_key_hash ~alias client =
   spawn_import_signer_key
     ?endpoint
     ?force
-    client
+    ?signer
     ~public_key_hash
     ~alias
-    signer_uri
+    client
   |> Process.check
 
 let import_public_key ?force ?endpoint client public_key ~alias =
@@ -2825,9 +2836,18 @@ module Zk_rollup = struct
 end
 
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint
-    ?(keys = Constant.all_secret_keys) ?media_type () =
+    ?(keys = Constant.all_secret_keys) ?media_type ?remote_signer () =
   let client =
-    create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type ()
+    create
+      ?path
+      ?admin_path
+      ?name
+      ?color
+      ?base_dir
+      ?endpoint
+      ?media_type
+      ?remote_signer
+      ()
   in
   Account.write keys ~base_dir:client.base_dir ;
   return client
@@ -2870,7 +2890,8 @@ let write_sources_file ~min_agreement ~uris client =
       Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
 
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
-    ?event_level ?event_sections_levels ?(nodes_args = []) ?dal_node () =
+    ?event_level ?event_sections_levels ?(nodes_args = []) ?dal_node
+    ?remote_signer () =
   let filter_node_arg = function
     | Node.Connections _ | Synchronisation_threshold _ -> None
     | x -> Some x
@@ -2893,6 +2914,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       ?color
       ?base_dir
       ?dal_node
+      ?remote_signer
       (Light (min_agreement, List.map (fun n -> Node n) nodes))
   in
   let* () =
@@ -2985,7 +3007,8 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
 let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
     ?event_level ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?(keys = Constant.all_secret_keys) ?rpc_external ?dal_node tag () =
+    ?(keys = Constant.all_secret_keys) ?rpc_external ?dal_node ?remote_signer
+    tag () =
   match tag with
   | (`Client | `Proxy) as mode ->
       let* node =
@@ -3003,7 +3026,15 @@ let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
         | `Proxy -> Proxy endpoint
       in
       let client =
-        create_with_mode ?path ?admin_path ?name ?color ?base_dir ?dal_node mode
+        create_with_mode
+          ?path
+          ?admin_path
+          ?name
+          ?color
+          ?base_dir
+          ?dal_node
+          ?remote_signer
+          mode
       in
       Account.write keys ~base_dir:client.base_dir ;
       return (node, client)
@@ -3025,7 +3056,8 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
     ?event_level ?event_sections_levels ?nodes_args
     ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file ?timestamp ?keys ?rpc_external ?dal_node tag ~protocol () =
+    ?parameter_file ?timestamp ?keys ?rpc_external ?dal_node ?remote_signer tag
+    ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -3040,6 +3072,7 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
       ?keys
       ?rpc_external
       ?dal_node
+      ?remote_signer
       tag
       ()
   in
