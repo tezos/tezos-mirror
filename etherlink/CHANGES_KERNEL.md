@@ -1,7 +1,10 @@
 # Changelog
 
+## Next proposal
 
-## Version NEXT
+This is a release candidate for a kernel upgrade proposal.
+
+Its storage version is 26.
 
 ### Features
 
@@ -20,13 +23,18 @@
     - [`KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK` for the regular upgrade governance][kgov]
     - [`KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2` for the security upgrade governance][sgov]
     - [`KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U` for the sequencer governance][sqgov]
+- A fast withdrawal entrypoint was added to the withdrawal precompiled contract
+  under a feature flag. (!16417)
+- Fast withdrawal entrypoint activation. (!16617)
 
 [kgov]: https://better-call.dev/mainnet/KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK/operations
 [sgov]: https://better-call.dev/mainnet/KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2/operations
 [sqgov]: https://better-call.dev/mainnet/KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U/operations
-- A fast withdrawal entrypoint was added to the withdrawal precompiled contract
-  under a feature flag. (!16417)
-- Fast withdrawal entrypoint activation. (!16617)
+
+### Bug fixes
+
+- Standard withdrawals from the withdrawal precompiled contract now emit events
+  from the appropriate address. (!16417)
 
 ### Internal
 
@@ -57,12 +65,7 @@
 - Deposits can now specify a chain id, but it is currently ignored. (!16153)
 - All blueprints in storage are deleted after a flush event. (!15673)
 
-### Bug fixes
-
-- Standard withdrawals from the withdrawal precompiled contract now emit events
-  from the appropriate address. (!16417)
-
-## Version 7386d0bc63f3589525bdfbd3cc0544076231b813
+## Bifrost (7386d0b)
 
 This kernel has been activated on Etherlink Testnet on block
 [10,758,937][7386-activation-testnet], and on Etherlink Mainnet on
