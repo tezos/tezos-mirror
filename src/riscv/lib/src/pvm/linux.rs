@@ -22,9 +22,6 @@ pub const PAGE_SIZE: u64 = 4096;
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
 
-/// [AT_PAGESZ](https://github.com/torvalds/linux/blob/bb066fe812d6fb3a9d01c073d9f1e2fd5a63403b/include/uapi/linux/auxvec.h#L15)
-const AT_PAGESZ: u64 = 6;
-
 /// Indicates a system call is not supported
 const ENOSYS: i64 = 38;
 
@@ -50,6 +47,14 @@ const RT_SIGACTION: u64 = 134;
 /// the length of that array, then we might read an arbitrary amount of memory. This impacts the
 /// proof size dramatically as everything read would also be in the proof.
 const RLIMIT_NOFILE: u64 = 512;
+
+/// Key into the auxiliary vector which informs supervised processes of auxiliary information
+#[derive(Clone, Copy)]
+#[repr(u64)]
+enum AuxVectorKey {
+    /// [AT_PAGESZ](https://github.com/torvalds/linux/blob/bb066fe812d6fb3a9d01c073d9f1e2fd5a63403b/include/uapi/linux/auxvec.h#L15)
+    PageSize = 6,
+}
 
 impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL, M> {
     /// Add data to the stack, returning the updated stack pointer.
@@ -87,7 +92,12 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL
     /// process initialisation. Musl programs extract valuable information from the stack such as
     /// the program name, command-line arguments, environment variables and other auxiliary
     /// information.
-    fn init_linux_stack(&mut self, args: &[&CStr], env: &[&CStr]) -> Result<(), MachineError>
+    fn init_linux_stack(
+        &mut self,
+        args: &[&CStr],
+        env: &[&CStr],
+        auxv: &[(AuxVectorKey, u64)],
+    ) -> Result<(), MachineError>
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -101,13 +111,15 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL
             .map(|arg| self.push_stack(1, arg.to_bytes_with_nul()))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // auxv[1] = [null, null]
+        // auxv[n] = [null, null]
         self.push_stack(8, 0u64.to_le_bytes())?;
         self.push_stack(8, 0u64.to_le_bytes())?;
 
-        // auxv[0] = [AT_PAGESZ, PAGE_SIZE]
-        self.push_stack(8, PAGE_SIZE.to_le_bytes())?;
-        self.push_stack(8, AT_PAGESZ.to_le_bytes())?;
+        // auxv[..] = [key, value]
+        for (key, value) in auxv.iter() {
+            self.push_stack(8, value.to_le_bytes())?;
+            self.push_stack(8, (*key as u64).to_le_bytes())?;
+        }
 
         // envp[n] = null
         self.push_stack(8, 0u64.to_le_bytes())?;
@@ -153,8 +165,14 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL
         M: ManagerReadWrite,
     {
         self.load_program(program)?;
+
+        // The stack needs to be prepared before we can push anything to it
         self.prepare_stack();
-        self.init_linux_stack(&[c"tezos-smart-rollup"], &[])?;
+
+        // Auxiliary values vector
+        let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE)];
+
+        self.init_linux_stack(&[c"tezos-smart-rollup"], &[], &auxv)?;
 
         // The user program may not access the M or S privilege level
         self.core.hart.mode.write(Mode::User);
