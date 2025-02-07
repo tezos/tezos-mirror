@@ -17,9 +17,13 @@ use crate::precompiles::tick_model;
 use crate::precompiles::PrecompileOutcome;
 use crate::precompiles::{SYSTEM_ACCOUNT_ADDRESS, WITHDRAWAL_ADDRESS};
 use crate::read_ticketer;
+use crate::utilities::alloy::h160_to_alloy;
+use crate::utilities::alloy::u256_to_alloy;
 use crate::utilities::u256_to_bigint;
 use crate::withdrawal_counter::WithdrawalCounter;
 use crate::{abi, fail_if_too_much, EthereumError};
+use alloy_primitives::FixedBytes;
+use alloy_sol_types::SolEvent;
 use crypto::hash::ContractKt1Hash;
 use crypto::hash::HashTrait;
 use evm::Handler;
@@ -73,13 +77,32 @@ pub const WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
     102, 53, 63, 221, 233, 204, 248, 19, 244, 91, 132, 250, 130,
 ];
 
-/// Keccak256 of FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,bytes20)
+/// Keccak256 of FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)
 /// Arguments in this order: l1 target address, withdrawal_id, amount, timestamp
 pub const FAST_WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
-    0xdf, 0x5e, 0xd9, 0xdc, 0x3d, 0x4e, 0x5e, 0x96, 0x98, 0x61, 0x60, 0xb2, 0x0d, 0xdc,
-    0xb4, 0xde, 0x3b, 0x48, 0x9a, 0x63, 0xd0, 0x0d, 0x5b, 0xef, 0x21, 0x05, 0x11, 0xb7,
-    0xc7, 0xb0, 0x70, 0xe0,
+    0x62, 0xe8, 0xe0, 0x1e, 0x31, 0xb8, 0x30, 0x84, 0xb9, 0x7c, 0x32, 0xb1, 0xb1, 0x1a,
+    0xd5, 0xa2, 0x4, 0x23, 0x82, 0xf5, 0xf6, 0x5e, 0xe4, 0x10, 0x6a, 0xd4, 0xa0, 0xd0,
+    0xf8, 0xb9, 0x94, 0x2c,
 ];
+
+alloy_sol_types::sol! {
+    event SolFastWithdrawalEvent (
+        bytes22 receiver,
+        uint256 withdrawalId,
+        uint256 amount,
+        uint256 timestamp,
+        bytes   payload,
+        address l2_caller,
+    );
+}
+
+alloy_sol_types::sol! {
+    event SolFastWithdrawalInput (
+        string target,
+        string fast_withdrawal_contract,
+        bytes  payload,
+    );
+}
 
 /// Calculate precompile gas cost given the estimated amount of ticks and gas price.
 fn estimate_gas_cost(estimated_ticks: u64, gas_price: U256) -> u64 {
@@ -375,8 +398,8 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 });
             };
 
-            let Some((address_str, fast_withdrawal, payload)) =
-                abi::fast_withdrawal_parameters(input_data)
+            let Ok((target, fast_withdrawal_contract, payload)) =
+                SolFastWithdrawalInput::abi_decode_data(input_data, true)
             else {
                 log!(
                     handler.borrow_host(),
@@ -388,7 +411,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
 
             // Execute base withdrawal preliminary
             let (base_withdraw, precompile_outcome) =
-                base_withdrawal_preliminary(handler, address_str.to_string(), transfer)?;
+                base_withdrawal_preliminary(handler, target, transfer)?;
 
             if let Some(precompile_outcome) = precompile_outcome {
                 return Ok(precompile_outcome);
@@ -412,7 +435,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
 
             // Prepare the outbox message
             let Some(fast_withdrawal) =
-                ContractKt1Hash::from_b58check(fast_withdrawal).ok()
+                ContractKt1Hash::from_b58check(&fast_withdrawal_contract).ok()
             else {
                 log!(
                     handler.borrow_host(),
@@ -436,9 +459,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 return Ok(revert_withdrawal());
             };
 
-            let mut payload_event = payload.clone();
-
-            let bytes_payload = MichelsonBytes(payload);
+            let bytes_payload = MichelsonBytes(payload.to_vec());
 
             let caller = MichelsonBytes(context.caller.to_fixed_bytes().to_vec());
 
@@ -479,7 +500,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 &base_transfer_value,
                 &timestamp_u256,
                 &target,
-                &mut payload_event,
+                payload.to_vec(),
                 &context.caller,
             );
 
@@ -544,44 +565,24 @@ fn event_log_fast_withdrawal(
     amount: &U256,
     timestamp: &U256,
     receiver: &Contract,
-    payload: &mut Vec<u8>,
+    payload: Vec<u8>,
     caller: &H160,
 ) -> Log {
-    let mut data = vec![];
-
+    let mut receiver_bytes = vec![];
     // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
-    receiver.bin_write(&mut data).unwrap();
-    data.extend_from_slice(&ABI_B22_RIGHT_PADDING);
-    debug_assert!(data.len() % 32 == 0);
+    receiver.bin_write(&mut receiver_bytes).unwrap();
+    let receiver_bytes: [u8; 22] = receiver_bytes.try_into().unwrap();
 
-    data.extend_from_slice(&Into::<[u8; 32]>::into(*withdrawal_id));
-    debug_assert!(data.len() % 32 == 0);
+    let event_data = SolFastWithdrawalEvent {
+        receiver: FixedBytes::<22>::from(&receiver_bytes),
+        withdrawalId: u256_to_alloy(withdrawal_id).unwrap_or_default(),
+        amount: u256_to_alloy(amount).unwrap_or_default(),
+        timestamp: u256_to_alloy(timestamp).unwrap_or_default(),
+        payload: payload.into(),
+        l2_caller: h160_to_alloy(caller),
+    };
 
-    data.extend_from_slice(&Into::<[u8; 32]>::into(*amount));
-    debug_assert!(data.len() % 32 == 0);
-
-    data.extend_from_slice(&Into::<[u8; 32]>::into(*timestamp));
-    debug_assert!(data.len() % 32 == 0);
-
-    //   5*32 bytes of arguments (receiver, withdrawal_id, amount, timestamp, caller)
-    // + 1*32 bytes its position
-    let payload_position = U256::from(32 * 6);
-    data.extend_from_slice(&Into::<[u8; 32]>::into(payload_position));
-    debug_assert!(data.len() % 32 == 0);
-
-    let mut caller = caller.to_fixed_bytes().to_vec();
-    caller.resize(32, 0);
-    data.extend_from_slice(&caller);
-    debug_assert!(data.len() % 32 == 0);
-
-    let payload_size = payload.len();
-    data.extend_from_slice(&Into::<[u8; 32]>::into(U256::from(payload_size)));
-    debug_assert!(data.len() % 32 == 0);
-
-    let payload_padding = payload_size % 32;
-    payload.resize(payload_size + payload_padding, 0);
-    data.extend_from_slice(payload);
-    debug_assert!(data.len() % 32 == 0);
+    let data = SolFastWithdrawalEvent::encode_data(&event_data);
 
     Log {
         address: WITHDRAWAL_ADDRESS,
@@ -658,7 +659,7 @@ mod tests {
         assert_eq!(
             FAST_WITHDRAWAL_EVENT_TOPIC.to_vec(),
             Keccak256::digest(
-                b"FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,bytes20)"
+                b"FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)"
             )
             .to_vec()
         );
