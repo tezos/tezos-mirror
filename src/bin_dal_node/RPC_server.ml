@@ -463,8 +463,8 @@ module Profile_handlers = struct
           List.map_es
             (fun (slot_id, num_stored) ->
               let all_stored = num_stored = number_of_assigned_shards in
-              if (not all_stored) || not proto_parameters.incentives_enable then
-                return @@ all_stored
+              if not proto_parameters.incentives_enable then return all_stored
+              else if not all_stored then return false
               else
                 is_slot_attestable_with_traps
                   shards_store
