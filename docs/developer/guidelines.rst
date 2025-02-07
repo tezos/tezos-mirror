@@ -166,8 +166,8 @@ Here are a few tips and guidelines on using docstrings.
 
 - Docstrings in ``.mli`` and ``.ml`` files are handled the same, so do not omit documenting the interfaces in the latter files.
 
-For more information on using docstrings, see the ``odoc`` `documentation for library authors <https://ocaml.github.io/odoc/odoc_for_authors.html>`__.
-In particular, it contains a `cheatsheet <https://ocaml.github.io/odoc/cheatsheet.html>`__ that may be useful.
+For more information on using docstrings, see the ``odoc`` `documentation for library authors <https://ocaml.github.io/odoc/odoc/odoc_for_authors.html>`__.
+In particular, it contains a `cheatsheet <https://ocaml.github.io/odoc/odoc/cheatsheet.html>`__ that may be useful.
 
 
 Docstrings errors
@@ -319,7 +319,7 @@ Fortunately, a few techniques may greatly increase the maintainability of commen
   * For instance, an externally-visble module exporting part of the functionality of some internal module(s) should describe each exported element, because users may not look to the internal module(s); but the internal modules should also describe their interface for their own users and maintainers.
 
     In such cases, duplication may be avoided by choosing a single place for the comments, and using cross-references to it wherever needed.
-    Fortunately, Odoc provides `such cross-references <https://ocaml.github.io/odoc/odoc_for_authors.html#links-and-references>`__ and checks for each reference that the target element exists, ensuring they do not get stale when code is moved or suppressed.
+    Fortunately, Odoc provides `such cross-references <https://ocaml.github.io/odoc/odoc/odoc_for_authors.html#links-and-references>`__ and checks for each reference that the target element exists, ensuring they do not get stale when code is moved or suppressed.
 
   * In other cases, the documentation needed near some piece of code is already available outside the code. For instance, a user-visible client command or node RPC should not duplicate explanations in the user reference.
 
