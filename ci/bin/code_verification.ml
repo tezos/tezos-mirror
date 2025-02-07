@@ -670,10 +670,7 @@ let jobs pipeline_type =
        [allow_failure: true]. *)
     let bin_packages_jobs =
       match pipeline_type with
-      | Schedule_extended_test ->
-          let job_build_rpm_amd64 = job_build_rpm_amd64 () in
-          [job_build_rpm_amd64]
-      | Before_merging | Merge_train -> []
+      | Schedule_extended_test | Before_merging | Merge_train -> []
     in
     let wasm_runtime_check : tezos_job =
       job
@@ -1960,18 +1957,6 @@ let jobs pipeline_type =
             ~rules:(make_rules ~changes:changeset_docker_files ~manual:Yes ())
             Test_manual
         in
-        let job_build_rpm_amd64_manual =
-          job_build_bin_package
-            ~__POS__
-            ~name:"oc.build:rpm:amd64"
-            ~target:Rpm
-            ~group:A
-            ~arch:Tezos_ci.Amd64
-            ~rules:(make_rules ~manual:Yes ())
-            ~dependencies:(Dependent [])
-            ~stage:Stages.manual
-            ()
-        in
         let job_docker_verify_test_amd64 : tezos_job =
           job_docker_authenticated
             ~__POS__
@@ -1993,11 +1978,7 @@ let jobs pipeline_type =
             ["./scripts/ci/docker_verify_signature.sh"]
         in
         let jobs =
-          [
-            job_docker_amd64_test_manual;
-            job_docker_arm64_test_manual;
-            job_build_rpm_amd64_manual;
-          ]
+          [job_docker_amd64_test_manual; job_docker_arm64_test_manual]
           @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
         in
         if pipeline_type = Merge_train then jobs
