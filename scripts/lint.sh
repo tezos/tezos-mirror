@@ -22,6 +22,8 @@ Where <action> can be:
 EOF
 }
 
+shopt -s extglob
+
 ## Testing for dependencies
 if ! type find > /dev/null 2>&-; then
   echo "find is required but could not be found. Aborting."
