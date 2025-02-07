@@ -1284,7 +1284,7 @@ mod tests {
     fn test_run_addr_zero() {
         type StateLayout = MachineStateLayout<T1K, TestCacheLayouts>;
 
-        let mut state: MachineState<T1K, TestCacheLayouts, Owned> =
+        let mut state: MachineState<T1K, TestCacheLayouts, Interpreted<T1K, Owned>, Owned> =
             MachineState::bind(Owned::allocate::<StateLayout>());
 
         // Encoding of ECALL instruction

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -86,8 +86,8 @@ pub type MachineStateLayout<ML, CL> = (
 pub struct MachineState<
     ML: main_memory::MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: backend::ManagerBase,
-    B: Block<ML, M> = block_cache::bcall::Interpreted<ML, M>,
 > {
     pub core: MachineCoreState<ML, M>,
     pub block_cache: BlockCache<CL::BlockCacheLayout<ML>, B, ML, M>,
@@ -98,7 +98,7 @@ impl<
     CL: CacheLayouts,
     B: Block<ML, M> + Clone,
     M: backend::ManagerClone,
-> Clone for MachineState<ML, CL, M, B>
+> Clone for MachineState<ML, CL, B, M>
 {
     fn clone(&self) -> Self {
         Self {
@@ -235,8 +235,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     }
 }
 
-impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBase>
-    MachineState<ML, CL, M>
+impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: backend::ManagerBase>
+    MachineState<ML, CL, B, M>
 {
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML, CL>, M>) -> Self {
@@ -661,6 +661,7 @@ pub enum MachineError {
 mod tests {
     use super::{
         MachineState, MachineStateLayout,
+        block_cache::bcall::Interpreted,
         instruction::{
             Instruction, OpCode,
             tagged_instruction::{TaggedArgs, TaggedInstruction},
@@ -678,7 +679,6 @@ mod tests {
                 PAGE_SIZE,
                 pte::{PPNField, PageTableEntry},
             },
-            cache_layouts,
             csregisters::{
                 CSRRepr, CSRegister,
                 satp::{Satp, TranslationAlgorithm},
@@ -706,7 +706,14 @@ mod tests {
     use std::ops::Bound;
 
     backend_test!(test_step, F, {
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
+        let state = create_state!(
+            MachineState, 
+            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            F, 
+            T1K, 
+            DefaultCacheLayouts, 
+            Interpreted<T1K, F::Manager>);
+
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -753,7 +760,14 @@ mod tests {
     });
 
     backend_test!(test_step_env_exc, F, {
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
+        let state = create_state!(
+            MachineState, 
+            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            F, 
+            T1K, 
+            DefaultCacheLayouts, 
+            Interpreted<T1K, F::Manager>);
+
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -789,7 +803,14 @@ mod tests {
     });
 
     backend_test!(test_step_exc_mm, F, {
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
+        let state = create_state!(
+            MachineState, 
+            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            F, 
+            T1K, 
+            DefaultCacheLayouts, 
+            Interpreted<T1K, F::Manager>);
+
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -832,7 +853,14 @@ mod tests {
     });
 
     backend_test!(test_step_exc_us, F, {
-        let state = create_state!(MachineState, MachineStateLayout<T1K, TestCacheLayouts>, F, T1K, TestCacheLayouts);
+        let state = create_state!(
+            MachineState, 
+            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            F, 
+            T1K, 
+            DefaultCacheLayouts, 
+            Interpreted<T1K, F::Manager>);
+
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -905,12 +933,21 @@ mod tests {
 
         type LocalLayout = MachineStateLayout<M1K, TestCacheLayouts>;
 
+        type BlockRunner<F> = Interpreted<M1K, <F as TestBackendFactory>::Manager>;
+
         type LocalMachineState<F> =
-            MachineState<M1K, TestCacheLayouts, <F as TestBackendFactory>::Manager>;
+            MachineState<M1K, TestCacheLayouts, BlockRunner<F>, <F as TestBackendFactory>::Manager>;
 
         // Configure the machine state.
         let base_state = {
-            let mut state = create_state!(MachineState, LocalLayout, F, M1K, TestCacheLayouts);
+            let mut state = create_state!(
+                MachineState,
+                LocalLayout,
+                F,
+                M1K,
+                TestCacheLayouts,
+                BlockRunner<F>
+            );
             state.reset();
 
             let start_ram = main_memory::FIRST_ADDRESS;
@@ -1142,13 +1179,21 @@ mod tests {
 
         type LocalLayout = MachineStateLayout<M1M, TestCacheLayouts>;
 
+        type BlockRunner<F> = Interpreted<M1M, <F as TestBackendFactory>::Manager>;
+
         type LocalMachineState<F> =
-            MachineState<M1M, TestCacheLayouts, <F as TestBackendFactory>::Manager>;
+            MachineState<M1M, TestCacheLayouts, BlockRunner<F>, <F as TestBackendFactory>::Manager>;
 
         // Configure the state backend.
         let base_state = {
-            let mut state: LocalMachineState<F> =
-                create_state!(MachineState, LocalLayout, F, M1M, TestCacheLayouts);
+            let mut state = create_state!(
+                MachineState,
+                LocalLayout,
+                F,
+                M1M,
+                TestCacheLayouts,
+                BlockRunner<F>
+            );
             state.reset();
 
             state
@@ -1229,7 +1274,13 @@ mod tests {
 
     // Ensure that cloning the machine state does not result in a stack overflow
     backend_test!(test_machine_state_cloneable, F, {
-        let state = create_state!(MachineState, MachineStateLayout<M1M, DefaultCacheLayouts>, F, M1M, DefaultCacheLayouts);
+        let state = create_state!(
+            MachineState, 
+            MachineStateLayout<M1M, DefaultCacheLayouts>, 
+            F, 
+            M1M, 
+            DefaultCacheLayouts, 
+            Interpreted<M1M, F::Manager>);
 
         let second = state.clone();
 
@@ -1240,7 +1291,13 @@ mod tests {
     });
 
     backend_test!(test_block_cache_crossing_pages_creates_new_block, F, {
-        let mut state = create_state!(MachineState, MachineStateLayout<M8K, TestCacheLayouts>, F, M8K, TestCacheLayouts);
+        let mut state = create_state!(
+            MachineState, 
+            MachineStateLayout<M8K, DefaultCacheLayouts>, 
+            F, 
+            M8K, 
+            DefaultCacheLayouts, 
+            Interpreted<M8K, F::Manager>);
 
         let uncompressed_bytes = 0x5307b3;
 
@@ -1307,8 +1364,6 @@ mod tests {
         //
         // Note that we are jumping 2 * CACHE_SIZE to achieve the wrap-around, as non u16-aligned
         // addresses cannot be cached, so CACHE_SIZE corresponds to 2*CACHE_SIZE addresses.
-        type CacheLayout = cache_layouts::Sizes<12, 4096>;
-
         let auipc_bytes: u32 = 0x517;
         let cj_bytes: u16 = 0xa8b5;
 
@@ -1392,8 +1447,14 @@ mod tests {
 
         let block_b_addr = phys_addr + 128;
 
-        let mut state =
-            create_state!(MachineState, MachineStateLayout<M8K, CacheLayout>, F, M8K, CacheLayout);
+        let mut state = create_state!(
+            MachineState, 
+            MachineStateLayout<M8K, DefaultCacheLayouts>, 
+            F, 
+            M8K, 
+            DefaultCacheLayouts, 
+            Interpreted<M8K, F::Manager>);
+
         // Write the instructions to the beginning of the main memory and point the program
         // counter at the first instruction.
         state.core.hart.pc.write(phys_addr);

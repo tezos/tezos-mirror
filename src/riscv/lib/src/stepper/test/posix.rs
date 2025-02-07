@@ -1,10 +1,11 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::{
     machine_state::{
         CacheLayouts, MachineState,
+        block_cache::bcall::Block,
         main_memory::MainMemoryLayout,
         mode::Mode,
         registers::{a0, a7},
@@ -61,9 +62,9 @@ impl<M: ManagerBase> PosixState<M> {
     }
 
     /// Handle a POSIX system call. Returns `Ok(true)` if it makes sense to continue execution.
-    pub fn handle_call<ML: MainMemoryLayout, CL: CacheLayouts>(
+    pub fn handle_call<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>>(
         &mut self,
-        machine: &mut MachineState<ML, CL, M>,
+        machine: &mut MachineState<ML, CL, B, M>,
         env_exception: EnvironException,
     ) -> Result<bool, String>
     where

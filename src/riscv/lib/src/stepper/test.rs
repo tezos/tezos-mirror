@@ -10,6 +10,7 @@ use crate::{
     machine_state::{
         CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
         StepManyResult, TestCacheLayouts,
+        block_cache::bcall::{Block, Interpreted},
         main_memory::{M1G, MainMemoryLayout},
         mode,
     },
@@ -75,8 +76,12 @@ pub enum TestStepperError {
 pub type TestStepperLayout<ML = M1G, CL = TestCacheLayouts> =
     (PosixStateLayout, MachineStateLayout<ML, CL>);
 
-pub struct TestStepper<ML: MainMemoryLayout = M1G, CL: CacheLayouts = TestCacheLayouts> {
-    machine_state: MachineState<ML, CL, Owned>,
+pub struct TestStepper<
+    ML: MainMemoryLayout = M1G,
+    CL: CacheLayouts = TestCacheLayouts,
+    B: Block<ML, Owned> = Interpreted<ML, Owned>,
+> {
+    machine_state: MachineState<ML, CL, B, Owned>,
     posix_state: PosixState<Owned>,
 }
 

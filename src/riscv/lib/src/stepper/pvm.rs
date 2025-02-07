@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Stepper, StepperStatus};
+use crate::machine_state::block_cache::bcall::{Block, Interpreted};
 use crate::state_backend::{ManagerBase, ManagerReadWrite};
 use crate::{
     kernel_loader,
@@ -47,8 +48,9 @@ pub struct PvmStepper<
     ML: MainMemoryLayout = M1G,
     CL: CacheLayouts = DefaultCacheLayouts,
     M: ManagerBase = Owned,
+    B: Block<ML, M> = Interpreted<ML, M>,
 > {
-    pvm: Pvm<ML, CL, M>,
+    pvm: Pvm<ML, CL, B, M>,
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
@@ -285,7 +287,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
             return false;
         };
 
-        let pvm = Pvm::<ML, CL, Verifier>::bind(space);
+        let pvm = Pvm::<ML, CL, _, Verifier>::bind(space);
         let mut stepper = PvmStepper {
             pvm,
             rollup_address: self.rollup_address,
