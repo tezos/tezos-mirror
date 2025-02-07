@@ -4946,7 +4946,8 @@ module Operation : sig
 
   val unsigned_operation_length : _ operation -> int
 
-  val check_signature : public_key -> Chain_id.t -> _ operation -> unit tzresult
+  val check_signature :
+    context -> public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val pack : 'kind operation -> packed_operation
 
@@ -4958,6 +4959,11 @@ module Operation : sig
   type ('a, 'b) eq = Eq : ('a, 'a) eq
 
   val equal : 'a operation -> 'b operation -> ('a, 'b) eq option
+
+  module Internal_for_tests : sig
+    val serialize_unsigned_operation :
+      context -> Block_hash.t -> _ contents_list -> bytes
+  end
 
   module Encoding : sig
     type 'b case =

@@ -648,6 +648,7 @@ module Consensus = struct
     let*? () =
       if check_signature then
         Operation.check_signature
+          vi.ctxt
           consensus_key.consensus_pk
           vi.chain_id
           operation
@@ -787,6 +788,7 @@ module Consensus = struct
     let*? () =
       if check_signature then
         Operation.check_signature
+          vi.ctxt
           consensus_key.consensus_pk
           vi.chain_id
           operation
@@ -1102,7 +1104,8 @@ module Voting = struct
          listings (or is a testnet dictator), which implies that it
          is a manager with a revealed key. *)
       let* public_key = Contract.get_manager_key vi.ctxt source in
-      Lwt.return (Operation.check_signature public_key vi.chain_id operation)
+      Lwt.return
+        (Operation.check_signature vi.ctxt public_key vi.chain_id operation)
     else return_unit
 
   (** Check that a Proposals operation is compatible with previously
@@ -1214,7 +1217,8 @@ module Voting = struct
            already checked that the delegate is in the vote listings,
            which implies that it is a manager with a revealed key. *)
         let* public_key = Contract.get_manager_key vi.ctxt source in
-        Lwt.return (Operation.check_signature public_key vi.chain_id operation))
+        Lwt.return
+          (Operation.check_signature vi.ctxt public_key vi.chain_id operation))
 
   (** Check that a Ballot operation is compatible with previously
       validated operations in the current block/mempool.
@@ -1417,8 +1421,8 @@ module Anonymous = struct
         (not already_slashed)
         (Already_denounced {kind; delegate; level})
     in
-    let*? () = Operation.check_signature delegate_pk vi.chain_id op1 in
-    let*? () = Operation.check_signature delegate_pk vi.chain_id op2 in
+    let*? () = Operation.check_signature vi.ctxt delegate_pk vi.chain_id op1 in
+    let*? () = Operation.check_signature vi.ctxt delegate_pk vi.chain_id op2 in
     return_unit
 
   let check_double_preattestation_evidence vi
@@ -1816,6 +1820,7 @@ module Anonymous = struct
                 in
                 let*? () =
                   Operation.check_signature
+                    vi.ctxt
                     consensus_key.consensus_pk
                     vi.chain_id
                     attestation
@@ -1954,7 +1959,11 @@ module Anonymous = struct
     in
     let*? () =
       if check_signature then
-        Operation.check_signature active_pk.consensus_pk info.chain_id operation
+        Operation.check_signature
+          info.ctxt
+          active_pk.consensus_pk
+          info.chain_id
+          operation
       else ok_unit
     in
     return_unit
@@ -2571,7 +2580,7 @@ module Manager = struct
     in
     let*? () =
       if check_signature then
-        Operation.check_signature source_pk vi.chain_id operation
+        Operation.check_signature vi.ctxt source_pk vi.chain_id operation
       else ok_unit
     in
     return gas_used

@@ -1856,10 +1856,10 @@ let () =
     (function Contents_list_error s -> Some s | _ -> None)
     (fun s -> Contents_list_error s)
 
-let serialize_unsigned_operation (type kind)
+let serialize_unsigned_operation (type kind) encoding
     ({shell; protocol_data} : kind operation) : bytes =
   Data_encoding.Binary.to_bytes_exn
-    unsigned_operation_encoding
+    encoding
     (shell, Contents_list protocol_data.contents)
 
 let unsigned_operation_length (type kind)
@@ -1868,9 +1868,9 @@ let unsigned_operation_length (type kind)
     unsigned_operation_encoding
     (shell, Contents_list protocol_data.contents)
 
-let check_signature (type kind) key chain_id (op : kind operation) =
+let check_signature (type kind) encoding key chain_id (op : kind operation) =
   let open Result_syntax in
-  let serialized_operation = serialize_unsigned_operation op in
+  let serialized_operation = serialize_unsigned_operation encoding op in
   let check ~watermark signature =
     if Signature.check ~watermark key signature serialized_operation then
       return_unit
@@ -2690,5 +2690,6 @@ let compare (oph1, op1) (oph2, op2) =
     if Compare.Int.(cmp = 0) then cmp_h else cmp
 
 module Internal_for_benchmarking = struct
-  let serialize_unsigned_operation = serialize_unsigned_operation
+  let serialize_unsigned_operation (type kind) (op : kind operation) : bytes =
+    serialize_unsigned_operation unsigned_operation_encoding op
 end

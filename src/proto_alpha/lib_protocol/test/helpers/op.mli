@@ -47,10 +47,11 @@ val pack_operation :
 
 val sign :
   ?watermark:Signature.watermark ->
+  Context.t ->
   Signature.secret_key ->
   Block_hash.t ->
   packed_contents_list ->
-  packed_operation
+  (packed_operation, tztrace) result Environment.Lwt.t
 
 (** Create an unpacked attestation that is expected for given [Block.t].
 

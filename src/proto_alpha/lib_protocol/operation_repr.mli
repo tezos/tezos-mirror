@@ -682,11 +682,21 @@ type error += Invalid_signature (* `Permanent *)
     signature. *)
 val unsigned_operation_length : _ operation -> int
 
-(** Check the signature of an operation. This function serializes the
-    operation before calling the [Signature.check] function with the
-    appropriate watermark. *)
+(** Check the signature of an operation. This function serializes the operation
+    using the provided encoding before calling the [Signature.check] function
+    with the appropriate watermark. *)
 val check_signature :
-  Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult
+  (Operation.shell_header * packed_contents_list) Data_encoding.t ->
+  Signature.Public_key.t ->
+  Chain_id.t ->
+  _ operation ->
+  unit tzresult
+
+(* Serializes the operation using the provided encoding. *)
+val serialize_unsigned_operation :
+  (Operation.shell_header * packed_contents_list) Data_encoding.t ->
+  _ operation ->
+  bytes
 
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 
