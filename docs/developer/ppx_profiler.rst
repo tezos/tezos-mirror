@@ -147,20 +147,16 @@ with
    (read_test_line () [@profiler.record_f {verbosity = Info} "read_test_line"])
    ...
 
-3. Custom functions
+3. Custom values
 ^^^^^^^^^^^^^^^^^^^^^
 
-You may want to declare a function that should only be used when the PPX is
-active. In this case you don't want to compile nor call this function when the
-PPX is disabled as it may create noise.
+This PPX library provides a special construct, which basically acts as a
+``#ifndef TEZOS_PPX_PROFILER`` / ``#else``:
 
-This PPX library provides a special construct:
+- ``expr_if_ppx_not_used [@profiler.custom expr_if_ppx_used]``
 
-- ``[profiler.custom function_application]``
-
-With ``function_application ::= <fun_name> <args>``.
-
-This construct will be preprocessed as ``fun_name args``.
+This construct will be preprocessed as ``expr_if_ppx_not_used`` if you are
+not using the PPX, or ``expr_if_ppx_used`` if you are.
 
 Structure of an attribute
 -------------------------
