@@ -7,6 +7,7 @@
 use crate::block_storage;
 use crate::blueprint_storage::{
     blueprint_path, clear_all_blueprints, read_next_blueprint_number,
+    store_current_block_header,
 };
 use crate::error::Error;
 use crate::error::StorageError;
@@ -241,6 +242,21 @@ fn migrate_to<Host: Runtime>(
         StorageVersion::V26 => {
             host.store_write_all(&ENABLE_FAST_WITHDRAWAL, &[1_u8])?;
             Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V27 => {
+            // Initialize the next_blueprint_info field
+            match block_storage::read_current(host) {
+                Ok(block) => {
+                    store_current_block_header(host, &block.into())?;
+                    Ok(MigrationStatus::Done)
+                }
+                Err(err) => match err.downcast_ref() {
+                    Some(tezos_storage::error::Error::Runtime(
+                        RuntimeError::PathNotFound,
+                    )) => Ok(MigrationStatus::Done),
+                    _ => Err(err),
+                },
+            }
         }
     }
 }
