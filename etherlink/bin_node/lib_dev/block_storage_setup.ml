@@ -60,6 +60,9 @@ let enable ~keep_alive ?evm_node_endpoint store =
     | Error trace ->
         Stdlib.failwith Format.(asprintf "%a" Error_monad.pp_print_trace trace)
   in
+  let tmp_path = "/tmp" in
+  let world_state_path = "/evm/world_state" in
+  let tmp_world_state_path = tmp_path ^ world_state_path in
   let store_get_hash tree key =
     let open Lwt_syntax in
     let enable_fallback =
@@ -76,7 +79,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
              any assumption on the running kernel. *)
           false
     in
-    if enable_fallback && key = "/tmp/evm/world_state/transactions_receipts"
+    if enable_fallback && key = tmp_world_state_path ^ "/transactions_receipts"
     then
       Lwt_preemptive.run_in_main @@ fun () ->
       let* pred = Evm_state.current_block_height tree in
@@ -84,7 +87,8 @@ let enable ~keep_alive ?evm_node_endpoint store =
       let+ block = get_block_exn n in
       let s = Ethereum_types.hash_to_bytes block.receiptRoot in
       Ok (Bytes.unsafe_of_string s)
-    else if enable_fallback && key = "/tmp/evm/world_state/transactions_objects"
+    else if
+      enable_fallback && key = tmp_world_state_path ^ "/transactions_objects"
     then
       Lwt_preemptive.run_in_main @@ fun () ->
       let* pred = Evm_state.current_block_height tree in
