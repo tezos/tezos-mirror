@@ -1234,12 +1234,6 @@ module State = struct
       ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url () =
     let open Lwt_result_syntax in
     let*! () =
-      Evm_context_events.start_history_mode
-        (Option.value
-           configuration.history_mode
-           ~default:Configuration.default_history_mode)
-    in
-    let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
     in
     let*! () =
@@ -1285,6 +1279,8 @@ module State = struct
       in
       return metadata
     in
+    let*! () = Evm_context_events.start_history_mode history_mode in
+
     let* evm_state, context =
       match kernel_path with
       | Some kernel ->
