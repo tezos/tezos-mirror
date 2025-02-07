@@ -483,6 +483,8 @@ pub enum InstrCacheable {
     /// to `rd`. The immediate is obtained by zero-extending and scaling by 4 the value
     /// encoded in the instruction (see U:C-16.5).
     CAddi4spn(CIBTypeArgs),
+    /// `C.SLLI` - Performs a logical left shift of the value in register `rd_rs1`
+    /// then writes the result back to `rd_rs1`.
     CSlli(CIBNZTypeArgs),
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),

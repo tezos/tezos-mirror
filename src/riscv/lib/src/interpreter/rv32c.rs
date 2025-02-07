@@ -103,15 +103,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `C.SLLI` CI-type compressed instruction
-    ///
-    /// Performs a logical left shift of the value in register `rd_rs1`
-    /// then writes the result back to `rd_rs1`.
-    pub fn run_cslli(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
-        // SLLI encoding allows to consider the whole immediate as the shift amount
-        self.write_nz(rd_rs1, self.read_nz(rd_rs1) << imm)
-    }
-
     /// `C.AND` CA-type compressed instruction
     ///
     /// Computes the bitwise AND of the values in registers `rd_rs1` and `rs2`,
@@ -333,7 +324,7 @@ mod tests {
             $rd_rs1:ident, $r1_val:expr, $expected_val:expr
         ) => {
             $state.xregisters.write_nz($rd_rs1, $r1_val);
-            $state.xregisters.$shift_fn($imm, $rd_rs1);
+            $state.xregisters.$shift_fn($imm, $rd_rs1, $rd_rs1);
             let new_val = $state.xregisters.read_nz($rd_rs1);
             assert_eq!(new_val, $expected_val);
         };
@@ -343,11 +334,11 @@ mod tests {
         let mut state = create_state!(HartState, F);
 
         // imm = 0
-        test_shift_instr!(state, run_cslli, 0, a0, 0x1234_ABEF, 0x1234_ABEF);
+        test_shift_instr!(state, run_slli, 0, a0, 0x1234_ABEF, 0x1234_ABEF);
 
         // small imm (< 32))
-        test_shift_instr!(state, run_cslli, 20, a0, 0x1234_ABEF, 0x1_234A_BEF0_0000);
+        test_shift_instr!(state, run_slli, 20, a0, 0x1234_ABEF, 0x1_234A_BEF0_0000);
         // big imm (>= 32))
-        test_shift_instr!(state, run_cslli, 40, a0, 0x1234_ABEF, 0x34AB_EF00_0000_0000);
+        test_shift_instr!(state, run_slli, 40, a0, 0x1234_ABEF, 0x34AB_EF00_0000_0000);
     });
 }

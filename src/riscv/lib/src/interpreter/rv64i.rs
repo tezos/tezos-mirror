@@ -67,6 +67,7 @@ where
     ///
     /// Relevant RISC-V opcodes:
     /// - `SLLI`
+    /// - `C.SLLI`
     pub fn run_slli(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // SLLI encoding allows to consider the whole immediate as the shift amount
         self.write_nz(rd, self.read_nz(rs1) << imm)
