@@ -250,18 +250,10 @@ gitlab:release:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   - oc.install-release-homebrew
-  - oc.build-ubuntu-current_a
-  - oc.build-debian-current_a
-  - oc.build-ubuntu-current_b
-  - oc.build-debian-current_b
   dependencies:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   - oc.install-release-homebrew
-  - oc.build-ubuntu-current_a
-  - oc.build-debian-current_a
-  - oc.build-ubuntu-current_b
-  - oc.build-debian-current_b
   timeout: 60 minutes
   interruptible: false
   script:
