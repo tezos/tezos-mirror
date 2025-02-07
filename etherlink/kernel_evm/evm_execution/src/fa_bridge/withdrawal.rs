@@ -43,6 +43,7 @@ use tezos_smart_rollup_encoding::{
 use crate::{
     abi::{self, ABI_B22_RIGHT_PADDING, ABI_H160_LEFT_PADDING},
     handler::Withdrawal,
+    precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS,
     utilities::keccak256_hash,
 };
 
@@ -171,7 +172,7 @@ impl FaWithdrawal {
         debug_assert!(data.len() % 32 == 0);
 
         Log {
-            address: H160::zero(),
+            address: FA_BRIDGE_PRECOMPILE_ADDRESS,
             topics: vec![H256(*WITHDRAW_EVENT_TOPIC), self.ticket_hash],
             data,
         }
