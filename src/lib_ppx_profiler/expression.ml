@@ -72,7 +72,7 @@ let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
         key
       ]}
 
-    [key] is a function application *)
+    [key] can be anything since this will replace the preprocessed expression *)
 let add_custom_function_apply loc key = [%expr [%e Key.to_expression loc key]]
 
 (** [add_wrapping_custom_function expr _ key] will create

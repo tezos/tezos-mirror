@@ -31,6 +31,15 @@ let pp_field ppf (lident, expr) =
     Ppxlib.Pprintast.expression
     expr
 
+let pp_accepted ppf () =
+  Format.fprintf
+    ppf
+    "Accepted attributes payload are:@,\
+     - [@profiler.aggregate_* <record> <string or ident>]@,\
+     - [@profiler.mark <record> [<list of strings or ident>]]@,\
+     - [@profiler.record_* <record> <string or ident>]@,\
+     - [@profiler.span_* <record> <list of strings or ident>]"
+
 let error loc err =
   let msg, hint =
     match err with
@@ -48,17 +57,15 @@ let error loc err =
     | Invalid_payload (missing_record, payload) ->
         ( "Invalid or empty attribute payload.",
           Format.asprintf
-            "@[<v 2>Accepted attributes payload are:@,\
-             - [@profiler.aggregate_* <record> <string or ident>]@,\
-             - [@profiler.mark <record> [<list of strings or ident>]]@,\
-             - [@profiler.record_* <record> <string or ident>]@,\
-             - [@profiler.span_* <record> <list of strings or ident>]@,\
-             %aFound: @[<v 0>%a@]@."
+            "@[<v 2>%a@,%aFound: @[<v 0>%a@]@]@."
+            pp_accepted
+            ()
             (fun ppf () ->
               if missing_record then
                 Format.fprintf
                   ppf
-                  "@[<v 2>With <record> containing the following fields:@,\
+                  "@[<v 2>With <record> containing the following optional \
+                   fields:@,\
                    - verbosity@,\
                    - profiler_module@,\
                    - metadata@,\
@@ -167,10 +174,9 @@ let error loc err =
     | Malformed_attribute expr ->
         ( "Malformed attribute.",
           Format.asprintf
-            "@[<v 2>Accepted attributes payload are:@,\
-             - [@profiler.mark [<list of strings>]]@,\
-             - [@profiler.aggregate_* <string or ident>]@,\
-             Found %a@.'"
+            "@[<v 2>%a@,Found %a@.'"
+            pp_accepted
+            ()
             Ppxlib.Pprintast.expression
             expr )
     | No_verbosity key ->
