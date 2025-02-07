@@ -1076,7 +1076,7 @@ impl Args {
     // RV64I R-type instructions
     impl_r_type!(i::run_add, run_add, non_zero);
     impl_r_type!(run_sub, non_zero_rd);
-    impl_r_type!(run_xor, non_zero_rd);
+    impl_r_type!(run_xor, non_zero);
     impl_r_type!(run_or, non_zero);
     impl_r_type!(run_and, non_zero);
     impl_r_type!(run_sll, non_zero_rd);
@@ -1357,10 +1357,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Sub,
                 args: args.into(),
             },
-            InstrCacheable::Xor(args) => Instruction {
-                opcode: OpCode::Xor,
-                args: args.into(),
-            },
+            InstrCacheable::Xor(args) => Instruction::from_ic_xor(args),
             InstrCacheable::Or(args) => Instruction::from_ic_or(args),
             InstrCacheable::And(args) => Instruction::from_ic_and(args),
             InstrCacheable::Sll(args) => Instruction {

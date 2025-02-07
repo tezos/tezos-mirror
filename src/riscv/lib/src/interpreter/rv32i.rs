@@ -106,11 +106,12 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `XOR` R-type instruction
-    ///
     /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
-    pub fn run_xor(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        let result = self.read(rs1) ^ self.read(rs2);
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - `XOR`
+    pub fn run_xor(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
+        let result = self.read_nz(rs1) ^ self.read_nz(rs2);
         self.write_nz(rd, result)
     }
 
@@ -641,7 +642,7 @@ mod tests {
 
             state.write(t2, v1);
             state.write(t3, v2);
-            state.run_xor(t3, t2, nz::t1);
+            state.run_xor(nz::t3, nz::t2, nz::t1);
             prop_assert_eq!(state.read(t1), v1 ^ v2);
 
             // Same register
@@ -650,7 +651,7 @@ mod tests {
             prop_assert_eq!(state.read(a1), v1);
             state.run_or(nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1);
-            state.run_xor(a0, a0, nz::a0);
+            state.run_xor(nz::a0, nz::a0, nz::a0);
             prop_assert_eq!(state.read(a0), 0);
         });
     });

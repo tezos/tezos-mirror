@@ -281,6 +281,7 @@ pub enum InstrCacheable {
     /// `ADD` - Perform val(rs1) + val(rs2) and store the result in `rd`
     Add(NonZeroRdRTypeArgs),
     Sub(NonZeroRdRTypeArgs),
+    /// `XOR` - Saves in `rd` the bitwise XOR between the value in `rs1` and `rs2`.
     Xor(NonZeroRdRTypeArgs),
     /// `OR` R-type instruction - Saves in `rd` the bitwise OR between
     /// the value in `rs1` and `rs2`.
