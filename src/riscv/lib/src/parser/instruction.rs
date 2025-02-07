@@ -313,6 +313,9 @@ pub enum InstrCacheable {
     ///
     /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SLLI
     Slli(NonZeroRdITypeArgs),
+    /// `SRLI`- Shift right logically (zeros are shifted in the upper bits)
+    ///
+    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRLI
     Srli(NonZeroRdITypeArgs),
     Srai(NonZeroRdITypeArgs),
     Slliw(NonZeroRdITypeArgs),
