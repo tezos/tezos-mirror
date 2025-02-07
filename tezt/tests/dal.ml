@@ -3959,7 +3959,7 @@ let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
 *)
 let generic_gs_messages_exchange protocol parameters _cryptobox node client
     dal_node1 ~mk_dal_node2 ~expect_app_notification ~is_first_slot_attestable =
-  let* dal_node2 = mk_dal_node2 protocol parameters in
+  let* node2, dal_node2 = mk_dal_node2 protocol parameters in
 
   let* () =
     Dal_common.Helpers.connect_nodes_via_p2p
@@ -4041,6 +4041,16 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   and* () = waiter_receive_shards
   and* () = waiter_app_notifs in
 
+  let* () =
+    match node2 with
+    | None -> unit
+    | Some node2 ->
+        (* We need that this node reaches level 2; otherwise, the RPC call to
+           [get_attestable_slots] may fail. *)
+        let* _level = Node.wait_for_level node2 2 in
+        unit
+  in
+
   (* Check that dal_node2 has the shards needed by attester account1/pkh1 to
      attest the slot with index 0. *)
   let* res =
@@ -4070,13 +4080,14 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
     client
     dal_node1
     ~mk_dal_node2:(fun _protocol _parameters ->
-      Dal_node.create ~node () |> return)
+      let dal_node2 = Dal_node.create ~node () in
+      (None, dal_node2) |> return)
     ~expect_app_notification:true
     ~is_first_slot_attestable:true
 
 (* Create a DAL node whose DAL parameters are not compatible with those in
    [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
-let make_invalid_dal_node protocol parameters =
+let make_invalid_dal_node node1 protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
@@ -4087,10 +4098,13 @@ let make_invalid_dal_node protocol parameters =
     in
     setup_node ~protocol ~parameter_overrides ()
   in
+  Node.add_peer node2 node1 ;
+  let* () = Node.terminate node2 in
+  let* () = Node.run node2 [] in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
   let dal_node2 = Dal_node.create ~node:node2 () in
-  return dal_node2
+  return (Some node2, dal_node2)
 
 let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node client dal_node1 =
@@ -4107,7 +4121,7 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node
     client
     dal_node1
-    ~mk_dal_node2:make_invalid_dal_node
+    ~mk_dal_node2:(make_invalid_dal_node node)
     ~expect_app_notification
     ~is_first_slot_attestable
 
@@ -4149,7 +4163,7 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
   in
 
   (* Create another (invalid) DAL node *)
-  let* dal_node2 = make_invalid_dal_node protocol parameters in
+  let* _, dal_node2 = make_invalid_dal_node node protocol parameters in
 
   (* Connect the nodes *)
   let* () =
