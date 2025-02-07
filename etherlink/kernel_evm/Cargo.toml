@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-# SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 # SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
 # SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 #
@@ -89,10 +89,10 @@ proptest = { version = "1.0" }
 pretty_assertions = { version = "1.4.0" }
 
 # alloy
-alloy-sol-types = { version = "0.7.6", default-features = false, features = [
+alloy-sol-types = { version = "0.7.7", default-features = false, features = [
   "json",
 ] }
-alloy-primitives = { version = "0.7.6", default-features = false }
+alloy-primitives = { version = "0.7.7", default-features = false }
 
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates
