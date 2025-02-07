@@ -199,10 +199,13 @@ val get_slot_shard :
   Types.shard_index ->
   (Cryptobox.shard, [Errors.other | Errors.not_found]) result Lwt.t
 
-(** [maybe_register_trap ctxt message_id message] checks if the given
-    message is a trap according to [Trap.share_is_trap]. If the share
-    is identified as a trap, it is stored in the traps cache of the
-    DAL node store. Otherwise does nothing.
-*)
+(** [maybe_register_trap traps_store ~traps_fraction message_id message] checks
+    if the given message is a trap according to [Trap.share_is_trap]. If the
+    share is identified as a trap, it is stored in the traps cache of the DAL
+    node store. Otherwise does nothing. *)
 val maybe_register_trap :
-  Node_context.t -> Types.Message_id.t -> Types.Message.t -> unit
+  Store.Traps.t ->
+  traps_fraction:Q.t ->
+  Types.Message_id.t ->
+  Types.Message.t ->
+  unit

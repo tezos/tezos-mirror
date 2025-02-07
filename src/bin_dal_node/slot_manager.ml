@@ -199,21 +199,13 @@ let commit cryptobox polynomial =
 
 (* Main functions *)
 
-let maybe_register_trap ctxt message_id message =
-  let proto_parameters = Node_context.get_proto_parameters ctxt in
+let maybe_register_trap traps_store ~traps_fraction message_id message =
   let delegate = message_id.Types.Message_id.pkh in
   let Types.Message.{share; shard_proof} = message in
   let Types.Message_id.{slot_index; level; shard_index; _} = message_id in
-  let trap_res =
-    Trap.share_is_trap
-      ~traps_fraction:proto_parameters.traps_fraction
-      delegate
-      share
-  in
+  let trap_res = Trap.share_is_trap ~traps_fraction delegate share in
   match trap_res with
   | Ok true ->
-      let store = Node_context.get_store ctxt in
-      let traps_store = Store.traps store in
       let slot_id = Types.Slot_id.{slot_index; slot_level = level} in
       Store.Traps.add
         traps_store
@@ -317,7 +309,16 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
                    pkh;
                  }
              in
-             maybe_register_trap ctxt message_id message ;
+             let store = Node_context.get_store ctxt in
+             let traps_store = Store.traps store in
+             let traps_fraction = proto_parameters.traps_fraction in
+             let () =
+               maybe_register_trap
+                 traps_store
+                 ~traps_fraction
+                 message_id
+                 message
+             in
              Gossipsub.Worker.(
                Publish_message {message; topic; message_id}
                |> app_input gs_worker) ;

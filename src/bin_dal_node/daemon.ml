@@ -248,10 +248,15 @@ module Handler = struct
                      cryptobox
                      message_id)
             in
-            if res = `Valid then
-              Option.iter
-                (Slot_manager.maybe_register_trap ctxt message_id)
-                message ;
+            (if res = `Valid then
+               let store = Node_context.get_store ctxt in
+               let traps_store = Store.traps store in
+               Option.iter
+                 (Slot_manager.maybe_register_trap
+                    traps_store
+                    ~traps_fraction:proto_parameters.traps_fraction
+                    message_id)
+                 message) ;
             res
         | other ->
             (* 4. In the case the message id is not Valid. *)
