@@ -32,18 +32,37 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     echo "This is not an Octez release. No assets will be added to the release page."
   else
 
-    sudo apk add aws-cli
+    #TODO: Add to docker image ?
+    sudo apk add aws-cli gawk
 
     aws s3 cp s3://"${S3_BUCKET}"/"$Releases_list" "./$Releases_list"
     echo "${CI_COMMIT_TAG}" >> "./$Releases_list"
 
     # Upload binaries to S3 bucket
+    echo "Uploading binaries..."
     aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
     aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
     # Upload rpm packages to S3 bucket
+    echo "Uploading rpm packages..."
     aws s3 sync "./packages/rockylinux/9.3" "s3://${S3_BUCKET}/${gitlab_release}/rpm/rockylinux:9.3/" --region "${REGION}"
     aws s3 sync "./packages/fedora/39" "s3://${S3_BUCKET}/${gitlab_release}/rpm/fedora:39/" --region "${REGION}"
+
+    # Push checksums for x86_64 binaries
+    echo "Generating checksums for x86_64 binaries"
+    for binary in ./octez-binaries/x86_64/*; do
+      filename=$(basename "$binary")
+      [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
+    done
+    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/sha256sums.txt"
+
+    # Push checksums for arm64 binaries
+    echo "Generating checksums for arm64 binaries"
+    for binary in ./octez-binaries/arm64/*; do
+      filename=$(basename "$binary")
+      [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./arm64_sha256sums.txt"
+    done
+    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/sha256sums.txt"
 
   fi
 else
@@ -53,7 +72,6 @@ fi
 "${script_dir}"/create_release_page.sh "$Releases_list"
 
 echo "Syncing files to remote s3 bucket"
-
 if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./$Releases_list" "s3://${S3_BUCKET}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
