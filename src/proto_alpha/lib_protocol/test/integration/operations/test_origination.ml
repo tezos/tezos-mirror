@@ -277,11 +277,11 @@ let test_unparsable_script () =
     |> Bytes.to_string
   in
   let* account = Account.find pkh in
-  let ill_typed_op =
+  let* ill_typed_op =
     Data_encoding.Binary.of_string_exn
       Operation.contents_list_encoding
       encoded_op
-    |> Op.sign account.sk (Context.branch (B b))
+    |> Op.sign (B b) account.sk (Context.branch (B b))
   in
   (* Ensure that the application fails with [Ill_typed_contract]. *)
   let* i = Incremental.begin_construction b in
@@ -310,7 +310,7 @@ let test_unparsable_script () =
   let unparsable_dummy_expr =
     Hex.to_bytes_exn (`Hex "00000003ffffff") |> Bytes.to_string
   in
-  let unparsable_operation =
+  let* unparsable_operation =
     let encoded_bad_op =
       Re.(
         replace_string
@@ -322,7 +322,7 @@ let test_unparsable_script () =
     Data_encoding.Binary.of_string_exn
       Operation.contents_list_encoding
       encoded_bad_op
-    |> Op.sign account.sk (Context.branch (B b))
+    |> Op.sign (B b) account.sk (Context.branch (B b))
   in
   (* Ensure that the operation is valid but the application fails with
      [Lazy_script_decode]. *)
