@@ -2671,7 +2671,7 @@ let test_deposit_and_fast_withdraw =
   in
 
   let fast_withdrawal_event_signature =
-    "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,bytes20)"
+    "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)"
   in
   (* Define the fast withdrawal event log topic, which will be searched for in the EVM logs.
      This topic is a hashed identifier that corresponds to the fast withdrawal transaction event. *)
