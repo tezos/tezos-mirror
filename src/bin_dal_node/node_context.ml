@@ -28,7 +28,6 @@ type t = {
   config : Configuration_file.t;
   cryptobox : Cryptobox.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  proto_parameters : Types.proto_parameters;
   mutable proto_plugins : Proto_plugins.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :
@@ -46,8 +45,7 @@ type t = {
 }
 
 let init config profile_ctxt cryptobox shards_proofs_precomputation
-    proto_parameters proto_plugins store gs_worker transport_layer cctxt
-    ~last_finalized_level =
+    proto_plugins store gs_worker transport_layer cctxt ~last_finalized_level =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -61,7 +59,6 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     config;
     cryptobox;
     shards_proofs_precomputation;
-    proto_parameters;
     proto_plugins;
     ongoing_amplifications = Types.Slot_id.Set.empty;
     slots_under_reconstruction = Types.Slot_id.Map.empty;
