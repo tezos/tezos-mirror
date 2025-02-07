@@ -1,5 +1,34 @@
 # This file redirects pages on the S3 bucket using a CloudFront server.
 # All redirections are relative to the docs/ folder.
-# this one is temporary, just for testing:
-/install.html /introduction/howtoget.html 301
-/releases/latest.html /releases/version-21.html 302
+# Update this one at each MAJOR release of Octez:
+/releases/latest.html /releases/version-21.html 301
+# These are inherited from the past, don't change:
+/whitedoc/micheline.html /shell/micheline.html 301
+/whitedoc/michelson.html /active/michelson.html 301
+/whitedoc/p2p.html /shell/p2p.html 301
+/whitedoc/proof_of_stake.html /active/proof_of_stake.html 301
+/whitedoc/sync.html /shell/sync.html 301
+/whitedoc/the_big_picture.html /shell/the_big_picture.html 301
+/whitedoc/validation.html /shell/validation.html 301
+/whitedoc/voting.html /active/voting.html 301
+/007/cli-commands.html /shell/cli-commands.html 301
+/007/* /alpha/:splat 301
+/009/* /active/:splat 301
+/010/* /active/:splat 301
+/011/* /active/:splat 301
+/012/* /active/:splat 301
+/013/* /active/:splat 301
+/kathmandu/* /active/:splat 301
+/nairobi/* /active/:splat 301
+/oxford/* /active/:splat 301
+/paris/* /active/:splat 301
+/api/cli-commands.html /shell/cli-commands.html 301
+/api/rpc.html /shell/rpc.html 301
+/developer/protocol_environment.html /shell/protocol_environment.html 301
+/developer/sapling.html /active/sapling.html 301
+/introduction/support.html /introduction/tezos.html 301
+/introduction/test_networks.html /user/multinetwork.html 301
+/user/glossary.html /active/glossary.html 301
+/user/various.html /user/exits.html 301
+/user/versioning.html /introduction/versioning.html 301
+/protocols/019_paris.html /protocols/020_paris.html 301
