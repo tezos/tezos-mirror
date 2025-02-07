@@ -67,13 +67,13 @@ let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
         [%e fun_name] [%e get_verbosity loc key] [%e key_expr] ;
         [%e expr]]
 
-(** [add_custom_function_apply _ key] will create
+(** [replace_expr_with _ key] will create
       {[
         key
       ]}
 
     [key] can be anything since this will replace the preprocessed expression *)
-let add_custom_function_apply loc key = [%expr [%e Key.to_expression loc key]]
+let replace_expr_with loc key = [%expr [%e Key.to_expression loc key]]
 
 (** [add_wrapping_custom_function expr _ key] will create
       {[
@@ -123,7 +123,7 @@ let rewrite rewriters t =
             loc
             rewriter.key
           (* Custom functions *)
-      | Rewriter.Custom -> add_custom_function_apply loc rewriter.key
+      | Rewriter.Custom -> replace_expr_with loc rewriter.key
       | Rewriter.Custom_f | Rewriter.Custom_s ->
           add_wrapping_custom_function expr loc rewriter.key)
     t
