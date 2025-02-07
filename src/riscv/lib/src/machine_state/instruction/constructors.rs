@@ -212,6 +212,25 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the [`OpCode::Or`].
+    pub(crate) fn new_or(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Or,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -332,6 +351,20 @@ impl Instruction {
             (X::NonZero(rd_rs1), X::X0) => Instruction::new_li(rd_rs1, 0, InstrWidth::Compressed),
             (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
                 Instruction::new_and(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Or`] according to whether register is non-zero.
+    pub(super) fn from_ic_or(args: &NonZeroRdRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, X::X0) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::X0) | (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_or(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }

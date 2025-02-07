@@ -282,6 +282,8 @@ pub enum InstrCacheable {
     Add(NonZeroRdRTypeArgs),
     Sub(NonZeroRdRTypeArgs),
     Xor(NonZeroRdRTypeArgs),
+    /// `OR` R-type instruction - Saves in `rd` the bitwise OR between
+    /// the value in `rs1` and `rs2`.
     Or(NonZeroRdRTypeArgs),
     /// `AND` - Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
     And(NonZeroRdRTypeArgs),
