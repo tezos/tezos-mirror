@@ -117,6 +117,15 @@ module Delegate_slots : sig
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
   val voting_power : t -> slot:Slot.t -> int option
+
+  (** Finds the first slot greater than or equal to [slot]. Returns the
+     corresponding (slot, delegate) pair if found, or [None] if no such slot
+     exist. *)
+  val find_first_slot_from : t -> slot:Slot.t -> (Slot.t * delegate_slot) option
+
+  (** Returns the slot with the smallest index, along with its associated
+      delegate. Returns [None] if the map is empty. *)
+  val min_slot : t -> (Slot.t * delegate_slot) option
 end
 
 type delegate_slots = Delegate_slots.t
