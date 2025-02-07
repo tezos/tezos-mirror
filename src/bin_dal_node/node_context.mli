@@ -57,6 +57,10 @@ val get_all_plugins : t -> (module Dal_plugin.T) list
     get the plugin for the predecessor of the target level. *)
 val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 
+(**e See {!get_plugin_for_level}. It additionally returns the protocol parameters are the given level. *)
+val get_plugin_and_parameters_for_level :
+  t -> level:int32 -> ((module Dal_plugin.T) * Types.proto_parameters) tzresult
+
 (** Tries to add a new plugin for the protocol with level [proto_level] to be used
     starting with the given [block_level].
 
@@ -100,11 +104,11 @@ val get_config : t -> Configuration_file.t
 val get_cryptobox : t -> Cryptobox.t
 
 (** [get_proto_parameters ?level ctxt] returns the DAL node's protocol
-    parameters stored in the context, when [level] is not provided. If [level]
-    is provided, then the protocol parameters for that level are fetched via the
-    relevant plugin. *)
-val get_proto_parameters :
-  ?level:int32 -> t -> Types.proto_parameters tzresult Lwt.t
+    parameters. When [level] is not provided, it returns the last known
+    parameters. If [level] is provided, then the protocol parameters for that
+    level are returned. The parameters returned are obtained via
+    {!get_plugin_and_parameters_for_level}. *)
+val get_proto_parameters : ?level:int32 -> t -> Types.proto_parameters tzresult
 
 (** Update the node's last finalized level. *)
 val set_last_finalized_level : t -> int32 -> unit

@@ -108,11 +108,12 @@ let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   ctxt.proto_plugins <- proto_plugins ;
   return_unit
 
+let get_plugin_and_parameters_for_level ctxt ~level =
+  Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
+
 let get_plugin_for_level ctxt ~level =
   let open Result_syntax in
-  let* plugin, _proto_parameters =
-    Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
-  in
+  let* plugin, _parameters = get_plugin_and_parameters_for_level ctxt ~level in
   return plugin
 
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
@@ -120,14 +121,12 @@ let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
 
 let get_proto_parameters ?level ctxt =
-  let open Lwt_result_syntax in
-  match level with
-  | None -> return ctxt.proto_parameters
-  | Some level ->
-      (* get the plugin from the plugin cache *)
-      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
-      let cctxt = get_tezos_node_cctxt ctxt in
-      Plugin.get_constants `Main (`Level level) cctxt
+  let open Result_syntax in
+  let level =
+    match level with None -> ctxt.last_finalized_level | Some level -> level
+  in
+  let* _plugin, parameters = get_plugin_and_parameters_for_level ctxt ~level in
+  return parameters
 
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with

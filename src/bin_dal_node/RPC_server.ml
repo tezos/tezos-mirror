@@ -189,6 +189,7 @@ module Slots_handlers = struct
               in
               let* proto_parameters =
                 Node_context.get_proto_parameters ctxt
+                |> Lwt.return
                 |> lwt_map_error (fun e -> `Other e)
               in
               let slot_size = proto_parameters.cryptobox_parameters.slot_size in
@@ -274,7 +275,7 @@ module Node = struct
     |> Store.last_processed_level |> Store.Last_processed_level.load
 
   let get_protocol_parameters ctxt level () =
-    Node_context.get_proto_parameters ?level ctxt
+    Node_context.get_proto_parameters ?level ctxt |> Lwt.return
 end
 
 module Profile_handlers = struct
@@ -288,6 +289,7 @@ module Profile_handlers = struct
         in
         let* proto_parameters =
           Node_context.get_proto_parameters ctxt
+          |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
         let number_of_slots = proto_parameters.Types.number_of_slots in
@@ -470,6 +472,7 @@ module Profile_handlers = struct
              it. *)
           let* proto_parameters =
             Node_context.get_proto_parameters ctxt ~level:published_level
+            |> Lwt.return
             |> lwt_map_error (fun e -> `Other e)
           in
 
@@ -495,6 +498,7 @@ module Profile_handlers = struct
           in
           let* published_level_parameters =
             Node_context.get_proto_parameters ctxt ~level:published_level
+            |> Lwt.return
             |> lwt_map_error (fun e -> `Other e)
           in
           let* flags =
@@ -541,6 +545,7 @@ module Profile_handlers = struct
         in
         let* proto_parameters =
           Node_context.get_proto_parameters ctxt
+          |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
         let store = Node_context.get_store ctxt in

@@ -424,7 +424,10 @@ module Handler = struct
         ~dal_constants
         ~pred_publication_level_dal_constants:
           (lazy
-            (Node_context.get_proto_parameters ctxt ~level:pred_published_level))
+            (Lwt.return
+            @@ Node_context.get_proto_parameters
+                 ctxt
+                 ~level:pred_published_level))
     in
     let cells_of_level =
       List.map
@@ -713,7 +716,7 @@ module Handler = struct
               ~proto_level:finalized_shell_header.proto_level
               ~block_level:level
           in
-          let* proto_parameters =
+          let*? proto_parameters =
             Node_context.get_proto_parameters ctxt ~level
           in
           (* At each potential published_level [level], we prefetch the
@@ -1100,7 +1103,7 @@ let update_and_register_profiles ctxt =
   let open Lwt_result_syntax in
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
-  let* proto_parameters = Node_context.get_proto_parameters ctxt in
+  let*? proto_parameters = Node_context.get_proto_parameters ctxt in
   let profile_ctxt =
     Profile_manager.register_profile
       profile_ctxt
@@ -1167,7 +1170,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let* block_info =
       Plugin.block_info cctxt ~block:(`Level level) ~metadata:`Always
     in
-    let* dal_constants = Node_context.get_proto_parameters ctxt ~level in
+    let*? dal_constants = Node_context.get_proto_parameters ctxt ~level in
     Handler.store_skip_list_cells
       ctxt
       cctxt

@@ -74,7 +74,7 @@ let inject_entrapment_evidences (type block_info)
     rpc_ctxt block =
   let open Lwt_result_syntax in
   let attested_level = (Plugin.block_shell_header block).level in
-  let* proto_parameters =
+  let*? proto_parameters =
     Node_context.get_proto_parameters node_ctxt ~level:attested_level
   in
   when_ proto_parameters.incentives_enable (fun () ->
