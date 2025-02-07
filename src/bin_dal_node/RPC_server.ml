@@ -382,33 +382,22 @@ module Profile_handlers = struct
     in
     Lwt.return_unit
 
-  let warn_if_lagging store ~attestation_level =
-    let open Lwt_result_syntax in
-    let*! last_processed_level =
-      let last_processed_level_store = Store.last_processed_level store in
-      Store.Last_processed_level.load last_processed_level_store
-    in
-    match last_processed_level with
-    | Ok (Some lpl) ->
-        (* The L1 node's level is at least [current_level = lpl + 2], because the
-           DAL node processes blocks with a delay of two levels, to be sure that
-           processed blocks are final. *)
-        let current_level = Int32.add lpl 2l in
-        (* The baker's current level is the same as its L1 node and is the one
-           of the latest seen proposal (ie block). The baker asks for slots'
-           status when it has seen a proposal at [attestation_level - 1]. *)
-        let current_baker_level = Int32.sub attestation_level 1l in
-        (* We check that the baker is not in advance wrt the DAL node, which would
-           mean that the DAL node is lagging. We allow a slack of 1 level. *)
-        if Int32.succ current_level < current_baker_level then
-          Event.emit_get_attestable_slots_future_level_warning
-            ~current_level
-            ~current_baker_level
-        else Lwt.return_unit
-    | _ ->
-        (* We simply don't do anything if we couldn't obtain the
-           [last_processed_level]. This should not happen though. *)
-        Lwt.return_unit
+  let warn_if_lagging ~last_finalized_level ~attestation_level =
+    (* The L1 node's level is at least [last_finalized_level + 2], because the
+       DAL node processes blocks with a delay of two levels, to be sure that
+       processed blocks are final. *)
+    let current_level = Int32.add last_finalized_level 2l in
+    (* The baker's current level is the same as its L1 node and is the level
+       of the latest seen proposal (ie block). The baker asks for slots'
+       status when it has seen a proposal at [attestation_level - 1]. *)
+    let current_baker_level = Int32.sub attestation_level 1l in
+    (* We check that the baker is not in advance wrt the DAL node, which would
+       mean that the DAL node is lagging. We allow a slack of 1 level. *)
+    if Int32.succ current_level < current_baker_level then
+      Event.emit_get_attestable_slots_future_level_warning
+        ~current_level
+        ~current_baker_level
+    else Lwt.return_unit
 
   let is_slot_attestable_with_traps shards_store traps_fraction pkh
       assigned_shard_indexes slot_id =
@@ -498,9 +487,9 @@ module Profile_handlers = struct
     in
     call_handler1 (fun () ->
         let open Lwt_result_syntax in
-        let store = Node_context.get_store ctxt in
+        let last_finalized_level = Node_context.get_last_finalized_level ctxt in
         let attestation_level = Int32.pred attested_level in
-        let*! () = warn_if_lagging store ~attestation_level in
+        let*! () = warn_if_lagging ~last_finalized_level ~attestation_level in
         (* For retrieving the assigned shard indexes, we consider the committee
            at [attestation_level], because the (DAL) attestations in the blocks
            at level [attested_level] refer to the predecessor level. *)
@@ -511,6 +500,7 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
+        let store = Node_context.get_store ctxt in
         let proto_parameters = Node_context.get_proto_parameters ctxt in
         get_attestable_slots
           ~shard_indices

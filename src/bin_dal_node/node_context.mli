@@ -40,6 +40,7 @@ val init :
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
+  last_finalized_level:int32 ->
   t
 
 (** Returns all the registered plugins *)
@@ -100,6 +101,13 @@ val get_cryptobox : t -> Cryptobox.t
 
 (** [get_proto_parameters ctxt] returns the DAL node's current protocol parameters. *)
 val get_proto_parameters : t -> Dal_plugin.proto_parameters
+
+(** Update the node's last finalized level. *)
+val set_last_finalized_level : t -> int32 -> unit
+
+(** Get the node's last finalized level. This level may be equal or higher than
+    the node's last processed level. *)
+val get_last_finalized_level : t -> int32
 
 (** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
 val get_shards_proofs_precomputation :
@@ -169,11 +177,9 @@ val fetch_committee :
 val version : t -> Types.Version.t
 
 (** Emit a warning for each public key hash in the given operator profile (if
-    any) that is not that of a L1-registered delegate. The optional [level]
-    argument is used to specify for which level to obtain the plugin; if not
-    given the last process level is used (if found in the store). *)
+    any) that is not that of a L1-registered delegate. *)
 val warn_if_attesters_not_delegates :
-  t -> ?level:int32 -> Operator_profile.t -> unit tzresult Lwt.t
+  t -> Operator_profile.t -> unit tzresult Lwt.t
 
 (** Module for P2P-related accessors.  *)
 module P2P : sig

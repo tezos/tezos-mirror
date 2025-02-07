@@ -672,6 +672,7 @@ module Handler = struct
       | None -> Lwt.fail_with "L1 crawler lib shut down"
       | Some (_finalized_hash, finalized_shell_header) ->
           let level = finalized_shell_header.level in
+          let () = Node_context.set_last_finalized_level ctxt level in
           (* At each potential published_level [level], we prefetch the
              committee for its corresponding attestation_level (that is:
              level + attestation_lag - 1). This is in particular used by GS
@@ -1405,14 +1406,12 @@ let run ~data_dir ~configuration_override =
       gs_worker
       transport_layer
       cctxt
+      ~last_finalized_level:head_level
   in
   let* () =
     match Profile_manager.get_profiles profile_ctxt with
     | Operator profile ->
-        Node_context.warn_if_attesters_not_delegates
-          ctxt
-          ~level:head_level
-          profile
+        Node_context.warn_if_attesters_not_delegates ctxt profile
     | _ -> return_unit
   in
   Gossipsub.Worker.Validate_message_hook.set
