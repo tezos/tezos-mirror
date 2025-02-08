@@ -68,7 +68,7 @@ let raw ?protocol t client =
           t.raw <- Some (`Hex raw) ;
           return (`Hex raw)
       | Some p -> (
-          let name = Protocol.daemon_name p ^ ".operation.unsigned" in
+          let name = Protocol.encoding_prefix p ^ ".operation.unsigned" in
           match Data_encoding.Registration.find name with
           | None -> Test.fail "%s encoding was not found" name
           | Some registered -> (
