@@ -91,35 +91,61 @@ let hex ?protocol ?signature t client =
       let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
       return (`Hex (raw ^ signature))
 
+let bls_mode_raw t client : Hex.t Lwt.t =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.post_chain_block_helpers_forge_bls_consensus_operations
+         ~data:(Data (json t))
+         ()
+  in
+  let sign_bytes = JSON.(json |-> "sign" |> as_string) in
+  let inject_bytes = JSON.(json |-> "inject" |> as_string) in
+  t.raw <- Some (`Hex inject_bytes) ;
+  return (`Hex sign_bytes)
+
 let sign ?protocol ({kind; signer; _} as t) client =
+  let is_tz4 = String.starts_with ~prefix:"tz4" in
   match signer with
   | None -> return Tezos_crypto.Signature.zero
-  | Some signer ->
-      let watermark =
-        match kind with
-        | Consensus {kind; chain_id} ->
-            let chain_id =
-              Tezos_crypto.Hashed.Chain_id.to_string
-                (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
-            in
-            let prefix =
-              match kind with
-              | Preattestation -> "\x12"
-              | Attestation _ -> "\x13"
-            in
+  | Some signer -> (
+      match kind with
+      | Consensus {kind; chain_id} ->
+          let chain_id =
+            Tezos_crypto.Hashed.Chain_id.to_string
+              (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+          in
+          let prefix =
+            match kind with Preattestation -> "\x12" | Attestation _ -> "\x13"
+          in
+          let watermark =
             Tezos_crypto.Signature.Custom
               (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
-        | Anonymous | Voting | Manager ->
-            Tezos_crypto.Signature.Generic_operation
-      in
-      let* hex = hex ?protocol t client in
-      let bytes = Hex.to_bytes hex in
-      return (Account.sign_bytes ~watermark ~signer bytes)
+          in
+          let* hex =
+            match protocol with
+            | Some p
+              when Protocol.number p >= 023 && is_tz4 signer.public_key_hash ->
+                let* constants =
+                  Client.RPC.call client
+                  @@ RPC.get_chain_block_context_constants ()
+                in
+                if JSON.(constants |-> "aggregate_attestation" |> as_bool) then
+                  bls_mode_raw t client
+                else hex ?protocol t client
+            | _ -> hex ?protocol t client
+          in
+          let bytes = Hex.to_bytes hex in
+          return (Account.sign_bytes ~watermark ~signer bytes)
+      | Anonymous | Voting | Manager ->
+          let watermark = Tezos_crypto.Signature.Generic_operation in
+          let* hex = hex ?protocol t client in
+          let bytes = Hex.to_bytes hex in
+          return (Account.sign_bytes ~watermark ~signer bytes))
 
 let signed_hex ?protocol ?signature t client =
   let* signature =
     match signature with
-    | None -> sign t client
+    | None -> sign ?protocol t client
     | Some signature -> return signature
   in
   hex ?protocol ~signature t client
@@ -354,9 +380,10 @@ module Consensus = struct
     in
     return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
 
-  let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
+  let inject ?request ?force ?branch ?chain_id ?error ~protocol ~signer
+      consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
-    inject ?request ?force ?error op client
+    inject ?request ?force ?error ~protocol op client
 
   let get_slots ~level client =
     Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
