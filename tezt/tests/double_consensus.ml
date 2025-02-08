@@ -120,7 +120,12 @@ let double_consensus_wrong_slot
   in
   let waiter = consensus_waiter accuser in
   let* _ =
-    Operation.Consensus.inject ~branch ~signer:Constant.bootstrap1 op client
+    Operation.Consensus.inject
+      ~protocol
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
   in
   let* () = waiter in
   Log.info
@@ -134,7 +139,12 @@ let double_consensus_wrong_slot
     double_consensus_already_denounced_waiter accuser oph
   in
   let* _ =
-    Operation.Consensus.inject ~branch ~signer:Constant.bootstrap1 op client
+    Operation.Consensus.inject
+      ~protocol
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
   in
   let* () = waiter_already_denounced in
   unit
@@ -185,6 +195,7 @@ let double_consensus_wrong_block_payload_hash
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -208,6 +219,7 @@ let double_consensus_wrong_block_payload_hash
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -264,6 +276,7 @@ let double_consensus_wrong_branch
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -284,6 +297,7 @@ let double_consensus_wrong_branch
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -361,6 +375,7 @@ let operation_too_old =
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -438,6 +453,7 @@ let operation_too_far_in_future =
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
