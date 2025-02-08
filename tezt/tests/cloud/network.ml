@@ -12,7 +12,7 @@ type t = [public | `Sandbox]
 let to_string = function
   | `Mainnet -> "mainnet"
   | `Ghostnet -> "ghostnet"
-  | `Nextnet _ -> "betanet"
+  | `Nextnet _ -> "nextnet"
   | `Weeklynet date -> sf "weeklynet-%s" date
   | `Sandbox -> "sandbox"
 
