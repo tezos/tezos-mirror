@@ -731,7 +731,7 @@ module Daemon_node_config = struct
 
   let default_media_type = Daemon_config.default_media_type
 
-  let other_registrations = None
+  let other_registrations = Client_config.other_registrations
 
   let default_daily_logs_path = None
 
