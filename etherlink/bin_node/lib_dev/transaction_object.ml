@@ -250,10 +250,34 @@ let reconstruct_block payload block =
       let* l = List.map_e (reconstruct_from_transactions_list transactions) l in
       return {block with transactions = TxFull l}
 
+let rereconstruct payload = function
+  | Kernel obj -> reconstruct payload obj
+  | other -> Ok other
+
+let rereconstruct_block payload block =
+  let open Result_syntax in
+  let* transactions = Blueprint_decoder.transactions payload in
+  match block.transactions with
+  | TxHash h -> return {block with transactions = TxHash h}
+  | TxFull l ->
+      let* l =
+        List.map_e
+          (function
+            | Kernel obj -> reconstruct_from_transactions_list transactions obj
+            | other -> Ok other)
+          l
+      in
+      return {block with transactions = TxFull l}
+
 let hash = function
   | Kernel obj -> obj.hash
   | Legacy obj -> obj.hash
   | EIP_1559 obj -> obj.hash
+
+let block_number = function
+  | Kernel obj -> obj.blockNumber
+  | Legacy obj -> obj.blockNumber
+  | EIP_1559 obj -> obj.block_number
 
 let encoding =
   let open Data_encoding in
