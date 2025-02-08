@@ -199,6 +199,7 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     base_dir : string;
+    remote_signer : Uri.t option;
     mutable operators : (purpose * string) list;
     default_operator : string option;
     metrics_addr : string option;
@@ -330,6 +331,10 @@ let make_command_arguments ?endpoint ?password_file node =
   in
   ["--endpoint"; endpoint; "--base-dir"; base_dir node]
   @ Cli_arg.optional_arg "password-filename" Fun.id password_file
+  @ Cli_arg.optional_arg
+      "remote-signer"
+      Uri.to_string
+      node.persistent_state.remote_signer
 
 let spawn_command sc_node args =
   Process.spawn
@@ -559,10 +564,11 @@ let handle_event sc_node {name; value; timestamp = _} =
   | _ -> ()
 
 let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
-    ?event_pipe ?metrics_addr ?metrics_port ?(rpc_host = Constant.default_host)
-    ?rpc_port ?(operators = []) ?default_operator
-    ?(dal_node : Dal_node.t option) ?loser_mode ?(allow_degraded = false)
-    ?(gc_frequency = 1) ?(history_mode = Full) ?password_file mode endpoint =
+    ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
+    ?(rpc_host = Constant.default_host) ?rpc_port ?(operators = [])
+    ?default_operator ?(dal_node : Dal_node.t option) ?loser_mode
+    ?(allow_degraded = false) ?(gc_frequency = 1) ?(history_mode = Full)
+    ?password_file mode endpoint =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -586,6 +592,7 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
       {
         data_dir;
         base_dir;
+        remote_signer;
         metrics_addr;
         metrics_port;
         rpc_host;
@@ -608,10 +615,10 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
-    ?metrics_addr ?metrics_port ?rpc_host ?rpc_port ?operators ?default_operator
-    ?dal_node ?loser_mode ?allow_degraded ?gc_frequency ?history_mode
-    ?password_file mode (node : Node.t) =
+let create ?runner ?path ?name ?color ?data_dir ~base_dir ?remote_signer
+    ?event_pipe ?metrics_addr ?metrics_port ?rpc_host ?rpc_port ?operators
+    ?default_operator ?dal_node ?loser_mode ?allow_degraded ?gc_frequency
+    ?history_mode ?password_file mode (node : Node.t) =
   create_with_endpoint
     ?runner
     ?path
@@ -619,6 +626,7 @@ let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
     ?color
     ?data_dir
     ~base_dir
+    ?remote_signer
     ?event_pipe
     ?metrics_addr
     ?metrics_port

@@ -3925,7 +3925,10 @@ let test_interrupt_rollup_node =
   let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
   unit
 
-let test_remote_signer =
+let remote_signer_uri signer ~yes =
+  if yes then Some (Signer.uri signer) else None
+
+let test_remote_signer ~hardcoded_remote_signer =
   let default_operator = Constant.bootstrap2 in
   let operators =
     [
@@ -3938,7 +3941,10 @@ let test_remote_signer =
     {
       tags = ["remote"; "signer"];
       variant = None;
-      description = "rollup node can sign operations with remote signer";
+      description =
+        sf
+          "rollup node can sign operations with %s remote signer"
+          (if hardcoded_remote_signer then "hardcoded" else "relocatable");
     }
     ~uses:(fun _ -> [Constant.octez_signer])
     ~commitment_period:3
@@ -3947,10 +3953,31 @@ let test_remote_signer =
     ~operator:default_operator.public_key_hash
     ~operators:
       (List.map (fun (p, k) -> (p, k.Account.public_key_hash)) operators)
-  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  @@ fun _protocol sc_rollup_node sc_rollup node _client ->
   let keys = default_operator :: List.map snd operators in
   Log.info "Starting remote signer" ;
   let* signer = Signer.init ~keys () in
+  let client_remote_signer =
+    remote_signer_uri signer ~yes:(not hardcoded_remote_signer)
+  in
+  let base_dir = Sc_rollup_node.base_dir sc_rollup_node in
+  let* client =
+    Client.init
+      ~base_dir
+      ~endpoint:(Node node)
+      ?remote_signer:client_remote_signer
+      ()
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~default_operator:default_operator.public_key_hash
+      ~operators:
+        (List.map (fun (p, k) -> (p, k.Account.public_key_hash)) operators)
+      ?remote_signer:client_remote_signer
+      ~base_dir
+      Operator
+      node
+  in
   Log.info "Registering keys as remote in client" ;
   let import (k : Account.key) =
     Client.import_signer_key
@@ -3958,7 +3985,7 @@ let test_remote_signer =
       ~force:true
       ~public_key_hash:k.public_key_hash
       ~alias:k.alias
-      ~signer:(Signer.uri signer)
+      ?signer:(remote_signer_uri signer ~yes:hardcoded_remote_signer)
   in
   let* () = Lwt_list.iter_s import keys in
   let sks =
@@ -3970,8 +3997,11 @@ let test_remote_signer =
     let open JSON in
     let entry = List.find (fun e -> e |-> "name" |> as_string = k.alias) sks in
     let sk = entry |-> "value" |> as_string in
-    if not @@ String.starts_with ~prefix:"http://" sk then
-      Test.fail ~__LOC__ "Key %s not using remote signer" k.alias
+    if
+      not
+      @@ (String.starts_with ~prefix:"http://" sk
+         || String.starts_with ~prefix:"remote:" sk)
+    then Test.fail ~__LOC__ "Key %s not using remote signer" k.alias
   in
   List.iter check_config_key keys ;
   Log.info "Create wallet just for baking" ;
@@ -3984,6 +4014,23 @@ let test_remote_signer =
       Constant.bootstrap1.secret_key
       ~alias:Constant.bootstrap1.alias
   in
+  Log.info "Stopping signer" ;
+  let* () = Signer.terminate signer in
+  let* () = Sc_rollup_node.run ~wait_ready:false sc_rollup_node sc_rollup []
+  and* () =
+    Lwt.choose
+      [
+        (let* () = Lwt_unix.sleep 30. in
+         Test.fail
+           "Rollup node did not detect the remote signer was unreachable");
+        Sc_rollup_node.check_error
+          ~exit_code:1
+          ~msg:(rex "Cannot get public key for signer")
+          sc_rollup_node;
+      ]
+  in
+  Log.info "Restart signer" ;
+  let* () = Signer.restart signer in
   Log.info "Starting rollup node" ;
   let* () =
     Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
@@ -7159,4 +7206,5 @@ let register_protocol_independent () =
   bailout_mode_fail_to_start_without_operator ~kind protocols ;
   bailout_mode_fail_operator_no_stake ~kind protocols ;
   bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
-  test_remote_signer ~kind protocols
+  test_remote_signer ~hardcoded_remote_signer:true ~kind protocols ;
+  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols

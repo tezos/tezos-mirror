@@ -130,6 +130,7 @@ val create :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   base_dir:string ->
+  ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
   ?metrics_port:int ->
@@ -155,6 +156,7 @@ val create_with_endpoint :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   base_dir:string ->
+  ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
   ?metrics_port:int ->
