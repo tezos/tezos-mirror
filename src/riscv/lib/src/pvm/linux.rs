@@ -43,6 +43,9 @@ const SIGALTSTACK: u64 = 132;
 /// System call number for `rt_sigaction` on RISC-V
 const RT_SIGACTION: u64 = 134;
 
+/// System call number for `rt_sigprocmask` on RISC-V
+const RT_SIGPROCMASK: u64 = 135;
+
 /// Hard limit on the number of file descriptors that a system call can work with
 ///
 /// We also use this constant to implictly limit how much memory can be associated with a system
@@ -50,6 +53,11 @@ const RT_SIGACTION: u64 = 134;
 /// the length of that array, then we might read an arbitrary amount of memory. This impacts the
 /// proof size dramatically as everything read would also be in the proof.
 const RLIMIT_NOFILE: u64 = 512;
+
+/// Size of the `sigset_t` type in bytes
+///
+/// As we're building a 64-bit system, the sigset should be 64-bit wide as well.
+const SIGSET_SIZE: u64 = 8;
 
 /// Key into the auxiliary vector which informs supervised processes of auxiliary information
 #[derive(Clone, Copy)]
@@ -242,12 +250,12 @@ impl<M: ManagerBase> SupervisorState<M> {
         // Programs targeting a Linux kernel pass the system call number in register a7
         let system_call_no = core.hart.xregisters.read(registers::a7);
 
-        #[allow(clippy::single_match)]
         match system_call_no {
             PPOLL => return self.handle_ppoll(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
             SIGALTSTACK => return self.handle_sigaltstack(core),
             RT_SIGACTION => return self.handle_rt_sigaction(core),
+            RT_SIGPROCMASK => return self.handle_rt_sigprocmask(core),
             _ => {}
         }
 
@@ -405,8 +413,8 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         // As we're implementing a 64-bit system, the size of `sigset_t` must be 8 bytes.
         // This is an assumption which is used in the remainder of the function body.
-        if sigset_t_size != 8 {
-            core.hart.xregisters.write(registers::a0, -ENOSYS as u64);
+        if sigset_t_size != SIGSET_SIZE {
+            core.hart.xregisters.write(registers::a0, -EINVAL as u64);
             return true;
         }
 
@@ -418,6 +426,42 @@ impl<M: ManagerBase> SupervisorState<M> {
             let Ok(()) = core
                 .main_memory
                 .write(old_action.get(), [0u8; SIZE_SIGACTION])
+            else {
+                core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+                return true;
+            };
+        }
+
+        // Return 0 as an indicator of success
+        core.hart.xregisters.write(registers::a0, 0);
+
+        true
+    }
+
+    /// Handle `rt_sigprocmask` system call. This does nothing effectively. If the previous mask is
+    /// requested, it will simply be zeroed out.
+    fn handle_rt_sigprocmask(
+        &mut self,
+        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+    ) -> bool
+    where
+        M: ManagerRead + ManagerWrite,
+    {
+        let old = core.hart.xregisters.read(registers::a2);
+        let sigset_t_size = core.hart.xregisters.read(registers::a3);
+
+        // As we're implementing a 64-bit system, the size of `sigset_t` must be 8 bytes.
+        // This is an assumption which is used in the remainder of the function body.
+        if sigset_t_size != SIGSET_SIZE {
+            core.hart.xregisters.write(registers::a0, -EINVAL as u64);
+            return true;
+        }
+
+        if let Some(old_action) = NonZeroU64::new(old) {
+            // As we don't store the previous mask, we just zero out the memory
+            let Ok(()) = core
+                .main_memory
+                .write(old_action.get(), [0u8; SIGSET_SIZE as usize])
             else {
                 core.hart.xregisters.write(registers::a0, -EFAULT as u64);
                 return true;
