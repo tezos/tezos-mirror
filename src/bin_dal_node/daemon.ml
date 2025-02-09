@@ -670,7 +670,7 @@ module Handler = struct
     let open Lwt_result_syntax in
     let stream = Crawler.finalized_heads_stream crawler in
     let rec loop () =
-      let proto_parameters = Node_context.get_proto_parameters ctxt in
+      let* proto_parameters = Node_context.get_proto_parameters ctxt in
       let cryptobox = Node_context.get_cryptobox ctxt in
       let*! next_final_head = Lwt_stream.get stream in
       match next_final_head with
@@ -1069,7 +1069,7 @@ let update_and_register_profiles ctxt =
   let open Lwt_result_syntax in
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
-  let proto_parameters = Node_context.get_proto_parameters ctxt in
+  let* proto_parameters = Node_context.get_proto_parameters ctxt in
   let profile_ctxt =
     Profile_manager.register_profile
       profile_ctxt

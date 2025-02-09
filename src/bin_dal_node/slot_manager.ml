@@ -391,7 +391,10 @@ let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
 
 let get_slot_pages ~reconstruct_if_missing node_context slot_id =
   let open Lwt_result_syntax in
-  let proto_parameters = Node_context.get_proto_parameters node_context in
+  let* proto_parameters =
+    Node_context.get_proto_parameters node_context
+    |> lwt_map_error (fun e -> `Other e)
+  in
   let page_size = proto_parameters.cryptobox_parameters.page_size in
   let* slot = get_slot_content ~reconstruct_if_missing node_context slot_id in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.

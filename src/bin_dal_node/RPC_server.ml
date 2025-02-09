@@ -187,7 +187,10 @@ module Slots_handlers = struct
                       (Errors.other [Cannot_publish_on_slot_index slot_index])
                 | None | Some _ -> return_unit
               in
-              let proto_parameters = Node_context.get_proto_parameters ctxt in
+              let* proto_parameters =
+                Node_context.get_proto_parameters ctxt
+                |> lwt_map_error (fun e -> `Other e)
+              in
               let slot_size = proto_parameters.cryptobox_parameters.slot_size in
               let slot_length = String.length slot in
               let*? slot_bytes =
@@ -280,7 +283,10 @@ module Profile_handlers = struct
           Node_context.warn_if_attesters_not_delegates ctxt operator_profiles
           |> lwt_map_error (fun e -> `Other e)
         in
-        let proto_parameters = Node_context.get_proto_parameters ctxt in
+        let* proto_parameters =
+          Node_context.get_proto_parameters ctxt
+          |> lwt_map_error (fun e -> `Other e)
+        in
         let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
         match
           Profile_manager.add_and_register_operator_profile
@@ -501,8 +507,11 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
+        let* proto_parameters =
+          Node_context.get_proto_parameters ctxt
+          |> lwt_map_error (fun e -> `Other e)
+        in
         let store = Node_context.get_store ctxt in
-        let proto_parameters = Node_context.get_proto_parameters ctxt in
         get_attestable_slots
           ~shard_indices
           store
