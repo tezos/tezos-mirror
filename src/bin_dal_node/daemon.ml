@@ -251,6 +251,13 @@ module Handler = struct
             (if res = `Valid then
                let store = Node_context.get_store ctxt in
                let traps_store = Store.traps store in
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+                  The [proto_parameters] are those for the last known finalized
+                  level, which may differ from those of the slot level. This
+                  will be an issue when the value of the [traps_fraction]
+                  changes. (We cannot use {!Node_context.get_proto_parameters},
+                  as it is not monad-free; we'll need to use mapping from levels
+                  to parameters.) *)
                Option.iter
                  (Slot_manager.maybe_register_trap
                     traps_store
@@ -668,7 +675,6 @@ module Handler = struct
     let open Lwt_result_syntax in
     let stream = Crawler.finalized_heads_stream crawler in
     let rec loop () =
-      let* proto_parameters = Node_context.get_proto_parameters ctxt in
       let cryptobox = Node_context.get_cryptobox ctxt in
       let*! next_final_head = Lwt_stream.get stream in
       match next_final_head with
@@ -676,6 +682,18 @@ module Handler = struct
       | Some (_finalized_hash, finalized_shell_header) ->
           let level = finalized_shell_header.level in
           let () = Node_context.set_last_finalized_level ctxt level in
+          let* () =
+            (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
+               We should use the head level instead. *)
+            Node_context.may_add_plugin
+              ctxt
+              cctxt
+              ~proto_level:finalized_shell_header.proto_level
+              ~block_level:level
+          in
+          let* proto_parameters =
+            Node_context.get_proto_parameters ctxt ~level
+          in
           (* At each potential published_level [level], we prefetch the
              committee for its corresponding attestation_level (that is:
              level + attestation_lag - 1). This is in particular used by GS
@@ -694,15 +712,6 @@ module Handler = struct
                 Node_context.fetch_committee ctxt ~level:attestation_level
               in
               return_unit
-          in
-          let* () =
-            (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
-               We should use the head level instead. *)
-            Node_context.may_add_plugin
-              ctxt
-              cctxt
-              ~proto_level:finalized_shell_header.proto_level
-              ~block_level:level
           in
           Gossipsub.Worker.Validate_message_hook.set
             (gossipsub_app_messages_validation
