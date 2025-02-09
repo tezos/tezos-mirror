@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::Pvm;
 use crate::{
     machine_state::{
         CacheLayouts, MachineCoreState, MachineError, MachineState,
@@ -23,8 +24,8 @@ pub const PAGE_SIZE: u64 = 4096;
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
 
-/// Indicates a system call is not supported
-const ENOSYS: i64 = 38;
+/// Indicates a process or thread was not found
+const ESRCH: i64 = 3;
 
 /// Indicates a memory address was faulty
 const EFAULT: i64 = 14;
@@ -32,11 +33,23 @@ const EFAULT: i64 = 14;
 /// Indicates an invalid argument
 const EINVAL: i64 = 22;
 
+/// Indicates a system call is not supported
+const ENOSYS: i64 = 38;
+
 /// System call number for `ppoll` on RISC-V
 const PPOLL: u64 = 73;
 
+/// System call number for `exit` on RISC-V
+const EXIT: u64 = 93;
+
+/// System call number for `exit_group` on RISC-V
+const EXITGROUP: u64 = 94;
+
 /// System call number for `set_tid_address` on RISC-V
 const SET_TID_ADDRESS: u64 = 96;
+
+/// System call number for `tkill` on RISC-V
+const TKILL: u64 = 130;
 
 /// System call number for `sigaltstack` on RISC-V
 const SIGALTSTACK: u64 = 132;
@@ -213,18 +226,39 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> MachineState<ML, CL
     }
 }
 
+impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> Pvm<ML, CL, M> {
+    /// Check if the supervised process has requested an exit.
+    pub fn has_exited(&self) -> Option<u64>
+    where
+        M: ManagerRead,
+    {
+        if self.system_state.exited.read() {
+            let code = self.system_state.exit_code.read();
+            return Some(code);
+        }
+
+        None
+    }
+}
+
 /// Layout for the Linux supervisor state
-pub type SupervisorStateLayout = Atom<u64>;
+pub type SupervisorStateLayout = (Atom<u64>, Atom<bool>, Atom<u64>);
 
 /// Linux supervisor state
 pub struct SupervisorState<M: ManagerBase> {
     tid_address: Cell<u64, M>,
+    exited: Cell<bool, M>,
+    exit_code: Cell<u64, M>,
 }
 
 impl<M: ManagerBase> SupervisorState<M> {
     /// Bind the given allocated regions to the supervisor state.
     pub fn bind(space: AllocatedOf<SupervisorStateLayout, M>) -> Self {
-        SupervisorState { tid_address: space }
+        SupervisorState {
+            tid_address: space.0,
+            exited: space.1,
+            exit_code: space.2,
+        }
     }
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
@@ -232,7 +266,11 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
         &'a self,
     ) -> AllocatedOf<SupervisorStateLayout, F::Output> {
-        self.tid_address.struct_ref::<F>()
+        (
+            self.tid_address.struct_ref::<F>(),
+            self.exited.struct_ref::<F>(),
+            self.exit_code.struct_ref::<F>(),
+        )
     }
 
     /// Handle a Linux system call.
@@ -241,7 +279,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         core: &mut MachineCoreState<impl MainMemoryLayout, M>,
     ) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         // We need to jump to the next instruction. The ECall instruction which triggered this
         // function is 4 byte wide.
@@ -253,7 +291,9 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         match system_call_no {
             PPOLL => return self.handle_ppoll(core),
+            EXIT | EXITGROUP => return self.handle_exit(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
+            TKILL => return self.handle_tkill(core),
             SIGALTSTACK => return self.handle_sigaltstack(core),
             RT_SIGACTION => return self.handle_rt_sigaction(core),
             RT_SIGPROCMASK => return self.handle_rt_sigprocmask(core),
@@ -377,6 +417,18 @@ impl<M: ManagerBase> SupervisorState<M> {
         true
     }
 
+    /// Handle `exit` and `exitgroup` system calls.
+    fn handle_exit(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    where
+        M: ManagerReadWrite,
+    {
+        let status = core.hart.xregisters.read(registers::a0);
+        self.exit_code.write(status);
+        self.exited.write(true);
+
+        false
+    }
+
     /// Handle `sigaltstack` system call. The new signal stack configuration is discarded. If the
     /// old signal stack configuration is requested, it will be zeroed out.
     fn handle_sigaltstack(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
@@ -474,12 +526,47 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         true
     }
+
+    /// Handle `tkill` system call. As there is only one thread at the moment, this system call
+    /// will return an error if the thread ID is not the main thread ID.
+    fn handle_tkill(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    where
+        M: ManagerReadWrite,
+    {
+        let thread_id = core.hart.xregisters.read(registers::a0);
+        let signal = core.hart.xregisters.read(registers::a1);
+
+        if thread_id != MAIN_THREAD_ID {
+            // We only support exiting the main thread
+            core.hart.xregisters.write(registers::a0, -ESRCH as u64);
+            return true;
+        }
+
+        // Indicate that we have exited
+        self.exited.write(true);
+
+        /// Setting bit 2^7 of the exit code indicates that the process was killed by a signal
+        const EXIT_BY_SIGNAL: u64 = 1 << 7;
+
+        /// Only 7 bits may be used to indicate the signal that terminated the process
+        const EXIT_SIGNAL_MASK: u64 = EXIT_BY_SIGNAL - 1;
+
+        self.exit_code
+            .write(EXIT_BY_SIGNAL | signal & EXIT_SIGNAL_MASK);
+
+        // Return 0 as an indicator of success, even if this might not actually be used
+        core.hart.xregisters.write(registers::a0, 0);
+
+        false
+    }
 }
 
 impl<M: ManagerClone> Clone for SupervisorState<M> {
     fn clone(&self) -> Self {
         Self {
             tid_address: self.tid_address.clone(),
+            exited: self.exited.clone(),
+            exit_code: self.exit_code.clone(),
         }
     }
 }

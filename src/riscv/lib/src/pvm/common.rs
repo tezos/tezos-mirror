@@ -129,7 +129,7 @@ pub struct Pvm<
     pub(crate) machine_state: machine_state::MachineState<ML, CL, M>,
     reveal_request: RevealRequest<M>,
     #[cfg(feature = "supervisor")]
-    system_state: linux::SupervisorState<M>,
+    pub(super) system_state: linux::SupervisorState<M>,
     version: state_backend::Cell<u64, M>,
     status: Cell<PvmStatus, M>,
 }
