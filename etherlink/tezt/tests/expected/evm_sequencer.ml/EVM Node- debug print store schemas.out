@@ -71,4 +71,6 @@ CREATE TABLE metadata (
 CREATE TABLE block_storage_mode (
   legacy INTEGER NOT NULL,
   CONSTRAINT valid_legacy CHECK (legacy IN (0, 1))
-)
+);
+
+CREATE INDEX index_transactions_block_number ON transactions(block_number)

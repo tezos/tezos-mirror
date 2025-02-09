@@ -234,7 +234,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 18
+    let version = 19
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
