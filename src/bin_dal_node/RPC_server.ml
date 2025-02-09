@@ -170,7 +170,6 @@ module Slots_handlers = struct
               return (commitment, commitment_proof)
           | _ ->
               let cryptobox = Node_context.get_cryptobox ctxt in
-              let proto_parameters = Node_context.get_proto_parameters ctxt in
               let profile = Node_context.get_profile_ctxt ctxt in
               let* () =
                 if not (Profile_manager.is_prover_profile profile) then
@@ -188,6 +187,7 @@ module Slots_handlers = struct
                       (Errors.other [Cannot_publish_on_slot_index slot_index])
                 | None | Some _ -> return_unit
               in
+              let proto_parameters = Node_context.get_proto_parameters ctxt in
               let slot_size = proto_parameters.cryptobox_parameters.slot_size in
               let slot_length = String.length slot in
               let*? slot_bytes =
