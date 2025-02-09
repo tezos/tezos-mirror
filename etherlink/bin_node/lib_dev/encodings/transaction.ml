@@ -409,7 +409,7 @@ let caller ({r; s; _} as transaction) =
 let to_transaction_object :
     hash:hash ->
     transaction ->
-    (Ethereum_types.transaction_object, string) result =
+    (Ethereum_types.legacy_transaction_object, string) result =
  fun ~hash
      ({
         transaction_type = _;

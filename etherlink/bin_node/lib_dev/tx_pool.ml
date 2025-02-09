@@ -22,7 +22,7 @@ module Pool = struct
     raw_tx : string; (* Current transaction. *)
     inclusion_timestamp : Time.Protocol.t;
     (* Time of inclusion in the transaction pool. *)
-    transaction_object : Ethereum_types.transaction_object;
+    transaction_object : Ethereum_types.legacy_transaction_object;
   }
 
   type t = {
@@ -40,7 +40,7 @@ module Pool = struct
       | None -> (Z.zero, Z.zero)
     in
     let is_transaction_pending
-        (transaction_object : Ethereum_types.transaction_object)
+        (transaction_object : Ethereum_types.legacy_transaction_object)
         (address_balance : Z.t) (address_nonce : Z.t) : bool =
       let (Qty gas_limit) = transaction_object.gas in
       let (Qty gas_price) = transaction_object.gasPrice in
@@ -90,7 +90,7 @@ module Pool = struct
 
   (** Add a transaction to the pool. *)
   let add ~must_replace {transactions; global_index} raw_tx
-      (transaction_object : Ethereum_types.transaction_object) =
+      (transaction_object : Ethereum_types.legacy_transaction_object) =
     let (Qty nonce) = transaction_object.nonce in
     let (Qty gas_price) = transaction_object.gasPrice in
     let inclusion_timestamp = Misc.now () in
@@ -273,11 +273,11 @@ end
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        Ethereum_types.transaction_object * string
+        Ethereum_types.legacy_transaction_object * string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | Pop_transactions :
         int
-        -> ((string * Ethereum_types.transaction_object) list, tztrace) t
+        -> ((string * Ethereum_types.legacy_transaction_object) list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
@@ -285,7 +285,7 @@ module Request = struct
     | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
     | Find :
         Ethereum_types.hash
-        -> (Ethereum_types.transaction_object option, tztrace) t
+        -> (Ethereum_types.legacy_transaction_object option, tztrace) t
     | Clear_popped_transactions : (unit, unit) t
 
   type view = View : _ t -> view
@@ -303,7 +303,7 @@ module Request = struct
              (req "request" (constant "add_transaction"))
              (req
                 "transaction_object"
-                Ethereum_types.transaction_object_encoding)
+                Ethereum_types.legacy_transaction_object_encoding)
              (req "transaction" string))
           (function
             | View (Add_transaction (transaction, txn)) ->
@@ -435,7 +435,7 @@ let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
         fail (`MaxPerUser txs)
 
 let insert_valid_transaction state tx_raw
-    (transaction_object : Ethereum_types.transaction_object) =
+    (transaction_object : Ethereum_types.legacy_transaction_object) =
   let open Lwt_result_syntax in
   let open Types in
   let {

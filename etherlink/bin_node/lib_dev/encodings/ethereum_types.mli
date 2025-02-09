@@ -134,7 +134,7 @@ val address_encoding : address Data_encoding.t
 
 val decode_address : bytes -> address
 
-type transaction_object = {
+type legacy_transaction_object = {
   blockHash : block_hash option;
   blockNumber : quantity option;
   from : address;
@@ -151,17 +151,18 @@ type transaction_object = {
   s : hash;
 }
 
-val transaction_object_encoding : transaction_object Data_encoding.t
+val legacy_transaction_object_encoding :
+  legacy_transaction_object Data_encoding.t
 
-val transaction_object_from_rlp_item :
-  block_hash option -> Rlp.item -> transaction_object
+val legacy_transaction_object_from_rlp_item :
+  block_hash option -> Rlp.item -> legacy_transaction_object
 
-val transaction_object_from_rlp :
-  block_hash option -> bytes -> transaction_object
+val legacy_transaction_object_from_rlp :
+  block_hash option -> bytes -> legacy_transaction_object
 
 type block_transactions =
   | TxHash of hash list
-  | TxFull of transaction_object list
+  | TxFull of legacy_transaction_object list
 
 (** Ethereum block hash representation from RPCs. *)
 type block = {
@@ -228,8 +229,8 @@ module AddressMap : sig
 end
 
 type txpool = {
-  pending : transaction_object NonceMap.t AddressMap.t;
-  queued : transaction_object NonceMap.t AddressMap.t;
+  pending : legacy_transaction_object NonceMap.t AddressMap.t;
+  queued : legacy_transaction_object NonceMap.t AddressMap.t;
 }
 
 val txpool_encoding : txpool Data_encoding.t

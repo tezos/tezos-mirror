@@ -217,17 +217,17 @@ module Get_transaction_receipt :
 module Get_transaction_by_hash :
   METHOD
     with type input = Ethereum_types.hash
-     and type output = Ethereum_types.transaction_object option
+     and type output = Ethereum_types.legacy_transaction_object option
 
 module Get_transaction_by_block_hash_and_index :
   METHOD
     with type input = Ethereum_types.block_hash * Ethereum_types.quantity
-     and type output = Ethereum_types.transaction_object option
+     and type output = Ethereum_types.legacy_transaction_object option
 
 module Get_transaction_by_block_number_and_index :
   METHOD
     with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
-     and type output = Ethereum_types.transaction_object option
+     and type output = Ethereum_types.legacy_transaction_object option
 
 module Get_uncle_by_block_hash_and_index :
   METHOD
@@ -288,7 +288,7 @@ module Produce_proposal :
 
 module Inject_transaction :
   METHOD
-    with type input = Ethereum_types.transaction_object * string
+    with type input = Ethereum_types.legacy_transaction_object * string
      and type output = unit
 
 module Durable_state_value :

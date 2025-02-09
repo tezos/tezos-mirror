@@ -133,7 +133,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
   let open Lwt_result_syntax in
   let transactions, tx_hashes =
     List.to_seq transactions_and_objects
-    |> Seq.map (fun (raw, (obj : Ethereum_types.transaction_object)) ->
+    |> Seq.map (fun (raw, (obj : Ethereum_types.legacy_transaction_object)) ->
            (raw, obj.hash))
     |> Seq.split
     |> fun (l, r) -> (List.of_seq l, List.of_seq r)

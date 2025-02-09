@@ -218,14 +218,15 @@ struct
   end
 
   module TxEncoder = struct
-    type transactions = (string * Ethereum_types.transaction_object) list
+    type transactions = (string * Ethereum_types.legacy_transaction_object) list
 
     type messages = string list
 
     let encode_transactions ~smart_rollup_address:_ ~transactions =
       let open Result_syntax in
       List.to_seq transactions
-      |> Seq.map (fun (raw_tx, (obj : Ethereum_types.transaction_object)) ->
+      |> Seq.map
+           (fun (raw_tx, (obj : Ethereum_types.legacy_transaction_object)) ->
              (obj.hash, raw_tx))
       |> Seq.split
       |> fun (l, r) -> (List.of_seq l, List.of_seq r) |> return

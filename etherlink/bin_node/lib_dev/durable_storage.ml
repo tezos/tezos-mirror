@@ -153,7 +153,7 @@ let transaction_object read tx_hash =
     inspect_durable_and_decode_opt
       read
       (Durable_storage_path.Transaction_object.object_ tx_hash)
-      (Ethereum_types.transaction_object_from_rlp (Some mock_block_hash))
+      (Ethereum_types.legacy_transaction_object_from_rlp (Some mock_block_hash))
   in
   match opt_object with
   | Some temp_object ->
@@ -176,7 +176,7 @@ let transaction_object_with_block_hash read block_hash tx_hash =
   inspect_durable_and_decode_opt
     read
     (Durable_storage_path.Transaction_object.object_ tx_hash)
-    (Ethereum_types.transaction_object_from_rlp block_hash)
+    (Ethereum_types.legacy_transaction_object_from_rlp block_hash)
 
 let full_transactions read block_hash transactions =
   let open Lwt_result_syntax in
@@ -259,7 +259,7 @@ let block_receipts_of_block read block =
         (* This case should never happen, because there is no ways
            to ask for full objects when requestion block receipts. *)
         List.map
-          (fun (tx_object : transaction_object) -> tx_object.hash)
+          (fun (tx_object : legacy_transaction_object) -> tx_object.hash)
           tx_objects
   in
   Lwt_list.filter_map_s get_receipt_from_hash tx_hashes
