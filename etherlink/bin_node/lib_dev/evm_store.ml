@@ -111,12 +111,12 @@ module Q = struct
       ~encode:(fun payload ->
         Ok
           (Data_encoding.Binary.to_string_exn
-             Ethereum_types.block_encoding
+             Ethereum_types.(block_encoding legacy_transaction_object_encoding)
              payload))
       ~decode:(fun bytes ->
         Option.to_result ~none:"Not a valid block payload"
         @@ Data_encoding.Binary.of_string_opt
-             Ethereum_types.block_encoding
+             Ethereum_types.(block_encoding legacy_transaction_object_encoding)
              bytes)
       string
 
@@ -1014,34 +1014,54 @@ module Transactions = struct
 
   let find_object store hash =
     let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let+ object_ = Db.find_opt conn Q.Transactions.select_object hash in
-    Option.map
-      (fun ( block_hash,
-             block_number,
-             index,
-             hash,
-             from,
-             to_,
-             Transaction_info.{gas; gas_price; input; nonce; value; v; r; s} ) ->
-        Ethereum_types.
-          {
-            blockHash = Some block_hash;
-            blockNumber = Some block_number;
-            from;
-            gas;
-            gasPrice = gas_price;
-            hash;
-            input;
-            nonce;
-            to_;
-            transactionIndex = Some index;
-            value;
-            v;
-            r;
-            s;
-          })
-      object_
+    let* object_ =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Transactions.select_object hash
+    in
+    let legacy_object =
+      Option.map
+        (fun ( block_hash,
+               block_number,
+               index,
+               hash,
+               from,
+               to_,
+               Transaction_info.{gas; gas_price; input; nonce; value; v; r; s}
+             ) ->
+          Ethereum_types.
+            {
+              blockHash = Some block_hash;
+              blockNumber = Some block_number;
+              from;
+              gas;
+              gasPrice = gas_price;
+              hash;
+              input;
+              nonce;
+              to_;
+              transactionIndex = Some index;
+              value;
+              v;
+              r;
+              s;
+            })
+        object_
+    in
+    match legacy_object with
+    | Some ({blockNumber = Some number; _} as obj) -> (
+        let* blueprint = Blueprints.find store number in
+        match blueprint with
+        | Some blueprint ->
+            let*? obj = Transaction_object.reconstruct blueprint.payload obj in
+            return_some obj
+        | None ->
+            return_some (Transaction_object.from_store_transaction_object obj))
+    | Some _ ->
+        (* We should not end up in this branch, per the function used in above
+           [Option.map]. We do not store transactions which have not been
+           included in a block already. *)
+        assert false
+    | None -> return_none
 
   let clear_after store level =
     with_connection store @@ fun conn ->
@@ -1083,13 +1103,15 @@ module Irmin_chunks = struct
 end
 
 module Blocks = struct
-  let store store (block : Ethereum_types.block) =
+  let store store
+      (block : Ethereum_types.legacy_transaction_object Ethereum_types.block) =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
 
-  let block_with_objects conn block =
+  let block_with_objects store block =
     let open Lwt_result_syntax in
-    let+ rows =
+    let* rows =
+      with_connection store @@ fun conn ->
       Db.collect_list
         conn
         Q.Transactions.select_objects_from_block_number
@@ -1122,23 +1144,35 @@ module Blocks = struct
             })
         rows
     in
-    {block with transactions = TxFull objects_}
+    let block = {block with transactions = TxFull objects_} in
+    let* blueprint = Blueprints.find store block.number in
+    let*? res =
+      match blueprint with
+      | Some blueprint ->
+          Transaction_object.reconstruct_block blueprint.payload block
+      | None -> Ok (Transaction_object.block_from_legacy block)
+    in
+    return res
 
   let find_with_level ~full_transaction_object store level =
     let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* block_opt = Db.find_opt conn Q.Blocks.select_with_level level in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.select_with_level level
+    in
     if full_transaction_object then
-      Option.map_es (block_with_objects conn) block_opt
-    else return block_opt
+      Option.map_es (block_with_objects store) block_opt
+    else return (Option.map Transaction_object.block_from_legacy block_opt)
 
   let find_with_hash ~full_transaction_object store hash =
     let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* block_opt = Db.find_opt conn Q.Blocks.select_with_hash hash in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.select_with_hash hash
+    in
     if full_transaction_object then
-      Option.map_es (block_with_objects conn) block_opt
-    else return block_opt
+      Option.map_es (block_with_objects store) block_opt
+    else return (Option.map Transaction_object.block_from_legacy block_opt)
 
   let find_hash_of_number store level =
     with_connection store @@ fun conn ->

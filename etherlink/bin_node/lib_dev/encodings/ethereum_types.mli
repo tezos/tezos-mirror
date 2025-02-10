@@ -160,12 +160,12 @@ val legacy_transaction_object_from_rlp_item :
 val legacy_transaction_object_from_rlp :
   block_hash option -> bytes -> legacy_transaction_object
 
-type block_transactions =
+type 'transaction_object block_transactions =
   | TxHash of hash list
-  | TxFull of legacy_transaction_object list
+  | TxFull of 'transaction_object list
 
 (** Ethereum block hash representation from RPCs. *)
-type block = {
+type 'transaction_object block = {
   number : quantity;
   hash : block_hash;
   parent : block_hash;
@@ -183,7 +183,7 @@ type block = {
   gasLimit : quantity;
   gasUsed : quantity;
   timestamp : quantity;
-  transactions : block_transactions;
+  transactions : 'transaction_object block_transactions;
   uncles : hash list;
   (* baseFeePerGas and prevRandao are set optionnal because old blocks didn't have
      them*)
@@ -191,7 +191,9 @@ type block = {
   prevRandao : block_hash option;
 }
 
-val block_encoding : block Data_encoding.t
+val block_encoding :
+  'transaction_object Data_encoding.t ->
+  'transaction_object block Data_encoding.t
 
 type transaction_log = {
   address : address;
@@ -255,7 +257,7 @@ val state_override_encoding : state_override Data_encoding.t
 
 val state_override_empty : state_override
 
-val block_from_rlp : bytes -> block
+val block_from_rlp : bytes -> legacy_transaction_object block
 
 module Block_parameter : sig
   (** Ethereum block params in RPCs. *)
@@ -370,11 +372,13 @@ module Subscription : sig
 
   type sync_output = {syncing : bool; status : sync_status}
 
-  type output =
-    | NewHeads of block
+  type 'transaction_object output =
+    | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
 
-  val output_encoding : output Data_encoding.t
+  val output_encoding :
+    'transaction_object Data_encoding.t ->
+    'transaction_object output Data_encoding.t
 end

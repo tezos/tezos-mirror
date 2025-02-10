@@ -135,7 +135,8 @@ val potential_observer_reorg :
   Ethereum_types.quantity option tzresult Lwt.t
 
 (** Watcher that gets notified each time a new block is produced. *)
-val head_watcher : Ethereum_types.Subscription.output Lwt_watcher.input
+val head_watcher :
+  Transaction_object.t Ethereum_types.Subscription.output Lwt_watcher.input
 
 (** Watcher that gets notified each time a new receipt is produced. *)
 val receipt_watcher : Transaction_receipt.t Lwt_watcher.input

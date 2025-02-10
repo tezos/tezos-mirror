@@ -514,11 +514,11 @@ let legacy_transaction_object_encoding =
           (req "r" hash_encoding)
           (req "s" hash_encoding)))
 
-type block_transactions =
+type 'transaction_object block_transactions =
   | TxHash of hash list
-  | TxFull of legacy_transaction_object list
+  | TxFull of 'transaction_object list
 
-let block_transactions_encoding =
+let block_transactions_encoding transaction_object_encoding =
   let open Data_encoding in
   union
     [
@@ -531,12 +531,12 @@ let block_transactions_encoding =
       case
         ~title:"full"
         (Tag 1)
-        (list legacy_transaction_object_encoding)
+        (list transaction_object_encoding)
         (function TxFull txs -> Some txs | _ -> None)
         (fun txs -> TxFull txs);
     ]
 
-type block = {
+type 'transaction_object block = {
   number : quantity;
   hash : block_hash;
   parent : block_hash;
@@ -554,7 +554,7 @@ type block = {
   gasLimit : quantity;
   gasUsed : quantity;
   timestamp : quantity;
-  transactions : block_transactions;
+  transactions : 'transaction_object block_transactions;
   uncles : hash list;
   (* baseFeePerGas and prevRandao are set optionnal because old blocks didn't have
      them*)
@@ -771,7 +771,7 @@ let block_from_rlp bytes =
     block_from_rlp_v1 (Bytes.sub bytes 1 (length - 1))
   else block_from_rlp_v0 bytes
 
-let block_encoding =
+let block_encoding transaction_object_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -883,7 +883,9 @@ let block_encoding =
              (req "gasLimit" quantity_encoding)
              (req "gasUsed" quantity_encoding)
              (req "timestamp" quantity_encoding)
-             (req "transactions" block_transactions_encoding)
+             (req
+                "transactions"
+                (block_transactions_encoding transaction_object_encoding))
              (req "uncles" (list hash_encoding))
              (opt "baseFeePerGas" quantity_encoding)))
        (obj1 (opt "prevRandao" block_hash_encoding)))
@@ -1328,20 +1330,20 @@ module Subscription = struct
       (fun (syncing, status) -> {syncing; status})
       (obj2 (req "syncing" bool) (req "status" sync_status_encoding))
 
-  type output =
-    | NewHeads of block
+  type 'transaction_object output =
+    | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
 
-  let output_encoding =
+  let output_encoding transaction_object_encoding =
     let open Data_encoding in
     union
       [
         case
           ~title:"newHeads"
           (Tag 0)
-          block_encoding
+          (block_encoding transaction_object_encoding)
           (function NewHeads b -> Some b | _ -> None)
           (fun b -> NewHeads b);
         case

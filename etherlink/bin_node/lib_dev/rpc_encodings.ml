@@ -311,12 +311,12 @@ module Get_block_by_number = struct
 
   type input = Block_parameter.t * bool
 
-  type output = block
+  type output = Transaction_object.t block
 
   let input_encoding =
     Data_encoding.tup2 Block_parameter.encoding Data_encoding.bool
 
-  let output_encoding = block_encoding
+  let output_encoding = block_encoding Transaction_object.encoding
 
   let method_ = "eth_getBlockByNumber"
 
@@ -328,11 +328,11 @@ module Get_block_by_hash = struct
 
   type input = block_hash * bool
 
-  type output = block
+  type output = Transaction_object.t block
 
   let input_encoding = Data_encoding.tup2 block_hash_encoding Data_encoding.bool
 
-  let output_encoding = block_encoding
+  let output_encoding = block_encoding Transaction_object.encoding
 
   let method_ = "eth_getBlockByHash"
 
@@ -490,11 +490,11 @@ module Get_transaction_by_hash = struct
 
   type input = hash
 
-  type output = legacy_transaction_object option
+  type output = Transaction_object.t option
 
   let input_encoding = Data_encoding.tup1 hash_encoding
 
-  let output_encoding = Data_encoding.option legacy_transaction_object_encoding
+  let output_encoding = Data_encoding.option Transaction_object.encoding
 
   let method_ = "eth_getTransactionByHash"
 
@@ -506,11 +506,11 @@ module Get_transaction_by_block_hash_and_index = struct
 
   type input = block_hash * quantity
 
-  type output = legacy_transaction_object option
+  type output = Transaction_object.t option
 
   let input_encoding = Data_encoding.tup2 block_hash_encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option legacy_transaction_object_encoding
+  let output_encoding = Data_encoding.option Transaction_object.encoding
 
   let method_ = "eth_getTransactionByBlockHashAndIndex"
 
@@ -522,12 +522,12 @@ module Get_transaction_by_block_number_and_index = struct
 
   type input = Block_parameter.t * quantity
 
-  type output = legacy_transaction_object option
+  type output = Transaction_object.t option
 
   let input_encoding =
     Data_encoding.tup2 Block_parameter.encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option legacy_transaction_object_encoding
+  let output_encoding = Data_encoding.option Transaction_object.encoding
 
   let method_ = "eth_getTransactionByBlockNumberAndIndex"
 
@@ -539,11 +539,12 @@ module Get_uncle_by_block_hash_and_index = struct
 
   type input = block_hash * quantity
 
-  type output = block option
+  type output = Transaction_object.t block option
 
   let input_encoding = Data_encoding.tup2 block_hash_encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option block_encoding
+  let output_encoding =
+    Data_encoding.option (block_encoding Transaction_object.encoding)
 
   let method_ = "eth_getUncleByBlockHashAndIndex"
 
@@ -555,12 +556,13 @@ module Get_uncle_by_block_number_and_index = struct
 
   type input = Block_parameter.t * quantity
 
-  type output = block option
+  type output = Transaction_object.t block option
 
   let input_encoding =
     Data_encoding.tup2 Block_parameter.encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option block_encoding
+  let output_encoding =
+    Data_encoding.option (block_encoding Transaction_object.encoding)
 
   let method_ = "eth_getUncleByBlockNumberAndIndex"
 
@@ -828,11 +830,16 @@ module Replay_block = struct
 
   type input = Ethereum_types.quantity
 
-  type output = block
+  type output =
+    (* Replay block is a debugging RPC, not used in production. We could
+       migrate it to use [Transaction_object.t] instead of
+       [legacy_transaction_object], but simply showing what the kernel is
+       producing is not harmful. *)
+    legacy_transaction_object block
 
   let input_encoding = quantity_encoding
 
-  let output_encoding = block_encoding
+  let output_encoding = block_encoding legacy_transaction_object_encoding
 
   let method_ = "tez_replayBlock"
 

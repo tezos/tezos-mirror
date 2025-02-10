@@ -162,12 +162,12 @@ module Block_number :
 module Get_block_by_number :
   METHOD
     with type input = Ethereum_types.Block_parameter.t * bool
-     and type output = Ethereum_types.block
+     and type output = Transaction_object.t Ethereum_types.block
 
 module Get_block_by_hash :
   METHOD
     with type input = Ethereum_types.block_hash * bool
-     and type output = Ethereum_types.block
+     and type output = Transaction_object.t Ethereum_types.block
 
 module Get_block_receipts :
   METHOD
@@ -217,27 +217,27 @@ module Get_transaction_receipt :
 module Get_transaction_by_hash :
   METHOD
     with type input = Ethereum_types.hash
-     and type output = Ethereum_types.legacy_transaction_object option
+     and type output = Transaction_object.t option
 
 module Get_transaction_by_block_hash_and_index :
   METHOD
     with type input = Ethereum_types.block_hash * Ethereum_types.quantity
-     and type output = Ethereum_types.legacy_transaction_object option
+     and type output = Transaction_object.t option
 
 module Get_transaction_by_block_number_and_index :
   METHOD
     with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
-     and type output = Ethereum_types.legacy_transaction_object option
+     and type output = Transaction_object.t option
 
 module Get_uncle_by_block_hash_and_index :
   METHOD
     with type input = Ethereum_types.block_hash * Ethereum_types.quantity
-     and type output = Ethereum_types.block option
+     and type output = Transaction_object.t Ethereum_types.block option
 
 module Get_uncle_by_block_number_and_index :
   METHOD
     with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
-     and type output = Ethereum_types.block option
+     and type output = Transaction_object.t Ethereum_types.block option
 
 module Send_raw_transaction :
   METHOD
@@ -309,7 +309,8 @@ module Eth_max_priority_fee_per_gas :
 module Replay_block :
   METHOD
     with type input = Ethereum_types.quantity
-     and type output = Ethereum_types.block
+     and type output =
+      Ethereum_types.legacy_transaction_object Ethereum_types.block
 
 module Trace_transaction :
   METHOD

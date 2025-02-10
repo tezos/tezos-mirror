@@ -2,7 +2,12 @@
 ; Edit file manifest/main.ml instead.
 
 (executables
- (names test_rlp test_ethbloom test_call_tracer_algo test_wasm_runtime)
+ (names
+  test_rlp
+  test_ethbloom
+  test_call_tracer_algo
+  test_wasm_runtime
+  test_blueprint_roundtrip)
  (libraries
   bls12-381.archive
   octez-evm-node-libs.evm_node_rust_deps
@@ -18,7 +23,9 @@
   tezt-tezos
   tezt_etherlink
   octez-l2-libs.irmin_context
-  tezos-protocol-alpha.protocol)
+  tezos-protocol-alpha.protocol
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -73,3 +80,12 @@
   invalidRLPTest.json
   ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
  (action (run %{dep:./test_wasm_runtime.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+ (action (run %{dep:./test_blueprint_roundtrip.exe})))

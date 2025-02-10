@@ -17,7 +17,9 @@ module type S = sig
       the transactions hashes otherwise.
     *)
   val nth_block :
-    full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
+    full_transaction_object:bool ->
+    Z.t ->
+    Transaction_object.t Ethereum_types.block tzresult Lwt.t
 
   (** [block_by_hash ~full_transaction_object hash] returns the block with the
       given [hash].
@@ -28,7 +30,7 @@ module type S = sig
   val block_by_hash :
     full_transaction_object:bool ->
     Ethereum_types.block_hash ->
-    Ethereum_types.block tzresult Lwt.t
+    Transaction_object.t Ethereum_types.block tzresult Lwt.t
 
   (** [block_receipts n] returns the receipts of the [n]th
       processed and stored block.
@@ -41,6 +43,5 @@ module type S = sig
 
   (** [transaction_object tx_hash] returns the informations of [tx_hash]. *)
   val transaction_object :
-    Ethereum_types.hash ->
-    Ethereum_types.legacy_transaction_object option tzresult Lwt.t
+    Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
 end

@@ -278,7 +278,10 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
   return values
 
 type apply_result =
-  | Apply_success of {evm_state : t; block : Ethereum_types.block}
+  | Apply_success of {
+      evm_state : t;
+      block : Ethereum_types.legacy_transaction_object Ethereum_types.block;
+    }
   | Apply_failure
 
 let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config

@@ -30,14 +30,22 @@ let enable ~keep_alive ?evm_node_endpoint store =
       @@ get_block_from_store n
     in
     match (from_store, evm_node_endpoint) with
-    | Some block, _ -> return block
+    | Some block, _ ->
+        (* We do not need the transactions, and the block returned from the
+           store and the EVM node endpoint are not compatible. *)
+        return {block with transactions = TxHash []}
     | None, Some evm_node_endpoint ->
-        trace
-          (error_of_fmt
-             "Failed when trying to fetch block %a from the upstream endpoint"
-             Z.pp_print
-             nz)
-        @@ get_block_from_endpoint evm_node_endpoint n
+        let+ block =
+          trace
+            (error_of_fmt
+               "Failed when trying to fetch block %a from the upstream endpoint"
+               Z.pp_print
+               nz)
+          @@ get_block_from_endpoint evm_node_endpoint n
+        in
+        (* We do not need the transactions, and the block returned from the
+           store and the EVM node endpoint are not compatible. *)
+        {block with transactions = TxHash []}
     | None, None ->
         failwith
           "Block %a was missing from the context and upstream endpoint"

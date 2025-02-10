@@ -87,7 +87,9 @@ module type S = sig
 
   val smart_rollup_address : string
 
-  val replay : Ethereum_types.quantity -> Ethereum_types.block tzresult Lwt.t
+  val replay :
+    Ethereum_types.quantity ->
+    Ethereum_types.legacy_transaction_object Ethereum_types.block tzresult Lwt.t
 
   (** [coinbase ()] returns the sequencer pool address if it exists,
       or the zero address. *)

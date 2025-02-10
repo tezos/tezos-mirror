@@ -20,6 +20,7 @@ depends: [
   "tezt-etherlink" { with-test & = version }
   "octez-l2-libs" {with-test}
   "tezos-protocol-alpha" {with-test}
+  "octez-shell-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

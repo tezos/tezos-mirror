@@ -20,7 +20,8 @@ val publisher_shutdown : unit -> unit Lwt.t
 (** [blueprint_applied block duration] advertizes that a blueprint
     leading to [block] has been applied in [duration] time onto the
     local state. *)
-val blueprint_applied : Ethereum_types.block -> Time.System.Span.t -> unit Lwt.t
+val blueprint_applied :
+  'transaction_object Ethereum_types.block -> Time.System.Span.t -> unit Lwt.t
 
 (** [blueprint_injected level] advertizes that a blueprint for level
     [level] has been forwarded to a rollup node  *)
