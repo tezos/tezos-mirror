@@ -126,18 +126,18 @@ let generated_machines =
   in
   (* The process in order to create a new protocol machine implementation is basically
      to clone the "parent" protocol of the new one and replace some module names.
-     If a new protocol is added in octez (either beta or a release candidate version
-     of beta), you should find the corresponding file automatically produced into
+     If a new protocol is added in octez (either next or a release candidate version
+     of next), you should find the corresponding file automatically produced into
      dune's build directory. Copy it in /teztale/bin_teztale_archiver and add it to git. *)
   List.fold_left
     (fun acc protocol ->
       match Protocol.number protocol with
       | V _ ->
           Dune.(
-            generate_protocol_machine "beta" (Protocol.short_hash protocol)
+            generate_protocol_machine "next" (Protocol.short_hash protocol)
             :: acc)
       | _ -> acc)
-    Dune.(generate_protocol_machine "alpha" "beta" :: generated_empty_machines)
+    Dune.(generate_protocol_machine "alpha" "next" :: generated_empty_machines)
     Protocol.active
 
 let _teztale_archiver =
