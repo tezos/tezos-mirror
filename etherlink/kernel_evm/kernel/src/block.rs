@@ -405,7 +405,6 @@ fn promote_block<Host: Runtime>(
     safe_host.promote_trace()?;
     drop_blueprint(safe_host.host, number)?;
 
-    let number = block_storage::read_current_number(safe_host.host)?;
     let hash = block_storage::read_current_hash(safe_host.host)?;
 
     Event::BlueprintApplied { number, hash }.store(safe_host.host)?;
