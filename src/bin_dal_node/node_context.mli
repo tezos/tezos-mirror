@@ -99,8 +99,12 @@ val get_config : t -> Configuration_file.t
 (** [get_cryptobox ctxt] returns the DAL node's cryptobox *)
 val get_cryptobox : t -> Cryptobox.t
 
-(** [get_proto_parameters ctxt] returns the DAL node's current protocol parameters. *)
-val get_proto_parameters : t -> Dal_plugin.proto_parameters
+(** [get_proto_parameters ?level ctxt] returns the DAL node's protocol
+    parameters stored in the context, when [level] is not provided. If [level]
+    is provided, then the protocol parameters for that level are fetched via the
+    relevant plugin. *)
+val get_proto_parameters :
+  ?level:int32 -> t -> Dal_plugin.proto_parameters tzresult Lwt.t
 
 (** Update the node's last finalized level. *)
 val set_last_finalized_level : t -> int32 -> unit

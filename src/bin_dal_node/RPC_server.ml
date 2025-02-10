@@ -170,7 +170,6 @@ module Slots_handlers = struct
               return (commitment, commitment_proof)
           | _ ->
               let cryptobox = Node_context.get_cryptobox ctxt in
-              let proto_parameters = Node_context.get_proto_parameters ctxt in
               let profile = Node_context.get_profile_ctxt ctxt in
               let* () =
                 if not (Profile_manager.is_prover_profile profile) then
@@ -187,6 +186,10 @@ module Slots_handlers = struct
                     fail
                       (Errors.other [Cannot_publish_on_slot_index slot_index])
                 | None | Some _ -> return_unit
+              in
+              let* proto_parameters =
+                Node_context.get_proto_parameters ctxt
+                |> lwt_map_error (fun e -> `Other e)
               in
               let slot_size = proto_parameters.cryptobox_parameters.slot_size in
               let slot_length = String.length slot in
@@ -280,11 +283,15 @@ module Profile_handlers = struct
           Node_context.warn_if_attesters_not_delegates ctxt operator_profiles
           |> lwt_map_error (fun e -> `Other e)
         in
-        let proto_parameters = Node_context.get_proto_parameters ctxt in
+        let* proto_parameters =
+          Node_context.get_proto_parameters ctxt
+          |> lwt_map_error (fun e -> `Other e)
+        in
+        let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
         match
           Profile_manager.add_and_register_operator_profile
             (Node_context.get_profile_ctxt ctxt)
-            proto_parameters
+            ~number_of_slots
             gs_worker
             operator_profiles
         with
@@ -439,51 +446,73 @@ module Profile_handlers = struct
               attested_level
               (of_int proto_parameters.Dal_plugin.attestation_lag))
         in
-        let shards_store = Store.shards store in
-        let number_of_shards_stored slot_index =
-          let slot_id : Types.slot_id =
-            {slot_level = published_level; slot_index}
+        if published_level < 1l then
+          let slots =
+            Stdlib.List.init proto_parameters.number_of_slots (fun _ -> false)
           in
-          let+ number_stored_shards =
-            Store.Shards.number_of_shards_available
-              shards_store
-              slot_id
-              shard_indices
+          return (Types.Attestable_slots {slots; published_level})
+        else
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
+
+             Normally, for checking whether the incentives are enabled we would
+             use the (parameters at) [attested_level].  However, the attestation
+             level may be in the future and we may not have the plugin for
+             it. *)
+          let* proto_parameters =
+            Node_context.get_proto_parameters ctxt ~level:published_level
             |> lwt_map_error (fun e -> `Other e)
           in
-          (slot_id, number_stored_shards)
-        in
-        let all_slot_indexes =
-          Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
-        in
-        let* number_of_stored_shards_per_slot =
-          List.map_es number_of_shards_stored all_slot_indexes
-        in
-        let* flags =
-          List.map_es
-            (fun (slot_id, num_stored) ->
-              let all_stored = num_stored = number_of_assigned_shards in
-              if (not all_stored) || not proto_parameters.incentives_enable then
-                return @@ all_stored
-              else
-                is_slot_attestable_with_traps
-                  shards_store
-                  proto_parameters.traps_fraction
-                  pkh
-                  shard_indices
-                  slot_id)
-            number_of_stored_shards_per_slot
-        in
-        Lwt.dont_wait
-          (fun () ->
-            warn_missing_shards
-              store
-              pkh
-              published_level
-              number_of_assigned_shards
-              number_of_stored_shards_per_slot)
-          (fun _exn -> ()) ;
-        return (Types.Attestable_slots {slots = flags; published_level})
+
+          let shards_store = Store.shards store in
+          let number_of_shards_stored slot_index =
+            let slot_id : Types.slot_id =
+              {slot_level = published_level; slot_index}
+            in
+            let+ number_stored_shards =
+              Store.Shards.number_of_shards_available
+                shards_store
+                slot_id
+                shard_indices
+              |> lwt_map_error (fun e -> `Other e)
+            in
+            (slot_id, number_stored_shards)
+          in
+          let all_slot_indexes =
+            Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
+          in
+          let* number_of_stored_shards_per_slot =
+            List.map_es number_of_shards_stored all_slot_indexes
+          in
+          let* published_level_parameters =
+            Node_context.get_proto_parameters ctxt ~level:published_level
+            |> lwt_map_error (fun e -> `Other e)
+          in
+          let* flags =
+            List.map_es
+              (fun (slot_id, num_stored) ->
+                let all_stored = num_stored = number_of_assigned_shards in
+                if not published_level_parameters.incentives_enable then
+                  return all_stored
+                else if not all_stored then return false
+                else
+                  is_slot_attestable_with_traps
+                    shards_store
+                    published_level_parameters.traps_fraction
+                    pkh
+                    shard_indices
+                    slot_id)
+              number_of_stored_shards_per_slot
+          in
+          Lwt.dont_wait
+            (fun () ->
+              warn_missing_shards
+                store
+                pkh
+                published_level
+                number_of_assigned_shards
+                number_of_stored_shards_per_slot)
+            (fun _exn -> ()) ;
+          return (Types.Attestable_slots {slots = flags; published_level})
     in
     call_handler1 (fun () ->
         let open Lwt_result_syntax in
@@ -500,8 +529,11 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
+        let* proto_parameters =
+          Node_context.get_proto_parameters ctxt
+          |> lwt_map_error (fun e -> `Other e)
+        in
         let store = Node_context.get_store ctxt in
-        let proto_parameters = Node_context.get_proto_parameters ctxt in
         get_attestable_slots
           ~shard_indices
           store

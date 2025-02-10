@@ -76,6 +76,8 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     last_finalized_level;
   }
 
+let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
+
 let may_reconstruct ~reconstruct slot_id t =
   let open Lwt_result_syntax in
   let p =
@@ -112,6 +114,16 @@ let get_plugin_for_level ctxt ~level =
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
 let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
+
+let get_proto_parameters ?level ctxt =
+  let open Lwt_result_syntax in
+  match level with
+  | None -> return ctxt.proto_parameters
+  | Some level ->
+      (* get the plugin from the plugin cache *)
+      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
+      let cctxt = get_tezos_node_cctxt ctxt in
+      Plugin.get_constants `Main (`Level level) cctxt
 
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
@@ -159,8 +171,6 @@ let get_config ctxt = ctxt.config
 
 let get_cryptobox ctxt = ctxt.cryptobox
 
-let get_proto_parameters ctxt = ctxt.proto_parameters
-
 let set_last_finalized_level ctxt level = ctxt.last_finalized_level <- level
 
 let get_last_finalized_level ctxt = ctxt.last_finalized_level
@@ -170,8 +180,6 @@ let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
 let get_store ctxt = ctxt.store
 
 let get_gs_worker ctxt = ctxt.gs_worker
-
-let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 

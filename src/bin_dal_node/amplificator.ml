@@ -475,7 +475,7 @@ let try_amplification commitment slot_metrics slot_id amplificator =
   let open Lwt_result_syntax in
   let node_ctxt = amplificator.node_ctxt in
   let node_store = Node_context.get_store node_ctxt in
-  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
+  let* proto_parameters = Node_context.get_proto_parameters node_ctxt in
   let number_of_shards =
     proto_parameters.cryptobox_parameters.number_of_shards
   in

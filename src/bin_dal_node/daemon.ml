@@ -248,10 +248,22 @@ module Handler = struct
                      cryptobox
                      message_id)
             in
-            if res = `Valid then
-              Option.iter
-                (Slot_manager.maybe_register_trap ctxt message_id)
-                message ;
+            (if res = `Valid then
+               let store = Node_context.get_store ctxt in
+               let traps_store = Store.traps store in
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+                  The [proto_parameters] are those for the last known finalized
+                  level, which may differ from those of the slot level. This
+                  will be an issue when the value of the [traps_fraction]
+                  changes. (We cannot use {!Node_context.get_proto_parameters},
+                  as it is not monad-free; we'll need to use mapping from levels
+                  to parameters.) *)
+               Option.iter
+                 (Slot_manager.maybe_register_trap
+                    traps_store
+                    ~traps_fraction:proto_parameters.traps_fraction
+                    message_id)
+                 message) ;
             res
         | other ->
             (* 4. In the case the message id is not Valid. *)
@@ -395,14 +407,9 @@ module Handler = struct
     in
     Profile_manager.on_new_head
       (Node_context.get_profile_ctxt ctxt)
-      proto_parameters
+      ~number_of_slots:proto_parameters.number_of_slots
       (Node_context.get_gs_worker ctxt)
       committee
-
-  let get_constants ctxt cctxt ~level =
-    let open Lwt_result_syntax in
-    let*? (module Plugin) = Node_context.get_plugin_for_level ctxt ~level in
-    Plugin.get_constants `Main (`Level level) cctxt
 
   let store_skip_list_cells (type block_info) ctxt cctxt dal_constants
       (block_info : block_info) block_level
@@ -419,7 +426,8 @@ module Handler = struct
         cctxt
         ~dal_constants
         ~pred_publication_level_dal_constants:
-          (lazy (get_constants ctxt cctxt ~level:pred_published_level))
+          (lazy
+            (Node_context.get_proto_parameters ctxt ~level:pred_published_level))
     in
     let cells_of_level =
       List.map
@@ -544,7 +552,9 @@ module Handler = struct
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
     let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
-    let* dal_constants = get_constants ctxt cctxt ~level:block_level in
+    let* dal_constants =
+      Node_context.get_proto_parameters ctxt ~level:block_level
+    in
     let* () =
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
@@ -665,7 +675,6 @@ module Handler = struct
     let open Lwt_result_syntax in
     let stream = Crawler.finalized_heads_stream crawler in
     let rec loop () =
-      let proto_parameters = Node_context.get_proto_parameters ctxt in
       let cryptobox = Node_context.get_cryptobox ctxt in
       let*! next_final_head = Lwt_stream.get stream in
       match next_final_head with
@@ -673,6 +682,18 @@ module Handler = struct
       | Some (_finalized_hash, finalized_shell_header) ->
           let level = finalized_shell_header.level in
           let () = Node_context.set_last_finalized_level ctxt level in
+          let* () =
+            (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
+               We should use the head level instead. *)
+            Node_context.may_add_plugin
+              ctxt
+              cctxt
+              ~proto_level:finalized_shell_header.proto_level
+              ~block_level:level
+          in
+          let* proto_parameters =
+            Node_context.get_proto_parameters ctxt ~level
+          in
           (* At each potential published_level [level], we prefetch the
              committee for its corresponding attestation_level (that is:
              level + attestation_lag - 1). This is in particular used by GS
@@ -691,15 +712,6 @@ module Handler = struct
                 Node_context.fetch_committee ctxt ~level:attestation_level
               in
               return_unit
-          in
-          let* () =
-            (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
-               We should use the head level instead. *)
-            Node_context.may_add_plugin
-              ctxt
-              cctxt
-              ~proto_level:finalized_shell_header.proto_level
-              ~block_level:level
           in
           Gossipsub.Worker.Validate_message_hook.set
             (gossipsub_app_messages_validation
@@ -799,12 +811,11 @@ let update_timing_shard_received node_ctxt shards_timing_table slot_id
   in
   timing
 
-let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
-    amplificator =
+let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
+    node_store node_ctxt amplificator =
   let open Gossipsub in
-  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
   let timing_table_size =
-    2 * proto_parameters.attestation_lag
+    2 * proto_parameters.Dal_plugin.attestation_lag
     * proto_parameters.cryptobox_parameters.number_of_shards
     * proto_parameters.number_of_slots
   in
@@ -1065,27 +1076,28 @@ let update_and_register_profiles ctxt =
   let open Lwt_result_syntax in
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
-  let proto_parameters = Node_context.get_proto_parameters ctxt in
+  let* proto_parameters = Node_context.get_proto_parameters ctxt in
   let profile_ctxt =
-    Profile_manager.register_profile profile_ctxt proto_parameters gs_worker
+    Profile_manager.register_profile
+      profile_ctxt
+      ~number_of_slots:proto_parameters.number_of_slots
+      gs_worker
   in
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
-(* This function fetches the protocol plugins for levels for which it is needed
-   to add skip list cells. It starts by computing the oldest level at which it
-   will be needed to add skip list cells. *)
+(* This function fetches the protocol plugins for levels in the past for which
+   the node may need a plugin, namely for adding skip list cells, or for
+   obtaining the protocol parameters.
+
+   Concerning the skip list, getting the plugin is (almost) necessary as skip
+   list cells are stored in the storage for a certain period and
+   [store_skip_list_cells] needs the L1 context for levels in this period. (It
+   would actually not be necessary to go as far in the past, because the
+   protocol parameters and the relevant encodings do not change for now, so the
+   head plugin could be used). *)
 let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
     head_level proto_parameters =
-  (* We resolve the plugins for all levels starting with [(max
-     last_processed_level (head_level - storage_period)], or (max
-     last_processed_level (head_level - storage_period) - (attestation_lag -
-     1))] in case the node supports refutations. This is necessary as skip list
-     cells are stored for attested levels is this storage period and
-     [store_skip_list_cells] needs the L1 context for these levels. (It would
-     actually not be necessary to go as far in the past, because the protocol
-     parameters and the relevant encodings do not change for now, so the head
-     plugin could be used). *)
   let storage_period =
     get_storage_period profile_ctxt proto_parameters head_level first_seen_level
   in
@@ -1097,7 +1109,10 @@ let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
   let first_level =
     if Profile_manager.supports_refutations profile_ctxt then
       Int32.sub first_level (Int32.of_int (skip_list_offset proto_parameters))
-    else first_level
+    else
+      (* The DAL node may need the protocol parameters [attestation_lag] in the
+         past wrt to the head level. *)
+      Int32.sub first_level (Int32.of_int proto_parameters.attestation_lag)
   in
   let first_level = Int32.(max 1l first_level) in
   Proto_plugins.initial_plugins cctxt ~first_level ~last_level:head_level
@@ -1125,7 +1140,7 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
     let* block_info =
       Plugin.block_info cctxt ~block:(`Level level) ~metadata:`Always
     in
-    let* dal_constants = Handler.get_constants ctxt cctxt ~level in
+    let* dal_constants = Node_context.get_proto_parameters ctxt ~level in
     Handler.store_skip_list_cells
       ctxt
       cctxt
@@ -1355,7 +1370,7 @@ let run ~data_dir ~configuration_override =
     let+ profile_ctxt = build_profile_context config in
     Profile_manager.resolve_random_observer_profile
       profile_ctxt
-      proto_parameters
+      ~number_of_slots:proto_parameters.number_of_slots
   in
   let*? () =
     Profile_manager.validate_slot_indexes
@@ -1494,6 +1509,7 @@ let run ~data_dir ~configuration_override =
   (* Activate the p2p instance. *)
   let shards_store = Store.shards store in
   connect_gossipsub_with_p2p
+    proto_parameters
     gs_worker
     transport_layer
     shards_store
