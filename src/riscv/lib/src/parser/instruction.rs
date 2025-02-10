@@ -305,6 +305,9 @@ pub enum InstrCacheable {
     Ori(NonZeroRdITypeArgs),
     /// `ANDI` - Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
     Andi(NonZeroRdITypeArgs),
+    /// `SLLI` - Shift left logically (zeros are shifted in the lower bits)
+    ///
+    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SLLI
     Slli(NonZeroRdITypeArgs),
     Srli(NonZeroRdITypeArgs),
     Srai(NonZeroRdITypeArgs),
@@ -480,6 +483,8 @@ pub enum InstrCacheable {
     /// to `rd`. The immediate is obtained by zero-extending and scaling by 4 the value
     /// encoded in the instruction (see U:C-16.5).
     CAddi4spn(CIBTypeArgs),
+    /// `C.SLLI` - Performs a logical left shift of the value in register `rd_rs1`
+    /// then writes the result back to `rd_rs1`.
     CSlli(CIBNZTypeArgs),
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),

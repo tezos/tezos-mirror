@@ -62,15 +62,15 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `SLLI` I-type instruction
-    ///
     /// Shift left logically
     /// (zeros are shifted in the lower bits)
     ///
-    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SLLI
-    pub fn run_slli(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+    /// Relevant RISC-V opcodes:
+    /// - `SLLI`
+    /// - `C.SLLI`
+    pub fn run_slli(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // SLLI encoding allows to consider the whole immediate as the shift amount
-        self.write_nz(rd, self.read(rs1) << imm)
+        self.write_nz(rd, self.read_nz(rs1) << imm)
     }
 
     /// `SRLI` I-type instruction
@@ -417,6 +417,16 @@ mod tests {
             let new_val = $state.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
+
+        ($state:ident, $shift_fn:tt, $imm:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr, non_zero
+        ) => {
+            $state.xregisters.write_nz(nz::$rs1, $r1_val);
+            $state.xregisters.$shift_fn($imm, nz::$rs1, nz::$rd);
+            let new_val = $state.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
     }
 
     macro_rules! test_shift_reg_instr {
@@ -459,6 +469,32 @@ mod tests {
                 $expected_val
             );
         };
+        ($state:ident, $shift_fn_imm:tt, $shift_fn_reg:tt,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr, non_zero
+        ) => {
+            test_shift_instr!(
+                $state,
+                $shift_fn_imm,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+            test_shift_reg_instr!(
+                $state,
+                $shift_fn_reg,
+                $rs2,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val
+            );
+        };
     }
 
     backend_test!(test_shift, F, {
@@ -474,7 +510,8 @@ mod tests {
             a0,
             0x1234_ABEF,
             a1,
-            0x1234_ABEF
+            0x1234_ABEF,
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -509,7 +546,8 @@ mod tests {
             a0,
             0x1234_ABEF,
             a1,
-            0x1_234A_BEF0_0000
+            0x1_234A_BEF0_0000,
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -555,7 +593,8 @@ mod tests {
             a0,
             0x1234_ABEF,
             a0,
-            0x34AB_EF00_0000_0000
+            0x34AB_EF00_0000_0000,
+            non_zero
         );
         test_both_shift_instr!(state, run_srli, run_srl, a1, 40, a0, 0x1234_ABEF, a0, 0x0);
         test_both_shift_instr!(
