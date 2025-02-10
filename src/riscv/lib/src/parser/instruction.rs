@@ -291,6 +291,8 @@ pub enum InstrCacheable {
     /// `SLL` - Shift left logically bits in rs1 by `shift_amount = val(rs2)[5:0]`
     /// saving the result in rd. (zeros are shifted in the lower bits)
     Sll(NonZeroRdRTypeArgs),
+    /// `SRL` - Shift right logically bits in rs1 by `shift_amount = val(rs2)[5:0]`
+    /// saving the result in rd (zeros are shifted in the upper bits)
     Srl(NonZeroRdRTypeArgs),
     Sra(NonZeroRdRTypeArgs),
     Slt(NonZeroRdRTypeArgs),

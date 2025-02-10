@@ -159,15 +159,16 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `SRL` R-type instruction
-    ///
     /// Shift right logically bits in rs1 by shift_amount = val(rs2)\[5:0\]
     /// saving the result in rd
     /// (zeros are shifted in the upper bits)
-    pub fn run_srl(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    ///
+    /// Relevant opcodes:
+    /// - `SRL`
+    pub fn run_srl(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
-        let sh_amt = self.read(rs2) & 0b11_1111;
-        let result = self.read(rs1) >> sh_amt;
+        let sh_amt = self.read_nz(rs2) & 0b11_1111;
+        let result = self.read_nz(rs1) >> sh_amt;
         self.write_nz(rd, result)
     }
 
@@ -594,7 +595,7 @@ mod tests {
             0x1234_ABEF,
             a0,
             0x1234_ABEF,
-            non_zero
+            non_zero_both
         );
         test_both_shift_instr!(
             state,
@@ -632,7 +633,7 @@ mod tests {
             0x44_1234_ABEF,
             a1,
             0x1104_8D2A,
-            non_zero
+            non_zero_both
         );
         test_both_shift_instr!(
             state,
@@ -644,7 +645,7 @@ mod tests {
             -1_i64 as u64,
             a0,
             0x0003_FFFF_FFFF_FFFF,
-            non_zero
+            non_zero_both
         );
         test_both_shift_instr!(
             state,
@@ -682,7 +683,7 @@ mod tests {
             0x1234_ABEF,
             a0,
             0x0,
-            non_zero
+            non_zero_both
         );
         test_both_shift_instr!(
             state,
