@@ -23,6 +23,7 @@ primitive-types.workspace = true
 num-traits.workspace = true
 num-derive.workspace = true
 softfloat.workspace = true
+alloy-sol-types.workspace = true
 
 rlp.workspace = true
 hex.workspace = true

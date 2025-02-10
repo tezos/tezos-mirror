@@ -6,12 +6,13 @@
 
 use std::borrow::Cow;
 
+use alloy_sol_types::SolEvent;
 use ethereum::Log;
 use evm::{Config, ExitError};
 use evm_execution::{
-    abi::{ABI_H160_LEFT_PADDING, ABI_U32_LEFT_PADDING},
     account_storage::{account_path, AccountStorageError, EthereumAccountStorage},
     handler::{ExecutionOutcome, ExecutionResult},
+    utilities::alloy::{h160_to_alloy, u256_to_alloy},
     EthereumError,
 };
 use primitive_types::{H160, H256, U256};
@@ -39,6 +40,15 @@ pub const DEPOSIT_EVENT_TOPIC: [u8; 32] = [
 pub enum BridgeError {
     #[error("Invalid deposit receiver address: {0:?}")]
     InvalidDepositReceiver(Vec<u8>),
+}
+
+alloy_sol_types::sol! {
+    event SolBridgeDepositEvent (
+        uint256 amount,
+        address receiver,
+        uint256 inbox_level,
+        uint256 inbox_msg_id,
+    );
 }
 
 /// Native token deposit
@@ -120,22 +130,15 @@ impl Deposit {
     ///
     /// Signature: Deposit(uint256,address,uint256,uint256)
     pub fn event_log(&self) -> Log {
-        let mut data = Vec::with_capacity(4 * 32);
+        let event_data = SolBridgeDepositEvent {
+            receiver: h160_to_alloy(&self.receiver),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            inbox_level: u256_to_alloy(&U256::from(self.inbox_level)).unwrap_or_default(),
+            inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id))
+                .unwrap_or_default(),
+        };
 
-        data.extend_from_slice(&Into::<[u8; 32]>::into(self.amount));
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-        data.extend_from_slice(&self.receiver.0);
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&ABI_U32_LEFT_PADDING);
-        data.extend_from_slice(&self.inbox_level.to_be_bytes());
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&ABI_U32_LEFT_PADDING);
-        data.extend_from_slice(&self.inbox_msg_id.to_be_bytes());
-        debug_assert!(data.len() % 32 == 0);
+        let data = SolBridgeDepositEvent::encode_data(&event_data);
 
         Log {
             // Emitted by the "system" contract
