@@ -69,6 +69,8 @@ type recorded_consensus_operations = {
 }
 
 type 'a state = {
+  (* Protocol constants *)
+  constants : Constants.t;
   (* Validators rights for the last preserved levels *)
   validators_rights : public_key_hash Slot.Map.t Validators_cache.t;
   (* Consensus operations seen so far *)
@@ -100,13 +102,19 @@ type 'a denunciable_consensus_operation =
   | Attestation : Kind.attestation denunciable_consensus_operation
   | Preattestation : Kind.preattestation denunciable_consensus_operation
 
-let create_state ~preserved_levels blocks_stream ops_stream ops_stream_stopper =
+let create_state (cctxt : #Protocol_client_context.full) ~preserved_levels
+    blocks_stream ops_stream ops_stream_stopper =
+  let open Lwt_result_syntax in
+  let* constants =
+    Plugin.Alpha_services.Constants.all cctxt (cctxt#chain, cctxt#block)
+  in
   let clean_frequency = max 1 (preserved_levels / 10) in
   let validators_rights = Validators_cache.create (preserved_levels + 2) in
   (* We keep rights for [preserved_levels] in the past, and 2 levels in the
      future from [highest_level_encountered] *)
-  Lwt.return
+  return
     {
+      constants;
       validators_rights;
       consensus_operations_table = HLevel.create preserved_levels;
       blocks_table = HLevel.create preserved_levels;
@@ -567,8 +575,9 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
   let open Lwt_result_syntax in
   let*! () = B_Events.(emit daemon_setup) name in
   let* ops_stream, ops_stream_stopper = start_ops_monitor cctxt in
-  let*! state =
+  let* state =
     create_state
+      cctxt
       ~preserved_levels
       valid_blocks_stream
       ops_stream
