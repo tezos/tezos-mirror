@@ -67,6 +67,8 @@ Node
 Client
 ------
 
+- Registered ``operation.bls_mode_unsigned`` encoding. (MR :gl:`!16655`)
+
 - Allow tz4 (BLS) addresses to be registered as delegate and or as consensus
   keys. (MR :gl:`!15302`)
 
