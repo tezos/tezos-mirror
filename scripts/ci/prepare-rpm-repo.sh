@@ -15,4 +15,4 @@ gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 EOM
 
 dnf install -y libxcrypt-compat.x86_64 google-cloud-cli \
-  createrepo_c rpm-sign rpmdevtools
+  createrepo_c rpm-sign rpmdevtools jq

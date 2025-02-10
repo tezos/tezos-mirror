@@ -167,6 +167,7 @@ let jobs pipeline_type =
              Artifacts job_build_rockylinux_package_data;
            ])
       ~variables:(archs_variables pipeline_type)
+      ~id_tokens:Tezos_ci.id_tokens
       ~image:Images.rockylinux_93
       ~before_script:
         (before_script
@@ -186,6 +187,7 @@ let jobs pipeline_type =
              Artifacts job_build_fedora_package_data;
            ])
       ~variables:(archs_variables pipeline_type)
+      ~id_tokens:Tezos_ci.id_tokens
       ~image:Images.fedora_39
       ~before_script:
         (before_script

@@ -195,6 +195,9 @@ rpm_repo_rockylinux:
     ARCHITECTURES: amd64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry:
     max: 2
     when:
