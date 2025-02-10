@@ -76,7 +76,10 @@ val current_block_height : t -> Ethereum_types.quantity Lwt.t
 val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
 
 type apply_result =
-  | Apply_success of {evm_state : t; block : Ethereum_types.block}
+  | Apply_success of {
+      evm_state : t;
+      block : Ethereum_types.legacy_transaction_object Ethereum_types.block;
+    }
   | Apply_failure
 
 (** [apply_blueprint ~data-dir ~config state payload] applies the
@@ -127,7 +130,8 @@ val get_delayed_inbox_item :
 (**[clear_block_storage block state] removes the parent of [block], and all
    durable storage information stored for [block], if this function is called
    they need to be store elsewhere, mainly it consists in transactions. *)
-val clear_block_storage : Ethereum_types.block -> t -> t Lwt.t
+val clear_block_storage :
+  'transaction_object Ethereum_types.block -> t -> t Lwt.t
 
 (** [storage_version tree] returns the current storage version set by the
     kernel. This storage version is used by the EVM node to determine whether a

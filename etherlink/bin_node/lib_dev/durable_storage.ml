@@ -188,9 +188,10 @@ let full_transactions read block_hash transactions =
           hashes
       in
       TxFull objects
-  | TxFull _ -> return transactions
+  | TxFull l -> return (TxFull l)
 
-let populate_tx_objects read ~full_transaction_object block =
+let populate_tx_objects read ~full_transaction_object
+    (block : legacy_transaction_object block) =
   let open Lwt_result_syntax in
   if full_transaction_object then
     let* transactions =
@@ -258,9 +259,7 @@ let block_receipts_of_block read block =
     | TxFull tx_objects ->
         (* This case should never happen, because there is no ways
            to ask for full objects when requestion block receipts. *)
-        List.map
-          (fun (tx_object : legacy_transaction_object) -> tx_object.hash)
-          tx_objects
+        List.map (fun (obj : legacy_transaction_object) -> obj.hash) tx_objects
   in
   Lwt_list.filter_map_s get_receipt_from_hash tx_hashes
 
@@ -439,12 +438,14 @@ module Make_block_storage (Reader : READER) = struct
   let nth_block ~full_transaction_object n =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
-    nth_block read ~full_transaction_object n
+    let+ block = nth_block read ~full_transaction_object n in
+    Transaction_object.block_from_legacy block
 
   let block_by_hash ~full_transaction_object block_hash =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
-    block_by_hash read ~full_transaction_object block_hash
+    let+ block = block_by_hash read ~full_transaction_object block_hash in
+    Transaction_object.block_from_legacy block
 
   let block_receipts n =
     let open Lwt_result_syntax in
@@ -454,5 +455,8 @@ module Make_block_storage (Reader : READER) = struct
   let transaction_object tx_hash =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
-    transaction_object read tx_hash
+    let+ transaction_object = transaction_object read tx_hash in
+    Option.map
+      Transaction_object.from_store_transaction_object
+      transaction_object
 end

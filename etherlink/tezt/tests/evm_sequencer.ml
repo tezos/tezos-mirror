@@ -9827,6 +9827,45 @@ let test_estimate_gas_with_block_param =
       unit
   | _ -> Test.fail "Test contract deployment failed"
 
+let test_eip1559_transaction_object =
+  register_all
+    ~tags:["eip1559"; "transaction_object"]
+    ~time_between_blocks:Nothing
+    ~title:
+      "RPC returns the correct transaction object for EIP-1559 transactions"
+  @@ fun {sequencer; _} _protocol ->
+  let* hash =
+    send_transaction_to_sequencer
+      (fun () ->
+        let* raw_tx =
+          Cast.craft_tx
+            ~legacy:false
+            ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+            ~chain_id:1337
+            ~nonce:0
+            ~gas_price:1_000_000_000
+            ~gas:23_300
+            ~value:Wei.zero
+            ~address:Eth_account.bootstrap_accounts.(1).address
+            ()
+        in
+        let*@ hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+        return hash)
+      sequencer
+  in
+  let* json =
+    Evm_node.jsonrpc
+      sequencer
+      (Rpc.Request.eth_getTransactionByHash ~transaction_hash:hash)
+  in
+  let type_ = JSON.(json |-> "result" |-> "type" |> as_string) in
+  Check.(
+    (type_ = "0x02")
+      string
+      ~error_msg:
+        "Type was expected to be %L, (EIP-1559) but the RPC returned %R") ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -9963,4 +10002,5 @@ let () =
   test_init_config_mainnet "testnet" ;
   test_estimate_gas_with_block_param protocols ;
   test_filling_max_slots_cant_lead_to_out_of_memory protocols ;
-  test_rpc_getLogs_with_earliest_fail protocols
+  test_rpc_getLogs_with_earliest_fail protocols ;
+  test_eip1559_transaction_object protocols

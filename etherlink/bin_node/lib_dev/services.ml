@@ -180,7 +180,7 @@ let block_transaction_count block =
 
 type sub_stream = {
   kind : Ethereum_types.Subscription.kind;
-  stream : Ethereum_types.Subscription.output Lwt_stream.t;
+  stream : Transaction_object.t Ethereum_types.Subscription.output Lwt_stream.t;
   stopper : unit -> unit;
 }
 
@@ -567,7 +567,13 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
               let* transaction_object =
                 let* transaction_object = Tx_pool.find tx_hash in
                 match transaction_object with
-                | Some transaction_object -> return_some transaction_object
+                | Some transaction_object ->
+                    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
+                       We should instrument the TX pool to return the real
+                       transaction objects. *)
+                    return_some
+                      (Transaction_object.from_store_transaction_object
+                         transaction_object)
                 | None -> Backend_rpc.Block_storage.transaction_object tx_hash
               in
               rpc_ok transaction_object
@@ -925,7 +931,9 @@ let websocket_response_of_response response = {response; subscription = None}
 
 let encode_subscription_response subscription r =
   let result =
-    Data_encoding.Json.construct Ethereum_types.Subscription.output_encoding r
+    Data_encoding.Json.construct
+      (Ethereum_types.Subscription.output_encoding Transaction_object.encoding)
+      r
   in
   Rpc_encodings.Subscription.{params = {result; subscription}}
 

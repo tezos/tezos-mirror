@@ -127,7 +127,10 @@ module Delayed_transactions : sig
 end
 
 module Blocks : sig
-  val store : conn -> Ethereum_types.block -> unit tzresult Lwt.t
+  val store :
+    conn ->
+    Ethereum_types.legacy_transaction_object Ethereum_types.block ->
+    unit tzresult Lwt.t
 
   (** [find_with_level ~full_transaction_object conn level] returns the block
       if it's present in the storage. If [full_transaction_object] is set to true,
@@ -136,7 +139,7 @@ module Blocks : sig
     full_transaction_object:bool ->
     conn ->
     Ethereum_types.quantity ->
-    Ethereum_types.block option tzresult Lwt.t
+    Transaction_object.t Ethereum_types.block option tzresult Lwt.t
 
   (** Same as {!find_with_level} but finds with the block hash instead of block
       number. *)
@@ -144,7 +147,7 @@ module Blocks : sig
     full_transaction_object:bool ->
     conn ->
     Ethereum_types.block_hash ->
-    Ethereum_types.block option tzresult Lwt.t
+    Transaction_object.t Ethereum_types.block option tzresult Lwt.t
 
   val find_hash_of_number :
     conn ->
@@ -180,9 +183,7 @@ module Transactions : sig
     conn -> Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
 
   val find_object :
-    conn ->
-    Ethereum_types.hash ->
-    Ethereum_types.legacy_transaction_object option tzresult Lwt.t
+    conn -> Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
 
   (** [receipts_of_block_number conn block_number] returns all the receipts found
       from level [block_number]. The function does not check if the block exists. *)

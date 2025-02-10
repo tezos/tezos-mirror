@@ -711,7 +711,8 @@ let find state tx_hash =
   in
   Option.either_f res (fun () -> Pool.find state.Types.pool tx_hash)
 
-let txs_watcher : Ethereum_types.Subscription.output Lwt_watcher.input =
+let txs_watcher :
+    Transaction_object.t Ethereum_types.Subscription.output Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
 module Handlers = struct
