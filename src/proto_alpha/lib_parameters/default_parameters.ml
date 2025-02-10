@@ -144,6 +144,9 @@ let default_cryptobox_parameters =
     slot_size = 126_944;
     redundancy_factor = 8;
     number_of_shards = 512;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+       Changing these values will be tricky. (The issue suggests a way to deal
+       with such changes.) *)
   }
 
 let default_dal =
@@ -173,6 +176,9 @@ let default_dal =
          rewards, [dal_rewards_weight] is ignored when [incentives_enable =
          false]. *)
       traps_fraction = Q.(5 // 10000);
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+         Further changes (both in the protocol and in the DAL node) need to be
+         made if this value changes. *)
     }
 
 let constants_mainnet : Constants.Parametric.t =
