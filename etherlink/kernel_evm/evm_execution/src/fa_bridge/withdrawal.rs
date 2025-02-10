@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -26,6 +27,8 @@
 //! which can be used both for indexing and for retrieving information necessary
 //! to generate outbox message proof (outbox level + message id).
 
+use alloy_primitives::FixedBytes;
+use alloy_sol_types::SolEvent;
 use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
@@ -41,9 +44,9 @@ use tezos_smart_rollup_encoding::{
 };
 
 use crate::{
-    abi::{self, ABI_B22_RIGHT_PADDING, ABI_H160_LEFT_PADDING},
     handler::Withdrawal,
     precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS,
+    utilities::alloy::{alloy_to_h160, alloy_to_u256, h160_to_alloy, u256_to_alloy},
     utilities::keccak256_hash,
 };
 
@@ -60,6 +63,35 @@ pub const WITHDRAW_EVENT_TOPIC: &[u8; 32] = b"\
 /// L1 proxy contract entrypoint that will be invoked by the outbox message
 /// execution.
 pub const WITHDRAW_ENTRYPOINT: &str = "withdraw";
+
+alloy_sol_types::sol! {
+    event SolStandardWithdrawalInput (
+        address ticket_owner,
+        bytes   routing_info,
+        uint256 amount,
+        bytes22 ticketer,
+        bytes   content,
+    );
+}
+
+alloy_sol_types::sol! {
+    event SolStandardWithdrawalProxyCallData (
+        address sender,
+        uint256 amount,
+        uint256 ticket_hash,
+    );
+}
+
+alloy_sol_types::sol! {
+    event SolStandardWithdrawalEvent (
+        address sender,
+        address ticket_owner,
+        bytes22 receiver,
+        bytes22 proxy,
+        uint256 amount,
+        uint256 withdrawal_id,
+    );
+}
 
 /// Withdrawal structure parsed from the precompile calldata
 #[derive(Debug, PartialEq)]
@@ -92,20 +124,17 @@ impl FaWithdrawal {
     ///     bytes memory content
     /// )
     pub fn try_parse(input_data: &[u8], sender: H160) -> Result<Self, FaBridgeError> {
-        let ticket_owner = abi::h160_parameter(input_data, 0)
-            .ok_or(FaBridgeError::AbiDecodeError("ticket_owner"))?;
-        let routing_info = abi::bytes_parameter(input_data, 1)
-            .ok_or(FaBridgeError::AbiDecodeError("routing_info"))?;
-        let amount = abi::u256_parameter(input_data, 2)
-            .ok_or(FaBridgeError::AbiDecodeError("amount"))?;
-        let ticketer: [u8; 22] = abi::fixed_bytes_parameter(input_data, 3)
-            .ok_or(FaBridgeError::AbiDecodeError("ticketer"))?;
-        let content = abi::bytes_parameter(input_data, 4)
-            .ok_or(FaBridgeError::AbiDecodeError("content"))?;
+        let (ticket_owner, routing_info, amount, ticketer, content) =
+            SolStandardWithdrawalInput::abi_decode_data(input_data, true).map_err(
+                |_| FaBridgeError::AbiDecodeError("Failed to parse precompile call data"),
+            )?;
 
-        let ticket_hash = ticket_hash_from_raw_parts(&ticketer, content);
-        let (receiver, proxy) = parse_l1_routing_info(routing_info)?;
-        let ticket = construct_ticket(ticketer, content, amount)?;
+        let ticket_owner = alloy_to_h160(&ticket_owner).unwrap_or_default();
+        let amount = alloy_to_u256(&amount);
+        let ticket_hash = ticket_hash_from_raw_parts(ticketer.as_slice(), &content);
+        let (receiver, proxy) = parse_l1_routing_info(&routing_info)?;
+        let ticketer: [u8; 22] = ticketer.as_slice().try_into().unwrap_or_default();
+        let ticket = construct_ticket(ticketer, &content, amount)?;
 
         Ok(Self {
             sender,
@@ -125,15 +154,17 @@ impl FaWithdrawal {
         let mut call_data = Vec::with_capacity(100);
         call_data.extend_from_slice(WITHDRAW_METHOD_ID);
 
-        call_data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-        call_data.extend_from_slice(self.sender.as_bytes());
-        debug_assert!((call_data.len() - 4) % 32 == 0);
+        let calldata_ = SolStandardWithdrawalProxyCallData {
+            sender: h160_to_alloy(&self.sender),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            ticket_hash: u256_to_alloy(&U256::from_big_endian(
+                self.ticket_hash.as_bytes(),
+            ))
+            .unwrap_or_default(),
+        };
 
-        call_data.extend_from_slice(&Into::<[u8; 32]>::into(self.amount));
-        debug_assert!((call_data.len() - 4) % 32 == 0);
-
-        call_data.extend_from_slice(self.ticket_hash.as_bytes());
-        debug_assert!((call_data.len() - 4) % 32 == 0);
+        let data = SolStandardWithdrawalProxyCallData::encode_data(&calldata_);
+        call_data.extend_from_slice(&data);
 
         call_data
     }
@@ -146,30 +177,27 @@ impl FaWithdrawal {
     ///
     /// Signature: Withdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256)
     pub fn event_log(&self, withdrawal_id: U256) -> Log {
-        let mut data = Vec::with_capacity(7 * 32);
-
-        data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-        data.extend_from_slice(self.sender.as_bytes());
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-        data.extend_from_slice(self.ticket_owner.as_bytes());
-        debug_assert!(data.len() % 32 == 0);
+        let mut receiver_bytes = vec![];
+        let mut proxy_bytes = vec![];
 
         // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
-        self.receiver.bin_write(&mut data).unwrap();
-        data.extend_from_slice(&ABI_B22_RIGHT_PADDING);
-        debug_assert!(data.len() % 32 == 0);
+        self.receiver.bin_write(&mut receiver_bytes).unwrap();
+        let receiver_bytes: [u8; 22] = receiver_bytes.try_into().unwrap();
 
-        self.proxy.bin_write(&mut data).unwrap();
-        data.extend_from_slice(&ABI_B22_RIGHT_PADDING);
-        debug_assert!(data.len() % 32 == 0);
+        // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
+        self.proxy.bin_write(&mut proxy_bytes).unwrap();
+        let proxy_bytes: [u8; 22] = proxy_bytes.try_into().unwrap();
 
-        data.extend_from_slice(&Into::<[u8; 32]>::into(self.amount));
-        debug_assert!(data.len() % 32 == 0);
+        let event_data = SolStandardWithdrawalEvent {
+            sender: h160_to_alloy(&self.sender),
+            ticket_owner: h160_to_alloy(&self.ticket_owner),
+            receiver: FixedBytes::<22>::from(&receiver_bytes),
+            proxy: FixedBytes::<22>::from(&proxy_bytes),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            withdrawal_id: u256_to_alloy(&withdrawal_id).unwrap_or_default(),
+        };
 
-        data.extend_from_slice(&Into::<[u8; 32]>::into(withdrawal_id));
-        debug_assert!(data.len() % 32 == 0);
+        let data = SolStandardWithdrawalEvent::encode_data(&event_data);
 
         Log {
             address: FA_BRIDGE_PRECOMPILE_ADDRESS,
@@ -259,6 +287,7 @@ fn ticket_hash_from_raw_parts(ticketer: &[u8], content: &[u8]) -> H256 {
 mod tests {
     use alloy_sol_types::{SolCall, SolEvent};
     use primitive_types::{H160, U256};
+    use sha3::{Digest, Keccak256};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_smart_rollup_encoding::contract::Contract;
 
@@ -293,6 +322,17 @@ mod tests {
             ticket,
             ticket_owner,
         }
+    }
+
+    #[test]
+    fn withdrawal_event_signature() {
+        assert_eq!(
+            WITHDRAW_EVENT_TOPIC.to_vec(),
+            Keccak256::digest(
+                b"Withdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256)"
+            )
+            .to_vec()
+        );
     }
 
     #[test]
