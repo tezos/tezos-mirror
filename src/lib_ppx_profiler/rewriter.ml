@@ -40,10 +40,7 @@ let aggregate_s key location =
   | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s
   | _ -> Error.error location (Error.Invalid_aggregate key)
 
-let custom key location =
-  match Key.content key with
-  | Key.Apply _ | Key.Ident _ -> Custom
-  | _ -> Error.error location (Error.Invalid_custom key)
+let custom _key _location = Custom
 
 let custom_f key location =
   match Key.content key with
@@ -198,7 +195,7 @@ let rec extract_list = function
   | [%expr []] -> Some []
   | _ -> None
 
-let extract_content_from_structure loc structure =
+let extract_content_from_structure structure =
   match structure with
   | [%expr []] ->
       (* [@ppx] *)
@@ -217,10 +214,7 @@ let extract_content_from_structure loc structure =
       (* [@ppx ["label1"; "label2"; ...]] *)
       match extract_list expr with
       | Some labels -> Key.List labels
-      | None ->
-          (* This branch corresponds to the fact that the value
-             associated to the field is not a list, which is an error *)
-          Error.error loc Error.(Malformed_attribute structure))
+      | None -> Key.Other expr)
 
 let exists_field field string =
   let Ppxlib.{txt; _}, _ = field in
@@ -311,7 +305,7 @@ let extract_key_from_payload loc payload =
               profiler_module;
               metadata;
               driver_ids;
-              content = extract_content_from_structure loc structure;
+              content = extract_content_from_structure structure;
             }
       | _ -> Error.error loc (Invalid_payload (false, payload)))
   | Ppxlib.PStr [[%stri [%e? structure]]] ->
@@ -322,7 +316,7 @@ let extract_key_from_payload loc payload =
           profiler_module = None;
           metadata = None;
           driver_ids = Handled_drivers.empty;
-          content = extract_content_from_structure loc structure;
+          content = extract_content_from_structure structure;
         }
   | Ppxlib.PStr [] ->
       (* [@ppx] *)
