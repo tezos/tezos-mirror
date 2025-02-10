@@ -146,15 +146,16 @@ where
         self.write_nz(rd, result as u64)
     }
 
-    /// `SLL` R-type instruction
-    ///
     /// Shift left logically bits in rs1 by shift_amount = val(rs2)\[5:0\]
-    /// saving the result in rd
+    /// saving the result in rd.
     /// (zeros are shifted in the lower bits)
-    pub fn run_sll(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    ///
+    /// Relevant opcodes:
+    /// - `SLL`
+    pub fn run_sll(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
-        let sh_amt = self.read(rs2) & 0b11_1111;
-        let result = self.read(rs1) << sh_amt;
+        let sh_amt = self.read_nz(rs2) & 0b11_1111;
+        let result = self.read_nz(rs1) << sh_amt;
         self.write_nz(rd, result)
     }
 
@@ -442,6 +443,19 @@ mod tests {
             let new_val = $state.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
+
+        ($state:ident, $shift_fn:tt,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr,
+            non_zero
+        ) => {
+            $state.xregisters.write($rs2, $r2_val);
+            $state.xregisters.write($rs1, $r1_val);
+            $state.xregisters.$shift_fn(nz::$rs1, nz::$rs2, nz::$rd);
+            let new_val = $state.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
     }
 
     macro_rules! test_both_shift_instr {
@@ -496,6 +510,62 @@ mod tests {
                 $expected_val
             );
         };
+        ($state:ident, $shift_fn_imm:tt, $shift_fn_reg:tt,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr,
+            non_zero
+        ) => {
+            test_shift_instr!(
+                $state,
+                $shift_fn_imm,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val
+            );
+            test_shift_reg_instr!(
+                $state,
+                $shift_fn_reg,
+                $rs2,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+        };
+
+        ($state:ident, $shift_fn_imm:tt, $shift_fn_reg:tt,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr,
+            non_zero_both
+        ) => {
+            test_shift_instr!(
+                $state,
+                $shift_fn_imm,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+            test_shift_reg_instr!(
+                $state,
+                $shift_fn_reg,
+                $rs2,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+        };
     }
 
     backend_test!(test_shift, F, {
@@ -512,7 +582,7 @@ mod tests {
             0x1234_ABEF,
             a1,
             0x1234_ABEF,
-            non_zero
+            non_zero_both
         );
         test_both_shift_instr!(
             state,
@@ -550,7 +620,7 @@ mod tests {
             0x1234_ABEF,
             a1,
             0x1_234A_BEF0_0000,
-            non_zero
+            non_zero_both
         );
         test_both_shift_instr!(
             state,
@@ -600,7 +670,7 @@ mod tests {
             0x1234_ABEF,
             a0,
             0x34AB_EF00_0000_0000,
-            non_zero
+            non_zero_both
         );
         test_both_shift_instr!(
             state,
@@ -636,7 +706,8 @@ mod tests {
             a1,
             0b1001_0101,
             a2,
-            0x12A0_0000
+            0x12A0_0000,
+            non_zero
         );
         // Use same register for shift and destination
         test_shift_reg_instr!(
@@ -647,7 +718,8 @@ mod tests {
             a2,
             0b1101_0101,
             a1,
-            0x1AA0_0000
+            0x1AA0_0000,
+            non_zero
         );
         // Use same register for shift, source and destination
         test_shift_reg_instr!(
@@ -658,7 +730,8 @@ mod tests {
             a1,
             0b1101_0101,
             a1,
-            0x1AA0_0000
+            0x1AA0_0000,
+            non_zero
         );
     });
 
