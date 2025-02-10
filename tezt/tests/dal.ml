@@ -6912,7 +6912,7 @@ module Tx_kernel_e2e = struct
           Test.fail "%s" message
 end
 
-module Profiler = Tezos_base.Profiler
+module Profiler = Tezos_profiler.Profiler
 
 (* A simpler test whith a bootstrap, a producer and an observer. The goal is to
    check regression on [get_connections] RPC response. *)
@@ -7100,7 +7100,9 @@ let dal_crypto_benchmark () =
     ~tags:["dal"; "benchmark"; "crypto"; Tag.slow; team]
   @@ fun () ->
   let open Dal.Cryptobox in
-  let driver = Tezos_base_unix.Simple_profiler.auto_write_as_txt_to_file in
+  let driver =
+    Tezos_profiler_backends.Simple_profiler.auto_write_as_txt_to_file
+  in
   let file =
     match Cli.Logs.level with
     | Info | Debug -> "/dev/stdout"

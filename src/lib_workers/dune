@@ -8,7 +8,7 @@
  (libraries
   octez-libs.base
   octez-libs.stdlib-unix
-  octez-libs.octez-profiler-backend)
+  opentelemetry)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags

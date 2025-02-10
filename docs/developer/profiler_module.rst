@@ -114,8 +114,8 @@ We can now easily create an instance for a ``Driver``:
 .. code-block:: OCaml
 
    let read_instance =
-     Tezos_base.Profiler.instance
-       Tezos_base_unix.Simple_profiler.auto_write_as_txt_to_file
+     Tezos_profiler.Profiler.instance
+       Tezos_profiler_backends.Simple_profiler.auto_write_as_txt_to_file
        ("read_profiling.txt", Profiler.Info)
 
 We just need one last thing. We have a ``read_profiler`` and a ``read_instance`` that
@@ -146,7 +146,7 @@ without providing it:
 
    val wrap : profiler -> (module GLOBAL_PROFILER)
 
-This will give access to the functions in :package-api:`the Profiler.GLOBAL_PROFILER module <octez-libs/Tezos_base/Profiler/module-type-GLOBAL_PROFILER/index.html>`.
+This will give access to the functions in :package-api:`the Profiler.GLOBAL_PROFILER module <octez-libs/Tezos_profiler/Profiler/module-type-GLOBAL_PROFILER/index.html>`.
 
 Use the profiler
 ^^^^^^^^^^^^^^^^
@@ -193,7 +193,7 @@ monitor our functions more precisely:
    module Read_profiler = (val Profiler.wrap profiler)
 
    let instance =
-     Profiler.instance Tezos_base_unix.Simple_profiler.auto_write_as_txt_to_file
+     Profiler.instance Tezos_profiler_backends.Simple_profiler.auto_write_as_txt_to_file
        ("/tmp/test_profiler.txt", Profiler.Info)
 
    let read_int ic =

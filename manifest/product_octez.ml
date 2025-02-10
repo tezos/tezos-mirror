@@ -1799,6 +1799,14 @@ let _octez_print_version_exe =
     ~modules:["octez_print_version"]
     ~bisect_ppx:No
 
+let octez_profiler =
+  octez_lib
+    "octez-profiler"
+    ~internal_name:"tezos_profiler"
+    ~path:"src/lib_profiler"
+    ~synopsis:"The Octez Profiler"
+    ~deps:[data_encoding; lwt]
+
 let octez_base =
   octez_lib
     "base"
@@ -1846,6 +1854,7 @@ let octez_base_unix =
         octez_hacl;
         octez_stdlib |> open_;
         octez_stdlib_unix |> open_;
+        octez_profiler |> open_;
         data_encoding |> open_;
         uri;
         octez_event_logging |> open_;
@@ -1895,7 +1904,7 @@ let _octez_base_tests =
 
 let _octez_base_unix_tests =
   tezt
-    ["test_unix_error"; "test_syslog"; "test_simple_profiler"]
+    ["test_unix_error"; "test_syslog"]
     ~path:"src/lib_base/unix/test"
     ~with_macos_security_framework:true
     ~opam:"octez-libs"
@@ -1933,6 +1942,99 @@ let octez_base_test_helpers =
     ~linkall:true
     ~bisect_ppx:No
     ~release_status:Released
+
+let ppx_profiler =
+  octez_lib
+    "ppx_profiler"
+    ~path:"src/lib_ppx_profiler"
+    ~deps:[ppxlib]
+    ~ppx_kind:Ppx_rewriter
+    ~ppx_runtime_libraries:[logs]
+    ~preprocess:(pps ppxlib_metaquot)
+
+let ppx_profiler =
+  make_ppx ~env_var:"TEZOS_PPX_PROFILER" ~preprocess:ppx_profiler
+
+let octez_profiler_unix =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  octez_lib
+    "octez-profiler.unix"
+    ~internal_name:"tezos_profiler_unix"
+    ~path:"src/lib_profiler/unix"
+    ~synopsis:"The Octez Profiler"
+    ~preprocess
+    ~preprocessor_deps
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_stdlib |> open_;
+        octez_stdlib_unix;
+        octez_profiler |> open_;
+        data_encoding |> open_;
+        octez_event_logging;
+        octez_error_monad |> open_;
+      ]
+
+let octez_profiler_backends =
+  octez_lib
+    "octez-profiler.backends"
+    ~internal_name:"tezos_profiler_backends"
+    ~path:"src/lib_profiler/backends"
+    ~synopsis:"Backends for the Octez Profiler"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_unix |> open_;
+        octez_stdlib |> open_;
+        data_encoding |> open_;
+      ]
+
+let _octez_profiler_backends_tests =
+  tezt
+    ["test_simple_profiler"]
+    ~path:"src/lib_profiler/backends/test"
+    ~with_macos_security_framework:true
+    ~opam:"octez-libs"
+    ~modes:[Native]
+    ~deps:
+      [
+        octez_base |> open_;
+        octez_base_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_backends |> open_;
+        octez_stdlib_unix |> open_;
+        octez_error_monad |> open_;
+        data_encoding;
+        octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
+        tezt_lib;
+      ]
+
+let octez_profiler_complex_backends =
+  octez_lib
+    "octez-profiler.complex_backends"
+    ~internal_name:"tezos_profiler_complex_backends"
+    ~path:"src/lib_profiler/backends/complex"
+    ~synopsis:
+      "Complex backends for the Octez Profiler that need more dependencies"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_unix |> open_;
+        octez_profiler_backends |> open_;
+        octez_stdlib |> open_;
+        data_encoding |> open_;
+        prometheus;
+        opentelemetry;
+        ambient_context_lwt;
+        opentelemetry_client_cohttp_lwt;
+      ]
 
 let octez_crypto_dal =
   octez_lib
@@ -1974,18 +2076,6 @@ let _octez_crypto_dal_tests =
         octez_bls12_381_polynomial;
         octez_test_helpers;
       ]
-
-let ppx_profiler =
-  octez_lib
-    "ppx_profiler"
-    ~path:"src/lib_ppx_profiler"
-    ~deps:[ppxlib]
-    ~ppx_kind:Ppx_rewriter
-    ~ppx_runtime_libraries:[logs]
-    ~preprocess:(pps ppxlib_metaquot)
-
-let ppx_profiler =
-  make_ppx ~env_var:"TEZOS_PPX_PROFILER" ~preprocess:ppx_profiler
 
 let ppx_brassaia =
   octez_lib
@@ -2286,23 +2376,6 @@ let octez_p2p_services =
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc]
     ~linkall:true
 
-let octez_profiler_backend =
-  octez_lib
-    "octez-profiler-backend"
-    ~internal_name:"tezos_profiler_backend"
-    ~path:"src/lib_profiler_backend"
-    ~synopsis:"Backends for the Octez Profiler"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives" |> open_;
-        octez_base_unix |> open_;
-        octez_stdlib |> open_;
-        octez_stdlib_unix;
-        opentelemetry;
-        ambient_context_lwt;
-        opentelemetry_client_cohttp_lwt;
-      ]
-
 let octez_workers =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib
@@ -2317,7 +2390,7 @@ let octez_workers =
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_stdlib_unix |> open_;
-        octez_profiler_backend;
+        opentelemetry;
       ]
 
 let _octez_workers_tests =
@@ -2373,6 +2446,7 @@ let octez_shell_services =
         octez_version |> open_;
         octez_context_sigs;
         octez_merkle_proof_encoding;
+        octez_profiler |> open_;
         octez_dal_config |> open_;
       ]
     ~linkall:true
@@ -3252,6 +3326,7 @@ let octez_protocol_environment =
         octez_context_brassaia_memory;
         octez_scoru_wasm;
         octez_event_logging;
+        octez_profiler |> open_;
       ]
 
 let _octez_protocol_environment_tests =
@@ -3642,6 +3717,8 @@ let octez_validation =
         octez_shell_services |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_backends |> open_;
         octez_version_value;
       ]
 
@@ -3688,6 +3765,7 @@ let octez_store_unix =
         octez_protocol_environment |> open_;
         octez_context_ops |> open_;
         octez_validation |> open_;
+        octez_profiler |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
@@ -3767,6 +3845,7 @@ let octez_store =
         octez_validation |> open_;
         octez_context_ops |> open_;
         octez_store_shared |> open_;
+        octez_profiler |> open_;
       ]
     ~virtual_modules:["store"]
     ~default_implementation:"octez-shell-libs.store.real"
@@ -3809,6 +3888,7 @@ let octez_requester =
         octez_shell_services |> open_;
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        octez_profiler |> open_;
         lwt_watcher;
       ]
 
@@ -3853,7 +3933,6 @@ let octez_shell =
         lwt_watcher;
         lwt_canceler;
         prometheus;
-        octez_profiler_backend |> open_;
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix |> open_;
         octez_rpc;
@@ -3865,6 +3944,8 @@ let octez_shell =
         octez_stdlib_unix |> open_;
         octez_shell_services |> open_;
         octez_p2p_services |> open_;
+        octez_profiler |> open_;
+        octez_profiler_complex_backends |> open_;
         octez_protocol_compiler_alternative_hashes;
         octez_protocol_updater |> open_;
         octez_requester |> open_;
@@ -3896,6 +3977,7 @@ let octez_rpc_http_client =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_profiler |> open_;
         resto_cohttp_client;
         octez_rpc;
         octez_rpc_http |> open_;
@@ -6708,6 +6790,7 @@ let hash = Protocol.hash
             octez_stdlib |> open_;
             octez_stdlib_unix |> open_;
             octez_context_memory |> if_ (N.(number >= 012) && N.(number <= 019));
+            octez_profiler |> if_ N.(number >= 021) |> open_;
             octez_rpc_http_client_unix |> if_ N.(number >= 011);
             octez_rpc_http_client |> if_ N.(number >= 011) |> open_;
             octez_context_ops |> if_ N.(number >= 011) |> open_;
@@ -7973,7 +8056,9 @@ let _octez_node =
          octez_rpc_http_server |> open_;
          octez_rpc_process |> open_;
          octez_p2p |> open_;
-         octez_profiler_backend |> open_;
+         octez_profiler |> open_;
+         octez_profiler_backends |> open_;
+         octez_profiler_complex_backends |> open_;
          octez_shell |> open_;
          octez_store |> open_;
          octez_store_unix_reconstruction |> open_;

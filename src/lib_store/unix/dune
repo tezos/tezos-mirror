@@ -14,6 +14,7 @@
   octez-proto-libs.protocol-environment
   octez-shell-libs.context-ops
   octez-shell-libs.validation
+  octez-libs.octez-profiler
   octez-shell-libs.protocol-updater
   octez-libs.stdlib-unix
   octez-libs.stdlib
@@ -36,6 +37,7 @@
   -open Tezos_protocol_environment
   -open Tezos_context_ops
   -open Tezos_validation
+  -open Tezos_profiler
   -open Tezos_protocol_updater
   -open Tezos_stdlib_unix
   -open Tezos_stdlib

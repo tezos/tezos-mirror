@@ -21,6 +21,10 @@ val octez_base_test_helpers : Manifest.target
 
 val octez_base_unix : Manifest.target
 
+val octez_profiler : Manifest.target
+
+val octez_profiler_backends : Manifest.target
+
 val octez_clic : Manifest.target
 
 val octez_client_base : Manifest.target

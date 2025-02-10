@@ -20,7 +20,9 @@
   octez-libs.rpc-http-server
   octez-rpc-process
   octez-shell-libs.p2p
-  octez-libs.octez-profiler-backend
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.backends
+  octez-libs.octez-profiler.complex_backends
   octez-shell-libs.shell
   octez-shell-libs.store
   octez-shell-libs.store.unix-reconstruction
@@ -187,7 +189,9 @@
   -open Tezos_rpc_http_server
   -open Octez_rpc_process
   -open Tezos_p2p
-  -open Tezos_profiler_backend
+  -open Tezos_profiler
+  -open Tezos_profiler_backends
+  -open Tezos_profiler_complex_backends
   -open Tezos_shell
   -open Tezos_store
   -open Tezos_store_unix_reconstruction

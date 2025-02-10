@@ -138,12 +138,16 @@ let report_encoding =
 
 type (_, _) kind = ..
 
+type view = View : ('config, 'state) kind -> view
+
 module type DRIVER = sig
   type config
 
   type state
 
   val kind : (config, state) kind
+
+  val encoding_case : view Data_encoding.case
 
   val create : config -> state
 

@@ -29,7 +29,7 @@ val trace :
   ?force_new_trace_id:bool ->
   ?trace_state:string ->
   ?service_name:string ->
-  ?attrs:(string * Opentelemetry.value) trace ->
+  ?attrs:(string * Opentelemetry.value) list ->
   ?kind:Opentelemetry_proto.Trace.span_span_kind ->
   ?trace_id:Opentelemetry.Trace_id.t ->
   ?parent:Opentelemetry.Span_id.t ->

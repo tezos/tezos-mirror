@@ -60,7 +60,7 @@ into
 
 It should be noted that a ``Profiler`` module has to be available and has to
 have the signature of :package-api:`the Profiler.GLOBAL_PROFILER module
-<octez-libs/Tezos_base/Profiler/module-type-GLOBAL_PROFILER/index.html>` that
+<octez-libs/Tezos_profiler/Profiler/module-type-GLOBAL_PROFILER/index.html>` that
 can be obtained with ``module Profiler = (val Profiler.wrap my_profiler)``.
 
 Of course you can create any module with this signature but in case you didn't

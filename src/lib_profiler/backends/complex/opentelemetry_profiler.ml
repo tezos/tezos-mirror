@@ -64,16 +64,29 @@ let update_scope s f =
       Ambient_context.with_binding Opentelemetry.Scope.ambient_scope_key s f
   | None -> f ()
 
-type (_, _) Profiler.kind += Opentelemetry_profiler : ('a, 'b) Profiler.kind
-
 type config = {service_name : string; verbosity : Profiler.verbosity}
 
-module Driver = struct
+type state = State
+
+type (_, _) Profiler.kind +=
+  | Opentelemetry_profiler : (config, state) Profiler.kind
+
+module Driver : Profiler.DRIVER with type config = config = struct
   type nonrec config = config
 
-  type state = State
+  type nonrec state = state
 
   let kind = Opentelemetry_profiler
+
+  let encoding_case =
+    Data_encoding.(
+      case
+        Json_only
+        ~title:"opentelemetry"
+        ~description:"Opentelemetry driver"
+        (constant "opentelemetry")
+        (function Profiler.View Opentelemetry_profiler -> Some () | _ -> None)
+        (fun () -> Profiler.View Opentelemetry_profiler))
 
   let create _ = State
 
@@ -101,8 +114,11 @@ end
 let opentelemetry : config Profiler.driver =
   (module Driver : Profiler.DRIVER with type config = config)
 
+let instance_maker driver ~verbosity ~directory:_ ~name =
+  Profiler.instance driver {verbosity; service_name = name}
+
 let () =
   Profiler_instance.register_backend
     ["opentelemetry"]
-    (fun ~verbosity ~directory:_ ~name ->
-      Profiler.instance opentelemetry {verbosity; service_name = name})
+    instance_maker
+    opentelemetry

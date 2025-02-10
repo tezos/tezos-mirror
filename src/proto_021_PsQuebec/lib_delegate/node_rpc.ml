@@ -39,7 +39,7 @@ module Profiler = struct
 end
 
 module RPC_profiler = struct
-  include (val Tezos_base.Profiler.wrap RPC_profiler.rpc_client_profiler)
+  include (val Tezos_profiler.Profiler.wrap RPC_profiler.rpc_client_profiler)
 
   let[@warning "-32"] reset_block_section =
     RPC_profiler.create_reset_block_section RPC_profiler.rpc_client_profiler

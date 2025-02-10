@@ -2,20 +2,25 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_requester)
- (public_name octez-shell-libs.requester)
+ (name tezos_profiler_unix)
+ (public_name octez-libs.octez-profiler.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-shell-libs.shell-services
   octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib
   octez-libs.stdlib-unix
   octez-libs.octez-profiler
-  lwt-watcher)
+  octez-libs.data-encoding
+  octez-libs.event-logging
+  octez-libs.error-monad)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
-  -open Tezos_shell_services
+  -open Tezos_base
   -open Tezos_base.TzPervasives
-  -open Tezos_stdlib_unix
-  -open Tezos_profiler))
+  -open Tezos_stdlib
+  -open Tezos_profiler
+  -open Data_encoding
+  -open Tezos_error_monad))

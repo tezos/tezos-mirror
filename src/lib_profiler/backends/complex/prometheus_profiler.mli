@@ -13,8 +13,8 @@
     in the metadata field of profiler calls. If this attribute is set to
     the empty string, the id passed to the call will be used as metric
     label. If the attribute is a non-empty string, that value will be
-    used instead of the one passed to the profiling function. 
-    
+    used instead of the one passed to the profiling function.
+
     You MUST avoid metric names that are too unique such as block or
     operation hashes because prometheus will quickly fail at handling
     a too high metrics cardinality otherwise. *)

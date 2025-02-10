@@ -188,8 +188,6 @@ module Empty : sig
   val absurd : t -> 'a
 end
 
-module Profiler = Profiler
-
 module type PRINTABLE = sig
   type t
 

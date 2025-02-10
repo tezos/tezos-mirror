@@ -117,6 +117,8 @@ val report_encoding : report Data_encoding.t
 
 type (_, _) kind = ..
 
+type view = View : ('config, 'state) kind -> view
+
 (** {2:driver Driver}
 
     The [Driver] is a signature that, when instantiated, specifies the behaviour
@@ -131,6 +133,9 @@ module type DRIVER = sig
 
   (** A typed kind for downcasting. *)
   val kind : (config, state) kind
+
+  (** An encoding to represent high-level informations about the driver *)
+  val encoding_case : view Data_encoding.case
 
   (** Create an instance from a config. *)
   val create : config -> state

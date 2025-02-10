@@ -9,10 +9,20 @@ open Profiler
 module BackendMap = Map.Make (String)
 module VerbosityMap = Map.Make (String)
 
-let registered_backends :
-    (verbosity:verbosity -> directory:string -> name:string -> instance)
-    BackendMap.t
-    ref =
+type instance_maker =
+  verbosity:Profiler.verbosity ->
+  directory:string ->
+  name:string ->
+  Profiler.instance
+
+type 'config driver = (module Profiler.DRIVER with type config = 'config)
+
+type 'instance_maker backend_infos = {
+  instance_maker : 'instance_maker;
+  view : view;
+}
+
+let registered_backends : instance_maker backend_infos BackendMap.t ref =
   ref BackendMap.empty
 
 (** Get the verbosity map from the contents of the PROFILING environment
@@ -64,21 +74,33 @@ let get_profiler_verbosity =
            the catch-all case, represented by "", has any verbosity assigned. *)
         Option.join @@ VerbosityMap.find "" profiler_verbosity_map
 
-let register_backend env driver =
+let register_backend :
+    type config.
+    string list -> (config driver -> instance_maker) -> config driver -> unit =
+ fun env instance_maker driver ->
+  let module Driver = (val driver : DRIVER with type config = config) in
+  (* Wrapping the kind in a View to avoid internal types of the Driver
+     escaping their scope *)
+  let view = Profiler.View Driver.kind in
+  Profiler_kind.register_case Driver.encoding_case ;
   match List.find (fun k -> BackendMap.mem k !registered_backends) env with
   | Some k ->
       Fmt.failwith "Profiler backend already registered for value \"%s\"" k
   | None ->
       registered_backends :=
         List.fold_left
-          (fun acc k -> BackendMap.add k driver acc)
+          (fun acc k ->
+            BackendMap.add k {instance_maker = instance_maker driver; view} acc)
           !registered_backends
           env
 
-let wrap_backend_verbosity backend ~directory ~name =
+let wrap_backend_verbosity instance_maker ~directory ~name =
   match get_profiler_verbosity ~name with
   | None -> None
-  | Some verbosity -> Some (backend ~verbosity ~directory ~name)
+  | Some verbosity -> Some (instance_maker ~verbosity ~directory ~name)
+
+type wrapped_instance_maker =
+  directory:string -> name:string -> Profiler.instance option
 
 let selected_backend () =
   let fail s =
@@ -106,41 +128,17 @@ let selected_backend () =
           |> fail)
   | Some b -> (
       match BackendMap.find b !registered_backends with
-      | Some x -> Some (wrap_backend_verbosity x)
+      | Some {instance_maker; view} ->
+          Some {instance_maker = wrap_backend_verbosity instance_maker; view}
       | None ->
           Format.sprintf "No backend registered for value \"%s\"" b |> fail)
 
-(** Default profilers. *)
-
-let profiler ?(suffix = "")
-    (backend : (module DRIVER with type config = string * verbosity)) ~verbosity
-    ~directory ~name =
-  let output_dir =
-    (* If [PROFILING_OUTPUT_DIR] environment variable is set, it overwrites the
-       directory provided by the application *)
-    let output_dir =
-      Sys.getenv_opt "PROFILING_OUTPUT_DIR" |> Option.value ~default:directory
-    in
-    match Sys.is_directory output_dir with
-    | true -> output_dir
-    | false ->
-        Fmt.failwith
-          "Error: Profiling output directory '%s' is not a directory."
-          output_dir
-    | exception Sys_error _ ->
-        Tezos_stdlib_unix.Utils.create_dir ~perm:0o777 output_dir ;
-        output_dir
-  in
-  Profiler.instance
-    backend
-    Filename.Infix.(output_dir // (name ^ "_profiling" ^ suffix), verbosity)
-
 let () =
-  register_backend
-    ["json"]
-    (profiler ~suffix:".json" Simple_profiler.auto_write_as_json_to_file)
-
-let () =
-  register_backend
-    ["text"; "txt"]
-    (profiler ~suffix:".txt" Simple_profiler.auto_write_as_txt_to_file)
+  if
+    (true [@profiler.custom false])
+    && Sys.getenv_opt "PROFILING_BACKEND" <> None
+  then
+    Fmt.failwith
+      "The profiling has been enabled with PROFILING_BACKEND='...' but the \
+       program hasn't been compiled with TEZOS_PPX_PROFILER='...'"
+  else ()

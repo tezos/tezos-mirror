@@ -2,13 +2,15 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_lib_base_unix_test_tezt_lib)
+ (name src_lib_profiler_backends_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.backends
   octez-libs.stdlib-unix
   octez-libs.error-monad
   octez-libs.data-encoding
@@ -23,18 +25,20 @@
   -open Tezt_core.Base
   -open Tezos_base
   -open Tezos_base_unix
+  -open Tezos_profiler
+  -open Tezos_profiler_backends
   -open Tezos_stdlib_unix
   -open Tezos_error_monad
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_unix_error test_syslog))
+ (modules test_simple_profiler))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (modes native)
  (libraries
-  src_lib_base_unix_test_tezt_lib
+  src_lib_profiler_backends_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
