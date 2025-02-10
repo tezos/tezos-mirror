@@ -510,6 +510,27 @@ Miscellaneous commands:
     --max-delayed-inbox-blueprint-length <1000>: value for max_delayed_inbox_blueprint_length in the installer config
     --enable-fast-withdrawal: enable flag enable_fast_withdrawal in the installer config
   
+  octez-evm-node make l2 kernel installer config <kernel config file> [--minimum-base-fee-per-gas <111...>]
+                     [--da-fee-per-byte <111...>]
+                     [--sequencer-pool-address <0x...>]
+                     [--maximum-gas-per-transaction <30000...>]
+                     [--bootstrap-balance <9999000000000000000000>]
+                     [--bootstrap-account <0x...>]
+                     [--set-code <0x...,0x....>]
+                     [--world-state-path </evm/world_state/<chain_id>>]
+                     [--l2-chain-id <1>]
+    Produce a file containing the part of the kernel configuration instructions related to a particular L2 chain.
+    <kernel config file>: file path where the config will be written to
+    --minimum-base-fee-per-gas <111...>: value for minimum_base_fee_per_gas in the installer config
+    --da-fee-per-byte <111...>: value for da_fee_per_byte in the installer config
+    --sequencer-pool-address <0x...>: value for sequencer_pool_address in the installer config
+    --maximum-gas-per-transaction <30000...>: value for maximum_gas_per_transaction in the installer config
+    --bootstrap-balance <9999000000000000000000>: balance of the bootstrap accounts
+    --bootstrap-account <0x...>: add a bootstrap account in the installer config.
+    --set-code <0x...,0x....>: add code to an account in the installer config.
+    --world-state-path </evm/world_state/<chain_id>>: value for world_state_path in the installer config
+    --l2-chain-id <1>: L2 chain id
+  
   octez-evm-node patch state at <path> with <value> [--data-dir <data-dir>]
                      [--block-number <N>] [-f --force]
     Patches the state with an arbitrary value. This is an unsafe command, it should be used for debugging only. Patched state is persisted and you need to use the command `reset` to revert the changes.
