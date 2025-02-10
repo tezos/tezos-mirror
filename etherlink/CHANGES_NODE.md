@@ -8,6 +8,8 @@
 
 - Advertises the correct history mode on start-up when it is not explicitely
   set in the configuration file. (!16633)
+- Fixes a performance regression in the RPCs of the new block storage backend.
+  (!16659)
 
 ### Internals
 
