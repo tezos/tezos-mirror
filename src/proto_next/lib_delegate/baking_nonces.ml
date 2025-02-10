@@ -639,10 +639,10 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
   *)
   let* () = try_migrate_legacy_nonces state in
   let last_proposal = ref None in
+  Lwt_canceler.on_cancel canceler (fun () ->
+      should_shutdown := true ;
+      Lwt.return_unit) ;
   let rec worker_loop () =
-    Lwt_canceler.on_cancel canceler (fun () ->
-        should_shutdown := true ;
-        Lwt.return_unit) ;
     let* new_proposal = Lwt_stream.get block_stream in
     match new_proposal with
     | None ->
