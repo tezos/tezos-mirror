@@ -340,8 +340,8 @@ fn compute_bip<Host: Runtime>(
                 .finalize_and_store(
                     host,
                     &constants,
-                    previous_receipts_root.clone(),
-                    previous_transactions_root.clone(),
+                    previous_receipts_root,
+                    previous_transactions_root,
                 )
                 .context("Failed to finalize the block in progress")?;
             *current_block_number = new_block.number + 1;
