@@ -51,14 +51,14 @@ if [ "$RELEASETYPE" = "Master" ]; then
   dnf -y install dnf-plugins-core
 
   # Add the repository
-  dnf -y config-manager --add-repo "https://packages.nomadic-labs.com/next/$distribution/dists/$release/"
+  dnf -y config-manager --add-repo "https://packages.nomadic-labs.com/$distribution/dists/$release/"
   if [ "$distroname" = "rockylinux" ]; then
     dnf -y config-manager --set-enabled devel
   fi
   dnf -y update
 
   # Install public key
-  rpm --import "https://packages.nomadic-labs.com/next/$distribution/octez.asc"
+  rpm --import "https://packages.nomadic-labs.com/$distribution/octez.asc"
   # [end add repository]
 else
   # Update and install the config-mananger plugin
@@ -66,7 +66,7 @@ else
   dnf -y install dnf-plugins-core
 
   # Add the repository
-  dnf -y config-manager --add-repo "https://storage.googleapis.com/$bucket/next/$distribution/dists/$release/"
+  dnf -y config-manager --add-repo "https://storage.googleapis.com/$bucket/$distribution/dists/$release/"
 
   if [ "$distroname" = "rockylinux" ]; then
     dnf -y config-manager --set-enabled devel
@@ -74,7 +74,7 @@ else
   dnf -y update
 
   # Install public key
-  rpm --import "https://storage.googleapis.com/$bucket/next/$distribution/octez.asc"
+  rpm --import "https://storage.googleapis.com/$bucket/$distribution/octez.asc"
 
 fi
 

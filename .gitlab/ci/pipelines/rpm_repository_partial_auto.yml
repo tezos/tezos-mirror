@@ -261,6 +261,5 @@ oc.install_bin_rockylinux_93_systemd:
     FLAVOUR: systemd-tests
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    PREFIX: next
     DISTRIBUTION: rockylinux
     RELEASE: "9.3"

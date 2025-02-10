@@ -277,11 +277,7 @@ let jobs pipeline_type =
         ~variables:
           (variables
              ~kind:"systemd-tests"
-             [
-               ("PREFIX", "next");
-               ("DISTRIBUTION", "rockylinux");
-               ("RELEASE", "9.3");
-             ])
+             [("DISTRIBUTION", "rockylinux"); ("RELEASE", "9.3")])
         [
           "./scripts/ci/systemd-packages-test.sh \
            docs/introduction/install-bin-rpm.sh \
