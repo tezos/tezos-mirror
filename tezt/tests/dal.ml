@@ -9939,19 +9939,16 @@ let register ~protocols =
     test_one_committee_per_level
     protocols ;
   scenario_with_layer1_node
-    ~incentives_enable:true
     ~traps_fraction:Q.one
     "inject accusation"
     test_inject_accusation
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_node
-    ~incentives_enable:true
     ~traps_fraction:Q.one
     "inject a duplicated denunciation at different steps"
     test_duplicate_denunciations
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_node
-    ~incentives_enable:true
     ~traps_fraction:Q.one
     "inject a denunciation at the next cycle"
     test_denunciation_next_cycle
