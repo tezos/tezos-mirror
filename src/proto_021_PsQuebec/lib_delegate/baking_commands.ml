@@ -699,7 +699,7 @@ let check_dal_node without_dal dal_node_rpc_ctxt =
       (* The user is aware that no DAL node is running, since they explicitly
          used the [--without-dal] option. However, we do not want to reduce the
          exposition of bakers to warnings about DAL, so we keep it. *)
-      result_emit Events.no_dal_node_running ()
+      result_emit Events.no_dal_node_provided ()
   | None, false -> result_emit Events.no_dal_deprecation ()
   | Some _, true -> tzfail Incompatible_dal_options
   | Some ctxt, false -> (

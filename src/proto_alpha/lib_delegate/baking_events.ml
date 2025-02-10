@@ -72,10 +72,10 @@ module Commands = struct
         Data_encoding.option
           Tezos_version.Octez_node_version.commit_info_encoding )
 
-  let no_dal_node_running =
+  let no_dal_node_provided =
     declare_0
       ~section
-      ~name:"no_dal_node_running"
+      ~name:"no_dal_node_provided"
       ~level:Warning
       ~msg:
         "No DAL node endpoint has been provided.\n\
@@ -1132,7 +1132,7 @@ module Actions = struct
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 
-  let no_dal_node_running = Commands.no_dal_node_running
+  let no_dal_node_provided = Commands.no_dal_node_provided
 
   let unhealthy_dal_node = Commands.unhealthy_dal_node
 

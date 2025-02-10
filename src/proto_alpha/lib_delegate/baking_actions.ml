@@ -455,7 +455,7 @@ let dal_checks_and_warnings state =
   let level_with_warning = Int32.rem current_level 10l = 1l in
   if level_with_warning then
     match state.global_state.dal_node_rpc_ctxt with
-    | None -> Events.(emit no_dal_node_running ())
+    | None -> Events.(emit no_dal_node_provided) ()
     | Some ctxt -> (
         let* health = Node_rpc.get_dal_health ctxt in
         match health with
