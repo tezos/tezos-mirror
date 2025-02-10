@@ -299,7 +299,9 @@ pub enum InstrCacheable {
     /// `ADDI` - Add `imm` to val(rs1) and store the result in `rd`.
     Addi(SplitITypeArgs),
     Addiw(NonZeroRdITypeArgs),
+    /// `XORI` - Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
     Xori(NonZeroRdITypeArgs),
+    /// `ORI` - Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
     Ori(NonZeroRdITypeArgs),
     /// `ANDI` - Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
     Andi(NonZeroRdITypeArgs),
