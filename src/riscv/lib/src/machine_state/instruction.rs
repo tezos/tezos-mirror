@@ -1079,7 +1079,7 @@ impl Args {
     impl_r_type!(run_and, non_zero);
     impl_r_type!(run_sll, non_zero);
     impl_r_type!(run_srl, non_zero);
-    impl_r_type!(run_sra, non_zero_rd);
+    impl_r_type!(run_sra, non_zero);
     impl_r_type!(run_slt, non_zero_rd);
     impl_r_type!(run_sltu, non_zero_rd);
     impl_r_type!(run_addw, non_zero_rd);
@@ -1359,10 +1359,7 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::And(args) => Instruction::from_ic_and(args),
             InstrCacheable::Sll(args) => Instruction::from_ic_sll(args),
             InstrCacheable::Srl(args) => Instruction::from_ic_srl(args),
-            InstrCacheable::Sra(args) => Instruction {
-                opcode: OpCode::Sra,
-                args: args.into(),
-            },
+            InstrCacheable::Sra(args) => Instruction::from_ic_sra(args),
             InstrCacheable::Slt(args) => Instruction {
                 opcode: OpCode::Slt,
                 args: args.into(),

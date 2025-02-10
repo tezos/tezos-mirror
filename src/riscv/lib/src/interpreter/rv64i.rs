@@ -154,6 +154,7 @@ where
     /// - `SLL`
     pub fn run_sll(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
+        // TODO: RV-459: Move bit-masking of shamt to the parser
         let sh_amt = self.read_nz(rs2) & 0b11_1111;
         let result = self.read_nz(rs1) << sh_amt;
         self.write_nz(rd, result)
@@ -167,21 +168,24 @@ where
     /// - `SRL`
     pub fn run_srl(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
+        // TODO: RV-459: Move bit-masking of shamt to the parser
         let sh_amt = self.read_nz(rs2) & 0b11_1111;
         let result = self.read_nz(rs1) >> sh_amt;
         self.write_nz(rd, result)
     }
 
-    /// `SRA` R-type instruction
-    ///
     /// Shift right arithmeticallly bits in rs1 by shift_amount = val(rs2)\[5:0\]
     /// saving the result in rd
     /// (sign-bits are shifted in the upper bits)
-    pub fn run_sra(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    ///
+    /// Relevant opcodes:
+    /// - `SRA`
+    pub fn run_sra(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
-        let sh_amt = self.read(rs2) & 0b11_1111;
+        // TODO: RV-459: Move bit-masking of shamt to the parser
+        let sh_amt = self.read_nz(rs2) & 0b11_1111;
         // Right shift on i64 is an arithmetic shift
-        let result = (self.read(rs1) as i64) >> sh_amt;
+        let result = (self.read_nz(rs1) as i64) >> sh_amt;
         // i64 as u64 is a no-op
         self.write_nz(rd, result as u64)
     }
@@ -485,65 +489,12 @@ mod tests {
                 $expected_val
             );
         };
-        ($state:ident, $shift_fn_imm:tt, $shift_fn_reg:tt,
-            $rs2:ident, $r2_val:expr,
-            $rs1:ident, $r1_val:expr,
-            $rd:ident, $expected_val:expr, non_zero
-        ) => {
-            test_shift_instr!(
-                $state,
-                $shift_fn_imm,
-                $r2_val,
-                $rs1,
-                $r1_val,
-                $rd,
-                $expected_val,
-                non_zero
-            );
-            test_shift_reg_instr!(
-                $state,
-                $shift_fn_reg,
-                $rs2,
-                $r2_val,
-                $rs1,
-                $r1_val,
-                $rd,
-                $expected_val
-            );
-        };
-        ($state:ident, $shift_fn_imm:tt, $shift_fn_reg:tt,
-            $rs2:ident, $r2_val:expr,
-            $rs1:ident, $r1_val:expr,
-            $rd:ident, $expected_val:expr,
-            non_zero
-        ) => {
-            test_shift_instr!(
-                $state,
-                $shift_fn_imm,
-                $r2_val,
-                $rs1,
-                $r1_val,
-                $rd,
-                $expected_val
-            );
-            test_shift_reg_instr!(
-                $state,
-                $shift_fn_reg,
-                $rs2,
-                $r2_val,
-                $rs1,
-                $r1_val,
-                $rd,
-                $expected_val,
-                non_zero
-            );
-        };
 
         ($state:ident, $shift_fn_imm:tt, $shift_fn_reg:tt,
             $rs2:ident, $r2_val:expr,
             $rs1:ident, $r1_val:expr,
             $rd:ident, $expected_val:expr,
-            non_zero_both
+            non_zero
         ) => {
             test_shift_instr!(
                 $state,
@@ -583,7 +534,7 @@ mod tests {
             0x1234_ABEF,
             a1,
             0x1234_ABEF,
-            non_zero_both
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -595,7 +546,7 @@ mod tests {
             0x1234_ABEF,
             a0,
             0x1234_ABEF,
-            non_zero_both
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -621,7 +572,7 @@ mod tests {
             0x1234_ABEF,
             a1,
             0x1_234A_BEF0_0000,
-            non_zero_both
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -633,7 +584,7 @@ mod tests {
             0x44_1234_ABEF,
             a1,
             0x1104_8D2A,
-            non_zero_both
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -645,7 +596,7 @@ mod tests {
             -1_i64 as u64,
             a0,
             0x0003_FFFF_FFFF_FFFF,
-            non_zero_both
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -671,7 +622,7 @@ mod tests {
             0x1234_ABEF,
             a0,
             0x34AB_EF00_0000_0000,
-            non_zero_both
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -683,7 +634,7 @@ mod tests {
             0x1234_ABEF,
             a0,
             0x0,
-            non_zero_both
+            non_zero
         );
         test_both_shift_instr!(
             state,
