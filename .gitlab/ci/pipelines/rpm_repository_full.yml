@@ -397,6 +397,30 @@ oc.install_bin_fedora_39.doc:
     - stuck_or_timeout_failure
     - runner_system_failure
 
+oc.install_bin_fedora_39_systemd:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.docker-systemd_tests-rpm
+  - rpm_repo_fedora
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/systemd-packages-test.sh docs/introduction/install-bin-rpm.sh images/packages/rpm-systemd-tests.Dockerfile
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: fedora
+    RELEASE: "39"
+
 oc.install_bin_rockylinux_9.3:
   image: rockylinux:9.3
   stage: publishing_tests

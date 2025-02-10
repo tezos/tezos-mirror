@@ -249,6 +249,24 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [Job job_rpm_repo_fedora])
         ~image:Images.fedora_39
         ["./docs/introduction/install-bin-rpm.sh fedora 39"];
+      job_install_systemd_bin
+        ~__POS__
+        ~name:"oc.install_bin_fedora_39_systemd"
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_rpm_dependencies;
+               Job job_rpm_repo_fedora;
+             ])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [("DISTRIBUTION", "fedora"); ("RELEASE", "39")])
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           docs/introduction/install-bin-rpm.sh \
+           images/packages/rpm-systemd-tests.Dockerfile";
+        ];
     ]
   in
   let test_rockylinux_packages_jobs =
