@@ -450,9 +450,9 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
 
 let dal_checks_and_warnings state =
   let open Lwt_syntax in
-  (* We print warning about DAL state only every 10 levels. *)
+  (* We print warning about DAL state only every 50 levels. *)
   let current_level = state.level_state.current_level in
-  let level_with_warning = Int32.rem current_level 10l = 1l in
+  let level_with_warning = Int32.rem current_level 50l = 1l in
   if level_with_warning then
     match state.global_state.dal_node_rpc_ctxt with
     | None -> Events.(emit no_dal_node_provided) ()
