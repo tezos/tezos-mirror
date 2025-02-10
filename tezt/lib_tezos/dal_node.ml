@@ -100,78 +100,73 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     dal_node =
-  spawn_command dal_node @@ List.filter_map Fun.id
+  spawn_command dal_node
   @@ [
-       Some "config";
-       Some "init";
-       Some "--data-dir";
-       Some (data_dir dal_node);
-       Some "--rpc-addr";
-       Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
-       Some "--net-addr";
-       Some (listen_addr dal_node);
-       Some "--metrics-addr";
-       Some (metrics_addr dal_node);
-       Some "--expected-pow";
-       Some (string_of_float expected_pow);
+       "config";
+       "init";
+       "--data-dir";
+       data_dir dal_node;
+       "--rpc-addr";
+       Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node);
+       "--net-addr";
+       listen_addr dal_node;
+       "--metrics-addr";
+       metrics_addr dal_node;
+       "--expected-pow";
+       string_of_float expected_pow;
      ]
   @ (match public_addr dal_node with
     | None -> []
-    | Some addr -> [Some "--public-addr"; Some addr])
-  @ (if peers = [] then [None]
-     else [Some "--peers"; Some (String.concat "," peers)])
-  @ (if attester_profiles = [] then [None]
-     else
-       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
-  @ (if observer_profiles = [] then [None]
+    | Some addr -> ["--public-addr"; addr])
+  @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
+  @ (if attester_profiles = [] then []
+     else ["--attester-profiles"; String.concat "," attester_profiles])
+  @ (if observer_profiles = [] then []
      else
        [
-         Some "--observer-profiles";
-         Some (String.concat "," (List.map string_of_int observer_profiles));
+         "--observer-profiles";
+         String.concat "," (List.map string_of_int observer_profiles);
        ])
-  @ (if producer_profiles = [] then [None]
+  @ (if producer_profiles = [] then []
      else
        [
-         Some "--producer-profiles";
-         Some (String.concat "," (List.map string_of_int producer_profiles));
+         "--producer-profiles";
+         String.concat "," (List.map string_of_int producer_profiles);
        ])
-  @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
+  @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
   @
   match history_mode with
   | None -> []
-  | Some Full -> [Some "--history-mode"; Some "full"]
-  | Some Auto -> [Some "--history-mode"; Some "auto"]
-  | Some (Custom i) -> [Some "--history-mode"; Some (string_of_int i)]
+  | Some Full -> ["--history-mode"; "full"]
+  | Some Auto -> ["--history-mode"; "auto"]
+  | Some (Custom i) -> ["--history-mode"; string_of_int i]
 
 let spawn_config_update ?(peers = []) ?(attester_profiles = [])
     ?(producer_profiles = []) ?(observer_profiles = [])
     ?(bootstrap_profile = false) ?history_mode dal_node =
-  spawn_command dal_node @@ List.filter_map Fun.id
-  @@ [Some "config"; Some "update"]
-  @ (if peers = [] then [None]
-     else [Some "--peers"; Some (String.concat "," peers)])
-  @ (if attester_profiles = [] then [None]
-     else
-       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
-  @ (if observer_profiles = [] then [None]
+  spawn_command dal_node @@ ["config"; "update"]
+  @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
+  @ (if attester_profiles = [] then []
+     else ["--attester-profiles"; String.concat "," attester_profiles])
+  @ (if observer_profiles = [] then []
      else
        [
-         Some "--observer-profiles";
-         Some (String.concat "," (List.map string_of_int observer_profiles));
+         "--observer-profiles";
+         String.concat "," (List.map string_of_int observer_profiles);
        ])
-  @ (if producer_profiles = [] then [None]
+  @ (if producer_profiles = [] then []
      else
        [
-         Some "--producer-profiles";
-         Some (String.concat "," (List.map string_of_int producer_profiles));
+         "--producer-profiles";
+         String.concat "," (List.map string_of_int producer_profiles);
        ])
-  @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
+  @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
   @
   match history_mode with
   | None -> []
-  | Some Full -> [Some "--history-mode"; Some "full"]
-  | Some Auto -> [Some "--history-mode"; Some "auto"]
-  | Some (Custom i) -> [Some "--history-mode"; Some (string_of_int i)]
+  | Some Full -> ["--history-mode"; "full"]
+  | Some Auto -> ["--history-mode"; "auto"]
+  | Some (Custom i) -> ["--history-mode"; string_of_int i]
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
