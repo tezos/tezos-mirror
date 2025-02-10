@@ -132,7 +132,11 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         let mut builder = self.start();
 
         for i in instr.iter() {
-            let lower = i.opcode.to_lowering()?;
+            let Some(lower) = i.opcode.to_lowering() else {
+                builder.fail();
+                self.clear();
+                return None;
+            };
 
             let pc_update = unsafe {
                 // # SAFETY: lower is called with args from the same instruction that it
@@ -220,16 +224,19 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
 
         // finalise the function
         self.module.finalize_definitions().unwrap();
-
         let code = self.module.get_finalized_function(id);
 
-        // Allow for a new function to be compiled
-        self.module.clear_context(&mut self.ctx);
+        self.clear();
 
         // SAFETY: the signature of a JitFn matches exactly the abi we specified in the
         //         entry block. Compilation has succeeded & therefore this produced code
         //         is safe to call.
         unsafe { std::mem::transmute(code) }
+    }
+
+    /// Clear the current context to allow a new function to be compiled
+    fn clear(&mut self) {
+        self.module.clear_context(&mut self.ctx)
     }
 }
 
@@ -478,5 +485,52 @@ mod tests {
             &interpreted.struct_ref::<FnManagerIdent>(),
             &jitted.struct_ref::<FnManagerIdent>(),
         );
+    });
+
+    backend_test!(test_jit_recovers_from_compilation_failure, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+        use Instruction as I;
+
+        // Arrange
+        let failure: &[I] = &[
+            // does not currently lowering
+            I::new_andi(x1, x1, 13, Uncompressed),
+        ];
+
+        let success: &[I] = &[I::new_nop(Compressed)];
+
+        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+
+        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+
+        block.construct(failure);
+
+        let mut jitted_steps = 0;
+
+        let initial_pc = 0;
+        jitted.hart.pc.write(initial_pc);
+
+        jitted.hart.xregisters.write_nz(x1, 1);
+
+        // Act
+        let res = jit.compile(block.as_slice());
+        assert!(
+            res.is_none(),
+            "Compilation of unsupported instruction should fail"
+        );
+
+        block.construct(success);
+        let fun = jit
+            .compile(block.as_slice())
+            .expect("Compilation of subsequent functions should succeed");
+        let jitted_res = unsafe {
+            // # Safety - the jit is not dropped until after we
+            //            exit the block.
+            fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+        };
+
+        assert!(jitted_res.is_ok());
+        assert_eq!(jitted_steps, success.len());
     });
 }
