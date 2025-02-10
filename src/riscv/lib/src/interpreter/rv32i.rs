@@ -58,11 +58,13 @@ where
         self.write_nz(rd, imm as u64);
     }
 
-    /// `ANDI` I-type instruction
-    ///
     /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
-    pub fn run_andi(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
-        let result = self.read(rs1) & (imm as u64);
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - `ANDI`
+    /// - `C.ANDI`
+    pub fn run_andi(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
+        let result = self.read_nz(rs1) & (imm as u64);
         self.write_nz(rd, result)
     }
 
@@ -592,11 +594,11 @@ mod tests {
             let positive_imm = imm & !prefix_mask;
 
             state.write(a0, val);
-            state.run_andi(negative_imm as i64, a0, nz::a1);
+            state.run_andi(negative_imm as i64, nz::a0, nz::a1);
             prop_assert_eq!(state.read(a1), val & negative_imm);
 
             state.write(a1, val);
-            state.run_andi(positive_imm as i64, a1, nz::a2);
+            state.run_andi(positive_imm as i64, nz::a1, nz::a2);
             prop_assert_eq!(state.read(a2), val & positive_imm);
 
             state.write(a0, val);

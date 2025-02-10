@@ -301,6 +301,7 @@ pub enum InstrCacheable {
     Addiw(NonZeroRdITypeArgs),
     Xori(NonZeroRdITypeArgs),
     Ori(NonZeroRdITypeArgs),
+    /// `ANDI` - Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
     Andi(NonZeroRdITypeArgs),
     Slli(NonZeroRdITypeArgs),
     Srli(NonZeroRdITypeArgs),
@@ -480,6 +481,8 @@ pub enum InstrCacheable {
     CSlli(CIBNZTypeArgs),
     CSrli(CIBTypeArgs),
     CSrai(CIBTypeArgs),
+    /// `C.ANDI` - Computes the bitwise AND of the value in register `rd_rs1` and
+    /// the sign-extended 6-bit immediate, then writes the result back to `rd_rs1`.
     CAndi(CIBTypeArgs),
     /// `C.MV` - Copies the value in register `rs2` into register `rd_rs1`.
     CMv(CNZRTypeArgs),
