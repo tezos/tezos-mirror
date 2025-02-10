@@ -563,23 +563,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let* () =
-    let* init =
-      if prover then
-        Cryptobox.init_prover_dal
-          ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-          ~fetch_trusted_setup:false
-          ()
-      else Lwt.return (Ok ())
-    in
-    match init with
-    | Error e ->
-        Test.fail
-          "Dal.with_layer1: init_prover_dal failed: %a@."
-          Tezos_error_monad.Error_monad.pp_print_trace
-          e
-    | Ok () -> unit
-  in
+  let* () = if prover then Helpers.init_prover ~__LOC__ () else unit in
   let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
