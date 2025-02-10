@@ -102,7 +102,8 @@ let register_old_protocol_migration_tests () =
       | None, _ -> ()
       | Some migrate_from, migrate_to ->
           Agnostic_baker_test.register ~migrate_from ~migrate_to ;
-          Sc_rollup_migration.register ~migrate_from ~migrate_to)
+          Sc_rollup_migration.register ~migrate_from ~migrate_to ;
+          Dal.register_migration ~migrate_from ~migrate_to)
     Protocol.all
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
