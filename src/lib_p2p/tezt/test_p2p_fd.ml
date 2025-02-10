@@ -51,6 +51,7 @@ let test_connect () =
     | Error `Connection_canceled -> tzfail P2p_errors.Connection_failed
     | Error `Connection_refused -> tzfail P2p_errors.Connection_failed
     | Error `Connection_unreachable -> tzfail P2p_errors.Connection_failed
+    | Error `Network_unreachable -> tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
   in
@@ -99,8 +100,8 @@ let test_read_write () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Error
-        (`Connection_unreachable | `Connection_refused | `Connection_canceled)
-      ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled ) ->
         tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
@@ -169,8 +170,8 @@ let test_closed_by_peer_read_outgoing () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Error
-        (`Connection_unreachable | `Connection_refused | `Connection_canceled)
-      ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled ) ->
         tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
@@ -236,8 +237,8 @@ let test_closed_by_peer_read_incoming () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Error
-        (`Connection_unreachable | `Connection_refused | `Connection_canceled)
-      ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled ) ->
         tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
@@ -284,8 +285,8 @@ let test_locally_closed_read_outgoing () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Error
-        (`Connection_unreachable | `Connection_refused | `Connection_canceled)
-      ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled ) ->
         tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
@@ -351,8 +352,8 @@ let test_locally_closed_read_incoming () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Error
-        (`Connection_unreachable | `Connection_refused | `Connection_canceled)
-      ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled ) ->
         tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
@@ -396,8 +397,8 @@ let test_locally_closed_write_outgoing () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Error
-        (`Connection_unreachable | `Connection_refused | `Connection_canceled)
-      ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled ) ->
         tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))
@@ -461,8 +462,8 @@ let test_locally_closed_write_incoming () =
     let*! r = P2p_fd.connect fd uaddr in
     match r with
     | Error
-        (`Connection_unreachable | `Connection_refused | `Connection_canceled)
-      ->
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled ) ->
         tzfail P2p_errors.Connection_failed
     | Error (`Unexpected_error ex) ->
         Lwt.return_error (TzTrace.make (error_of_exn ex))

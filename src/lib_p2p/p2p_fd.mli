@@ -83,6 +83,8 @@ type read_write_error =
 type connect_error =
   [ `Connection_refused
   | `Connection_unreachable
+  | `Network_unreachable
+    (** Likely when try to reach an ipv6 and this is not supported by the ISP. *)
   | `Connection_canceled
   | unexpected_error ]
 
