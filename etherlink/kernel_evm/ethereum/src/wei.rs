@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024 PK Lab <contact@pklab.io>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -32,7 +33,7 @@ pub fn mutez_from_wei(wei: Wei) -> Result<u64, ErrorMutezFromWei> {
 
     if !remainder.is_zero() {
         Err(ErrorMutezFromWei::NonNullRemainder)
-    } else if amount >= U256::from(u64::max_value()) {
+    } else if amount >= U256::from(u64::MAX) {
         Err(ErrorMutezFromWei::AmountTooLarge)
     } else {
         Ok(amount.as_u64())

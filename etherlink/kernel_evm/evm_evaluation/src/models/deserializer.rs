@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2021-2023 draganrakita
 //
 // SPDX-License-Identifier: MIT
@@ -165,7 +165,7 @@ where
 
     if let Some(stripped) = value.strip_prefix("0x") {
         // Some values or indexes are already in hexadecimal.
-        value = stripped.to_owned();
+        value = stripped.to_string();
     } else if value
         .find(|c: char| ('a'..='f').contains(&c) || ('A'..='F').contains(&c))
         .is_some()
