@@ -203,6 +203,11 @@ let () =
        "operation"
        ["unsigned"]
        Protocol.Alpha_context.Operation.unsigned_encoding ;
+  register
+  @@ def
+       "operation"
+       ["bls_mode_unsigned"]
+       Protocol.Alpha_context.Operation.bls_mode_unsigned_encoding ;
   register ~pp:Protocol.Alpha_context.Period.pp
   @@ def "period" [] Protocol.Alpha_context.Period.encoding ;
   register ~pp:Protocol.Alpha_context.Cycle.pp
