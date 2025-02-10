@@ -37,6 +37,11 @@ let teztale_server_library =
         teztale_library_base |> open_;
       ]
 
+let link_flags =
+  [Dune.[S ":include"; S "%{workspace_root}/static-link-flags-teztale.sexp"]]
+
+let release_status = Experimental
+
 let _teztale_server =
   public_exe
     (sf "octez-teztale-server")
@@ -46,10 +51,7 @@ let _teztale_server =
     ~synopsis:"Tezos: teztale, a delegate operations monitor"
     ~with_macos_security_framework:true
     ~static:false
-    ~link_flags:
-      [
-        Dune.[S ":include"; S "%{workspace_root}/static-link-flags-teztale.sexp"];
-      ]
+    ~link_flags
     ~deps:
       [
         bls12_381_archive;
@@ -65,7 +67,7 @@ let _teztale_server =
         teztale_server_library |> open_;
         cmdliner;
       ]
-    ~release_status:Experimental
+    ~release_status
 
 let protocols =
   List.filter_map
@@ -158,10 +160,7 @@ let _teztale_archiver =
     ~synopsis:"Tezos: teztale, a delegate operations monitor"
     ~with_macos_security_framework:true
     ~static:false
-    ~link_flags:
-      [
-        Dune.[S ":include"; S "%{workspace_root}/static-link-flags-teztale.sexp"];
-      ]
+    ~link_flags
     ~deps:
       ([
          octez_rust_deps (* for rustzcash *);
@@ -182,7 +181,29 @@ let _teztale_archiver =
          x509;
        ]
       @ protocol_deps)
-    ~release_status:Experimental
+    ~release_status
     ~dune:generated_machines
+
+let _teztale_snitch =
+  public_exe
+    (sf "octez-teztale-snitch")
+    ~internal_name:(sf "teztale_snitch_main")
+    ~path:"teztale/bin_teztale_snitch"
+    ~opam:"octez-teztale"
+    ~synopsis:"Tezos: teztale, a delegate operations monitor"
+    ~with_macos_security_framework:true
+    ~static:false
+    ~link_flags
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_version_value;
+        teztale_library_base |> open_;
+        Product_cohttp.cohttp_lwt;
+        Product_cohttp.cohttp_lwt_unix;
+        cmdliner;
+      ]
+    ~release_status
 
 let () = generate_content_input ()

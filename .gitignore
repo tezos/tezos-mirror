@@ -62,6 +62,7 @@ __pycache__
 /octez-teztale-archiver
 /octez-teztale-server
 /octez-experimental-agnostic-baker
+/octez-teztale-snitch
 
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf
