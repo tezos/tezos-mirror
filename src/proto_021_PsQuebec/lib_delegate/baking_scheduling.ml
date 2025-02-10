@@ -294,46 +294,33 @@ let rec wait_next_event ~timeout loop_state =
       return_some (New_forge_event event)
   | `Timeout e -> return_some (Timeout e)
 
-let rec first_own_round_in_range delegate_slots ~committee_size ~included_min
-    ~excluded_max =
-  if included_min >= excluded_max then None
-  else
-    match Round.of_int included_min with
-    | Error _ ->
-        (* Should not happen because in practice, [included_min] is
-           non-negative and not big enough to overflow as an Int32. *)
-        None
-    | Ok round -> (
-        match Round.to_slot round ~committee_size with
-        | Error _ ->
-            (* Impossible because [Round.of_int] builds a sound round. *) None
-        | Ok slot -> (
-            match Delegate_slots.own_slot_owner delegate_slots ~slot with
-            | Some {consensus_key_and_delegate; _} ->
-                Some (round, consensus_key_and_delegate)
-            | None ->
-                first_own_round_in_range
-                  delegate_slots
-                  ~committee_size
-                  ~included_min:(included_min + 1)
-                  ~excluded_max))
-
 let first_potential_round_at_next_level state ~earliest_round =
-  match Round.to_int earliest_round with
-  | Error _ -> None
-  | Ok earliest_round ->
-      let committee_size =
-        state.global_state.constants.parametric.consensus_committee_size
+  let open Option_syntax in
+  let ( let*? ) res f = match res with Error _ -> None | Ok x -> f x in
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.next_level_delegate_slots in
+  (* Rounds attribution cycles with a period of [committee_size].
+     To find the next owned round, we translate [earliest_round] into a slot
+     within the range [0 ... committee_size], look for the first subsequent slot
+     we own, and finally translate it back to a round by restoring the original
+     offset. *)
+  let*? earliest_slot = Round.to_slot ~committee_size earliest_round in
+  let*? earliest_round = Round.to_int earliest_round in
+  let period_offset = earliest_round / committee_size in
+  match Delegate_slots.find_first_slot_from owned_slots ~slot:earliest_slot with
+  | Some (slot, delegate) ->
+      let slot = Slot.to_int slot in
+      let*? round = Round.of_int (slot + (committee_size * period_offset)) in
+      Some (round, delegate.consensus_key_and_delegate)
+  | None ->
+      let* slot, delegate = Delegate_slots.min_slot owned_slots in
+      let slot = Slot.to_int slot in
+      let*? round =
+        Round.of_int (slot + (committee_size * (1 + period_offset)))
       in
-      first_own_round_in_range
-        state.level_state.next_level_delegate_slots
-        ~committee_size
-        ~included_min:earliest_round
-        ~excluded_max:(earliest_round + committee_size)
-(* If no own round is found between [earliest_round] included and
-   [earliest_round + committee_size] excluded, then we can stop
-   searching, because baking slots repeat themselves modulo the
-   [committee_size]. *)
+      Some (round, delegate.consensus_key_and_delegate)
 
 (** From the current [state], the function returns an optional
     association pair, which consists of the next baking timestamp and
