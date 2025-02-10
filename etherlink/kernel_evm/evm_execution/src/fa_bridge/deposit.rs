@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -27,6 +28,7 @@
 //! (regardless of the inner proxy contract call result) and can be used for
 //! indexing.
 
+use alloy_sol_types::SolEvent;
 use primitive_types::{H160, H256, U256};
 use rlp::{Encodable, RlpDecodable, RlpEncodable};
 use sha3::{Digest, Keccak256};
@@ -34,9 +36,9 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::Log;
 use tezos_smart_rollup_encoding::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 
-use crate::{
-    abi::{ABI_H160_LEFT_PADDING, ABI_U32_LEFT_PADDING},
-    utilities::{bigint_to_u256, keccak256_hash},
+use crate::utilities::{
+    alloy::{h160_to_alloy, u256_to_alloy},
+    bigint_to_u256, keccak256_hash,
 };
 
 use super::error::FaBridgeError;
@@ -53,6 +55,24 @@ pub const FA_DEPOSIT_EVENT_TOPIC: &[u8; 32] = b"\
 
 /// Overapproximation for the typical FA ticket payload (ticketer address and content)
 const TICKET_PAYLOAD_SIZE_HINT: usize = 200;
+
+alloy_sol_types::sol! {
+    event SolDepositProxyCallData (
+        address receiver,
+        uint256 amount,
+        uint256 ticket_hash,
+    );
+}
+
+alloy_sol_types::sol! {
+    event SolDepositEvent (
+        address ticket_owner,
+        address receiver,
+        uint256 amount,
+        uint256 inbox_level,
+        uint256 inbox_msg_id,
+    );
+}
 
 /// Deposit structure parsed from the inbox message
 #[derive(Debug, PartialEq, Clone, RlpEncodable, RlpDecodable)]
@@ -103,15 +123,17 @@ impl FaDeposit {
         let mut call_data = Vec::with_capacity(100);
         call_data.extend_from_slice(FA_PROXY_DEPOSIT_METHOD_ID);
 
-        call_data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-        call_data.extend_from_slice(&self.receiver.0);
-        debug_assert!((call_data.len() - 4) % 32 == 0);
+        let calldata_ = SolDepositProxyCallData {
+            receiver: h160_to_alloy(&self.receiver),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            ticket_hash: u256_to_alloy(&U256::from_big_endian(
+                self.ticket_hash.as_bytes(),
+            ))
+            .unwrap_or_default(),
+        };
 
-        call_data.extend_from_slice(&Into::<[u8; 32]>::into(self.amount));
-        debug_assert!((call_data.len() - 4) % 32 == 0);
-
-        call_data.extend_from_slice(self.ticket_hash.as_bytes());
-        debug_assert!((call_data.len() - 4) % 32 == 0);
+        let data = SolDepositProxyCallData::encode_data(&calldata_);
+        call_data.extend_from_slice(&data);
 
         call_data
     }
@@ -125,26 +147,16 @@ impl FaDeposit {
     ///
     /// Signature: Deposit(uint256,address,address,uint256,uint256,uint256)
     pub fn event_log(&self, ticket_owner: &H160) -> Log {
-        let mut data = Vec::with_capacity(5 * 32);
+        let event_data = SolDepositEvent {
+            ticket_owner: h160_to_alloy(ticket_owner),
+            receiver: h160_to_alloy(&self.receiver),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            inbox_level: u256_to_alloy(&U256::from(self.inbox_level)).unwrap_or_default(),
+            inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id))
+                .unwrap_or_default(),
+        };
 
-        data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-        data.extend_from_slice(&ticket_owner.0);
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-        data.extend_from_slice(&self.receiver.0);
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&Into::<[u8; 32]>::into(self.amount));
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&ABI_U32_LEFT_PADDING);
-        data.extend_from_slice(&self.inbox_level.to_be_bytes());
-        debug_assert!(data.len() % 32 == 0);
-
-        data.extend_from_slice(&ABI_U32_LEFT_PADDING);
-        data.extend_from_slice(&self.inbox_msg_id.to_be_bytes());
-        debug_assert!(data.len() % 32 == 0);
+        let data = SolDepositEvent::encode_data(&event_data);
 
         Log {
             // Emitted by the "system" contract
