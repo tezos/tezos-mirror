@@ -128,10 +128,13 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     ///
     /// Not all instructions are currently supported. For blocks containing
     /// unsupported instructions, `None` will be returned.
-    pub fn compile(&mut self, instr: &[Instruction]) -> Option<JCall<ML, JSA>> {
+    pub fn compile<'a>(
+        &mut self,
+        instr: impl IntoIterator<Item = &'a Instruction>,
+    ) -> Option<JCall<ML, JSA>> {
         let mut builder = self.start();
 
-        for i in instr.iter() {
+        for i in instr {
             let Some(lower) = i.opcode.to_lowering() else {
                 builder.fail();
                 self.clear();
