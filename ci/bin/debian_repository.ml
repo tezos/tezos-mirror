@@ -69,11 +69,15 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
     ~__POS__
     ~stage
     ~name
+    ~id_tokens:Tezos_ci.id_tokens
     ~image
     ~before_script:
       (before_script
          ~source_version:true
-         ["./scripts/ci/install-gsutil.sh"; "apt install -y apt-utils debsigs"])
+         [
+           "./scripts/ci/install-gsutil.sh";
+           "apt install -y apt-utils debsigs jq";
+         ])
     ~variables
     ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
     script

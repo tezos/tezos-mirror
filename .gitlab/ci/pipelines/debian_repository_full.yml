@@ -273,12 +273,15 @@ apt_repo_debian_current:
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
-  - apt install -y apt-utils debsigs
+  - apt install -y apt-utils debsigs jq
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry:
     max: 2
     when:
@@ -300,13 +303,16 @@ apt_repo_debian:
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
-  - apt install -y apt-utils debsigs
+  - apt install -y apt-utils debsigs jq
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry:
     max: 2
     when:
@@ -499,12 +505,15 @@ apt_repo_ubuntu_current:
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
-  - apt install -y apt-utils debsigs
+  - apt install -y apt-utils debsigs jq
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry:
     max: 2
     when:
@@ -526,13 +535,16 @@ apt_repo_ubuntu:
   before_script:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
-  - apt install -y apt-utils debsigs
+  - apt install -y apt-utils debsigs jq
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: next
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry:
     max: 2
     when:
