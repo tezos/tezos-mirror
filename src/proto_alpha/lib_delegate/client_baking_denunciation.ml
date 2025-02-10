@@ -227,6 +227,29 @@ let get_validator_rights state cctxt level =
       return validators
   | Some t -> return t
 
+let events_of_kind (type kind) (op_kind : kind denunciable_consensus_operation)
+    =
+  match op_kind with
+  | Attestation ->
+      Events.
+        ( double_attestation_detected,
+          double_attestation_denounced,
+          double_attestation_ignored )
+  | Preattestation ->
+      Events.
+        ( double_preattestation_detected,
+          double_preattestation_denounced,
+          double_preattestation_ignored )
+
+let should_different_slots_be_denunced (type kind) state
+    (op_kind : kind denunciable_consensus_operation) =
+  match op_kind with
+  | Attestation ->
+      (* attestations with different slots are not denunced under
+         aggregate_attestation feature flag *)
+      not state.constants.parametric.aggregate_attestation
+  | _ -> true
+
 let process_consensus_op (type kind) state cctxt
     (op_kind : kind denunciable_consensus_operation) (new_op : kind Operation.t)
     chain_id level round slot =
@@ -271,19 +294,23 @@ let process_consensus_op (type kind) state cctxt
                        {operation = new_op; previously_denounced_oph = None})
                     round_map)
         | Operation_seen {operation = existing_op; previously_denounced_oph} ->
+            let double_op_detected, double_op_denounced, double_op_ignored =
+              events_of_kind op_kind
+            in
+            let new_op_hash, existing_op_hash =
+              (Operation.hash new_op, Operation.hash existing_op)
+            in
             let existing_payload_hash = get_payload_hash op_kind existing_op in
             let new_payload_hash = get_payload_hash op_kind new_op in
             let existing_slot = get_slot op_kind existing_op in
             if
               Block_payload_hash.(existing_payload_hash <> new_payload_hash)
               || Slot.(existing_slot <> slot)
+                 && should_different_slots_be_denunced state op_kind
               || Block_hash.(existing_op.shell.branch <> new_op.shell.branch)
             then (
               (* Same level, round, and delegate, and:
                  different payload hash OR different slot OR different branch *)
-              let new_op_hash, existing_op_hash =
-                (Operation.hash new_op, Operation.hash existing_op)
-              in
               let op1, op2 =
                 if Operation_hash.(new_op_hash < existing_op_hash) then
                   (new_op, existing_op)
@@ -305,20 +332,8 @@ let process_consensus_op (type kind) state cctxt
                   ()
               in
               let bytes = Signature.concat bytes Signature.zero in
-              let* double_op_detected, double_op_denounced =
-                Events.(
-                  match op_kind with
-                  | Attestation ->
-                      return
-                        ( double_attestation_detected,
-                          double_attestation_denounced )
-                  | Preattestation ->
-                      return
-                        ( double_preattestation_detected,
-                          double_preattestation_denounced ))
-              in
               let*! () =
-                Events.(emit double_op_detected) (new_op_hash, existing_op_hash)
+                Events.(emit double_op_detected) (existing_op_hash, new_op_hash)
               in
               let* op_hash =
                 Shell_services.Injection.private_operation cctxt ~chain bytes
@@ -343,7 +358,11 @@ let process_consensus_op (type kind) state cctxt
                    round_map) ;
               let*! () = Events.(emit double_op_denounced) (op_hash, bytes) in
               return_unit)
-            else return_unit)
+            else
+              let*! () =
+                Events.(emit double_op_ignored) (existing_op_hash, new_op_hash)
+              in
+              return_unit)
 
 let process_operations (cctxt : #Protocol_client_context.full) state
     (attestations : 'a list) ~packed_op chain_id =
