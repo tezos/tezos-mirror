@@ -25,7 +25,6 @@ use thiserror::Error;
 
 mod access_record;
 
-pub mod abi;
 pub mod account_storage;
 pub mod code_storage;
 pub mod configuration;
