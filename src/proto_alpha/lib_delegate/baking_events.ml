@@ -79,8 +79,9 @@ module Commands = struct
       ~level:Warning
       ~msg:
         "No DAL node endpoint has been provided.\n\
-         It will soon be required to launch a DAL node before running the \
-         baker. For instructions on running a DAL node, please visit \
+         Not running a DAL node might result in losing a share of the \
+         participation rewards.\n\
+         For instructions on how to run a DAL node, please visit \
          https://docs.tezos.com/tutorials/join-dal-baker."
       ()
 
