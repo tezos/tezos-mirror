@@ -404,11 +404,6 @@ module Handler = struct
       (Node_context.get_gs_worker ctxt)
       committee
 
-  let get_constants ctxt cctxt ~level =
-    let open Lwt_result_syntax in
-    let*? (module Plugin) = Node_context.get_plugin_for_level ctxt ~level in
-    Plugin.get_constants `Main (`Level level) cctxt
-
   let store_skip_list_cells (type block_info) ctxt cctxt dal_constants
       (block_info : block_info) block_level
       (module Plugin : Dal_plugin.T with type block_info = block_info) =
@@ -424,7 +419,8 @@ module Handler = struct
         cctxt
         ~dal_constants
         ~pred_publication_level_dal_constants:
-          (lazy (get_constants ctxt cctxt ~level:pred_published_level))
+          (lazy
+            (Node_context.get_proto_parameters ctxt ~level:pred_published_level))
     in
     let cells_of_level =
       List.map
@@ -549,7 +545,9 @@ module Handler = struct
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
     let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
-    let* dal_constants = get_constants ctxt cctxt ~level:block_level in
+    let* dal_constants =
+      Node_context.get_proto_parameters ctxt ~level:block_level
+    in
     let* () =
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
@@ -1132,7 +1130,7 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
     let* block_info =
       Plugin.block_info cctxt ~block:(`Level level) ~metadata:`Always
     in
-    let* dal_constants = Handler.get_constants ctxt cctxt ~level in
+    let* dal_constants = Node_context.get_proto_parameters ctxt ~level in
     Handler.store_skip_list_cells
       ctxt
       cctxt
