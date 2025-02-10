@@ -402,7 +402,7 @@ fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
-    number: U256,
+    block: L2Block,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
@@ -411,11 +411,13 @@ fn promote_block<Host: Runtime>(
     }
     safe_host.promote()?;
     safe_host.promote_trace()?;
-    drop_blueprint(safe_host.host, number)?;
+    drop_blueprint(safe_host.host, block.number)?;
 
-    let hash = block_storage::read_current_hash(safe_host.host)?;
-
-    Event::BlueprintApplied { number, hash }.store(safe_host.host)?;
+    Event::BlueprintApplied {
+        number: block.number,
+        hash: block.hash,
+    }
+    .store(safe_host.host)?;
 
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.
@@ -537,13 +539,13 @@ pub fn produce<Host: Runtime>(
     ) {
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions,
-            block: _,
+            block,
         }) => {
             promote_block(
                 &mut safe_host,
                 &outbox_queue,
                 &block_in_progress_provenance,
-                processed_blueprint,
+                *block,
                 config,
                 included_delayed_transactions,
             )?;
