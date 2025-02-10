@@ -6431,6 +6431,33 @@ let hash = Protocol.hash
     let {Lib_protocol.main; lifted; embedded} =
       Lib_protocol.make ~name ~status
     in
+    let dune_signatures_version_rule =
+      Dune.targets_rule
+        ["signature.ml"]
+        ~action:
+          [
+            S "write-file";
+            S "%{targets}";
+            S
+              (sf
+                 {|  module Bls = Tezos_crypto.Signature.Bls
+  module Ed25519 = Tezos_crypto.Signature.Ed25519
+  module P256 = Tezos_crypto.Signature.P256
+  module Secp256k1 = Tezos_crypto.Signature.Secp256k1
+  include Tezos_crypto.Signature.V1|});
+          ]
+    in
+    let dune_client_keys_version_rule =
+      Dune.(
+        targets_rule
+          ["client_keys.ml"]
+          ~action:
+            [
+              S "write-file";
+              S "%{targets}";
+              S (sf {|include Tezos_client_base.Client_keys_v1|});
+            ])
+    in
     let parameters =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
@@ -6444,6 +6471,7 @@ let hash = Protocol.hash
             main |> open_;
           ]
         ~linkall:true
+        ~dune:(if N.(number >= 016) then [dune_signatures_version_rule] else [])
     in
     let _parameters_exe =
       opt_map parameters @@ fun parameters ->
@@ -6521,6 +6549,7 @@ let hash = Protocol.hash
           ]
         ~all_modules_except:["Plugin_registerer"]
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
+        ~dune:(if N.(number >= 016) then [dune_signatures_version_rule] else [])
     in
     let plugin_registerer =
       opt_map plugin @@ fun plugin ->
@@ -6583,6 +6612,10 @@ let hash = Protocol.hash
              Some ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
            else None)
         ~linkall:true
+        ~dune:
+          (if N.(number >= 016) then
+             [dune_client_keys_version_rule; dune_signatures_version_rule]
+           else [])
     in
     let test_helpers =
       only_if active @@ fun () ->
@@ -6613,6 +6646,7 @@ let hash = Protocol.hash
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             octez_sc_rollup |> if_some |> if_ N.(number >= 018) |> open_;
           ]
+        ~dune:[dune_signatures_version_rule]
     in
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
@@ -6706,6 +6740,10 @@ let hash = Protocol.hash
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ~linkall:true
         ~all_modules_except:["alpha_commands_registration"]
+        ~dune:
+          (if N.(number >= 016) then
+             [dune_signatures_version_rule; dune_client_keys_version_rule]
+           else [])
     in
     let client_sapling =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
@@ -6807,6 +6845,7 @@ let hash = Protocol.hash
           (if N.(number <= 011) then
              ["Delegate_commands"; "Delegate_commands_registration"]
            else ["Baking_commands"; "Baking_commands_registration"])
+        ~dune:[dune_signatures_version_rule; dune_client_keys_version_rule]
     in
     let tenderbrute =
       only_if active @@ fun () ->
@@ -6826,6 +6865,7 @@ let hash = Protocol.hash
             client |> if_some |> open_;
           ]
         ~bisect_ppx:No
+        ~dune:[dune_signatures_version_rule]
     in
     let _tenderbrute_exe =
       only_if (active && N.(number >= 013)) @@ fun () ->
@@ -6876,6 +6916,7 @@ let hash = Protocol.hash
               tezt_core_lib |> open_;
             ]
           ~bisect_ppx:No
+          ~dune:[dune_client_keys_version_rule]
       in
       tezt
         ["test_scenario"]
@@ -7030,6 +7071,7 @@ let hash = Protocol.hash
         ~inline_tests_link_flags:
           ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
         ~linkall:true
+        ~dune:[dune_signatures_version_rule]
     in
     let _dal_tests =
       only_if (active && N.(number >= 016)) @@ fun () ->
@@ -7068,6 +7110,7 @@ let hash = Protocol.hash
             plugin |> if_some |> open_;
           ]
         ~linkall:true
+        ~dune:[dune_client_keys_version_rule; dune_signatures_version_rule]
     in
     let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
@@ -7147,6 +7190,7 @@ let hash = Protocol.hash
             octez_version_value;
           ]
         ~conflicts:[Conflicts.checkseum]
+        ~dune:[dune_signatures_version_rule]
     in
     let _octez_sc_rollup_node_test =
       only_if (active && N.(number >= 016)) @@ fun () ->
@@ -7232,6 +7276,25 @@ let hash = Protocol.hash
         ~linkall:true
         ~private_modules:["kernel"; "rules"; "state_space"]
         ~bisect_ppx:(if N.(number <= 012) then Yes else No)
+        ~dune:
+          [
+            Dune.targets_rule
+              ["crypto_samplers.mli"]
+              ~action:
+                [
+                  S "write-file";
+                  S "%{targets}";
+                  S "include module type of Tezos_benchmark.Crypto_samplers.V1";
+                ];
+            Dune.targets_rule
+              ["crypto_samplers.ml"]
+              ~action:
+                [
+                  S "write-file";
+                  S "%{targets}";
+                  S "include Tezos_benchmark.Crypto_samplers.V1";
+                ];
+          ]
     in
     let _benchmark_tests =
       opt_map (both benchmark test_helpers) @@ fun (benchmark, test_helpers) ->
@@ -7307,6 +7370,7 @@ let hash = Protocol.hash
             octez_protocol_environment;
           ]
         ~linkall:true
+        ~dune:[dune_signatures_version_rule]
     in
     let _ =
       if active then

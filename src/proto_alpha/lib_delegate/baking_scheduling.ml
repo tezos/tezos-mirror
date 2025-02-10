@@ -995,7 +995,8 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
           let attesters =
             Tezos_dal_node_services.Operator_profile.attesters operator_profile
           in
-          if Signature.Public_key_hash.Set.is_empty attesters then warn ()
+          if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
+            warn ()
           else Lwt.return_unit
     in
     Node_rpc.register_dal_profiles dal_ctxt delegates

@@ -57,11 +57,26 @@ module type CONV_OPT = sig
   val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t option
 
   val signature : V_from.t -> V_to.t option
+
+  val get_public_key :
+    V_from.Public_key.t -> V_to.Public_key.t Error_monad.tzresult
+
+  val get_public_key_exn : V_from.Public_key.t -> V_to.Public_key.t
+
+  val get_public_key_hash :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t Error_monad.tzresult
+
+  val get_public_key_hash_exn :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t
+
+  val get_signature : V_from.t -> V_to.t Error_monad.tzresult
+
+  val get_signature_exn : V_from.t -> V_to.t
 end
 
 (** The module [V_latest] is to be used by the shell and points to the latest
     available version of signatures. *)
-module V_latest : module type of Signature_v1
+module V_latest : module type of Signature_v2
 
 (** [V0] supports Ed25519, Secp256k1, and P256. *)
 module V0 : sig
@@ -72,7 +87,7 @@ module V0 : sig
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v0
 end
 
-(** [V1] supports Ed25519, Secp256k1, P256, and BLS. *)
+(** [V1] supports Ed25519, Secp256k1, P256, and BLS (aug). *)
 module V1 : sig
   include module type of Signature_v1
 
@@ -81,12 +96,21 @@ module V1 : sig
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v1
 end
 
+(** [V2] supports Ed25519, Secp256k1, P256, and BLS (aug). *)
+module V2 : sig
+  include module type of Signature_v2
+
+  (** Converting from signatures of {!V_latest} to {!V2}. *)
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v2
+end
+
 include module type of V_latest
 
 (** Converting from signatures of {!V_latest} to {!V_latest}. This module
     implements conversions which are the identity, so total, but we keep the
     signature as {!CONV_OPT} for compatibility with {!V0.Of_V_latest} and
-    {!V1.Of_V_latest} and to ease snapshotting. *)
+    {!V1.Of_V_latest} and to ease snapshotting. TODO ADAPT THIS WITH V2*)
 module Of_V_latest :
   CONV_OPT with module V_from := V_latest and module V_to := V_latest
 
@@ -95,3 +119,6 @@ module Of_V0 : CONV with module V_from := V0 and module V_to := V_latest
 
 (** Converting from signatures of {!V1} to {!V_latest}. *)
 module Of_V1 : CONV with module V_from := V1 and module V_to := V_latest
+
+(** Converting from signatures of {!V2} to {!V_latest}. *)
+module Of_V2 : CONV with module V_from := V2 and module V_to := V_latest

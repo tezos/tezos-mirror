@@ -380,7 +380,7 @@ let get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level =
   Tezos_rpc.Context.make_call
     Tezos_dal_node_services.Services.get_attestable_slots
     dal_node_rpc_ctxt
-    (((), pkh), attested_level)
+    (((), Tezos_crypto.Signature.Of_V1.public_key_hash pkh), attested_level)
     ()
     ()
 
@@ -404,7 +404,11 @@ let get_dal_profiles dal_node_rpc_ctxt =
 let register_dal_profiles dal_node_rpc_ctxt delegates =
   let profiles =
     Tezos_dal_node_services.Operator_profile.make
-      ~attesters:(List.map (fun k -> k.public_key_hash) delegates)
+      ~attesters:
+        (List.map
+           (fun k ->
+             Tezos_crypto.Signature.Of_V1.public_key_hash k.public_key_hash)
+           delegates)
       ()
   in
   Tezos_rpc.Context.make_call

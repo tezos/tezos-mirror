@@ -846,9 +846,7 @@ let commands_ro () =
       ~desc:"Get the frozen deposits limit of a delegate."
       no_options
       (prefixes ["get"; "deposits"; "limit"; "for"]
-      @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
-           ~desc:"source delegate"
+      @@ Public_key_hash.source_param ~name:"src" ~desc:"source delegate"
       @@ stop)
       (fun () delegate (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in

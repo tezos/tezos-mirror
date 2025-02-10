@@ -804,6 +804,7 @@ let sources_from_operation ctxt
     ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
     =
   let open Lwt_syntax in
+  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V1.public_key_hash in
   match contents with
   | Single (Failing_noop _) -> return_nil
   | Single (Preattestation consensus_content)
@@ -814,7 +815,7 @@ let sources_from_operation ctxt
       in
       match slot_owner with
       | Ok (_ctxt, {delegate; consensus_pkh; consensus_pk = _}) ->
-          return [delegate; consensus_pkh]
+          return @@ map_pkh_env [delegate; consensus_pkh]
       | Error _ -> return_nil)
   | Single (Attestations_aggregate {consensus_content; committee}) ->
       let level = Level.from_raw ctxt consensus_content.level in
@@ -829,7 +830,7 @@ let sources_from_operation ctxt
           []
           committee
       in
-      return sources
+      return @@ map_pkh_env sources
   | Single (Seed_nonce_revelation _)
   | Single (Double_preattestation_evidence _)
   | Single (Double_attestation_evidence _)
@@ -839,10 +840,10 @@ let sources_from_operation ctxt
   | Single (Vdf_revelation _) ->
       return_nil
   | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
-      return [source]
-  | Single (Drain_delegate {delegate; _}) -> return [delegate]
-  | Single (Manager_operation {source; _}) -> return [source]
-  | Cons (Manager_operation {source; _}, _) -> return [source]
+      return @@ map_pkh_env [source]
+  | Single (Drain_delegate {delegate; _}) -> return @@ map_pkh_env [delegate]
+  | Single (Manager_operation {source; _}) -> return @@ map_pkh_env [source]
+  | Cons (Manager_operation {source; _}, _) -> return @@ map_pkh_env [source]
 
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =

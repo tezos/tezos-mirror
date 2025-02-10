@@ -234,7 +234,7 @@ module Proto_client = struct
   let dummy_sk_uri =
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Tezos_signer_backends.Unencrypted.make_sk
-    @@ Signature.Secret_key.of_b58check_exn
+    @@ Tezos_crypto.Signature.Secret_key.of_b58check_exn
          "edsk3UqeiQWXX7NFEY1wUs6J1t2ez5aQ3hEWdqX5Jr5edZiGLW8nZr"
 
   let simulate_operations cctxt ~force ~source ~src_pk ~successor_level
@@ -272,6 +272,8 @@ module Proto_client = struct
     in
     let safety_guard = Option.map Gas.Arith.integral_of_int_exn safety_guard in
     let*! simulation_result =
+      let*? source = Signature.Of_V_latest.get_public_key_hash source in
+      let*? src_pk = Signature.Of_V_latest.get_public_key src_pk in
       Injection.inject_manager_operation
         cctxt
         ~simulation:true (* Only simulation here *)
@@ -446,7 +448,7 @@ module Proto_client = struct
     let cctxt =
       new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
     in
-
+    let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
     let+ balance =
       Plugin.Alpha_services.Contract.balance
         cctxt

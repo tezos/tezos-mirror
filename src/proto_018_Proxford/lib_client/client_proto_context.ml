@@ -29,7 +29,6 @@ open Alpha_context
 open Protocol_client_context
 open Tezos_micheline
 open Client_proto_contracts
-open Client_keys
 
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
@@ -292,7 +291,7 @@ let list_contract_labels cctxt ~chain ~block =
         let* nm =
           match (h : Contract.t) with
           | Implicit m -> (
-              let* nm_opt = Public_key_hash.rev_find cctxt m in
+              let* nm_opt = Client_keys.Public_key_hash.rev_find cctxt m in
               match nm_opt with
               | None -> return ""
               | Some nm -> (
@@ -812,8 +811,8 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          Signature.Ed25519.Public_key_hash.pp
          key.pkh)
   in
-  let pk = Signature.Of_V1.public_key pk in
-  let sk = Signature.Of_V1.secret_key sk in
+  let pk = Tezos_crypto.Signature.Of_V1.public_key pk in
+  let sk = Tezos_crypto.Signature.Of_V1.secret_key sk in
   let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
   let* sk_uri =
     if encrypted then

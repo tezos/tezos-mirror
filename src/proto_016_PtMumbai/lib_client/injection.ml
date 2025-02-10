@@ -1223,10 +1223,10 @@ let pending_applied_operations_of_source (cctxt : #full) chain src :
            (fun acc (_oph, {protocol_data = Operation_data {contents; _}; _}) ->
              match contents with
              | Single (Manager_operation {source; _} as _op)
-               when Tezos_crypto.Signature.Public_key_hash.equal source src ->
+               when Signature.Public_key_hash.equal source src ->
                  Contents_list contents :: acc
              | Cons (Manager_operation {source; _}, _rest) as _op
-               when Tezos_crypto.Signature.Public_key_hash.equal source src ->
+               when Signature.Public_key_hash.equal source src ->
                  Contents_list contents :: acc
              | _ -> acc)
            []
@@ -1349,14 +1349,14 @@ let replace_operation (type kind) (cctxt : #full) chain source
           cctxt#error
             "Cannot replace! No applied manager operation found for %a in \
              mempool@."
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Signature.Public_key_hash.pp
             source
           >>= fun () -> exit 1
       | _ :: _ :: _ as l ->
           cctxt#error
             "More than one applied manager operation found for %a in mempool. \
              Found %d operations. Are you sure the node is in precheck mode?@."
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Signature.Public_key_hash.pp
             source
             (List.length l)
           >>= fun () -> exit 1
