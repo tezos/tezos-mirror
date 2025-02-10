@@ -172,14 +172,14 @@ type legacy_transaction_object = {
   gas : quantity;
   gasPrice : quantity;
   hash : hash;
-  input : hash;
+  input : hex;
   nonce : quantity;
   to_ : address option;
   transactionIndex : quantity option;
   value : quantity;
   v : quantity;
-  r : hash;
-  s : hash;
+  r : hex;
+  s : hex;
 }
 
 val legacy_transaction_object_encoding :
