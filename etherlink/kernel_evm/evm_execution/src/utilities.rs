@@ -86,7 +86,7 @@ pub fn u256_to_le_bytes(value: U256) -> Vec<u8> {
 
 pub mod alloy {
     use super::*;
-    use alloy_primitives;
+    use alloy_primitives::{self, Address, Uint};
 
     pub fn u256_to_alloy(value: &U256) -> Option<alloy_primitives::U256> {
         Some(alloy_primitives::U256::from_le_bytes::<32>(
@@ -95,6 +95,15 @@ pub mod alloy {
     }
 
     pub fn h160_to_alloy(value: &H160) -> alloy_primitives::Address {
-        alloy_primitives::Address::from_slice(&value.to_fixed_bytes())
+        Address::from_slice(&value.to_fixed_bytes())
+    }
+
+    pub fn alloy_to_u256(value: &Uint<256, 4>) -> U256 {
+        U256(value.into_limbs())
+    }
+
+    pub fn alloy_to_h160(value: &Address) -> Option<H160> {
+        let value: [u8; 20] = value.as_slice().try_into().ok()?;
+        Some(H160::from_slice(&value))
     }
 }
