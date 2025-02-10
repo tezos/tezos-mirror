@@ -1917,6 +1917,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer:delegate
         client
     in
@@ -2429,6 +2430,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer:account
         client
     in
@@ -2541,6 +2543,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer:account
         client
     in
@@ -2672,6 +2675,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer
         client
     in
@@ -2916,6 +2920,7 @@ module Revamped = struct
     let* _ =
       Operation.Consensus.inject
         ~force:true
+        ~protocol
         ~branch:branch_future1
         ~signer:Constant.bootstrap1
         op_future1
@@ -2924,6 +2929,7 @@ module Revamped = struct
     let* _ =
       Operation.Consensus.inject
         ~force:true
+        ~protocol
         ~branch:branch_future2
         ~signer:Constant.bootstrap1
         op_future2

@@ -300,6 +300,7 @@ module Consensus : sig
     ?branch:string ->
     ?chain_id:string ->
     ?error:rex ->
+    protocol:Protocol.t ->
     signer:Account.key ->
     t ->
     Client.t ->

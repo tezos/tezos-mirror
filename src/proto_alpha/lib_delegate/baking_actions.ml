@@ -678,10 +678,17 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Attestation -> `Attestation
   in
   let unsigned_operation = (shell, Contents_list contents) in
+  let bls_mode =
+    match delegate.consensus_key.public_key with
+    | Bls _ -> global_state.constants.parametric.aggregate_attestation
+    | _ -> false
+  in
+  let encoding =
+    if bls_mode then Operation.bls_mode_unsigned_encoding
+    else Operation.unsigned_encoding
+  in
   let unsigned_operation_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding
-      unsigned_operation
+    Data_encoding.Binary.to_bytes_exn encoding unsigned_operation
   in
   let sk_uri = delegate.consensus_key.secret_key_uri in
   let* signature =
