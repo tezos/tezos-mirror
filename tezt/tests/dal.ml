@@ -4584,6 +4584,112 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     ~description
     ()
 
+(* This test checks the following scenario (that occurred on `nextnet--20250203`):
+   - start a DAL node attester in protocol [migrate_from]
+   - then start a DAL node accuser in protocol [migrate_to]
+   - check that no baker is denounced
+
+   This issue was that bakers were denounced, because the DAL node attester was
+   started when the DAL incentives were not enabled, so they did not check for
+   traps, and the DAL node did not used the new protocol parameters after
+   migrating to the new protocol, so they also did not check for traps when the
+   DAL incentives were enabled.
+*)
+let test_migration_accuser_issue ~migrate_from ~migrate_to =
+  let slot_index = 0 in
+  let tags = ["accuser"; "migration"] in
+  let description = "test accuser" in
+  let scenario ~migration_level dal_parameters client node dal_node =
+    let* proto_params =
+      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+    in
+    let blocks_per_cycle =
+      JSON.(proto_params |-> "blocks_per_cycle" |> as_int)
+    in
+    assert (migration_level < blocks_per_cycle) ;
+    let* level = Client.level client in
+    let first_level = level + 1 in
+    let last_level = blocks_per_cycle in
+    Log.info
+      "Publish slots from first_level = %d to last_level = %d"
+      first_level
+      last_level ;
+    let _promise =
+      simple_slot_producer
+        ~slot_size:dal_parameters.Dal.Parameters.cryptobox.slot_size
+        ~slot_index
+        ~from:(migration_level - 1)
+        ~into:last_level
+        dal_node
+        node
+        client
+    in
+    Log.info "Start bakers for the current and the next protocols" ;
+    let baker_from =
+      Baker.create ~dal_node ~protocol:migrate_from node client
+    in
+    let baker_to = Baker.create ~dal_node ~protocol:migrate_to node client in
+
+    let* () = Baker.run baker_from in
+    let* () = Baker.run baker_to in
+
+    let* _level = Node.wait_for_level node migration_level in
+    Log.info "migrated to next protocol, starting a second DAL node accuser" ;
+    let dal_node_p2p_endpoint = Dal_node.listen_addr dal_node in
+    let accuser = Dal_node.create ~node () in
+    let* () =
+      Dal_node.init_config
+        ~peers:[dal_node_p2p_endpoint]
+        ~producer_profiles:[slot_index]
+        accuser
+    in
+    let* () = Dal_node.run accuser ~wait_ready:true in
+
+    let* _level = Node.wait_for_level node last_level in
+    let* () = Baker.terminate baker_from in
+    let* () = Baker.terminate baker_to in
+
+    Lwt_list.iter_s
+      (fun delegate ->
+        let* dal_participation =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_context_delegate_dal_participation
+               ~block:(string_of_int (last_level - 1))
+               delegate.Account.public_key_hash
+        in
+        let is_denounced =
+          JSON.(dal_participation |-> "denounced" |> as_bool)
+        in
+        Check.is_false
+          is_denounced
+          ~__LOC__
+          ~error_msg:"Expected the delegate to not be denounced" ;
+        unit)
+      (Array.to_list Account.Bootstrap.keys)
+  in
+  test_l1_migration_scenario
+    ~scenario
+    ~tags
+    ~description
+    ~uses:[Protocol.baker migrate_from; Protocol.baker migrate_to]
+    ~activation_timestamp:Now
+    ~producer_profiles:[slot_index]
+    ~minimal_block_delay:
+      (* to be sure there is enough time to published slots *)
+      "2"
+    ~blocks_per_cycle:32
+    ~consensus_committee_size:512
+      (* Use more blocks per cycle and more shards so that we're sure that we
+         encounter traps: there are 32 (blocks per cycle) - 4 (migration level)
+         - 8 (attestation lag) = 20 attestable levels; so 20 * 512 = 10240
+         shards. Since [traps_fraction = 1 / 2000], the probability to not
+         encounter at least one trap in these many shards is (1 - 1/2000)^10240
+         = 0.6%. *)
+    ~number_of_shards:512
+    ~migrate_from
+    ~migrate_to
+    ()
+
 let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
     dal_node =
   let index = 0 in
@@ -10339,7 +10445,8 @@ let register_migration ~migrate_from ~migrate_to =
     ~migration_level:10
     ~migrate_from
     ~migrate_to ;
-  tests_start_dal_node_around_migration ~migrate_from ~migrate_to
+  tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
+  test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to
 
 let () =
   Regression.register
