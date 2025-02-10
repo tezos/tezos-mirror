@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -187,16 +187,54 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
   in
   return observer
 
+let setup_kernel ~l1_contracts ?max_delayed_inbox_blueprint_length
+    ~mainnet_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?(bootstrap_accounts =
+      List.map
+        (fun account -> account.Eth_account.address)
+        (Array.to_list Eth_account.bootstrap_accounts)) ?sequencer_pool_address
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ~enable_dal ?dal_slots
+    ~enable_multichain ~sequencer ~preimages_dir ~kernel () =
+  let output_config = Temp.file "config.yaml" in
+  let*! () =
+    Evm_node.make_kernel_installer_config
+      ?max_delayed_inbox_blueprint_length
+      ~mainnet_compat
+      ~sequencer
+      ~delayed_bridge:l1_contracts.delayed_transaction_bridge
+      ~ticketer:l1_contracts.exchanger
+      ~administrator:l1_contracts.admin
+      ~sequencer_governance:l1_contracts.sequencer_governance
+      ?minimum_base_fee_per_gas
+      ?da_fee_per_byte
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?sequencer_pool_address
+      ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction
+      ~enable_dal
+      ?enable_fast_withdrawal
+      ?dal_slots
+      ~enable_multichain
+      ?max_blueprint_lookahead_in_seconds
+      ~bootstrap_accounts
+      ~output:output_config
+      ?enable_fa_bridge
+      ()
+  in
+  let* {output; _} =
+    prepare_installer_kernel ~preimages_dir ~config:(`Path output_config) kernel
+  in
+  return output
+
 let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
     ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?commitment_period ?challenge_window
-    ?(bootstrap_accounts =
-      List.map
-        (fun account -> account.Eth_account.address)
-        (Array.to_list Eth_account.bootstrap_accounts))
+    ?commitment_period ?challenge_window ?bootstrap_accounts
     ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
@@ -239,16 +277,12 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
       preimages_dir
   in
-  let output_config = Temp.file "config.yaml" in
-  let*! () =
-    Evm_node.make_kernel_installer_config
+  let* output =
+    setup_kernel
+      ~l1_contracts
       ?max_delayed_inbox_blueprint_length
       ~mainnet_compat
       ~sequencer:sequencer.public_key
-      ~delayed_bridge:l1_contracts.delayed_transaction_bridge
-      ~ticketer:l1_contracts.exchanger
-      ~administrator:l1_contracts.admin
-      ~sequencer_governance:l1_contracts.sequencer_governance
       ?minimum_base_fee_per_gas
       ?da_fee_per_byte:da_fee
       ?delayed_inbox_timeout
@@ -261,13 +295,11 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?dal_slots
       ~enable_multichain
       ?max_blueprint_lookahead_in_seconds
-      ~bootstrap_accounts
-      ~output:output_config
+      ?bootstrap_accounts
       ?enable_fa_bridge
+      ~preimages_dir
+      ~kernel
       ()
-  in
-  let* {output; _} =
-    prepare_installer_kernel ~preimages_dir ~config:(`Path output_config) kernel
   in
   let* sc_rollup_address =
     originate_sc_rollup
