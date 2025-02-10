@@ -43,6 +43,8 @@ Its storage version is 26.
 
 - Standard withdrawals from the withdrawal precompiled contract now emit events
   from the appropriate address. (!16417)
+- Fixed an issue in the FA bridge where withdrawals events were not
+  being emitted from the appropriate address. (!16666)
 
 ### Internal
 
