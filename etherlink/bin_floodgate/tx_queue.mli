@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -57,10 +57,13 @@ val beacon : tick_interval:float -> unit tzresult Lwt.t
     {!callback}). *)
 val transfer :
   ?callback:callback ->
+  ?to_:Efunc_core.Private.address ->
+  ?value:Z.t ->
+  ?data:Efunc_core.Private.b ->
+  gas_limit:Z.t ->
   infos:Network_info.t ->
-  Account.t ->
-  Efunc_core.Private.address ->
-  Z.t ->
+  from:Account.t ->
+  unit ->
   unit Lwt.t
 
 module Misc : sig

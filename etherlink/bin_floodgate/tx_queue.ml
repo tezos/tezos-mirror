@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -192,7 +192,9 @@ let send_transactions_batch ~relay_endpoint transactions =
                           Data_encoding.Json.destruct Srt.output_encoding res
                         in
                         Lwt_result.ok (callback (`Accepted hash))
-                    | Error _ -> Lwt_result.ok (callback `Refused)
+                    | Error error ->
+                        let*! () = Floodgate_events.rpc_error error in
+                        Lwt_result.ok (callback `Refused)
                   in
                   return (M.remove req callbacks)
               | _ -> return callbacks)
@@ -319,8 +321,9 @@ let start ~relay_endpoint () =
   let*! () = Floodgate_events.tx_queue_is_ready () in
   return_unit
 
-let transfer ?(callback = fun _ -> Lwt.return_unit) ~infos from to_ value =
-  let fees = Z.(infos.Network_info.gas_limit * infos.base_fee_per_gas) in
+let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero) ?data
+    ~gas_limit ~infos ~from () =
+  let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
   let callback reason =
     (match reason with
     | `Accepted _ ->
@@ -329,7 +332,7 @@ let transfer ?(callback = fun _ -> Lwt.return_unit) ~infos from to_ value =
     | _ -> ()) ;
     callback reason
   in
-  let txn = Craft.transfer ~infos ~from ~to_ value in
+  let txn = Craft.transfer ~infos ~from ?to_ ~gas_limit ~value ?data () in
   inject ~callback txn
 
 module Misc = struct

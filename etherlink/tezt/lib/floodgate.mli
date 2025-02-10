@@ -9,6 +9,7 @@
 val run :
   ?runner:Runner.t ->
   ?path:string ->
+  ?scenario:[< `ERC20 | `XTZ > `XTZ] ->
   rpc_endpoint:string ->
   controller:Eth_account.t ->
   ?relay_endpoint:string ->

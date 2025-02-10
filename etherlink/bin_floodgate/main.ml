@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -48,6 +49,14 @@ module Parameter = struct
                 return (Z.add n m)
             | _ -> assert false)
           (fun _ -> failwith "%s is not a valid balance" n))
+
+  let scenario =
+    Tezos_clic.parameter (fun _ token ->
+        let open Lwt_result_syntax in
+        match String.uppercase_ascii token with
+        | "XTZ" -> return `XTZ
+        | "ERC20" -> return `ERC20
+        | _ -> failwith "Expected <xtz | erc20>, got %s" token)
 end
 
 module Arg = struct
@@ -146,6 +155,24 @@ module Arg = struct
          network (expressed in the primary unit of the targeted EVM-compatible \
          chain, e.g., tez for Etherlink, Eth for Ethereum, etc.)"
       Parameter.tez
+
+  let controller =
+    secret_key
+      ~long:"controller"
+      ~short:'c'
+      ~doc:
+        "The secret key (encoded in hexadecimal, with a leading 0x) to an EOA \
+         with enough fund to pay for the experiment"
+
+  let scenario =
+    let default = "xtz" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"scenario"
+      ~placeholder:"xtz | erc20"
+      ~doc:
+        "Specifies the transfer mode: ERC20 transfers or native XTZ transfers."
+      Parameter.scenario
 end
 
 let log_config ~verbose () =
@@ -164,21 +191,17 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args9
+      args10
         verbose
         relay_endpoint
         rpc_endpoint
-        (secret_key
-           ~long:"controller"
-           ~short:'c'
-           ~doc:
-             "The secret key (encoded in hexadecimal, with a leading 0x) to an \
-              EOA with enough fund to pay for the experiment")
+        controller
         max_active_eoa
         spawn_interval
         tick_interval
         base_fee_factor
-        initial_balance)
+        initial_balance
+        scenario)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
            relay_endpoint,
@@ -188,7 +211,8 @@ let run_command =
            spawn_interval,
            tick_interval,
            base_fee_factor,
-           initial_balance )
+           initial_balance,
+           scenario )
          () ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbose () in
@@ -203,7 +227,8 @@ let run_command =
         ~spawn_interval
         ~tick_interval
         ~base_fee_factor
-        ~initial_balance)
+        ~initial_balance
+        ~scenario)
 
 let commands = [run_command]
 

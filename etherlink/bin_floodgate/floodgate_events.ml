@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -113,6 +114,23 @@ let reimbursed_controller =
     ~level:Notice
     ("account", Ethereum_types.address_encoding)
 
+let deploy_erc20 =
+  declare_1
+    ~section
+    ~name:"deploy_erc20"
+    ~msg:"ERC20 contract as been deployed at address {address}"
+    ~level:Notice
+    ("address", Data_encoding.string)
+
+let rpc_error =
+  declare_2
+    ~section
+    ~name:"rpc_error"
+    ~msg:"An RPC produced the error :\n code:{code},\n message:{message}"
+    ~level:Error
+    ("code", Data_encoding.int32)
+    ("message", Data_encoding.string)
+
 let mainnet_experiment () = emit mainnet_experiment ()
 
 let is_ready chain_id base_fee_per_gas =
@@ -139,3 +157,8 @@ let transaction_dropped account =
 
 let reimbursed_controller account =
   emit reimbursed_controller (Account.address_et account)
+
+let deploy_erc20 address = emit deploy_erc20 address
+
+let rpc_error (error : Rpc_encodings.JSONRPC.error) =
+  emit rpc_error (Int32.of_int error.code, error.message)

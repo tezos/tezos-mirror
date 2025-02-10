@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>              *)
+(* SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>              *)
 (* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -11,8 +11,11 @@
     [Rpc.send_transaction_batch]. *)
 val transfer :
   ?nonce:Z.t ->
+  ?to_:Efunc_core.Eth.address ->
+  ?data:Efunc_core.Private.b ->
+  value:Z.t ->
+  gas_limit:Z.t ->
   infos:Network_info.t ->
   from:Account.t ->
-  to_:Efunc_core.Eth.address ->
-  Z.t ->
+  unit ->
   Ethereum_types.hex
