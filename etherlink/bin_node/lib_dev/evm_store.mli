@@ -182,7 +182,7 @@ module Transactions : sig
   val find_object :
     conn ->
     Ethereum_types.hash ->
-    Ethereum_types.transaction_object option tzresult Lwt.t
+    Ethereum_types.legacy_transaction_object option tzresult Lwt.t
 
   (** [receipts_of_block_number conn block_number] returns all the receipts found
       from level [block_number]. The function does not check if the block exists. *)

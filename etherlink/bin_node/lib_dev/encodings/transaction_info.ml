@@ -74,7 +74,7 @@ let of_receipt_and_object
        r;
        s;
      } :
-      transaction_object) : t =
+      legacy_transaction_object) : t =
   let receipt_fields =
     {
       cumulative_gas_used;

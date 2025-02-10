@@ -358,7 +358,7 @@ let transaction_log_encoding =
        (req "logIndex" (option quantity_encoding))
        (req "removed" (option bool)))
 
-type transaction_object = {
+type legacy_transaction_object = {
   blockHash : block_hash option;
   blockNumber : quantity option;
   from : address;
@@ -376,7 +376,7 @@ type transaction_object = {
   s : hash;
 }
 
-let transaction_object_from_rlp_item block_hash rlp_item =
+let legacy_transaction_object_from_rlp_item block_hash rlp_item =
   let decode_optional_number_le bytes =
     if block_hash == None then None else Some (decode_number_le bytes)
   in
@@ -434,12 +434,12 @@ let transaction_object_from_rlp_item block_hash rlp_item =
       }
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
-let transaction_object_from_rlp block_hash bytes =
+let legacy_transaction_object_from_rlp block_hash bytes =
   match Rlp.decode bytes with
-  | Ok rlp_item -> transaction_object_from_rlp_item block_hash rlp_item
+  | Ok rlp_item -> legacy_transaction_object_from_rlp_item block_hash rlp_item
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
-let transaction_object_encoding =
+let legacy_transaction_object_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -516,7 +516,7 @@ let transaction_object_encoding =
 
 type block_transactions =
   | TxHash of hash list
-  | TxFull of transaction_object list
+  | TxFull of legacy_transaction_object list
 
 let block_transactions_encoding =
   let open Data_encoding in
@@ -531,7 +531,7 @@ let block_transactions_encoding =
       case
         ~title:"full"
         (Tag 1)
-        (list transaction_object_encoding)
+        (list legacy_transaction_object_encoding)
         (function TxFull txs -> Some txs | _ -> None)
         (fun txs -> TxFull txs);
     ]
@@ -1016,15 +1016,15 @@ end
 module AddressMap = MapMake (Address)
 
 type txpool = {
-  pending : transaction_object NonceMap.t AddressMap.t;
-  queued : transaction_object NonceMap.t AddressMap.t;
+  pending : legacy_transaction_object NonceMap.t AddressMap.t;
+  queued : legacy_transaction_object NonceMap.t AddressMap.t;
 }
 
 let txpool_encoding =
   let open Data_encoding in
   let field_encoding =
     AddressMap.associative_array_encoding
-      (NonceMap.associative_array_encoding transaction_object_encoding)
+      (NonceMap.associative_array_encoding legacy_transaction_object_encoding)
   in
   conv
     (fun {pending; queued} -> (pending, queued))

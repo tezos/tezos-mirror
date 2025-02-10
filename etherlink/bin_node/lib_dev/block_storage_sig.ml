@@ -42,5 +42,5 @@ module type S = sig
   (** [transaction_object tx_hash] returns the informations of [tx_hash]. *)
   val transaction_object :
     Ethereum_types.hash ->
-    Ethereum_types.transaction_object option tzresult Lwt.t
+    Ethereum_types.legacy_transaction_object option tzresult Lwt.t
 end

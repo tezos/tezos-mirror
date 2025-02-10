@@ -47,7 +47,7 @@ val txs_watcher : Ethereum_types.Subscription.output Lwt_watcher.input
     The consistency between [transaction_object] and [raw_tx] is assumed by
     [add]. It is the responsibility of the caller to enforce it. *)
 val add :
-  Ethereum_types.transaction_object ->
+  Ethereum_types.legacy_transaction_object ->
   string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 
@@ -61,7 +61,7 @@ val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
     `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
 val pop_transactions :
   maximum_cumulative_size:int ->
-  (string * Ethereum_types.transaction_object) list tzresult Lwt.t
+  (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
 (** [pop_and_inject_transactions ()] pops the valid transactions from
     the pool using {!pop_transactions} and injects them using
@@ -92,6 +92,7 @@ val get_tx_pool_content : unit -> Ethereum_types.txpool tzresult Lwt.t
     [tx_hash] exists and returns it's corresponding
     {!Ethereum_types.transaction_object}. *)
 val find :
-  Ethereum_types.hash -> Ethereum_types.transaction_object option tzresult Lwt.t
+  Ethereum_types.hash ->
+  Ethereum_types.legacy_transaction_object option tzresult Lwt.t
 
 val clear_popped_transactions : unit -> unit tzresult Lwt.t

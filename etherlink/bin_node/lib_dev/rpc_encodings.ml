@@ -490,11 +490,11 @@ module Get_transaction_by_hash = struct
 
   type input = hash
 
-  type output = transaction_object option
+  type output = legacy_transaction_object option
 
   let input_encoding = Data_encoding.tup1 hash_encoding
 
-  let output_encoding = Data_encoding.option transaction_object_encoding
+  let output_encoding = Data_encoding.option legacy_transaction_object_encoding
 
   let method_ = "eth_getTransactionByHash"
 
@@ -506,11 +506,11 @@ module Get_transaction_by_block_hash_and_index = struct
 
   type input = block_hash * quantity
 
-  type output = transaction_object option
+  type output = legacy_transaction_object option
 
   let input_encoding = Data_encoding.tup2 block_hash_encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option transaction_object_encoding
+  let output_encoding = Data_encoding.option legacy_transaction_object_encoding
 
   let method_ = "eth_getTransactionByBlockHashAndIndex"
 
@@ -522,12 +522,12 @@ module Get_transaction_by_block_number_and_index = struct
 
   type input = Block_parameter.t * quantity
 
-  type output = transaction_object option
+  type output = legacy_transaction_object option
 
   let input_encoding =
     Data_encoding.tup2 Block_parameter.encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option transaction_object_encoding
+  let output_encoding = Data_encoding.option legacy_transaction_object_encoding
 
   let method_ = "eth_getTransactionByBlockNumberAndIndex"
 
@@ -754,12 +754,13 @@ module Produce_proposal = struct
 end
 
 module Inject_transaction = struct
-  type input = Ethereum_types.transaction_object * string
+  type input = Ethereum_types.legacy_transaction_object * string
 
   type output = unit
 
   let input_encoding =
-    Data_encoding.(tup2 Ethereum_types.transaction_object_encoding string)
+    Data_encoding.(
+      tup2 Ethereum_types.legacy_transaction_object_encoding string)
 
   let output_encoding = Data_encoding.unit
 

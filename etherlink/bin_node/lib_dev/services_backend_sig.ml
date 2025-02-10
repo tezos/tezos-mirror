@@ -38,7 +38,7 @@ module type S = sig
   val inject_transactions :
     timestamp:Time.Protocol.t ->
     smart_rollup_address:string ->
-    transactions:(string * Ethereum_types.transaction_object) list ->
+    transactions:(string * Ethereum_types.legacy_transaction_object) list ->
     Ethereum_types.hash list tzresult Lwt.t
 
   val block_param_to_block_number :

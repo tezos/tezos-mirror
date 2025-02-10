@@ -85,7 +85,7 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    type transactions = (string * Ethereum_types.transaction_object) list
+    type transactions = (string * Ethereum_types.legacy_transaction_object) list
 
     type messages = string list
 
