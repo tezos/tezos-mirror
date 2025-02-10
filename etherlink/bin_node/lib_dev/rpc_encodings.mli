@@ -289,7 +289,7 @@ module Produce_proposal :
 module Inject_transaction :
   METHOD
     with type input = Ethereum_types.legacy_transaction_object * string
-     and type output = unit
+     and type output = Ethereum_types.hash
 
 module Durable_state_value :
   METHOD

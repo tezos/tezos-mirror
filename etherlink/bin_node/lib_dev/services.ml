@@ -864,7 +864,7 @@ let dispatch_private_request (rpc : Configuration.rpc)
         let f (transaction_object, raw_txn) =
           let* tx_hash = Tx_pool.add transaction_object raw_txn in
           match tx_hash with
-          | Ok _tx_hash -> rpc_ok ()
+          | Ok tx_hash -> rpc_ok tx_hash
           | Error reason ->
               rpc_error (Rpc_errors.transaction_rejected reason None)
         in

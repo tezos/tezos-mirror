@@ -28,7 +28,8 @@ let set_metrics_confirmed_levels (ctxt : Evm_ro_context.t) =
       Metrics.set_l1_level ~level:l1_level
   | None -> ()
 
-let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
+let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
+    ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
@@ -53,7 +54,20 @@ let main ~data_dir ~evm_node_endpoint ~(config : Configuration.t) =
         smart_rollup_address =
           Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
             ctxt.smart_rollup_address;
-        mode = Relay;
+        mode =
+          (match evm_node_private_endpoint with
+          | Some base ->
+              Forward
+                {
+                  injector =
+                    (fun tx_object raw_tx ->
+                      Injector.inject_transaction
+                        ~keep_alive:config.keep_alive
+                        ~base
+                        ~tx_object
+                        ~raw_tx);
+                }
+          | None -> Relay);
         tx_timeout_limit = config.tx_pool_timeout_limit;
         tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit =

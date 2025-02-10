@@ -263,10 +263,11 @@ Miscellaneous commands:
                      [--blacklisted-rpcs <blacklist>]
                      [--whitelisted-rpcs <whitelist>] [--finalized-view]
                      [--evm-node-endpoint <url>]
+                     [--evm-node-private-endpoint <url>]
                      [--preimages-dir <_evm_installer_preimages>]
                      [--preimages-endpoint <url>]
                      [-n --native-execution-policy <policy>]
-    Start the EVM node in sequencer mode
+    Start the EVM node in rpc mode
     --data-dir <data-dir>: The path to the EVM node data directory
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
@@ -287,6 +288,7 @@ Miscellaneous commands:
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final state of the rollup, not its current HEAD, for any read-only operation.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
+    --evm-node-private-endpoint <url>: The address of an EVM node and its private endpoint.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages directory
     --preimages-endpoint <url>: The address of a service which provides pre-images for the rollup. Missing pre-images will be downloaded remotely if they are not already present on disk.
     -n --native-execution-policy <policy>: Policy regarding the use of native execution for supported kernels. Can be `never`, `rpcs_only` or `always`.

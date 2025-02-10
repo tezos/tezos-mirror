@@ -6,47 +6,64 @@
 (*****************************************************************************)
 
 open Batch
+open Rpc_encodings
 
-let send_raw_transaction_method txn =
-  let open Rpc_encodings in
-  let message = Ethereum_types.hex_encode_string txn in
+let construct_rpc_call ~method_ ~input_encoding parameters =
   JSONRPC.
     {
-      method_ = Send_raw_transaction.method_;
-      parameters =
-        Some
-          (Data_encoding.Json.construct
-             Send_raw_transaction.input_encoding
-             message);
+      method_;
+      parameters = Some (Data_encoding.Json.construct input_encoding parameters);
       id = Some (random_id ());
     }
 
-let send_raw_transaction ~keep_alive ~base raw_txn =
+let call_rpc_service ~keep_alive ~base ~path request output_encoding =
   let open Lwt_result_syntax in
   let* response =
     let open Rollup_services in
     call_service
       ~keep_alive
       ~base
-      (dispatch_batch_service ~path:Resto.Path.root)
+      (dispatch_batch_service ~path)
       ()
       ()
-      (Singleton (send_raw_transaction_method raw_txn))
+      (Singleton request)
   in
-
   match response with
   | Singleton {value = Ok json; id = _} ->
-      let open Rpc_encodings in
-      let hash =
-        Data_encoding.Json.destruct Send_raw_transaction.output_encoding json
-      in
-      return (Ok hash)
+      return (Ok (Data_encoding.Json.destruct output_encoding json))
   | Singleton {value = Error err; id = _} | Batch [{value = Error err; id = _}]
     ->
       return (Error err.message)
   | Batch _ ->
-      (* should not be possible, we consider it failed *)
       return
         (Error
-           "Upstream EVM endpoint returned an inconsistent response (more than \
-            one result)")
+           "Upstream endpoint returned an inconsistent response (more than one \
+            result)")
+
+let send_raw_transaction_request raw_tx =
+  construct_rpc_call
+    ~method_:Send_raw_transaction.method_
+    ~input_encoding:Send_raw_transaction.input_encoding
+    (Ethereum_types.hex_encode_string raw_tx)
+
+let inject_transaction_request tx_object raw_tx =
+  construct_rpc_call
+    ~method_:Inject_transaction.method_
+    ~input_encoding:Inject_transaction.input_encoding
+    (tx_object, raw_tx)
+
+let send_raw_transaction ~keep_alive ~base ~raw_tx =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.root
+    (send_raw_transaction_request raw_tx)
+    Send_raw_transaction.output_encoding
+
+let inject_transaction ~keep_alive ~base ~tx_object ~raw_tx =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.(root / "private")
+    (inject_transaction_request tx_object raw_tx)
+    Inject_transaction.output_encoding
