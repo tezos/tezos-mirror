@@ -1086,20 +1086,18 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
-(* This function fetches the protocol plugins for levels for which it is needed
-   to add skip list cells. It starts by computing the oldest level at which it
-   will be needed to add skip list cells. *)
+(* This function fetches the protocol plugins for levels in the past for which
+   the node may need a plugin, namely for adding skip list cells, or for
+   obtaining the protocol parameters.
+
+   Concerning the skip list, getting the plugin is (almost) necessary as skip
+   list cells are stored in the storage for a certain period and
+   [store_skip_list_cells] needs the L1 context for levels in this period. (It
+   would actually not be necessary to go as far in the past, because the
+   protocol parameters and the relevant encodings do not change for now, so the
+   head plugin could be used). *)
 let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
     head_level proto_parameters =
-  (* We resolve the plugins for all levels starting with [(max
-     last_processed_level (head_level - storage_period)], or (max
-     last_processed_level (head_level - storage_period) - (attestation_lag -
-     1))] in case the node supports refutations. This is necessary as skip list
-     cells are stored for attested levels is this storage period and
-     [store_skip_list_cells] needs the L1 context for these levels. (It would
-     actually not be necessary to go as far in the past, because the protocol
-     parameters and the relevant encodings do not change for now, so the head
-     plugin could be used). *)
   let storage_period =
     get_storage_period profile_ctxt proto_parameters head_level first_seen_level
   in
@@ -1111,7 +1109,10 @@ let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
   let first_level =
     if Profile_manager.supports_refutations profile_ctxt then
       Int32.sub first_level (Int32.of_int (skip_list_offset proto_parameters))
-    else first_level
+    else
+      (* The DAL node may need the protocol parameters [attestation_lag] in the
+         past wrt to the head level. *)
+      Int32.sub first_level (Int32.of_int proto_parameters.attestation_lag)
   in
   let first_level = Int32.(max 1l first_level) in
   Proto_plugins.initial_plugins cctxt ~first_level ~last_level:head_level
