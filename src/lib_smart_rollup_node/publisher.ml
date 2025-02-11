@@ -579,9 +579,6 @@ let on_cement_commitments (node_ctxt : state) =
   let* cementable_commitments = cementable_commitments node_ctxt in
   List.iter_es (cement_commitment node_ctxt) cementable_commitments
 
-let on_execute_outbox (node_ctxt : state) =
-  Outbox_execution.publish_executable_messages node_ctxt
-
 module Types = struct
   type nonrec state = state
 
@@ -617,7 +614,6 @@ module Handlers = struct
     match request with
     | Request.Publish -> protect @@ fun () -> on_publish_commitments state
     | Request.Cement -> protect @@ fun () -> on_cement_commitments state
-    | Request.Execute_outbox -> protect @@ fun () -> on_execute_outbox state
 
   type launch_error = error trace
 
@@ -636,7 +632,6 @@ module Handlers = struct
     match r with
     | Request.Publish -> emit_and_return_errors errs
     | Request.Cement -> emit_and_return_errors errs
-    | Request.Execute_outbox -> emit_and_return_errors errs
 
   let on_completion _w r _ st =
     Commitment_event.Publisher.request_completed (Request.view r) st
@@ -661,10 +656,7 @@ let start_in_mode mode =
   match mode with
   | Maintenance | Operator | Bailout -> true
   | Observer | Accuser | Batcher -> false
-  | Custom ops ->
-      purposes_matches_mode
-        (Custom ops)
-        [Operating; Cementing; Executing_outbox]
+  | Custom ops -> purposes_matches_mode (Custom ops) [Operating; Cementing]
 
 let init (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
@@ -710,10 +702,6 @@ let publish_commitments () =
 let cement_commitments () =
   worker_add_request ~request:Request.Cement (fun node_ctxt ->
       Configuration.can_inject node_ctxt.config.mode Cement)
-
-let execute_outbox () =
-  worker_add_request ~request:Request.Execute_outbox (fun node_ctxt ->
-      Configuration.can_inject node_ctxt.config.mode Execute_outbox_message)
 
 let shutdown () =
   match worker () with

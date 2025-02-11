@@ -96,9 +96,6 @@ val publish_commitments : unit -> unit tzresult Lwt.t
     appropriate mode. *)
 val cement_commitments : unit -> unit tzresult Lwt.t
 
-(** [execute_outbox] execute pending outbox messages on L1. *)
-val execute_outbox : unit -> unit tzresult Lwt.t
-
 (** Stop worker for publishing and cementing commitments. *)
 val shutdown : unit -> unit Lwt.t
 
