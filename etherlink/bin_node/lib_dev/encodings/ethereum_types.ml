@@ -115,6 +115,16 @@ let quantity_encoding =
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
+let decode_z_le bytes = Bytes.to_string bytes |> Z.of_bits
+
+let decode_z_be bytes =
+  Bytes.fold_left
+    (fun acc c ->
+      let open Z in
+      add (of_int (Char.code c)) (shift_left acc 8))
+    Z.zero
+    bytes
+
 type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
 
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
@@ -250,16 +260,9 @@ let decode_address bytes = Address (decode_hex bytes)
 
 let encode_address (Address address) = encode_hex address
 
-let decode_number_le bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
+let decode_number_le bytes = decode_z_le bytes |> quantity_of_z
 
-let decode_number_be bytes =
-  Bytes.fold_left
-    (fun acc c ->
-      let open Z in
-      add (of_int (Char.code c)) (shift_left acc 8))
-    Z.zero
-    bytes
-  |> quantity_of_z
+let decode_number_be bytes = decode_z_be bytes |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
