@@ -117,10 +117,6 @@ let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
 type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
 
-let chain_id_encoding : chain_id Data_encoding.t =
-  let open Data_encoding in
-  conv (fun (Chain_id z) -> z) (fun z -> Chain_id z) z
-
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
 
 let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h

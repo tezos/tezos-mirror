@@ -57,6 +57,11 @@ let chain_id network =
   Ethereum_types.Chain_id
     (Z.of_int (match network with Mainnet -> 0xa729 | Testnet -> 0x1f47b))
 
+let chain_id_encoding : Ethereum_types.chain_id Data_encoding.t =
+  let open Ethereum_types in
+  let open Data_encoding in
+  conv (fun (Chain_id z) -> z) (fun z -> Chain_id z) z
+
 type l2_chain = {chain_id : Ethereum_types.chain_id}
 
 type experimental_features = {
@@ -822,13 +827,9 @@ let opt_monitor_websocket_heartbeat_encoding =
 
 let l2_chain_encoding : l2_chain Data_encoding.t =
   let open Data_encoding in
-  let open Evm_node_lib_dev_encoding in
   conv (fun {chain_id} -> chain_id) (fun chain_id -> {chain_id})
   @@ obj1
-       (req
-          "chain_id"
-          ~description:"The id of the l2 chain"
-          Ethereum_types.chain_id_encoding)
+       (req "chain_id" ~description:"The id of the l2 chain" chain_id_encoding)
 
 let experimental_features_encoding =
   let open Data_encoding in
