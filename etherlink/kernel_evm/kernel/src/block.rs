@@ -28,6 +28,7 @@ use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
+use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
@@ -60,10 +61,19 @@ impl TickCounter {
 }
 
 #[derive(PartialEq, Debug)]
+pub enum BlockInProgressComputationResult {
+    RebootNeeded,
+    Finished {
+        included_delayed_transactions: Vec<TransactionHash>,
+    },
+}
+
+#[derive(PartialEq, Debug)]
 pub enum BlockComputationResult {
     RebootNeeded,
     Finished {
         included_delayed_transactions: Vec<TransactionHash>,
+        block: Box<L2Block>,
     },
 }
 
@@ -109,7 +119,7 @@ fn compute<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     tracer_input: Option<TracerInput>,
-) -> Result<BlockComputationResult, anyhow::Error> {
+) -> Result<BlockInProgressComputationResult, anyhow::Error> {
     log!(
         host,
         Debug,
@@ -149,7 +159,7 @@ fn compute<Host: Runtime>(
                 );
             }
 
-            return Ok(BlockComputationResult::RebootNeeded);
+            return Ok(BlockInProgressComputationResult::RebootNeeded);
         }
 
         let execution_gas_limit =
@@ -216,7 +226,7 @@ fn compute<Host: Runtime>(
                          current reboot but will be retried."
                 );
                 block_in_progress.repush_tx(transaction);
-                return Ok(BlockComputationResult::RebootNeeded);
+                return Ok(BlockInProgressComputationResult::RebootNeeded);
             }
             ExecutionResult::Invalid => {
                 on_invalid_transaction(host, &transaction, block_in_progress, data_size)
@@ -224,7 +234,7 @@ fn compute<Host: Runtime>(
         };
         is_first_transaction = false;
     }
-    Ok(BlockComputationResult::Finished {
+    Ok(BlockInProgressComputationResult::Finished {
         included_delayed_transactions: block_in_progress.delayed_txs.clone(),
     })
 }
@@ -317,8 +327,8 @@ fn compute_bip<Host: Runtime>(
         limits,
         tracer_input,
     )?;
-    match &result {
-        BlockComputationResult::RebootNeeded => {
+    match result {
+        BlockInProgressComputationResult::RebootNeeded => {
             log!(host, Info, "Ask for reboot.");
             log!(
                 host,
@@ -327,14 +337,15 @@ fn compute_bip<Host: Runtime>(
                 &block_in_progress.estimated_ticks_in_run
             );
             storage::store_block_in_progress(host, &block_in_progress)?;
+            Ok(BlockComputationResult::RebootNeeded)
         }
-        BlockComputationResult::Finished {
-            included_delayed_transactions: _,
+        BlockInProgressComputationResult::Finished {
+            included_delayed_transactions,
         } => {
             crate::gas_price::register_block(host, &block_in_progress)?;
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
-            let _new_block = block_in_progress
+            let new_block = block_in_progress
                 .finalize_and_store(
                     host,
                     &constants,
@@ -342,9 +353,12 @@ fn compute_bip<Host: Runtime>(
                     previous_transactions_root,
                 )
                 .context("Failed to finalize the block in progress")?;
+            Ok(BlockComputationResult::Finished {
+                included_delayed_transactions,
+                block: Box::new(new_block),
+            })
         }
     }
-    Ok(result)
 }
 
 fn revert_block<Host: Runtime>(
@@ -388,7 +402,7 @@ fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
-    number: U256,
+    block: L2Block,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
@@ -397,11 +411,13 @@ fn promote_block<Host: Runtime>(
     }
     safe_host.promote()?;
     safe_host.promote_trace()?;
-    drop_blueprint(safe_host.host, number)?;
+    drop_blueprint(safe_host.host, block.number)?;
 
-    let hash = block_storage::read_current_hash(safe_host.host)?;
-
-    Event::BlueprintApplied { number, hash }.store(safe_host.host)?;
+    Event::BlueprintApplied {
+        number: block.number,
+        hash: block.hash,
+    }
+    .store(safe_host.host)?;
 
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.
@@ -523,12 +539,13 @@ pub fn produce<Host: Runtime>(
     ) {
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions,
+            block,
         }) => {
             promote_block(
                 &mut safe_host,
                 &outbox_queue,
                 &block_in_progress_provenance,
-                processed_blueprint,
+                *block,
                 config,
                 included_delayed_transactions,
             )?;
@@ -1309,7 +1326,7 @@ mod tests {
 
         assert_eq!(
             result,
-            BlockComputationResult::RebootNeeded,
+            BlockInProgressComputationResult::RebootNeeded,
             "Should have asked for a reboot"
         );
         // block in progress should not have registered any gas or ticks

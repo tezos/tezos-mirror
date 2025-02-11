@@ -8,6 +8,9 @@
 
 ### Internal
 
+- Rework block production to simplify data flow and remove unnecessary
+  IO. (!16661 !16684 !16685)
+
 ## Next proposal
 
 This is a release candidate for a kernel upgrade proposal.
