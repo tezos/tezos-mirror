@@ -10,8 +10,8 @@ open Agnostic_baker_errors
 type baker = {
   protocol_hash : Protocol_hash.t;
   binary_path : string;
-  process : unit Lwt_process_watchdog.t;
-  ccid : Lwt_exit.clean_up_callback_id;
+  thread : int Lwt.t;
+  canceller : int Lwt.u;
 }
 
 module type BAKER = sig
@@ -52,7 +52,8 @@ module MakeBaker (Name : Lwt_process_watchdog.NAME) : BAKER = struct
   let shutdown baker =
     let open Lwt_syntax in
     let* () = Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash in
-    Watchdog.stop baker.process
+    Lwt.wakeup baker.canceller 0 ;
+    return_unit
 
   (** [spawn_baker protocol_hash ~binaries_directory ~baker_args] spawns a baker
       for the given [protocol_hash] using the [~binaries_directory] as path for
@@ -72,27 +73,20 @@ module MakeBaker (Name : Lwt_process_watchdog.NAME) : BAKER = struct
     in
     let binary_path = baker_path ?user_path:binaries_directory protocol_hash in
     let baker_args = binary_path :: baker_args in
-    let baker_args = Array.of_list baker_args in
-    let w =
-      Lwt_process_watchdog.create
-        ~parameters:()
-        ~parameters_encoding:Data_encoding.unit
+    let _baker_args = Array.of_list baker_args in
+    (* TODO: Use baker_args in agnostic baker plugin. *)
+    let cancel_promise, canceller = Lwt.wait () in
+    let* thread =
+      match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
+      | Some (module Agnostic_baker_plugin) ->
+          return @@ Agnostic_baker_plugin.run_baker_binary ~cancel_promise
+      | None ->
+          tzfail
+            (Missing_agnostic_baker_plugin
+               (Protocol_hash.to_short_b58check protocol_hash))
     in
-    let run_process =
-      Watchdog.run_process w ~binary_path ~arguments:baker_args
-    in
-    let* new_baker = run_process () in
-    let _ = Watchdog.watch_dog ~start_new_server:run_process new_baker in
     let*! () = Agnostic_baker_events.(emit baker_running) protocol_hash in
-    let ccid =
-      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-          let*! () =
-            Agnostic_baker_events.(emit stopping_baker) protocol_hash
-          in
-          let*! () = Watchdog.stop new_baker in
-          Lwt.return_unit)
-    in
-    return {protocol_hash; binary_path; process = new_baker; ccid}
+    return {protocol_hash; binary_path; thread; canceller}
 end
 
 type baker_instance = Baker : (module BAKER) -> baker_instance
@@ -153,7 +147,6 @@ let hot_swap_baker ~state ~next_protocol_hash =
   (* Shutdown previous baker *)
   let*! () =
     let*! () = CurrentBaker.shutdown current_baker in
-    let () = Lwt_exit.unregister_clean_up_callback current_baker.ccid in
     state.current_baker <- None ;
     Lwt.return_unit
   in
