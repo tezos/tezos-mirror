@@ -69,7 +69,21 @@ let indexes_to_delegates =
         indexes)
     IntMap.empty
 
-(** Check various accusation operation injection scenarios. *)
+(** This function checks various accusation operation injection scenarios.
+
+    The simplest scenario, when all optional arguments are not given, is as
+    follows:
+    1. Bake two blocks (because of #7686, see below).
+    2. Bake a block that publishes a slot.
+    3. Bake [lag - 1] blocks.
+    4. Build an attestation.
+    5. Bake one block before accusing.
+    6. Retrieve traps and build an accusation.
+    7. Bake a block with the accusation.
+
+    This scenario varies slightly depending on the optional arguments. For their
+    use, look first at the relevant tests.
+*)
 let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     ?(publish_slot = true) ?(with_dal_content = true) ?(attest_slot = true)
     ?(inclusion_time = Now) ?(not_trap = false) ?(wrong_owner = false)
@@ -136,16 +150,27 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
           Int32.(
             rem (sub blocks_per_cycle (of_int lag)) blocks_per_cycle |> to_int)
     in
+    Log.info "1. Bake %d blocks" blocks_to_bake ;
     Block.bake_n blocks_to_bake genesis
   in
+
   let slot_header =
     Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
   in
   let* op = Op.dal_publish_commitment (B genesis) contract slot_header in
   let* blk =
-    if publish_slot then Block.bake blk ~operation:op else Block.bake blk
+    if publish_slot then (
+      Log.info "2. Bake a block with a publish operation" ;
+      Block.bake blk ~operation:op)
+    else (
+      Log.info "2. Bake a block without a publish operation" ;
+      Block.bake blk)
   in
+
+  Log.info "3. Bake 'attestation_lag - 1' blocks" ;
   let* blk = Block.bake_n (lag - 1) blk in
+
+  Log.info "4. Build an attestation" ;
   (match inclusion_time with
   | Now -> ()
   | _ ->
@@ -179,6 +204,24 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   in
   let* attestation = Op.raw_attestation blk ~delegate ?dal_content in
   let attestation_level = blk.header.shell.level in
+
+  let* blk =
+    let blocks_to_bake =
+      let position = Block.cycle_position blk |> Int32.to_int in
+      let blocks_per_cycle = blk.constants.blocks_per_cycle |> Int32.to_int in
+      match inclusion_time with
+      | Now ->
+          (* bake one block such that accusation level is different from the
+             attestation level; though this does not really matter *)
+          1
+      | Last_valid -> (2 * blocks_per_cycle) - 2 - position
+      | First_invalid -> (2 * blocks_per_cycle) - 1 - position
+    in
+    Log.info "5. Bake %d blocks before including an accusation" blocks_to_bake ;
+    Block.bake_n blocks_to_bake blk
+  in
+
+  Log.info "6. Retrieve traps and build accusation" ;
   let shard_with_proof =
     let owner =
       if wrong_owner then (
@@ -205,18 +248,8 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   let accusation =
     Op.dal_entrapment (B blk) attestation slot_index shard_with_proof
   in
-  let position = Block.cycle_position blk |> Int32.to_int in
-  let blocks_to_bake =
-    let blocks_per_cycle = blk.constants.blocks_per_cycle |> Int32.to_int in
-    match inclusion_time with
-    | Now ->
-        (* bake one block such that accusation level is different from the
-           attestation level; though this does not really matter *)
-        1
-    | Last_valid -> (2 * blocks_per_cycle) - 2 - position
-    | First_invalid -> (2 * blocks_per_cycle) - 1 - position
-  in
-  let* blk = Block.bake_n blocks_to_bake blk in
+
+  Log.info "7. Bake a block with the accusation" ;
   let* blk =
     match expect_failure with
     | None -> Block.bake ~operation:accusation blk
