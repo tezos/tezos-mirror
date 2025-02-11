@@ -404,4 +404,15 @@ mod tests {
         assert!(!outcome.is_success());
         assert!(outcome.logs.is_empty());
     }
+
+    #[test]
+    fn bridge_deposit_event_log_consistent() {
+        let deposit = dummy_deposit();
+        let log = deposit.event_log();
+        let expected_log = hex::decode("0000000000000000000000000000000000000000000000000000000000000001\
+                                        0000000000000000000000000202020202020202020202020202020202020202\
+                                        0000000000000000000000000000000000000000000000000000000000000003\
+                                        0000000000000000000000000000000000000000000000000000000000000004").unwrap();
+        assert_eq!(expected_log, log.data)
+    }
 }
