@@ -309,24 +309,6 @@ apt_repo_debian:
     - stuck_or_timeout_failure
     - runner_system_failure
 
-oc.lintian_debian:
-  image: debian:bookworm
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - oc.build-debian
-  dependencies:
-  - oc.build-debian
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/version.sh
-  - export DEBIAN_FRONTEND=noninteractive
-  - apt-get update
-  - apt-get install lintian -y
-  script:
-  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
-
 oc.install_bin_debian_bookworm_current:
   image: debian:bookworm
   stage: publishing_tests
@@ -344,6 +326,24 @@ oc.install_bin_debian_bookworm_current:
     when:
     - stuck_or_timeout_failure
     - runner_system_failure
+
+oc.lintian_debian:
+  image: debian:bookworm
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian -y
+  script:
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
 
 oc.install_bin_debian_bookworm:
   image: debian:bookworm

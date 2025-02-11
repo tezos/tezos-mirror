@@ -403,12 +403,6 @@ let jobs pipeline_type =
     (* in merge pipelines we tests only debian. release pipelines
        test the entire matrix *)
     [
-      job_lintian
-        ~__POS__
-        ~name:"oc.lintian_ubuntu"
-        ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
-        ~image:Images.ubuntu_noble
-        ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_noble_current"
@@ -421,6 +415,18 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
+    ]
+  in
+  let test_ubuntu_packages_jobs =
+    (* in merge pipelines we tests only debian. release pipelines
+       test the entire matrix *)
+    [
+      job_lintian
+        ~__POS__
+        ~name:"oc.lintian_ubuntu"
+        ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
+        ~image:Images.ubuntu_noble
+        ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble"];
       job_upgrade_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_jammy"
@@ -432,18 +438,22 @@ let jobs pipeline_type =
   in
   let test_current_debian_packages_jobs =
     [
-      job_lintian
-        ~__POS__
-        ~name:"oc.lintian_debian"
-        ~dependencies:(Dependent [Artifacts job_build_debian_package])
-        ~image:Images.debian_bookworm
-        ["./scripts/ci/lintian_debian_packages.sh debian bookworm"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_current"
         ~dependencies:(Dependent [Job job_apt_repo_debian_current])
         ~image:Images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
+    ]
+  in
+  let test_debian_packages_jobs =
+    [
+      job_lintian
+        ~__POS__
+        ~name:"oc.lintian_debian"
+        ~dependencies:(Dependent [Artifacts job_build_debian_package])
+        ~image:Images.debian_bookworm
+        ["./scripts/ci/lintian_debian_packages.sh debian bookworm"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm"
@@ -506,7 +516,7 @@ let jobs pipeline_type =
   match pipeline_type with
   | Partial ->
       ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
-        @ test_current_debian_packages_jobs,
+        @ test_current_debian_packages_jobs @ test_debian_packages_jobs,
         job_build_ubuntu_package_current_a,
         job_build_debian_package_current_a,
         job_build_ubuntu_package_current_b,
@@ -514,7 +524,8 @@ let jobs pipeline_type =
   | Full ->
       ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
         @ ubuntu_jobs @ test_current_debian_packages_jobs
-        @ test_current_ubuntu_packages_jobs,
+        @ test_debian_packages_jobs @ test_current_ubuntu_packages_jobs
+        @ test_ubuntu_packages_jobs,
         job_build_ubuntu_package_current_a,
         job_build_debian_package_current_a,
         job_build_ubuntu_package_current_b,
