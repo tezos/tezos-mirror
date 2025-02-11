@@ -224,14 +224,14 @@ let create_connection t p2p_conn id_point point_info peer_info
   let* () =
     (* DISCLAIMER: A similar check is also performed in [P2p_worker] before
        running the maintenance. Thus, it is important that both conditionals
-       be identical to maintain the maintainance triggering consitency.
+       be identical to maintain the maintenance triggering consistency.
        If this comparison needs to be updated for some reason (for example
        from a strict to a non strict one), please, consider updating also
        the [P2p_worker]. *)
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5291
        Improve invariant stability using a better encapsulation. *)
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5294
-       Stop triggering the maintainance while performing a connection swap. *)
+       Stop triggering the maintenance while performing a connection swap. *)
     if t.config.max_connections < P2p_pool.active_connections t.pool then (
       P2p_trigger.broadcast_too_many_connections t.triggers ;
       Events.(emit trigger_maintenance_too_many_connections)
@@ -734,6 +734,7 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                   ~timestamp
                   t.config.reconnection_config
                   point_info ;
+
                 match err with
                 | `Unexpected_error ex ->
                     let*! () =
