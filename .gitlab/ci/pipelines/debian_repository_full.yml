@@ -143,7 +143,7 @@ oc.build-debian:
       - gcp
       - gcp_arm64
 
-oc.build-debian-current_a:
+oc.build-debian-old_a:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
@@ -161,7 +161,7 @@ oc.build-debian-current_a:
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages_current.sh A
+  - ./scripts/ci/build-debian-packages_old.sh A
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -189,7 +189,7 @@ oc.build-debian-current_a:
       - gcp
       - gcp_arm64
 
-oc.build-debian-current_b:
+oc.build-debian-old_b:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
@@ -207,7 +207,7 @@ oc.build-debian-current_b:
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages_current.sh B
+  - ./scripts/ci/build-debian-packages_old.sh B
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -258,17 +258,17 @@ oc.build-data_packages:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
 
-apt_repo_debian_current:
+apt_repo_debian_old:
   image: debian:bookworm
   stage: publishing
   tags:
   - gcp
   needs:
-  - oc.build-debian-current_a
-  - oc.build-debian-current_b
+  - oc.build-debian-old_a
+  - oc.build-debian-old_b
   dependencies:
-  - oc.build-debian-current_a
-  - oc.build-debian-current_b
+  - oc.build-debian-old_a
+  - oc.build-debian-old_b
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
@@ -399,7 +399,7 @@ oc.build-ubuntu:
       - gcp
       - gcp_arm64
 
-oc.build-ubuntu-current_a:
+oc.build-ubuntu-old_a:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
@@ -417,7 +417,7 @@ oc.build-ubuntu-current_a:
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages_current.sh A
+  - ./scripts/ci/build-debian-packages_old.sh A
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -445,7 +445,7 @@ oc.build-ubuntu-current_a:
       - gcp
       - gcp_arm64
 
-oc.build-ubuntu-current_b:
+oc.build-ubuntu-old_b:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
@@ -463,7 +463,7 @@ oc.build-ubuntu-current_b:
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages_current.sh B
+  - ./scripts/ci/build-debian-packages_old.sh B
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -491,17 +491,17 @@ oc.build-ubuntu-current_b:
       - gcp
       - gcp_arm64
 
-apt_repo_ubuntu_current:
+apt_repo_ubuntu_old:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publishing
   tags:
   - gcp
   needs:
-  - oc.build-ubuntu-current_a
-  - oc.build-ubuntu-current_b
+  - oc.build-ubuntu-old_a
+  - oc.build-ubuntu-old_b
   dependencies:
-  - oc.build-ubuntu-current_a
-  - oc.build-ubuntu-current_b
+  - oc.build-ubuntu-old_a
+  - oc.build-ubuntu-old_b
   timeout: 60 minutes
   before_script:
   - . ./scripts/version.sh
@@ -597,7 +597,7 @@ oc.upgrade_bin_debian_bookworm:
   tags:
   - gcp
   needs:
-  - apt_repo_debian_current
+  - apt_repo_debian_old
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
@@ -692,7 +692,7 @@ oc.upgrade_bin_ubuntu_jammy:
   tags:
   - gcp
   needs:
-  - apt_repo_ubuntu_current
+  - apt_repo_ubuntu_old
   - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes

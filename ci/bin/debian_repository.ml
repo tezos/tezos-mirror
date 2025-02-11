@@ -8,7 +8,7 @@
 (* This module defines the jobs of the [debian_repository] child
    pipeline.
 
-   This pipeline builds the current and old Debian (and Ubuntu)
+   This pipeline builds the old and old Debian (and Ubuntu)
    packages. *)
 
 open Gitlab_ci.Types
@@ -188,49 +188,49 @@ let jobs pipeline_type =
     |> enable_sccache ~idle_timeout:"0"
   in
 
-  (* These jobs build the current packages in a matrix using the
+  (* These jobs build the old packages in a matrix using the
      build dependencies images *)
-  let job_build_debian_package_current_a : tezos_job =
+  let job_build_debian_package_old_a : tezos_job =
     make_job_build_debian_packages
       ~__POS__
-      ~name:"oc.build-debian-current_a"
+      ~name:"oc.build-debian-old_a"
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_current.sh A"
+      ~script:"./scripts/ci/build-debian-packages_old.sh A"
       ~matrix:(debian_package_release_matrix pipeline_type)
       ~timeout:(Minutes 90)
       ()
   in
-  let job_build_ubuntu_package_current_a : tezos_job =
+  let job_build_ubuntu_package_old_a : tezos_job =
     make_job_build_debian_packages
       ~__POS__
-      ~name:"oc.build-ubuntu-current_a"
+      ~name:"oc.build-ubuntu-old_a"
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_current.sh A"
+      ~script:"./scripts/ci/build-debian-packages_old.sh A"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
       ~timeout:(Minutes 90)
       ()
   in
 
-  let job_build_debian_package_current_b : tezos_job =
+  let job_build_debian_package_old_b : tezos_job =
     make_job_build_debian_packages
       ~__POS__
-      ~name:"oc.build-debian-current_b"
+      ~name:"oc.build-debian-old_b"
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_current.sh B"
+      ~script:"./scripts/ci/build-debian-packages_old.sh B"
       ~matrix:(debian_package_release_matrix pipeline_type)
       ~timeout:(Minutes 90)
       ()
   in
-  let job_build_ubuntu_package_current_b : tezos_job =
+  let job_build_ubuntu_package_old_b : tezos_job =
     make_job_build_debian_packages
       ~__POS__
-      ~name:"oc.build-ubuntu-current_b"
+      ~name:"oc.build-ubuntu-old_b"
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_current.sh B"
+      ~script:"./scripts/ci/build-debian-packages_old.sh B"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
       ~timeout:(Minutes 90)
       ()
@@ -279,31 +279,31 @@ let jobs pipeline_type =
       ()
   in
 
-  (* These jobs create the apt repository for the current packages *)
-  let job_apt_repo_debian_current =
+  (* These jobs create the apt repository for the old packages *)
+  let job_apt_repo_debian_old =
     make_job_apt_repo
       ~__POS__
-      ~name:"apt_repo_debian_current"
+      ~name:"apt_repo_debian_old"
       ~dependencies:
         (Dependent
            [
-             Artifacts job_build_debian_package_current_a;
-             Artifacts job_build_debian_package_current_b;
+             Artifacts job_build_debian_package_old_a;
+             Artifacts job_build_debian_package_old_b;
            ])
       ~prefix:"old"
       ~variables:(archs_variables pipeline_type)
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
-  let job_apt_repo_ubuntu_current =
+  let job_apt_repo_ubuntu_old =
     make_job_apt_repo
       ~__POS__
-      ~name:"apt_repo_ubuntu_current"
+      ~name:"apt_repo_ubuntu_old"
       ~dependencies:
         (Dependent
            [
-             Artifacts job_build_ubuntu_package_current_a;
-             Artifacts job_build_ubuntu_package_current_b;
+             Artifacts job_build_ubuntu_package_old_a;
+             Artifacts job_build_ubuntu_package_old_b;
            ])
       ~prefix:"old"
       ~variables:(archs_variables pipeline_type)
@@ -341,7 +341,7 @@ let jobs pipeline_type =
       ~image:Images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
-  (* These test the installability of the current packages *)
+  (* These test the installability of the old packages *)
   let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
       ?allow_failure ?before_script script =
     job
@@ -429,7 +429,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_jammy"
         ~dependencies:
-          (Dependent [Job job_apt_repo_ubuntu_current; Job job_apt_repo_ubuntu])
+          (Dependent [Job job_apt_repo_ubuntu_old; Job job_apt_repo_ubuntu])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/upgrade-bin-deb.sh ubuntu jammy"];
     ]
@@ -453,7 +453,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.upgrade_bin_debian_bookworm"
         ~dependencies:
-          (Dependent [Job job_apt_repo_debian_current; Job job_apt_repo_debian])
+          (Dependent [Job job_apt_repo_debian_old; Job job_apt_repo_debian])
         ~image:Images.debian_bookworm
         ["./docs/introduction/upgrade-bin-deb.sh debian bookworm"];
       job_install_systemd_bin
@@ -484,10 +484,10 @@ let jobs pipeline_type =
     [
       job_docker_build_debian_dependencies;
       job_build_debian_package;
-      job_build_debian_package_current_a;
-      job_build_debian_package_current_b;
+      job_build_debian_package_old_a;
+      job_build_debian_package_old_b;
       job_build_data_packages;
-      job_apt_repo_debian_current;
+      job_apt_repo_debian_old;
       job_apt_repo_debian;
     ]
   in
@@ -495,9 +495,9 @@ let jobs pipeline_type =
     [
       job_docker_build_ubuntu_dependencies;
       job_build_ubuntu_package;
-      job_build_ubuntu_package_current_a;
-      job_build_ubuntu_package_current_b;
-      job_apt_repo_ubuntu_current;
+      job_build_ubuntu_package_old_a;
+      job_build_ubuntu_package_old_b;
+      job_apt_repo_ubuntu_old;
       job_apt_repo_ubuntu;
     ]
   in
@@ -505,23 +505,23 @@ let jobs pipeline_type =
   | Partial ->
       ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
         @ test_debian_packages_jobs,
-        job_build_ubuntu_package_current_a,
-        job_build_debian_package_current_a,
-        job_build_ubuntu_package_current_b,
-        job_build_debian_package_current_b )
+        job_build_ubuntu_package_old_a,
+        job_build_debian_package_old_a,
+        job_build_ubuntu_package_old_b,
+        job_build_debian_package_old_b )
   | Full ->
       ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
         @ ubuntu_jobs @ test_debian_packages_jobs @ test_ubuntu_packages_jobs,
-        job_build_ubuntu_package_current_a,
-        job_build_debian_package_current_a,
-        job_build_ubuntu_package_current_b,
-        job_build_debian_package_current_b )
+        job_build_ubuntu_package_old_a,
+        job_build_debian_package_old_a,
+        job_build_ubuntu_package_old_b,
+        job_build_debian_package_old_b )
   | Release ->
       ( debian_jobs @ ubuntu_jobs,
-        job_build_ubuntu_package_current_a,
-        job_build_debian_package_current_a,
-        job_build_ubuntu_package_current_b,
-        job_build_debian_package_current_b )
+        job_build_ubuntu_package_old_a,
+        job_build_debian_package_old_a,
+        job_build_ubuntu_package_old_b,
+        job_build_debian_package_old_b )
 
 let register ~auto ~description pipeline_type =
   let pipeline_name =
