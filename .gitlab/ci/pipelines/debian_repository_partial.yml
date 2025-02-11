@@ -310,25 +310,6 @@ apt_repo_debian:
     - stuck_or_timeout_failure
     - runner_system_failure
 
-oc.install_bin_debian_bookworm_current:
-  image: debian:bookworm
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian_current
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - ./docs/introduction/install-bin-deb.sh debian bookworm
-  variables:
-    PREFIX: old
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
-
 oc.lintian_debian:
   image: debian:bookworm
   stage: publishing_tests

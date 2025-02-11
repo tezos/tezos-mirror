@@ -401,26 +401,6 @@ let jobs pipeline_type =
       ~stage:Stages.publishing_tests
       script
   in
-  let test_current_ubuntu_packages_jobs =
-    (* in merge pipelines we tests only debian. release pipelines
-       test the entire matrix *)
-    [
-      job_install_bin
-        ~__POS__
-        ~name:"oc.install_bin_ubuntu_noble_current"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
-        ~variables:[("PREFIX", "old")]
-        ~image:Images.ubuntu_noble
-        ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
-      job_install_bin
-        ~__POS__
-        ~name:"oc.install_bin_ubuntu_jammy_current"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
-        ~variables:[("PREFIX", "old")]
-        ~image:Images.ubuntu_jammy
-        ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
-    ]
-  in
   let test_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. release pipelines
        test the entire matrix *)
@@ -438,17 +418,6 @@ let jobs pipeline_type =
           (Dependent [Job job_apt_repo_ubuntu_current; Job job_apt_repo_ubuntu])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/upgrade-bin-deb.sh ubuntu jammy"];
-    ]
-  in
-  let test_current_debian_packages_jobs =
-    [
-      job_install_bin
-        ~__POS__
-        ~name:"oc.install_bin_debian_bookworm_current"
-        ~dependencies:(Dependent [Job job_apt_repo_debian_current])
-        ~variables:[("PREFIX", "old")]
-        ~image:Images.debian_bookworm
-        ["./docs/introduction/install-bin-deb.sh debian bookworm"];
     ]
   in
   let test_debian_packages_jobs =
@@ -521,16 +490,14 @@ let jobs pipeline_type =
   match pipeline_type with
   | Partial ->
       ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
-        @ test_current_debian_packages_jobs @ test_debian_packages_jobs,
+        @ test_debian_packages_jobs,
         job_build_ubuntu_package_current_a,
         job_build_debian_package_current_a,
         job_build_ubuntu_package_current_b,
         job_build_debian_package_current_b )
   | Full ->
       ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
-        @ ubuntu_jobs @ test_current_debian_packages_jobs
-        @ test_debian_packages_jobs @ test_current_ubuntu_packages_jobs
-        @ test_ubuntu_packages_jobs,
+        @ ubuntu_jobs @ test_debian_packages_jobs @ test_ubuntu_packages_jobs,
         job_build_ubuntu_package_current_a,
         job_build_debian_package_current_a,
         job_build_ubuntu_package_current_b,
