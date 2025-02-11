@@ -70,6 +70,38 @@ dal-deps.dot: manifest
 		--dep-graph-source src/bin_dal_node \
 		--dep-graph-without src/proto_0)
 
+opam-deps.dot: manifest
+	(cd .. && manifest/manifest --opam-dep-graph manifest/$@ \
+		--dep-graph-without octez-protocol-0 \
+		--dep-graph-without tezos-protocol-0)
+
+l1-opam-deps.dot: manifest
+	(cd .. && manifest/manifest --opam-dep-graph manifest/$@ \
+		--dep-graph-source octez-node \
+		--dep-graph-source octez-client \
+		--dep-graph-source octez-baker- \
+		--dep-graph-source octez-accuser- \
+		--dep-graph-without octez-protocol-0 \
+		--dep-graph-without tezos-protocol-0)
+
+rollup-opam-deps.dot: manifest
+	(cd .. && manifest/manifest --opam-dep-graph manifest/$@ \
+		--dep-graph-source -rollup- \
+		--dep-graph-without octez-protocol-0 \
+		--dep-graph-without tezos-protocol-0)
+
+evm-opam-deps.dot: manifest
+	(cd .. && manifest/manifest --opam-dep-graph manifest/$@ \
+		--dep-graph-source -evm- \
+		--dep-graph-without octez-protocol-0 \
+		--dep-graph-without tezos-protocol-0)
+
+dal-opam-deps.dot: manifest
+	(cd .. && manifest/manifest --opam-dep-graph manifest/$@ \
+		--dep-graph-source -dal- \
+		--dep-graph-without octez-protocol-0 \
+		--dep-graph-without tezos-protocol-0)
+
 %.svg: %.dot
 	dot -Tsvg $^ > $@
 
