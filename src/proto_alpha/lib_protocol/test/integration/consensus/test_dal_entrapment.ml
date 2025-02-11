@@ -133,15 +133,37 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     | First_invalid -> (2 * blocks_per_cycle) - 1 - position
   in
   let* blk = Block.bake_n blocks_to_bake blk in
-  match expect_failure with
-  | None ->
-      let* _blk_final = Block.bake ~operation blk in
-      return_unit
-  | Some f ->
-      let expect_failure = f attestation_level in
+  let* blk =
+    match expect_failure with
+    | None -> Block.bake ~operation blk
+    | Some f ->
+        let expect_failure = f attestation_level in
+        let* ctxt = Incremental.begin_construction blk in
+        let* _ = Incremental.add_operation ctxt operation ~expect_failure in
+        Incremental.finalize_block ctxt
+  in
+  (* Re-include the accusation in the following cycle and check that it is
+     rejected as a duplicate. *)
+  match (inclusion_time, expect_failure) with
+  | Now, None ->
+      let expect_failure = function
+        | [
+            Environment.Ecoproto_error
+              (Validate_errors.Anonymous.Dal_already_denounced {level; _});
+          ]
+          when Raw_level.to_int32 level = attestation_level ->
+            Lwt_result_syntax.return_unit
+        | errs ->
+            Test.fail
+              ~__LOC__
+              "Error trace:@, %a does not match the expected one"
+              Error_monad.pp_print_trace
+              errs
+      in
       let* ctxt = Incremental.begin_construction blk in
       let* _ = Incremental.add_operation ctxt operation ~expect_failure in
       return_unit
+  | _ -> return_unit
 
 let test_invalid_accusation_too_close_to_migration =
   let expect_failure attestation_level = function
