@@ -8,7 +8,7 @@
 (* This module defines the jobs of the [debian_repository] child
    pipeline.
 
-   This pipeline builds the current and next Debian (and Ubuntu)
+   This pipeline builds the current and old Debian (and Ubuntu)
    packages. *)
 
 open Gitlab_ci.Types
@@ -57,11 +57,9 @@ let archs_variables pipeline =
 
 (* Push .deb artifacts to storagecloud apt repository. *)
 let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
-    ?(prefix = false) ?dependencies ~variables ~image script : tezos_job =
+    ?dependencies ~prefix ~variables ~image script : tezos_job =
   let variables =
-    variables
-    @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
-    @ if prefix then [("PREFIX", "next")] else []
+    variables @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")] @ [("PREFIX", prefix)]
   in
   job
     ?rules
@@ -258,7 +256,7 @@ let jobs pipeline_type =
         "./scripts/ci/build-debian-packages.sh zcash";
       ]
   in
-  (* These jobs build the next packages in a matrix using the
+  (* These jobs build the packages in a matrix using the
      build dependencies images *)
   let job_build_debian_package : tezos_job =
     make_job_build_debian_packages
@@ -292,6 +290,7 @@ let jobs pipeline_type =
              Artifacts job_build_debian_package_current_a;
              Artifacts job_build_debian_package_current_b;
            ])
+      ~prefix:"old"
       ~variables:(archs_variables pipeline_type)
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
@@ -306,16 +305,17 @@ let jobs pipeline_type =
              Artifacts job_build_ubuntu_package_current_a;
              Artifacts job_build_ubuntu_package_current_b;
            ])
+      ~prefix:"old"
       ~variables:(archs_variables pipeline_type)
       ~image:Images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
-  (* These jobs create the apt repository for the next packages *)
+  (* These jobs create the apt repository for the packages *)
   let job_apt_repo_debian =
     make_job_apt_repo
       ~__POS__
       ~name:"apt_repo_debian"
-      ~prefix:true
+      ~prefix:""
       ~dependencies:
         (Dependent
            [
@@ -330,7 +330,7 @@ let jobs pipeline_type =
     make_job_apt_repo
       ~__POS__
       ~name:"apt_repo_ubuntu"
-      ~prefix:true
+      ~prefix:""
       ~dependencies:
         (Dependent
            [
@@ -369,7 +369,8 @@ let jobs pipeline_type =
       script
   in
 
-  let job_lintian ~__POS__ ~name ~dependencies ~image ?allow_failure script =
+  let job_lintian ~__POS__ ~name ~dependencies ?(variables = []) ~image
+      ?allow_failure script =
     job
       ?allow_failure
       ~__POS__
@@ -377,6 +378,7 @@ let jobs pipeline_type =
       ~image
       ~dependencies
       ~stage:Stages.publishing_tests
+      ~variables
       ~before_script:
         (before_script
            ~source_version:true
@@ -387,7 +389,7 @@ let jobs pipeline_type =
            ])
       script
   in
-  (* These test the upgrade of the current packages *)
+  (* These test the upgrade from the old packages *)
   let job_upgrade_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
       =
     job
@@ -407,12 +409,14 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.install_bin_ubuntu_noble_current"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
+        ~variables:[("PREFIX", "old")]
         ~image:Images.ubuntu_noble
         ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_jammy_current"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu_current])
+        ~variables:[("PREFIX", "old")]
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
     ]
@@ -442,6 +446,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_current"
         ~dependencies:(Dependent [Job job_apt_repo_debian_current])
+        ~variables:[("PREFIX", "old")]
         ~image:Images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
     ]
@@ -458,7 +463,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm"
         ~dependencies:(Dependent [Job job_apt_repo_debian])
-        ~variables:[("PREFIX", "next")]
+        ~variables:[("PREFIX", "")]
         ~image:Images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
       job_upgrade_bin
@@ -481,7 +486,7 @@ let jobs pipeline_type =
           (variables
              ~kind:"systemd-tests"
              [
-               ("PREFIX", "next");
+               ("PREFIX", "");
                ("DISTRIBUTION", "debian");
                ("RELEASE", "bookworm");
              ])

@@ -485,6 +485,7 @@ apt_repo_debian_current:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: old
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -515,7 +516,7 @@ apt_repo_debian:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: next
+    PREFIX: ""
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -717,6 +718,7 @@ apt_repo_ubuntu_current:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: old
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -747,7 +749,7 @@ apt_repo_ubuntu:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: next
+    PREFIX: ""
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}

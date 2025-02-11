@@ -279,6 +279,7 @@ apt_repo_debian_current:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: old
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -309,7 +310,7 @@ apt_repo_debian:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: next
+    PREFIX: ""
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -511,6 +512,7 @@ apt_repo_ubuntu_current:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: old
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -541,7 +543,7 @@ apt_repo_ubuntu:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: next
+    PREFIX: ""
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -562,7 +564,8 @@ oc.install_bin_debian_bookworm_current:
   timeout: 60 minutes
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
-  variables: {}
+  variables:
+    PREFIX: old
   retry:
     max: 2
     when:
@@ -586,6 +589,7 @@ oc.lintian_debian:
   - apt-get install lintian -y
   script:
   - ./scripts/ci/lintian_debian_packages.sh debian bookworm
+  variables: {}
 
 oc.install_bin_debian_bookworm:
   image: debian:bookworm
@@ -599,7 +603,7 @@ oc.install_bin_debian_bookworm:
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
   variables:
-    PREFIX: next
+    PREFIX: ""
   retry:
     max: 2
     when:
@@ -640,7 +644,7 @@ oc.install_bin_debian_bookworm-systemd:
     FLAVOUR: systemd-tests
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    PREFIX: next
+    PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
 
@@ -655,7 +659,8 @@ oc.install_bin_ubuntu_noble_current:
   timeout: 60 minutes
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu noble
-  variables: {}
+  variables:
+    PREFIX: old
   retry:
     max: 2
     when:
@@ -673,7 +678,8 @@ oc.install_bin_ubuntu_jammy_current:
   timeout: 60 minutes
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy
-  variables: {}
+  variables:
+    PREFIX: old
   retry:
     max: 2
     when:
@@ -697,6 +703,7 @@ oc.lintian_ubuntu:
   - apt-get install lintian -y
   script:
   - ./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble
+  variables: {}
 
 oc.upgrade_bin_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
