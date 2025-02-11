@@ -402,8 +402,8 @@ let jobs pipeline_type =
       script
   in
   let test_ubuntu_packages_jobs =
-    (* in merge pipelines we tests only debian. release pipelines
-       test the entire matrix *)
+    (* in merge pipelines we tests only debian. ubuntu packages
+       are built and tested in the sheduled pipelines*)
     [
       job_lintian
         ~__POS__
@@ -411,6 +411,20 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
         ~image:Images.ubuntu_noble
         ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_ubunty_jammy"
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~variables:[("PREFIX", "")]
+        ~image:Images.debian_bookworm
+        ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
+      job_install_bin
+        ~__POS__
+        ~name:"oc.install_bin_ubunty_noble"
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~variables:[("PREFIX", "")]
+        ~image:Images.debian_bookworm
+        ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
       job_upgrade_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_jammy"
