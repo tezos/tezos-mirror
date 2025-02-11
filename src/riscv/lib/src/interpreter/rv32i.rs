@@ -217,38 +217,27 @@ where
         current_pc.wrapping_add(imm as u64)
     }
 
-    /// `BEQ` w.r.t. instruction width argument
-    #[inline(always)]
-    pub(super) fn run_beq_impl(
+    /// Performs a conditional ( `val(rs1) == val(rs2)` ) control transfer.
+    /// If condition met, the offset is sign-extended and added to the pc to form the branch
+    /// target address that is then set, otherwise indicates to proceed to the next instruction.
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - `BEQ`
+    /// - `C.BEQZ`
+    pub fn run_beq(
         &mut self,
         imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> ProgramCounterUpdate {
         let current_pc = self.pc.read();
 
-        // Branch if `val(rs1) == val(rs2)`, jumping `imm` bytes ahead.
-        // Otherwise, jump the width of current instruction
-        if self.xregisters.read(rs1) == self.xregisters.read(rs2) {
+        if self.xregisters.read_nz(rs1) == self.xregisters.read_nz(rs2) {
             ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
         } else {
             ProgramCounterUpdate::Next(width)
         }
-    }
-
-    /// `BEQ` B-type instruction
-    ///
-    /// Sets the target address if registers contain the same value,
-    /// otherwise proceeds to the next instruction address
-    pub fn run_beq(
-        &mut self,
-        imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
-        width: InstrWidth,
-    ) -> ProgramCounterUpdate {
-        self.run_beq_impl(imm, rs1, rs2, width)
     }
 
     /// `BNE` w.r.t. instruction width argument
@@ -498,6 +487,21 @@ mod tests {
         };
     }
 
+    macro_rules! test_nz_branch_instr {
+        ($state:ident, $branch_fn:tt, $imm:expr,
+            $rs1:ident, $r1_val:expr,
+            $rs2:ident, $r2_val:expr, $width:expr,
+            $init_pc:ident, $expected_pc:expr
+           ) => {
+            $state.pc.write($init_pc);
+            $state.xregisters.write($rs1, $r1_val);
+            $state.xregisters.write($rs2, $r2_val);
+
+            let new_pc = $state.$branch_fn($imm, nz::$rs1, nz::$rs2, $width);
+            prop_assert_eq!(&new_pc, $expected_pc);
+        };
+    }
+
     backend_test!(test_beq_bne, F, {
         proptest!(|(
             init_pc in any::<u64>(),
@@ -517,9 +521,9 @@ mod tests {
             let mut state = create_state!(HartState, F);
 
             // BEQ - different
-            test_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
             // BEQ - equal
-            test_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r1_val, width, init_pc, &branch_pcu);
+            test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r1_val, width, init_pc, &branch_pcu);
 
             // BNE - different
             test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r2_val, width, init_pc, &branch_pcu);
@@ -527,9 +531,9 @@ mod tests {
             test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
 
             // BEQ - different - imm = 0
-            test_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
             // BEQ - equal - imm = 0
-            test_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r1_val, width, init_pc, &init_pcu);
+            test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r1_val, width, init_pc, &init_pcu);
 
             // BNE - different - imm = 0
             test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r2_val, width, init_pc, &init_pcu);
@@ -537,9 +541,9 @@ mod tests {
             test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
 
             // BEQ - same register - imm = 0
-            test_branch_instr!(state, run_beq, 0, t1, r1_val, t1, r2_val, width, init_pc, &init_pcu);
+            test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t1, r2_val, width, init_pc, &init_pcu);
             // BEQ - same register
-            test_branch_instr!(state, run_beq, imm, t1, r1_val, t1, r2_val, width, init_pc, &branch_pcu);
+            test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t1, r2_val, width, init_pc, &branch_pcu);
 
             // BNE - same register - imm = 0
             test_branch_instr!(state, run_bne, 0, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);

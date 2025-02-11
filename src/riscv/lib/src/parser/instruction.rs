@@ -347,6 +347,8 @@ pub enum InstrCacheable {
     Sd(SBTypeArgs),
 
     // RV64I B-type instructions
+    /// `BEQ` - Sets the target address if registers contain the same value,
+    /// otherwise proceeds to the next instruction address.
     Beq(SBTypeArgs),
     Bne(SBTypeArgs),
     Blt(SBTypeArgs),
@@ -489,6 +491,9 @@ pub enum InstrCacheable {
     CJ(CJTypeArgs),
     CJr(CRJTypeArgs),
     CJalr(CRJTypeArgs),
+    /// `C.BEQZ` - Performs a conditional ( `val(rs1) == 0` ) control transfer.
+    /// The offset is sign-extended and added to the pc to form the branch
+    /// target address.
     CBeqz(CIBTypeArgs),
     CBnez(CIBTypeArgs),
     /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
