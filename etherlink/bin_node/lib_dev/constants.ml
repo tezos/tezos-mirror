@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Ethereum_types
-
 let supported_networks = Configuration.[Mainnet; Testnet]
 
 let network_name = function
@@ -14,8 +12,7 @@ let network_name = function
   | Testnet -> "Testnet"
 
 let chain_id network =
-  (match network with Configuration.Mainnet -> 0xa729 | Testnet -> 0x1f47b)
-  |> Z.of_int |> quantity_of_z
+  match Configuration.chain_id network with Chain_id x -> Ethereum_types.Qty x
 
 let rollup_address network =
   Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn

@@ -53,6 +53,10 @@ type rpc_server = Resto | Dream
 
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
+let chain_id network =
+  Ethereum_types.Chain_id
+    (Z.of_int (match network with Mainnet -> 0xa729 | Testnet -> 0x1f47b))
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;

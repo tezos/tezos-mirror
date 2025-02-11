@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Evm_node_lib_dev_encoding
+
 (** A list of network officially supported by the EVM node. *)
 type supported_network = Mainnet | Testnet
 
@@ -80,6 +82,8 @@ type rpc_server =
 
 (** Parameters for monitoring websocket connection heartbeats. *)
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
+
+val chain_id : supported_network -> Ethereum_types.chain_id
 
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
