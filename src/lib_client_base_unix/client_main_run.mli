@@ -97,3 +97,15 @@ val run :
     Client_config.cli_args ->
     Client_context.full Tezos_clic.command list tzresult Lwt.t) ->
   unit
+
+(** [lwt_run (module M) ~select_commands] sets up the main application
+    computation as an Lwt promise. Unlike [run], this function does not run
+    the event loop, it merely returns the wrapped promise to be integrated
+    into an existing Lwt-based application. *)
+val lwt_run :
+  (module M) ->
+  select_commands:
+    (RPC_client_unix.http_ctxt ->
+    Client_config.cli_args ->
+    Client_context.full Tezos_clic.command list tzresult Lwt.t) ->
+  int Lwt.t
