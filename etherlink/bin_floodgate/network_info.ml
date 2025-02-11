@@ -17,8 +17,9 @@ let get_chain_id ~evm_node_endpoint =
       ~evm_node_endpoint
       ()
   in
+  let (Chain_id mainnet_chain_id) = Configuration.chain_id Mainnet in
   let* () =
-    when_ (chain_id = Constants.chain_id Mainnet) @@ fun () ->
+    when_ (Ethereum_types.Qty.to_z chain_id = mainnet_chain_id) @@ fun () ->
     Lwt_result.ok (Floodgate_events.mainnet_experiment ())
   in
   return chain_id
