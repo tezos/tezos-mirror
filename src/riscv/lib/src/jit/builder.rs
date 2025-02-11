@@ -72,6 +72,14 @@ impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
         self.builder.ins().return_(&[]);
         self.builder.finalize();
     }
+
+    /// Clear the builder context on failure.
+    pub(super) fn fail(self) {
+        // On failure, the context must be cleared to ensure a clean context for the next
+        // block to be compiled. This is done via `finalize`, which internally clears the
+        // buffers to allow re-use.
+        self.builder.finalize();
+    }
 }
 
 impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> ICB for Builder<'a, ML, JSA> {
