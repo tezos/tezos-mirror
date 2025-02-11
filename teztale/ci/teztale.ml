@@ -13,7 +13,7 @@ module String_set = Set.Make (String)
 let changeset = Changeset.(make ["teztale/**/*"])
 
 (** Job that builds the Teztale executables *)
-let job_build ?rules () =
+let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) () =
   job
     ~__POS__
     ~name:"build_teztale"
@@ -23,7 +23,7 @@ let job_build ?rules () =
     ~artifacts:
       (artifacts
          ~name:"teztale-binaries"
-         ~expire_in:(Duration (Days 1))
+         ~expire_in
          ~when_:On_success
          ["octez-teztale-*"])
     ~before_script:
