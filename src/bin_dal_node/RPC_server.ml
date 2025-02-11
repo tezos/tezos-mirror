@@ -272,6 +272,9 @@ module Node = struct
   let get_last_processed_level ctxt () () =
     Node_context.get_store ctxt
     |> Store.last_processed_level |> Store.Last_processed_level.load
+
+  let get_protocol_parameters ctxt level () =
+    Node_context.get_proto_parameters ?level ctxt
 end
 
 module Profile_handlers = struct
@@ -780,6 +783,10 @@ let register :
        Tezos_rpc.Directory.opt_register0
        Services.get_last_processed_level
        (Node.get_last_processed_level ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.get_protocol_parameters
+       (Node.get_protocol_parameters ctxt)
 
 let register_plugin node_ctxt =
   let open Lwt_syntax in

@@ -137,6 +137,16 @@ val get_last_processed_level :
   ; query : unit >
   service
 
+(** Returns the protocol parameters as known by the DAL node. *)
+val get_protocol_parameters :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.proto_parameters
+  ; prefix : unit
+  ; params : unit
+  ; query : int32 option >
+  service
+
 (** Update the list of profiles tracked by the DAL node.
     Note that it does not take the bootstrap profile as it
     is incompatible with other profiles. *)

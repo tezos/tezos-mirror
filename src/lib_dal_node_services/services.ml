@@ -86,6 +86,11 @@ let all_query =
   |+ flag "all" (fun t -> t#all)
   |> seal
 
+let level_query =
+  let open Tezos_rpc in
+  let open Query in
+  query (fun level -> level) |+ opt_field "level" Arg.int32 (fun t -> t) |> seal
+
 (* Service declarations *)
 
 type 'rpc service =
@@ -257,6 +262,22 @@ let get_last_processed_level :
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.int32
     Tezos_rpc.Path.(open_root / "last_processed_level")
+
+let get_protocol_parameters :
+    < meth : [`GET]
+    ; input : unit
+    ; output : proto_parameters
+    ; prefix : unit
+    ; params : unit
+    ; query : int32 option >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Returns the protocol parameters as known by the DAL node. An optional \
+       'level' argument can specify for which level to retrieve them."
+    ~query:level_query
+    ~output:proto_parameters_encoding
+    Tezos_rpc.Path.(open_root / "protocol_parameters")
 
 let patch_profiles :
     < meth : [`PATCH]
