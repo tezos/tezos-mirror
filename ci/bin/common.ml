@@ -966,9 +966,8 @@ let job_container_scanning ~docker_image ~dockerfile_path : tezos_job =
         ("CS_DOCKERFILE_PATH", dockerfile_path);
       ]
     ~description:(Format.sprintf "Scanning image %s" docker_image)
-    ~artifacts:(artifacts ["scan.log"])
     ~git_strategy:Fetch
-    ["gtcs scan > scan.log"; "grep \"Vulnerability DB:\" -B2 -A4 scan.log"]
+    ["gtcs scan"]
 
 let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
   job
