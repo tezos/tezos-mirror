@@ -22,13 +22,62 @@ let commitment_and_proofs_cache = ref None
 
 type injection_time = Now | Last_valid | First_invalid
 
+module IntMap = Map.Make (Int)
+module PkhMap = Map.Make (Signature.Public_key_hash)
+
+let get_traps_and_non_traps ~traps_fraction shard_assignment shards_with_proofs
+    =
+  List.of_seq shards_with_proofs
+  |> List.fold_left
+       (fun map (shard, proof) ->
+         let pkh_opt =
+           IntMap.find shard.Tezos_crypto_dal.Cryptobox.index shard_assignment
+         in
+         match pkh_opt with
+         | None ->
+             Test.fail
+               ~__LOC__
+               "Did not find a delegate for shard index %d"
+               shard.index
+         | Some pkh -> (
+             let res =
+               Environment.Dal.share_is_trap pkh shard.share ~traps_fraction
+             in
+             match res with
+             | Ok b ->
+                 let shard_with_proof = Dal.Shard_with_proof.{shard; proof} in
+                 let traps, not_traps =
+                   match PkhMap.find_opt pkh map with
+                   | None -> ([], [])
+                   | Some v -> v
+                 in
+                 let traps, not_traps =
+                   if b then (shard_with_proof :: traps, not_traps)
+                   else (traps, shard_with_proof :: not_traps)
+                 in
+                 PkhMap.add pkh (traps, not_traps) map
+             | Error `Decoding_error ->
+                 Test.fail ~__LOC__ "Decoding error in [share_is_trap]"))
+       PkhMap.empty
+
+let indexes_to_delegates =
+  List.fold_left
+    (fun map Plugin.RPC.Dal.S.{delegate; indexes} ->
+      List.fold_left
+        (fun map index -> IntMap.add index delegate map)
+        map
+        indexes)
+    IntMap.empty
+
 (** Check various accusation operation injection scenarios. *)
 let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     ?(publish_slot = true) ?(with_dal_content = true) ?(attest_slot = true)
     ?(inclusion_time = Now) () =
   let open Lwt_result_syntax in
   let c = Default_parameters.constants_test in
-  let dal = {c.dal with incentives_enable = true; traps_fraction = Q.one} in
+  let dal =
+    {c.dal with incentives_enable = true; traps_fraction = Q.(1 // 2)}
+  in
   let cryptobox_parameters = dal.cryptobox_parameters in
   let number_of_slots = dal.number_of_slots in
   let lag = dal.attestation_lag in
@@ -116,9 +165,26 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   in
   let* attestation = Op.raw_attestation blk ?dal_content in
   let attestation_level = blk.header.shell.level in
-  let (shard, proof), _ = Seq.uncons shards_with_proofs |> Stdlib.Option.get in
-  let shard_with_proof = Dal.Shard_with_proof.{shard; proof} in
-  let operation =
+  let* shard_assignment = Context.Dal.shards (B blk) () in
+  let indexes_to_delegates = indexes_to_delegates shard_assignment in
+  let delegate_to_shards_map =
+    get_traps_and_non_traps
+      ~traps_fraction:blk.constants.dal.traps_fraction
+      indexes_to_delegates
+      shards_with_proofs
+  in
+  let _delegate, shard_with_proof =
+    match PkhMap.min_binding_opt delegate_to_shards_map with
+    | None -> Test.fail ~__LOC__ "Unexpected case: there are no delegates"
+    | Some (pkh, ([], _not_traps)) ->
+        Test.fail
+          ~__LOC__
+          "Unexpected case: there are no traps for delegate %a"
+          Signature.Public_key_hash.pp
+          pkh
+    | Some (pkh, (shard_with_proof :: _, _not_traps)) -> (pkh, shard_with_proof)
+  in
+  let accusation =
     Op.dal_entrapment (B blk) attestation slot_index shard_with_proof
   in
   let position = Block.cycle_position blk |> Int32.to_int in
@@ -135,11 +201,11 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   let* blk = Block.bake_n blocks_to_bake blk in
   let* blk =
     match expect_failure with
-    | None -> Block.bake ~operation blk
+    | None -> Block.bake ~operation:accusation blk
     | Some f ->
         let expect_failure = f attestation_level in
         let* ctxt = Incremental.begin_construction blk in
-        let* _ = Incremental.add_operation ctxt operation ~expect_failure in
+        let* _ = Incremental.add_operation ctxt accusation ~expect_failure in
         Incremental.finalize_block ctxt
   in
   (* Re-include the accusation in the following cycle and check that it is
@@ -161,7 +227,7 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
               errs
       in
       let* ctxt = Incremental.begin_construction blk in
-      let* _ = Incremental.add_operation ctxt operation ~expect_failure in
+      let* _ = Incremental.add_operation ctxt accusation ~expect_failure in
       return_unit
   | _ -> return_unit
 
