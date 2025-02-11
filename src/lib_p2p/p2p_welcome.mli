@@ -31,16 +31,11 @@
 (** Type of a welcome worker. *)
 type t
 
-(** [create ?reuse_port ?addr ~backlog pool port] returns a running welcome worker
+(** [create ?addr ~backlog pool port] returns a running welcome worker
     adding connections into [pool] listening on [addr:port]. [backlog]
     is passed to [Lwt_unix.listen]. No connections are accepted until
-    {!activate} is called.
-
-    [reuse_port] should be used for testing purposes. This option
-    sets [SO_REUSEPORT] on the socket, allowing to reuse a port opened
-    elsewhere. *)
+    {!activate} is called. *)
 val create :
-  ?reuse_port:bool ->
   ?addr:P2p_addr.t ->
   backlog:int ->
   ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
@@ -53,3 +48,18 @@ val activate : t -> unit
 (** [shutdown t] shutdowns [t] and returns when it has completed the
     shutdown. *)
 val shutdown : t -> unit Lwt.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** {!create} with an optional argument [reuse_port]. This option
+      sets [SO_REUSEPORT] on the socket, allowing to reuse a port
+      opened elsewhere. *)
+  val create :
+    ?reuse_port:bool ->
+    ?addr:P2p_addr.t ->
+    backlog:int ->
+    ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
+    P2p_addr.port ->
+    t tzresult Lwt.t
+end

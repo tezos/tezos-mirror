@@ -273,7 +273,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               trusted_points
           in
           let* welcome =
-            P2p_welcome.create
+            P2p_welcome.Internal_for_tests.create
               ~reuse_port:true
               ~backlog:10
               connect_handler
