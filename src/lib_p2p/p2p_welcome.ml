@@ -32,46 +32,59 @@ type connect_handler =
 
 type state = {socket : Lwt_unix.file_descr; connect_handler : connect_handler}
 
+(* This worker must not be parallelized. The worker loops on {!P2p_fd.accept}
+   then checks if not too many file descriptors are opened. If multiple
+   {!P2p_fd.accept} are ran in parallel, we may crash because of too many opened
+   file descriptors.
+
+   Therefore we declare at toplevel a mutex, that prevents concurrent [accept]. *)
+let accept_lock = Lwt_mutex.create ()
+
 let accept st =
   let open Lwt_syntax in
   let (Connect_handler connect_handler) = st.connect_handler in
   let* () = Lwt.pause () in
-  protect @@ fun () ->
-  let* r = P2p_fd.accept st.socket in
-  Result.fold
-    ~ok:(fun (fd, addr) ->
-      let point =
-        match addr with
-        | Lwt_unix.ADDR_UNIX _ -> assert false
-        | Lwt_unix.ADDR_INET (addr, port) ->
-            (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
-      in
-      P2p_fd.set_point ~point fd ;
-      P2p_connect_handler.accept connect_handler fd point ;
-      Lwt.return_ok ())
-    ~error:(function
-      (* These are temporary system errors, giving some time for
-         the system to recover *)
-      | `System_error ex ->
-          let* () =
-            Events.(emit incoming_error)
-              (TzTrace.make (error_of_exn ex), "system")
-          in
-          let* () = Lwt_unix.sleep 5. in
-          Lwt.return_ok ()
-      (* These errors are specific to attempted incoming connection,
-         ignoring them. *)
-      | `Socket_error ex ->
-          let* () =
-            Events.(emit incoming_error)
-              (TzTrace.make (error_of_exn ex), "socket")
-          in
-          Lwt.return (Ok ())
-      | `Unexpected_error ex ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
-             Losing some information here... *)
-          Lwt.return_error (TzTrace.make (error_of_exn ex)))
-    r
+  let* () = Lwt_mutex.lock accept_lock in
+  let* res =
+    protect @@ fun () ->
+    let* r = P2p_fd.accept st.socket in
+    Result.fold
+      ~ok:(fun (fd, addr) ->
+        let point =
+          match addr with
+          | Lwt_unix.ADDR_UNIX _ -> assert false
+          | Lwt_unix.ADDR_INET (addr, port) ->
+              (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
+        in
+        P2p_fd.set_point ~point fd ;
+        P2p_connect_handler.accept connect_handler fd point ;
+        Lwt.return_ok ())
+      ~error:(function
+        (* These are temporary system errors, giving some time for
+           the system to recover *)
+        | `System_error ex ->
+            let* () =
+              Events.(emit incoming_error)
+                (TzTrace.make (error_of_exn ex), "system")
+            in
+            let* () = Lwt_unix.sleep 5. in
+            Lwt.return_ok ()
+        (* These errors are specific to attempted incoming connection,
+           ignoring them. *)
+        | `Socket_error ex ->
+            let* () =
+              Events.(emit incoming_error)
+                (TzTrace.make (error_of_exn ex), "socket")
+            in
+            Lwt.return (Ok ())
+        | `Unexpected_error ex ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+               Losing some information here... *)
+            Lwt.return_error (TzTrace.make (error_of_exn ex)))
+      r
+  in
+  Lwt_mutex.unlock accept_lock ;
+  return res
 
 module Name = P2p_workers.UniqueNameMaker (struct
   let base = ["p2p"; "welcome"]
