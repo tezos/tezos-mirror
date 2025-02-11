@@ -325,3 +325,5 @@ Protocol
 
 Miscellaneous
 -------------
+
+- Renamed ``Bls`` file from the crypto library in ``Bls_aug.ml``. (MR :gl:`!16683`).
