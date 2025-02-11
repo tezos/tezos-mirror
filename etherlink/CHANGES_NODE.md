@@ -11,7 +11,7 @@
 - Fixes a performance regression in the RPCs of the new block storage backend.
   (!16659)
 - Fixes transaction objects returned by the RPCs for non-legacy transactions
-  (!16653)
+  (!16653 !16654)
 
 ### Internals
 

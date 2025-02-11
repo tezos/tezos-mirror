@@ -512,7 +512,71 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
       include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
     end)
-  else (module Backend)
+  else
+    (module struct
+      include Backend
+
+      module Block_storage = struct
+        (* Current block number is kept in durable storage. *)
+        let current_block_number = Block_storage.current_block_number
+
+        let with_blueprint ~default level k =
+          let open Lwt_result_syntax in
+          let* blueprint =
+            Evm_store.(use ctxt.store @@ fun conn -> Blueprints.find conn level)
+          in
+          match blueprint with
+          | None -> return default
+          | Some blueprint -> k blueprint
+
+        let nth_block ~full_transaction_object level =
+          let open Lwt_result_syntax in
+          let* block = Block_storage.nth_block ~full_transaction_object level in
+          if full_transaction_object then
+            with_blueprint ~default:block block.number @@ fun blueprint ->
+            Lwt.return
+              (Transaction_object.rereconstruct_block blueprint.payload block)
+          else
+            (* [full_transaction_object] being false, we just return hashes, no
+               need to try to reconstruct the transaction objects. *)
+            return block
+
+        let block_by_hash ~full_transaction_object hash =
+          let open Lwt_result_syntax in
+          let* block =
+            Block_storage.block_by_hash ~full_transaction_object hash
+          in
+          if full_transaction_object then
+            with_blueprint ~default:block block.number @@ fun blueprint ->
+            Lwt.return
+              (Transaction_object.rereconstruct_block blueprint.payload block)
+          else
+            (* [full_transaction_object] being false, we just return hashes, no
+               need to try to reconstruct the transaction objects. *)
+            return block
+
+        let block_receipts = Block_storage.block_receipts
+
+        let transaction_receipt = Block_storage.transaction_receipt
+
+        let transaction_object hash =
+          let open Lwt_result_syntax in
+          let* obj = Block_storage.transaction_object hash in
+          match obj with
+          | Some obj -> (
+              match Transaction_object.block_number obj with
+              | Some level ->
+                  with_blueprint ~default:(Some obj) level @@ fun blueprint ->
+                  let*? obj =
+                    Transaction_object.rereconstruct blueprint.payload obj
+                  in
+                  return_some obj
+              | None -> return_some obj)
+          | None -> return_none
+      end
+
+      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+    end)
 
 let next_blueprint_number ctxt =
   let open Lwt_result_syntax in
