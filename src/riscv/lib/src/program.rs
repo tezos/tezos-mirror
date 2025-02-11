@@ -20,6 +20,9 @@ pub struct Program<'a, ML> {
     // representing bytes at `index..index+length` and
     // all the arrays are non-overlapping
     pub segments: BTreeMap<main_memory::Address, Cow<'a, [u8]>>,
+
+    /// Raw program headers
+    pub program_headers: Option<kernel_loader::ProgramHeaders<'a>>,
 }
 
 impl<'a, ML> kernel_loader::Memory for Program<'a, ML> {
@@ -101,21 +104,14 @@ impl<'a, ML: main_memory::MainMemoryLayout> Program<'a, ML> {
             _pd: PhantomData,
             entrypoint: start_if_reloc,
             segments: BTreeMap::new(),
+            program_headers: None,
         };
 
-        myself.entrypoint = kernel_loader::load_elf(&mut myself, start_if_reloc, elf)?.entry;
+        let load_result = kernel_loader::load_elf(&mut myself, start_if_reloc, elf)?;
+        myself.entrypoint = load_result.entry;
+        myself.program_headers = Some(load_result.program_headers);
 
         Ok(myself)
-    }
-
-    /// Construct a program from raw RISC-V machine code.
-    pub fn from_raw(code: &'a [u8]) -> Self {
-        let entrypoint = main_memory::FIRST_ADDRESS;
-        Self {
-            _pd: PhantomData,
-            entrypoint,
-            segments: BTreeMap::from_iter([(entrypoint, Cow::Borrowed(code))]),
-        }
     }
 
     pub fn parsed(&self) -> BTreeMap<u64, String> {
@@ -147,6 +143,7 @@ mod tests {
             _pd: PhantomData,
             entrypoint: 0,
             segments: BTreeMap::new(),
+            program_headers: None,
         };
         let mut buffer = Cursor::new(vec![0; 2048]);
 

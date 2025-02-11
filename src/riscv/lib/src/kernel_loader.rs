@@ -1,8 +1,11 @@
 use derive_more::{Error, From};
 use goblin::{
     elf::header::{ET_DYN, ET_EXEC},
-    elf::program_header::{ProgramHeader, PT_LOAD},
     elf::Elf,
+    elf::{
+        program_header::{ProgramHeader, PT_LOAD},
+        Header,
+    },
 };
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
@@ -16,12 +19,28 @@ pub enum Error {
     Goblin(goblin::error::Error),
 }
 
+/// Program headers extracted from the ELF file
+pub struct ProgramHeaders<'a> {
+    /// Size of each entry in the program headers
+    pub entry_size: u64,
+
+    /// Number of program headers entries
+    pub num_entries: u64,
+
+    /// Raw contents
+    pub contents: &'a [u8],
+}
+
 /// [LoadResult] is the outcome of loading an ELF file
-pub struct LoadResult {
-    /// the address at which the entrypoint of the program is located
+pub struct LoadResult<'a> {
+    /// Address at which the entrypoint of the program is located
     pub entry: u64,
-    /// index of the last written byte in memory after loading the ELF
+
+    /// Index of the last written byte in memory after loading the ELF
     pub last_written: u64,
+
+    /// Raw program headers
+    pub program_headers: ProgramHeaders<'a>,
 }
 
 /// [Memory] is an interface to the linear array of bytes of the RISC-V virtual machine
@@ -41,7 +60,7 @@ pub fn load_elf_nonreloc<'a>(
     mem: &mut impl Memory,
     elf: &Elf<'a>,
     contents: &'a [u8],
-) -> Result<LoadResult, Error> {
+) -> Result<LoadResult<'a>, Error> {
     let loadable_segments = elf
         .program_headers
         .iter()
@@ -64,9 +83,12 @@ pub fn load_elf_nonreloc<'a>(
         last_written = segment.p_paddr + segment.p_memsz;
     }
 
+    let program_headers = extract_program_headers(&elf.header, contents);
+
     Ok(LoadResult {
         entry: elf.entry,
         last_written,
+        program_headers,
     })
 }
 
@@ -87,7 +109,7 @@ pub fn load_elf_reloc<'a>(
     start: u64,
     elf: &Elf<'a>,
     contents: &'a [u8],
-) -> Result<LoadResult, Error> {
+) -> Result<LoadResult<'a>, Error> {
     let loadable_segments = elf
         .program_headers
         .iter()
@@ -127,15 +149,22 @@ pub fn load_elf_reloc<'a>(
         }
     }
 
+    let program_headers = extract_program_headers(&elf.header, contents);
+
     Ok(LoadResult {
         entry: elf.header.e_entry + start,
         last_written,
+        program_headers,
     })
 }
 
 /// Loads an ELF file. If the file is relocatable, loads it at the given [start] address in the memory of the VM.
 /// If it is not relocatable, [start] is ignored.
-pub fn load_elf(mem: &mut impl Memory, start: u64, contents: &[u8]) -> Result<LoadResult, Error> {
+pub fn load_elf<'a>(
+    mem: &mut impl Memory,
+    start: u64,
+    contents: &'a [u8],
+) -> Result<LoadResult<'a>, Error> {
     let elf = Elf::parse(contents)?;
     match elf.header.e_type {
         ET_EXEC => load_elf_nonreloc(mem, &elf, contents),
@@ -159,5 +188,18 @@ where
             msg: Some(err.to_string()),
             addr: paddr,
         })
+    }
+}
+
+/// Extract the raw program headers from the ELF file.
+pub fn extract_program_headers<'a>(header: &Header, contents: &'a [u8]) -> ProgramHeaders<'a> {
+    let start = header.e_phoff as usize;
+    let length = header.e_phentsize as usize * header.e_phnum as usize;
+    let contents = &contents[start..][..length];
+
+    ProgramHeaders {
+        entry_size: header.e_phentsize as u64,
+        num_entries: header.e_phnum as u64,
+        contents,
     }
 }
