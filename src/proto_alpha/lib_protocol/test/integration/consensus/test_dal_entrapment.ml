@@ -20,9 +20,12 @@ open Alpha_context
 
 let commitment_and_proofs_cache = ref None
 
+type injection_time = Now | Last_valid | First_invalid
+
 (** Check various accusation operation injection scenarios. *)
-let test_accusation_injection ?(initial_blocks_to_bake = 2) ?expect_failure
-    ?(publish_slot = true) ?(with_dal_content = true) ?(attest_slot = true) () =
+let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
+    ?(publish_slot = true) ?(with_dal_content = true) ?(attest_slot = true)
+    ?(inclusion_time = Now) () =
   let open Lwt_result_syntax in
   let c = Default_parameters.constants_test in
   let dal = {c.dal with incentives_enable = true; traps_fraction = Q.one} in
@@ -61,11 +64,30 @@ let test_accusation_injection ?(initial_blocks_to_bake = 2) ?expect_failure
         result
   in
   let* genesis, contract = Context.init_with_constants1 constants in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-     We bake two blocks because we need the accusation to be introduced at level
-     at least 10 (2 = 10 - attestation_lag). In protocol S we will not need this
-     restriction. *)
-  let* blk = Block.bake_n initial_blocks_to_bake genesis in
+  let* blk =
+    let blocks_to_bake =
+      match inclusion_time with
+      | Now -> (
+          match initial_blocks_to_bake with
+          | None ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
+                 We bake two blocks because we need the accusation to be introduced
+                 at level at least 10 (2 = 10 - attestation_lag). In protocol S we
+                 will not need this restriction. *)
+              2
+          | Some v -> v)
+      | _ ->
+          (* In this case we want the attestation to be as far as possible from
+             the accusation, so we want the attestation level to be the first
+             level of a cycle. Checking this "extreme" case ensure that slot
+             headers are not deleted too soon. *)
+          assert (Option.is_none initial_blocks_to_bake) ;
+          let blocks_per_cycle = genesis.constants.blocks_per_cycle in
+          Int32.(
+            rem (sub blocks_per_cycle (of_int lag)) blocks_per_cycle |> to_int)
+    in
+    Block.bake_n blocks_to_bake genesis
+  in
   let slot_header =
     Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
   in
@@ -74,6 +96,15 @@ let test_accusation_injection ?(initial_blocks_to_bake = 2) ?expect_failure
     if publish_slot then Block.bake blk ~operation:op else Block.bake blk
   in
   let* blk = Block.bake_n (lag - 1) blk in
+  (match inclusion_time with
+  | Now -> ()
+  | _ ->
+      let position = Block.cycle_position blk |> Int32.to_int in
+      Check.(
+        (position = 0)
+          int
+          ~__LOC__
+          ~error_msg:"Expected cycle position to be 0, got %L")) ;
   let dal_content =
     if with_dal_content then
       let attestation =
@@ -90,6 +121,18 @@ let test_accusation_injection ?(initial_blocks_to_bake = 2) ?expect_failure
   let operation =
     Op.dal_entrapment (B blk) attestation slot_index shard_with_proof
   in
+  let position = Block.cycle_position blk |> Int32.to_int in
+  let blocks_to_bake =
+    let blocks_per_cycle = blk.constants.blocks_per_cycle |> Int32.to_int in
+    match inclusion_time with
+    | Now ->
+        (* bake one block such that accusation level is different from the
+           attestation level; though this does not really matter *)
+        1
+    | Last_valid -> (2 * blocks_per_cycle) - 2 - position
+    | First_invalid -> (2 * blocks_per_cycle) - 1 - position
+  in
+  let* blk = Block.bake_n blocks_to_bake blk in
   match expect_failure with
   | None ->
       let* _blk_final = Block.bake ~operation blk in
@@ -172,6 +215,23 @@ let test_invalid_accusation_slot_not_published =
   in
   test_accusation_injection ~publish_slot:false ~expect_failure
 
+let test_invalid_accusation_include_late =
+  let expect_failure attestation_level = function
+    | [
+        Environment.Ecoproto_error
+          (Validate_errors.Anonymous.Outdated_dal_denunciation {level; _});
+      ]
+      when Raw_level.to_int32 level = attestation_level ->
+        Lwt_result_syntax.return_unit
+    | errs ->
+        Test.fail
+          ~__LOC__
+          "Error trace:@, %a does not match the expected one"
+          Error_monad.pp_print_trace
+          errs
+  in
+  test_accusation_injection ~inclusion_time:First_invalid ~expect_failure
+
 let tests =
   [
     Tztest.tztest "test valid accusation" `Quick test_accusation_injection;
@@ -191,6 +251,14 @@ let tests =
       "test invalid accusation (slot_not_published)"
       `Quick
       test_invalid_accusation_slot_not_published;
+    Tztest.tztest
+      "test invalid accusation (include last)"
+      `Quick
+      (test_accusation_injection ~inclusion_time:Last_valid);
+    Tztest.tztest
+      "test invalid accusation (include late)"
+      `Quick
+      test_invalid_accusation_include_late;
   ]
 
 let () =
