@@ -72,7 +72,7 @@ let indexes_to_delegates =
 (** Check various accusation operation injection scenarios. *)
 let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     ?(publish_slot = true) ?(with_dal_content = true) ?(attest_slot = true)
-    ?(inclusion_time = Now) () =
+    ?(inclusion_time = Now) ?(not_trap = false) () =
   let open Lwt_result_syntax in
   let c = Default_parameters.constants_test in
   let dal =
@@ -182,7 +182,14 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
           "Unexpected case: there are no traps for delegate %a"
           Signature.Public_key_hash.pp
           pkh
-    | Some (pkh, (shard_with_proof :: _, _not_traps)) -> (pkh, shard_with_proof)
+    | Some (pkh, (_traps, [])) ->
+        Test.fail
+          ~__LOC__
+          "Unexpected case: all shards are traps for delegate %a"
+          Signature.Public_key_hash.pp
+          pkh
+    | Some (pkh, (trap_shard :: _, not_trap_shard :: _)) ->
+        if not_trap then (pkh, not_trap_shard) else (pkh, trap_shard)
   in
   let accusation =
     Op.dal_entrapment (B blk) attestation slot_index shard_with_proof
@@ -320,6 +327,24 @@ let test_invalid_accusation_include_late =
   in
   test_accusation_injection ~inclusion_time:First_invalid ~expect_failure
 
+let test_invalid_accusation_shard_is_not_trap =
+  let expect_failure attestation_level = function
+    | [
+        Environment.Ecoproto_error
+          (Validate_errors.Anonymous.Invalid_accusation_shard_is_not_trap
+            {level; _});
+      ]
+      when Raw_level.to_int32 level = attestation_level ->
+        Lwt_result_syntax.return_unit
+    | errs ->
+        Test.fail
+          ~__LOC__
+          "Error trace:@, %a does not match the expected one"
+          Error_monad.pp_print_trace
+          errs
+  in
+  test_accusation_injection ~not_trap:true ~expect_failure
+
 let tests =
   [
     Tztest.tztest "test valid accusation" `Quick test_accusation_injection;
@@ -347,6 +372,10 @@ let tests =
       "test invalid accusation (include late)"
       `Quick
       test_invalid_accusation_include_late;
+    Tztest.tztest
+      "test invalid accusation (shard is not trap)"
+      `Quick
+      test_invalid_accusation_shard_is_not_trap;
   ]
 
 let () =
