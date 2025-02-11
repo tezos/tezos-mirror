@@ -122,14 +122,15 @@ module type T = sig
 
     (** A function called at the end of the worker loop in case of an error. One
         can first log the incoming error. Then, the error can be filtered out by
-        returning [return_unit] and the worker execution continues, or the error
-        can be propagated through a [tzresult], making the worker crash. *)
+        returning [`Continue] and the worker execution continues, [`Shutdown]
+        and the worker shutdowns without crashing, or the error can be propagated
+        through a [tzresult], making the worker crash. *)
     val on_error :
       self ->
       Worker_types.request_status ->
       ('a, 'request_error) Request.t ->
       'request_error ->
-      unit tzresult Lwt.t
+      [`Continue | `Shutdown] tzresult Lwt.t
 
     (** A function called at the end of the worker loop in case of a
         successful treatment of the current request. *)

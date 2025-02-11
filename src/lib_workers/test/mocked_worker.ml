@@ -25,19 +25,23 @@
 
 type void = |
 
-type failure = Simple | Crash | RaiseExn
+type failure = Simple | Crash | RaiseExn | Shutdown
 
 module Request = struct
   type ('a, 'b) t =
     | RqA : int -> (unit, string option) t
     | RqB : (unit, void) t
-    | RqErr : failure -> (unit, [`SimpleError | `CrashError]) t
+    | RqErr : failure -> (unit, [`SimpleError | `CrashError | `Shutdown]) t
 
   type view = View : _ t -> view
 
   let view req = View req
 
-  let int_of_failure = function Simple -> 0 | Crash -> 1 | RaiseExn -> 2
+  let int_of_failure = function
+    | Simple -> 0
+    | Crash -> 1
+    | RaiseExn -> 2
+    | Shutdown -> 3
 
   let failure_of_int = function 1 -> Simple | 2 -> Crash | 3 | _ -> RaiseExn
 
