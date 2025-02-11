@@ -28,7 +28,7 @@
 
 type time_between_blocks = Nothing | Time_between_blocks of float
 
-type history_mode = Archive | Rolling of int
+type history_mode = Archive | Rolling of int | Full of int
 
 type mode =
   | Observer of {
@@ -599,7 +599,11 @@ let wait_for_start_history_mode ?history_mode evm_node =
   match history_mode with
   | Some history_mode ->
       if history_mode = event_history_mode then Some history_mode
-      else Test.fail "Started with wrong history mode"
+      else
+        Test.fail
+          "Started with wrong history mode (expected: %s; current %s)"
+          history_mode
+          event_history_mode
   | None -> Some event_history_mode
 
 let wait_for_blueprint_catchup ?timeout evm_node =
@@ -958,7 +962,10 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         evm_node.persistent_state.restricted_rpcs
     @ Cli_arg.optional_arg
         "history"
-        (function Archive -> "archive" | Rolling n -> sf "rolling:%d" n)
+        (function
+          | Archive -> "archive"
+          | Rolling n -> sf "rolling:%d" n
+          | Full n -> sf "full:%d" n)
         evm_node.persistent_state.history
   in
 
@@ -1277,7 +1284,8 @@ let patch_config_gc ?history_mode json =
   json
   |> optional_json_put ~name:"history" history_mode (function
          | Archive -> `String "archive"
-         | Rolling retention -> `String (Format.sprintf "rolling:%d" retention))
+         | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
+         | Full retention -> `String (Format.sprintf "full:%d" retention))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     ?restricted_rpcs ?history_mode rollup_node =
@@ -1704,7 +1712,10 @@ let list_events ?hooks ?level ?(json = false) () =
 
 let switch_history_mode evm_node history =
   let hist =
-    match history with Archive -> "archive" | Rolling n -> sf "rolling:%d" n
+    match history with
+    | Archive -> "archive"
+    | Rolling n -> sf "rolling:%d" n
+    | Full n -> sf "full:%d" n
   in
   let args =
     ["switch"; "history"; "to"; hist; "--data-dir"; data_dir evm_node]

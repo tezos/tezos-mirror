@@ -9866,6 +9866,50 @@ let test_eip1559_transaction_object =
         "Type was expected to be %L, (EIP-1559) but the RPC returned %R") ;
   unit
 
+let test_apply_from_full_history_mode =
+  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
+  let genesis_timestamp = Client.At genesis_time in
+  let days n = Ptime.Span.of_int_s (n * 86400) in
+  let get_timestamp i =
+    Ptime.add_span genesis_time (days (i + 1))
+    |> Option.get |> Client.Time.to_notation
+  in
+  register_all
+    ~genesis_timestamp
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "observer"]
+    ~title:"Can apply blueprints from full mode"
+  @@ fun {sequencer; observer; _} _protocol ->
+  (* Stop the observer *)
+  let* () = Evm_node.terminate observer in
+
+  (* Restart sequencer in full mode *)
+  let* () = Evm_node.terminate sequencer in
+  let*! () = Evm_node.switch_history_mode sequencer (Full 3) in
+  let wait_full =
+    Evm_node.wait_for_start_history_mode ~history_mode:"full:3" sequencer
+  in
+  let* () = Evm_node.run sequencer and* _ = wait_full in
+
+  (* Trigger gc twice with 9 blocks and confirm it *)
+  let wait_gc = Evm_node.wait_for_gc_finished sequencer in
+  let* _ =
+    fold 9 () (fun i _ ->
+        let* _ = Rpc.produce_block ~timestamp:(get_timestamp i) sequencer in
+        Evm_node.wait_for_blueprint_injected sequencer i)
+  and* _ = wait_gc in
+
+  Log.info "first block in sequencer is accessible" ;
+  let*@ _ = Rpc.get_block_by_number ~block:"1" sequencer in
+
+  (* Start the observer and check it applied block 1  *)
+  let* () = Evm_node.run observer in
+  let* _ = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  Log.info "first block in observer after the catchup is accessible" ;
+  let*@ _ = Rpc.get_block_by_number ~block:"1" observer in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -10003,4 +10047,5 @@ let () =
   test_estimate_gas_with_block_param protocols ;
   test_filling_max_slots_cant_lead_to_out_of_memory protocols ;
   test_rpc_getLogs_with_earliest_fail protocols ;
-  test_eip1559_transaction_object protocols
+  test_eip1559_transaction_object protocols ;
+  test_apply_from_full_history_mode protocols

@@ -134,32 +134,49 @@ let test_switch_history_mode () =
   let blocks_before_switch = 3 in
   register
     ~genesis_timestamp
-    ~title:"Switch history mode (archive -> rolling)"
+    ~title:"Switch history mode"
     ~history_mode:Archive
     ~tags:["history_mode"]
   @@ fun sequencer ->
-  let* () = Evm_node.terminate sequencer in
-  let wait_for_archive =
-    Evm_node.wait_for_start_history_mode ~history_mode:"archive" sequencer
-  in
-  let* () = Evm_node.run sequencer and* _ = wait_for_archive in
+  (* Switch history mode downwards: archive -> full -> rolling *)
   let* _ =
     fold blocks_before_switch () (fun i () ->
         let timestamp = get_timestamp i in
         let* _ = Rpc.produce_block ~timestamp sequencer in
         unit)
   in
-  (* Restart the node in archive mode. *)
+  (* Restart the node in full mode *)
   let* () = Evm_node.terminate sequencer in
   let* () =
     Evm_node.Config_file.update
       sequencer
-      (Evm_node.patch_config_gc ~history_mode:(Rolling retention_period))
+      (Evm_node.patch_config_gc ~history_mode:(Full retention_period))
   in
+  (* Config update is not enough *)
   let process = Evm_node.spawn_run sequencer in
   let* () =
-    Process.check_error ~msg:(rex "cannot be run with history mode") process
+    Process.check_error
+      ~msg:(rex "cannot be run with history mode full")
+      process
   in
+  (* Switch history explicitely *)
+  let*! () = Evm_node.switch_history_mode sequencer (Full retention_period) in
+  let wait_for_full =
+    Evm_node.wait_for_start_history_mode
+      ~history_mode:(Format.sprintf "full:%d" retention_period)
+      sequencer
+  in
+  let* () = Evm_node.run sequencer and* _ = wait_for_full in
+  (* Show that we indeed gc *)
+  let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
+  let* _ =
+    fold blocks_before_switch () (fun i () ->
+        let timestamp = get_timestamp (blocks_before_switch + i + 1) in
+        let* _ = Rpc.produce_block ~timestamp sequencer in
+        unit)
+  and* _ = wait_for_gc in
+  (* Restart the node in rolling mode *)
+  let* () = Evm_node.terminate sequencer in
   let*! () =
     Evm_node.switch_history_mode sequencer (Rolling retention_period)
   in
@@ -169,16 +186,86 @@ let test_switch_history_mode () =
       sequencer
   in
   let* () = Evm_node.run sequencer and* _ = wait_for_rolling in
-  (* show that we indeed gc *)
-  let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
-  let* _ =
-    fold (retention_period + 1) () (fun i () ->
-        let timestamp = get_timestamp (blocks_before_switch + i + 1) in
-        let* _ = Rpc.produce_block ~timestamp sequencer in
+  unit
+
+let test_invalid_switch_history_mode () =
+  register
+    ~history_mode:(Rolling 2)
+    ~title:"Invalid switch history mode"
+    ~tags:["history_mode"]
+  @@ fun sequencer ->
+  let* () = Evm_node.terminate sequencer in
+  let {Runnable.value = process; _} =
+    Evm_node.switch_history_mode sequencer (Full 2)
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "cannot be run with history mode full")
+      process
+  in
+  unit
+
+let test_full_history_mode_gc () =
+  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
+  let genesis_timestamp = Client.At genesis_time in
+  let get_timestamp i =
+    Ptime.add_span genesis_time (days (i + 1))
+    |> Option.get |> Client.Time.to_notation
+  in
+  register
+    ~genesis_timestamp
+    ~history_mode:(Full 2)
+    ~title:"Full history mode GC"
+    ~tags:["boundaries"; "gc"; "history_mode"]
+  @@ fun sequencer ->
+  let raw_tx nonce =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price:1_000_000_000
+      ~gas:25_000
+      ~value:Wei.one
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* Produce txs and trigger one garbage collector *)
+  let* list =
+    fold 3 [] (fun i acc ->
+        let* raw_tx = raw_tx i in
+        let*@ hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+        let* _ = Rpc.produce_block ~timestamp:(get_timestamp i) sequencer in
+        return (hash :: acc))
+  and* _ = Evm_node.wait_for_gc_finished sequencer in
+
+  (* Block 0 is still present *)
+  let*@ earliest_block = Rpc.get_block_by_number ~block:"0" sequencer in
+  Check.((earliest_block.number = 0l) int32)
+    ~error_msg:"Garbage collector should *not* have removed genesis block" ;
+
+  (* Query the transactions by hash *)
+  let* () =
+    Lwt_list.iter_s
+      (fun transaction_hash ->
+        let*@ tx_obj =
+          Rpc.get_transaction_by_hash ~transaction_hash sequencer
+        in
+        Check.is_true (Option.is_some tx_obj) ~error_msg:"Transaction missing" ;
         unit)
-  and* _ = wait_for_gc in
+      list
+  in
+
+  (* But get_balance fails as it requires the context *)
+  let*@? _e =
+    Rpc.get_balance
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ~block:(Number 0)
+      sequencer
+  in
   unit
 
 let () =
   test_gc_boundaries () ;
-  test_switch_history_mode ()
+  test_switch_history_mode () ;
+  test_invalid_switch_history_mode () ;
+  test_full_history_mode_gc ()

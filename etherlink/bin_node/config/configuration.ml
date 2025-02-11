@@ -44,7 +44,10 @@ type garbage_collector_parameters = {
   number_of_chunks : int;
 }
 
-type history_mode = Archive | Rolling of garbage_collector_parameters
+type history_mode =
+  | Archive
+  | Rolling of garbage_collector_parameters
+  | Full of garbage_collector_parameters
 
 type rpc_server = Resto | Dream
 
@@ -158,14 +161,27 @@ let history_mode_of_string_opt str =
       let* days = int_of_string_opt days in
       if days > 0 then return (Rolling (gc_param_from_retention_period ~days))
       else None
+  | ["full"; days] ->
+      let* days = int_of_string_opt days in
+      if days > 0 then return (Full (gc_param_from_retention_period ~days))
+      else None
   | _ -> None
 
-let string_of_history_mode = function
+let string_of_history_mode_debug = function
   | Archive -> "archive"
   | Rolling gc -> Format.sprintf "rolling:%d" gc.number_of_chunks
+  | Full gc -> Format.sprintf "full:%d" gc.number_of_chunks
 
-let pp_history_mode fmt h =
-  Format.pp_print_string fmt @@ string_of_history_mode h
+let string_of_history_mode_info = function
+  | Archive -> "Archive"
+  | Rolling _ -> Format.sprintf "Rolling"
+  | Full _ -> Format.sprintf "Full"
+
+let pp_history_mode_debug fmt h =
+  Format.pp_print_string fmt @@ string_of_history_mode_debug h
+
+let pp_history_mode_info fmt h =
+  Format.pp_print_string fmt @@ string_of_history_mode_info h
 
 (* This should be enough for messages we expect to receive in the ethereum
    JSONRPC protocol. *)
@@ -749,7 +765,7 @@ let history_mode_encoding =
        period"
   @@ conv_with_guard
        ~schema:history_mode_schema
-       string_of_history_mode
+       string_of_history_mode_debug
        (fun str ->
          match history_mode_of_string_opt str with
          | None -> Error (Format.sprintf "%s is not a valid history mode" str)

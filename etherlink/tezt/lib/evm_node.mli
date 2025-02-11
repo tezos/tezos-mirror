@@ -124,6 +124,7 @@ type mode =
 type history_mode =
   | Archive
   | Rolling of int  (** Rolling with retention period in days. *)
+  | Full of int  (** Full with retention period in days. *)
 
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode

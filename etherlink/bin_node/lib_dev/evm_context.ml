@@ -100,9 +100,9 @@ let () =
         "The EVM node has stored data with history mode %a, it cannot be run \
          with history mode %a without risk. Please use the command switch \
          history mode to change history mode for the node."
-        Configuration.pp_history_mode
+        Configuration.pp_history_mode_debug
         store_history_mode
-        Configuration.pp_history_mode
+        Configuration.pp_history_mode_debug
         history_mode)
     Data_encoding.(
       obj2
@@ -276,7 +276,7 @@ module State = struct
     let* () = Evm_store.Context_hashes.store store number checkpoint in
     return context
 
-  let gc ctxt conn gc_level head_level =
+  let gc ctxt conn gc_level head_level history_mode =
     let open Lwt_result_syntax in
     let*! () = Evm_context_events.gc_started ~gc_level ~head_level in
     let start_timestamp = Time.System.now () in
@@ -292,7 +292,7 @@ module State = struct
           ]
         hash
     in
-    let* () = Evm_store.reset_before conn ~l2_level:gc_level in
+    let* () = Evm_store.reset_before conn ~l2_level:gc_level ~history_mode in
     let*! () = Irmin_context.gc ctxt.index hash in
     let gc_waiter () =
       let open Lwt_syntax in
@@ -311,7 +311,7 @@ module State = struct
     let* history_mode = Evm_store.Metadata.get_history_mode conn in
     match history_mode with
     | Archive -> return_none
-    | Rolling gc_param ->
+    | Rolling gc_param | Full gc_param ->
         let split =
           match ctxt.session.last_split_block with
           | None -> true
@@ -338,7 +338,7 @@ module State = struct
               let* gc_level, _gc_timestamp =
                 Evm_store.Irmin_chunks.oldest conn
               in
-              gc ctxt conn gc_level level
+              gc ctxt conn gc_level level history_mode
             else return_unit
           in
           return_some (level, timestamp))
@@ -1149,10 +1149,17 @@ module State = struct
     let open Configuration in
     match (h1, h2) with
     | Archive, Archive -> `No_switch
-    | Rolling gc, Rolling gc' when gc.number_of_chunks = gc'.number_of_chunks ->
+    | (Rolling gc, Rolling gc' | Full gc, Full gc')
+      when gc.number_of_chunks = gc'.number_of_chunks ->
         `No_switch
-    | Rolling _, Rolling _ | Archive, Rolling _ -> `Needs_switch
-    | Rolling _, Archive -> `Cannot_switch
+    (* Keep this match explicit *)
+    | Rolling _, Full _ | Rolling _, Archive | Full _, Archive -> `Cannot_switch
+    | Rolling _, Rolling _
+    | Full _, Full _
+    | Full _, Rolling _
+    | Archive, Rolling _
+    | Archive, Full _ ->
+        `Needs_switch
 
   let check_history_mode ?(switch = false) ~store_history_mode ~history_mode ()
       =
@@ -1167,7 +1174,7 @@ module State = struct
             if switch then
               Format.printf
                 "History mode is already %a, not switching@."
-                Configuration.pp_history_mode
+                Configuration.pp_history_mode_debug
                 store_history_mode ;
             return store_history_mode
         | `Needs_switch when switch ->
@@ -1313,7 +1320,7 @@ module State = struct
 
     let* last_split_block =
       match history_mode with
-      | Rolling _ -> Evm_store.Irmin_chunks.latest conn
+      | Rolling _ | Full _ -> Evm_store.Irmin_chunks.latest conn
       | Archive -> return_none
     in
 

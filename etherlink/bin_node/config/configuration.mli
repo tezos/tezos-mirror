@@ -69,6 +69,9 @@ type history_mode =
   | Rolling of garbage_collector_parameters
       (** Keep blocks, operations and states for a period defined by
           {!type-garbage_collector_parameters}. *)
+  | Full of garbage_collector_parameters
+      (** Keep all blocks and transactions. Keep operations and states for a period defined by
+              {!type-garbage_collector_parameters}. *)
 
 (** RPC server implementation. *)
 type rpc_server =
@@ -175,7 +178,9 @@ type t = {
 
 val history_mode_encoding : history_mode Data_encoding.t
 
-val pp_history_mode : Format.formatter -> history_mode -> unit
+val pp_history_mode_debug : Format.formatter -> history_mode -> unit
+
+val pp_history_mode_info : Format.formatter -> history_mode -> unit
 
 val native_execution_policy_encoding : native_execution_policy Data_encoding.t
 
@@ -260,7 +265,9 @@ val observer_config_dft :
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
-val string_of_history_mode : history_mode -> string
+val string_of_history_mode_debug : history_mode -> string
+
+val string_of_history_mode_info : history_mode -> string
 
 val history_mode_of_string_opt : string -> history_mode option
 

@@ -272,6 +272,9 @@ val reset_after :
   conn -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
 
 (** [reset_before conn ~l2_level] clear the table that has information related to l2
-    level before [l2_level] *)
+    level before [l2_level], if [history_mode] is set to [Full] keep block-related information and clear the rest *)
 val reset_before :
-  conn -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
+  conn ->
+  l2_level:Ethereum_types.quantity ->
+  history_mode:Configuration.history_mode ->
+  unit tzresult Lwt.t
