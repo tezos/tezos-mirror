@@ -760,6 +760,12 @@ let jobs pipeline_type =
       | Schedule_extended_test ->
           Grafazos_ci.job_build_grafazos ~rules:[job_rule ~when_:Always ()] ()
     in
+    let job_build_teztale =
+      Teztale.job_build
+        ~rules:(make_rules ~manual:Yes ~changes:Teztale.changeset ())
+        ()
+      |> enable_cargo_cache |> enable_sccache
+    in
     [
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
@@ -773,6 +779,7 @@ let jobs pipeline_type =
       job_tezt_fetch_records;
       build_octez_source;
       job_build_grafazos;
+      job_build_teztale;
       job_build_layer1_profiling ();
     ]
     @ Option.to_list job_select_tezts
