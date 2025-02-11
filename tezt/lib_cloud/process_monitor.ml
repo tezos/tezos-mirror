@@ -8,6 +8,7 @@
 type t = {
   listening_port : int;
   mutable monitored_processes : (string * string) list;
+  mutable checked_in_path : bool;
 }
 
 let executable = "prometheus-process-exporter"
@@ -15,11 +16,13 @@ let executable = "prometheus-process-exporter"
 let encoding =
   let open Data_encoding in
   conv
-    (fun {listening_port; monitored_processes = _} -> listening_port)
-    (fun listening_port -> {listening_port; monitored_processes = []})
+    (fun {listening_port; monitored_processes = _; _} -> listening_port)
+    (fun listening_port ->
+      {listening_port; monitored_processes = []; checked_in_path = false})
     (obj1 (req "listening_port" int31))
 
-let init ~listening_port = {listening_port; monitored_processes = []}
+let init ~listening_port =
+  {listening_port; monitored_processes = []; checked_in_path = false}
 
 let add_binary t ~group ~name =
   if List.mem (group, name) t.monitored_processes then false
@@ -32,14 +35,22 @@ let get_binaries t = t.monitored_processes
 let get_port t = t.listening_port
 
 let reload t run_cmd =
+  let* () =
+    (* Check if in path only the first time *)
+    if not t.checked_in_path then
+      let* r =
+        run_cmd ~detach:false "command" ["-v"; executable] |> Process.wait
+      in
+      let () =
+        match r with
+        | WEXITED 0 -> t.checked_in_path <- true
+        | _ -> Test.fail "Cannot find executable: %s" executable
+      in
+      Lwt.return_unit
+    else Lwt.return_unit
+  in
   let processes_names = List.map snd (get_binaries t) in
   let processes = String.concat "," processes_names in
-  let* r = run_cmd ~detach:false "command" ["-v"; executable] |> Process.wait in
-  let () =
-    match r with
-    | WEXITED 0 -> ()
-    | _ -> Test.fail "Cannot find executable: %s" executable
-  in
   Log.warn
     "Restarting prometheus-process-exporter; monitored processes = {%s}"
     processes ;
