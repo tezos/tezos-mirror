@@ -109,7 +109,8 @@ let test_invalid_accusation_too_close_to_migration =
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit
     | errs ->
-        failwith
+        Test.fail
+          ~__LOC__
           "Error trace:@, %a does not match the expected one"
           Error_monad.pp_print_trace
           errs
@@ -126,7 +127,8 @@ let test_invalid_accusation_no_dal_content =
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit
     | errs ->
-        failwith
+        Test.fail
+          ~__LOC__
           "Error trace:@, %a does not match the expected one"
           Error_monad.pp_print_trace
           errs
@@ -143,7 +145,8 @@ let test_invalid_accusation_slot_not_attested =
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit
     | errs ->
-        failwith
+        Test.fail
+          ~__LOC__
           "Error trace:@, %a does not match the expected one"
           Error_monad.pp_print_trace
           errs
@@ -160,7 +163,8 @@ let test_invalid_accusation_slot_not_published =
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit
     | errs ->
-        failwith
+        Test.fail
+          ~__LOC__
           "Error trace:@, %a does not match the expected one"
           Error_monad.pp_print_trace
           errs
