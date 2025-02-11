@@ -281,7 +281,7 @@ module Handlers = struct
       Tezos_base.Worker_types.request_status ->
       (r, request_error) Request.t ->
       request_error ->
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
    fun _w _ req errs ->
     let open Lwt_result_syntax in
     match req with
@@ -291,14 +291,14 @@ module Handlers = struct
             (Request.view req)
             errs
         in
-        return_unit
+        return `Continue
     | Request.Apply_evm_events _ ->
         let*! () =
           Evm_events_follower_events.worker_request_failed
             (Request.view req)
             errs
         in
-        return_unit
+        return `Continue
 
   let on_completion _ _ _ _ = Lwt.return_unit
 

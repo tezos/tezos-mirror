@@ -323,7 +323,7 @@ module Handlers = struct
   let on_close _self = Lwt.return_unit
 
   let on_error (type a b) _w _st (r : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     let request_view = Request.view r in
     let emit_and_return_errors errs =

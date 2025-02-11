@@ -1327,14 +1327,14 @@ module Make (Parameters : PARAMETERS) = struct
            tags
 
     let on_error (type a b) w st (r : (a, b) Request.t) (errs : b) :
-        unit tzresult Lwt.t =
+        [`Continue | `Shutdown] tzresult Lwt.t =
       let open Lwt_result_syntax in
       let state = Worker.state w in
       let request_view = Request.view r in
       let emit_and_return_errors errs =
         (* Errors do not stop the worker but emit an entry in the log. *)
         let*! () = Event.(emit3 request_failed) state request_view st errs in
-        return_unit
+        return `Continue
       in
       match r with
       | Request.Inject -> emit_and_return_errors errs

@@ -1657,9 +1657,10 @@ module Make
       return pv
 
     let on_error (type a b) _w st (request : (a, b) Request.t) (errs : b) :
-        unit tzresult Lwt.t =
+        [`Continue | `Shutdown] tzresult Lwt.t =
       Prometheus.Counter.inc_one metrics.worker_counters.worker_error_count ;
       let open Lwt_syntax in
+      let return_ok_unit = Lwt.return_ok `Continue in
       match request with
       | Request.(Inject _) as r ->
           let* () = Events.(emit request_failed) (Request.view r, st, errs) in

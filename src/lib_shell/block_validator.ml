@@ -701,7 +701,9 @@ let create limits db validation_process ~start_testchain =
 
     let on_close = on_close
 
-    let on_error = on_error
+    let on_error w status req err =
+      Lwt_result.bind (on_error w status req err) (fun () ->
+          Lwt_result.return `Continue)
 
     let on_completion = on_completion
 
