@@ -72,12 +72,11 @@ let indexes_to_delegates =
 (** Check various accusation operation injection scenarios. *)
 let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     ?(publish_slot = true) ?(with_dal_content = true) ?(attest_slot = true)
-    ?(inclusion_time = Now) ?(not_trap = false) () =
+    ?(inclusion_time = Now) ?(not_trap = false) ?(wrong_owner = false)
+    ?(traps_fraction = Q.(1 // 2)) () =
   let open Lwt_result_syntax in
   let c = Default_parameters.constants_test in
-  let dal =
-    {c.dal with incentives_enable = true; traps_fraction = Q.(1 // 2)}
-  in
+  let dal = {c.dal with incentives_enable = true; traps_fraction} in
   let cryptobox_parameters = dal.cryptobox_parameters in
   let number_of_slots = dal.number_of_slots in
   let lag = dal.attestation_lag in
@@ -112,7 +111,9 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
         commitment_and_proofs_cache := Some result ;
         result
   in
-  let* genesis, contract = Context.init_with_constants1 constants in
+  let* genesis, (contract, _contract2) =
+    Context.init_with_constants2 constants
+  in
   let* blk =
     let blocks_to_bake =
       match inclusion_time with
@@ -163,8 +164,6 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
       Some {attestation}
     else None
   in
-  let* attestation = Op.raw_attestation blk ?dal_content in
-  let attestation_level = blk.header.shell.level in
   let* shard_assignment = Context.Dal.shards (B blk) () in
   let indexes_to_delegates = indexes_to_delegates shard_assignment in
   let delegate_to_shards_map =
@@ -173,23 +172,35 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
       indexes_to_delegates
       shards_with_proofs
   in
-  let _delegate, shard_with_proof =
+  let delegate =
     match PkhMap.min_binding_opt delegate_to_shards_map with
     | None -> Test.fail ~__LOC__ "Unexpected case: there are no delegates"
-    | Some (pkh, ([], _not_traps)) ->
+    | Some (pkh, _) -> pkh
+  in
+  let* attestation = Op.raw_attestation blk ~delegate ?dal_content in
+  let attestation_level = blk.header.shell.level in
+  let shard_with_proof =
+    let owner =
+      if wrong_owner then (
+        match PkhMap.max_binding delegate_to_shards_map with
+        | None -> Test.fail ~__LOC__ "Unexpected case: there are no delegates"
+        | Some (pkh, _) ->
+            if Signature.Public_key_hash.equal delegate pkh then
+              Test.fail
+                ~__LOC__
+                "Unexpected case: there should be at least two delegates" ;
+            pkh)
+      else delegate
+    in
+    match PkhMap.find owner delegate_to_shards_map with
+    | None ->
         Test.fail
           ~__LOC__
-          "Unexpected case: there are no traps for delegate %a"
+          "Unexpected case: delegate %a not found in map"
           Signature.Public_key_hash.pp
-          pkh
-    | Some (pkh, (_traps, [])) ->
-        Test.fail
-          ~__LOC__
-          "Unexpected case: all shards are traps for delegate %a"
-          Signature.Public_key_hash.pp
-          pkh
-    | Some (pkh, (trap_shard :: _, not_trap_shard :: _)) ->
-        if not_trap then (pkh, not_trap_shard) else (pkh, trap_shard)
+          owner
+    | Some (traps, not_traps) ->
+        if not_trap then Stdlib.List.hd not_traps else Stdlib.List.hd traps
   in
   let accusation =
     Op.dal_entrapment (B blk) attestation slot_index shard_with_proof
@@ -345,6 +356,30 @@ let test_invalid_accusation_shard_is_not_trap =
   in
   test_accusation_injection ~not_trap:true ~expect_failure
 
+let test_invalid_accusation_wrong_shard_owner =
+  let expect_failure attestation_level = function
+    | [
+        Environment.Ecoproto_error
+          (Validate_errors.Anonymous.Invalid_accusation_wrong_shard_owner
+            {level; _});
+      ]
+      when Raw_level.to_int32 level = attestation_level ->
+        Lwt_result_syntax.return_unit
+    | errs ->
+        Test.fail
+          ~__LOC__
+          "Error trace:@, %a does not match the expected one"
+          Error_monad.pp_print_trace
+          errs
+  in
+  (* By using [traps_fraction = 1] we are sure that the shard is a trap for the
+     attester. Otherwise the validation may fail with "shard is not trap" error
+     (which is emitted first). *)
+  test_accusation_injection
+    ~wrong_owner:true
+    ~traps_fraction:Q.one
+    ~expect_failure
+
 let tests =
   [
     Tztest.tztest "test valid accusation" `Quick test_accusation_injection;
@@ -376,6 +411,10 @@ let tests =
       "test invalid accusation (shard is not trap)"
       `Quick
       test_invalid_accusation_shard_is_not_trap;
+    Tztest.tztest
+      "test invalid accusation (wrong shard owner)"
+      `Quick
+      test_invalid_accusation_wrong_shard_owner;
   ]
 
 let () =
