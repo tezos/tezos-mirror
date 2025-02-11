@@ -43,6 +43,28 @@ let fedora_package_release_matrix = function
   | Full | Release ->
       [[("RELEASE", ["39"; "42"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
+(* Push .rpm artifacts to storagecloud rpm repository. *)
+let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+    ?(prefix = false) ?dependencies ~variables ?id_tokens ~image ~before_script
+    script : tezos_job =
+  let variables =
+    variables
+    @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
+    @ if prefix then [("PREFIX", "")] else []
+  in
+  job
+    ?rules
+    ?dependencies
+    ~__POS__
+    ~stage
+    ~name
+    ?id_tokens
+    ~image
+    ~before_script
+    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+    ~variables
+    script
+
 (* The entire RPM packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Rockylinux. Returns a triplet, the first element is
    the list of all jobs, the second is the job building fedora packages artifats
