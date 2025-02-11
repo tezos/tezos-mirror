@@ -605,18 +605,6 @@ struct
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
     let open Lwt_syntax in
     let rec loop () =
-      (* The call to [protect] here allows the call to [pop] (responsible
-         for fetching the next request) to be canceled by the use of the
-         [canceler].
-
-         These cancellations cannot affect the processing of ongoing requests.
-         This is due to the limited scope of the argument of [protect]. As a
-         result, ongoing requests are never canceled by this mechanism.
-
-         In the case when the [canceler] is canceled whilst a request is being
-         processed, the processing eventually resolves, at which point a
-         recursive call to this [loop] at which point this call to [protect]
-         fails immediately with [Canceled]. *)
       let* popped = protect_result (fun () -> pop w) in
       match popped with
       | Error exn -> raise exn
@@ -775,9 +763,7 @@ struct
 
   let shutdown w =
     (* The actual cancellation ([Lwt_canceler.cancel w.canceler]) resolves
-       immediately because no hooks are registered on the canceler. However, the
-       worker ([w.worker]) resolves only once the ongoing request has resolved
-       (if any) and some clean-up operations have completed. *)
+       immediately because no hooks are registered on the canceler. *)
     let open Lwt_syntax in
     let* () = Worker_events.(emit triggering_shutdown) () in
     let* () = Error_monad.cancel_with_exceptions w.canceler in
