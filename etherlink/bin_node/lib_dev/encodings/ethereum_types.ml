@@ -115,7 +115,7 @@ let quantity_encoding =
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
-type chain_id = Chain_id of Z.t
+type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
 
 let chain_id_encoding : chain_id Data_encoding.t =
   let open Data_encoding in
