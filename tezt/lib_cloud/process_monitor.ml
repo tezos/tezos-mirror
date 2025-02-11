@@ -10,6 +10,8 @@ type t = {
   mutable monitored_processes : (string * string) list;
 }
 
+let executable = "prometheus-process-exporter"
+
 let encoding =
   let open Data_encoding in
   conv
@@ -32,17 +34,20 @@ let get_port t = t.listening_port
 let reload t run_cmd =
   let processes_names = List.map snd (get_binaries t) in
   let processes = String.concat "," processes_names in
+  let* r = run_cmd ~detach:false "command" ["-v"; executable] |> Process.wait in
+  let () =
+    match r with
+    | WEXITED 0 -> ()
+    | _ -> Test.fail "Cannot find executable: %s" executable
+  in
   Log.warn
     "Restarting prometheus-process-exporter; monitored processes = {%s}"
     processes ;
-  let* _ =
-    run_cmd ~detach:false "pkill" ["-f"; "prometheus-process-exporter"]
-    |> Process.wait
-  in
+  let* _ = run_cmd ~detach:false "pkill" ["-f"; executable] |> Process.wait in
   let* () =
     run_cmd
       ~detach:true
-      "prometheus-process-exporter"
+      executable
       (["-web.listen-address"; Format.asprintf ":%d" t.listening_port]
       @ ["--procnames"; processes])
     |> Process.check
