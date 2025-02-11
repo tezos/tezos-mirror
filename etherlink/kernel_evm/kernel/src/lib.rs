@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::configuration::{fetch_configuration, Configuration};
+use crate::configuration::{fetch_configuration, Configuration, CHAIN_ID};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
@@ -67,10 +67,6 @@ mod tick_model;
 mod upgrade;
 
 extern crate alloc;
-
-/// The chain id will need to be unique when the EVM rollup is deployed in
-/// production.
-pub const CHAIN_ID: u32 = 1337;
 
 /// The configuration for the EVM execution.
 const CONFIG: Config = Config {
