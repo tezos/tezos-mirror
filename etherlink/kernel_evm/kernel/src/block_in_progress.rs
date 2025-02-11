@@ -364,17 +364,17 @@ impl BlockInProgress {
     fn receipts_root(
         &self,
         host: &mut impl Runtime,
-        previous_receipts_root: Vec<u8>,
+        previous_receipts_root: &[u8],
     ) -> anyhow::Result<Vec<u8>> {
         if self.valid_txs.is_empty() {
-            Ok(previous_receipts_root)
+            Ok(previous_receipts_root.to_vec())
         } else {
             for hash in &self.valid_txs {
                 let receipt_path = receipt_path(hash)?;
                 let new_receipt_path = concat(&Self::RECEIPTS, &receipt_path)?;
                 host.store_copy(&receipt_path, &new_receipt_path)?;
             }
-            host.store_write_all(&Self::RECEIPTS_PREVIOUS_ROOT, &previous_receipts_root)?;
+            host.store_write_all(&Self::RECEIPTS_PREVIOUS_ROOT, previous_receipts_root)?;
             let receipts_root = Self::safe_store_get_hash(host, &Self::RECEIPTS)?;
             host.store_delete(&Self::RECEIPTS)?;
             Ok(receipts_root)
@@ -388,10 +388,10 @@ impl BlockInProgress {
     fn transactions_root(
         &self,
         host: &mut impl Runtime,
-        previous_transactions_root: Vec<u8>,
+        previous_transactions_root: &[u8],
     ) -> anyhow::Result<Vec<u8>> {
         if self.valid_txs.is_empty() {
-            Ok(previous_transactions_root)
+            Ok(previous_transactions_root.to_vec())
         } else {
             for hash in &self.valid_txs {
                 let object_path = object_path(hash)?;
@@ -400,7 +400,7 @@ impl BlockInProgress {
             }
             host.store_write_all(
                 &Self::OBJECTS_PREVIOUS_ROOT,
-                &previous_transactions_root,
+                previous_transactions_root,
             )?;
             let objects_root = Self::safe_store_get_hash(host, &Self::OBJECTS)?;
             host.store_delete(&Self::OBJECTS)?;
@@ -413,8 +413,8 @@ impl BlockInProgress {
         self,
         host: &mut Host,
         block_constants: &BlockConstants,
-        previous_receipts_root: Vec<u8>,
-        previous_transactions_root: Vec<u8>,
+        previous_receipts_root: &[u8],
+        previous_transactions_root: &[u8],
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root(host, previous_receipts_root)?;
