@@ -120,7 +120,6 @@ type t = {
   iteration : int ref;
   channel : (unit, unit) Process.Channel.t;
   connect_handler : (message, metadata, metadata) P2p_connect_handler.t;
-  pool : (message, metadata, metadata) Tezos_p2p.P2p_pool.t;
   watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
   trigger : P2p_trigger.t;
   points : P2p_point.Id.t list;
@@ -291,7 +290,6 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               iteration;
               channel;
               connect_handler;
-              pool;
               watcher;
               trigger;
               trusted_points;
