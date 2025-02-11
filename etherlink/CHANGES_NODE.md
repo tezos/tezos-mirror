@@ -1,20 +1,17 @@
 # Changelog
 
-## Unreleased
+## Version 0.17 (2025-02-14)
+
+This release addresses several bugs reported by partners, notably around the
+transaction objects returned by the RPCs, notably for EIP-1559 transactions.
+
+The node will apply one migration to its internal store (version 19), meaning
+it is not possible to downgrade to the previous version.
 
 ### Features
 
 - Adds `full` history mode, where the EVM node keeps all the blocks and transactions,
   but still prunes state data. (!16584)
-
-#### Experimental
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
-
-- Added possibility of configuring multiple l2_chains. The first admissable configuration is their `chain_id` (!16587)
 
 ### Bug Fixes
 
@@ -24,10 +21,11 @@ you start using them, you probably want to use `octez-evm-node check config
   (!16659)
 - Fixes transaction objects returned by the RPCs for non-legacy transactions
   (!16653 !16654 !16703 !16707)
+- Improves call traces of `DELEGATECALL` and `CALLCODE` for Bifrost (requires
+  native execution enabled with `--native-execution-policy rpcs_only` for
+  instance). (!16588)
 
-### Internals
-
-## Version 0.16 (2025-01-06)
+## Version 0.16 (2025-02-06)
 
 This release notably stabilizes the new storage for blocks (which
 significantly reduces the size of data directories), and the `rolling` history
