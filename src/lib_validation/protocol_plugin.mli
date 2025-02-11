@@ -216,6 +216,8 @@ end
     of the agnostic baker binary. *)
 module type AGNOSTIC_BAKER_PLUGIN = sig
   val hash : Protocol_hash.t
+
+  val run_baker_binary : unit -> unit
 end
 
 (** Register a validation plugin for a specific protocol

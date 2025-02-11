@@ -167,6 +167,8 @@ end
 
 module type AGNOSTIC_BAKER_PLUGIN = sig
   val hash : Protocol_hash.t
+
+  val run_baker_binary : unit -> unit
 end
 
 let rpc_table : (module RPC) Protocol_hash.Table.t =
