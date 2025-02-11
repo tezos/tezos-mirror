@@ -7,9 +7,9 @@ mod common;
 
 use common::*;
 use octez_riscv::{
-    machine_state::{main_memory::M64M, DefaultCacheLayouts},
+    machine_state::{DefaultCacheLayouts, main_memory::M64M},
     state_backend::hash,
-    stepper::{pvm::PvmStepper, Stepper, StepperStatus},
+    stepper::{Stepper, StepperStatus, pvm::PvmStepper},
 };
 use rand::Rng;
 use std::ops::Bound;

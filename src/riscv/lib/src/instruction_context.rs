@@ -9,10 +9,10 @@
 
 use crate::{
     machine_state::{
+        MachineCoreState, ProgramCounterUpdate,
         instruction::Args,
         main_memory::MainMemoryLayout,
         registers::{NonZeroXRegister, XValue},
-        MachineCoreState, ProgramCounterUpdate,
     },
     state_backend::ManagerReadWrite,
     traps::Exception,

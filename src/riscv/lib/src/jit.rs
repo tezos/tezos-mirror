@@ -9,17 +9,17 @@ mod builder;
 pub mod state_access;
 
 use self::builder::Builder;
-use self::state_access::register_jsa_symbols;
 use self::state_access::JsaCalls;
 use self::state_access::JsaImports;
-use crate::machine_state::instruction::Instruction;
-use crate::machine_state::main_memory::MainMemoryLayout;
+use self::state_access::register_jsa_symbols;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
+use crate::machine_state::instruction::Instruction;
+use crate::machine_state::main_memory::MainMemoryLayout;
 use crate::traps::EnvironException;
+use cranelift::codegen::CodegenError;
 use cranelift::codegen::ir::types::I64;
 use cranelift::codegen::settings::SetError;
-use cranelift::codegen::CodegenError;
 use cranelift::frontend::FunctionBuilderContext;
 use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
@@ -316,8 +316,8 @@ mod tests {
             // Assert
             assert_eq!(jitted_res, interpreted_res);
             assert_eq!(
-            interpreted_steps, jitted_steps,
-            "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+                interpreted_steps, jitted_steps,
+                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
             );
 
             assert_eq!(interpreted_steps, scenario.len());
@@ -385,8 +385,8 @@ mod tests {
             // Assert
             assert_eq!(jitted_res, interpreted_res);
             assert_eq!(
-            interpreted_steps, jitted_steps,
-            "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+                interpreted_steps, jitted_steps,
+                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
             );
 
             assert_eq!(interpreted_steps, scenario.len());

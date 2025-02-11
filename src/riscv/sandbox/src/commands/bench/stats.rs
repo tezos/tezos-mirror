@@ -212,7 +212,9 @@ impl fmt::Display for BenchStats {
                 let bench_overhead = self.bench_duration_stats.total - instr_duration;
                 let per_instr_overhead = bench_overhead.div_f64(self.total_steps as f64);
                 let instr_duration_f = format!("Instr Duration:        {instr_duration:?}");
-                let overhead_f =       format!("Overhead:              {bench_overhead:?} (total) / {per_instr_overhead:?} (per instr.)");
+                let overhead_f = format!(
+                    "Overhead:              {bench_overhead:?} (total) / {per_instr_overhead:?} (per instr.)"
+                );
 
                 let instr_data = counts
                     .iter()

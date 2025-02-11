@@ -422,8 +422,8 @@ mod tests {
     use super::merkle::MERKLE_LEAF_SIZE;
     use super::*;
     use crate::state_backend::{
-        layout::Array, owned_backend::Owned, Cells, CommitmentLayout, DynArray, DynCells,
-        ProofLayout, Ref,
+        Cells, CommitmentLayout, DynArray, DynCells, ProofLayout, Ref, layout::Array,
+        owned_backend::Owned,
     };
     use proptest::{array, prop_assert_eq, proptest};
     use std::collections::VecDeque;

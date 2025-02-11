@@ -4,17 +4,16 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{main_memory::M64M, mode::Mode, TestCacheLayouts},
+    machine_state::{TestCacheLayouts, main_memory::M64M, mode::Mode},
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{
-        self,
+        self, AllocatedOf, CommitmentLayout, ProofLayout, ProofTree, Ref,
         owned_backend::Owned,
         proof_backend::{
-            proof::MerkleProof, ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion,
+            ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion, proof::MerkleProof,
         },
         verify_backend::Verifier,
-        AllocatedOf, CommitmentLayout, ProofLayout, ProofTree, Ref,
     },
     storage::{self, Hash, Repo},
 };

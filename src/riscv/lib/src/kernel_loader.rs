@@ -1,10 +1,10 @@
 use derive_more::{Error, From};
 use goblin::{
-    elf::header::{ET_DYN, ET_EXEC},
     elf::Elf,
+    elf::header::{ET_DYN, ET_EXEC},
     elf::{
-        program_header::{ProgramHeader, PT_LOAD},
         Header,
+        program_header::{PT_LOAD, ProgramHeader},
     },
 };
 use std::io::{Cursor, Seek, SeekFrom, Write};

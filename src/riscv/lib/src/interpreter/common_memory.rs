@@ -5,9 +5,9 @@
 
 use crate::{
     machine_state::{
+        AccessType, MachineCoreState,
         main_memory::{MainMemoryLayout, OutOfBounds},
         registers::XRegister,
-        AccessType, MachineCoreState,
     },
     state_backend as backend,
     traps::Exception,

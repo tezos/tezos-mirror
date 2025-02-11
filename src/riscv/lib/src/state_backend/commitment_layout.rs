@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    hash::{self, Hash, HashError, HashWriter},
-    proof_backend::merkle::{chunks_to_writer, MERKLE_ARITY, MERKLE_LEAF_SIZE},
     Array, Atom, DynArray, Layout, Many, RefOwnedAlloc,
+    hash::{self, Hash, HashError, HashWriter},
+    proof_backend::merkle::{MERKLE_ARITY, MERKLE_LEAF_SIZE, chunks_to_writer},
 };
 use crate::default::ConstDefault;
 

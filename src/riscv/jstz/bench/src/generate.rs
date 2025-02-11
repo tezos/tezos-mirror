@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use base64::{engine::general_purpose::URL_SAFE, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE};
 use http::{HeaderMap, Method, Uri};
 use jstz_crypto::{keypair_from_passphrase, public_key::PublicKey, secret_key::SecretKey};
 use jstz_proto::context::account::{Address, Nonce, ParsedCode};

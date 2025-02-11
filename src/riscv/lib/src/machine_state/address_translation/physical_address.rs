@@ -91,7 +91,7 @@ pub fn set_ppn_idx(
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::csregisters::{satp::SvLength, CSRRepr};
+    use crate::machine_state::csregisters::{CSRRepr, satp::SvLength};
     use proptest::proptest;
 
     #[test]

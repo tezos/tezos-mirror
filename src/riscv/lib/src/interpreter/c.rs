@@ -30,7 +30,7 @@ mod tests {
     use crate::{
         backend_test, create_state,
         interpreter::i::run_add,
-        machine_state::{main_memory::tests::T1K, registers::nz, MachineCoreStateLayout},
+        machine_state::{MachineCoreStateLayout, main_memory::tests::T1K, registers::nz},
     };
 
     backend_test!(test_add_mv, F, {

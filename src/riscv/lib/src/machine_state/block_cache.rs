@@ -80,16 +80,16 @@
 
 pub mod bcall;
 
+use super::MachineCoreState;
 use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::instruction::Instruction;
 use super::main_memory::MainMemoryLayout;
-use super::MachineCoreState;
-use super::{main_memory::Address, ProgramCounterUpdate};
+use super::{ProgramCounterUpdate, main_memory::Address};
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::parser::instruction::InstrWidth;
 use crate::state_backend::{
-    self, proof_backend, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase,
-    ManagerClone, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+    self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
+    ManagerRead, ManagerReadWrite, ManagerWrite, Ref, proof_backend,
 };
 use crate::traps::{EnvironException, Exception};
 use crate::{cache_utils::FenceCounter, state_backend::FnManager};
@@ -531,11 +531,11 @@ pub struct BlockCache<
 }
 
 impl<
-        BCL: BlockCacheLayout<MainMemoryLayout = ML>,
-        B: Block<ML, M>,
-        ML: MainMemoryLayout,
-        M: ManagerBase,
-    > BlockCache<BCL, B, ML, M>
+    BCL: BlockCacheLayout<MainMemoryLayout = ML>,
+    B: Block<ML, M>,
+    ML: MainMemoryLayout,
+    M: ManagerBase,
+> BlockCache<BCL, B, ML, M>
 {
     /// Bind the block cache to the given allocated state.
     pub fn bind(space: AllocatedOf<BCL, M>) -> Self {
@@ -857,11 +857,11 @@ impl<
 }
 
 impl<
-        BCL: BlockCacheLayout<MainMemoryLayout = ML>,
-        B: Block<ML, M> + Clone,
-        ML: MainMemoryLayout,
-        M: ManagerClone,
-    > Clone for BlockCache<BCL, B, ML, M>
+    BCL: BlockCacheLayout<MainMemoryLayout = ML>,
+    B: Block<ML, M> + Clone,
+    ML: MainMemoryLayout,
+    M: ManagerClone,
+> Clone for BlockCache<BCL, B, ML, M>
 {
     fn clone(&self) -> Self {
         Self {
@@ -894,19 +894,19 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
+            TestCacheLayouts,
             address_translation::PAGE_SIZE,
             block_cache::bcall::Interpreted,
             instruction::{
-                tagged_instruction::{TaggedArgs, TaggedInstruction},
                 Instruction, OpCode,
+                tagged_instruction::{TaggedArgs, TaggedInstruction},
             },
             main_memory::{self, tests::T1K},
             mode::Mode,
             registers::{a1, nz, t0, t1},
-            MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
-            TestCacheLayouts,
         },
-        state_backend::{owned_backend::Owned, CommitmentLayout},
+        state_backend::{CommitmentLayout, owned_backend::Owned},
     };
 
     pub type TestLayout<ML> = Layout<ML, TEST_CACHE_BITS, TEST_CACHE_SIZE>;

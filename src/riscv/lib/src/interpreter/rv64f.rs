@@ -9,16 +9,16 @@
 use super::float::FloatExt;
 use crate::{
     machine_state::{
+        MachineCoreState,
         hart_state::HartState,
         main_memory::MainMemoryLayout,
         registers::{FRegister, FValue, XRegister},
-        MachineCoreState,
     },
     parser::instruction::InstrRoundingMode,
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{ieee::Single, Float, Status, StatusAnd};
+use rustc_apfloat::{Float, Status, StatusAnd, ieee::Single};
 
 impl From<Single> for FValue {
     fn from(f: Single) -> Self {
@@ -557,14 +557,14 @@ mod tests {
         bits::Bits64,
         create_state,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout,
             csregisters::{
-                xstatus::{ExtensionValue, MStatus},
                 CSRegister,
+                xstatus::{ExtensionValue, MStatus},
             },
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
             registers::{fa1, fa4, parse_fregister, parse_xregister, t0},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
@@ -572,7 +572,7 @@ mod tests {
     use arbitrary_int::u5;
     use proptest::prelude::*;
 
-    use rustc_apfloat::{ieee::Double, ieee::Single, Float};
+    use rustc_apfloat::{Float, ieee::Double, ieee::Single};
 
     backend_test!(test_fmv_f, F, {
         proptest!(|(

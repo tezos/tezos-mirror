@@ -9,9 +9,9 @@
 
 use crate::{
     machine_state::{
-        main_memory::MainMemoryLayout,
-        registers::{sp, NonZeroXRegister, XRegister, XRegisters},
         MachineCoreState,
+        main_memory::MainMemoryLayout,
+        registers::{NonZeroXRegister, XRegister, XRegisters, sp},
     },
     state_backend as backend,
     traps::Exception,
@@ -125,15 +125,15 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout,
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
             registers::{a3, a4, nz, t0},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
     use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
-    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
 
     backend_test!(test_caddiw, F, {
         proptest!(|(

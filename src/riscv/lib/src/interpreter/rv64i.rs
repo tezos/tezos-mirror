@@ -8,9 +8,9 @@
 
 use crate::{
     machine_state::{
+        MachineCoreState,
         main_memory::MainMemoryLayout,
         registers::{NonZeroXRegister, XRegister, XRegisters},
-        MachineCoreState,
     },
     state_backend as backend,
     traps::Exception,
@@ -354,10 +354,10 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout,
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
             registers::{a0, a1, a2, a3, a4, nz, t0, t1, t2, t3, t4},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };

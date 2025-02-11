@@ -8,22 +8,22 @@ use crate::state_backend::{ManagerBase, ManagerReadWrite};
 use crate::{
     kernel_loader,
     machine_state::{
-        main_memory::{MainMemoryLayout, M1G},
         CacheLayouts, DefaultCacheLayouts, MachineCoreState, MachineError,
+        main_memory::{M1G, MainMemoryLayout},
     },
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
     state_backend::{
+        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref,
         hash::Hash,
         owned_backend::Owned,
-        proof_backend::{proof::Proof, ProofGen},
+        proof_backend::{ProofGen, proof::Proof},
         verify_backend::Verifier,
-        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref,
     },
     storage::binary,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::ops::Bound;
 use std::sync::Arc;
@@ -370,7 +370,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> Stepper for PvmStepper<'hoo
                         steps: total_steps.saturating_add(steps),
                         success,
                         status,
-                    }
+                    };
                 }
 
                 StepperStatus::Errored {

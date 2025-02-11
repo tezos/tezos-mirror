@@ -7,21 +7,21 @@ mod mstatus;
 mod xip;
 
 use super::{
-    effects::{handle_csr_effect, NoEffect},
-    root::RootCSRegister,
     CSRegisters,
+    effects::{NoEffect, handle_csr_effect},
+    root::RootCSRegister,
 };
 use crate::state_backend::proof_backend::merkle::{AccessInfo, AccessInfoAggregatable};
 use crate::{
     bits::Bits64,
     state_backend::{
+        AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout, FnManager,
+        FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
+        ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref, RefOwnedAlloc, RefProofGenOwnedAlloc,
         hash::{Hash, HashError},
         owned_backend::Owned,
         proof_backend::merkle::MerkleTree,
-        verify_backend, AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout,
-        FnManager, FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead,
-        ManagerReadWrite, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref, RefOwnedAlloc,
-        RefProofGenOwnedAlloc,
+        verify_backend,
     },
     storage::binary,
 };

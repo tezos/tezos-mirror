@@ -6,7 +6,7 @@
 pub mod binary;
 mod chunked_io;
 
-pub use crate::state_backend::hash::{Hash, HashError, DIGEST_SIZE};
+pub use crate::state_backend::hash::{DIGEST_SIZE, Hash, HashError};
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},

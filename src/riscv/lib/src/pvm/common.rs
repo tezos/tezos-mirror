@@ -11,16 +11,15 @@ use crate::{
     },
     pvm::sbi,
     state_backend::{
-        self,
+        self, Atom, Cell,
         proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
-        Atom, Cell,
     },
     traps::EnvironException,
 };
 use std::{
     convert::Infallible,
     fmt,
-    io::{stdout, Write},
+    io::{Write, stdout},
     ops::Bound,
 };
 
@@ -136,10 +135,10 @@ pub struct Pvm<
 }
 
 impl<
-        ML: main_memory::MainMemoryLayout,
-        CL: machine_state::CacheLayouts,
-        M: state_backend::ManagerBase,
-    > Pvm<ML, CL, M>
+    ML: main_memory::MainMemoryLayout,
+    CL: machine_state::CacheLayouts,
+    M: state_backend::ManagerBase,
+> Pvm<ML, CL, M>
 {
     /// Bind the PVM to the given allocated region.
     pub fn bind(space: state_backend::AllocatedOf<PvmLayout<ML, CL>, M>) -> Self {
@@ -345,10 +344,10 @@ impl<
 }
 
 impl<
-        ML: main_memory::MainMemoryLayout,
-        CL: machine_state::CacheLayouts,
-        M: state_backend::ManagerClone,
-    > Clone for Pvm<ML, CL, M>
+    ML: main_memory::MainMemoryLayout,
+    CL: machine_state::CacheLayouts,
+    M: state_backend::ManagerClone,
+> Clone for Pvm<ML, CL, M>
 {
     fn clone(&self) -> Self {
         Self {
@@ -368,13 +367,13 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
+            TestCacheLayouts,
             main_memory::M1M,
             registers::{a0, a1, a2, a3, a6, a7},
-            TestCacheLayouts,
         },
         state_backend::owned_backend::Owned,
     };
-    use rand::{thread_rng, Fill};
+    use rand::{Fill, thread_rng};
     use std::mem;
     use tezos_smart_rollup_constants::riscv::{
         REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT,
@@ -471,12 +470,14 @@ mod tests {
         }
 
         // Data after the buffer should be untouched
-        assert!((BUFFER_LEN..4096)
-            .map(|offset| {
-                let addr = buffer_addr + offset as u64;
-                pvm.machine_state.core.main_memory.read(addr).unwrap()
-            })
-            .all(|b: u8| b == 0));
+        assert!(
+            (BUFFER_LEN..4096)
+                .map(|offset| {
+                    let addr = buffer_addr + offset as u64;
+                    pvm.machine_state.core.main_memory.read(addr).unwrap()
+                })
+                .all(|b: u8| b == 0)
+        );
     }
 
     #[test]

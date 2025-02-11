@@ -8,11 +8,11 @@
 
 use crate::{
     machine_state::{
+        MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
         mode::Mode,
         registers::{NonZeroXRegister, XRegister, XRegisters},
-        MachineCoreState, ProgramCounterUpdate,
     },
     parser::instruction::{FenceSet, InstrWidth},
     state_backend::{self as backend},
@@ -402,17 +402,17 @@ mod tests {
         backend_test, create_state,
         interpreter::i::run_add,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
             csregisters::{
-                xstatus::{MPPValue, MStatus, SPPValue},
                 CSRRepr, CSRegister,
+                xstatus::{MPPValue, MStatus, SPPValue},
             },
             hart_state::{HartState, HartStateLayout},
-            main_memory::{tests::T1K, Address},
+            main_memory::{Address, tests::T1K},
             mode::Mode,
             registers::{
-                a0, a1, a2, a3, a4, fa0, nz, t0, t1, t2, t3, XRegisters, XRegistersLayout,
+                XRegisters, XRegistersLayout, a0, a1, a2, a3, a4, fa0, nz, t0, t1, t2, t3,
             },
-            MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
         },
         parser::instruction::{FenceSet, InstrWidth},
         traps::Exception,

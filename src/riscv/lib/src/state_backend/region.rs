@@ -4,12 +4,12 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    proof_backend::{
-        merkle::{AccessInfo, AccessInfoAggregatable},
-        ProofGen,
-    },
     Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
     ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
+    proof_backend::{
+        ProofGen,
+        merkle::{AccessInfo, AccessInfoAggregatable},
+    },
 };
 use std::borrow::Borrow;
 
@@ -573,8 +573,8 @@ pub(crate) mod tests {
         backend_test,
         default::ConstDefault,
         state_backend::{
-            layout::{Atom, Layout},
             Array, DynCells, Elem, FnManagerIdent, ManagerAlloc, ManagerBase,
+            layout::{Atom, Layout},
         },
     };
     use serde::ser::SerializeTuple;
@@ -742,27 +742,21 @@ pub(crate) mod tests {
         assert_eq!(buffer, [37, 13]);
 
         // Writing to the entire region must convert properly to stored format.
-        region.write_all::<Flipper>(
-            0,
-            &[
-                Flipper { a: 11, b: 22 },
-                Flipper { a: 13, b: 24 },
-                Flipper { a: 15, b: 26 },
-                Flipper { a: 17, b: 28 },
-            ],
-        );
+        region.write_all::<Flipper>(0, &[
+            Flipper { a: 11, b: 22 },
+            Flipper { a: 13, b: 24 },
+            Flipper { a: 15, b: 26 },
+            Flipper { a: 17, b: 28 },
+        ]);
 
         let mut buff = [Flipper::default(); 4];
         region.read_all::<Flipper>(0, &mut buff);
-        assert_eq!(
-            buff,
-            [
-                Flipper { a: 11, b: 22 },
-                Flipper { a: 13, b: 24 },
-                Flipper { a: 15, b: 26 },
-                Flipper { a: 17, b: 28 },
-            ]
-        );
+        assert_eq!(buff, [
+            Flipper { a: 11, b: 22 },
+            Flipper { a: 13, b: 24 },
+            Flipper { a: 15, b: 26 },
+            Flipper { a: 17, b: 28 },
+        ]);
 
         let buffer = region.read::<[u8; 8]>(0);
         assert_eq!(buffer, [22, 11, 24, 13, 26, 15, 28, 17]);
@@ -795,15 +789,12 @@ pub(crate) mod tests {
             Flipper { a: 17, b: 28 },
         ]);
 
-        assert_eq!(
-            region.read_all(),
-            [
-                Flipper { a: 11, b: 22 },
-                Flipper { a: 13, b: 24 },
-                Flipper { a: 15, b: 26 },
-                Flipper { a: 17, b: 28 },
-            ]
-        );
+        assert_eq!(region.read_all(), [
+            Flipper { a: 11, b: 22 },
+            Flipper { a: 13, b: 24 },
+            Flipper { a: 15, b: 26 },
+            Flipper { a: 17, b: 28 },
+        ]);
 
         let buffer = bincode::serialize(&region.struct_ref::<FnManagerIdent>()).unwrap();
         assert_eq!(buffer[..8], [22, 11, 24, 13, 26, 15, 28, 17]);

@@ -16,14 +16,14 @@ mod constructors;
 pub mod tagged_instruction;
 
 use super::{
+    MachineCoreState, ProgramCounterUpdate,
     csregisters::CSRegister,
     main_memory::MainMemoryLayout,
     registers::{FRegister, NonZeroXRegister, XRegister},
-    MachineCoreState, ProgramCounterUpdate,
 };
 use crate::{
     default::ConstDefault,
-    instruction_context::{IcbLoweringFn, ICB},
+    instruction_context::{ICB, IcbLoweringFn},
     interpreter::{c, i},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
@@ -39,7 +39,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Formatter};
-use tagged_instruction::{opcode_to_argsshape, ArgsShape, TaggedInstruction};
+use tagged_instruction::{ArgsShape, TaggedInstruction, opcode_to_argsshape};
 
 /// An instruction formed of an opcode and flat arguments.
 ///

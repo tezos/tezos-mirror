@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use self::utils::{
-    prepend_cell, tableify_bench_stats, thousand_format, vec_cell_factory_ref, NamedBenchInstrStats,
+    NamedBenchInstrStats, prepend_cell, tableify_bench_stats, thousand_format, vec_cell_factory_ref,
 };
 use crate::{
     cli::{SortInstr, SortRuns, TableSortArgs},
@@ -11,8 +11,8 @@ use crate::{
     table::utils::format_opt_duration,
 };
 use comfy_table::{
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Attribute, Cell, CellAlignment, Color,
-    ContentArrangement, Table,
+    Attribute, Cell, CellAlignment, Color, ContentArrangement, Table,
+    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL,
 };
 use itertools::Itertools;
 
@@ -97,7 +97,9 @@ fn section_interpreter_stats(table: &mut Table, data: &[(&BenchStats, &String)])
 fn section_instruction_stats(table: &mut Table, data: &[&[&NamedBenchInstrStats]]) {
     table.add_row(Vec::<Cell>::new());
 
-    table.add_row(vec![Cell::new("Distinct Instructions").fg(Color::DarkGreen)]);
+    table.add_row(vec![
+        Cell::new("Distinct Instructions").fg(Color::DarkGreen),
+    ]);
 
     for instr_data in data {
         // instruction name + props

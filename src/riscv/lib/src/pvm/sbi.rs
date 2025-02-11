@@ -5,12 +5,12 @@
 // When the Supervisor is enabled, most of this module is not used.
 #![cfg_attr(feature = "supervisor", allow(dead_code))]
 
-use super::{reveals::RevealRequest, PvmHooks, PvmStatus};
+use super::{PvmHooks, PvmStatus, reveals::RevealRequest};
 use crate::{
     machine_state::{
-        main_memory::MainMemoryLayout,
-        registers::{a0, a1, a2, a3, a6, a7, XValue},
         AccessType, CacheLayouts, MachineState,
+        main_memory::MainMemoryLayout,
+        registers::{XValue, a0, a1, a2, a3, a6, a7},
     },
     parser::instruction::InstrUncacheable,
     state_backend::{CellRead, CellReadWrite, CellWrite, ManagerReadWrite},
@@ -21,11 +21,11 @@ use std::cmp::min;
 use tezos_smart_rollup_constants::{
     core::MAX_INPUT_MESSAGE_SIZE,
     riscv::{
-        SbiError, REVEAL_DATA_MAX_SIZE, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
+        REVEAL_DATA_MAX_SIZE, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
         SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_SRST,
         SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN,
         SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL,
-        SBI_TEZOS_REVEAL,
+        SBI_TEZOS_REVEAL, SbiError,
     },
 };
 

@@ -8,11 +8,11 @@ mod pointer_apply;
 
 use crate::{
     pvm::{
-        node_pvm::{NodePvm, PvmStorage, PvmStorageError},
         PvmHooks, PvmStatus,
+        node_pvm::{NodePvm, PvmStorage, PvmStorageError},
     },
     state_backend::{
-        hash::Hash, owned_backend::Owned, proof_backend::proof::serialise_proof, ManagerReadWrite,
+        ManagerReadWrite, hash::Hash, owned_backend::Owned, proof_backend::proof::serialise_proof,
     },
 };
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 use move_semantics::{ImmutableState, MutableState};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
-use pointer_apply::{apply_imm, apply_mut, ApplyReadOnly};
+use pointer_apply::{ApplyReadOnly, apply_imm, apply_mut};
 use sha2::{Digest, Sha256};
 use std::{fs, str};
 
@@ -369,7 +369,13 @@ pub fn octez_riscv_install_boot_sector(
                     let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
                     return pvm.install_boot_sector(HERMIT_LOADER, &kernel);
                 }
-                ["kernel", kernel_path, kernel_checksum, loader_path, loader_checksum] => {
+                [
+                    "kernel",
+                    kernel_path,
+                    kernel_checksum,
+                    loader_path,
+                    loader_checksum,
+                ] => {
                     let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
                     let loader = read_boot_sector_binary(loader_path, loader_checksum);
                     return pvm.install_boot_sector(&loader, &kernel);

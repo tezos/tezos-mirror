@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
-    machine_state::{main_memory::M64M, DefaultCacheLayouts},
+    machine_state::{DefaultCacheLayouts, main_memory::M64M},
     pvm::PvmHooks,
-    stepper::{pvm::PvmStepper, Stepper, StepperStatus},
+    stepper::{Stepper, StepperStatus, pvm::PvmStepper},
 };
 use std::{fs, io::Write, ops::Bound};
 use tezos_smart_rollup_utils::inbox::InboxBuilder;

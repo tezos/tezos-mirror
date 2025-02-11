@@ -8,10 +8,10 @@
 pub mod instruction;
 
 use crate::bits::u16;
-use crate::machine_state::registers::{x0, NonZeroXRegister};
+use crate::machine_state::registers::{NonZeroXRegister, x0};
 use crate::machine_state::{
     csregisters::CSRegister,
-    registers::{parse_fregister, parse_xregister, FRegister, XRegister},
+    registers::{FRegister, XRegister, parse_fregister, parse_xregister},
 };
 use arbitrary_int::{u3, u5};
 use core::ops::Range;
@@ -697,7 +697,7 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
                     return Instr::Uncacheable(SFenceVma {
                         vaddr: rs1(instr),
                         asid: rs2(instr),
-                    })
+                    });
                 }
                 F7_8 => match (rs1_bits(instr), rs2_bits(instr)) {
                     (RS1_0, RS2_2) => return Instr::Uncacheable(Sret),
@@ -1404,11 +1404,11 @@ mod tests {
     use std::collections::HashMap;
 
     use super::{
+        XRegisterParsed::*,
         instruction::{
             CsrArgs, Instr, InstrCacheable::*, NonZeroRdITypeArgs, SBTypeArgs, UJTypeArgs,
         },
         parse_block,
-        XRegisterParsed::*,
     };
     use crate::{
         machine_state::{
@@ -1416,9 +1416,9 @@ mod tests {
             registers::{NonZeroXRegister, XRegister::*},
         },
         parser::{
+            NonZeroRdUJTypeArgs, SplitITypeArgs,
             instruction::{CIBNZTypeArgs, CIBTypeArgs, InstrUncacheable},
-            parse_compressed_instruction, parse_compressed_instruction_inner, NonZeroRdUJTypeArgs,
-            SplitITypeArgs,
+            parse_compressed_instruction, parse_compressed_instruction_inner,
         },
     };
 
